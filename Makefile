@@ -1,6 +1,5 @@
 # .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
-RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/docker-compose-run.sh)
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
@@ -41,7 +40,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= docker.pkg.github.com/timberio/vector/environment
+export ENVIRONMENT_UPSTREAM ?= timberio/ci_image
 # Override to disable building the container, having it pull from the Github packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from Github Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -172,9 +171,6 @@ build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
 
-.PHONY: build-all
-build-all: build-x86_64-unknown-linux-musl build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
-
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
@@ -184,12 +180,12 @@ build-aarch64-unknown-linux-gnu: target/aarch64-unknown-linux-gnu/release/vector
 	@echo "Output to ${<}"
 
 .PHONY: build-x86_64-unknown-linux-musl
-build-x86_64-unknown-linux-musl: ## Build static binary in release mode for the x86_64 architecture
-	$(RUN) build-x86_64-unknown-linux-musl
+build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 .PHONY: build-aarch64-unknown-linux-musl
-build-aarch64-unknown-linux-musl: load-qemu-binfmt ## Build static binary in release mode for the aarch64 architecture
-	$(RUN) build-aarch64-unknown-linux-musl
+build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
 
 ##@ Cross Compiling
 .PHONY: cross-enable
@@ -208,6 +204,7 @@ cross-%: export TRIPLE ?=$(subst ${SPACE},-,$(wordlist 2,99,${PAIR}))
 cross-%: export PROFILE ?= release
 cross-%: export RUSTFLAGS += -C link-arg=-s
 cross-%: cargo-install-cross
+	$(MAKE) -k cross-image-${TRIPLE}
 	cross ${COMMAND} \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -219,6 +216,7 @@ target/%/vector: export TRIPLE ?=$(word 1,${PAIR})
 target/%/vector: export PROFILE ?=$(word 2,${PAIR})
 target/%/vector: export RUSTFLAGS += -C link-arg=-s
 target/%/vector: cargo-install-cross CARGO_HANDLES_FRESHNESS
+	$(MAKE) -k cross-image-${TRIPLE}
 	cross build \
 		$(if $(findstring release,$(PROFILE)),--release,) \
 		--target ${TRIPLE} \
@@ -249,6 +247,14 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 		--directory target/scratch/ \
 		./vector-${TRIPLE}
 	rm -rf target/scratch/
+
+.PHONY: cross-image-%
+cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
+cross-image-%:
+	$(CONTAINER_TOOL) build \
+		--tag vector-cross-env:${TRIPLE} \
+		--file scripts/cross/${TRIPLE}.dockerfile \
+		scripts/cross
 
 ##@ Testing (Supports `ENVIRONMENT=true`)
 
@@ -490,22 +496,30 @@ endif
 .PHONY: start-integration-influxdb
 start-integration-influxdb:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-influxdb -p 8086:8086 -p 9999:9999
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-influxdb -p 8086:8086 -p 8087:8087 -p 9999:9999
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1_tls \
+	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 \
+	 -e INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/localhost.crt -e INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/localhost.key \
+	 -v $(PWD)/tests/data:/etc/ssl:ro influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v2 \
 	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-rc influxd --reporting-disabled --http-bind-address=:9999
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-influxdb
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 8086:8086 --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 8087:8087 --name vector_influxdb_v1_tls \
+	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 \
+	 -e INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/localhost.crt -e INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/localhost.key \
+	 -v $(PWD)/tests/data:/etc/ssl:ro influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 9999:9999 --name vector_influxdb_v2 \
 	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-rc influxd --reporting-disabled --http-bind-address=:9999
 endif
 
 .PHONY: stop-integration-influxdb
 stop-integration-influxdb:
-	$(CONTAINER_TOOL) rm --force vector_influxdb_v1 vector_influxdb_v2 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_influxdb_v1 vector_influxdb_v1_tls vector_influxdb_v2 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-influxdb 2>/dev/null; true
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-influxdb 2>/dev/null; true
@@ -520,7 +534,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-influxdb
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib integration_tests:: --  ::influxdb --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-influxdb
 endif
@@ -740,7 +754,8 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-markdown check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts check-kubernetes-yaml
+check-all: check-scripts
+check-all: check-helm-lint check-helm-dependencies check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -778,9 +793,13 @@ check-examples: ## Check that the config/examples files are valid
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
 
-.PHONY: check-helm
-check-helm: ## Check that the Helm Chart passes helm lint
-	${MAYBE_ENVIRONMENT_EXEC} helm lint distribution/helm/vector
+.PHONY: check-helm-lint
+check-helm-lint: ## Check that Helm charts pass helm lint
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-helm-lint.sh
+
+.PHONY: check-helm-dependencies
+check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
 
 .PHONY: check-kubernetes-yaml
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
@@ -792,8 +811,8 @@ check-internal-events: ## Check that internal events satisfy patterns set in htt
 ##@ Packaging
 
 # archives
-.PHONY: package
 target/artifacts/vector-%.tar.gz: export TRIPLE :=$(@:target/artifacts/vector-%.tar.gz=%)
+target/artifacts/vector-%.tar.gz: override PROFILE =release
 target/artifacts/vector-%.tar.gz: target/%/release/vector.tar.gz
 	@echo "Built to ${<}, relocating to ${@}"
 	@mkdir -p target/artifacts/
@@ -812,44 +831,40 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
 .PHONY: package-x86_64-unknown-linux-gnu
-package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive of the x86_64-unknown-linux-gnu triple.
+package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 .PHONY: package-x86_64-unknown-linux-musl
-package-x86_64-unknown-linux-musl: build-x86_64-unknown-linux-musl ## Build the x86_64 musl archive
-	$(RUN) package-x86_64-unknown-linux-musl
+package-x86_64-unknown-linux-musl: target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-musl` triple.
+	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-musl
-package-aarch64-unknown-linux-musl: build-aarch64-unknown-linux-musl ## Build an archive of the aarch64-unknown-linux-gnu triple.
-	$(RUN) package-aarch64-unknown-linux-musl
+package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-musl` triple.
+	@echo "Output to ${<}."
 
 .PHONY: package-aarch64-unknown-linux-gnu
-package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build the aarch64 archive
+package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
 # debs
 
-.PHONY: package-deb
-package-deb: ## Build the deb package
-	$(RUN) package-deb
-
 .PHONY: package-deb-x86_64
 package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
-	$(RUN) package-deb-x86_64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
-	$(RUN) package-deb-aarch64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
 # rpms
 
 .PHONY: package-rpm-x86_64
 package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(RUN) package-rpm-x86_64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
-	$(RUN) package-rpm-aarch64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
 
 ##@ Releasing
 
@@ -896,59 +911,6 @@ release-helm: ## Package and release Helm Chart
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
-##@ Verifying
-
-.PHONY: verify
-verify: verify-rpm verify-deb ## Default target, verify all packages
-
-.PHONY: verify-rpm
-verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7 ## Verify all rpm packages
-
-.PHONY: verify-rpm-amazonlinux-1
-verify-rpm-amazonlinux-1: package-rpm-x86_64 ## Verify the rpm package on Amazon Linux 1
-	$(RUN) verify-rpm-amazonlinux-1
-
-.PHONY: verify-rpm-amazonlinux-2
-verify-rpm-amazonlinux-2: package-rpm-x86_64 ## Verify the rpm package on Amazon Linux 2
-	$(RUN) verify-rpm-amazonlinux-2
-
-.PHONY: verify-rpm-centos-7
-verify-rpm-centos-7: package-rpm-x86_64 ## Verify the rpm package on CentOS 7
-	$(RUN) verify-rpm-centos-7
-
-.PHONY: verify-deb
-verify-deb: ## Verify all deb packages
-verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10
-verify-deb: verify-deb-artifact-on-ubuntu-14-04 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-20-04
-
-.PHONY: verify-deb-artifact-on-deb-8
-verify-deb-artifact-on-deb-8: package-deb-x86_64 ## Verify the deb package on Debian 8
-	$(RUN) verify-deb-artifact-on-deb-8
-
-.PHONY: verify-deb-artifact-on-deb-9
-verify-deb-artifact-on-deb-9: package-deb-x86_64 ## Verify the deb package on Debian 9
-	$(RUN) verify-deb-artifact-on-deb-9
-
-.PHONY: verify-deb-artifact-on-deb-10
-verify-deb-artifact-on-deb-10: package-deb-x86_64 ## Verify the deb package on Debian 10
-	$(RUN) verify-deb-artifact-on-deb-10
-
-.PHONY: verify-deb-artifact-on-ubuntu-14-04
-verify-deb-artifact-on-ubuntu-14-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 14.04
-	$(RUN) verify-deb-artifact-on-ubuntu-14-04
-
-.PHONY: verify-deb-artifact-on-ubuntu-16-04
-verify-deb-artifact-on-ubuntu-16-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 16.04
-	$(RUN) verify-deb-artifact-on-ubuntu-16-04
-
-.PHONY: verify-deb-artifact-on-ubuntu-18-04
-verify-deb-artifact-on-ubuntu-18-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 18.04
-	$(RUN) verify-deb-artifact-on-ubuntu-18-04
-
-.PHONY: verify-deb-artifact-on-ubuntu-20-04
-verify-deb-artifact-on-ubuntu-20-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 20.04
-	$(RUN) verify-deb-artifact-on-ubuntu-20-04
-
 ##@ Utility
 
 .PHONY: build-ci-docker-images
@@ -963,14 +925,6 @@ clean: environment-clean ## Clean everything
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
-
-.PHONY: init-target-dir
-init-target-dir: ## Create target directory owned by the current user
-	$(RUN) init-target-dir
-
-.PHONY: load-qemu-binfmt
-load-qemu-binfmt: ## Load `binfmt-misc` kernel module which required to use `qemu-user`
-	$(RUN) load-qemu-binfmt
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
@@ -993,10 +947,6 @@ ci-sweep: ## Sweep up the CI to try to get more disk space.
 	df -h
 endif
 
-.PHONY: target-graph
-target-graph: ## Display dependencies between targets in this Makefile
-	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
-
 .PHONY: version
 version: ## Get the current Vector version
 	@scripts/version.sh
@@ -1004,6 +954,10 @@ version: ## Get the current Vector version
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
+
+.PHONY: update-helm-dependencies
+update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
 
 .PHONY: update-kubernetes-yaml
 update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config
