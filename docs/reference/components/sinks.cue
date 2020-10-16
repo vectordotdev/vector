@@ -182,11 +182,13 @@ components: sinks: [Name=string]: {
 		}
 
 		if sinks[Name].features.send != _|_ {
-			healthcheck: {
-				common:      true
-				description: "Enables/disables the sink healthcheck upon Vector boot."
-				required:    false
-				type: bool: default: true
+			if sinks[Name].features.healthcheck.enabled {
+				healthcheck: {
+					common:      true
+					description: "Enables/disables the sink healthcheck upon Vector boot."
+					required:    false
+					type: bool: default: true
+				}
 			}
 		}
 
@@ -281,13 +283,35 @@ components: sinks: [Name=string]: {
 	how_it_works: {
 		if !sinks[Name].features.healthcheck.enabled {
 			healthchecks: {
-				title: "Healthchecks"
+				title: "Health Checks"
 				body: """
 					Health checks ensure that the downstream service is
 					accessible and ready to accept data. This check is performed
-					upon sink initialization. You can disable this check by
-					setting the `healthcheck` option to `false`.
+					upon sink initialization. If the health check fails an error
+					will be logged and Vector will proceed to start.
 					"""
+				sub_sections: [
+					{
+						title: "Require health checks"
+						body: """
+								If you'd like to exit immediately upon a health
+								check failure, you can pass the
+								`--require-healthy` flag:
+
+								```bash
+								vector --config /etc/vector/vector.toml --require-healthy
+								```
+								"""
+					},
+					{
+						title: "Disable health checks"
+						body: """
+								If you'd like to disable health checks for this
+								sink you can set the `healthcheck` option to
+								`false`.
+								"""
+					},
+				]
 			}
 		}
 	}
