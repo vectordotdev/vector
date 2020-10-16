@@ -41,4 +41,29 @@ components: transforms: filter: {
 		logs:    true
 		metrics: null
 	}
+
+	examples: [
+		{
+			title: "Drop debug logs"
+			configuration: {
+				condition: "level.neq": "debug"
+			}
+			input: [
+				{log: {
+					level:   "debug"
+					message: "I'm a noisy debug log"
+				}},
+				{log: {
+					level:   "info"
+					message: "I'm a normal info log"
+				}},
+			]
+			output: [
+				{log: {
+					level:   "info"
+					message: "I'm a normal info log"
+				}},
+			]
+		},
+	]
 }
