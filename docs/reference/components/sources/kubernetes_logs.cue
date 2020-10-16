@@ -126,6 +126,30 @@ components: sources: kubernetes_logs: {
 				default: "${VECTOR_SELF_NODE_NAME}"
 			}
 		}
+		extra_field_selector: {
+			common: false
+			description: """
+				Specifies the field selector to filter `Pod`s with, to be used in addition to the built-in `Node` filter.
+				The name of the Kubernetes `Node` this Vector instance runs at. Configured to use an env var by default, to be evaluated to a value provided by Kubernetes at Pod deploy time.
+				"""
+			required: false
+			type: array: {
+				default: []
+				items: type: string: examples: ["metadata.name!=pod-name-to-exclude"]
+			}
+		}
+		extra_label_selector: {
+			common: false
+			description: """
+				Specifies the label selector to filter `Pod`s with, to be used in
+				addition to the built-in `vector.dev/exclude` filter.
+				"""
+			required: false
+			type: array: {
+				default: []
+				items: type: string: examples: ["my_custom_label!=my_value"]
+			}
+		}
 	}
 
 	output: logs: line: {
