@@ -2,7 +2,7 @@ package metadata
 
 components: sources: journald: {
 	title:       "Journald"
-	description: "[Journald][urls.journald] is a utility for accessing log data across a variety of system services. It was introduced with [Systemd][urls.systemd] to help system administrators collect, access, and route log data."
+	description: "[Journald](\(urls.journald)) is a utility for accessing log data across a variety of system services. It was introduced with [Systemd](\(urls.systemd)) to help system administrators collect, access, and route log data."
 
 	classes: {
 		commonly_used: true
@@ -130,11 +130,11 @@ components: sources: journald: {
 		{
 			title: "Sample Output"
 			configuration: {}
-			input: #"""
+			input: """
 				```text
 				2019-07-26 20:30:27 reply from 192.168.1.2: offset -0.001791 delay 0.000176, next query 1500s
 				```
-				"""#
+				"""
 			output: [{
 				log: {
 					timestamp:                _values.current_timestamp

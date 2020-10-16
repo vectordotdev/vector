@@ -16,7 +16,10 @@ components: sinks: vector: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: enabled: false
 			tls: {
 				enabled:                true

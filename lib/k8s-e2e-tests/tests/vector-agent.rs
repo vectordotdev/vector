@@ -612,6 +612,184 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// This test validates that vector-agent properly filters out the logs by the
+/// custom selectors, based on k8s API `Pod` labels and annotations.
+#[tokio::test]
+async fn custom_selectors() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    const CONFIG: &str = r#"
+kubernetesLogsSource:
+  rawConfig: |
+    extra_label_selector = "my_custom_negative_label_selector!=my_val"
+    extra_field_selector = "metadata.name!=test-pod-excluded-by-name"
+"#;
+
+    let vector = framework
+        .vector(
+            "test-vector",
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig {
+                custom_helm_values: &format!("{}\n{}", CONFIG, HELM_VALUES_STDOUT_SINK),
+                ..Default::default()
+            },
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+
+    let label_sets = vec![
+        ("test-pod-excluded-1", vec![("vector.dev/exclude", "true")]),
+        (
+            "test-pod-excluded-2",
+            vec![("my_custom_negative_label_selector", "my_val")],
+        ),
+        ("test-pod-excluded-by-name", vec![]),
+    ];
+    let mut excluded_test_pods = Vec::new();
+    let mut excluded_test_pod_names = Vec::new();
+    for (name, label_set) in label_sets {
+        excluded_test_pods.push(
+            framework
+                .test_pod(test_pod::Config::from_pod(&make_test_pod(
+                    "test-vector-test-pod",
+                    name,
+                    "echo EXCLUDED_MARKER",
+                    label_set,
+                ))?)
+                .await?,
+        );
+        excluded_test_pod_names.push(name);
+    }
+    for name in excluded_test_pod_names {
+        let name = format!("pods/{}", name);
+        framework
+            .wait(
+                "test-vector-test-pod",
+                vec![name.as_ref()],
+                WaitFor::Condition("initialized"),
+                vec!["--timeout=60s"],
+            )
+            .await?;
+    }
+
+    let control_test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod-control",
+            "echo CONTROL_MARKER",
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod-control"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the log lines until the reasonable amount of time passes for us
+    // to be confident that vector should've picked up the excluded message
+    // if it wasn't filtering it.
+    let mut got_control_marker = false;
+    let mut lines_till_we_give_up: usize = 10000;
+    let (stop_tx, mut stop_rx) = futures::channel::mpsc::channel(0);
+    loop {
+        let line = tokio::select! {
+            result = stop_rx.next() => {
+                result.unwrap();
+                log_reader.kill()?;
+                continue;
+            }
+            line = log_reader.read_line() => line,
+        };
+        let line = match line {
+            Some(line) => line,
+            None => break,
+        };
+        println!("Got line: {:?}", line);
+
+        lines_till_we_give_up -= 1;
+        if lines_till_we_give_up <= 0 {
+            println!("Giving up");
+            log_reader.kill()?;
+            break;
+        }
+
+        if !line.starts_with("{") {
+            // This isn't a json, must be an entry from Vector's own log stream.
+            continue;
+        }
+
+        let val = parse_json(&line)?;
+
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            // A log from something other than our test pod, pretend we don't
+            // see it.
+            continue;
+        }
+
+        // Ensure we got the log event from the control pod.
+        assert_eq!(val["kubernetes"]["pod_name"], "test-pod-control");
+
+        // Ensure the test sanity by validating that we got the control marker.
+        // If we get an excluded marker here - it's an error.
+        assert_eq!(val["message"], "CONTROL_MARKER");
+
+        if got_control_marker {
+            // We've already seen one control marker! This is not good, we only
+            // emitted one.
+            panic!("Control marker seen more than once");
+        }
+
+        // Remember that we've seen a control marker.
+        got_control_marker = true;
+
+        // Request termination in a while.
+        let mut stop_tx = stop_tx.clone();
+        tokio::spawn(async move {
+            // Wait for two minutes - a reasonable time for vector internals to
+            // pick up new `Pod` and collect events from them in idle load.
+            // Here, we're assuming that if the `Pod` that was supposed to be
+            // ignored was in fact collected (meaning something's wrong with
+            // the exclusion logic), we'd see it's data within this time frame.
+            // It's not enough to just wait for `Pod` complete, we should still
+            // apply a reasonably big timeout before we stop waiting for the
+            // logs to appear to have high confidence that Vector has enough
+            // time to pick them up and spit them out.
+            let duration = std::time::Duration::from_secs(120);
+            println!("Starting stop timer, due in {} seconds", duration.as_secs());
+            tokio::time::delay_for(duration).await;
+            println!("Stop timer complete");
+            stop_tx.send(()).await.unwrap();
+        });
+    }
+
+    // Ensure log reader exited.
+    log_reader.wait().await.expect("log reader wait failed");
+
+    assert!(got_control_marker);
+
+    drop(excluded_test_pods);
+    drop(control_test_pod);
+    drop(test_namespace);
+    drop(vector);
+    Ok(())
+}
+
 /// This test validates that vector-agent properly collects logs from multiple
 /// `Namespace`s and `Pod`s.
 #[tokio::test]

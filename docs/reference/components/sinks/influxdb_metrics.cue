@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: influxdb_metrics: {
 	title:       "InfluxDB Metrics"
-	description: "[InfluxDB][urls.influxdb] is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
+	description: "[InfluxDB](\(urls.influxdb)) is an open-source time series database developed by InfluxData. It is written in Go and optimized for fast, high-availability storage and retrieval of time series data in fields such as operations monitoring, application metrics, Internet of Things sensor data, and real-time analytics."
 
 	classes: {
 		commonly_used: false
@@ -24,7 +24,10 @@ components: sinks: influxdb_metrics: {
 				timeout_secs: 1
 			}
 			compression: enabled: false
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: {
 				enabled:                    true
 				in_flight_limit:            5

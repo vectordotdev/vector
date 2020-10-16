@@ -16,10 +16,13 @@ components: sinks: console: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: codec: {
+			encoding: {
 				enabled: true
-				default: null
-				enum: ["json", "text"]
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
 			}
 			request: enabled: false
 			tls: enabled:     false
@@ -52,14 +55,14 @@ components: sinks: console: {
 	configuration: {
 		target: {
 			common:      true
-			description: "The [standard stream][urls.standard_streams] to write to."
+			description: "The [standard stream](\(urls.standard_streams)) to write to."
 			required:    false
 			warnings: []
 			type: string: {
 				default: "stdout"
 				enum: {
-					stdout: "Output will be written to [STDOUT][urls.stdout]"
-					stderr: "Output will be written to [STDERR][urls.stderr]"
+					stdout: "Output will be written to [STDOUT](\(urls.stdout))"
+					stderr: "Output will be written to [STDERR](\(urls.stderr))"
 				}
 			}
 		}

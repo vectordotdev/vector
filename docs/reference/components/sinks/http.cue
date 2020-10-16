@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: http: {
 	title:       "HTTP"
-	description: "Batches log events to a generic [HTTP][urls.http] endpoint."
+	description: "Batches log events to a generic [HTTP](\(urls.http)) endpoint."
 
 	classes: {
 		commonly_used: true
@@ -29,10 +29,13 @@ components: sinks: http: {
 				algorithms: ["none", "gzip"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
-			encoding: codec: {
+			encoding: {
 				enabled: true
-				default: null
-				enum: ["json", "ndjson", "text"]
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "ndjson", "text"]
+				}
 			}
 			request: {
 				enabled:                    true
@@ -105,7 +108,7 @@ components: sinks: http: {
 						warnings: []
 						type: string: {
 							enum: {
-								basic:  "The [basic authentication strategy][urls.basic_auth]."
+								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
 						}
@@ -151,6 +154,6 @@ components: sinks: http: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

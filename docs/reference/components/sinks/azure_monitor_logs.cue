@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: azure_monitor_logs: {
 	title:       "Azure Monitor Logs"
-	description: "[Azure Monitor][urls.azure_monitor] is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
+	description: "[Azure Monitor](\(urls.azure_monitor)) is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
 
 	classes: {
 		commonly_used: false
@@ -24,7 +24,10 @@ components: sinks: azure_monitor_logs: {
 				timeout_secs: 1
 			}
 			compression: enabled: false
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: enabled: false
 			tls: {
 				enabled:                true
@@ -118,6 +121,6 @@ components: sinks: azure_monitor_logs: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }
