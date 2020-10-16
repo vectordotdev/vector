@@ -53,11 +53,7 @@ components: sources: kafka: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			"""
-				[Kafka][urls.kafka] version `>= 0.8` is required.
-				""",
-		]
+		requirements: []
 		warnings: []
 		notices: []
 	}
