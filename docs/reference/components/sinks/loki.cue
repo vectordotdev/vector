@@ -118,7 +118,13 @@ components: sinks: loki: {
 			required:    true
 			warnings: []
 			type: object: {
-				examples: [{"forwarder": "vector"}, {"event": "{{ event_field }}"}, {"key": "value"}]
+				examples: [
+					{
+						"forwarder": "vector"
+						"event":     "{{ event_field }}"
+						"key":       "value"
+					},
+				]
 				options: {}
 			}
 		}
