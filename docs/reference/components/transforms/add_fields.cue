@@ -43,7 +43,7 @@ components: transforms: add_fields: {
 						int_field:       1
 						float_field:     1.2
 						bool_field:      true
-						timestamp_field: "1979-05-27 00:32:00 -0700"
+						timestamp_field: "1979-05-27T00:32:00-0700"
 						parent: child_field: "child_value"
 						list_field: ["first", "second", "third"]
 					},
