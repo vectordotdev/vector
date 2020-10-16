@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: concat: {
-	title:             "Concat"
-	short_description: "Accepts log events and allows you to concat (substrings) of other fields to a new one."
+	title: "Concat"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {
@@ -57,7 +57,7 @@ components: transforms: concat: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

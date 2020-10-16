@@ -4,8 +4,7 @@ components: sources: apache_metrics: {
 	_config_path: "/etc/apache2/httpd.conf"
 	_path:        "/server-status"
 
-	title:             "Apache HTTP Server (HTTPD) Metrics"
-	short_description: "Collect metrics from an Apache HTTPD server."
+	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
 		commonly_used: false
@@ -13,21 +12,15 @@ components: sources: apache_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			apache_http: {
-				required: true
-				title:    "Apache HTTP Server (HTTPD)"
-				type:     "external"
+		multiline: enabled: false
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Apache HTTP server (HTTPD)"
+				thing:    "an \(name)"
 				url:      urls.apache
 				versions: null
 
@@ -44,11 +37,11 @@ components: sources: apache_metrics: {
 				}
 
 				setup: [
-					#"""
-						[Install the Apache HTTP server][urls.apache_install].
-						"""#,
-					#"""
-						Enable the [Apache Status module][urls.apache_mod_status]
+					"""
+						[Install the Apache HTTP server](\(urls.apache_install)).
+						""",
+					"""
+						Enable the [Apache Status module](\(urls.apache_mod_status))
 						in your Apache config:
 
 						```text file="\(_config_path)"
@@ -57,23 +50,25 @@ components: sources: apache_metrics: {
 						    Require host example.com
 						</Location>
 						```
-						"""#,
-					#"""
-						Optionally enable [`ExtendedStatus` option][urls.apache_extended_status]
+						""",
+					"""
+						Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
 						for more detailed metrics (see [Output](#output)). Note,
 						this defaults to `On` in Apache >= 2.3.6.
 
 						```text file="\(_config_path)"
 						ExtendedStatus On
 						```
-						"""#,
-					#"""
+						""",
+					"""
 						Start or reload Apache to apply the config changes.
-						"""#,
+						""",
 				]
 			}
 		}
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true

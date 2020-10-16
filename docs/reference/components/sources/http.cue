@@ -3,8 +3,7 @@ package metadata
 components: sources: http: {
 	_port: 80
 
-	title:             "HTTP"
-	short_description: "Receive logs through the HTTP protocol"
+	title: "HTTP"
 
 	classes: {
 		commonly_used: false
@@ -12,26 +11,14 @@ components: sources: http: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             false
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			http_client: {
-				required: true
-				title:    "HTTP Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "HTTP client"
+				thing:    "an \(name)"
 				url:      urls.http_client
 				versions: null
 
@@ -44,8 +31,17 @@ components: sources: http: {
 					}
 				}
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -96,7 +92,7 @@ components: sources: http: {
 			fields: {
 				message: {
 					description:   "The raw line line from the incoming payload."
-					relevant_when: "`encoding` == \"text\""
+					relevant_when: "encoding == \"text\""
 					required:      true
 					type: string: examples: ["Hello world"]
 				}
@@ -109,7 +105,7 @@ components: sources: http: {
 				"*": {
 					common:        false
 					description:   "Any field contained in your JSON payload"
-					relevant_when: "`encoding` != \"text\""
+					relevant_when: "encoding != \"text\""
 					required:      false
 					type: "*": {}
 				}

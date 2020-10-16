@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: split: {
-	title:             "Split"
-	short_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
+	title: "Split"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {
@@ -54,7 +54,7 @@ components: transforms: split: {
 		}
 		separator: {
 			common:      true
-			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`][urls.unicode_whitespace]."
+			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`](\(urls.unicode_whitespace))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -67,7 +67,7 @@ components: transforms: split: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

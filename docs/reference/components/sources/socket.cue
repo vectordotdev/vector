@@ -3,8 +3,7 @@ package metadata
 components: sources: socket: {
 	_port: 9000
 
-	title:             "Socket"
-	short_description: "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
+	title: "Socket"
 
 	classes: {
 		commonly_used: true
@@ -12,26 +11,14 @@ components: sources: socket: {
 		deployment_roles: ["aggregator", "sidecar"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
-
-	support: {
-		dependencies: {
-			socket_client: {
-				required: true
-				title:    "Socket Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "socket client"
+				thing:    "a \(name)"
 				url:      urls.prometheus_client
 				versions: null
 
@@ -42,8 +29,17 @@ components: sources: socket: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -135,9 +131,9 @@ components: sources: socket: {
 
 	examples: [
 		{
-			_line: #"""
+			_line: """
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-				"""#
+				"""
 			title: "Socket line"
 			configuration: {}
 			input: """
