@@ -74,6 +74,8 @@ urls: {
 	datadog_distribution:                                     "https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition"
 	datadog_logs:                                             "https://docs.datadoghq.com/logs/"
 	datadog_logs_endpoints:                                   "https://docs.datadoghq.com/logs/log_collection/?tab=tcpussite#datadog-logs-endpoints"
+	datadog_metrics:                                          "https://docs.datadoghq.com/metrics/"
+	datadog_metrics_endpoints:                                "https://docs.datadoghq.com/api/v1/metrics/"
 	default_configuration:                                    "https://github.com/timberio/vector/blob/master/config/vector.toml"
 	docker:                                                   "https://www.docker.com/"
 	docker_alpine:                                            "https://hub.docker.com/_/alpine"
