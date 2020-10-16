@@ -40,11 +40,7 @@ components: sources: kubernetes_logs: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			"""
-				[Kubernetes][urls.kubernetes] version `>= 1.14` is required.
-				""",
-		]
+		requirements: []
 		warnings: []
 		notices: []
 	}
