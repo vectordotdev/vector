@@ -447,6 +447,7 @@ _values: {
 #MetricEvent: {
 	name: string
 	tags: [Name=string]: string
+	timestamp?: string
 	close({counter: #MetricEventCounter}) |
 	close({distribution: #MetricEventDistribution}) |
 	close({gauge: #MetricEventGauge}) |
