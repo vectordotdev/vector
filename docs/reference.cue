@@ -359,12 +359,16 @@ _values: {
 
 	// `encoding` describes how the component encodes data.
 	encoding: {
-		codec: {
-			enabled: bool
+		enabled: bool
 
-			if enabled {
-				default: #EncodingCodec | null
-				enum:    [#EncodingCodec, ...] | null
+		if enabled {
+			codec: {
+				enabled: bool
+
+				if enabled {
+					default: #EncodingCodec | null
+					enum:    [#EncodingCodec, ...] | null
+				}
 			}
 		}
 	}

@@ -3,23 +3,8 @@ package metadata
 components: sinks: [Name=string]: {
 	kind: "sink"
 
-	features: {
-		send?: {
-			encoding: {
-				codec: {
-					enabled: bool
-
-					if enabled {
-						default: #EncodingCodec | null
-						enum:    [#EncodingCodec, ...] | null
-					}
-				}
-			}
-		}
-	}
-
 	configuration: {
-		if features.send != _|_ && features.send.batch != _|_ {
+		if sinks[Name].features.send != _|_ && sinks[Name].features.send.batch != _|_ {
 			if sinks[Name].features.send.batch.enabled {
 				batch: {
 					common:      false
@@ -65,7 +50,7 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if features.buffer.enabled {
+		if sinks[Name].features.buffer.enabled {
 			buffer: {
 				common:      false
 				description: "Configures the sink specific buffer behavior."
@@ -119,30 +104,21 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if features.send != _|_ {
-			encoding: {
-				description: "Configures the encoding specific sink behavior."
-				required:    true
-				type: object: options: {
-					if features.send.encoding.codec.enabled {
-						codec: {
-							description: "The encoding codec used to serialize the events before outputting."
-							required:    true
-							type: string: examples: features.send.encoding.codec.enum
+		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.encoding.enabled {
+				encoding: {
+					description: "Configures the encoding specific sink behavior."
+					required:    true
+					type: object: options: {
+						if sinks[Name].features.send.encoding.codec.enabled {
+							codec: {
+								description: "The encoding codec used to serialize the events before outputting."
+								required:    true
+								type: string: examples: sinks[Name].features.send.encoding.codec.enum
+							}
 						}
-					}
 
-					if sinks[Name].features.healthcheck.enabled {except_fields: {
-						common:      false
-						description: "Prevent the sink from encoding the specified labels."
-						required:    false
-						type: array: {
-							default: null
-							items: type: string: examples: ["message", "parent.child"]
-						}
-					}
-
-						only_fields: {
+						if sinks[Name].features.healthcheck.enabled {except_fields: {
 							common:      false
 							description: "Prevent the sink from encoding the specified labels."
 							required:    false
@@ -152,15 +128,26 @@ components: sinks: [Name=string]: {
 							}
 						}
 
-						timestamp_format: {
-							common:      false
-							description: "How to format event timestamps."
-							required:    false
-							type: string: {
-								default: "rfc3339"
-								enum: {
-									rfc3339: "Formats as a RFC3339 string"
-									unix:    "Formats as a unix timestamp"
+							only_fields: {
+								common:      false
+								description: "Prevent the sink from encoding the specified labels."
+								required:    false
+								type: array: {
+									default: null
+									items: type: string: examples: ["message", "parent.child"]
+								}
+							}
+
+							timestamp_format: {
+								common:      false
+								description: "How to format event timestamps."
+								required:    false
+								type: string: {
+									default: "rfc3339"
+									enum: {
+										rfc3339: "Formats as a RFC3339 string"
+										unix:    "Formats as a unix timestamp"
+									}
 								}
 							}
 						}
@@ -169,7 +156,7 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if features.send != _|_ {
+		if sinks[Name].features.send != _|_ {
 			healthcheck: {
 				common:      true
 				description: "Enables/disables the sink healthcheck upon Vector boot."
@@ -178,8 +165,8 @@ components: sinks: [Name=string]: {
 			}
 		}
 
-		if features.send != _|_ {
-			if features.send.request.enabled {
+		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.request.enabled {
 				request: {
 					common:      false
 					description: "Configures the sink request behavior."
@@ -192,7 +179,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum number of in-flight requests allowed at any given time."
 								required:    false
 								type: uint: {
-									default: features.send.request.in_flight_limit
+									default: sinks[Name].features.send.request.in_flight_limit
 									unit:    "requests"
 								}
 							}
@@ -201,7 +188,7 @@ components: sinks: [Name=string]: {
 								description: "The time window, in seconds, used for the `rate_limit_num` option."
 								required:    false
 								type: uint: {
-									default: features.send.request.rate_limit_duration_secs
+									default: sinks[Name].features.send.request.rate_limit_duration_secs
 									unit:    "seconds"
 								}
 							}
@@ -210,7 +197,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
 								required:    false
 								type: uint: {
-									default: features.send.request.rate_limit_num
+									default: sinks[Name].features.send.request.rate_limit_num
 									unit:    null
 								}
 							}
@@ -228,7 +215,7 @@ components: sinks: [Name=string]: {
 								description: "The amount of time to wait before attempting the first retry for a failed request. Once, the first retry has failed the fibonacci sequence will be used to select future backoffs."
 								required:    false
 								type: uint: {
-									default: features.send.request.retry_initial_backoff_secs
+									default: sinks[Name].features.send.request.retry_initial_backoff_secs
 									unit:    "seconds"
 								}
 							}
@@ -237,7 +224,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum amount of time, in seconds, to wait between retries."
 								required:    false
 								type: uint: {
-									default: features.send.request.retry_max_duration_secs
+									default: sinks[Name].features.send.request.retry_max_duration_secs
 									unit:    "seconds"
 								}
 							}
@@ -246,7 +233,7 @@ components: sinks: [Name=string]: {
 								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
 								required:    false
 								type: uint: {
-									default: features.send.request.timeout_secs
+									default: sinks[Name].features.send.request.timeout_secs
 									unit:    "seconds"
 								}
 							}
