@@ -81,12 +81,12 @@ components: sinks: gcp_cloud_storage: {
       type: string: {
         default: null
         enum: {
-          authenticatedRead: "Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission."
-          bucketOwnerFullControl: "Gives the object and bucket owners OWNER permission."
-          bucketOwnerRead: "Gives the object owner OWNER permission, and gives the bucket owner READER permission."
-          private: "Gives the bucket or object owner OWNER permission for a bucket or object."
-          projectPrivate: "Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default."
-          publicRead: "Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."
+          "authenticated-read": "Gives the bucket or object owner OWNER permission, and gives all authenticated Google account holders READER permission."
+          "bucket-owner-full-control": "Gives the object and bucket owners OWNER permission."
+          "bucket-owner-read": "Gives the object owner OWNER permission, and gives the bucket owner READER permission."
+          "private": "Gives the bucket or object owner OWNER permission for a bucket or object."
+          "project-private": "Gives permission to the project team based on their roles. Anyone who is part of the team has READER permission. Project owners and project editors have OWNER permission. This the default."
+          "public-read": "Gives the bucket or object owner OWNER permission, and gives all users, both authenticated and anonymous, READER permission. When you apply this to an object, anyone on the Internet can read the object without authenticating."
         }
       }
     }
