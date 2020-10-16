@@ -1,5 +1,9 @@
 package metadata
 
+import (
+	"list"
+)
+
 components: sinks: [Name=string]: {
 	kind: "sink"
 
@@ -97,6 +101,27 @@ components: sinks: [Name=string]: {
 									block:       "Applies back pressure when the buffer is full. This prevents data loss, but will cause data to pile up on the edge."
 									drop_newest: "Drops new data as it's received. This data is lost. This should be used when performance is the highest priority."
 								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.compression.enabled {
+				compression: {
+					common:      true
+					description: "The compression strategy used to compress the encoded event data before transmission."
+					required:    false
+					type: string: {
+						default: sinks[Name].features.send.compression.default
+						enum: {
+							if list.Contains(sinks[Name].features.send.compression.algorithms, "none") {
+								none: "No compression."
+							}
+							if list.Contains(sinks[Name].features.send.compression.algorithms, "gzip") {
+								gzip: "[Gzip](\(urls.gzip)) standard DEFLATE compression."
 							}
 						}
 					}
