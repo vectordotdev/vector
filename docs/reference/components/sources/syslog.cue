@@ -115,7 +115,7 @@ components: sources: syslog: {
 			"*": {
 				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
 				required:    true
-				type: "*": {}
+				type: string: examples: ["hello world"]
 			}
 		}
 	}
