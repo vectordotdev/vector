@@ -22,8 +22,19 @@ components: sources: kubernetes_logs: {
 				url:      urls.kubernetes
 				versions: ">= 1.14"
 
-				interface: file_system: {
-					directory: _directory
+				interface: {
+					file_system: {
+						directory: _directory
+					}
+					socket: {
+						api: {
+							title: "kube-apiserver"
+							url:   "dynamically detected at runtime"
+						}
+						direction: "outgoing"
+						ssl: "required"
+						protocols: ["http"]
+					}
 				}
 			}
 		}
