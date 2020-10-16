@@ -1,7 +1,7 @@
 [transforms.reduce]
   inputs = []
   type = "reduce"
-  identifier_fields = [ "request_id" ]
+  group_by = [ "request_id" ]
   [transforms.reduce.ends_when]
     "test_end_message.exists" = true
 
@@ -84,7 +84,7 @@
 [transforms.reduce_strats]
   inputs = []
   type = "reduce"
-  identifier_fields = [ "request_id" ]
+  group_by = [ "request_id" ]
 
   [transforms.reduce_strats.merge_strategies]
     "message" = "concat"
