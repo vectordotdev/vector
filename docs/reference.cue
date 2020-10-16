@@ -258,14 +258,15 @@ _values: {
 	}
 
 	if Args.kind == "transform" {
-		convert?: close({})
-		enrich?:  #FeaturesEnrich
-		filter?:  close({})
-		parse?:   #FeaturesParse
-		program?: #FeaturesProgram
-		reduce?:  close({})
-		route?:   close({})
-		shape?:   close({})
+		convert?:  close({})
+		enrich?:   #FeaturesEnrich
+		filter?:   close({})
+		parse?:    #FeaturesParse
+		program?:  #FeaturesProgram
+		reduce?:   close({})
+		route?:    close({})
+		sanitize?: close({})
+		shape?:    close({})
 	}
 
 	if Args.kind == "sink" {
