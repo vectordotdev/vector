@@ -5,7 +5,8 @@ components: sinks: _influxdb: {
 		send: {
 			tls: enabled: false
 			to: {
-				name:     "Influxdb"
+				name:     "InfluxDB"
+				thing:    "an \(name) database"
 				url:      urls.influxdb
 				versions: null
 
@@ -35,6 +36,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		consistency: {
+			category:    "Persistence"
 			common:      true
 			description: "Sets the write consistency for the point for InfluxDB 1."
 			groups: ["v1"]
@@ -72,6 +74,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		org: {
+			category:    "Auth"
 			description: "Specifies the destination organization for writes into InfluxDB 2."
 			groups: ["v2"]
 			required: true
@@ -81,6 +84,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		password: {
+			category:    "Auth"
 			common:      true
 			description: "Sets the password for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]
@@ -92,6 +96,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		retention_policy_name: {
+			category:    "Persistence"
 			common:      true
 			description: "Sets the target retention policy for the write into InfluxDB 1."
 			groups: ["v1"]
@@ -114,7 +119,8 @@ components: sinks: _influxdb: {
 			}
 		}
 		token: {
-			description: "[Authentication token][urls.influxdb_authentication_token] for InfluxDB 2."
+			category:    "Auth"
+			description: "[Authentication token](\(urls.influxdb_authentication_token)) for InfluxDB 2."
 			groups: ["v2"]
 			required: true
 			warnings: []
@@ -123,6 +129,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		username: {
+			category:    "Auth"
 			common:      true
 			description: "Sets the username for authentication if you’ve enabled authentication for the write into InfluxDB 1."
 			groups: ["v1"]

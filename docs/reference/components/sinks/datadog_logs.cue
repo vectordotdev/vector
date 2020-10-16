@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: datadog_logs: {
 	title:       "Datadog Logs"
-	description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
+	description: "[Datadog](\(urls.datadog)) is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
 
 	classes: {
 		commonly_used: false
@@ -17,10 +17,13 @@ components: sinks: datadog_logs: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: codec: {
+			encoding: {
 				enabled: true
-				default: null
-				enum: ["json", "text"]
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
 			}
 			request: enabled: false
 			tls: {
@@ -31,7 +34,8 @@ components: sinks: datadog_logs: {
 				enabled_default:        true
 			}
 			to: {
-				name:     "Datadog Logs"
+				name:     "Datadog logs"
+				thing:    "a \(name) account"
 				url:      urls.datadog_logs
 				versions: null
 
@@ -87,19 +91,6 @@ components: sinks: datadog_logs: {
 
 	input: {
 		logs:    true
-		metrics: false
-	}
-
-	how_it_works: {
-		setup: {
-			title: "Setup"
-			body: #"""
-				1. Register for a free account at [datadoghq.com](https://www.datadoghq.com/)
-
-				2. Fetch your logs api key by going to the [other](https://app.datadoghq.com/logs/onboarding/other) options
-				and selecting the `fluentd` option, it should then present you an `api_key`. This api key can now be used
-				with Vector!
-				"""#
-		}
+		metrics: null
 	}
 }

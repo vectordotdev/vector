@@ -12,7 +12,7 @@ components: transforms: aws_ec2_metadata: {
 	features: {
 		enrich: {
 			from: {
-				name:     "AWS EC2 Instance Metadata"
+				name:     "AWS EC2 instance metadata"
 				url:      urls.aws_ec2_instance_metadata
 				versions: ">= 2"
 			}
@@ -30,13 +30,13 @@ components: transforms: aws_ec2_metadata: {
 		}
 
 		requirements: [
-			#"""
+			"""
 				Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit:
 
 				```bash
 				aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
 				```
-				"""#,
+				""",
 		]
 		warnings: []
 		notices: []
@@ -77,7 +77,7 @@ components: transforms: aws_ec2_metadata: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	output: logs: log: {

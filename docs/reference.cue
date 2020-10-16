@@ -83,7 +83,8 @@ _values: {
 	// input, output, and example configuration.
 	examples: [
 		...close({
-			title: string
+			title:    string
+			context?: string
 			"configuration": {
 				for k, v in configuration {
 					"\( k )"?: _ | *null
@@ -103,13 +104,7 @@ _values: {
 			}
 
 			if Kind != "sink" {
-				if classes.egress_method == "batch" {
-					output: [#Event, ...] | null
-				}
-
-				if classes.egress_method == "stream" {
-					output: #Event | null
-				}
+				output: #Event | [#Event, ...] | null
 			}
 
 			notes?: string
@@ -142,6 +137,14 @@ _values: {
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
 }
+
+// `#CompressionAlgorithm` specified data compression algorithm.
+//
+// * `none` - compression is not applied
+// * `gzip` - gzip compression applied
+#CompressionAlgorithm: "none" | "gzip"
+
+#CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
 
 // `#DeliveryStatus` documents the delivery guarantee.
 //
@@ -202,7 +205,8 @@ _values: {
 	close({ffi: close({})}) |
 	close({file_system: #InterfaceFileSystem}) |
 	close({socket: #InterfaceSocket}) |
-	close({stdin: close({})})
+	close({stdin: close({})}) |
+	close({stdout: close({})})
 }
 
 #InterfaceBinary: {
@@ -243,8 +247,9 @@ _values: {
 	let Args = _args
 
 	if Args.kind == "source" {
-		collect?: #FeaturesCollect
+		collect?: #FeaturesCollect & {_args: {kind: Args.kind}}
 		receive?: #FeaturesReceive & {_args: {kind: Args.kind}}
+		test?:    close({})
 
 		// `multiline` should be enabled for sources that offer the ability
 		// to merge multiple lines together.
@@ -254,14 +259,15 @@ _values: {
 	}
 
 	if Args.kind == "transform" {
-		convert?: close({})
-		enrich?:  #FeaturesEnrich
-		filter?:  close({})
-		parse?:   #FeaturesParse
-		program?: #FeaturesProgram
-		reduce?:  close({})
-		route?:   close({})
-		shape?:   close({})
+		convert?:  close({})
+		enrich?:   #FeaturesEnrich
+		filter?:   close({})
+		parse?:    #FeaturesParse
+		program?:  #FeaturesProgram
+		reduce?:   close({})
+		route?:    close({})
+		sanitize?: close({})
+		shape?:    close({})
 	}
 
 	if Args.kind == "sink" {
@@ -281,6 +287,11 @@ _values: {
 }
 
 #FeaturesCollect: {
+	_args: {
+		kind: string
+	}
+	let Args = _args
+
 	// `checkpoint` describes how the component checkpoints its read
 	// position.
 	checkpoint: close({
@@ -288,6 +299,7 @@ _values: {
 	})
 
 	from?: #Service
+	tls?:  #FeaturesTLS & {_args: {kind: Args.kind}}
 }
 
 #FeaturesEnrich: {
@@ -317,10 +329,7 @@ _values: {
 	let Args = _args
 
 	from?: #Service
-
-	// `tls` describes if the component secures network communication
-	// via TLS.
-	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls:   #FeaturesTLS & {_args: {kind: Args.kind}}
 }
 
 #FeaturesSend: {
@@ -347,19 +356,24 @@ _values: {
 		enabled: bool
 
 		if enabled == true {
-			default: "gzip" | null
-			gzip:    bool
+			default: #CompressionAlgorithm
+			algorithms: [#CompressionAlgorithm, ...]
+			levels: [#CompressionLevel, ...]
 		}
 	}
 
 	// `encoding` describes how the component encodes data.
 	encoding: {
-		codec: {
-			enabled: bool
+		enabled: bool
 
-			if enabled {
-				default: #EncodingCodec | null
-				enum:    [#EncodingCodec, ...] | null
+		if enabled {
+			codec: {
+				enabled: bool
+
+				if enabled {
+					default: #EncodingCodec | null
+					enum:    [#EncodingCodec, ...] | null
+				}
 			}
 		}
 	}
@@ -370,7 +384,7 @@ _values: {
 		enabled: bool
 
 		if enabled {
-			in_flight_limit:            uint8
+			in_flight_limit:            uint8 | *5
 			rate_limit_duration_secs:   uint8
 			rate_limit_num:             uint16
 			retry_initial_backoff_secs: uint8
@@ -415,7 +429,7 @@ _values: {
 
 #Input: {
 	logs:    bool
-	metrics: false | #MetricInput
+	metrics: #MetricInput | null
 }
 
 #LogEvent: {
@@ -530,10 +544,11 @@ _values: {
 
 #Service: {
 	name:     string
+	thing:    string
 	url:      string
 	versions: string | null
 
-	interface: #Interface
+	interface?: #Interface
 
 	setup: [...string]
 }
@@ -574,8 +589,8 @@ _values: {
 	// specify that here. We accept a string to allow for the expression of
 	// complex requirements.
 	//
-	//              relevant_when: '`strategy` = "fingerprint"'
-	//              relevant_when: '`strategy` = "fingerprint" or "inode"'
+	//              relevant_when: 'strategy = "fingerprint"'
+	//              relevant_when: 'strategy = "fingerprint" or "inode"'
 	relevant_when?: string
 
 	// `required` requires the option to be set.
@@ -783,7 +798,7 @@ _values: {
 	unit: #Unit | null
 }
 
-#Unit: "bytes" | "logs" | "milliseconds" | "seconds"
+#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
 components: close({
 	sources:    #Components

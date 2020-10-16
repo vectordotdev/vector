@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: logdna: {
 	title:       "LogDNA"
-	description: "[LogDNA][urls.logdna] is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
+	description: "[LogDNA](\(urls.logdna)) is a log management system that allows engineering and DevOps to aggregate all system, server, and application logs into one platform. Collect, monitor, store, tail, and search application logs in with one command-line or web interface."
 
 	classes: {
 		commonly_used: false
@@ -24,7 +24,10 @@ components: sinks: logdna: {
 				timeout_secs: 1
 			}
 			compression: enabled: false
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: {
 				enabled:                    true
 				in_flight_limit:            5
@@ -37,6 +40,7 @@ components: sinks: logdna: {
 			tls: enabled: false
 			to: {
 				name:     "LogDNA"
+				thing:    "a \(name) account"
 				url:      urls.logdna
 				versions: null
 
@@ -146,6 +150,6 @@ components: sinks: logdna: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

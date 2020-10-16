@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: papertrail: {
 	title:       "Papertrail"
-	description: "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
+	description: "[Papertrail](\(urls.papertrail)) is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
 
 	classes: {
 		commonly_used: false
@@ -17,10 +17,13 @@ components: sinks: papertrail: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: codec: {
+			encoding: {
 				enabled: true
-				default: null
-				enum: ["json", "text"]
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
 			}
 			request: enabled: false
 			tls: {
@@ -32,6 +35,7 @@ components: sinks: papertrail: {
 			}
 			to: {
 				name:     "Papertrail"
+				thing:    "an \(name) account"
 				url:      urls.papertrail
 				versions: null
 
@@ -77,20 +81,20 @@ components: sinks: papertrail: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {
 		setup: {
 			title: "Setup"
-			body: #"""
+			body: """
 				1. Register for a free account at [Papertrailapp.com](https://papertrailapp.com/signup?plan=free)
 
 				2. [Create a Log Destination](https://papertrailapp.com/destinations/new) to get a Log Destination
 				and ensure that TCP is enabled.
 
 				3. Set the log destination as the `endpoint` option and start shipping your logs!
-				"""#
+				"""
 		}
 	}
 }

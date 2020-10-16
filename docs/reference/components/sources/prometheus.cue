@@ -2,7 +2,7 @@ package metadata
 
 components: sources: prometheus: {
 	title:       "Prometheus"
-	description: "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: false
@@ -16,7 +16,8 @@ components: sources: prometheus: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Prometheus client"
+				name:     "Prometheus"
+				thing:    "one or more \(name) endpoints"
 				url:      urls.prometheus_client
 				versions: null
 

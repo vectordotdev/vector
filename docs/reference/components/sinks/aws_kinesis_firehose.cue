@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_kinesis_firehose: {
 	title:       "AWS Kinesis Firehose"
-	description: "[Amazon Kinesis Data Firehose][urls.aws_kinesis_firehose] is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
+	description: "[Amazon Kinesis Data Firehose](\(urls.aws_kinesis_firehose)) is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
 
 	classes: {
 		commonly_used: false
@@ -25,13 +25,17 @@ components: sinks: aws_kinesis_firehose: {
 			}
 			compression: {
 				enabled: true
-				default: null
-				gzip:    true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
-			encoding: codec: {
+			encoding: {
 				enabled: true
-				default: null
-				enum: ["json", "text"]
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
 			}
 			request: {
 				enabled:                    true
@@ -45,6 +49,7 @@ components: sinks: aws_kinesis_firehose: {
 			tls: enabled: false
 			to: {
 				name:     "AWS Kinesis Firehose"
+				thing:    "a \(name) stream"
 				url:      urls.aws_kinesis_firehose
 				versions: null
 
@@ -80,7 +85,7 @@ components: sinks: aws_kinesis_firehose: {
 
 	configuration: {
 		stream_name: {
-			description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target Kinesis Firehose delivery stream."
+			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target Kinesis Firehose delivery stream."
 			required:    true
 			warnings: []
 			type: string: {
@@ -91,6 +96,6 @@ components: sinks: aws_kinesis_firehose: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

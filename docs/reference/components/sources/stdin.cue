@@ -15,7 +15,8 @@ components: sources: stdin: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "STDIN client"
+				name:     "STDIN"
+				thing:    "the \(name) stream"
 				url:      urls.stdin
 				versions: null
 
@@ -72,9 +73,9 @@ components: sources: stdin: {
 
 	examples: [
 		{
-			_line: #"""
+			_line: """
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-				"""#
+				"""
 			title: "STDIN line"
 			configuration: {}
 			input: """

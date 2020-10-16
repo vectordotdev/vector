@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: clickhouse: {
 	title:       "Clickhouse"
-	description: "[ClickHouse][urls.clickhouse] is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data."
+	description: "[ClickHouse](\(urls.clickhouse)) is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data."
 
 	classes: {
 		commonly_used: true
@@ -26,9 +26,13 @@ components: sinks: clickhouse: {
 			compression: {
 				enabled: true
 				default: "gzip"
-				gzip:    true
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: {
 				enabled:                    true
 				in_flight_limit:            5
@@ -47,6 +51,7 @@ components: sinks: clickhouse: {
 			}
 			to: {
 				name:     "Clickhouse"
+				thing:    "a \(name) database"
 				url:      urls.clickhouse
 				versions: null
 
@@ -77,7 +82,7 @@ components: sinks: clickhouse: {
 
 		requirements: [
 			"""
-				[Clickhouse][urls.clickhouse] version `>= 1.1.54378` is required.
+				[Clickhouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
 				""",
 		]
 		warnings: []
@@ -107,7 +112,7 @@ components: sinks: clickhouse: {
 						warnings: []
 						type: string: {
 							enum: {
-								basic:  "The [basic authentication strategy][urls.basic_auth]."
+								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
 						}
@@ -142,7 +147,7 @@ components: sinks: clickhouse: {
 			}
 		}
 		endpoint: {
-			description: "The endpoint of the [Clickhouse][urls.clickhouse] server."
+			description: "The endpoint of the [Clickhouse](\(urls.clickhouse)) server."
 			required:    true
 			type: string: {
 				examples: ["http://localhost:8123"]
@@ -160,6 +165,6 @@ components: sinks: clickhouse: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }
