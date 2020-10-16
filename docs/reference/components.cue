@@ -289,20 +289,5 @@ components: {
 				}
 			}
 		}
-
-		how_it_works: {
-			if (Kind == "source") {
-				if components["\(Kind)s"][Name].features.receive != _|_ {
-					if components["\(Kind)s"][Name].features.receive.tls.enabled {
-						tls: {
-							title: "Transport Layer Security (TLS)"
-							body:  """
-                  Vector uses [Openssl](\(urls.openssl)) for TLS protocols. You can
-                  adjust TLS behavior via the `tls.*` options.
-                  """
-						}
-					}}
-			}
-		}
 	}}
 }
