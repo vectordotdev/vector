@@ -630,6 +630,28 @@ mod tests {
                 r#".foo."invalid \k escape".sequence = "foo""#,
                 vec![" 1:6\n", "= expected path_field_name or quoted_path_segment"],
             ),
+            (
+                // An invalid regex.
+                // Technically this isn't a (pest) parser error, so the error doesn't include the
+                // line and column numbers of the offending regex.
+                r#".foo = split(.foo, /[aa/)"#,
+                vec!["invalid regex: regex parse error:"],
+            ),
+            (
+                // Regexes can't be parsed as part of a path
+                r#".foo = split(.foo, ./[aa]/)"#,
+                vec![" 1:21\n", "= expected path_field_name, quoted_path_segment, or path_coalesce"],
+            ),
+            (
+                // We cannot assign a regular expression to a field.
+                r#".foo = /ab/i"#,
+                vec![" 1:8\n", "= expected query"],
+            ),
+            (
+                // We cannot assign to a regular expression.
+                r#"/ab/ = .foo"#,
+                vec![" 1:1\n", "= expected if_statement, target_path, or function"],
+            ),
         ];
 
         for (mapping, exp_expressions) in cases {
