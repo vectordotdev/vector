@@ -36,6 +36,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		consistency: {
+			category:    "Persistence"
 			common:      true
 			description: "Sets the write consistency for the point for InfluxDB 1."
 			groups: ["v1"]
@@ -95,6 +96,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		retention_policy_name: {
+			category:    "Persistence"
 			common:      true
 			description: "Sets the target retention policy for the write into InfluxDB 1."
 			groups: ["v1"]
