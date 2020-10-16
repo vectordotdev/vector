@@ -10,6 +10,13 @@ components: sinks: datadog_logs: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    1049000
+				max_events:   null
+				timeout_secs: 1
+			}
 			compression: enabled: false
 			encoding: {
 				enabled: true
@@ -48,7 +55,7 @@ components: sinks: datadog_logs: {
 		}
 	}
 
-	support: support: sinks._datadog.support
+	support: sinks._datadog.support
 
 	configuration: {
 		api_key:  sinks._datadog.configuration.api_key
