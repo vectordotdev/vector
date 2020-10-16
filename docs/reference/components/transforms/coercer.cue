@@ -1,8 +1,7 @@
 package metadata
 
 components: transforms: coercer: {
-	title:       "Coercer"
-	description: "Accepts log events and allows you to coerce log fields into fixed types."
+	title: "Coercer"
 
 	classes: {
 		commonly_used: false
@@ -44,4 +43,36 @@ components: transforms: coercer: {
 		}
 		types: configuration._types
 	}
+
+	examples: [
+		{
+			title: "Date"
+			configuration: {
+				types: {
+					bytes_in:  "int"
+					bytes_out: "int"
+					status:    "int"
+					timestamp: "timestamp|%d/%m/%Y:%H:%M:%S %z"
+				}
+			}
+			input: log: {
+				bytes_in:  "5667"
+				bytes_out: "20574"
+				host:      "5.86.210.12"
+				message:   "GET /embrace/supply-chains/dynamic/vertical"
+				status:    "201"
+				timestamp: "19/06/2019:17:20:49 -0400"
+				user_id:   "zieme4647"
+			}
+			output: log: {
+				bytes_in:  5667
+				bytes_out: 20574
+				host:      "5.86.210.12"
+				message:   "GET /embrace/supply-chains/dynamic/vertical"
+				status:    201
+				timestamp: "19/06/2019:17:20:49 -0400"
+				user_id:   "zieme4647"
+			}
+		},
+	]
 }
