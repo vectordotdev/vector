@@ -24,7 +24,10 @@ components: sinks: influxdb_logs: {
 				timeout_secs: 1
 			}
 			compression: enabled: false
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: {
 				enabled:                    true
 				in_flight_limit:            5

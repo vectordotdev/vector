@@ -24,7 +24,10 @@ components: sinks: sematext_metrics: {
 				timeout_secs: 1
 			}
 			compression: enabled: false
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: enabled: false
 			tls: enabled:     false
 			to: sinks._sematext.features.send.to

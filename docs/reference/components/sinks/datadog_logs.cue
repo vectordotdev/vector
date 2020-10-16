@@ -17,10 +17,13 @@ components: sinks: datadog_logs: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: codec: {
+			encoding: {
 				enabled: true
-				default: null
-				enum: ["json", "text"]
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
 			}
 			request: enabled: false
 			tls: {
