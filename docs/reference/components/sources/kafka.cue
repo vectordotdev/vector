@@ -1,6 +1,8 @@
 package metadata
 
 components: sources: kafka: {
+	_port: 9093
+
 	title:       "Kafka"
 	description: "[Apache Kafka][urls.kafka] is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
 
@@ -12,6 +14,22 @@ components: sources: kafka: {
 				can_enable:             true
 				can_verify_certificate: false
 				enabled_default:        false
+			}
+			from: {
+				name:     "Kafka"
+				thing:    "a \(name) topics"
+				url:      urls.kafka
+				versions: ">= 0.8"
+
+				interface: socket: {
+					api: {
+						title: "Kafka Protocol"
+						url:   urls.kafka_protocol
+					}
+					port: _port
+					protocols: ["tcp"]
+					ssl: "optional"
+				}
 			}
 		}
 		multiline: enabled: false
@@ -199,7 +217,9 @@ components: sources: kafka: {
 				required:    true
 				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 			}
-			timestamp: fields._current_timestamp
+			timestamp: fields._current_timestamp & {
+				description: "If the [Splunk HEC event endpoint](\(urls.splunk_hec_event_endpoint)) is used then the value of the `time` field will be used. If the [Splunk HEC raw endpoint](\(urls.splunk_hec_raw_endpoint)) is used, then the current time the event was received will be used."
+			}
 		}
 	}
 

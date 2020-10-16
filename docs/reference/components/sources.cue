@@ -74,7 +74,7 @@ components: sources: [Name=string]: {
 		logs?: [Name=string]: {
 			fields: {
 				_current_timestamp: {
-					description: "The exact time the event was ingested into Vector."
+					description: string | *"The exact time the event was ingested into Vector."
 					required:    true
 					type: timestamp: {}
 				}
