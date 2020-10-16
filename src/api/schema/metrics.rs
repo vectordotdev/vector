@@ -1,10 +1,17 @@
 use crate::event::{Event, Metric, MetricValue};
-use crate::metrics::{capture_metrics, get_controller};
+use crate::metrics::{capture_metrics, get_controller, Controller};
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
 use chrono::{DateTime, Utc};
+use lazy_static::lazy_static;
+use std::sync::Arc;
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
+
+lazy_static! {
+    static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
+        Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
+}
 
 pub struct Uptime(Metric);
 
@@ -78,7 +85,8 @@ impl From<Metric> for BytesProcessed {
     }
 }
 
-#[Interface(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
+#[derive(Interface)]
+#[graphql(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
 pub enum MetricType {
     Uptime(Uptime),
     EventsProcessed(EventsProcessed),
@@ -93,7 +101,7 @@ impl MetricsSubscription {
     /// Metrics for how long the Vector instance has been running
     async fn uptime_metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Uptime> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(Uptime(m)),
@@ -115,7 +123,7 @@ impl MetricsSubscription {
     /// Bytes processed metrics
     async fn bytes_processed_metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = BytesProcessed> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "bytes_processed" => Some(BytesProcessed(m)),
@@ -126,7 +134,7 @@ impl MetricsSubscription {
     /// All metrics
     async fn metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(MetricType::Uptime(m.into())),
@@ -152,4 +160,21 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
             }
         }
     }
+}
+
+/// Get the events processed by topology component name
+pub fn topology_events_processed(topology_name: String) -> Option<EventsProcessed> {
+    let key = String::from("component_name");
+
+    capture_metrics(&GLOBAL_CONTROLLER)
+        .find(|ev| match ev {
+            Event::Metric(m)
+                if m.name.as_str().eq("events_processed")
+                    && m.tag_matches(&key, &topology_name) =>
+            {
+                true
+            }
+            _ => false,
+        })
+        .map(|ev| EventsProcessed(ev.into_metric()))
 }
