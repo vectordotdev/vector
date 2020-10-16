@@ -30,8 +30,8 @@ components: sinks: aws_cloudwatch_metrics: {
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: enabled: false
-			request: enabled: false
-			tls: enabled:     false
+			request: enabled:  false
+			tls: enabled:      false
 			to: {
 				name:     "AWS Cloudwatch metrics"
 				thing:    "an \(name) namespace"
