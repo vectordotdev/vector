@@ -914,16 +914,17 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         // Request termination in a while.
         let mut stop_tx = stop_tx.clone();
         tokio::spawn(async move {
-            // Wait for two minutes - a reasonable time for vector internals to
-            // pick up new `Pod` and collect events from them in idle load.
-            // Here, we're assuming that if the `Pod` that was supposed to be
-            // ignored was in fact collected (meaning something's wrong with
-            // the exclusion logic), we'd see it's data within this time frame.
+            // Wait for 30 seconds - a reasonable time for vector internals to
+            // ingest logs for each container in a `Pod` in idle load.
+            // Here, we're assuming that if the container log file that was
+            // supposed to be ignored was in fact collected (meaning something's
+            // wrong with the exclusion logic), we'd see it's data within this
+            // time frame.
             // It's not enough to just wait for `Pod` complete, we should still
             // apply a reasonably big timeout before we stop waiting for the
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
-            let duration = std::time::Duration::from_secs(120);
+            let duration = std::time::Duration::from_secs(30);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::delay_for(duration).await;
             println!("Stop timer complete");
@@ -1063,16 +1064,16 @@ kubernetesLogsSource:
         // Request termination in a while.
         let mut stop_tx = stop_tx.clone();
         tokio::spawn(async move {
-            // Wait for two minutes - a reasonable time for vector internals to
-            // pick up new `Pod` and collect events from them in idle load.
-            // Here, we're assuming that if the `Pod` that was supposed to be
+            // Wait for 30 seconds - a reasonable time for vector internals to
+            // ingest logs for each log file of a `Pod` in idle load.
+            // Here, we're assuming that if the log file that was supposed to be
             // ignored was in fact collected (meaning something's wrong with
             // the exclusion logic), we'd see it's data within this time frame.
             // It's not enough to just wait for `Pod` complete, we should still
             // apply a reasonably big timeout before we stop waiting for the
             // logs to appear to have high confidence that Vector has enough
             // time to pick them up and spit them out.
-            let duration = std::time::Duration::from_secs(120);
+            let duration = std::time::Duration::from_secs(30);
             println!("Starting stop timer, due in {} seconds", duration.as_secs());
             tokio::time::delay_for(duration).await;
             println!("Stop timer complete");
