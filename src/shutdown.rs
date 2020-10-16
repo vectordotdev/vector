@@ -1,3 +1,4 @@
+use crate::stream::tripwire_handler;
 use futures::{future, ready, FutureExt, TryFutureExt};
 use futures01::Future as Future01;
 use std::{
@@ -34,7 +35,7 @@ pub struct ShutdownSignal {
     /// This will be triggered when global shutdown has begun, and is a sign to the Source to begin
     /// its shutdown process.
     #[pin]
-    begin_shutdown: Tripwire,
+    begin_shutdown: Option<Tripwire>,
 
     /// When a Source allows this to go out of scope it informs the global shutdown coordinator that
     /// this Source's local shutdown process is complete.
@@ -45,22 +46,28 @@ pub struct ShutdownSignal {
 impl Future for ShutdownSignal {
     type Output = ShutdownSignalToken;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-        let closed = ready!(this.begin_shutdown.poll(cx));
-        if closed {
-            Poll::Ready(this.shutdown_complete.take().unwrap())
-        } else {
-            Poll::Pending
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.as_mut().project().begin_shutdown.as_pin_mut() {
+            Some(fut) => {
+                let closed = ready!(fut.poll(cx));
+                let mut pinned = self.project();
+                pinned.begin_shutdown.set(None);
+                if closed {
+                    Poll::Ready(pinned.shutdown_complete.take().unwrap())
+                } else {
+                    Poll::Pending
+                }
+            }
+            None => Poll::Pending,
         }
     }
 }
 
 impl ShutdownSignal {
-    pub fn new(begin_shutdown: Tripwire, shutdown_complete: Trigger) -> Self {
+    pub fn new(tripwire: Tripwire, trigger: Trigger) -> Self {
         Self {
-            begin_shutdown,
-            shutdown_complete: Some(ShutdownSignalToken::new(shutdown_complete)),
+            begin_shutdown: Some(tripwire),
+            shutdown_complete: Some(ShutdownSignalToken::new(trigger)),
         }
     }
 
@@ -68,7 +75,7 @@ impl ShutdownSignal {
     pub fn noop() -> Self {
         let (trigger, tripwire) = Tripwire::new();
         Self {
-            begin_shutdown: tripwire,
+            begin_shutdown: Some(tripwire),
             shutdown_complete: Some(ShutdownSignalToken::new(trigger)),
         }
     }
@@ -111,7 +118,7 @@ impl SourceShutdownCoordinator {
 
         // `force_shutdown_tripwire` resolved even on success when we should *not* be shutting down.
         // `tripwire_handler` will check resolved value and never resolve future if this not required.
-        let force_shutdown_tripwire = force_shutdown_tripwire.then(crate::stream::tripwire_handler);
+        let force_shutdown_tripwire = force_shutdown_tripwire.then(tripwire_handler);
         (shutdown_signal, force_shutdown_tripwire)
     }
 
@@ -274,7 +281,7 @@ impl SourceShutdownCoordinator {
             .shutdown_complete_tripwires
             .values()
             .cloned()
-            .map(|tripwire| tripwire.then(crate::stream::tripwire_handler).boxed());
+            .map(|tripwire| tripwire.then(tripwire_handler).boxed());
 
         future::join_all(futures)
             .map(|_| info!("All sources have finished."))
@@ -288,7 +295,7 @@ impl SourceShutdownCoordinator {
         deadline: Instant,
     ) -> impl Future01<Item = bool, Error = ()> {
         async move {
-            let fut = shutdown_complete_tripwire.then(crate::stream::tripwire_handler);
+            let fut = shutdown_complete_tripwire.then(tripwire_handler);
             if timeout_at(deadline, fut).await.is_ok() {
                 shutdown_force_trigger.disable();
                 true
