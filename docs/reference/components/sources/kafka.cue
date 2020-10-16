@@ -17,7 +17,7 @@ components: sources: kafka: {
 			}
 			from: {
 				name:     "Kafka"
-				thing:    "a \(name) topics"
+				thing:    "\(name) topics"
 				url:      urls.kafka
 				versions: ">= 0.8"
 
