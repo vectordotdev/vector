@@ -1,5 +1,6 @@
 use crate::config;
 use prettytable::{format, Table};
+use std::collections::HashMap;
 use structopt::StructOpt;
 use url::Url;
 use vector_api_client::{
@@ -71,24 +72,55 @@ pub struct Opts {
     human: bool,
 }
 
-async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) -> Result<(), ()> {
-    let res = client.topology_query().await.map_err(|_| ())?;
+/// Row type containing individual metrics stats
+pub struct TopologyRow {
+    topology_type: String,
+    events_processed: f64,
+}
 
+type TopologyTable = HashMap<String, TopologyRow>;
+
+/// (Re)draw the table with the latest stats
+fn draw_table(t: &TopologyTable, mut formatter: Box<dyn StatsWriter>) {
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
     table.set_titles(row!("NAME", "TYPE", r->"EVENTS"));
 
-    for data in res.data.unwrap().topology {
+    for (name, r) in t.iter() {
         table.add_row(row!(
-            data.name,
-            data.on.to_string(),
-            r->formatter.kb(data
-                .events_processed
-                .map(|ep| ep.events_processed)
-                .unwrap_or(0.00))));
+            name,
+            r.topology_type,
+            r->formatter.kb(r.events_processed)
+        ));
     }
 
     table.printstd();
+}
+
+async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) -> Result<(), ()> {
+    // Get initial topology, including aggregate stats, and build a table of rows
+    let rows = client
+        .topology_query()
+        .await
+        .map_err(|_| ())?
+        .data
+        .ok_or_else(|| ())?
+        .iter()
+        .map(|d| {
+            (
+                d.name,
+                TopologyRow {
+                    topology_type: d.on.to_string(),
+                    events_processed: d
+                        .events_processed
+                        .map(|ep| ep.events_processed)
+                        .unwrap_or(0.00),
+                },
+            )
+        })
+        .collect::<TopologyTable>();
+
+    draw_table(rows, formatter);
 
     Ok(())
 }
