@@ -649,7 +649,7 @@
     [[tests.outputs.conditions]]
       "parts.scheme.equals" = "https"
       "parts.username.equals" = ""
-      "parts.password.equals" = "<null>"
+      "parts.password.equals" = ""
       "parts.host.equals" = "master.vector.dev"
       "parts.port.equals" = "<null>"
       "parts.path.equals" = "/docs/reference/transforms/merge/"

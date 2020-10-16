@@ -49,8 +49,14 @@ impl From<Url> for Value {
 
         map.insert("scheme", url.scheme().to_owned().into());
         map.insert("username", url.username().to_owned().into());
+        map.insert(
+            "password",
+            url.password()
+                .map(ToOwned::to_owned)
+                .unwrap_or_default()
+                .into(),
+        );
         map.insert("path", url.path().to_owned().into());
-        map.insert("password", url.password().map(ToOwned::to_owned).into());
         map.insert("host", url.host_str().map(ToOwned::to_owned).into());
         map.insert("port", url.port().map(|v| v as isize).into());
         map.insert("fragment", url.fragment().map(ToOwned::to_owned).into());
@@ -90,7 +96,7 @@ mod tests {
                 Ok(map![
                     "scheme": "https",
                     "username": "",
-                    "password": Value::Null,
+                    "password": "",
                     "host": "vector.dev",
                     "port": Value::Null,
                     "path": "/",
