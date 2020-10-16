@@ -20,7 +20,11 @@ inventory::submit! {
     TransformDescription::new::<RemoveTagsConfig>("remove_tags")
 }
 
-impl GenerateConfig for RemoveTagsConfig {}
+impl GenerateConfig for RemoveTagsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { tags: Vec::new() }).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
@@ -71,12 +75,17 @@ impl Transform for RemoveTags {
 
 #[cfg(test)]
 mod tests {
-    use super::RemoveTags;
+    use super::{RemoveTags, RemoveTagsConfig};
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
         transforms::Transform,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoveTagsConfig>();
+    }
 
     #[test]
     fn remove_tags() {
