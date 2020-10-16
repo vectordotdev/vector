@@ -124,7 +124,13 @@ components: sources: kafka: {
 			required:    false
 			warnings: []
 			type: object: {
-				examples: [{"client.id": "${ENV_VAR}"}, {"fetch.error.backoff.ms": "1000"}, {"socket.send.buffer.bytes": "100"}]
+				examples: [
+					{
+						"client.id":                "${ENV_VAR}"
+						"fetch.error.backoff.ms":   "1000"
+						"socket.send.buffer.bytes": "100"
+					},
+				]
 				options: {}
 			}
 		}

@@ -152,7 +152,12 @@ components: sinks: elasticsearch: {
 			required:    false
 			warnings: []
 			type: object: {
-				examples: [{"Authorization": "${ELASTICSEARCH_TOKEN}"}, {"X-Powered-By": "Vector"}]
+				examples: [
+					{
+						"Authorization": "${ELASTICSEARCH_TOKEN}"
+						"X-Powered-By":  "Vector"
+					},
+				]
 				options: {}
 			}
 		}

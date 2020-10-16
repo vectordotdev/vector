@@ -43,7 +43,12 @@ components: transforms: add_tags: {
 			required:    false
 			warnings: []
 			type: object: {
-				examples: [{"static_tag": "my value"}, {"env_tag": "${ENV_VAR}"}]
+				examples: [
+					{
+						"static_tag": "my value"
+						"env_tag":    "${ENV_VAR}"
+					},
+				]
 				options: {}
 			}
 		}
