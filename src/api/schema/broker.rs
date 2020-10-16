@@ -4,14 +4,12 @@ use futures::{Stream, StreamExt};
 use once_cell::sync::Lazy;
 use serde::export::PhantomData;
 use slab::Slab;
-use std::any::{Any, TypeId};
-use std::collections::HashMap;
-use std::pin::Pin;
-use std::sync::Mutex;
+use std::{pin::Pin, sync::Mutex};
 
 /// Current subscriptions. This is static so that 'global' changes can be published to any
 /// connecting subscriber. Subscribers fall out of scope once the subscription is terminated
-static SUBSCRIBERS: Lazy<Mutex<HashMap<TypeId, Box<dyn Any + Send>>>> = Lazy::new(Default::default);
+static SUBSCRIBERS: Lazy<Mutex<anymap::Map<dyn anymap::any::Any + Send>>> =
+    Lazy::new(|| Mutex::new(anymap::Map::new()));
 
 struct Senders<T>(Slab<UnboundedSender<T>>);
 struct BrokerStream<T: Sync + Send + Clone + 'static>(usize, UnboundedReceiver<T>);
@@ -23,9 +21,9 @@ where
 {
     let mut map = SUBSCRIBERS.lock().unwrap();
     let senders = map
-        .entry(TypeId::of::<Senders<T>>())
+        .entry()
         .or_insert_with(|| Box::new(Senders::<T>(Default::default())));
-    f(senders.downcast_mut::<Senders<T>>().unwrap())
+    f(senders)
 }
 
 impl<T: Sync + Send + Clone + 'static> Drop for BrokerStream<T> {
