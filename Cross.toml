@@ -1,0 +1,17 @@
+[build.env]
+passthrough = [
+    "RUST_BACKTRACE",
+    "RUST_LOG",
+]
+
+[target.x86_64-unknown-linux-gnu]
+image = "vector-cross-env:x86_64-unknown-linux-gnu"
+
+[target.aarch64-unknown-linux-gnu]
+image = "vector-cross-env:aarch64-unknown-linux-gnu"
+
+[target.x86_64-unknown-linux-musl]
+image = "vector-cross-env:x86_64-unknown-linux-musl"
+
+[target.aarch64-unknown-linux-musl]
+image = "vector-cross-env:aarch64-unknown-linux-musl"

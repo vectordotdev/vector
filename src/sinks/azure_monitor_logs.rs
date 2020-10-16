@@ -24,6 +24,10 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
+fn default_host() -> String {
+    "ods.opinsights.azure.com".into()
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct AzureMonitorLogsConfig {
@@ -31,6 +35,8 @@ pub struct AzureMonitorLogsConfig {
     pub shared_key: String,
     pub log_type: String,
     pub azure_resource_id: Option<String>,
+    #[serde(default = "default_host")]
+    pub host: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -67,6 +73,8 @@ lazy_static! {
 inventory::submit! {
     SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
 }
+
+impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
 const MAX_BATCH_SIZE_MB: u64 = 30;
@@ -177,8 +185,8 @@ impl HttpSink for AzureMonitorLogsSink {
 impl AzureMonitorLogsSink {
     fn new(config: &AzureMonitorLogsConfig) -> crate::Result<AzureMonitorLogsSink> {
         let url = format!(
-            "https://{}.ods.opinsights.azure.com{}?api-version={}",
-            config.customer_id, RESOURCE, API_VERSION
+            "https://{}.{}{}?api-version={}",
+            config.customer_id, config.host, RESOURCE, API_VERSION
         );
         let uri: Uri = url.parse()?;
 
@@ -302,6 +310,11 @@ mod tests {
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
+    }
+
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
 
@@ -401,10 +414,7 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(
-            time_generated_field.to_str().unwrap(),
-            timestamp_key.as_ref()
-        );
+        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(
@@ -432,6 +442,30 @@ mod tests {
         if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
+    }
+
+    #[test]
+    fn correct_host() {
+        let config_default = toml::from_str::<AzureMonitorLogsConfig>(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type = "Vector"
+        "#,
+        )
+        .expect("Config parsing failed without custom host");
+        assert_eq!(config_default.host, default_host());
+
+        let config_cn = toml::from_str::<AzureMonitorLogsConfig>(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type = "Vector"
+            host = "ods.opinsights.azure.cn"
+        "#,
+        )
+        .expect("Config parsing failed with .cn custom host");
+        assert_eq!(config_cn.host, "ods.opinsights.azure.cn");
     }
 
     #[tokio::test]

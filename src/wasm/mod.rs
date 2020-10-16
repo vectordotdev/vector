@@ -199,7 +199,7 @@ fn protobuf() -> Result<()> {
         collections::HashMap,
         io::{Read, Write},
     };
-    use string_cache::DefaultAtom as Atom;
+
     crate::test_util::trace_init();
 
     // Load in fixtures.
@@ -227,7 +227,7 @@ fn protobuf() -> Result<()> {
 
     let retval = out.into_iter().next().unwrap();
     assert_eq!(
-        serde_json::to_value(retval.as_log().get(&Atom::from("processed")).unwrap()).unwrap(),
+        serde_json::to_value(retval.as_log().get("processed").unwrap()).unwrap(),
         json!({
             "people": [
                 {
