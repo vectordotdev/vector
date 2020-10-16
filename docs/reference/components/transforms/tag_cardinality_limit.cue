@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: tag_cardinality_limit: {
-	title:             "Tag Cardinality Limit"
-	short_description: "Accepts metric events and allows you to limit the cardinality of metric tags to prevent downstream disruption of metrics services."
+	title: "Tag Cardinality Limit"
 
 	classes: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "filter"
 	}
 
-	features: {}
+	features: {
+		filter: {}
+	}
 
 	support: {
 		platforms: {
@@ -30,9 +30,10 @@ components: transforms: tag_cardinality_limit: {
 
 	configuration: {
 		cache_size_per_tag: {
-			common:      false
-			description: "The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits."
-			required:    false
+			common:        false
+			description:   "The size of the cache in bytes to use to detect duplicate tags. The bigger the cache the less likely it is to have a 'false positive' or a case where we allow a new value for tag even after we have reached the configured limits."
+			relevant_when: "mode = \"probabilistic\""
+			required:      false
 			warnings: []
 			type: uint: {
 				default: 5120000
@@ -87,10 +88,66 @@ components: transforms: tag_cardinality_limit: {
 		}
 	}
 
+	examples: [
+		{
+			title: "Drop high-cardinality tag"
+			context: """
+				In this example we'll demonstrate how to drop a
+				high-cardinality tag named `user_id`. Notice that the
+				second metric's `user_id` tag has been removed. That's
+				because it exceeded the `value_limit`.
+				"""
+			configuration: {
+				fields: {
+					value_limit:           1
+					limit_exceeded_action: "drop_tag"
+				}
+			}
+			input: [
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {
+						user_id: "user_id_1"
+					}
+				}},
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {
+						user_id: "user_id_2"
+					}
+				}},
+			]
+			output: [
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {
+						user_id: "user_id_1"
+					}
+				}},
+				{metric: {
+					name: "logins"
+					counter: {
+						value: 2.0
+					}
+					tags: {}
+				}},
+			]
+		},
+	]
+
 	how_it_works: {
 		intended_usage: {
 			title: "Intended Usage"
-			body: #"""
+			body: """
 				This transform is intended to be used as a protection mechanism to prevent
 				upstream mistakes. Such as a developer accidentally adding a `request_id`
 				tag. When this is happens, it is recommended to fix the upstream error as soon
@@ -98,12 +155,12 @@ components: transforms: tag_cardinality_limit: {
 				will be erased when Vector is restarted. This will cause new tag values to pass
 				through until the cardinality limit is reached again. For normal usage this
 				should not be a common problem since Vector processes are normally long-lived.
-				"""#
+				"""
 		}
 
 		memory_utilization: {
 			title: "Failed Parsing"
-			body: #"""
+			body: """
 				This transform stores in memory a copy of the key for every tag on every metric
 				event seen by this transform.  In mode `exact`, a copy of every distinct
 				value *for each key* is also kept in memory, until `value_limit` distinct values
@@ -144,17 +201,17 @@ components: transforms: tag_cardinality_limit: {
 				for you.   Remember when converting from `value_limit` to the 'm' value to plug
 				into the calculator that `value_limit` is in bytes, and 'm' is often presented
 				in bits (1/8 of a byte).
-				"""#
+				"""
 		}
 
 		restarts: {
 			title: "Restarts"
-			body: #"""
+			body: """
 				This transform's cache is held in memory, and therefore, restarting Vector
 				will reset the cache. This means that new values will be passed through until
 				the cardinality limit is reached again. See [intended usage](#intended-usage)
 				for more info.
-				"""#
+				"""
 		}
 	}
 }

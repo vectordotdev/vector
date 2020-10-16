@@ -1,59 +1,72 @@
 package metadata
 
 components: sinks: http: {
-	title:             "HTTP"
-	short_description: "Batches log events to a generic [HTTP][urls.http] endpoint."
-	long_description:  "Batches log events to a generic [HTTP][urls.http] endpoint."
+	title:       "HTTP"
+	description: "Batches log events to a generic [HTTP](\(urls.http)) endpoint."
 
 	classes: {
 		commonly_used: true
-		function:      "transmit"
 		service_providers: []
 		delivery:      "at_least_once"
 		development:   "stable"
 		egress_method: "batch"
 	}
 
-	input: {
-		logs:    true
-		metrics: false
-	}
-
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    1049000
-			max_events:   null
-			timeout_secs: 1
-		}
-		buffer: enabled: true
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "ndjson", "text"]
-		}
+		buffer: enabled:      true
 		healthcheck: enabled: true
-		request: {
-			enabled:                    true
-			in_flight_limit:            10
-			rate_limit_duration_secs:   1
-			rate_limit_num:             1000
-			retry_initial_backoff_secs: 1
-			retry_max_duration_secs:    10
-			timeout_secs:               30
-		}
-		tls: {
-			enabled:                true
-			can_enable:             false
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        false
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    1049000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
+			encoding: {
+				enabled: true
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "ndjson", "text"]
+				}
+			}
+			request: {
+				enabled:                    true
+				in_flight_limit:            10
+				rate_limit_duration_secs:   1
+				rate_limit_num:             1000
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               30
+			}
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
+			to: {
+				name:     "HTTP server"
+				thing:    "an \(name)"
+				url:      urls.http_server
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
 		}
 	}
 
@@ -95,7 +108,7 @@ components: sinks: http: {
 						warnings: []
 						type: string: {
 							enum: {
-								basic:  "The [basic authentication strategy][urls.basic_auth]."
+								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
 								bearer: "The bearer token authentication strategy."
 							}
 						}
@@ -137,5 +150,10 @@ components: sinks: http: {
 				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
+	}
+
+	input: {
+		logs:    true
+		metrics: null
 	}
 }

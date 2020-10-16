@@ -1,7 +1,7 @@
 package metadata
 
-components: transforms: remove_fields: {
-	title: "Remove Fields"
+components: transforms: ansi_stripper: {
+	title: "ANSI Stripper"
 
 	classes: {
 		commonly_used: false
@@ -10,7 +10,7 @@ components: transforms: remove_fields: {
 	}
 
 	features: {
-		shape: {}
+		sanitize: {}
 	}
 
 	support: {
@@ -29,18 +29,15 @@ components: transforms: remove_fields: {
 	}
 
 	configuration: {
-		drop_empty: {
-			common:      false
-			description: "If set to `true`, after removing fields, remove any parent objects that are now empty."
+		field: {
+			common:      true
+			description: "The target field to strip ANSI escape sequences from."
 			required:    false
 			warnings: []
-			type: bool: default: false
-		}
-		fields: {
-			description: "The log field names to drop."
-			required:    true
-			warnings: []
-			type: array: items: type: string: examples: ["field1", "field2", "parent.child"]
+			type: string: {
+				default: "message"
+				examples: ["message", "parent.child", "array[0]"]
+			}
 		}
 	}
 

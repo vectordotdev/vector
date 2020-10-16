@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: prometheus: {
-	title:             "Prometheus"
-	short_description: "Ingests data through the [Prometheus text exposition format][urls.prometheus_text_based_exposition_format] and outputs metric events."
-	long_description:  "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	title:       "Prometheus"
+	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: false
@@ -11,21 +10,14 @@ components: sources: prometheus: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			prometheus_client: {
-				required: true
-				title:    "Prometheus Client"
-				type:     "external"
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Prometheus"
+				thing:    "one or more \(name) endpoints"
 				url:      urls.prometheus_client
 				versions: null
 
@@ -40,7 +32,10 @@ components: sources: prometheus: {
 				}
 			}
 		}
+		multiline: enabled: false
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
