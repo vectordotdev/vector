@@ -26,7 +26,14 @@ inventory::submit! {
     SourceDescription::new::<StatsdConfig>("statsd")
 }
 
-impl GenerateConfig for StatsdConfig {}
+impl GenerateConfig for StatsdConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "0.0.0.0:8125".parse().unwrap(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "statsd")]
@@ -118,6 +125,11 @@ mod test {
     use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StatsdConfig>();
+    }
 
     fn parse_count(lines: &[&str], prefix: &str) -> usize {
         lines
