@@ -337,7 +337,7 @@ _values: {
 			common:       bool
 			max_bytes:    uint | null
 			max_events:   uint | null
-			timeout_secs: uint8
+			timeout_secs: uint16
 		})
 	}
 
