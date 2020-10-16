@@ -56,7 +56,7 @@ components: transforms: reduce: {
 				unit:    "milliseconds"
 			}
 		}
-		identifier_fields: {
+		group_by: {
 			common:      true
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
 			required:    false

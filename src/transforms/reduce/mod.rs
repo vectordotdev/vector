@@ -33,7 +33,7 @@ pub struct ReduceConfig {
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
     #[serde(default)]
-    pub identifier_fields: Vec<String>,
+    pub group_by: Vec<String>,
 
     #[serde(default)]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
@@ -143,7 +143,7 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
-    identifier_fields: Vec<String>,
+    group_by: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
@@ -157,12 +157,12 @@ impl Reduce {
             None
         };
 
-        let identifier_fields = config.identifier_fields.clone().into_iter().collect();
+        let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
             flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
-            identifier_fields,
+            group_by,
             merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),
             ends_when,
@@ -207,7 +207,7 @@ impl Transform for Reduce {
             .unwrap_or(false);
 
         let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, &self.identifier_fields);
+        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
         if ends_here {
             output.push(Event::from(
@@ -302,7 +302,7 @@ mod test {
     async fn reduce_from_condition() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 [ends_when]
   "test_end.exists" = true
@@ -368,7 +368,7 @@ identifier_fields = [ "request_id" ]
     async fn reduce_merge_strategies() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 merge_strategies.foo = "concat"
 merge_strategies.bar = "array"
@@ -427,10 +427,10 @@ merge_strategies.baz = "max"
     }
 
     #[tokio::test]
-    async fn missing_identifier() {
+    async fn missing_group_by() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 [ends_when]
   "test_end.exists" = true
@@ -495,7 +495,7 @@ identifier_fields = [ "request_id" ]
     async fn arrays() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 merge_strategies.foo = "array"
 merge_strategies.bar = "concat"
