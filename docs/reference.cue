@@ -532,7 +532,7 @@ _values: {
 #Runtime: {
 	name:    string
 	url:     string
-	version: string
+	version: string | null
 }
 
 #Service: {
