@@ -138,7 +138,12 @@ components: sinks: http: {
 			required:    false
 			warnings: []
 			type: object: {
-				examples: [{"Authorization": "${HTTP_TOKEN}"}, {"X-Powered-By": "Vector"}]
+				examples: [
+					{
+						"Authorization": "${HTTP_TOKEN}"
+						"X-Powered-By":  "Vector"
+					},
+				]
 				options: {}
 			}
 		}

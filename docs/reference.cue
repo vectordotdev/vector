@@ -504,6 +504,8 @@ _values: {
 
 #MetricType: "counter" | "gauge" | "histogram" | "summary"
 
+#Object: {[_=string]: #Any}
+
 #Output: {
 	logs?:    #LogOutput
 	metrics?: #MetricOutput
@@ -718,7 +720,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [...#Any]
+	examples: [#Object] | *[]
 
 	// `options` represent the child options for this option.
 	options: #Schema

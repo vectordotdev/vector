@@ -47,7 +47,12 @@ components: transforms: rename_fields: {
 					""",
 			]
 			type: object: {
-				examples: [{"old_field_name": "new_field_name"}, {"parent": {"old_child_name": "parent.new_child_name"}}]
+				examples: [
+					{
+						"old_field_name": "new_field_name"
+						"parent": {"old_child_name": "parent.new_child_name"}
+					},
+				]
 				options: {}
 			}
 		}
