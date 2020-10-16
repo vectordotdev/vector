@@ -33,7 +33,7 @@ components: transforms: log_to_metric: {
 			description: "A table of key/value pairs representing the keys to be added to the event."
 			required:    true
 			warnings: []
-			type: object: {
+			type: array: items: type: object: {
 				examples: []
 				options: {
 					field: {
@@ -46,9 +46,9 @@ components: transforms: log_to_metric: {
 					}
 					increment_by_value: {
 						description: """
-                If `true` the metric will be incremented by the `field` value.
-                If `false` the metric will be incremented by 1 regardless of the `field` value.
-                """
+	                If `true` the metric will be incremented by the `field` value.
+	                If `false` the metric will be incremented by 1 regardless of the `field` value.
+	                """
 						required: false
 						common:   false
 						warnings: []
@@ -81,9 +81,9 @@ components: transforms: log_to_metric: {
 							options: {
 								"*": {
 									description: """
-                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-                      Environment variables and field interpolation is allowed.
-                      """
+	                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+	                      Environment variables and field interpolation is allowed.
+	                      """
 									required: true
 									warnings: []
 									type: "*": {}
