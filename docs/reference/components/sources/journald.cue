@@ -164,4 +164,29 @@ components: sources: journald: {
 			}]
 		},
 	]
+
+	how_it_works: {
+		communication_strategy: {
+			title: "Communication Strategy"
+			body: """
+				To ensure the `journald` source works across all platforms, Vector interacts
+				with the Systemd journal via the `journalctl` command. This is accomplished by
+				spawning a [subprocess][urls.rust_subprocess] that Vector interacts
+				with. If the `journalctl` command is not in the environment path you can
+				specify the exact location via the `journalctl_path` option. For more
+				information on this communication strategy please see
+				[issue #1473][urls.issue_1473].
+				"""
+		}
+		non_ascii: {
+			title: "Non-ASCII Messages"
+			body: """
+				When `journald` has stored a message that is not strict ASCII,
+				`journalctl` will output it in an alternate format to prevent data
+				loss. Vector handles this alternate format by translating such messages
+				into UTF-8 in "lossy" mode, where characters that are not valid UTF-8
+				are replaced with the Unicode replacement character, `�`.
+				"""
+		}
+	}
 }
