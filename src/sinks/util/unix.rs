@@ -2,13 +2,13 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     internal_events::{
-        UnixSocketConnectionEstablished,
-        UnixSocketConnectionFailure,
-        UnixSocketError,
+        UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
         UnixSocketEventSent,
-        // UnixSocketFlushFailed, UnixSocketSendFailed,
     },
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSink},
+    sinks::util::{
+        acker_framed_write::AckerFramedWrite, encode_event, encoding::EncodingConfig, Encoding,
+        StreamSink,
+    },
     sinks::{Healthcheck, VectorSink},
     Event,
 };
@@ -17,12 +17,13 @@ use bytes::Bytes;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::task::{Context, Poll};
-use std::{path::PathBuf, time::Duration};
-use tokio::{
-    net::UnixStream,
-    time::{delay_for, Delay},
+use std::{
+    path::PathBuf,
+    pin::Pin,
+    task::{Context, Poll},
+    time::Duration,
 };
+use tokio::{net::UnixStream, time::delay_for};
 use tokio_retry::strategy::ExponentialBackoff;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
@@ -119,17 +120,10 @@ impl tower::Service<Bytes> for UnixService {
     }
 }
 
-enum UnixSinkState {
-    Connected(FramedWrite<UnixStream, BytesCodec>),
-    Disconnected,
-}
-
 pub struct UnixSink {
     path: PathBuf,
     acker: Acker,
     encoding: EncodingConfig<Encoding>,
-    state: UnixSinkState,
-    backoff: ExponentialBackoff,
 }
 
 impl UnixSink {
@@ -138,8 +132,6 @@ impl UnixSink {
             path,
             acker,
             encoding,
-            state: UnixSinkState::Disconnected,
-            backoff: Self::fresh_backoff(),
         }
     }
 
@@ -150,34 +142,29 @@ impl UnixSink {
             .max_delay(Duration::from_secs(60))
     }
 
-    fn next_delay(&mut self) -> Delay {
-        delay_for(self.backoff.next().unwrap())
-    }
-
-    async fn get_stream(&mut self) -> &mut FramedWrite<UnixStream, BytesCodec> {
+    async fn connect(&mut self) -> AckerFramedWrite<UnixStream, BytesCodec> {
+        let mut backoff = Self::fresh_backoff();
         loop {
-            match self.state {
-                UnixSinkState::Connected(ref mut stream) => return stream,
-                UnixSinkState::Disconnected => {
-                    debug!(
-                        message = "Connecting",
-                        path = %self.path.to_str().unwrap()
+            debug!(
+                message = "Connecting",
+                path = %self.path.to_str().unwrap()
+            );
+            match UnixStream::connect(self.path.clone()).await {
+                Ok(stream) => {
+                    emit!(UnixSocketConnectionEstablished { path: &self.path });
+                    return AckerFramedWrite::new(
+                        stream,
+                        BytesCodec::new(),
+                        self.acker.clone(),
+                        Box::new(|byte_size| emit!(UnixSocketEventSent { byte_size })),
                     );
-                    match UnixStream::connect(self.path.clone()).await {
-                        Ok(stream) => {
-                            emit!(UnixSocketConnectionEstablished { path: &self.path });
-                            let out = FramedWrite::new(stream, BytesCodec::new());
-                            self.state = UnixSinkState::Connected(out);
-                            self.backoff = Self::fresh_backoff()
-                        }
-                        Err(error) => {
-                            emit!(UnixSocketConnectionFailure {
-                                error,
-                                path: &self.path
-                            });
-                            self.next_delay().await
-                        }
-                    }
+                }
+                Err(error) => {
+                    emit!(UnixSocketConnectionFailure {
+                        error,
+                        path: &self.path
+                    });
+                    delay_for(backoff.next().unwrap()).await;
                 }
             }
         }
@@ -186,65 +173,25 @@ impl UnixSink {
 
 #[async_trait]
 impl StreamSink for UnixSink {
-    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // use futures::future;
-        // let encoding = self.encoding.clone();
-        // let encode_event = move |event| encode_event(event, &encoding);
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let encoding = self.encoding.clone();
+        let mut input = input
+            .map(|event| match encode_event(event, &encoding) {
+                Some(bytes) => bytes,
+                None => Bytes::new(),
+            })
+            .map(Ok)
+            .peekable();
 
-        // let mut slot = None;
-        // loop {
-        //     let stream = self.get_stream().await;
-
-        //     let mut stream_error = None;
-        //     tokio::select! {
-        //         // poll_ready => start_send
-        //         // poll_flush => ack
-        //         // next => slot
-        //         event = input.next(), if slot.is_none() => match event {
-        //             Some(event) => slot = encode_event(event),
-        //             None => break,
-        //         },
-        //         ready = future::poll_fn(|cx| stream.poll_ready_unpin(cx)), if slot.is_some() => match ready {
-        //             Ok(()) => match stream.start_send(slot.take().expect("slot should not be empty")) {
-
-        //             },
-        //             Err(error) => {
-        //                 stream_error = Some(error);
-        //                 // emit!(UnixSocketError { error, path: &self.path });
-        //                 // self.state = UnixSinkState::Disconnected;
-        //             }
-        //         },
-        //     };
-        // }
-
-        // TODO: use select! for `input.next()` & `stream.start_send / stream.poll_flush`.
-        while let Some(event) = input.next().await {
-            if let Some(bytes) = encode_event(event, &self.encoding) {
-                let stream = self.get_stream().await;
-
-                let byte_size = bytes.len();
-                match stream.send(bytes).await {
-                    Ok(()) => emit!(UnixSocketEventSent { byte_size }),
-                    Err(error) => {
-                        emit!(UnixSocketError {
-                            error,
-                            path: &self.path
-                        });
-                        self.state = UnixSinkState::Disconnected;
-                    }
-                };
-            }
-
-            self.acker.ack(1);
-        }
-
-        if let UnixSinkState::Connected(stream) = &mut self.state {
-            if let Err(error) = stream.close().await {
+        while Pin::new(&mut input).peek().await.is_some() {
+            let mut sink = self.connect().await;
+            if let Err(error) = sink.send_all(&mut input).await {
                 emit!(UnixSocketError {
                     error,
                     path: &self.path
                 });
             }
+            sink.ack_left();
         }
 
         Ok(())

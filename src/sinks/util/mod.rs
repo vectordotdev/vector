@@ -1,3 +1,4 @@
+pub mod acker_framed_write;
 pub mod auto_concurrency;
 pub mod batch;
 pub mod buffer;
