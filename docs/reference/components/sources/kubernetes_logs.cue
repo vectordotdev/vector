@@ -157,6 +157,40 @@ components: sources: kubernetes_logs: {
 		fields: {}
 	}
 
+	examples: [
+		{
+			title: "Sample Output"
+			configuration: {
+				type: "kubernetes_logs"
+			}
+			input: """
+				```text
+				F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable
+				```
+				"""
+			output: log: {
+				"file": "/var/log/pods/kube-system_storage-provisioner_93bde4d0-9731-4785-a80e-cd27ba8ad7c2/storage-provisioner/1.log"
+				"kubernetes": {
+					"container_image": "gcr.io/k8s-minikube/storage-provisioner:v3"
+					"container_name":  "storage-provisioner"
+					"pod_labels": {
+						"addonmanager.kubernetes.io/mode": "Reconcile"
+						"gcp-auth-skip-secret":            "true"
+						"integration-test":                "storage-provisioner"
+					}
+					"pod_name":      "storage-provisioner"
+					"pod_namespace": "kube-system"
+					"pod_node_name": "minikube"
+					"pod_uid":       "93bde4d0-9731-4785-a80e-cd27ba8ad7c2"
+				}
+				"message":     "F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable"
+				"source_type": "kubernetes_logs"
+				"stream":      "stderr"
+				"timestamp":   "2020-10-15T11:01:46.499555308Z"
+			}
+		},
+	]
+
 	how_it_works: {
 		connecting_to_kubernetes_api: {
 			title: "Connecting To The Kubernetes API server"
