@@ -84,6 +84,48 @@ impl SourceConfig for ApacheMetricsConfig {
     }
 }
 
+trait UriExt {
+    fn to_sanitized_string(&self) -> String;
+
+    fn sanitized_authority(&self) -> String;
+}
+
+impl UriExt for http::Uri {
+    fn to_sanitized_string(&self) -> String {
+        let mut s = String::new();
+
+        if let Some(scheme) = self.scheme() {
+            s.push_str(scheme.as_str());
+            s.push_str("://");
+        }
+
+        s.push_str(&self.sanitized_authority());
+
+        s.push_str(self.path());
+
+        if let Some(query) = self.query() {
+            s.push_str(query);
+        }
+
+        s
+    }
+
+    fn sanitized_authority(&self) -> String {
+        let mut s = String::new();
+
+        if let Some(host) = self.host() {
+            s.push_str(host);
+        }
+
+        if let Some(port) = self.port() {
+            s.push_str(":");
+            s.push_str(port.as_str());
+        }
+
+        s
+    }
+}
+
 fn apache_metrics(
     urls: Vec<http::Uri>,
     interval: u64,
@@ -101,16 +143,15 @@ fn apache_metrics(
         .map(move |url| {
             let https = HttpsConnector::new().expect("TLS initialization failed");
             let client = Client::builder().build(https);
+            let sanitized_url = url.to_sanitized_string();
 
             let request = Request::get(&url)
                 .body(Body::empty())
                 .expect("error creating request");
 
             let mut tags: BTreeMap<String, String> = BTreeMap::new();
-            tags.insert("endpoint".into(), url.to_string());
-            if let Some(host) = url.host() {
-                tags.insert("host".into(), host.into());
-            }
+            tags.insert("endpoint".into(), sanitized_url.to_string());
+            tags.insert("host".into(), url.sanitized_authority());
 
             let start = Instant::now();
             let namespace = namespace.clone();
@@ -148,7 +189,7 @@ fn apache_metrics(
                                     Err(e) => {
                                         emit!(ApacheMetricsParseError {
                                             error: e,
-                                            url: url.clone(),
+                                            url: &sanitized_url,
                                         });
                                         None
                                     }
@@ -164,7 +205,7 @@ fn apache_metrics(
                         Ok((header, _)) => {
                             emit!(ApacheMetricsErrorResponse {
                                 code: header.status,
-                                url: url.clone(),
+                                url: &sanitized_url,
                             });
                             Some(
                                 stream::iter(vec![Metric {
@@ -181,7 +222,7 @@ fn apache_metrics(
                         Err(error) => {
                             emit!(ApacheMetricsHttpError {
                                 error,
-                                url: url.clone()
+                                url: &sanitized_url
                             });
                             Some(
                                 stream::iter(vec![Metric {
@@ -282,7 +323,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         let (tx, rx) = Pipeline::new_test();
 
         let source = ApacheMetricsConfig {
-            endpoints: vec![format!("http://{}", in_addr)],
+            endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
             scrape_interval_secs: 1,
             namespace: "custom".to_string(),
         }
@@ -307,7 +348,20 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .collect::<Vec<_>>();
 
         match metrics.iter().find(|m| m.name == "custom_up") {
-            Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
+            Some(m) => {
+                assert_eq!(m.value, MetricValue::Gauge { value: 1.0 });
+
+                match &m.tags {
+                    Some(tags) => {
+                        assert_eq!(
+                            tags.get("endpoint"),
+                            Some(&format!("http://{}/metrics", in_addr))
+                        );
+                        assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
+                    }
+                    None => error!("no tags for metric {:?}", m),
+                }
+            }
             None => error!("could not find apache_up metric in {:?}", metrics),
         }
     }
