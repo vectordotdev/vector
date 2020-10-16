@@ -1,79 +1,81 @@
 package metadata
 
 components: sinks: datadog_metrics: {
-  title: "Datadog Metrics"
-  short_description: "Batches metric events to [Datadog's][urls.datadog] metrics service using [HTTP API](https://docs.datadoghq.com/api/?lang=bash#metrics)."
-  long_description: "[Datadog][urls.datadog] is a monitoring service for cloud-scale applications, providing monitoring of servers, databases, tools, and services, through a SaaS-based data analytics platform."
+	title: "Datadog Metrics"
 
-  classes: {
-    commonly_used: false
-    function: "transmit"
-    service_providers: ["Datadog"]
-  }
+	description: sinks._datadog.description
+	classes:     sinks._datadog.classes
 
-  features: {
-    batch: {
-      enabled: true
-      common: false,
-      max_events: 20,
-      timeout_secs: 1
-    }
-    buffer: enabled: false
-    compression: enabled: false
-    encoding: enabled: false
-    healthcheck: enabled: true
-    request: {
-      enabled: true
-      in_flight_limit: 5,
-      rate_limit_duration_secs: 1,
-      rate_limit_num: 5,
-      retry_initial_backoff_secs: 1,
-      retry_max_duration_secs: 10,
-      timeout_secs: 60
-    }
-    tls: enabled: false
-  }
+	features: {
+		buffer: enabled:      false
+		healthcheck: enabled: true
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    null
+				max_events:   20
+				timeout_secs: 1
+			}
+			compression: enabled: false
+			encoding: enabled:    false
+			request: {
+				enabled:                    true
+				in_flight_limit:            5
+				rate_limit_duration_secs:   1
+				rate_limit_num:             5
+				retry_initial_backoff_secs: 1
+				retry_max_duration_secs:    10
+				timeout_secs:               60
+			}
+			tls: enabled: false
+			to: {
+				name:     "Datadog metrics"
+				thing:    "a \(name) account"
+				url:      urls.datadog_metrics
+				versions: null
 
-  statuses: {
-    delivery: "at_least_once"
-    development: "beta"
-  }
+				interface: {
+					socket: {
+						api: {
+							title: "Datadog metrics API"
+							url:   urls.datadog_metrics_endpoints
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
+		}
+	}
 
-  support: {
-    input_types: ["metric"]
+	support: sinks._datadog.support
 
-    platforms: {
-      "aarch64-unknown-linux-gnu": true
-      "aarch64-unknown-linux-musl": true
-      "x86_64-apple-darwin": true
-      "x86_64-pc-windows-msv": true
-      "x86_64-unknown-linux-gnu": true
-      "x86_64-unknown-linux-musl": true
-    }
+	configuration: {
+		api_key:  sinks._datadog.configuration.api_key
+		endpoint: sinks._datadog.configuration.endpoint
+		namespace: {
+			common:      true
+			description: "A prefix that will be added to all metric names."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["service"]
+			}
+		}
+	}
 
-    requirements: []
-    warnings: []
-  }
-
-  configuration: {
-    api_key: {
-      description: "Datadog [API key](https://docs.datadoghq.com/api/?lang=bash#authentication)"
-      required: true
-      warnings: []
-      type: string: {
-        examples: ["${DATADOG_API_KEY}","ef8d5de700e7989468166c40fc8a0ccd"]
-      }
-    }
-    namespace: {
-      common: true
-      description: "A prefix that will be added to all metric names."
-      required: false
-      warnings: []
-      type: string: {
-        default: null
-        examples: ["service"]
-      }
-    }
-  }
+	input: {
+		logs: false
+		metrics: {
+			counter:      true
+			distribution: true
+			gauge:        true
+			histogram:    true
+			set:          true
+			summary:      true
+		}
+	}
 }
-
