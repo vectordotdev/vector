@@ -20,7 +20,7 @@ components: sinks: [Name=string]: {
 			endpoint: {
 				common:        false
 				description:   "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
-				relevant_when: "`region` = null"
+				relevant_when: "region = null"
 				required:      false
 				type: string: {
 					default: null
@@ -31,7 +31,7 @@ components: sinks: [Name=string]: {
 			region: {
 				description:   "The [AWS region](\(urls.aws_regions)) of the target service. If `endpoint` is provided it will override this value since the endpoint includes the region."
 				required:      true
-				relevant_when: "`endpoint` = null"
+				relevant_when: "endpoint = null"
 				type: string: {
 					examples: ["us-east-1"]
 				}

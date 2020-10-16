@@ -23,7 +23,7 @@ components: sinks: _sematext: {
 		endpoint: {
 			common:        false
 			description:   "The endpoint to send data to."
-			relevant_when: "`region` is not set"
+			relevant_when: "region is not set"
 			required:      false
 			type: string: {
 				default: null
@@ -33,7 +33,7 @@ components: sinks: _sematext: {
 		region: {
 			description:   "The region to send data to."
 			required:      true
-			relevant_when: "`endpoint` is not set"
+			relevant_when: "endpoint is not set"
 			warnings: []
 			type: string: {
 				enum: {

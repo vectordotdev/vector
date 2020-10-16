@@ -584,8 +584,8 @@ _values: {
 	// specify that here. We accept a string to allow for the expression of
 	// complex requirements.
 	//
-	//              relevant_when: '`strategy` = "fingerprint"'
-	//              relevant_when: '`strategy` = "fingerprint" or "inode"'
+	//              relevant_when: 'strategy = "fingerprint"'
+	//              relevant_when: 'strategy = "fingerprint" or "inode"'
 	relevant_when?: string
 
 	// `required` requires the option to be set.
