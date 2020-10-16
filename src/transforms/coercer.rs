@@ -8,19 +8,20 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct CoercerConfig {
-    types: HashMap<Atom, String>,
+    types: HashMap<String, String>,
     drop_unspecified: bool,
 }
 
 inventory::submit! {
     TransformDescription::new::<CoercerConfig>("coercer")
 }
+
+impl_generate_config_from_default!(CoercerConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
@@ -47,7 +48,7 @@ impl TransformConfig for CoercerConfig {
 }
 
 pub struct Coercer {
-    types: HashMap<Atom, Conversion>,
+    types: HashMap<String, Conversion>,
     drop_unspecified: bool,
 }
 
@@ -99,6 +100,11 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CoercerConfig>();
+    }
+
     async fn parse_it(extra: &str) -> LogEvent {
         let mut event = Event::from("dummy message");
         for &(key, value) in &[
@@ -129,20 +135,20 @@ mod tests {
     #[tokio::test]
     async fn converts_valid_fields() {
         let log = parse_it("").await;
-        assert_eq!(log[&"number".into()], Value::Integer(1234));
-        assert_eq!(log[&"bool".into()], Value::Boolean(true));
+        assert_eq!(log["number"], Value::Integer(1234));
+        assert_eq!(log["bool"], Value::Boolean(true));
     }
 
     #[tokio::test]
     async fn leaves_unnamed_fields_as_is() {
         let log = parse_it("").await;
-        assert_eq!(log[&"other".into()], Value::Bytes("no".into()));
+        assert_eq!(log["other"], Value::Bytes("no".into()));
     }
 
     #[tokio::test]
     async fn drops_nonconvertible_fields() {
         let log = parse_it("").await;
-        assert!(log.get(&"float".into()).is_none());
+        assert!(log.get("float").is_none());
     }
 
     #[tokio::test]
