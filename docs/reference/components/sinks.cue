@@ -272,9 +272,11 @@ components: sinks: [Name=string]: {
 
 		if sinks[Name].features.send != _|_ {
 			if sinks[Name].features.send.tls.enabled {
-				tls: configuration._tls & {_args: {
-					can_enable:      sinks[Name].features.send.tls.can_enable
-					enabled_default: sinks[Name].features.send.tls.enabled_default
+				tls: configuration._tls_connect & {_args: {
+					can_enable:             sinks[Name].features.send.tls.can_enable
+					can_verify_certificate: sinks[Name].features.send.tls.can_enable
+					can_verify_hostname:    sinks[Name].features.send.tls.can_verify_hostname
+					enabled_default:        sinks[Name].features.send.tls.enabled_default
 				}}
 			}
 		}
