@@ -1,5 +1,0 @@
-[releases."0.8.1"]
-date = 2020-03-04
-commits = [
-{sha = "5d9aa496338aff6926e8d447e150858468b8a603", message = "fix(humio_logs sink): Correct typetag (#1972)", author = "Lucio Franco", date = 2020-03-03T15:21:30Z, files_count = 1, insertions_count = 1, deletions_count = 1}
-]

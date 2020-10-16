@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     sinks::{
         util::{self, encoding::EncodingConfig, tcp::TcpSink, Encoding, StreamSinkOld, UriSerde},
@@ -21,8 +21,10 @@ pub struct DatadogLogsConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<DatadogLogsConfig>("datadog_logs")
+    SinkDescription::new::<DatadogLogsConfig>("datadog_logs")
 }
+
+impl GenerateConfig for DatadogLogsConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_logs")]
@@ -74,15 +76,15 @@ fn encode_event(
 ) -> Option<Bytes> {
     let log = event.as_mut_log();
 
-    if let Some(message) = log.remove(&log_schema().message_key()) {
+    if let Some(message) = log.remove(log_schema().message_key()) {
         log.insert("message", message);
     }
 
-    if let Some(timestamp) = log.remove(&log_schema().timestamp_key()) {
+    if let Some(timestamp) = log.remove(log_schema().timestamp_key()) {
         log.insert("date", timestamp);
     }
 
-    if let Some(host) = log.remove(&log_schema().host_key()) {
+    if let Some(host) = log.remove(log_schema().host_key()) {
         log.insert("host", host);
     }
 
