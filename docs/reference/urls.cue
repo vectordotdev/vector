@@ -177,6 +177,7 @@ urls: {
 	kubernetes_daemonset:                                     "https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/"
 	kubernetes_example_daemonset:                             "https://github.com/timberio/vector/blob/master/config/kubernetes/vector-daemonset.yaml"
 	kubernetes_limit_resources:                               "https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/"
+	kubernetes_logging_architecture:                          "https://kubernetes.io/docs/concepts/cluster-administration/logging/"
 	kubernetes_rbac:                                          "https://kubernetes.io/docs/reference/access-authn-authz/rbac/"
 	kubernetes_request_verbs:                                 "https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb"
 	kubernetes_watch_api:                                     "https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.10/#watch-30"

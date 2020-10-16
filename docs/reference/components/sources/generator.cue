@@ -13,7 +13,7 @@ components: sources: generator: {
 
 	features: {
 		multiline: enabled: false
-		test: {}
+		generate: {}
 	}
 
 	support: {
@@ -45,11 +45,11 @@ components: sources: generator: {
 		}
 		count: {
 			common:      false
-			description: "The number of times to repeat outputting the `lines`."
+			description: "The number of times to repeat outputting the `lines`. By default the source will continuously print logs (infinite)."
 			required:    false
 			warnings: []
 			type: uint: {
-				default: 0
+				default: null
 				unit:    null
 			}
 		}
