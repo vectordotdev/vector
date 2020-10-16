@@ -182,35 +182,18 @@ impl TcpSource for StatsdTcpSource {
     }
 }
 
-#[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        config,
-        sinks::prometheus::PrometheusSinkConfig,
-        test_util::{next_addr, start_topology},
-    };
-    use futures::{compat::Future01CompatExt, TryStreamExt};
-    use futures01::Stream;
+    use crate::test_util::next_addr;
     use tokio::sync::mpsc;
-    use tokio::time::{delay_for, Duration};
 
     #[test]
     fn test_generate_config() {
         crate::test_util::test_generate_config::<StatsdConfig>();
     }
 
-    fn parse_count(lines: &[&str], prefix: &str) -> usize {
-        lines
-            .iter()
-            .find(|s| s.starts_with(prefix))
-            .map(|s| s.split_whitespace().nth(1).unwrap())
-            .unwrap()
-            .parse::<usize>()
-            .unwrap()
-    }
-
+    #[cfg_attr(not(feature = "sinks-prometheus"), ignore)]
     #[tokio::test]
     async fn test_statsd_udp() {
         let in_addr = next_addr();
@@ -231,6 +214,7 @@ mod test {
         test_statsd(config, sender).await;
     }
 
+    #[cfg_attr(not(feature = "sinks-prometheus"), ignore)]
     #[tokio::test]
     async fn test_statsd_tcp() {
         let in_addr = next_addr();
@@ -259,6 +243,7 @@ mod test {
     }
 
     #[cfg(unix)]
+    #[cfg_attr(not(feature = "sinks-prometheus"), ignore)]
     #[tokio::test]
     async fn test_statsd_unix() {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
@@ -284,12 +269,25 @@ mod test {
         test_statsd(config, sender).await;
     }
 
+    #[cfg(not(feature = "sinks-prometheus"))]
+    async fn test_statsd(_: StatsdConfig, _: mpsc::Sender<&'static [u8]>) {}
+
+    #[cfg(feature = "sinks-prometheus")]
     async fn test_statsd(
         statsd_config: StatsdConfig,
         // could use unbounded channel,
         // but we want to reserve the order messages.
         mut sender: mpsc::Sender<&'static [u8]>,
     ) {
+        use crate::{
+            config,
+            sinks::prometheus::PrometheusSinkConfig,
+            test_util::{next_addr, start_topology},
+        };
+        use futures::{compat::Future01CompatExt, TryStreamExt};
+        use futures01::Stream;
+        use tokio::time::{delay_for, Duration};
+
         let out_addr = next_addr();
 
         let mut config = config::Config::builder();
@@ -430,5 +428,16 @@ mod test {
 
         // Shut down server
         topology.stop().compat().await.unwrap();
+    }
+
+    #[cfg(feature = "sinks-prometheus")]
+    fn parse_count(lines: &[&str], prefix: &str) -> usize {
+        lines
+            .iter()
+            .find(|s| s.starts_with(prefix))
+            .map(|s| s.split_whitespace().nth(1).unwrap())
+            .unwrap()
+            .parse::<usize>()
+            .unwrap()
     }
 }
