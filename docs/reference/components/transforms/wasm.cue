@@ -21,12 +21,12 @@ components: transforms: wasm: {
 
 	support: {
 		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
+			"aarch64-unknown-linux-gnu":  false
+			"aarch64-unknown-linux-musl": false
+			"x86_64-apple-darwin":        false
+			"x86_64-pc-windows-msv":      false
 			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
+			"x86_64-unknown-linux-musl":  false
 		}
 
 		requirements: []
