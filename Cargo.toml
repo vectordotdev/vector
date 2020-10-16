@@ -400,7 +400,7 @@ sinks = [
   "sinks-gcp",
   "sinks-honeycomb",
   "sinks-http",
-  "sinks-humio_logs",
+  "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
   "sinks-logdna",
@@ -430,7 +430,7 @@ sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
 sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
-sinks-humio_logs = ["sinks-splunk_hec"]
+sinks-humio = ["sinks-splunk_hec"]
 sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
@@ -485,7 +485,7 @@ es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
-humio-integration-tests = ["sinks-humio_logs"]
+humio-integration-tests = ["sinks-humio"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]

@@ -40,8 +40,8 @@ pub mod gcp;
 pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
 pub mod http;
-#[cfg(feature = "sinks-humio_logs")]
-pub mod humio_logs;
+#[cfg(feature = "sinks-humio")]
+pub mod humio;
 #[cfg(feature = "sinks-influxdb")]
 pub mod influxdb;
 #[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
