@@ -1,39 +1,41 @@
 package metadata
 
 components: sinks: file: {
-	title:             "File"
-	short_description: "Streams log events to a file."
-	long_description:  "Streams log events to a file."
+	title: "File"
 
 	classes: {
 		commonly_used: false
-		function:      "transmit"
+		delivery:      "at_least_once"
+
+		development:   "beta"
+		egress_method: "stream"
 		service_providers: []
 	}
 
 	features: {
-		batch: enabled:  false
-		buffer: enabled: false
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: {
-			enabled: true
-			default: null
-			json:    null
-			ndjson:  null
-			text:    null
-		}
+		buffer: enabled:      false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
+		send: {
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
+			encoding: {
+				enabled: true
+				codec: {
+					enabled: true
+					default: null
+					enum: ["ndjson", "text"]
+				}
+			}
+			request: enabled: false
+			tls: enabled:     false
+		}
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -45,6 +47,7 @@ components: sinks: file: {
 
 		requirements: []
 		warnings: []
+		notices: []
 	}
 
 	configuration: {
@@ -65,6 +68,23 @@ components: sinks: file: {
 			type: string: {
 				examples: ["/tmp/vector-%Y-%m-%d.log", "/tmp/application-{{ application_id }}-%Y-%m-%d.log"]
 			}
+		}
+	}
+
+	input: {
+		logs:    true
+		metrics: null
+	}
+
+	how_it_works: {
+		dir_and_file_creation: {
+			title: "File & Directory Creation"
+			body: """
+				Vector will attempt to create the entire directory structure
+				and the file when emitting events to the file sink. This
+				requires that the Vector agent have the correct permissions
+				to create and write to files in the specified directories.
+				"""
 		}
 	}
 }

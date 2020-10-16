@@ -156,26 +156,26 @@ components: sinks: loki: {
 	how_it_works: {
 		decentralized_deployments: {
 			title: "Decentralized Deployments"
-			body:	"""
-					Loki currently does not support out-of-order inserts. If
-					Vector is deployed in a decentralized setup then there is
-					the possibility that logs might get rejected due to data
-					races between Vector instances. To avoid this we suggest
-					either assigning each Vector instance with a unique label
-					or deploying a centralized Vector which will ensure no logs
-					will get sent out-of-order.
-					"""
+			body: """
+				Loki currently does not support out-of-order inserts. If
+				Vector is deployed in a decentralized setup then there is
+				the possibility that logs might get rejected due to data
+				races between Vector instances. To avoid this we suggest
+				either assigning each Vector instance with a unique label
+				or deploying a centralized Vector which will ensure no logs
+				will get sent out-of-order.
+				"""
 		}
 
 		event_ordering: {
 			title: "Event Ordering"
-			body:	"""
-					The `loki` sink will ensure that all logs are sorted via
-					their `timestamp`. This is to ensure that logs will be
-					accepted by Loki. If no timestamp is supplied with events
-					then the Loki sink will supply its own monotonically
-					increasing timestamp.
-					"""
+			body: """
+				The `loki` sink will ensure that all logs are sorted via
+				their `timestamp`. This is to ensure that logs will be
+				accepted by Loki. If no timestamp is supplied with events
+				then the Loki sink will supply its own monotonically
+				increasing timestamp.
+				"""
 		}
 	}
 }
