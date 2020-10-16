@@ -157,6 +157,13 @@ components: sources: syslog: {
 	]
 
 	how_it_works: {
+		line_delimiters: {
+			title: "Line Delimiters"
+			body: """
+				Each line is read until a new line delimiter, the `0xA` byte, is found.
+				"""
+		}
+
 		parsing: {
 			title: "Parsing"
 			body:  """

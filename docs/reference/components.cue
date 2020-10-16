@@ -182,9 +182,9 @@ components: {
 					if Args.can_verify_certificate {
 						verify_certificate: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host."
+							description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
 							required:    false
-							type: bool: default: true
+							type: bool: default: false
 						}
 					}
 				}
