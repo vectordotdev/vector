@@ -19,8 +19,8 @@ impl FormatTimestampFn {
 
 impl Function for FormatTimestampFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
-        let format = required!(ctx, self.format, Value::Bytes(b) => String::from_utf8_lossy(&b).into_owned());
-        let ts = required!(ctx, self.query, Value::Timestamp(ts) => ts);
+        let format = required_value!(ctx, self.format, Value::Bytes(b) => String::from_utf8_lossy(&b).into_owned());
+        let ts = required_value!(ctx, self.query, Value::Timestamp(ts) => ts);
 
         try_format(&ts, &format).map(QueryValue::from_value)
     }
@@ -104,7 +104,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

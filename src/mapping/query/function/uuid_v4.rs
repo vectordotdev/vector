@@ -34,8 +34,8 @@ mod tests {
 
     #[test]
     fn uuid_v4() {
-        match UuidV4Fn::new().execute(&Event::from("")).unwrap().into() {
-            Value::Bytes(value) => {
+        match UuidV4Fn::new().execute(&Event::from("")).unwrap() {
+            QueryValue::Value(Value::Bytes(value)) => {
                 uuid::Uuid::parse_str(std::str::from_utf8(&value).unwrap()).expect("valid UUID V4")
             }
             _ => panic!("unexpected uuid_v4 output"),

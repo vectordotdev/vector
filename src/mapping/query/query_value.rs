@@ -33,14 +33,3 @@ impl From<Regex> for QueryValue {
         Self::Regex(value)
     }
 }
-
-impl From<QueryValue> for Value {
-    fn from(value: QueryValue) -> Self {
-        use QueryValue::*;
-
-        match value {
-            Value(v) => v,
-            Regex(r) => r.into(),
-        }
-    }
-}

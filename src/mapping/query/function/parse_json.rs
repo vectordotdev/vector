@@ -14,8 +14,8 @@ impl ParseJsonFn {
 
 impl Function for ParseJsonFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
-        match self.query.execute(ctx)?.into() {
-            Value::Bytes(b) => serde_json::from_slice(&b)
+        match self.query.execute(ctx)? {
+            QueryValue::Value(Value::Bytes(b)) => serde_json::from_slice(&b)
                 .map(|v: serde_json::Value| {
                     let v: Value = v.into();
                     v.into()
@@ -79,7 +79,7 @@ mod tests {
                         .insert("foo", Value::from("{\"field\": \"value\"}"));
                     event
                 },
-                Ok(Value::Map({
+                Ok(Value::from({
                     let mut map = BTreeMap::new();
                     map.insert("field".into(), Value::from("value"));
                     map
@@ -100,7 +100,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

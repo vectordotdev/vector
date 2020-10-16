@@ -17,20 +17,18 @@ impl ToFloatFn {
 impl Function for ToFloatFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         match self.query.execute(ctx) {
-            Ok(v) => {
-                let value = v.into();
-                match value {
-                    Value::Float(_) => Ok(value.into()),
-                    Value::Integer(i) => Ok(Value::Float(i as f64).into()),
-                    Value::Bytes(_) => Conversion::Float
-                        .convert(value)
-                        .map(Into::into)
-                        .map_err(|e| e.to_string()),
-                    Value::Boolean(b) => Ok(Value::Float(if b { 1.0 } else { 0.0 }).into()),
-                    Value::Timestamp(t) => Ok(Value::Float(t.timestamp() as f64).into()),
-                    _ => unexpected_type!(value),
-                }
-            }
+            Ok(QueryValue::Value(value)) => match value {
+                Value::Float(_) => Ok(value.into()),
+                Value::Integer(i) => Ok(Value::Float(i as f64).into()),
+                Value::Bytes(_) => Conversion::Float
+                    .convert(value)
+                    .map(Into::into)
+                    .map_err(|e| e.to_string()),
+                Value::Boolean(b) => Ok(Value::Float(if b { 1.0 } else { 0.0 }).into()),
+                Value::Timestamp(t) => Ok(Value::Float(t.timestamp() as f64).into()),
+                _ => unexpected_type!(value),
+            },
+            Ok(query) => unexpected_type!(query),
             Err(err) => Err(err),
         }
         .or_else(|err| match &self.default {
@@ -108,7 +106,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

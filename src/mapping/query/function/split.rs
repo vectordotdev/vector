@@ -25,11 +25,10 @@ impl SplitFn {
 impl Function for SplitFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let string = {
-            let bytes = required!(ctx, self.path, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.path, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
-
-        let limit = optional!(ctx, self.limit, Value::Integer(i) => i)
+        let limit = optional_value!(ctx, self.limit, Value::Integer(i) => i)
             .map(|limit| {
                 if limit < 0 {
                     Err("limit is not a positive number".to_string())
@@ -106,8 +105,8 @@ impl TryFrom<ArgumentList> for SplitFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::regex::Regex;
     use crate::mapping::query::path::Path;
+    use crate::mapping::query::regex::Regex;
 
     #[test]
     fn check_split() {
@@ -191,7 +190,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

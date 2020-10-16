@@ -16,7 +16,7 @@ impl TokenizeFn {
 impl Function for TokenizeFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = {
-            let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
@@ -73,7 +73,7 @@ mod tests {
                 )];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 

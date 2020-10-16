@@ -14,8 +14,8 @@ impl StripWhitespaceFn {
 
 impl Function for StripWhitespaceFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
-        match self.query.execute(ctx)?.into() {
-            Value::Bytes(b) => std::str::from_utf8(&b)
+        match self.query.execute(ctx)? {
+            QueryValue::Value(Value::Bytes(b)) => std::str::from_utf8(&b)
                 .map(|s| Value::Bytes(b.slice_ref(s.trim().as_bytes())))
                 .map(Into::into)
                 .map_err(|_| {
@@ -110,7 +110,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

@@ -17,8 +17,7 @@ impl ToIntegerFn {
 impl Function for ToIntegerFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         match self.query.execute(ctx) {
-            Ok(v) => {
-                let value = v.into();
+            Ok(QueryValue::Value(value)) => {
                 match value {
                     Value::Integer(_) => Ok(value.into()),
                     Value::Float(f) => Ok(Value::Integer(f as i64).into()),
@@ -31,6 +30,7 @@ impl Function for ToIntegerFn {
                     _ => unexpected_type!(value),
                 }
             }
+            Ok(query) => unexpected_type!(query),
             Err(err) => Err(err),
         }
         .or_else(|err| match &self.default {
@@ -108,7 +108,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

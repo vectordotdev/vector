@@ -26,51 +26,42 @@ impl TruncateFn {
 
 impl Function for TruncateFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
-        let value = self.query.execute(ctx)?.into();
-        if let Value::Bytes(bytes) = value {
-            let limit = match self.limit.execute(ctx)?.into() {
-                // If the result of execution is a float, we take the floor as our limit.
-                Value::Float(f) => f.floor() as usize,
-                Value::Integer(i) if i >= 0 => i as usize,
-                _ => return Err("limit is not a positive number".into()),
-            };
+        let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
 
-            let ellipsis = match &self.ellipsis {
-                None => false,
-                Some(v) => match v.execute(ctx)?.into() {
-                    Value::Boolean(value) => value,
-                    v => unexpected_type!(v),
-                },
-            };
+        let limit = required_value!(ctx, self.limit,
+                                    Value::Float(f) if f >= 0.0 => f.floor() as usize,
+                                    Value::Integer(i) if i >= 0 => i as usize,
+        );
 
-            if let Ok(s) = std::str::from_utf8(&bytes) {
-                let pos = if let Some((pos, chr)) = s.char_indices().take(limit).last() {
-                    // char_indices gives us the starting position of the character at limit,
-                    // we want the end position.
-                    pos + chr.len_utf8()
-                } else {
-                    // We have an empty string
-                    0
-                };
+        let ellipsis = optional_value!(ctx, self.ellipsis,
+                                 Value::Boolean(value) => value)
+        .unwrap_or_default();
 
-                if s.len() <= pos {
-                    // No truncating necessary.
-                    Ok(Value::Bytes(bytes).into())
-                } else if ellipsis {
-                    // Allocate a new string to add the ellipsis to.
-                    let mut new = s[0..pos].to_string();
-                    new.push_str("...");
-                    Ok(Value::Bytes(new.into()).into())
-                } else {
-                    // Just pull the relevant part out of the original parameter.
-                    Ok(Value::Bytes(bytes.slice(0..pos)).into())
-                }
+        if let Ok(s) = std::str::from_utf8(&bytes) {
+            let pos = if let Some((pos, chr)) = s.char_indices().take(limit).last() {
+                // char_indices gives us the starting position of the character at limit,
+                // we want the end position.
+                pos + chr.len_utf8()
             } else {
-                // Not a valid utf8 string.
-                Err("unable to truncate from non-unicode string types".to_string())
+                // We have an empty string
+                0
+            };
+
+            if s.len() <= pos {
+                // No truncating necessary.
+                Ok(Value::Bytes(bytes).into())
+            } else if ellipsis {
+                // Allocate a new string to add the ellipsis to.
+                let mut new = s[0..pos].to_string();
+                new.push_str("...");
+                Ok(Value::Bytes(new.into()).into())
+            } else {
+                // Just pull the relevant part out of the original parameter.
+                Ok(Value::Bytes(bytes.slice(0..pos)).into())
             }
         } else {
-            Err("unable to truncate non-string types".to_string())
+            // Not a valid utf8 string.
+            Err("unable to truncate from non-unicode string types".to_string())
         }
     }
 
@@ -222,19 +213,6 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert("foo", Value::Float(3.0));
-                    event
-                },
-                Err("unable to truncate non-string types".to_string()),
-                TruncateFn::new(
-                    Box::new(Path::from(vec![vec!["foo"]])),
-                    Box::new(Literal::from(Value::Float(5.0))),
-                    Some(Value::Boolean(true)),
-                ),
-            ),
-            (
-                {
-                    let mut event = Event::from("");
                     event
                         .as_mut_log()
                         .insert("foo", Value::from("Supercalifragilisticexpialidocious"));
@@ -250,7 +228,33 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
+    }
+
+    #[test]
+    #[should_panic(expected = "unexpected value type: 'float'")]
+    fn negative_value() {
+        let mut event = Event::from("");
+        event.as_mut_log().insert("foo", Value::from("Super"));
+        let _ = TruncateFn::new(
+            Box::new(Path::from(vec![vec!["foo"]])),
+            Box::new(Literal::from(Value::Float(-5.0))),
+            Some(Value::Boolean(true)),
+        )
+        .execute(&event);
+    }
+
+    #[test]
+    #[should_panic(expected = "unexpected value type: 'float'")]
+    fn invalid_type() {
+        let mut event = Event::from("");
+        event.as_mut_log().insert("foo", Value::Float(3.0));
+        let _ = TruncateFn::new(
+            Box::new(Path::from(vec![vec!["foo"]])),
+            Box::new(Literal::from(Value::Float(5.0))),
+            Some(Value::Boolean(true)),
+        )
+        .execute(&event);
     }
 }

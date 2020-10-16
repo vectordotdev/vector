@@ -16,8 +16,8 @@ impl Function for Md5Fn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         use md5::{Digest, Md5};
 
-        match self.query.execute(ctx)?.into() {
-            Value::Bytes(bytes) => {
+        match self.query.execute(ctx)? {
+            QueryValue::Value(Value::Bytes(bytes)) => {
                 let md5 = hex::encode(Md5::digest(&bytes));
                 Ok(Value::Bytes(md5.into()).into())
             }
@@ -63,13 +63,13 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::from("foo"));
                     event
                 },
-                Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
+                Ok(QueryValue::from_value("acbd18db4cc2f85cedef654fccc4a4d8")),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp);
         }
     }
 

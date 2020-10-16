@@ -28,17 +28,17 @@ impl ContainsFn {
 impl Function for ContainsFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let substring = {
-            let bytes = required!(ctx, self.substring, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.substring, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
         let value = {
-            let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
         let contains = value.contains(&substring)
-            || optional!(ctx, self.case_sensitive, Value::Boolean(b) => b)
+            || optional_value!(ctx, self.case_sensitive, Value::Boolean(b) => b)
                 .iter()
                 .filter(|&case_sensitive| !case_sensitive)
                 .any(|_| value.to_lowercase().contains(&substring.to_lowercase()));
@@ -144,7 +144,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

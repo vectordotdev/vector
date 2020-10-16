@@ -17,13 +17,11 @@ impl ToStringFn {
 impl Function for ToStringFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         match self.query.execute(ctx) {
-            Ok(v) => {
-                let value: Value = v.into();
-                Ok(match value {
-                    Value::Bytes(_) => value.into(),
-                    _ => Value::Bytes(value.as_bytes()).into(),
-                })
-            }
+            Ok(QueryValue::Value(value)) => match value {
+                Value::Bytes(_) => Ok(value.into()),
+                value => Ok(Value::Bytes(value.as_bytes()).into()),
+            },
+            Ok(query) => unexpected_type!(query),
             Err(err) => match &self.default {
                 Some(v) => v.execute(ctx),
                 None => Err(err),
@@ -100,7 +98,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

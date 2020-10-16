@@ -14,12 +14,8 @@ impl UpcaseFn {
 
 impl Function for UpcaseFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
-        match self.query.execute(ctx)?.into() {
-            Value::Bytes(bytes) => Ok(Value::Bytes(
-                String::from_utf8_lossy(&bytes).to_uppercase().into(),
-            ).into()),
-            v => unexpected_type!(v),
-        }
+        let string = required_value!(ctx, self.query, Value::Bytes(bytes) => String::from_utf8_lossy(&bytes).into_owned());
+        Ok(Value::Bytes(string.to_uppercase().into()).into())
     }
 
     fn parameters() -> &'static [Parameter] {
@@ -66,7 +62,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 

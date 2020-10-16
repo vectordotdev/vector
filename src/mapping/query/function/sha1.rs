@@ -15,14 +15,10 @@ impl Sha1Fn {
 impl Function for Sha1Fn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         use sha1::{Digest, Sha1};
+        let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
+        let sha1 = hex::encode(Sha1::digest(&bytes));
 
-        match self.query.execute(ctx)?.into() {
-            Value::Bytes(bytes) => {
-                let sha1 = hex::encode(Sha1::digest(&bytes));
-                Ok(Value::Bytes(sha1.into()).into())
-            }
-            v => unexpected_type!(v),
-        }
+        Ok(Value::Bytes(sha1.into()).into())
     }
 
     fn parameters() -> &'static [Parameter] {
@@ -69,7 +65,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 

@@ -14,7 +14,7 @@ impl DowncaseFn {
 
 impl Function for DowncaseFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
-        let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+        let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
         Ok(QueryValue::from_value(
             String::from_utf8_lossy(&bytes).to_lowercase(),
         ))
@@ -58,13 +58,13 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::from("FOO 2 bar"));
                     event
                 },
-                Ok(Value::from("foo 2 bar")),
+                Ok(QueryValue::from_value("foo 2 bar")),
                 DowncaseFn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event).map(Into::into), exp);
+            assert_eq!(query.execute(&input_event), exp);
         }
     }
 
