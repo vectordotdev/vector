@@ -112,7 +112,7 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
 
     // Print initial topology
     // TODO - make this auto-update!
-    if print_topology(&client, new_formatter(opts.humanize))
+    if print_topology(&client, new_formatter(opts.human))
         .await
         .is_err()
     {
