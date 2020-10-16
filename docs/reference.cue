@@ -375,7 +375,7 @@ _values: {
 		enabled: bool
 
 		if enabled {
-			in_flight_limit:            uint8
+			in_flight_limit:            uint8 | *5
 			rate_limit_duration_secs:   uint8
 			rate_limit_num:             uint16
 			retry_initial_backoff_secs: uint8
@@ -789,7 +789,7 @@ _values: {
 	unit: #Unit | null
 }
 
-#Unit: "bytes" | "logs" | "milliseconds" | "seconds"
+#Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
 components: close({
 	sources:    #Components
