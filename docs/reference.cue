@@ -247,7 +247,7 @@ _values: {
 	let Args = _args
 
 	if Args.kind == "source" {
-		collect?: #FeaturesCollect
+		collect?: #FeaturesCollect & {_args: {kind: Args.kind}}
 		receive?: #FeaturesReceive & {_args: {kind: Args.kind}}
 		test?:    close({})
 
@@ -287,6 +287,11 @@ _values: {
 }
 
 #FeaturesCollect: {
+	_args: {
+		kind: string
+	}
+	let Args = _args
+
 	// `checkpoint` describes how the component checkpoints its read
 	// position.
 	checkpoint: close({
@@ -294,6 +299,7 @@ _values: {
 	})
 
 	from?: #Service
+	tls?:  #FeaturesTLS & {_args: {kind: Args.kind}}
 }
 
 #FeaturesEnrich: {
@@ -323,10 +329,7 @@ _values: {
 	let Args = _args
 
 	from?: #Service
-
-	// `tls` describes if the component secures network communication
-	// via TLS.
-	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls:   #FeaturesTLS & {_args: {kind: Args.kind}}
 }
 
 #FeaturesSend: {
