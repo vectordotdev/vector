@@ -307,6 +307,7 @@ urls: {
 	toml_array:                                               "https://github.com/toml-lang/toml#array"
 	toml_table:                                               "https://github.com/toml-lang/toml#table"
 	toml_types:                                               "https://github.com/toml-lang/toml#table-of-contents"
+	trl:                                                      "https://vector.dev/docs/reference/timber_remap_language"
 	twelve_factor_app:                                        "https://12factor.net/"
 	udp:                                                      "https://en.wikipedia.org/wiki/User_Datagram_Protocol"
 	uds:                                                      "https://en.wikipedia.org/wiki/Unix_domain_socket"
