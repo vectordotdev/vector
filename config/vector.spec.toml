@@ -2418,8 +2418,8 @@ require('custom_module')
   # * optional
   # * default: []
   # * type: [string]
-  identifier_fields = ["request_id"]
-  identifier_fields = ["user_id", "transaction_id"]
+  group_by = ["request_id"]
+  group_by = ["user_id", "transaction_id"]
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
