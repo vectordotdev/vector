@@ -37,52 +37,6 @@ impl<E: std::error::Error> InternalEvent for UnixSocketConnectionFailure<'_, E> 
 }
 
 #[derive(Debug)]
-pub struct UnixSocketSendFailed<'a, E> {
-    pub error: E,
-    pub path: &'a std::path::Path,
-}
-
-impl<E: std::error::Error> InternalEvent for UnixSocketSendFailed<'_, E> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Unix socket send failed.",
-            error = %self.error,
-            path = ?self.path,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("unix_socket_send_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix");
-    }
-}
-
-#[derive(Debug)]
-pub struct UnixSocketFlushFailed<'a, E> {
-    pub error: E,
-    pub path: &'a std::path::Path,
-}
-
-impl<E: std::error::Error> InternalEvent for UnixSocketFlushFailed<'_, E> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Flush failed.",
-            error = %self.error,
-            path = ?self.path,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("unix_socket_flush_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix");
-    }
-}
-
-#[derive(Debug)]
 pub struct UnixSocketEventSent {
     pub byte_size: usize,
 }
