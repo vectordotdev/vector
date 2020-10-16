@@ -29,7 +29,11 @@ components: transforms: wasm: {
 			"x86_64-unknown-linux-musl":  false
 		}
 
-		requirements: []
+		requirements: [
+			#"""
+				Vector must be build with the `wasm` feature. *This is not enabled by default. Review [Building Vector][urls.contributing]*.
+				"""#,
+		]
 		warnings: []
 		notices: []
 	}

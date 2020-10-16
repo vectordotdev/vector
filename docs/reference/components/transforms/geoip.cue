@@ -66,7 +66,7 @@ components: transforms: geoip: {
 	}
 
 	output: logs: line: {
-		description: "Fix me"
+		description: "Geo enriched log event"
 		fields: {
 			geoip: {
 				description: "The root field containing all geolocation data as sub-fields."
