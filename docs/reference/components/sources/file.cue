@@ -104,7 +104,7 @@ components: sources: file: {
 				bytes: {
 					common:        false
 					description:   "The number of bytes read off the head of the file to generate a unique fingerprint."
-					relevant_when: "`strategy` = \"checksum\""
+					relevant_when: "strategy = \"checksum\""
 					required:      false
 					type: uint: {
 						default: 256
@@ -114,7 +114,7 @@ components: sources: file: {
 				ignored_header_bytes: {
 					common:        false
 					description:   "The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header."
-					relevant_when: "`strategy` = \"checksum\""
+					relevant_when: "strategy = \"checksum\""
 					required:      false
 					type: uint: {
 						default: 0
