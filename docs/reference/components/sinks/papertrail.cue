@@ -1,39 +1,57 @@
 package metadata
 
 components: sinks: papertrail: {
-	title:             "Papertrail"
-	short_description: "Streams log events to [Papertrail][urls.papertrail] via [Syslog][urls.papertrail_syslog]."
-	long_description:  "[Papertrail][urls.papertrail] is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
+	title:       "Papertrail"
+	description: "[Papertrail](\(urls.papertrail)) is a web-based log aggregation application used by developers and IT team to search and view logs in real time."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "stream"
-		function:      "transmit"
 		service_providers: ["Papertrail"]
 	}
 
 	features: {
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        true
-		}
-	}
+		send: {
+			compression: enabled: false
+			encoding: {
+				enabled: true
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
+			}
+			request: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
+			to: {
+				name:     "Papertrail"
+				thing:    "an \(name) account"
+				url:      urls.papertrail
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+				interface: {
+					socket: {
+						api: {
+							title: "Syslog"
+							url:   urls.syslog
+						}
+						direction: "outgoing"
+						protocols: ["tcp"]
+						ssl: "required"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
@@ -63,20 +81,20 @@ components: sinks: papertrail: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {
 		setup: {
 			title: "Setup"
-			body: #"""
+			body: """
 				1. Register for a free account at [Papertrailapp.com](https://papertrailapp.com/signup?plan=free)
 
 				2. [Create a Log Destination](https://papertrailapp.com/destinations/new) to get a Log Destination
 				and ensure that TCP is enabled.
 
 				3. Set the log destination as the `endpoint` option and start shipping your logs!
-				"""#
+				"""
 		}
 	}
 }

@@ -1,20 +1,16 @@
 package metadata
 
 components: transforms: merge: {
-	title:             "Merge"
-	short_description: "Accepts log events and allows you to merge partial log events into a single event."
-	long_description:  "Accepts log events and allows you to merge partial log events into a single event."
+	title: "Merge"
 
 	classes: {
 		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
-		function:      "aggregate"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "beta"
+	features: {
+		reduce: {}
 	}
 
 	support: {
@@ -80,7 +76,7 @@ components: transforms: merge: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

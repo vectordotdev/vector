@@ -1,21 +1,16 @@
 package metadata
 
 components: transforms: log_to_metric: {
-	title:             "Log to Metric"
-	short_description: "Accepts log events and allows you to convert logs into one or more metrics."
-	long_description:  "Accepts log events and allows you to convert logs into one or more metrics."
+	title: "Log to Metric"
 
 	classes: {
-		commonly_used: true
-		function:      "convert"
+		commonly_used: false
+		development:   "stable"
 		egress_method: "batch"
 	}
 
 	features: {
-	}
-
-	statuses: {
-		development: "stable"
+		convert: {}
 	}
 
 	support: {
@@ -57,7 +52,7 @@ components: transforms: log_to_metric: {
 						required: false
 						common:   false
 						warnings: []
-						relevant_when: #"`type` = `"counter"`"#
+						relevant_when: #"type = "counter""#
 						type: bool: {
 							default: false
 						}
@@ -117,7 +112,7 @@ components: transforms: log_to_metric: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	output: metrics: {

@@ -1,40 +1,56 @@
 package metadata
 
 components: sinks: aws_cloudwatch_metrics: {
-	title:             "AWS Cloudwatch Metrics"
-	short_description: "Streams metric events to [Amazon Web Service's CloudWatch Metrics service][urls.aws_cloudwatch_metrics] via the [`PutMetricData` API endpoint](https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_PutMetricData.html)."
-	long_description:  "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in the form of logs and metrics from a single platform."
+	title:       "AWS Cloudwatch Metrics"
+	description: "[Amazon CloudWatch](\(urls.aws_cloudwatch)) is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in the form of logs and metrics from a single platform."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["AWS"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    null
-			max_events:   20
-			timeout_secs: 1
-		}
-		buffer: enabled: false
-		compression: {
-			enabled: true
-			default: null
-			gzip:    true
-		}
-		encoding: codec: enabled: false
+		buffer: enabled:      false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
-	}
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    null
+				max_events:   20
+				timeout_secs: 1
+			}
+			compression: {
+				enabled: true
+				default: "none"
+				algorithms: ["none", "gzip"]
+				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+			}
+			encoding: enabled: false
+			request: enabled:  false
+			tls: enabled:      false
+			to: {
+				name:     "AWS Cloudwatch metrics"
+				thing:    "an \(name) namespace"
+				url:      urls.aws_cloudwatch_metrics
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+				interface: {
+					socket: {
+						api: {
+							title: "AWS Cloudwatch metrics API"
+							url:   urls.aws_cloudwatch_metrics_api
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
@@ -49,17 +65,17 @@ components: sinks: aws_cloudwatch_metrics: {
 
 		requirements: []
 		warnings: [
-			#"""
+			"""
 				Gauge values are persisted between flushes. On Vector start up each
 				gauge is assumed to have zero, 0.0, value, that can be updated
 				explicitly by the consequent absolute, not delta, gauge observation,
 				or by delta increments/decrements. Delta gauges are considered an
 				advanced feature useful in a distributed setting, however they
 				should be used with care.
-				"""#,
+				""",
 		]
 		notices: [
-			#"""
+			"""
 				CloudWatch Metrics types are organized not by their semantics, but
 				by storage properties:
 
@@ -68,20 +84,11 @@ components: sinks: aws_cloudwatch_metrics: {
 
 				In Vector only the latter is used to allow lossless statistics
 				calculations on CloudWatch side.
-				"""#,
+				""",
 		]
 	}
 
 	configuration: {
-		endpoint: {
-			common:      false
-			description: "Custom endpoint for use with AWS-compatible services. Providing a value for this option will make `region` moot."
-			required:    false
-			type: string: {
-				default: null
-				examples: ["127.0.0.0:5000/path/to/service"]
-			}
-		}
 		namespace: {
 			description: "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
 			required:    true

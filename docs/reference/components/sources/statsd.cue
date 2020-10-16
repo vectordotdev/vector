@@ -1,26 +1,41 @@
 package metadata
 
 components: sources: statsd: {
-	title:             "StatsD"
-	short_description: "Ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and outputs metric events."
-	long_description:  "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
+	_port: 8126
+
+	title:       "StatsD"
+	description: "[StatsD](\(urls.statsd)) is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy](\(urls.etsy)) in Node."
 
 	classes: {
 		commonly_used: false
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator"]
+		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "StatsD"
+				thing:    "a \(name) client"
+				url:      urls.statsd
+				versions: null
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
+				interface: socket: {
+					api: {
+						title: "StatsD"
+						url:   urls.statsd_udp_protocol
+					}
+					port: _port
+					protocols: ["udp"]
+					ssl: "optional"
+				}
+			}
+
+			tls: enabled: false
+		}
 	}
 
 	support: {
@@ -33,11 +48,7 @@ components: sources: statsd: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			"""
-				This component exposes a configured port. You must ensure your network allows access to this port.
-				""",
-		]
+		requirements: []
 		warnings: []
 		notices: []
 	}
@@ -48,7 +59,7 @@ components: sources: statsd: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["127.0.0.1:8126"]
+				examples: ["127.0.0.1:\(_port)"]
 			}
 		}
 	}
@@ -63,14 +74,15 @@ components: sources: statsd: {
 	how_it_works: {
 		timestamps: {
 			title: "Timestamps"
-			body: #"""
-				StatsD protocol does not provide support for sending metric timestamps. You'll
-				notice that each parsed metric is assigned a `null` timestamp, which is a
-				special value which means "a real time metric", i.e. not a historical one. Normally such
-				`null` timestamps will be substituted by current time by downstream sinks or
-				3rd party services during sending/ingestion. See the [metric][docs.data-model.metric]
-				data model page for more info.
-				"""#
+			body: """
+				StatsD protocol does not provide support for sending metric
+				timestamps. You'll notice that each parsed metric is assigned a
+				`null` timestamp, which is a special value which means "a real
+				time metric", i.e. not a historical one. Normally such `null`
+				timestamps will be substituted by current time by downstream
+				sinks or 3rd party services during sending/ingestion. See the
+				[metric][docs.data-model.metric] data model page for more info.
+				"""
 		}
 	}
 }

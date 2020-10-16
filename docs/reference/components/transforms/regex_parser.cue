@@ -1,20 +1,22 @@
 package metadata
 
 components: transforms: regex_parser: {
-	title:             "Regex Parser"
-	short_description: "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
-	long_description:  "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
+	title: "Regex Parser"
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "stable"
+	features: {
+		parse: {
+			format: {
+				name:     "regular expressions"
+				url:      urls.regex
+				versions: null
+			}
+		}
 	}
 
 	support: {
@@ -85,7 +87,7 @@ components: transforms: regex_parser: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [
@@ -120,21 +122,21 @@ components: transforms: regex_parser: {
 	how_it_works: {
 		failed_parsing: {
 			title: "Failed Parsing"
-			body: #"""
+			body: """
 				By default, if the input message text does not match any of the configured regular expression patterns, this transform will log an error message but leave the log event unchanged. If you instead wish to have this transform drop the event, set `drop_failed = true`.
-				"""#
+				"""
 		}
 		regex_debugger: {
 			title: "Regex Debugger"
-			body: #"""
+			body: """
 				If you are having difficulty with your regular expression not matching text, you may try debugging your patterns at [Regex 101][regex_tester]. This site includes a regular expression tester and debugger. The regular expression engine used by Vector is most similar to the "Go" implementation, so make sure that is selected in the "Flavor" menu.
-				"""#
+				"""
 		}
 		regex_syntax: {
 			title: "Regex Syntax"
-			body: #"""
+			body: """
 				Vector uses the Rust standard regular expression engine for pattern matching. Its syntax shares most of the features of Perl-style regular expressions, with a few exceptions. You can find examples of patterns in the [Rust regex module documentation][rust_regex_syntax].
-				"""#
+				"""
 		}
 	}
 }

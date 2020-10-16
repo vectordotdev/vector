@@ -1,31 +1,42 @@
 package metadata
 
 components: sources: socket: {
-	title:             "Socket"
-	short_description: "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
-	long_description:  "Ingests data through a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket and outputs log events."
+	_port: 9000
+
+	title: "Socket"
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["aggregator", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			enabled_default:        false
-		}
-	}
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "socket client"
+				thing:    "a \(name)"
+				url:      urls.prometheus_client
+				versions: null
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "stable"
+				interface: socket: {
+					direction: "incoming"
+					port:      _port
+					protocols: ["tcp", "unix", "udp"]
+					ssl: "optional"
+				}
+			}
+
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				enabled_default:        false
+			}
+		}
 	}
 
 	support: {
@@ -39,12 +50,7 @@ components: sources: socket: {
 		}
 
 		requirements: []
-		warnings: [
-			"""
-				This component exposes a configured port. You must ensure your
-				network allows access to this port.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 
@@ -55,7 +61,7 @@ components: sources: socket: {
 			required: true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9000", "systemd", "systemd#3"]
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
 		}
 		host_key: {
@@ -125,9 +131,9 @@ components: sources: socket: {
 
 	examples: [
 		{
-			_line: #"""
+			_line: """
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-				"""#
+				"""
 			title: "Socket line"
 			configuration: {}
 			input: """

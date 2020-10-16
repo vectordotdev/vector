@@ -17,11 +17,8 @@ fn add_fields(c: &mut Criterion) {
     let key = "the key";
     let value = "this is the value";
 
-    let key_atom_native = key.into();
     let value_bytes_native = Bytes::from(value).into();
-    let key_atom_v1 = key.into();
     let value_bytes_v1 = Bytes::from(value).into();
-    let key_atom_v2 = key.into();
     let value_bytes_v2 = Bytes::from(value).into();
 
     c.bench(
@@ -37,7 +34,7 @@ fn add_fields(c: &mut Criterion) {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_native], value_bytes_native);
+                        assert_eq!(event.as_log()[key], value_bytes_native);
                     }
                 },
             )
@@ -52,7 +49,7 @@ fn add_fields(c: &mut Criterion) {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_v1], value_bytes_v1);
+                        assert_eq!(event.as_log()[key], value_bytes_v1);
                     }
                 },
             )
@@ -77,7 +74,7 @@ fn add_fields(c: &mut Criterion) {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_v2], value_bytes_v2);
+                        assert_eq!(event.as_log()[key], value_bytes_v2);
                     }
                 },
             )

@@ -1,26 +1,30 @@
 package metadata
 
 components: sources: stdin: {
-	title:             "STDIN"
-	short_description: "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
-	long_description:  "Ingests data through [standard input (STDIN)][urls.stdin] and outputs log events."
+	title: "STDIN"
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["sidecar"]
+		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "STDIN"
+				thing:    "the \(name) stream"
+				url:      urls.stdin
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "stable"
+				interface: stdin: {}
+			}
+
+			tls: enabled: false
+		}
 	}
 
 	support: {
@@ -69,9 +73,9 @@ components: sources: stdin: {
 
 	examples: [
 		{
-			_line: #"""
+			_line: """
 				2019-02-13T19:48:34+00:00 [info] Started GET "/" for 127.0.0.1
-				"""#
+				"""
 			title: "STDIN line"
 			configuration: {}
 			input: """
@@ -84,5 +88,15 @@ components: sources: stdin: {
 				message:   _line
 				host:      _values.local_host
 			}
-		}]
+		},
+	]
+
+	how_it_works: {
+		line_delimiters: {
+			title: "Line Delimiters"
+			body: """
+				Each line is read until a new line delimiter, the `0xA` byte, is found.
+				"""
+		}
+	}
 }

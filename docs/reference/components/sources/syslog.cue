@@ -1,14 +1,46 @@
 package metadata
 
 components: sources: syslog: {
-	title:             "Syslog"
-	short_description: "Ingests data through the [Syslog protocol][urls.syslog_5424] and outputs log events."
-	long_description:  "[Syslog][urls.syslog] stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
+	_port: 514
 
-	classes:       sources.socket.classes
-	features:      sources.socket.features
-	statuses:      sources.socket.statuses
-	support:       sources.socket.support
+	title:       "Syslog"
+	description: "[Syslog](\(urls.syslog)) stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
+
+	classes: sources.socket.classes
+	features: {
+		multiline: sources.socket.features.multiline
+
+		receive: {
+			from: {
+				name:     "Syslog"
+				thing:    "a \(name) client"
+				url:      urls.syslog
+				versions: null
+
+				interface: socket: {
+					api: {
+						title: "Syslog"
+						url:   urls.syslog
+					}
+					direction: "incoming"
+					port:      _port
+					protocols: ["tcp", "unix", "udp"]
+					ssl: "optional"
+				}
+			}
+
+			tls: sources.socket.features.receive.tls
+		}
+	}
+
+	support: {
+		platforms: sources.socket.support.platforms
+
+		requirements: []
+		warnings: []
+		notices: []
+	}
+
 	configuration: sources.socket.configuration
 
 	output: logs: line: {
@@ -83,7 +115,7 @@ components: sources: syslog: {
 			"*": {
 				description: "In addition to the defined fields, any Syslog 5424 structured fields are parsed and inserted as root level fields."
 				required:    true
-				type: "*": {}
+				type: string: examples: ["hello world"]
 			}
 		}
 	}
@@ -125,9 +157,16 @@ components: sources: syslog: {
 	]
 
 	how_it_works: {
+		line_delimiters: {
+			title: "Line Delimiters"
+			body: """
+				Each line is read until a new line delimiter, the `0xA` byte, is found.
+				"""
+		}
+
 		parsing: {
 			title: "Parsing"
-			body: #"""
+			body:  """
 				Vector makes a _best effort_ to parse the various Syslog formats out in the
 				wild. This includes [RFC 6587][urls.syslog_6587], [RFC 5424][urls.syslog_5424],
 				[RFC 3164][urls.syslog_3164], and other common variations (such as the Nginx
@@ -138,9 +177,9 @@ components: sources: syslog: {
 				key. If you find this happening often, we recommend using the
 				[`socket` source][docs.sources.socket] combined with the
 				[`regex_parser` transform][docs.transforms.regex_parser] to implement your own
-				ingestion and parsing scheme. Or, [open an issue][urls.new_feature_request]
+				ingestion and parsing scheme. Or, [open an issue](\(urls.new_feature_request))
 				requesting support for your specific format.
-				"""#
+				"""
 		}
 	}
 }

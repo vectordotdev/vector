@@ -1,20 +1,16 @@
 package metadata
 
 components: transforms: remove_fields: {
-	title:             "Remove Fields"
-	short_description: "Accepts log events and allows you to remove one or more log fields."
-	long_description:  "Accepts log events and allows you to remove one or more log fields."
+	title: "Remove Fields"
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "stable"
+	features: {
+		shape: {}
 	}
 
 	support: {
@@ -50,6 +46,6 @@ components: transforms: remove_fields: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

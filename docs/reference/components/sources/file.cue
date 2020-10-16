@@ -1,26 +1,52 @@
 package metadata
 
 components: sources: file: {
-	title:             "File"
-	long_description:  ""
-	short_description: "Collect logs by tailing one more files."
+	_directory: "/var/log"
+
+	title: "File"
 
 	classes: {
 		commonly_used: true
+		delivery:      "best_effort"
 		deployment_roles: ["daemon", "sidecar"]
+		development:   "stable"
 		egress_method: "stream"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: true
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
+		collect: {
+			checkpoint: enabled: true
+			from: {
+				name:     "file system"
+				thing:    "one or more files"
+				url:      urls.file_system
+				versions: null
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
+				interface: file_system: {
+					directory: _directory
+				}
+
+				setup: [
+					"""
+						Ensure that [Docker is setup](\(urls.docker_setup)) and running.
+						""",
+					"""
+						Ensure that the Docker Engine is properly exposing logs:
+
+						```bash
+						docker logs $(docker ps | awk '{ print $1 }')
+						```
+
+						If you receive an error it's likely that you do not have
+						the proper Docker logging drivers installed. The Docker
+						Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
+						or [`journald`](docker_logging_driver_journald) Docker
+						logging driver to be installed.
+						""",
+				]
+			}
+		}
+		multiline: enabled: true
 	}
 
 	support: {
@@ -45,7 +71,7 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["/var/log/nginx/*.[0-9]*.log"]
+				items: type: string: examples: ["\(_directory)/apache/*.[0-9]*.log"]
 			}
 		}
 		file_key: {
@@ -70,7 +96,7 @@ components: sources: file: {
 						default: "checksum"
 						enum: {
 							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
-							device_and_inode: "Uses the [device and inode][urls.inode] to unique identify files."
+							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
 						examples: ["checksum", "device_and_inode"]
 					}
@@ -78,7 +104,7 @@ components: sources: file: {
 				bytes: {
 					common:        false
 					description:   "The number of bytes read off the head of the file to generate a unique fingerprint."
-					relevant_when: "`strategy` = \"checksum\""
+					relevant_when: "strategy = \"checksum\""
 					required:      false
 					type: uint: {
 						default: 256
@@ -88,7 +114,7 @@ components: sources: file: {
 				ignored_header_bytes: {
 					common:        false
 					description:   "The number of bytes to skip ahead (or ignore) when generating a unique fingerprint. This is helpful if all files share a common header."
-					relevant_when: "`strategy` = \"checksum\""
+					relevant_when: "strategy = \"checksum\""
 					required:      false
 					type: uint: {
 						default: 0
@@ -113,7 +139,7 @@ components: sources: file: {
 			type: string: default: "host"
 		}
 		ignore_older: {
-			common:      false
+			common:      true
 			description: "Ignore files with a data modification date that does not exceed this age."
 			required:    false
 			type: uint: {
@@ -125,7 +151,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["/var/log/nginx/*.log"]
+			type: array: items: type: string: examples: ["\(_directory)/apache/*.log"]
 		}
 		max_line_bytes: {
 			common:      false
@@ -137,6 +163,7 @@ components: sources: file: {
 			}
 		}
 		max_read_bytes: {
+			category:    "Reading"
 			common:      false
 			description: "An approximate limit on the amount of data read from a single file at a given time."
 			required:    false
@@ -147,6 +174,7 @@ components: sources: file: {
 			}
 		}
 		oldest_first: {
+			category:    "Reading"
 			common:      false
 			description: "Instead of balancing read capacity fairly across all watched files, prioritize draining the oldest files before moving on to read data from younger files."
 			required:    false
@@ -156,6 +184,7 @@ components: sources: file: {
 			common:      false
 			description: "Timeout from reaching `eof` after which file will be removed from filesystem, unless new data is written in the meantime. If not specified, files will not be removed."
 			required:    false
+			warnings: ["Vector's process must have permission to delete files."]
 			type: uint: {
 				default: null
 				examples: [0, 5, 60]
@@ -176,7 +205,7 @@ components: sources: file: {
 			file: {
 				description: "The absolute path of originating file."
 				required:    true
-				type: string: examples: ["/var/log/apache/access.log"]
+				type: string: examples: ["\(_directory)/apache/access.log"]
 			}
 			host: fields._local_host
 			message: {
@@ -190,11 +219,11 @@ components: sources: file: {
 
 	examples: [
 		{
-			_file: "/var/log/apache/access.log"
+			_file: "\(_directory)/apache/access.log"
 			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
 			title: "Apache Access Log"
 			configuration: {
-				include: ["/var/logs/**/*.log"]
+				include: ["\(_directory)/**/*.log"]
 			}
 			input: """
 				```text filename="\(_file)"
@@ -213,7 +242,7 @@ components: sources: file: {
 	how_it_works: {
 		autodiscover: {
 			title: "Autodiscovery"
-			body: #"""
+			body: """
 				Vector will continually look for new files matching any of your
 				include patterns. The frequency is controlled via the
 				`glob_minimum_cooldown` option. If a new file is added that matches
@@ -221,12 +250,12 @@ components: sources: file: {
 				maintains a unique list of files and will not tail a file more than
 				once, even if it matches multiple patterns. You can read more about
 				how we identify files in the Identification section.
-				"""#
+				"""
 		}
 
 		compressed_files: {
 			title: "Compressed Files"
-			body: #"""
+			body: """
 				Vector will transparently detect files which have been compressed
 				using Gzip and decompress them for reading. This detection process
 				looks for the unique sequence of bytes in the Gzip header and does
@@ -241,22 +270,22 @@ components: sources: file: {
 				this reason, users should take care to allow Vector to fully
 				process anycompressed files before shutting the process down or moving the
 				files to another location on disk.
-				"""#
+				"""
 		}
 
 		file_deletion: {
 			title: "File Deletion"
-			body: #"""
+			body: """
 				When a watched file is deleted, Vector will maintain its open file
 				handle and continue reading until it reaches `EOF`. When a file is
 				no longer findable in the `includes` option and the reader has
 				reached `EOF`, that file's reader is discarded.
-				"""#
+				"""
 		}
 
 		file_read_order: {
 			title: "File Read Order"
-			body: #"""
+			body: """
 				By default, Vector attempts to allocate its read bandwidth fairly
 				across all of the files it's currently watching. This prevents a
 				single very busy file from starving other independent files from
@@ -290,12 +319,12 @@ components: sources: file: {
 				you're dealing with a single logical log stream or if you value
 				per-stream ordering over fairness across streams, consider setting
 				the `oldest_first` option to true.
-				"""#
+				"""
 		}
 
 		file_rotation: {
 			title: "File Rotation"
-			body: #"""
+			body: """
 				Vector supports tailing across a number of file rotation strategies.
 				The default behavior of `logrotate` is simply to move the old log
 				file and create a new one. This requires no special configuration of
@@ -314,12 +343,12 @@ components: sources: file: {
 				read it uncompressed to identify it, and then ensure it has all of
 				the data, including any written in a gap between Vector's last read
 				and the actual rotation event.
-				"""#
+				"""
 		}
 
 		fingerprint: {
 			title: "fingerprint"
-			body: #"""
+			body: """
 				By default, Vector identifies files by creating a
 				[cyclic redundancy check](urls.crc) (CRC) on the first 256 bytes of
 				the file. This serves as a fingerprint to uniquely identify the file.
@@ -329,34 +358,34 @@ components: sources: file: {
 				This strategy avoids the common pitfalls of using device and inode
 				names since inode names can be reused across files. This enables
 				Vector to properly tail files across various rotation strategies.
-				"""#
+				"""
 		}
 
 		globbing: {
 			title: "Globbing"
-			body: #"""
-				[Globbing][urls.globbing] is supported in all provided file paths,
+			body:  """
+				[Globbing](\(urls.globbing)) is supported in all provided file paths,
 				files will be autodiscovered continually at a rate defined by the
 				`glob_minimum_cooldown` option.
-				"""#
+				"""
 		}
 
 		line_delimiters: {
 			title: "Line Delimiters"
-			body: #"""
+			body: """
 				Each line is read until a new line delimiter (the `0xA` byte) or `EOF`
 				is found.
-				"""#
+				"""
 		}
 
 		multiline_messages: {
 			title: "Multiline Messages"
-			body: #"""
+			body: """
 				Sometimes a single log event will appear as multiple log lines. To
 				handle this, Vector provides a set of `multiline` options. These
 				options were carefully thought through and will allow you to solve the
 				simplest and most complex cases. Let's look at a few examples:
-				"""#
+				"""
 			sub_sections: [
 				{
 					title: "Example 1: Ruy Exceptions"
@@ -433,7 +462,7 @@ components: sources: file: {
 				},
 				{
 					title: "Example 3: Line Continuations"
-					body: ##"""
+					body: #"""
 						Activity logs from services such as Elasticsearch typically begin
 						with a timestamp, followed by information on the specific
 						activity, as in this example:
@@ -467,14 +496,14 @@ components: sources: file: {
 						* `condition_pattern`, set to `^\[[0-9]{4}-[0-9]{2}-[0-9]{2}`,
 							tells Vector to continue aggregating up until a line starts with
 							a timestamp sequence.
-						"""##
+						"""#
 				},
 			]
 		}
 
 		read_position: {
 			title: "Read Position"
-			body: #"""
+			body: """
 				By default, Vector will read new data only for newly discovered
 				files, similar to the `tail` command. You can read from the
 				beginning of the file by setting the `start_at_beginning` option to
@@ -482,7 +511,7 @@ components: sources: file: {
 
 				Previously discovered files will be checkpointed](#checkpointing),
 				and the read position will resume from the last checkpoint.
-				"""#
+				"""
 		}
 	}
 }

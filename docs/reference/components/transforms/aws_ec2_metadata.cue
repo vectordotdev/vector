@@ -1,24 +1,25 @@
 package metadata
 
 components: transforms: aws_ec2_metadata: {
-	title:             "AWS EC2 Metadata"
-	short_description: "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata."
-	long_description:  "Accepts log events and allows you to enrich logs with AWS EC2 instance metadata."
+	title: "AWS EC2 Metadata"
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
-		function:      "enrich"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "beta"
+	features: {
+		enrich: {
+			from: {
+				name:     "AWS EC2 instance metadata"
+				url:      urls.aws_ec2_instance_metadata
+				versions: ">= 2"
+			}
+		}
 	}
 
 	support: {
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -29,26 +30,27 @@ components: transforms: aws_ec2_metadata: {
 		}
 
 		requirements: [
-			#"""
-				[AWS IMDS v2][urls.aws_ec2_instance_metadata] is required for
-				security reasons. This is available by default on all EC2
-				instances.
-				"""#,
-			#"""
-				Running this transform within Docker on EC2 requires 2 network
-				hops. Users must raise this limit by running the following
-				command:
+			"""
+				Running this transform within Docker on EC2 requires 2 network hops. Users must raise this limit:
 
 				```bash
 				aws ec2 modify-instance-metadata-options --instance-id <ID> --http-endpoint enabled --http-put-response-hop-limit 2
 				```
-				"""#,
+				""",
 		]
 		warnings: []
 		notices: []
 	}
 
 	configuration: {
+		endpoint: {
+			common:      false
+			description: "Override the default EC2 Metadata endpoint."
+			required:    false
+			type: string: {
+				default: "http://169.254.169.254"
+			}
+		}
 		fields: {
 			common:      true
 			description: "A list of fields to include in each event."
@@ -83,7 +85,7 @@ components: transforms: aws_ec2_metadata: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	output: logs: log: {

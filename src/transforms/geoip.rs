@@ -5,12 +5,11 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
-    pub source: Atom,
+    pub source: String,
     pub database: String,
     #[serde(default = "default_geoip_target_field")]
     pub target: String,
@@ -18,7 +17,7 @@ pub struct GeoipConfig {
 
 pub struct Geoip {
     pub dbreader: maxminddb::Reader<Vec<u8>>,
-    pub source: Atom,
+    pub source: String,
     pub target: String,
 }
 
@@ -64,7 +63,7 @@ const ASN_DATABASE_TYPE: &str = "GeoLite2-ASN";
 const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
 
 impl Geoip {
-    pub fn new(dbreader: maxminddb::Reader<Vec<u8>>, source: Atom, target: String) -> Self {
+    pub fn new(dbreader: maxminddb::Reader<Vec<u8>>, source: String, target: String) -> Self {
         Geoip {
             dbreader,
             source,
@@ -163,7 +162,7 @@ impl Transform for Geoip {
         } else {
             debug!(
                 message = "Field does not exist.",
-                field = self.source.as_ref(),
+                field = %self.source,
             );
         };
 
@@ -190,7 +189,6 @@ mod tests {
         transforms::Transform,
     };
     use std::collections::HashMap;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn geoip_city_lookup_success() {
@@ -199,7 +197,7 @@ mod tests {
         let event = parser.transform(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
-        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let mut augment = Geoip::new(reader, "remote_addr".into(), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -212,7 +210,7 @@ mod tests {
         exp_geoip_attr.insert("postal_code", "OX1");
 
         for field in exp_geoip_attr.keys() {
-            let k = Atom::from(format!("geo.{}", field).to_string());
+            let k = format!("geo.{}", field).to_string();
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -225,7 +223,7 @@ mod tests {
         let event = parser.transform(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
-        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let mut augment = Geoip::new(reader, "remote_addr".into(), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -238,7 +236,7 @@ mod tests {
         exp_geoip_attr.insert("postal_code", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Atom::from(format!("geo.{}", field).to_string());
+            let k = format!("geo.{}", field).to_string();
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -251,7 +249,7 @@ mod tests {
         let event = parser.transform(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
-        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let mut augment = Geoip::new(reader, "remote_addr".into(), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -264,7 +262,7 @@ mod tests {
         exp_geoip_attr.insert("postal_code", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Atom::from(format!("geo.{}", field).to_string());
+            let k = format!("geo.{}", field).to_string();
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
@@ -277,7 +275,7 @@ mod tests {
         let event = parser.transform(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-ISP-Test.mmdb").unwrap();
 
-        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let mut augment = Geoip::new(reader, "remote_addr".to_string(), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -290,7 +288,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "Verizon Business");
 
         for field in exp_geoip_attr.keys() {
-            let k = Atom::from(format!("geo.{}", field).to_string());
+            let k = format!("geo.{}", field).to_string();
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -303,7 +301,7 @@ mod tests {
         let event = parser.transform(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoLite2-ASN-Test.mmdb").unwrap();
 
-        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let mut augment = Geoip::new(reader, "remote_addr".to_string(), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -313,7 +311,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Atom::from(format!("geo.{}", field).to_string());
+            let k = format!("geo.{}", field).to_string();
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -326,7 +324,7 @@ mod tests {
         let event = parser.transform(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoLite2-ASN-Test.mmdb").unwrap();
 
-        let mut augment = Geoip::new(reader, Atom::from("remote_addr"), "geo".to_string());
+        let mut augment = Geoip::new(reader, "remote_addr".to_string(), "geo".to_string());
         let new_event = augment.transform(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -336,7 +334,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Atom::from(format!("geo.{}", field).to_string());
+            let k = format!("geo.{}", field).to_string();
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }

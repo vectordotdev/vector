@@ -1,20 +1,16 @@
 package metadata
 
 components: transforms: sampler: {
-	title:             "Sampler"
-	short_description: "Accepts log events and allows you to sample events with a configurable rate."
-	long_description:  "Accepts log events and allows you to sample events with a configurable rate."
+	title: "Sampler"
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "beta"
 		egress_method: "stream"
-		function:      "filter"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "beta"
+	features: {
+		filter: {}
 	}
 
 	support: {
@@ -66,6 +62,6 @@ components: transforms: sampler: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

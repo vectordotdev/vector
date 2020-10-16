@@ -1,42 +1,60 @@
 package metadata
 
 components: sinks: azure_monitor_logs: {
-	title:             "Azure Monitor Logs"
-	short_description: "Batches log events to [Azure Monitor's][urls.azure_monitor] logs via the [REST endpoint][urls.azure_monitor_logs_endpoints]."
-	long_description:  "[Azure Monitor][urls.azure_monitor] is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
+	title:       "Azure Monitor Logs"
+	description: "[Azure Monitor](\(urls.azure_monitor)) is a service in Azure that provides performance and availability monitoring for applications and services in Azure, other cloud environments, or on-premises. Azure Monitor collects data from multiple sources into a common data platform where it can be analyzed for trends and anomalies."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "beta"
 		egress_method: "batch"
-		function:      "transmit"
 		service_providers: ["Azure"]
 	}
 
 	features: {
-		batch: {
-			enabled:      true
-			common:       false
-			max_bytes:    30000000
-			max_events:   null
-			timeout_secs: 1
-		}
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        true
-		}
-	}
+		send: {
+			batch: {
+				enabled:      true
+				common:       false
+				max_bytes:    30000000
+				max_events:   null
+				timeout_secs: 1
+			}
+			compression: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
+			request: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        true
+			}
+			to: {
+				name:     "Azure Monitor logs"
+				thing:    "a \(name) account"
+				url:      urls.azure_monitor
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+				interface: {
+					socket: {
+						api: {
+							title: "Azure Monitor logs API"
+							url:   urls.azure_monitor_logs_endpoints
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
@@ -73,6 +91,16 @@ components: sinks: azure_monitor_logs: {
 				examples: ["5ce893d9-2c32-4b6c-91a9-b0887c2de2d6", "97ce69d9-b4be-4241-8dbd-d265edcf06c4"]
 			}
 		}
+		host: {
+			common:      true
+			description: "[Alternative host](https://docs.azure.cn/en-us/articles/guidance/developerdifferences#check-endpoints-in-azure) for dedicated Azure regions."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "ods.opinsights.azure.com"
+				examples: ["ods.opinsights.azure.us", "ods.opinsights.azure.cn"]
+			}
+		}
 		log_type: {
 			description: "The [record type of the data that is being submitted](https://docs.microsoft.com/en-us/azure/azure-monitor/platform/data-collector-api#request-headers). Can only contain letters, numbers, and underscore (_), and may not exceed 100 characters."
 			required:    true
@@ -93,6 +121,6 @@ components: sinks: azure_monitor_logs: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }
