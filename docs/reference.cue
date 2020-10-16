@@ -247,9 +247,9 @@ _values: {
 	let Args = _args
 
 	if Args.kind == "source" {
-		collect?: #FeaturesCollect & {_args: {kind: Args.kind}}
-		receive?: #FeaturesReceive & {_args: {kind: Args.kind}}
-		test?:    close({})
+		collect?:  #FeaturesCollect & {_args: {kind: Args.kind}}
+		receive?:  #FeaturesReceive & {_args: {kind: Args.kind}}
+		generate?: close({})
 
 		// `multiline` should be enabled for sources that offer the ability
 		// to merge multiple lines together.
