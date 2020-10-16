@@ -13,7 +13,7 @@ default-run = "vector"
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
-required-features = ["api"]
+required-features = ["default-no-api-client"]
 
 [profile.bench]
 debug = true
@@ -102,6 +102,11 @@ smpl_jwt = { version = "0.5.0", optional = true }
 # API
 async-graphql = { version = "2.0.0", optional = true }
 async-graphql-warp = { version = "2.0.0", optional = true }
+
+# API client
+prettytable-rs = { version = "0.8.0", optional = true }
+human_format = { version = "1.0.3", optional = true }
+num-format = { version = "0.4.0", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -219,13 +224,14 @@ reqwest = { version = "0.10.6", features = ["json"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-msvc = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-no-api-client = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -260,6 +266,14 @@ kubernetes = ["k8s-openapi", "evmap"]
 api = [
   "async-graphql",
   "async-graphql-warp",
+]
+
+# API client
+api-client = [
+  "vector-api-client",
+  "prettytable-rs",
+  "human_format",
+  "num-format",
 ]
 
 # Sources
