@@ -190,4 +190,16 @@ components: sources: kafka: {
 			type: array: items: type: string: examples: ["^(prefix1|prefix2)-.+", "topic-1", "topic-2"]
 		}
 	}
+
+	how_it_works: {
+		librdkafka: {
+			title: "librdkafka"
+			body: """
+				The `kafka` sink uses [`librdkafka`][urls.librdkafka] under the hood. This
+				is a battle tested, high performance, and reliable library that facilitates
+				communication with Kafka. And because Vector produces static MUSL builds,
+				this dependency is packaged with Vector, meaning you do not need to install it.
+				"""
+		}
+	}
 }
