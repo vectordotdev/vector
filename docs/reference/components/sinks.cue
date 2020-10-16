@@ -281,7 +281,7 @@ components: sinks: [Name=string]: {
 	}
 
 	how_it_works: {
-		if !sinks[Name].features.healthcheck.enabled {
+		if sinks[Name].features.healthcheck.enabled {
 			healthchecks: {
 				title: "Health Checks"
 				body: """
