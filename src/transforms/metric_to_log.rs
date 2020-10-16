@@ -12,7 +12,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
     pub host_tag: Option<String>,
