@@ -7,7 +7,9 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<BTreeMap<String, String>>,
     pub kind: MetricKind,
     #[serde(flatten)]
@@ -237,6 +239,14 @@ impl Metric {
             kind: MetricKind::Absolute,
             value,
         }
+    }
+
+    /// Returns `true` if `name` tag is present, and matches the provided `value`
+    pub fn tag_matches(&self, name: &str, value: &str) -> bool {
+        self.tags
+            .as_ref()
+            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
+            .is_some()
     }
 }
 
