@@ -105,7 +105,7 @@ async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) ->
         .map_err(|_| ())?
         .data
         .ok_or_else(|| ())?
-        .iter()
+        .topology
         .map(|d| {
             (
                 d.name,
