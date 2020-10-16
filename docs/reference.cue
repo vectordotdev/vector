@@ -308,7 +308,7 @@ _values: {
 #FeaturesParse: {
 	format: close({
 		name:     string
-		url:      string
+		url:      string | null
 		versions: string | null
 	})
 }
@@ -447,6 +447,7 @@ _values: {
 #MetricEvent: {
 	name: string
 	tags: [Name=string]: string
+	timestamp?: string
 	close({counter: #MetricEventCounter}) |
 	close({distribution: #MetricEventDistribution}) |
 	close({gauge: #MetricEventGauge}) |
@@ -531,7 +532,7 @@ _values: {
 #Runtime: {
 	name:    string
 	url:     string
-	version: string
+	version: string | null
 }
 
 #Service: {
@@ -801,3 +802,38 @@ components: close({
 data_model: close({
 	schema: #Schema
 })
+
+#Fields: [Name=string]: #Fields | _
+
+remap: {
+	errors: [Name=string]: {
+		description: string
+		name:        Name
+	}
+
+	functions: [Name=string]: {
+		arguments: [
+			...{
+				required: bool
+
+				if !required {
+					name: string
+				}
+
+				type: "float" | "int" | "string"
+			},
+		]
+		category:    "coerce" | "parse"
+		description: string
+		examples: [
+			{
+				title:  string
+				input:  #Fields
+				source: string
+				output: #Fields
+			},
+			...,
+		]
+		name: Name
+	}
+}
