@@ -1,5 +1,5 @@
 use futures::{
-    channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    channel::mpsc::{self, Receiver, Sender},
     task::{Context, Poll},
     Stream, StreamExt,
 };
@@ -13,8 +13,8 @@ use std::{pin::Pin, sync::Mutex};
 static SUBSCRIBERS: Lazy<Mutex<anymap::Map<dyn anymap::any::Any + Send>>> =
     Lazy::new(|| Mutex::new(anymap::Map::new()));
 
-struct Senders<T>(Slab<UnboundedSender<T>>);
-struct BrokerStream<T: Sync + Send + Clone + 'static>(usize, UnboundedReceiver<T>);
+struct Senders<T>(Slab<Sender<T>>);
+struct BrokerStream<T: Sync + Send + Clone + 'static>(usize, Receiver<T>);
 
 fn with_senders<T, F, R>(f: F) -> R
 where
@@ -59,7 +59,7 @@ impl<T: Sync + Send + Clone + 'static> Broker<T> {
     /// use with GraphQL subscriptions
     pub fn subscribe() -> impl Stream<Item = T> {
         with_senders::<T, _, _>(|senders| {
-            let (tx, rx) = mpsc::unbounded();
+            let (tx, rx) = mpsc::channel(20);
             let id = senders.0.insert(tx);
             BrokerStream(id, rx)
         })
