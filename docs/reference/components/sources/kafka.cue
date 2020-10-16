@@ -191,6 +191,18 @@ components: sources: kafka: {
 		}
 	}
 
+	output: logs: record: {
+		description: "An individual Kafka record"
+		fields: {
+			message: {
+				description: "The raw line from the Kafka record."
+				required:    true
+				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+			}
+			timestamp: fields._current_timestamp
+		}
+	}
+
 	how_it_works: {
 		librdkafka: {
 			title: "librdkafka"
