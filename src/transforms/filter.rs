@@ -16,7 +16,15 @@ inventory::submit! {
     TransformDescription::new::<FilterConfig>("filter")
 }
 
-impl GenerateConfig for FilterConfig {}
+impl GenerateConfig for FilterConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"condition.type = "check_fields"
+            condition."message.eq" = "value""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
@@ -55,5 +63,13 @@ impl Transform for Filter {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::FilterConfig>();
     }
 }
