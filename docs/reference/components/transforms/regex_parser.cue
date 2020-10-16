@@ -126,6 +126,45 @@ components: transforms: regex_parser: {
 				By default, if the input message text does not match any of the configured regular expression patterns, this transform will log an error message but leave the log event unchanged. If you instead wish to have this transform drop the event, set `drop_failed = true`.
 				"""
 		}
+		flags: {
+			title: "Flags"
+			body: #"""
+				Regex flags can be toggled with the `(?flags)` syntax. The available flags are:
+
+				| Flag | Descriuption |
+				| :--- | :----------- |
+				| `i`  | case-insensitive: letters match both upper and lower case |
+				| `m`  | multi-line mode: ^ and $ match begin/end of line |
+				| `s`  | allow . to match `\n` |
+				| `U`  | swap the meaning of `x*` and `x*?` |
+				| `u`  | Unicode support (enabled by default) |
+				| `x`  | ignore whitespace and allow line comments (starting with `#`)
+
+				For example, to enable the case-insensitive flag you can write:
+
+				```text
+				(?i)Hello world
+				```
+
+				More info can be found in the [Regex grouping and flags documentation](#(urls.regex_grouping_and_flags)).
+				"""#
+		}
+		named_captures: {
+			title: "Named Captures"
+			body: #"""
+				You can name Regex captures with the `<name>` syntax. For example:
+
+				```text
+				^(?P<timestamp>\w*) (?P<level>\w*) (?P<message>.*)$
+				```
+
+				Will capture `timestamp`, `level`, and `message`. All values are extracted as
+				`string` values and must be coerced with the `types` table.
+
+				More info can be found in the [Regex grouping and flags
+				documentation](#(urls.regex_grouping_and_flags)).
+				"""#
+		}
 		regex_debugger: {
 			title: "Regex Debugger"
 			body: """
