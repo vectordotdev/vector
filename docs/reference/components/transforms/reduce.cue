@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: reduce: {
-	title:             "Reduce"
-	short_description: "Accepts log events and allows you to combine multiple events into a single event based on a set of identifiers."
+	title: "Reduce"
 
 	classes: {
 		commonly_used: false
 		development:   "beta"
 		egress_method: "stream"
-		function:      "aggregate"
 	}
 
-	features: {}
+	features: {
+		reduce: {}
+	}
 
 	support: {
 		platforms: {
@@ -68,7 +68,7 @@ components: transforms: reduce: {
 		}
 		merge_strategies: {
 			common: false
-			description: #"""
+			description: """
 				A map of field names to custom merge strategies. For each
 				field specified this strategy will be used for combining
 				events rather than the default behavior.
@@ -81,7 +81,7 @@ components: transforms: reduce: {
 				   `[field-name]_end` is added with the last received
 				   timestamp value.
 				3. Numeric values are summed.
-				"""#
+				"""
 			required: false
 			warnings: []
 			type: object: {
@@ -116,7 +116,7 @@ components: transforms: reduce: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

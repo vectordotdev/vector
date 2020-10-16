@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 
 if [[ "$CHANNEL" == "nightly" ]]; then
@@ -57,6 +57,14 @@ for CHART in "${CHARTS_TO_PUBLISH[@]}"; do
     --version "$CHART_VERSION" \
     --app-version "$APP_VERSION" \
     --destination "$REPO_DIR"
+
+  # Apply a workaround to fix the subchart versions.
+  PACKAGED_ARCHIVE_PATH="$REPO_DIR/$CHART-$CHART_VERSION.tgz"
+  scripts/patch-packaged-helm-chart-versions.sh \
+    "$PACKAGED_ARCHIVE_PATH" \
+    "$CHART" \
+    "$CHART_VERSION" \
+    "$APP_VERSION"
 done
 
 # Download previous manifest.

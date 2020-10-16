@@ -1,15 +1,15 @@
 package metadata
 
-components: sinks: clickhouse: {
-	title:       "Clickhouse"
-	description: "[ClickHouse](\(urls.clickhouse)) is an open-source column-oriented database management system that manages extremely large volumes of data, including non-aggregated data, in a stable and sustainable manner and allows generating custom data reports in real time. The system is linearly scalable and can be scaled up to store and process trillions of rows and petabytes of data. This makes it an best-in-class storage for logs and metrics data."
+components: sinks: http: {
+	title:       "HTTP"
+	description: "Batches log events to a generic [HTTP](\(urls.http)) endpoint."
 
 	classes: {
 		commonly_used: true
+		service_providers: []
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
-		service_providers: ["Yandex"]
 	}
 
 	features: {
@@ -25,19 +25,23 @@ components: sinks: clickhouse: {
 			}
 			compression: {
 				enabled: true
-				default: "gzip"
+				default: "none"
 				algorithms: ["none", "gzip"]
 				levels: ["none", "fast", "default", "best", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 			}
 			encoding: {
 				enabled: true
-				codec: enabled: false
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "ndjson", "text"]
+				}
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				in_flight_limit:            10
 				rate_limit_duration_secs:   1
-				rate_limit_num:             5
+				rate_limit_num:             1000
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               30
@@ -50,17 +54,13 @@ components: sinks: clickhouse: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "Clickhouse"
-				thing:    "a \(name) database"
-				url:      urls.clickhouse
+				name:     "HTTP server"
+				thing:    "an \(name)"
+				url:      urls.http_server
 				versions: null
 
 				interface: {
 					socket: {
-						api: {
-							title: "Clickhouse HTTP API"
-							url:   urls.clickhouse_http
-						}
 						direction: "outgoing"
 						protocols: ["http"]
 						ssl: "optional"
@@ -80,11 +80,7 @@ components: sinks: clickhouse: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			"""
-				[Clickhouse](\(urls.clickhouse)) version `>= 1.1.54378` is required.
-				""",
-		]
+		requirements: []
 		warnings: []
 		notices: []
 	}
@@ -103,7 +99,7 @@ components: sinks: clickhouse: {
 						required:    true
 						warnings: []
 						type: string: {
-							examples: ["${CLICKHOUSE_PASSWORD}", "password"]
+							examples: ["${HTTP_PASSWORD}", "password"]
 						}
 					}
 					strategy: {
@@ -130,35 +126,28 @@ components: sinks: clickhouse: {
 						required:    true
 						warnings: []
 						type: string: {
-							examples: ["${CLICKHOUSE_USERNAME}", "username"]
+							examples: ["${HTTP_USERNAME}", "username"]
 						}
 					}
 				}
 			}
 		}
-		database: {
-			common:      true
-			description: "The database that contains the stable that data will be inserted into."
+		headers: {
+			common:      false
+			description: "Options for custom headers."
 			required:    false
 			warnings: []
-			type: string: {
-				default: null
-				examples: ["mydatabase"]
+			type: object: {
+				examples: [{"Authorization": "${HTTP_TOKEN}"}, {"X-Powered-By": "Vector"}]
+				options: {}
 			}
 		}
-		endpoint: {
-			description: "The endpoint of the [Clickhouse](\(urls.clickhouse)) server."
-			required:    true
-			type: string: {
-				examples: ["http://localhost:8123"]
-			}
-		}
-		table: {
-			description: "The table that data will be inserted into."
+		uri: {
+			description: "The full URI to make HTTP requests to. This should include the protocol and host, but can also include the port, path, and any other valid part of a URI."
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["mytable"]
+				examples: ["https://10.22.212.22:9000/endpoint"]
 			}
 		}
 	}
