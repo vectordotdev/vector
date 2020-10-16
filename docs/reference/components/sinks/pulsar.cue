@@ -17,10 +17,13 @@ components: sinks: pulsar: {
 		healthcheck: enabled: true
 		send: {
 			compression: enabled: false
-			encoding: codec: {
+			encoding: {
 				enabled: true
-				default: "text"
-				enum: ["text", "json"]
+				codec: {
+					enabled: true
+					default: "text"
+					enum: ["text", "json"]
+				}
 			}
 			request: enabled: false
 			tls: enabled:     false

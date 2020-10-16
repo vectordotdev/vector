@@ -24,7 +24,10 @@ components: sinks: azure_monitor_logs: {
 				timeout_secs: 1
 			}
 			compression: enabled: false
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: enabled: false
 			tls: {
 				enabled:                true

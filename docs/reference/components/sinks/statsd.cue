@@ -11,7 +11,10 @@ components: sinks: statsd: {
 		healthcheck: sinks.socket.features.healthcheck
 		send: {
 			compression: sinks.socket.features.send.compression
-			encoding: codec: enabled: false
+			encoding: {
+				enabled: true
+				codec: enabled: false
+			}
 			request: sinks.socket.features.send.request
 			tls:     sinks.socket.features.send.tls
 			to: {
