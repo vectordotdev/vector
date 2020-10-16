@@ -15,7 +15,7 @@ components: sources: kubernetes_logs: {
 
 	features: {
 		collect: {
-			checkpoint: enabled: false
+			checkpoint: enabled: true
 			from: {
 				name:     "Kubernetes"
 				thing:    "\(name) nodes"
