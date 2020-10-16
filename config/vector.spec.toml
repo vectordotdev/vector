@@ -2444,7 +2444,7 @@ require('custom_module')
     #
     # * required
     # * type: string
-    # * enum: "array", "concat", "discard", "sum", "max", and "min"
+    # * enum: "array", "concat", "concat_newline", "discard", "sum", "max", and "min"
     method = "discard"
     path = "discard"
     duration_ms = "sum"
