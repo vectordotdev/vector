@@ -90,6 +90,7 @@ components: sinks: humio_logs: {
 			type: string: {
 				default: null
 				examples: ["json", "none"]
+				templateable: true
 			}
 		}
 		host_key: {
@@ -110,6 +111,7 @@ components: sinks: humio_logs: {
 			type: string: {
 				default: null
 				examples: ["{{file}}", "/var/log/syslog", "UDP:514"]
+				templateable: true
 			}
 		}
 		token: {

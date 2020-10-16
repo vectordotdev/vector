@@ -179,6 +179,7 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: "vector-%F"
 				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
+				templateable: true
 			}
 		}
 		pipeline: {
