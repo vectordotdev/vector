@@ -247,8 +247,8 @@ _values: {
 	let Args = _args
 
 	if Args.kind == "source" {
-		collect?:  #FeaturesCollect & {_args: {kind: Args.kind}}
-		receive?:  #FeaturesReceive & {_args: {kind: Args.kind}}
+		collect?:  #FeaturesCollect
+		receive?:  #FeaturesReceive
 		generate?: close({})
 
 		// `multiline` should be enabled for sources that offer the ability
@@ -287,11 +287,6 @@ _values: {
 }
 
 #FeaturesCollect: {
-	_args: {
-		kind: string
-	}
-	let Args = _args
-
 	// `checkpoint` describes how the component checkpoints its read
 	// position.
 	checkpoint: close({
@@ -299,7 +294,7 @@ _values: {
 	})
 
 	from?: #Service
-	tls?:  #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
 }
 
 #FeaturesEnrich: {
@@ -323,13 +318,8 @@ _values: {
 }
 
 #FeaturesReceive: {
-	_args: {
-		kind: string
-	}
-	let Args = _args
-
 	from?: #Service
-	tls:   #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls:   #FeaturesTLS & {_args: {mode: "accept"}}
 }
 
 #FeaturesSend: {
@@ -395,14 +385,14 @@ _values: {
 
 	// `tls` describes if the component secures network communication
 	// via TLS.
-	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls: #FeaturesTLS & {_args: {mode: "connect"}}
 
 	to?: #Service
 }
 
 #FeaturesTLS: {
 	_args: {
-		kind: string
+		mode: "accept" | "connect"
 	}
 	let Args = _args
 	enabled: bool
@@ -410,7 +400,7 @@ _values: {
 	if enabled {
 		can_enable:             bool
 		can_verify_certificate: bool
-		if Args.kind == "sink" {
+		if Args.mode == "connect" {
 			can_verify_hostname: bool
 		}
 		enabled_default: bool

@@ -13,6 +13,7 @@ components: sources: kafka: {
 				enabled:                true
 				can_enable:             true
 				can_verify_certificate: false
+				can_verify_hostname:    false
 				enabled_default:        false
 			}
 			from: {

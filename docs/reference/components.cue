@@ -123,9 +123,10 @@ components: {
 
 			_tls: {
 				_args: {
-					can_enable:          bool
-					can_verify_hostname: bool | *false
-					enabled_default:     bool
+					can_enable:             bool
+					can_verify_certificate: bool | *true
+					can_verify_hostname:    bool | *false
+					enabled_default:        bool
 				}
 				let Args = _args
 
@@ -179,11 +180,13 @@ components: {
 						}
 					}
 
-					verify_certificate: {
-						common:      false
-						description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
-						required:    false
-						type: bool: default: false
+					if Args.can_verify_certificate {
+						verify_certificate: {
+							common:      false
+							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host."
+							required:    false
+							type: bool: default: true
+						}
 					}
 
 					if Args.can_verify_hostname {
