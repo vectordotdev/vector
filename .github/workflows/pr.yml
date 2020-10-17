@@ -171,6 +171,8 @@ jobs:
 
   check-component-features:
     name: Component Features - Linux
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
     runs-on: ubuntu-20.04
     container: timberio/ci_image
     steps:
