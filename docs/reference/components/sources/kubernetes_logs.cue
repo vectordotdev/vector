@@ -137,6 +137,17 @@ components: sources: kubernetes_logs: {
 				default: "${VECTOR_SELF_NODE_NAME}"
 			}
 		}
+		exclude_paths_glob_patterns: {
+			common: false
+			description: """
+				A list of glob patterns to exclude from reading the files.
+				"""
+			required: false
+			type: array: {
+				default: []
+				items: type: string: examples: ["**/exclude/**"]
+			}
+		}
 		extra_field_selector: {
 			common: false
 			description: """
