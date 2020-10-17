@@ -14,6 +14,8 @@ inventory::submit! {
     ConditionDescription::new::<IsMetricConfig>("is_metric")
 }
 
+impl_generate_config_from_default!(IsMetricConfig);
+
 #[typetag::serde(name = "is_metric")]
 impl ConditionConfig for IsMetricConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
@@ -51,6 +53,11 @@ mod test {
         event::metric::{Metric, MetricKind, MetricValue},
         Event,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<IsMetricConfig>();
+    }
 
     #[test]
     fn is_metric_basic() {
