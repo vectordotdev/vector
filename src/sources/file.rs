@@ -1513,7 +1513,7 @@ mod tests {
             // Wait for remove grace period to end.
             delay_for(Duration::from_secs(remove_after + 1)).await;
 
-            if let Err(_) = File::open(&path) {
+            if File::open(&path).is_err() {
                 break;
             }
         }
