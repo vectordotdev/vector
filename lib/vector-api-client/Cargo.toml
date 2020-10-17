@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 
 # Serde
-serde = { version = "1.0.116", features = ["derive"] }
+serde = { version = "1.0.117", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Error handling
