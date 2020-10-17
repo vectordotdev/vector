@@ -11,7 +11,7 @@ components: sinks: [Name=string]: {
 		if sinks[Name].features.send != _|_ && sinks[Name].features.send.batch != _|_ {
 			if sinks[Name].features.send.batch.enabled {
 				batch: {
-					common:      false
+					common:      sinks[Name].features.send.batch.common
 					description: "Configures the sink batching behavior."
 					required:    false
 					type: object: {
@@ -63,17 +63,19 @@ components: sinks: [Name=string]: {
 					examples: []
 					options: {
 						max_events: {
-							common:      true
-							description: "The maximum number of [events][docs.data-model] allowed in the buffer."
-							required:    false
+							common:        true
+							description:   "The maximum number of [events][docs.data-model] allowed in the buffer."
+							required:      false
+							relevant_when: "type = \"memory\""
 							type: uint: {
 								default: 500
 								unit:    "events"
 							}
 						}
 						max_size: {
-							description: "The maximum size of the buffer on the disk."
-							required:    true
+							description:   "The maximum size of the buffer on the disk."
+							required:      true
+							relevant_when: "type = \"disk\""
 							type: uint: {
 								examples: [104900000]
 								unit: "bytes"
