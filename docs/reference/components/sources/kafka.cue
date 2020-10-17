@@ -4,7 +4,7 @@ components: sources: kafka: {
 	_port: 9093
 
 	title:       "Kafka"
-	description: "[Apache Kafka][urls.kafka] is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
+	description: components._kafka.description
 
 	features: {
 		collect: {
@@ -16,22 +16,7 @@ components: sources: kafka: {
 				can_verify_hostname:    false
 				enabled_default:        false
 			}
-			from: {
-				name:     "Kafka"
-				thing:    "\(name) topics"
-				url:      urls.kafka
-				versions: ">= 0.8"
-
-				interface: socket: {
-					api: {
-						title: "Kafka Protocol"
-						url:   urls.kafka_protocol
-					}
-					port: _port
-					protocols: ["tcp"]
-					ssl: "optional"
-				}
-			}
+			from: components._kafka.features.service
 		}
 		multiline: enabled: false
 	}
@@ -44,20 +29,7 @@ components: sources: kafka: {
 		egress_method: "stream"
 	}
 
-	support: {
-		platforms: {
-			"aarch64-unknown-linux-gnu":  true
-			"aarch64-unknown-linux-musl": true
-			"x86_64-apple-darwin":        true
-			"x86_64-pc-windows-msv":      true
-			"x86_64-unknown-linux-gnu":   true
-			"x86_64-unknown-linux-musl":  true
-		}
-
-		requirements: []
-		warnings: []
-		notices: []
-	}
+	support: components._kafka.support
 
 	configuration: {
 		auto_offset_reset: {
@@ -70,14 +42,7 @@ components: sources: kafka: {
 				examples: ["smallest", "earliest", "beginning", "largest", "latest", "end", "error"]
 			}
 		}
-		bootstrap_servers: {
-			description: "A comma-separated list of host and port pairs that are the addresses of the Kafka brokers in a \"bootstrap\" Kafka cluster that a Kafka client connects to initially to bootstrap itself."
-			required:    true
-			warnings: []
-			type: string: {
-				examples: ["10.14.22.123:9092,10.14.23.332:9092"]
-			}
-		}
+		bootstrap_servers: components._kafka.configuration.bootstrap_servers
 		commit_interval_ms: {
 			common:      false
 			description: "The frequency that the consumer offsets are committed (written) to offset storage.\n"
@@ -118,22 +83,7 @@ components: sources: kafka: {
 				examples: ["message_key"]
 			}
 		}
-		librdkafka_options: {
-			common:      false
-			description: "Advanced options. See [librdkafka documentation][urls.librdkafka_config] for details.\n"
-			required:    false
-			warnings: []
-			type: object: {
-				examples: [
-					{
-						"client.id":                "${ENV_VAR}"
-						"fetch.error.backoff.ms":   "1000"
-						"socket.send.buffer.bytes": "100"
-					},
-				]
-				options: {}
-			}
-		}
+		librdkafka_options: components._kafka.configuration.librdkafka_options
 		sasl: {
 			common:      false
 			description: "Options for SASL/SCRAM authentication support."
@@ -193,17 +143,7 @@ components: sources: kafka: {
 				unit: "milliseconds"
 			}
 		}
-		socket_timeout_ms: {
-			common:      false
-			description: "Default timeout for network requests.\n"
-			required:    false
-			warnings: []
-			type: uint: {
-				default: 60000
-				examples: [30000, 60000]
-				unit: "milliseconds"
-			}
-		}
+		socket_timeout_ms: components._kafka.configuration.socket_timeout_ms
 		topics: {
 			description: "The Kafka topics names to read events from. Regex is supported if the topic begins with `^`.\n"
 			required:    true
