@@ -97,6 +97,15 @@ impl From<DateTime<Utc>> for Value {
     }
 }
 
+impl<T: Into<Value>> From<Option<T>> for Value {
+    fn from(value: Option<T>) -> Self {
+        match value {
+            None => Value::Null,
+            Some(v) => v.into(),
+        }
+    }
+}
+
 impl From<f32> for Value {
     fn from(value: f32) -> Self {
         Value::Float(f64::from(value))

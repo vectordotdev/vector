@@ -125,6 +125,7 @@ build_signatures! {
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
     parse_duration => ParseDurationFn,
     format_number => FormatNumberFn,
+    parse_url => ParseUrlFn,
 }
 
 /// A parameter definition accepted by a function.
