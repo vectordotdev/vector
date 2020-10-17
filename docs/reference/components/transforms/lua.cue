@@ -445,36 +445,6 @@ components: transforms: lua: {
 				},
 			]
 		}
-		defining_timestamps: {
-			title: "Defining Timestamps"
-			body: """
-				To parse a timestamp with an optional milliseconds field, like `2020-04-07 06:26:02.643` or `2020-04-07 06:26:02`:
-
-				```lua
-				timestamp_pattern = "(%d%d%d%d)[-](%d%d)[-](%d%d) (%d%d):(%d%d):(%d%d).?(%d*)"
-
-				function parse_timestamp(str)
-				  local year, month, day, hour, min, sec, millis = string.match(str, timestamp_pattern)
-				  local ms = 0
-				  if millis and millis ~= "" then
-				    ms = tonumber(millis)
-				  end
-				  return {
-				    year    = tonumber(year),
-				    month   = tonumber(month),
-				    day     = tonumber(day),
-				    hour    = tonumber(hour),
-				    min     = tonumber(min),
-				    sec     = tonumber(sec),
-				    nanosec = ms * 1000000
-				  }
-				end
-
-				parse_timestamp('2020-04-07 06:26:02.643')
-				parse_timestamp('2020-04-07 06:26:02')
-				```
-				"""
-		}
 		learning_lua: {
 			title: "Learning Lua"
 			body:  """
