@@ -22,47 +22,7 @@ use http::{Request, StatusCode};
 use hyper::body::Body;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{convert::TryFrom, io::Write, time::Duration};
-use string_cache::DefaultAtom as Atom;
-
-/// GZip compression level must be between 0 and 9.
-/// 0 is no compression, 9 is take as long as you like for maximum compression.
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(try_from = "u32")]
-#[serde(into = "u32")]
-pub struct CompressionLevel(flate2::Compression);
-
-impl CompressionLevel {
-    fn get_level(&self) -> flate2::Compression {
-        self.0
-    }
-}
-
-impl Into<u32> for CompressionLevel {
-    fn into(self) -> u32 {
-        self.0.level()
-    }
-}
-
-impl TryFrom<u32> for CompressionLevel {
-    type Error = String;
-
-    fn try_from(level: u32) -> Result<Self, Self::Error> {
-        if level > 9 {
-            Err("Gzip `compression_level` must be between 0 and 9.".into())
-        } else {
-            Ok(CompressionLevel(flate2::Compression::new(level)))
-        }
-    }
-}
-
-impl Default for CompressionLevel {
-    fn default() -> Self {
-        // Default the compression level to 6, which is the same as the Datadog agent.
-        // https://docs.datadoghq.com/agent/logs/log_transport/?tab=https#log-compression
-        CompressionLevel(flate2::Compression::new(6))
-    }
-}
+use std::{io::Write, time::Duration};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -231,15 +191,15 @@ impl HttpSink for DatadogLogsJsonService {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let log = event.as_mut_log();
 
-        if let Some(message) = log.remove(&Atom::from(log_schema().message_key())) {
+        if let Some(message) = log.remove(log_schema().message_key()) {
             log.insert("message", message);
         }
 
-        if let Some(timestamp) = log.remove(&Atom::from(log_schema().timestamp_key())) {
+        if let Some(timestamp) = log.remove(log_schema().timestamp_key()) {
             log.insert("date", timestamp);
         }
 
-        if let Some(host) = log.remove(&Atom::from(log_schema().host_key())) {
+        if let Some(host) = log.remove(log_schema().host_key()) {
             log.insert("host", host);
         }
 
