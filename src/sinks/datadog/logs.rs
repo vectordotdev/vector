@@ -126,7 +126,8 @@ impl DatadogLogsConfig {
                 // Default the compression level to 6, which is similar to datadog agent.
                 // https://docs.datadoghq.com/agent/logs/log_transport/?tab=https#log-compression
                 let level = level.unwrap_or(6);
-                let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
+                let mut encoder =
+                    GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
 
                 encoder.write_all(&body)?;
                 (
