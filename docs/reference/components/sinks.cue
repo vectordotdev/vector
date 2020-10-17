@@ -11,7 +11,7 @@ components: sinks: [Name=string]: {
 		if sinks[Name].features.send != _|_ && sinks[Name].features.send.batch != _|_ {
 			if sinks[Name].features.send.batch.enabled {
 				batch: {
-					common:      false
+					common:      sinks[Name].features.send.batch.common
 					description: "Configures the sink batching behavior."
 					required:    false
 					type: object: {
@@ -63,17 +63,19 @@ components: sinks: [Name=string]: {
 					examples: []
 					options: {
 						max_events: {
-							common:      true
-							description: "The maximum number of [events][docs.data-model] allowed in the buffer."
-							required:    false
+							common:        true
+							description:   "The maximum number of [events][docs.data-model] allowed in the buffer."
+							required:      false
+							relevant_when: "type = \"memory\""
 							type: uint: {
 								default: 500
 								unit:    "events"
 							}
 						}
 						max_size: {
-							description: "The maximum size of the buffer on the disk."
-							required:    true
+							description:   "The maximum size of the buffer on the disk."
+							required:      true
+							relevant_when: "type = \"disk\""
 							type: uint: {
 								examples: [104900000]
 								unit: "bytes"
@@ -257,7 +259,7 @@ components: sinks: [Name=string]: {
 							}
 							timeout_secs: {
 								common:      true
-								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
+								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
 								required:    false
 								type: uint: {
 									default: sinks[Name].features.send.request.timeout_secs
