@@ -32,7 +32,7 @@ components: sources: kubernetes_logs: {
 							url:   "dynamically detected at runtime"
 						}
 						direction: "outgoing"
-						ssl: "required"
+						ssl:       "required"
 						protocols: ["http"]
 					}
 				}
@@ -185,7 +185,7 @@ components: sources: kubernetes_logs: {
 			"kubernetes.container_image": {
 				description: "Container image."
 				required:    false
-				common:    true
+				common:      true
 				type: string: {
 					examples: ["busybox:1.30"]
 					default: null
@@ -194,7 +194,7 @@ components: sources: kubernetes_logs: {
 			"kubernetes.container_name": {
 				description: "Container name."
 				required:    false
-				common:    true
+				common:      true
 				type: string: {
 					examples: ["coredns"]
 					default: null
@@ -203,7 +203,7 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_labels": {
 				description: "Pod labels name."
 				required:    false
-				common:    true
+				common:      true
 				type: object: {
 					examples: [{"mylabel": "myvalue"}]
 					options: {}
@@ -212,7 +212,7 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_name": {
 				description: "Pod name."
 				required:    false
-				common:    true
+				common:      true
 				type: string: {
 					examples: ["coredns-qwertyuiop-qwert"]
 					default: null
@@ -221,7 +221,7 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_namespace": {
 				description: "Pod namespace."
 				required:    false
-				common:    true
+				common:      true
 				type: string: {
 					examples: ["kube-system"]
 					default: null
@@ -230,7 +230,7 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_node_name": {
 				description: "Pod node name."
 				required:    false
-				common:    true
+				common:      true
 				type: string: {
 					examples: ["minikube"]
 					default: null
@@ -239,7 +239,7 @@ components: sources: kubernetes_logs: {
 			"kubernetes.pod_uid": {
 				description: "Pod uid."
 				required:    false
-				common:    true
+				common:      true
 				type: string: {
 					examples: ["ba46d8c9-9541-4f6b-bbf9-d23b36f2f136"]
 					default: null
