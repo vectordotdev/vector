@@ -169,6 +169,19 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
+  check-component-features:
+    name: Component Features - Linux
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    runs-on: ubuntu-20.04
+    container: timberio/ci_image
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
+      - run: make check-component-features
+
   checks:
     name: Checks
     runs-on: ubuntu-20.04
