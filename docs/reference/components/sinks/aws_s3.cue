@@ -85,6 +85,7 @@ components: sinks: aws_s3: {
 
 	configuration: {
 		acl: {
+			category:    "ACL"
 			common:      false
 			description: "Canned ACL to apply to the created objects. For more information, see [Canned ACL][urls.aws_s3_canned_acl]."
 			required:    false
@@ -110,7 +111,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		content_encoding: {
-			category: "Content Type"
+			category:    "Content Type"
 			common:      false
 			description: "Specifies what content encodings have been applied to the object and thus what decoding mechanisms must be applied to obtain the media-type referenced by the Content-Type header field. By default calculated from `compression` value."
 			required:    false
@@ -121,7 +122,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		content_type: {
-			category: "Content Type"
+			category:    "Content Type"
 			common:      false
 			description: "A standard MIME type describing the format of the contents."
 			required:    false
@@ -131,7 +132,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		filename_append_uuid: {
-			category: "File Naming"
+			category:    "File Naming"
 			common:      false
 			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 			required:    false
@@ -139,7 +140,7 @@ components: sinks: aws_s3: {
 			type: bool: default: true
 		}
 		filename_extension: {
-			category: "File Naming"
+			category:    "File Naming"
 			common:      false
 			description: "The filename extension to use in the object name."
 			required:    false
@@ -149,7 +150,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		filename_time_format: {
-			category: "File Naming"
+			category:    "File Naming"
 			common:      false
 			description: "The format of the resulting object file name. [`strftime` specifiers](\(urls.strptime_specifiers)) are supported."
 			required:    false
@@ -159,7 +160,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		grant_full_control: {
-			category: "ACL"
+			category:    "ACL"
 			common:      false
 			description: "Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP permissions on the created objects."
 			required:    false
@@ -170,7 +171,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		grant_read: {
-			category: "ACL"
+			category:    "ACL"
 			common:      false
 			description: "Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and their metadata."
 			required:    false
@@ -181,7 +182,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		grant_read_acp: {
-			category: "ACL"
+			category:    "ACL"
 			common:      false
 			description: "Allows the named [grantee][urls.aws_s3_grantee] to read the created objects' ACL."
 			required:    false
@@ -192,7 +193,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		grant_write_acp: {
-			category: "ACL"
+			category:    "ACL"
 			common:      false
 			description: "Allows the named [grantee][urls.aws_s3_grantee] to write the created objects' ACL."
 			required:    false
@@ -203,7 +204,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		key_prefix: {
-			category: "File Naming"
+			category:    "File Naming"
 			common:      true
 			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root S3 \"folder\"."
 			required:    false
@@ -239,7 +240,7 @@ components: sinks: aws_s3: {
 			}
 		}
 		storage_class: {
-			category: "Storage"
+			category:    "Storage"
 			common:      false
 			description: "The storage class for the created objects. See [the S3 Storage Classes](https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-class-intro.html) for more details."
 			required:    false
