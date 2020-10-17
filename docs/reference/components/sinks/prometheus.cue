@@ -1,6 +1,8 @@
 package metadata
 
 components: sinks: prometheus: {
+	_port: 9598
+
 	title:       "Prometheus"
 	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
@@ -15,7 +17,27 @@ components: sinks: prometheus: {
 	features: {
 		buffer: enabled:      false
 		healthcheck: enabled: false
-		exposes: {}
+		exposes: {
+			for: {
+				name:     "Prometheus"
+				thing:    "a \(name) database"
+				url:      urls.prometheus
+				versions: ">= 1.0"
+
+				interface: {
+					socket: {
+						api: {
+							title: "Prometheus text exposition format"
+							url:   urls.prometheus_text_based_exposition_format
+						}
+						direction: "incoming"
+						port:      _port
+						protocols: ["http"]
+						ssl: "disabled"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
@@ -28,11 +50,7 @@ components: sinks: prometheus: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			"""
-				[Prometheus](\(urls.prometheus)) version `>= 1.0` is required.
-				""",
-		]
+		requirements: []
 		warnings: [
 			"""
 				High cardinality metric names and labels are discouraged by
@@ -40,10 +58,6 @@ components: sinks: prometheus: {
 				problems. You should consider alternative strategies to reduce
 				the cardinality. Vector offers a [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit]
 				as a way to protect against this.
-				""",
-			"""
-				This component exposes a configured port. You must ensure your
-				network allows access to this port.
 				""",
 		]
 		notices: []
@@ -55,7 +69,7 @@ components: sinks: prometheus: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9598"]
+				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
 		buckets: {
