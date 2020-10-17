@@ -1,5 +1,5 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, Label, Recorder, Unit};
+use metrics::{Key, KeyData, Label, Recorder, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
@@ -8,10 +8,21 @@ use std::sync::Arc;
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 
+// Cardinality counter parameters, expose the internal metrics registry
+// cardinality.
+// Useful for the end users to help understand the characteristics of their
+// environment and how vectors acts in it.
+static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name("internal_metrics_cardinality");
+static CARDINALITY_KEY: CompositeKey =
+    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
+
 pub fn init() -> crate::Result<()> {
     // Prepare the registry.
     let registry = Registry::new();
     let registry = Arc::new(registry);
+
+    // Init the cardinality counter.
+    registry.op(CARDINALITY_KEY.clone(), |_| {}, Handle::counter);
 
     // Initialize the controller.
     let controller = Controller {
@@ -41,14 +52,36 @@ struct VectorRecorder {
     registry: Arc<Registry<CompositeKey, Handle>>,
 }
 
+impl VectorRecorder {
+    fn bump_cardinality_counter_and<F, O>(&self, f: F) -> O
+    where
+        F: FnOnce() -> O,
+    {
+        self.registry.op(
+            CARDINALITY_KEY.clone(),
+            |handle| handle.increment_counter(1),
+            Handle::counter,
+        );
+        f()
+    }
+}
+
 impl Recorder for VectorRecorder {
     fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Counter, key);
-        self.registry.op(ckey, |_| {}, Handle::counter)
+        self.registry.op(
+            ckey,
+            |_| {},
+            || self.bump_cardinality_counter_and(Handle::counter),
+        )
     }
     fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Gauge, key);
-        self.registry.op(ckey, |_| {}, Handle::gauge)
+        self.registry.op(
+            ckey,
+            |_| {},
+            || self.bump_cardinality_counter_and(Handle::gauge),
+        )
     }
     fn register_histogram(
         &self,
@@ -57,7 +90,11 @@ impl Recorder for VectorRecorder {
         _description: Option<&'static str>,
     ) {
         let ckey = CompositeKey::new(MetricKind::Histogram, key);
-        self.registry.op(ckey, |_| {}, Handle::histogram)
+        self.registry.op(
+            ckey,
+            |_| {},
+            || self.bump_cardinality_counter_and(Handle::histogram),
+        )
     }
 
     fn increment_counter(&self, key: Key, value: u64) {
@@ -65,20 +102,23 @@ impl Recorder for VectorRecorder {
         self.registry.op(
             ckey,
             |handle| handle.increment_counter(value),
-            Handle::counter,
+            || self.bump_cardinality_counter_and(Handle::counter),
         )
     }
     fn update_gauge(&self, key: Key, value: f64) {
         let ckey = CompositeKey::new(MetricKind::Gauge, key);
-        self.registry
-            .op(ckey, |handle| handle.update_gauge(value), Handle::gauge)
+        self.registry.op(
+            ckey,
+            |handle| handle.update_gauge(value),
+            || self.bump_cardinality_counter_and(Handle::gauge),
+        )
     }
     fn record_histogram(&self, key: Key, value: u64) {
         let ckey = CompositeKey::new(MetricKind::Histogram, key);
         self.registry.op(
             ckey,
             |handle| handle.record_histogram(value),
-            Handle::histogram,
+            || self.bump_cardinality_counter_and(Handle::histogram),
         )
     }
 }
@@ -152,7 +192,7 @@ mod tests {
 
         let metric = super::capture_metrics(super::get_controller().unwrap())
             .map(|e| e.into_metric())
-            .find(|metric| metric.name == "labels_injected")
+            .find(|metric| metric.name == "labels_injected_total")
             .unwrap();
 
         let expected_tags = Some(
