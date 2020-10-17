@@ -3,3 +3,5 @@ distribution/* linguist-detectable=false
 lib/* linguist-vendored
 scripts/* linguist-detectable=false
 Makefile linguist-detectable=false
+
+distribution/helm/*/charts/*.tgz filter=lfs diff=lfs merge=lfs -text
