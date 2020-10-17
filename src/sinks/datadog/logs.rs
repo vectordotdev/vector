@@ -36,9 +36,6 @@ pub struct DatadogLogsConfig {
     compression: Option<Compression>,
 
     #[serde(default)]
-    compression_level: CompressionLevel,
-
-    #[serde(default)]
     batch: BatchConfig,
 
     #[serde(default)]
@@ -121,10 +118,15 @@ impl DatadogLogsConfig {
             .header("Content-Type", "text/plain")
             .header("DD-API-KEY", self.api_key.clone());
 
-        let (request, body) = match self.compression {
-            Some(Compression::None) => (request, body),
-            None | Some(Compression::Gzip) => {
-                let mut encoder = GzEncoder::new(Vec::new(), self.compression_level.get_level());
+        let compression = self.compression.unwrap_or(Compression::Gzip(None));
+
+        let (request, body) = match compression {
+            Compression::None => (request, body),
+            Compression::Gzip(level) => {
+                // Default the compression level to 6, which is similar to datadog agent.
+                // https://docs.datadoghq.com/agent/logs/log_transport/?tab=https#log-compression
+                let level = level.unwrap_or(6);
+                let mut encoder = GzEncoder::new(Vec::new(), flate2::Compression::new(level as u32));
 
                 encoder.write_all(&body)?;
                 (
