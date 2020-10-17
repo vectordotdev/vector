@@ -16,7 +16,6 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
 use std::time::{Duration, Instant};
-use string_cache::DefaultAtom as Atom;
 
 mod merge_strategy;
 
@@ -34,7 +33,7 @@ pub struct ReduceConfig {
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
     #[serde(default)]
-    pub identifier_fields: Vec<String>,
+    pub group_by: Vec<String>,
 
     #[serde(default)]
     pub merge_strategies: IndexMap<String, MergeStrategy>,
@@ -47,6 +46,8 @@ pub struct ReduceConfig {
 inventory::submit! {
     TransformDescription::new::<ReduceConfig>("reduce")
 }
+
+impl_generate_config_from_default!(ReduceConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
@@ -142,7 +143,7 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
-    identifier_fields: Vec<Atom>,
+    group_by: Vec<String>,
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
@@ -156,17 +157,12 @@ impl Reduce {
             None
         };
 
-        let identifier_fields = config
-            .identifier_fields
-            .clone()
-            .into_iter()
-            .map(Atom::from)
-            .collect();
+        let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
             expire_after: Duration::from_millis(config.expire_after_ms.unwrap_or(30000)),
             flush_period: Duration::from_millis(config.flush_period_ms.unwrap_or(1000)),
-            identifier_fields,
+            group_by,
             merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),
             ends_when,
@@ -211,7 +207,7 @@ impl Transform for Reduce {
             .unwrap_or(false);
 
         let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, &self.identifier_fields);
+        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
         if ends_here {
             output.push(Event::from(
@@ -297,11 +293,16 @@ mod test {
     };
     use serde_json::json;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ReduceConfig>();
+    }
+
     #[tokio::test]
     async fn reduce_from_condition() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 [ends_when]
   "test_end.exists" = true
@@ -337,13 +338,10 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -356,24 +354,21 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
     #[tokio::test]
     async fn reduce_merge_strategies() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 merge_strategies.foo = "concat"
 merge_strategies.bar = "array"
@@ -417,25 +412,25 @@ merge_strategies.baz = "max"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             "first foo second foo".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(outputs.first().unwrap().as_log()[&"baz".into()], 3.into(),);
+        assert_eq!(outputs.first().unwrap().as_log()["baz"], 3.into(),);
     }
 
     #[tokio::test]
-    async fn missing_identifier() {
+    async fn missing_group_by() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 [ends_when]
   "test_end.exists" = true
@@ -471,13 +466,10 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(8)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
 
         outputs.clear();
 
@@ -489,24 +481,21 @@ identifier_fields = [ "request_id" ]
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"message".into()],
+            outputs.first().unwrap().as_log()["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"extra_field".into()],
+            outputs.first().unwrap().as_log()["extra_field"],
             "value1".into()
         );
-        assert_eq!(
-            outputs.first().unwrap().as_log()[&"counter".into()],
-            Value::from(7)
-        );
+        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
     }
 
     #[tokio::test]
     async fn arrays() {
         let mut reduce = toml::from_str::<ReduceConfig>(
             r#"
-identifier_fields = [ "request_id" ]
+group_by = [ "request_id" ]
 
 merge_strategies.foo = "array"
 merge_strategies.bar = "concat"
@@ -549,13 +538,13 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[1, 3], [5, 7], "done"]).into()
         );
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([1, 3, 5, 7, "done"]).into()
         );
 
@@ -576,11 +565,11 @@ merge_strategies.bar = "concat"
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"foo".into()],
+            outputs.first().unwrap().as_log()["foo"],
             json!([[2, 4], [6, 8], "done"]).into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()[&"bar".into()],
+            outputs.first().unwrap().as_log()["bar"],
             json!([2, 4, 6, 8, "done"]).into()
         );
     }

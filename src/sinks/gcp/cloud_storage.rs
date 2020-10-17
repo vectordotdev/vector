@@ -1,6 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     serde::to_string,
     sinks::{
@@ -31,6 +31,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
+
 use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
 
@@ -87,7 +88,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
         encoding: e.into(),
-        compression: Compression::Gzip,
+        compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
         auth: Default::default(),
@@ -144,8 +145,10 @@ impl Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
+    SinkDescription::new::<GcsSinkConfig>(NAME)
 }
+
+impl GenerateConfig for GcsSinkConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
@@ -414,7 +417,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&crate::config::log_schema().message_key())
+                .get(crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -433,8 +436,8 @@ impl RetryLogic for GcsRetryLogic {
     type Error = hyper::Error;
     type Response = Response<Body>;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_connect() || error.is_closed()
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
@@ -543,11 +546,14 @@ mod tests {
 
         let req = RequestWrapper::new(
             buf.clone(),
-            request_settings(None, false, Compression::Gzip),
+            request_settings(None, false, Compression::gzip_default()),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = RequestWrapper::new(buf, request_settings(None, true, Compression::Gzip));
+        let req = RequestWrapper::new(
+            buf,
+            request_settings(None, true, Compression::gzip_default()),
+        );
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }

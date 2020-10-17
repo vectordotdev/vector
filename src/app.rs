@@ -13,6 +13,8 @@ use futures::{
 };
 use futures01::sync::mpsc;
 
+#[cfg(feature = "api-client")]
+use crate::top;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 
@@ -87,8 +89,6 @@ impl Application {
 
         metrics::init().expect("metrics initialization failed");
 
-        info!("Log level {:?} is enabled.", level);
-
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
                 error!("The `threads` argument must be greater or equal to 1.");
@@ -118,6 +118,8 @@ impl Application {
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         SubCommand::Generate(g) => generate::cmd(&g),
+                        #[cfg(feature = "api-client")]
+                        SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                     };
@@ -125,13 +127,15 @@ impl Application {
                     return Err(code);
                 };
 
+                info!("Log level {:?} is enabled.", level);
+
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(&config_paths, None).or_else(|error| {
+                    config::watcher::spawn_thread(&config_paths, None).map_err(|error| {
                         error!(message = "Unable to start config watcher.", %error);
-                        Err(exitcode::CONFIG)
+                        exitcode::CONFIG
                     })?;
                 }
 

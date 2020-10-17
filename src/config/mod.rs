@@ -10,7 +10,6 @@ use snafu::{ResultExt, Snafu};
 use std::fs::DirBuilder;
 use std::path::PathBuf;
 
-#[cfg(feature = "api")]
 pub mod api;
 mod builder;
 mod compiler;
@@ -130,6 +129,24 @@ pub enum DataType {
     Metric,
 }
 
+pub trait GenerateConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::Table(Default::default())
+    }
+}
+
+#[macro_export]
+macro_rules! impl_generate_config_from_default {
+    ($type:ty) => {
+        impl $crate::config::GenerateConfig for $type {
+            fn generate_config() -> toml::Value {
+                toml::Value::try_from(&Self::default()).unwrap()
+            }
+        }
+    };
+}
+
+#[async_trait::async_trait]
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SourceConfig: core::fmt::Debug + Send + Sync {
