@@ -70,6 +70,17 @@ components: sinks: splunk_hec: {
 						ssl: "optional"
 					}
 				}
+
+				setup: [
+					"""
+						Follow the [Splunk HEC setup docs][urls.splunk_hec_setup]
+						and create a Splunk HEC endpoint.
+						""",
+					"""
+						Splunk will provide you with a host and token. Copy those
+						values to the `host` and `token` options.
+						""",
+				]
 			}
 		}
 	}
