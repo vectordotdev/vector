@@ -216,7 +216,7 @@ components: sinks: aws_s3: {
 		server_side_encryption: {
 			category:    "Encryption"
 			common:      false
-			description: "The server-side encryption algorithm used when storing these objects."
+			description: "The Server-side Encryption algorithm used when storing these objects."
 			required:    false
 			warnings: []
 			type: string: {
