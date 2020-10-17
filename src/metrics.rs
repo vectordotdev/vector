@@ -12,7 +12,8 @@ static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 // cardinality.
 // Useful for the end users to help understand the characteristics of their
 // environment and how vectors acts in it.
-static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name("internal_metrics_cardinality");
+const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
+static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(CARDINALITY_KEY_NAME);
 static CARDINALITY_KEY: CompositeKey =
     CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
 
@@ -206,5 +207,39 @@ mod tests {
         );
 
         assert_eq!(metric.tags, expected_tags);
+    }
+
+    #[test]
+    fn test_cardinality_metric() {
+        trace_init();
+        let _ = super::init();
+
+        let capture_value = || {
+            let metric = super::capture_metrics(super::get_controller().unwrap())
+                .map(|e| e.into_metric())
+                .find(|metric| metric.name == super::CARDINALITY_KEY_NAME)
+                .unwrap();
+            match metric.value {
+                crate::event::MetricValue::Counter { value } => value,
+                _ => panic!("invalid metric value type, expected coutner, got something else"),
+            }
+        };
+
+        let intial_value = capture_value();
+
+        counter!("cardinality_test_metric_1", 1);
+        assert_eq!(capture_value(), intial_value + 1.0);
+
+        counter!("cardinality_test_metric_1", 1);
+        assert_eq!(capture_value(), intial_value + 1.0);
+
+        counter!("cardinality_test_metric_2", 1);
+        counter!("cardinality_test_metric_3", 1);
+        assert_eq!(capture_value(), intial_value + 3.0);
+
+        counter!("cardinality_test_metric_1", 1);
+        counter!("cardinality_test_metric_2", 1);
+        counter!("cardinality_test_metric_3", 1);
+        assert_eq!(capture_value(), intial_value + 3.0);
     }
 }
