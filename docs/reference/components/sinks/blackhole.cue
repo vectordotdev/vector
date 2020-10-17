@@ -1,56 +1,56 @@
 package metadata
 
 components: sinks: blackhole: {
-  title: "Blackhole"
-  short_description: "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
-  long_description: "Streams log and metric events to a blackhole that simply discards data, designed for testing and benchmarking purposes."
+	title: "Blackhole"
 
-  classes: {
-    commonly_used: false
-    function: "test"
-    service_providers: []
-  }
+	classes: {
+		commonly_used: false
+		delivery:      "at_least_once"
+		development:   "stable"
+		egress_method: "stream"
+		service_providers: []
+	}
 
-  features: {
-    batch: enabled: false
-    buffer: enabled: false
-    compression: enabled: false
-    encoding: enabled: false
-    request: enabled: false
-    tls: enabled: false
-  }
+	features: {
+		buffer: enabled:      false
+		healthcheck: enabled: false
+		send: {
+			compression: enabled: false
+			encoding: enabled:    false
+			request: enabled:     false
+			tls: enabled:         false
+		}
+	}
 
-  statuses: {
-    delivery: "at_least_once"
-    development: "stable"
-  }
+	support: {
+		platforms: {
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
+		}
 
-  support: {
-    input_types: ["log","metric"]
+		requirements: []
+		warnings: []
+		notices: []
+	}
 
-    platforms: {
-      "aarch64-unknown-linux-gnu": true
-      "aarch64-unknown-linux-musl": true
-      "x86_64-apple-darwin": true
-      "x86_64-pc-windows-msv": true
-      "x86_64-unknown-linux-gnu": true
-      "x86_64-unknown-linux-musl": true
-    }
+	configuration: {
+		print_amount: {
+			description: "The number of events that must be received in order to print a summary of activity."
+			required:    true
+			warnings: []
+			type: uint: {
+				examples: [1000]
+				unit: null
+			}
+		}
+	}
 
-    requirements: []
-    warnings: []
-  }
-
-  configuration: {
-    print_amount: {
-      description: "The number of events that must be received in order to print a summary of activity."
-      required: true
-      warnings: []
-      type: uint: {
-        examples: [1000]
-        unit: null
-      }
-    }
-  }
+	input: {
+		logs:    true
+		metrics: null
+	}
 }
-
