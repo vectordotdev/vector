@@ -129,4 +129,6 @@ components: sinks: kafka: {
 		logs:    true
 		metrics: null
 	}
+
+	how_it_works: components._kafka.how_it_works
 }
