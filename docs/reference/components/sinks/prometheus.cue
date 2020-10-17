@@ -212,8 +212,7 @@ components: sinks: prometheus: {
 			title: "Histogram Buckets"
 			body: #"""
 				Choosing the appropriate buckets for Prometheus histograms is a complicated
-				point of discussion. The [Histograms and Summaries Prometheus \
-				guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
+				point of discussion. The [Histograms and Summaries Prometheus guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
 				buckets, summaries, and how you should think about configuring them. The buckets
 				you choose should align with your known range and distribution of values as
 				well as how you plan to report on them. The aforementioned guide provides
@@ -223,23 +222,10 @@ components: sinks: prometheus: {
 				{
 					title: "Default Buckets"
 					body: """
-						The `buckets` option defines the global default buckets for histograms:
-
-						```toml
-						<%= component.options.buckets.default %>
-						```
-
+						The `buckets` option defines the global default buckets for histograms.
 						These defaults are tailored to broadly measure the response time (in seconds)
 						of a network service. Most likely, however, you will be required to define
 						buckets customized to your use case.
-
-						<Alert type="warning">
-
-						Note: These values are in `<%= component.options.buckets.unit %>`, therefore,
-						your metric values should also be in `<%= component.options.buckets.unit %>`.
-						If this is not the case you should adjust your metric or buckets to coincide.
-
-						</Alert>
 						"""
 				},
 			]
@@ -248,7 +234,7 @@ components: sinks: prometheus: {
 		memory_usage: {
 			title: "Memory Usage"
 			body: """
-				Like other Prometheus instances, the `<%= component.name %>` sink aggregates
+				Like other Prometheus instances, the `prometheus` sink aggregates
 				metrics in memory which keeps the memory footprint to a minimum if Prometheus
 				fails to scrape the Vector instance over an extended period of time. The
 				downside is that data will be lost if Vector is restarted. This is by design of
