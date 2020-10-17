@@ -11,41 +11,67 @@ pub fn make_framework() -> Framework {
     Framework::new(interface)
 }
 
-pub fn make_test_pod<'a>(
-    namespace: &'a str,
-    name: &'a str,
-    command: &'a str,
-    labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
-) -> Pod {
-    let labels: std::collections::BTreeMap<String, String> = labels
+pub fn collect_btree<'a>(
+    items: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+) -> Option<std::collections::BTreeMap<String, String>> {
+    let collected: std::collections::BTreeMap<String, String> = items
         .into_iter()
         .map(|(key, val)| (key.to_owned(), val.to_owned()))
         .collect();
-    let labels = if labels.is_empty() {
-        None
-    } else {
-        Some(labels)
-    };
+    if collected.is_empty() {
+        return None;
+    }
+    Some(collected)
+}
+
+pub fn make_test_container<'a>(name: &'a str, command: &'a str) -> Container {
+    Container {
+        name: name.to_owned(),
+        image: Some(BUSYBOX_IMAGE.to_owned()),
+        command: Some(vec!["sh".to_owned()]),
+        args: Some(vec!["-c".to_owned(), command.to_owned()]),
+        ..Container::default()
+    }
+}
+
+pub fn make_test_pod_with_containers<'a>(
+    namespace: &'a str,
+    name: &'a str,
+    labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+    annotations: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+    containers: Vec<Container>,
+) -> Pod {
     Pod {
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
             namespace: Some(namespace.to_owned()),
-            labels,
+            labels: collect_btree(labels),
+            annotations: collect_btree(annotations),
             ..ObjectMeta::default()
         },
         spec: Some(PodSpec {
-            containers: vec![Container {
-                name: name.to_owned(),
-                image: Some(BUSYBOX_IMAGE.to_owned()),
-                command: Some(vec!["sh".to_owned()]),
-                args: Some(vec!["-c".to_owned(), command.to_owned()]),
-                ..Container::default()
-            }],
+            containers,
             restart_policy: Some("Never".to_owned()),
             ..PodSpec::default()
         }),
         ..Pod::default()
     }
+}
+
+pub fn make_test_pod<'a>(
+    namespace: &'a str,
+    name: &'a str,
+    command: &'a str,
+    labels: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+    annotations: impl IntoIterator<Item = (&'a str, &'a str)> + 'a,
+) -> Pod {
+    make_test_pod_with_containers(
+        namespace,
+        name,
+        labels,
+        annotations,
+        vec![make_test_container(name, command)],
+    )
 }
 
 pub fn parse_json(s: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
