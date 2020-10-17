@@ -1,0 +1,40 @@
+{{- if .Values.rbac.enabled -}}
+# Permissions to use Kubernetes API.
+# Requires that RBAC authorization is enabled.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "libvector.fullname" . }}
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - watch
+{{- if .Values.psp.enabled }}
+  - apiGroups:
+      - policy
+    resources:
+      - podsecuritypolicies
+    verbs:
+      - use
+    resourceNames:
+      - {{ include "libvector.fullname" . }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "libvector.fullname" . }}
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "libvector.fullname" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "libvector.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

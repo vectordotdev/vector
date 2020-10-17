@@ -8,15 +8,15 @@ jitter = 0.1
 
 [stats.in_flight]
 max = [20, 35]
-mean = [10.0, 20.0]
+mean = [9.0, 20.0]
 
 [controller.in_flight]
 max = [20, 35]
-mean = [10.0, 20.0]
+mean = [9.0, 20.0]
 
 [controller.concurrency_limit]
 max = [20, 35]
-mean = [10.0, 20.0]
+mean = [9.0, 20.0]
 
 [controller.observed_rtt]
 mean = [0.100, 0.130]

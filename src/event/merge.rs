@@ -1,15 +1,14 @@
 use crate::event::{LogEvent, Value};
 use bytes::BytesMut;
-use string_cache::DefaultAtom as Atom;
 
 /// Merges all fields specified at `fields` from `incoming` to `current`.
-pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, fields: &[Atom]) {
+pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, fields: &[impl AsRef<str>]) {
     for field in fields {
         let incoming_val = match incoming.remove(field) {
             None => continue,
             Some(val) => val,
         };
-        match current.get_mut(field) {
+        match current.get_mut(&field) {
             None => {
                 current.insert(field, incoming_val);
             }
@@ -65,11 +64,11 @@ mod test {
         // Specify the fields that will be merged.
         // Only the ones listed will be merged from the `incoming` event
         // to the `current`.
-        let fields_to_merge = [
-            Atom::from("merge"),
-            Atom::from("merge_a"),
-            Atom::from("merge_b"),
-            Atom::from("merge_c"),
+        let fields_to_merge = vec![
+            "merge".to_string(),
+            "merge_a".to_string(),
+            "merge_b".to_string(),
+            "merge_c".to_string(),
         ];
 
         let current = {

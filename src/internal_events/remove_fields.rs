@@ -6,10 +6,7 @@ pub struct RemoveFieldsEventProcessed;
 
 impl InternalEvent for RemoveFieldsEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "remove_fields",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -20,6 +17,6 @@ pub struct RemoveFieldsFieldMissing<'a> {
 
 impl<'a> InternalEvent for RemoveFieldsFieldMissing<'a> {
     fn emit_logs(&self) {
-        error!(message = "Field did not exist.", %self.field, rate_limit_secs = 30);
+        debug!(message = "Field did not exist.", %self.field, rate_limit_secs = 30);
     }
 }
