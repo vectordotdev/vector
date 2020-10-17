@@ -49,7 +49,7 @@ _values: {
 		// For example, "AWS" is a service provider for many services, and
 		// a user on AWS can use this to filter for AWS supported
 		// components.
-		service_providers: [...string]
+		service_providers: [...string] | *[]
 	}
 }
 

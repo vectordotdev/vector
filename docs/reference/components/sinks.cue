@@ -259,7 +259,7 @@ components: sinks: [Name=string]: {
 							}
 							timeout_secs: {
 								common:      true
-								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
+								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
 								required:    false
 								type: uint: {
 									default: sinks[Name].features.send.request.timeout_secs
