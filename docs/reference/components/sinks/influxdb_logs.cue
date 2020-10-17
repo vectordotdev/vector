@@ -84,6 +84,30 @@ components: sinks: influxdb_logs: {
 
 				The default behavior can be overridden by a `tags` configuration.
 				"""
+
+			sub_sections: [
+				{
+					title: "Mapping Example"
+					body: """
+						The following event:
+
+						```js
+						{
+						  "host": "my.host.com",
+						  "message": "<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar",
+						  "timestamp": "2019-11-01T21:15:47+00:00",
+						  "custom_field": "custom_value"
+						}
+						```
+
+						Will be mapped to Influx's line protocol:
+
+						```influxdb_line_protocol
+						ns.vector,host=my.host.com,metric_type=logs custom_field="custom_value",message="<13>Feb 13 20:07:26 74794bfb6795 root[8539]: i am foobar" 1572642947000000000
+						```
+						"""
+				},
+			]
 		}
 	}
 }
