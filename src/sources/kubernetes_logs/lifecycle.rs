@@ -1,7 +1,6 @@
 use crate::shutdown::{ShutdownSignal, ShutdownSignalToken};
 use futures::{
     channel::oneshot,
-    compat::Compat01As03,
     future::{select, BoxFuture, Either},
     pin_mut, ready,
     stream::FuturesUnordered,
@@ -67,8 +66,7 @@ impl<'bound> Lifecycle<'bound> {
         let first_task_fut = self.futs.next();
         pin_mut!(first_task_fut);
 
-        let global_shutdown_fut = Compat01As03::new(&mut global_shutdown);
-        let token = match select(first_task_fut, global_shutdown_fut).await {
+        let token = match select(first_task_fut, &mut global_shutdown).await {
             Either::Left((None, _)) => {
                 trace!(message = "Lifecycle had no tasks upon run, we're done");
                 GlobalShutdownToken::Unused(global_shutdown)
@@ -77,8 +75,7 @@ impl<'bound> Lifecycle<'bound> {
                 trace!(message = "Lifecycle had the first task completed");
                 GlobalShutdownToken::Unused(global_shutdown)
             }
-            Either::Right((shutdown_signal_token_result, _)) => {
-                let shutdown_signal_token = shutdown_signal_token_result.unwrap();
+            Either::Right((shutdown_signal_token, _)) => {
                 trace!(message = "Lifecycle got a global shutdown request");
                 GlobalShutdownToken::Token(shutdown_signal_token)
             }

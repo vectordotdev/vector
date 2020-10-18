@@ -280,7 +280,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(Compat01As03Sink::new(tx), shutdown.compat());
+            let result = file_server.run(Compat01As03Sink::new(tx), shutdown);
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -724,7 +724,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -761,7 +761,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -798,7 +798,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
