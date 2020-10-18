@@ -17,6 +17,7 @@ urls: {
 	aws_elb:                                                  "https://aws.amazon.com/elasticloadbalancing/"
 	aws_cloudwatch:                                           "https://aws.amazon.com/cloudwatch/"
 	aws_cloudwatch_logs:                                      "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html"
+	aws_cloudwatch_logs_api:                                  "https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/Welcome.html"
 	aws_cloudwatch_logs_group_name:                           "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
 	aws_cloudwatch_logs_service_limits:                       "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/cloudwatch_limits_cwl.html"
 	aws_cloudwatch_logs_stream_name:                          "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html"
