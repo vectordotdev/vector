@@ -101,7 +101,7 @@ data_model: schema: {
 								warnings: []
 								type: string: enum: #DistributionStatistic & {
 									histogram: "Counts values in buckets."
-									summary: "Calculates quantiles of values."
+									summary:   "Calculates quantiles of values."
 								}
 							}
 						}

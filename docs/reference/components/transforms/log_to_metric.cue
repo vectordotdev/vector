@@ -59,11 +59,13 @@ components: transforms: log_to_metric: {
 					}
 					name: {
 						description: "The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`."
-						required:    true
+						required:    false
+						common:      true
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
 						}
+						templateable: true
 					}
 					tags: {
 						description: "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
@@ -82,11 +84,11 @@ components: transforms: log_to_metric: {
 								"*": {
 									description: """
 	                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-	                      Environment variables and field interpolation is allowed.
 	                      """
 									required: true
 									warnings: []
 									type: "*": {}
+									templateable: true
 								}
 							}
 						}
@@ -116,15 +118,15 @@ components: transforms: log_to_metric: {
 	}
 
 	output: metrics: {
-		counter:   	  output._passthrough_counter
+		counter:      output._passthrough_counter
 		distribution: output._passthrough_distribution
-		gauge:     	  output._passthrough_gauge
-		set:       	  output._passthrough_set
+		gauge:        output._passthrough_gauge
+		set:          output._passthrough_set
 	}
 
 	examples: [
 		{
-			title: "Counters"
+			title: "Counter"
 			configuration: {
 				metrics: [
 					{
@@ -144,7 +146,8 @@ components: transforms: log_to_metric: {
 				status:  200
 			}
 			output: [{metric: {
-				name: "time_ms"
+				name: "response_total"
+				kind: "incremental"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -155,25 +158,53 @@ components: transforms: log_to_metric: {
 			}}]
 		},
 		{
-			title: "Gauge"
+			title: "Sum"
+			configuration: {
+				metrics: [
+					{
+						type:               "counter"
+						field:              "total"
+						name:               "order_total"
+						increment_by_value: true
+						tags: {
+							host: "{{host}}"
+						}
+					},
+				]
+			}
+			input: log: {
+				host:    "10.22.11.222"
+				message: "Order placed for $122.20"
+				total:   122.2
+			}
+			output: [{metric: {
+				name: "order_total"
+				kind: "incremental"
+				tags: {
+					host: "10.22.11.222"
+				}
+				counter: {
+					value: 122.2
+				}
+			}}]
+		},
+		{
+			title: "Gauges"
 			configuration: {
 				metrics: [
 					{
 						type:  "gauge"
 						field: "1m_load_avg"
-						name:  "1m_load_avg"
 						tags: host: "{{host}}"
 					},
 					{
 						type:  "gauge"
 						field: "5m_load_avg"
-						name:  "5m_load_avg"
 						tags: host: "{{host}}"
 					},
 					{
 						type:  "gauge"
 						field: "15m_load_avg"
-						name:  "15m_load_avg"
 						tags: host: "{{host}}"
 					},
 				]
@@ -188,6 +219,7 @@ components: transforms: log_to_metric: {
 			output: [
 				{metric: {
 					name: "1m_load_avg"
+					kind: "absolute"
 					tags: {
 						host: "10.22.11.222"
 					}
@@ -197,6 +229,7 @@ components: transforms: log_to_metric: {
 				}},
 				{metric: {
 					name: "5m_load_avg"
+					kind: "absolute"
 					tags: {
 						host: "10.22.11.222"
 					}
@@ -206,6 +239,7 @@ components: transforms: log_to_metric: {
 				}},
 				{metric: {
 					name: "15m_load_avg"
+					kind: "absolute"
 					tags: {
 						host: "10.22.11.222"
 					}
@@ -216,7 +250,7 @@ components: transforms: log_to_metric: {
 			]
 		},
 		{
-			title: "Histograms"
+			title: "Histogram"
 			configuration: {
 				metrics: [
 					{
@@ -238,6 +272,7 @@ components: transforms: log_to_metric: {
 			}
 			output: [{metric: {
 				name: "time_ms"
+				kind: "incremental"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -250,11 +285,11 @@ components: transforms: log_to_metric: {
 			}}]
 		},
 		{
-			title: "Sets"
+			title: "Summary"
 			configuration: {
 				metrics: [
 					{
-						type:  "histogram"
+						type:  "summary"
 						field: "time"
 						name:  "time_ms"
 						tags: {
@@ -265,15 +300,48 @@ components: transforms: log_to_metric: {
 				]
 			}
 			input: log: {
+				host:    "10.22.11.222"
+				message: "Sent 200 in 54.2ms"
+				status:  200
+				time:    54.2
+			}
+			output: [{metric: {
+				name: "time_ms"
+				kind: "incremental"
+				tags: {
+					status: "200"
+					host:   "10.22.11.222"
+				}
+				distribution: {
+					values: [54.2]
+					sample_rates: [1.0]
+					statistic: "summary"
+				}
+			}}]
+		},
+		{
+			title: "Set"
+			configuration: {
+				metrics: [
+					{
+						type:  "set"
+						field: "remote_addr"
+						tags: {
+							host: "{{host}}"
+						}
+					},
+				]
+			}
+			input: log: {
 				host:        "10.22.11.222"
 				message:     "Sent 200 in 54.2ms"
 				remote_addr: "233.221.232.22"
 			}
 			output: [{metric: {
-				name: "time_ms"
+				name: "remote_addr"
+				kind: "incremental"
 				tags: {
-					status: "200"
-					host:   "10.22.11.222"
+					host: "10.22.11.222"
 				}
 				set: {
 					values: ["233.221.232.22"]

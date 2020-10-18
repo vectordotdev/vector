@@ -65,7 +65,7 @@ components: sources: statsd: {
 	}
 
 	output: metrics: {
-		counter:   	  output._passthrough_counter
+		counter:      output._passthrough_counter
 		distribution: output._passthrough_distribution
 		gauge:        output._passthrough_gauge
 		histogram:    output._passthrough_histogram
