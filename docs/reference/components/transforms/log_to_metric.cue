@@ -64,6 +64,7 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
+							default: string
 						}
 						templateable: true
 					}
@@ -147,7 +148,6 @@ components: transforms: log_to_metric: {
 			}
 			output: [{metric: {
 				name: "response_total"
-				kind: "incremental"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -179,7 +179,6 @@ components: transforms: log_to_metric: {
 			}
 			output: [{metric: {
 				name: "order_total"
-				kind: "incremental"
 				tags: {
 					host: "10.22.11.222"
 				}
@@ -219,7 +218,6 @@ components: transforms: log_to_metric: {
 			output: [
 				{metric: {
 					name: "1m_load_avg"
-					kind: "absolute"
 					tags: {
 						host: "10.22.11.222"
 					}
@@ -229,7 +227,6 @@ components: transforms: log_to_metric: {
 				}},
 				{metric: {
 					name: "5m_load_avg"
-					kind: "absolute"
 					tags: {
 						host: "10.22.11.222"
 					}
@@ -239,7 +236,6 @@ components: transforms: log_to_metric: {
 				}},
 				{metric: {
 					name: "15m_load_avg"
-					kind: "absolute"
 					tags: {
 						host: "10.22.11.222"
 					}
@@ -272,7 +268,6 @@ components: transforms: log_to_metric: {
 			}
 			output: [{metric: {
 				name: "time_ms"
-				kind: "incremental"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -307,7 +302,6 @@ components: transforms: log_to_metric: {
 			}
 			output: [{metric: {
 				name: "time_ms"
-				kind: "incremental"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -339,7 +333,6 @@ components: transforms: log_to_metric: {
 			}
 			output: [{metric: {
 				name: "remote_addr"
-				kind: "incremental"
 				tags: {
 					host: "10.22.11.222"
 				}
