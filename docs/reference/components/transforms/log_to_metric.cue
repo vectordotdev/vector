@@ -128,6 +128,7 @@ components: transforms: log_to_metric: {
 	examples: [
 		{
 			title: "Counter"
+			notes: "This example demonstrates counting HTTP status codes."
 			configuration: {
 				metrics: [
 					{
@@ -159,6 +160,7 @@ components: transforms: log_to_metric: {
 		},
 		{
 			title: "Sum"
+			notes: "In this example we'll demonstrate computing a sum by computing the total of orders placed."
 			configuration: {
 				metrics: [
 					{
@@ -189,6 +191,7 @@ components: transforms: log_to_metric: {
 		},
 		{
 			title: "Gauges"
+			notes: "In this example we'll demonstrate creating a gauge that represents the current CPU load averages."
 			configuration: {
 				metrics: [
 					{
@@ -247,6 +250,7 @@ components: transforms: log_to_metric: {
 		},
 		{
 			title: "Histogram"
+			notes: "This example demonstrates capturing timings in your logs."
 			configuration: {
 				metrics: [
 					{
@@ -281,6 +285,7 @@ components: transforms: log_to_metric: {
 		},
 		{
 			title: "Summary"
+			notes: "This example demonstrates capturing timings in your logs to compute summary."
 			configuration: {
 				metrics: [
 					{
@@ -315,6 +320,12 @@ components: transforms: log_to_metric: {
 		},
 		{
 			title: "Set"
+			notes: """
+				In this example we'll demonstrate how to use sets. Sets are primarly a Statsd concept 
+				that represent the number of unique values seens for a given metric. 
+				The idea is that you pass the unique/high-cardinality value as the metric value
+				and the metric store will count the number of unique values seen.
+				"""
 			configuration: {
 				metrics: [
 					{
