@@ -171,6 +171,8 @@ def create_release_file!(new_version)
         )
       end
 
+      `cue fmt #{release_reference_path}`
+
       words =
         <<~EOF
         All done! I've create a release file at:
