@@ -98,7 +98,7 @@ components: sinks: influxdb_metrics: {
 				name: _name
 				distribution: {
 					values: [1.0, 5.0, 3.0]
-					sample_rates: [1.5, 2.0, 3.0]
+					sample_rates: [1, 2, 3]
 					statistic: "histogram"
 				}
 				tags: {
