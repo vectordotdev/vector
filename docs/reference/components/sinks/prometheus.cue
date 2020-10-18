@@ -10,7 +10,7 @@ components: sinks: prometheus: {
 		commonly_used: true
 		delivery:      "best_effort"
 		development:   "beta"
-		egress_method: "aggregate"
+		egress_method: "expose"
 		service_providers: []
 	}
 

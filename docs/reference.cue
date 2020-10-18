@@ -177,7 +177,7 @@ _values: {
 //
 // * `batch` - one or more events at a time
 // * `stream` - one event at a time
-#EgressMethod: "aggregate" | "batch" | "stream"
+#EgressMethod: "batch" | "expose" | "stream"
 
 #EncodingCodec: "json" | "ndjson" | "text"
 
