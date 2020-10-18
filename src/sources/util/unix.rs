@@ -1,6 +1,11 @@
 use crate::{
-    async_read::VecAsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
-    shutdown::ShutdownSignal, sources::Source, Pipeline,
+    async_read::VecAsyncReadExt,
+    emit,
+    event::Event,
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError},
+    shutdown::ShutdownSignal,
+    sources::Source,
+    Pipeline,
 };
 use bytes::Bytes;
 use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt};
@@ -35,6 +40,7 @@ where
             UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", ?listen_path, r#type = "unix");
 
+        let connection_open = OpenGauge::new();
         let mut stream = listener.incoming().take_until(shutdown.clone());
         while let Some(socket) = stream.next().await {
             let socket = match socket {
@@ -78,9 +84,11 @@ where
                 })
             });
 
+            let connection_open = connection_open.clone();
             let mut out = out.clone().sink_compat();
             tokio::spawn(
                 async move {
+                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
                     let _ = out.send_all(&mut stream).await;
                     info!("Finished sending");
 
