@@ -321,6 +321,18 @@ components: {
 					type: "counter"
 				}
 
+				_passthrough_distribution: {
+					description: data_model.schema.metric.type.object.options.distribution.description
+					tags: {
+						"*": {
+							description: "Any tags present on the metric."
+							examples: [_values.local_host]
+							required: false
+						}
+					}
+					type: "gauge"
+				}
+
 				_passthrough_gauge: {
 					description: data_model.schema.metric.type.object.options.gauge.description
 					tags: {
