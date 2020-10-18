@@ -40,7 +40,6 @@ components: sinks: _sematext: {
 					us: "United States"
 					eu: "Europe"
 				}
-				examples: [ "us"]
 			}
 		}
 		token: {

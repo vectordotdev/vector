@@ -8,6 +8,7 @@ components: sinks: [Name=string]: {
 	if strings.HasPrefix(Name, "aws_") {
 		configuration: {
 			assume_role: {
+				category:    "Auth"
 				common:      false
 				description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
 				required:    false
