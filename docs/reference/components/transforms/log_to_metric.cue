@@ -102,9 +102,9 @@ components: transforms: log_to_metric: {
 							enum: {
 								counter:   "A [counter metric type][docs.data-model.metric#counter]."
 								gauge:     "A [gauge metric type][docs.data-model.metric#gauge]."
-								histogram: "A [distribution metric type with histogram statistic][docs.data-model.metric#distribution]."
+								histogram: "A [distribution metric type][docs.data-model.metric#distribution] with histogram statistic."
 								set:       "A [set metric type][docs.data-model.metric#set]."
-								summary:   "A [distribution metric type with summary statistic][docs.data-model.metric#distribution]."
+								summary:   "A [distribution metric type][docs.data-model.metric#distribution] with summary statistic."
 							}
 						}
 					}
@@ -254,8 +254,8 @@ components: transforms: log_to_metric: {
 			]
 		},
 		{
-			title: "Histogram"
-			notes: "This example demonstrates capturing timings in your logs."
+			title: "Distribution histogram"
+			notes: "This example demonstrates capturing timings in your logs to compute histogram."
 			configuration: {
 				metrics: [
 					{
@@ -290,7 +290,7 @@ components: transforms: log_to_metric: {
 			}}]
 		},
 		{
-			title: "Summary"
+			title: "Distribution summary"
 			notes: "This example demonstrates capturing timings in your logs to compute summary."
 			configuration: {
 				metrics: [

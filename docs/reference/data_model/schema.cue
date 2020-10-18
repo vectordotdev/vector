@@ -73,7 +73,7 @@ data_model: schema: {
 					description: """
 						A distribution represents a distribution of
 						sampled values. It is used with services
-						that support global histograms.
+						that support global histograms and summaries.
 						"""
 					required: false
 					warnings: []
