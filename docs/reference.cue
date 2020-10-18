@@ -467,7 +467,7 @@ _values: {
 #MetricEventDistribution: {
 	values: [float, ...]
 	sample_rates: [float, ...]
-	statistic: "histogram" | "summary"
+	statistic: #DistributionStatistic
 }
 
 #MetricEventGauge: {
@@ -508,6 +508,8 @@ _values: {
 })
 
 #MetricType: "counter" | "gauge" | "histogram" | "summary"
+
+#DistributionStatistic: "histogram" | "summary"
 
 #Object: {[_=string]: #Any}
 
