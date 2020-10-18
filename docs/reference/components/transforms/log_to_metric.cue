@@ -116,11 +116,10 @@ components: transforms: log_to_metric: {
 	}
 
 	output: metrics: {
-		counter:   output._passthrough_counter
-		gauge:     output._passthrough_gauge
-		histogram: output._passthrough_histogram
-		set:       output._passthrough_set
-		summary:   output._passthrough_summary
+		counter:   	  output._passthrough_counter
+		distribution: output._passthrough_distribution
+		gauge:     	  output._passthrough_gauge
+		set:       	  output._passthrough_set
 	}
 
 	examples: [
