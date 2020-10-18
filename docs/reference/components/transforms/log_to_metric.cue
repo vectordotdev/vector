@@ -254,7 +254,7 @@ components: transforms: log_to_metric: {
 			]
 		},
 		{
-			title: "Distribution histogram"
+			title: "Histogram distribution"
 			notes: "This example demonstrates capturing timings in your logs to compute histogram."
 			configuration: {
 				metrics: [
@@ -290,7 +290,7 @@ components: transforms: log_to_metric: {
 			}}]
 		},
 		{
-			title: "Distribution summary"
+			title: "Summary distribution"
 			notes: "This example demonstrates capturing timings in your logs to compute summary."
 			configuration: {
 				metrics: [
