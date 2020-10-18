@@ -401,14 +401,15 @@ where
 
 fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
     let mut record = serde_json::from_str::<JsonValue>(&text)?;
-    // journalctl will output non-ASCII messages using an array
-    // of integers. Look for those messages and re-parse them.
-    record.get_mut("MESSAGE").and_then(|message| {
-        message
-            .as_array()
-            .and_then(|v| decode_array(&v))
-            .map(|decoded| *message = decoded)
-    });
+    // journalctl will output non-ASCII values using an array
+    // of integers. Look for those values and re-parse them.
+    if let Some(record) = record.as_object_mut() {
+        for (_, value) in record.iter_mut() {
+            if let Some(decoded) = value.as_array().and_then(|v| decode_array(&v)) {
+                *value = decoded;
+            }
+        }
+    }
     if remap {
         record.get_mut("PRIORITY").map(remap_priority);
     }
@@ -568,6 +569,7 @@ mod tests {
 {"_SYSTEMD_UNIT":"badunit.service","MESSAGE":[194,191,72,101,108,108,111,63],"__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140003","PRIORITY":"5"}
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Missing timestamp","__CURSOR":"3","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"2"}
 {"_SYSTEMD_UNIT":"stdout","MESSAGE":"Different timestamps","__CURSOR":"4","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3"}
+{"_SYSTEMD_UNIT":"syslog.service","MESSAGE":"Non-ASCII in other field","__CURSOR":"5","_SOURCE_REALTIME_TIMESTAMP":"1578529839140005","__REALTIME_TIMESTAMP":"1578529839140004","PRIORITY":"3","SYSLOG_RAW":[194,191,87,111,114,108,100,63]}
 "#;
 
     struct FakeJournal {
@@ -663,7 +665,7 @@ mod tests {
     #[tokio::test]
     async fn reads_journal() {
         let received = run_journal(&[], &[], None).await;
-        assert_eq!(received.len(), 5);
+        assert_eq!(received.len(), 6);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -690,7 +692,7 @@ mod tests {
     #[tokio::test]
     async fn excludes_units() {
         let received = run_journal(&[], &["unit.service", "badunit.service"], None).await;
-        assert_eq!(received.len(), 3);
+        assert_eq!(received.len(), 4);
         assert_eq!(
             message(&received[0]),
             Value::Bytes("System Initialization".into())
@@ -708,7 +710,7 @@ mod tests {
     #[tokio::test]
     async fn handles_checkpoint() {
         let received = run_journal(&[], &[], Some("1")).await;
-        assert_eq!(received.len(), 4);
+        assert_eq!(received.len(), 5);
         assert_eq!(message(&received[0]), Value::Bytes("unit message".into()));
         assert_eq!(timestamp(&received[0]), value_ts(1578529839, 140002000));
     }
@@ -718,6 +720,16 @@ mod tests {
         let received = run_journal(&["badunit.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(message(&received[0]), Value::Bytes("¿Hello?".into()));
+    }
+
+    #[tokio::test]
+    async fn parses_array_fields() {
+        let received = run_journal(&["syslog.service"], &[], None).await;
+        assert_eq!(received.len(), 1);
+        assert_eq!(
+            received[0].as_log()["SYSLOG_RAW"],
+            Value::Bytes("¿World?".into())
+        );
     }
 
     #[tokio::test]
