@@ -95,6 +95,15 @@ data_model: schema: {
 								warnings: []
 								type: array: items: type: float: examples: [12.0, 43.3, 25.2]
 							}
+							statistic: {
+								description: "The statistic to be calculated from the values."
+								required:    true
+								warnings: []
+								type: string: enum: {
+									histogram: "Counts values in buckets."
+									summary:   "Calculates quantiles of values."
+								}
+							}
 						}
 					}
 				}
