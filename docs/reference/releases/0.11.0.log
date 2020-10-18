@@ -1,0 +1,159 @@
+5308b865614987b50bbeecf2167d37ddfc326f55	feat(new source): Initial `kubernetes_logs` implementation (#2653)	MOZGIII	Wed Jul 22 11:15:07 2020 +0300
+ca69b000e00b5c3e668b3998a62bc7ecfbc1f51a	fix(prometheus source): Allow '=' in tag values (#3090)	Adam Casey	Wed Jul 22 18:08:53 2020 +0100
+94f6db43db5f25b6c1fb005c8a5bd3a2a211a06b	enhancement(cli): Cleanup `list` command (#3099)	Kruno Tomola Fabro	Sun Jul 26 17:03:42 2020 +0200
+622dbf78f3335ca275251f74c64c7a16a93ec9c2	enhancement(buffers, sinks): Upgrade all VecBuffer sinks to allow setting `max_bytes` (#3190)	Bruce Guenter	Tue Jul 28 09:18:12 2020 -0600
+6a6c390b7e7af2b977ff088245e94e31cefb7640	fix(regex_parser transform): Correctly assign capture group fields (#3164)	Jesse Szwedko	Tue Jul 28 12:04:38 2020 -0400
+24da4475d798460df64d4c2728f9cde823b4d73b	enhancement(socket source): Add max_length to UDP (#3236)	Kirill Fomichev	Tue Jul 28 21:02:57 2020 +0300
+7d0dbc9ba5497bae2a217f6bbd3a7fba744a832d	enhancement(observability, stdin source): Instrument "stdin" source (#3151)	Jean Mertz	Tue Jul 28 23:50:24 2020 +0200
+9745e9a3560570ba17afd5148e37e329affec9a2	enhancement(observability, journald source): Add received and invalid line events (#3241)	Bruce Guenter	Tue Jul 28 16:14:56 2020 -0600
+9aed5e08ede334dee921df7bd5aaa6ef2ecfd3c1	enhancement(prometheus source): Provide error context on parse error (#3278)	Bruce Guenter	Thu Jul 30 15:04:01 2020 -0600
+0d497ec9f350f723172efab2ab2462c46de70c4b	fix(file source): Correct an error with line aggregation in `continue_through` and `halt_before` (#3262)	MOZGIII	Fri Jul 31 21:44:10 2020 +0300
+9117c9dfbf44100d60b6c9c5fd824835650918ec	enhancement(observability, kafka source): Instrument "kafka" source (#3187)	Jean Mertz	Fri Jul 31 22:46:53 2020 +0200
+814102df3c8a98affbe15a7673a63d6668cc4170	fix(splunk_hec sink)!: Make sourcetype explicit on Splunk sink (#3297)	Jesse Szwedko	Mon Aug 3 14:05:38 2020 -0400
+dc3848d176f500588a7c0446aee731e0a6743f4c	enhancement(humio_logs sink): Allow configuration of type field (#3300)	Jesse Szwedko	Mon Aug 3 14:07:34 2020 -0400
+67adfd6da35cd341b59200c8cf5d506ea6ab3835	enhancement(observability, prometheus source): Update instrumentation (#3317)	Kruno Tomola Fabro	Tue Aug 4 11:07:48 2020 +0200
+70b0b13d297fc34d446497729803ad885960e122	enhancement(observability, syslog source): Update instrumentation (#3315)	Kruno Tomola Fabro	Tue Aug 4 11:09:04 2020 +0200
+059e160cb599ee007affa7f19223a10a40af222f	enhancement(observability, http source): Add internal events for `http` source (#3264)	Do Duy	Tue Aug 4 21:36:27 2020 +0700
+3c06a27444cccd530c4a1c5ed09f5c7054045d94	enhancement(splunk_hec sink): Make sourcetype templatable (#3351)	Jesse Szwedko	Tue Aug 4 17:21:01 2020 -0400
+851d00114281791f29cc1c68f1b44aa201bb0ca4	enhancement(observability, statsd source): Add events (#3254)	Kirill Fomichev	Wed Aug 5 09:47:23 2020 +0300
+e7d3015bf548aa76a8b174576ded9b4932aace53	enhancement(observability, docker source): Add instrumentation (#3345)	Kruno Tomola Fabro	Wed Aug 5 09:19:15 2020 +0200
+1101f26457df26e4d12ede3c93a6d331ac82dd13	enhancement(observability, splunk_hec source): Add instrumentation (#3312)	Kruno Tomola Fabro	Wed Aug 5 09:21:42 2020 +0200
+547c8ad6ac6ad4fa21dbf3a70f6b18570704bed6	enhancement(data_dog_metrics sink): Add DataDog's `distribution` metric (#2913)	Kruno Tomola Fabro	Wed Aug 5 15:24:05 2020 +0200
+bd26d0d7bc04652548dc45ee2f60b311027050ce	enhancement(splunk_hec sink): Add configuration for source (#3327)	Jesse Szwedko	Wed Aug 5 13:26:28 2020 -0400
+7987c59ba587022bd5c9960618be4bd58636fb52	enhancement(humio_logs sink): Allow configuration of type field (#3300) (#3337)	Jesse Szwedko	Wed Aug 5 14:41:24 2020 -0400
+6d126e7656215640ce123dbc5ae6b00cd0a27ef3	enhancement(humio_logs sink): Add source configuration to Humio sink (#3328)	Jesse Szwedko	Wed Aug 5 16:11:33 2020 -0400
+6bac9f1c6bc74f2b775f5a18ea25b3796f58a555	enhancement(observability, logplex source): Add instrumentation (#3356)	Kruno Tomola Fabro	Sun Aug 9 18:14:42 2020 +0200
+0f1556702aa2d7b6901eb1d59164a858c7f79630	feat(sinks, networking): Automatic concurrency management (#3094)	Bruce Guenter	Tue Aug 11 14:20:44 2020 -0600
+8d1995d0d6243624a540b8dfc824e51ae5d77044	fix(debian platform)!: Remove forwarding to syslog from distributed systemd unit (#3427)	Jesse Szwedko	Wed Aug 12 15:18:24 2020 -0400
+3d434d190c5f6d454141f18922b59b1a5c6072c7	enhancement(observability, file source): Add more instrumentation (#3417)	Kruno Tomola Fabro	Thu Aug 13 13:15:41 2020 +0200
+86ccdeabd20edc66ac5a19f04a618cfcedc180e1	enhancement(observability, ansi_stripper transform): Add instrumentation (#3421)	Kruno Tomola Fabro	Thu Aug 13 14:57:54 2020 +0200
+b4048d9131fc764c6457463b5a9c1768c4b0ae24	enhancement(observability. sampler transform): Add instrumentation (#3419)	Kruno Tomola Fabro	Thu Aug 13 14:58:13 2020 +0200
+bb601f5fae5ad5a7cd05adafd2d6dc84f0b3e868	enhancement(observability. split transform): Add instrumentation (#3418)	Kruno Tomola Fabro	Thu Aug 13 16:56:50 2020 +0200
+3ffc3c30b42a482ce1e1dd4bb68faeac7b4d4b76	enhancement(aws_s3 sink): Add additional canned ACLs (#3439)	Jesse Szwedko	Thu Aug 13 14:48:29 2020 -0400
+e4e597067bf001d96cf51a9259714debeeb7ca86	enhancement(codecs, console sink): Add "text" encoding for metrics (#3434)	Bruce Guenter	Fri Aug 14 08:56:33 2020 -0600
+40d7dd936a4155409282b5f9e2a43b2989e739ae	enhancement(observability, file source): Even more instrumentation (#3436)	Kruno Tomola Fabro	Sat Aug 15 16:59:21 2020 +0200
+a9f746c6f8b0666b5c3573e9e67c47632b00b149	enhancement(prometheus source): Rewrite parser, improve error handlings  (#3286)	Do Duy	Wed Aug 19 11:21:36 2020 +0700
+5f6ce7cfa5fea6e8a3078e63d2e04425b8c38c64	enhancement(observability, startup, shutdown): Add events for starting, stopping, and reloading (#3476)	Kruno Tomola Fabro	Wed Aug 19 22:25:56 2020 +0200
+db2e647ce4a08e2602606e036507f46614a2ec2c	enhancement(observability): Add Heartbeat (#3502)	Kruno Tomola Fabro	Thu Aug 20 14:39:42 2020 +0200
+61e806d01d4cc6d2a527b52aa9388d4547f1ebc2	feat(cli): Allow configuring flags via env vars (#2149)	MOZGIII	Fri Aug 21 20:42:14 2020 +0300
+da07131539763df44b638780b7bde23764b0cd92	enhancement(file sink, compression): Add support for gzip compression (#3373)	Ayush Goyal	Mon Aug 24 00:08:50 2020 +0530
+c6847c68da9ff175f2a62b285b63d119bf07331b	fix(statsd sink): Handle Absolute kind for values other than Gauge. (#3510)	FungusHumungus	Mon Aug 24 18:53:52 2020 +0100
+b41b63ac723d2b0de3a52defa27cac10386f667c	feat(geoip transform): ASN/ISP database support (#3265)	Marko Karppinen	Tue Aug 25 06:29:39 2020 +0300
+a67d18cac8aad548887933ce9793708c61c23cc4	enhancement(file sink): Sync all data before finishing (#3475)	Kruno Tomola Fabro	Tue Aug 25 14:43:00 2020 +0200
+cc284b4f35f1b482b9056a914222edf58bc5acc9	enhancement(observability, json_parser transform): Enhance instrumentation (#3521)	Bruce Guenter	Tue Aug 25 08:43:30 2020 -0600
+c6e660801a8bf091202bd511656434a5229d8767	enhancement(observability, socket source): Add and unify events (#3486)	Bruce Guenter	Tue Aug 25 08:51:16 2020 -0600
+d11587489476c85f44fc9996e900535737a43922	enhancement(observability, regex_parser transform): Enhance instrumentation (#3523)	Bruce Guenter	Tue Aug 25 12:01:48 2020 -0600
+8b4ff32e23a16e44b0c88848c82e34b724730828	enhancement(observability, grok_parser transform): Add internal events (#3553)	Bruce Guenter	Tue Aug 25 14:22:27 2020 -0600
+692e683646fb843633e158fe7cb25e5085dafff0	enhancement(kubernetes_logs source): Add the ability to store pod labels flat (#3598)	MOZGIII	Thu Aug 27 21:00:31 2020 +0300
+1e180bff8f1635b7d24cd9f4838af63255ec5137	enhancement(kubernetes_logs source): Store pod labels flat by default, remove the switch (#3602)	MOZGIII	Fri Aug 28 11:44:00 2020 +0300
+2e840a04a9dcd41637adb7b4dd50f5ed948a1e2a	enhancement(file source): Add `file` label (#3586)	Kruno Tomola Fabro	Fri Aug 28 13:20:18 2020 +0200
+f2301e2e583b227718b258e08eb580fe4989a586	enhancement(observability): Add more `main` events (#3582)	Kruno Tomola Fabro	Fri Aug 28 13:36:40 2020 +0200
+680ab9bc3042ab281c76e11ae0251aeda1f97b6b	fix(file source): Switch off of broadcast channel (#3611)	Luke Steensen	Fri Aug 28 10:43:41 2020 -0500
+b96a04554c971e4a92c872527dc1765140e83d58	enhancement(observability, log_to_metric transform): Add internal events (#3593)	Bruce Guenter	Fri Aug 28 10:11:07 2020 -0600
+4237b6fff0a333bdeb1623b21482168e827268b8	enhancement(wasm transform): Implement some UX improvements for WASM (#3490)	Ana Hobden	Fri Aug 28 10:29:27 2020 -0700
+9570f71c8c2a5c6410d928366e722b12fa1e8912	enhancement(kuberentes platform): Adds new Helm template variable for podsLabels. (#3610)	nkinkade	Fri Aug 28 15:40:33 2020 -0600
+1a4359363c8e65a034e1e13d7b81dfbcb2342b97	enhancement(docker source): Multiline support (#3607)	MOZGIII	Mon Aug 31 18:51:32 2020 +0300
+9adebdef5b5a27567803a6b2d2967551935a689c	enhancement(observability, tag_cardinality_limit transform): Add internal events (#3577)	Bruce Guenter	Mon Aug 31 13:38:28 2020 -0600
+22dc55246ea82e51c85c1340cb7fe618c8ae40da	enhancement(observability, coercer transform): Add internal events (#3554)	Bruce Guenter	Mon Aug 31 13:40:10 2020 -0600
+7e2ea2958ba2714b87abcf06ce245b71e48fb838	enhancement(http sink): Increase rate_limit_num to its maximum (#3655)	Bruce Guenter	Wed Sep 2 11:08:07 2020 -0600
+7eb1ea3f58727d06417c88d65da478dd004f121a	fix(http source): Handle panic on HTTP request to HTTPS source (#3693)	Kirill Fomichev	Thu Sep 3 18:45:42 2020 +0300
+2f373b470353f435572362f59b7f58c4ae337830	fix(security): Handle multiple (intermediate) certificates in PEM files (#3687)	Ana Hobden	Thu Sep 3 15:44:48 2020 -0700
+2024ab6a9ecc5167e587e3dae8a864f03ff16a7d	enhancement(networking): Add a new options to control the auto concurrency limiter (#3690)	Bruce Guenter	Fri Sep 4 09:10:09 2020 -0600
+b374fb6a7e2dfe58ffc18d53912748d287068ad8	fix(gcp platform): rate_limit_num for GCP pubsub and cloud_storage was wrong (#3656)	Bruce Guenter	Fri Sep 4 15:22:49 2020 -0600
+25602ee60359956bf1e5e152408ee252f24a3e57	fix(elasticsearch sink): allow using excepted fields (#3716)	Luke Steensen	Fri Sep 4 17:44:22 2020 -0500
+d15ff9e125c672e1c4c4401f9ac040406917d53a	enhancement(observability, socket sink): Fix TcpEventSent (#3720)	Do Duy	Sat Sep 5 17:18:27 2020 +0700
+b692e3e67af92e4490682429b44235f74eca070d	enhancement(observability, swimlanes transform): Add internal events (#3730)	Do Duy	Mon Sep 7 19:31:03 2020 +0700
+7e351a225ba8dbbeef9f8db35103a42f4ad5d461	fix(gcp_cloud_storage sink): Apply encoding rules after key prefix (#3770)	Kirill Fomichev	Tue Sep 8 20:33:05 2020 +0300
+fe68891452955772e9a98fdf2565c6d762295e19	enhancement(socket sink): Add IPv6 supports (#3699)	Do Duy	Wed Sep 9 08:31:59 2020 +0700
+431bd8686b52eee95c59e4c68ea390395ad7ac48	fix(loki sink): Apply encoding rules right before encoding (#3775)	Hoàng Đức Hiếu	Wed Sep 9 15:50:54 2020 +0700
+eb2426c271c90caa2e0ddec855eccc781f9dd86b	fix(docker source): Add retry delay (#3732)	Do Duy	Wed Sep 9 15:58:04 2020 +0700
+7c5aecb9a7741a8816b4f087c920fbe802613862	feat(new transform): New `remap` transform (#3341)	Ashley Jeffs	Wed Sep 9 15:36:20 2020 +0100
+6869120e280541add19777882f20e2ddb4ca9c3e	enhancement(log_to_metric transform): Add support for `summary` metric (#3726)	Kruno Tomola Fabro	Wed Sep 9 19:40:28 2020 +0200
+52cd9a777963154bf619975df72e3c52726a4228	enhancement(observability, journald source): Enhance checkpoint errors with file name (#3782)	Bruce Guenter	Wed Sep 9 13:23:24 2020 -0600
+94def0fb9ec971539984fdcf42dacdcfd0aa3200	enhancement(observability, reduce transform): Add internal events (#3812)	Luke Steensen	Thu Sep 10 16:17:03 2020 -0500
+ff555aaed1208742ffb71be5242b52ed258eaa06	enhancement(observability, dedupe transform): add internal events (#3809)	Luke Steensen	Fri Sep 11 15:53:27 2020 -0500
+f03898e1b6a9d78ce40c48b19675d8e7cb67f8c5	enhancement(observability, tokenizer transform): add internal events (#3807)	Luke Steensen	Fri Sep 11 15:53:51 2020 -0500
+9c83300f005648d3a5292754b7127692b9e72e53	fix(sinks): apply encoding rules in sinks (#3766)	Kirill Fomichev	Mon Sep 14 12:29:16 2020 +0300
+9df7255da7d7f602e62e0adf1205c417db83d287	enhancement(influxdb_metrics sink): Support `summary` statistic (#3846)	Kruno Tomola Fabro	Tue Sep 15 18:50:03 2020 +0200
+f8696563012d1840e9e6a52206b03634a6bfdb4c	enhancement(datadog_metrics sink): Support datadog `distribution` metric  (#3725)	Kruno Tomola Fabro	Tue Sep 15 18:58:20 2020 +0200
+654bad152b4cd0931957c0710d861f215206e4f0	enhancement(observability): Regularize internal event messages (#3850)	Kruno Tomola Fabro	Tue Sep 15 19:12:22 2020 +0200
+8f8084e8c3b6810dd095980c7d2a0c0e308a609f	fix(reload): Recreate trigger (#3855)	Kruno Tomola Fabro	Tue Sep 15 20:43:19 2020 +0200
+85f8a6f4e622d26073485f156f904bdfeb49c6b2	enhancement(networking, security): Enable tls by default  for `papertrail` and `datadog_logs` sinks (#3824)	Kruno Tomola Fabro	Tue Sep 15 20:49:29 2020 +0200
+823308f9bfdd061c62356bef6c77390f9a17cfce	enhancement(observability, elasticsearch sink): Improve retry error messages (#3861)	Do Duy	Thu Sep 17 09:35:24 2020 +0700
+39433cd073fcb349915d64b1b3890ed9def841f9	feat(new source): Initial `apache_metrics` source implementation (#3704)	Jesse Szwedko	Thu Sep 17 13:45:55 2020 -0400
+3e6dac044cbc3f8950cb91dac7a4f455bdc60189	feat(observability): New GraphQL API (#3708)	Lee Benson	Thu Sep 17 21:40:21 2020 +0100
+0fc7c55feff53af813c2a2717f8e8ead986fb333	enhancement(remap transform): Accept more timestamp patterns in `to_timestamp` (#3989)	Jean Mertz	Fri Sep 18 09:09:57 2020 +0200
+bb5993d349a14d50b8e7d47b9f609e1e30a89400	enhancement(kubernetes_logs source): Include container_name in kubernetes_logs (#4018)	Raphael Taylor-Davies	Fri Sep 18 17:08:03 2020 +0100
+778081044b83058b4b555311fa8ae33e17853911	fix(sinks): instrument and guard against double poll (#4024)	Luke Steensen	Sun Sep 20 12:26:42 2020 -0500
+e6a84eb6bd48281ebb53a1225f39099f533251a0	fix(socket sink): Add reconnect loop to `TcpSink` (#4030)	Kruno Tomola Fabro	Mon Sep 21 00:37:57 2020 +0200
+316ec957214dc10aed7a8288ebe521291c91a89a	enhancement(gcp_stackdriver sink): Insert timestamp into stackdriver message (#3833)	FungusHumungus	Mon Sep 21 22:57:13 2020 +0100
+b995485d08988c37e8d35730b3fc0b0a9b017be8	fix(kubernetes_logs source): Start reading logs at checkpoint (#4043)	MOZGIII	Thu Sep 24 05:41:32 2020 +030ebacf5728c8e56d7cd2b2cb1bac8dbe1901e79a6	fix(windows platform): Update tokio signal to avoid unnecessary shutdowns. (#4025)	Ana Hobden	Thu Sep 24 15:23:53 2020 -0700
+ad77d20302cd77f5f00262a32d75d592a711fa86	enhancement(observability): GraphQL client (#3778)	Lee Benson	Fri Sep 25 08:31:03 2020 +0100
+cfa8e78193e4ec5f0c7132c6edda90ae68c2ca2d	fix(networking): Avoid calling `peer_addr` (#3822)	Kruno Tomola Fabro	Fri Sep 25 16:55:15 2020 +0200
+1ceb8fb7d290eedf80330065be102827628189fa	fix(shutdown): Fix tokio signal behavior to handle a loop of signals (#4095)	Ana Hobden	Fri Sep 25 10:02:27 2020 -0700
+fba1de4463b41a7fd42d626f3cb6b4971278c3ed	enhancement(remap transform): add `format_timestamp` function (#4075)	Jean Mertz	Sat Sep 26 14:53:52 2020 +0200
+c66a7307e92a327c1c046398b9a4fa495d028ee6	enhancement(remap transform): add `contains` function (#4090)	Jean Mertz	Sun Sep 27 15:48:22 2020 +0200
+f7858e83bbf1452afe5401cacbcb0dba44b2f1e1	enhancement(remap transform): add `slice` function (#4092)	Jean Mertz	Sun Sep 27 17:40:09 2020 +0200
+5bfaff9527d93158c8570532fd0ae4eba890658f	enhancement(remap transform): add `tokenize` function (#4093)	Jean Mertz	Mon Sep 28 08:13:02 2020 +0200
+c5ec225ac48bc0d1de08bf84b73569cb75a307b2	fix(file source): more robust handling of split reads (#4089)	Luke Steensen	Mon Sep 28 10:59:47 2020 -0500
+83f1887b77cd1986b777da167e575386e6b7327c	enhancement(kubernetes_logs source): Add container_image and pod_node_name annotations (#4020)	MOZGIII	Mon Sep 28 20:11:17 2020 +0300
+2bef814916bc54db2da09cd5594d7c6939b017a4	feat(observability, add_fields transform): Emit overwrite logs as debug (#3803) (#4088)	Spencer Gilbert	Mon Sep 28 16:46:18 2020 -0400
+95df9244f7444cc52ec16c9aefd23c3e5f0310ff	enhancement(observability, socket sink): Emit warning on incomplete UDP sent (#4034)	Do Duy	Tue Sep 29 09:33:25 2020 +0700
+8c9a72b87608abb782f6812bdf8e34b307efb6fa	enhancement(remap transform): add `strip_ansi_escape_codes` function (#4170)	Jean Mertz	Tue Sep 29 13:05:59 2020 +0200
+2a1ef473e84138ea06d5ba82ba4ae1f6288a0378	fix(reload): Recompute configuration paths (#4094)	Kruno Tomola Fabro	Tue Sep 29 18:00:19 2020 +0200
+9f7cbad9d65f86c083165027b5745587fdc63305	fix(reload, windows platform): Wait on Windows after components shutdown (#4102)	Kruno Tomola Fabro	Tue Sep 29 18:19:31 2020 +0200
+43329e8e7b5715d89d92b262d7b1bfee25e796a1	fix(config): Do not serialize None in in-flight config (#4192)	Do Duy	Wed Sep 30 08:18:55 2020 +0700
+3a1e96892283e907a3eb1f031d94e3c29f9bf2a2	enhancement(remap transform): add `sha2` function (#4188)	Jean Mertz	Wed Sep 30 12:25:32 2020 +0200
+5ad63f7d146727326300d96d6be5f8c0dbb747d1	enhancement(remap transform): add `sha3` function (#4198)	Jean Mertz	Wed Sep 30 13:38:09 2020 +0200
+2b52002740b1f595e1eeac77ca8b0326a70fd9e5	enhancement(observability, json_parser transform): add field's value in warn message when failing to parse (#4215)	Mathieu Stefani	Wed Sep 30 21:44:42 2020 +0200
+d645cae992706340cd8abf84039c8a4c5b808499	enhancement(docker platform): Added distroless-libc and distroless-static docker container bases (#4236)	Rick Richardson	Wed Sep 30 22:25:14 2020 -0700
+9fceb7ddf0504b475cc59f971d04d8905b241b23	observability(remap transform): add `parse_duration` function (#4186)	Jean Mertz	Thu Oct 1 15:07:51 2020 +0200
+1e7abc23850f3cae83b4672698f89f34a594038c	enhancement(prometheus sink): Add support for `summary` metric (#4032)	Kruno Tomola Fabro	Thu Oct 1 15:47:22 2020 +0200
+6b2e43cb29428ffa8a341e80a1efaf4bac589515	fix(statsd sink): Sink should emit event on invalid metric (#3636)	FungusHumungus	Thu Oct 1 14:53:54 2020 +0100
+6d585c96c0ccbfbed02eb883d3a8cf16d33786e0	fix(prometheus sink): Ensure server starts immediately (#4239)	Rick Richardson	Thu Oct 1 07:14:21 2020 -0700
+24ff76f1899a36122ced0fc38846708a1bb2b807	feat(windows platform): add a way to register and run vector as a service (#2896)	Mathieu Stefani	Thu Oct 1 16:33:11 2020 +0200
+57df969c7a2498d540946e73628f7d169c870914	fix(startup): Fix 101 exit code on `api.enabled = true` (#4254)	Lee Benson	Thu Oct 1 22:44:53 2020 +0100
+a2cc2440307cd3fe34ba99d80445260286dace56	enhancement(auth, kubernetes platform, aws service): Add EKS Web Identity Support (#4049)	Raphael Taylor-Davies	Thu Oct 1 22:51:19 2020 +0100
+d93dc92b964bc081ccc3303b35871ee256853bdd	enhancement(observability): Initial GraphQL topology (#4191)	Lee Benson	Fri Oct 2 14:46:12 2020 +0100
+f7a9b676c823ecfdda3ff14f268fd83d80056e17	fix(humio_logs sink): Set host key correctly (#4229)	Jesse Szwedko	Fri Oct 2 13:23:25 2020 -0400
+f77faa5a31c6ce337604c3102fea6f89df816830	feat(new sink): Initial `azure_monitor_logs` sink (#2811)	Nazar Mishturak	Sun Oct 4 00:09:22 2020 +0000
+9c3f09c172d3ae7f35c0707a60ffe6a874501112	enhancement(console sink): Improve error handling (#4288)	Do Duy	Mon Oct 5 09:30:56 2020 +0000
+51fd8679ac36b567c70b385e09b54b5bf59c5520	enhancement(remap transform): add `format_number` function (#4220)	Jean Mertz	Tue Oct 6 15:53:08 2020 +0200
+3e0eb97804874df96af548778db70b5d20418031	fix(apache_metrics source) Use configured namespace for `up` metric (#4437)	Jesse Szwedko	Wed Oct 7 17:27:29 2020 -0400
+e83c4cc2d7d1e37c8a0d6769e799345bc85e5ff3	feat(new source): Add `host_metrics` source (#4157)	Bruce Guenter	Wed Oct 7 16:11:54 2020 -0600
+a9b176b2f94df3a6996f2081c9a4bbc84c57e271	fix(sematext_logs sink): Rename sink type and fallback on US region by default (#4447)	Nedim Šabić²	Thu Oct 8 16:05:34 2020 +0200
+b6a331bbdedd570ab7e8ffdbd4f10e48c0d9afe9	feat(new transform): Add `metric_to_log` transform (#3552)	Daniel Jin	Thu Oct 8 17:45:44 2020 -0400
+d3a5fe992e26d422e561b12cf294b748ea013d5d	fix(config): Merge `api::Options` (#4342)	Kruno Tomola Fabro	Fri Oct 9 00:39:45 2020 +0200
+a2723d7f2f162bdfb47473d6a3f0eb046dd1c87f	enhancement(observability): Bidirectional source/transform/sink GraphQL types (#4383)	Lee Benson	Fri Oct 9 09:32:36 2020 +0100
+06da2aa13c3e24a36a4d735e494ef1730f4d76c9	enhancement(observability, log_to_metric transform): Improve error messages (#4429)	Do Duy	Fri Oct 9 19:48:52 2020 +0700
+d04df77033dd30a90b45733c989146e59db9da80	fix(file source): Add alias to avoid breaking change (#4469)	Do Duy	Fri Oct 9 22:29:09 2020 +0700
+178e5bed9509497dc73ecadda509b2e69f403b17	fix(cli): Use temporary data directory during `validate` command (#4341)	Kruno Tomola Fabro	Fri Oct 9 17:43:05 2020 +0200
+1c41985f35cbc702925b919c3d660673f3a9c2ec	feat(new source): New `aws_firehose` source and `aws_cloudwatch_logs_subscription_parser` transform (#4101)	Jesse Szwedko	Fri Oct 9 14:39:39 2020 -0400
+36dea21a558d706535c980930f3c7b750b93bbfc	feat(new sink): New `sematext_metrics` sink (#3501)	FungusHumungus	Sun Oct 11 10:05:17 2020 +0100
+2b3b98cea0844e254d65fcb3c674f93bbe6560b2	enhancement(metrics, sinks): Option to specify `quantiles` (#4412)	Kruno Tomola Fabro	Sun Oct 11 18:52:53 2020 +0200
+5ee768ac7fc31efbc80e9932b104d11c7272325f	feat(logdna sink): Allow inclusion of env field in request and default_env in config (#4077)	Robin Mattheussen	Sun Oct 11 19:54:04 2020 +0200
+48064d005664e772e5664645240d7a713d1364bd	feat(observability, transforms): Update log levels for transforms (#4235)	Spencer Gilbert	Sun Oct 11 14:05:32 2020 -0400
+7dd7e8125e33751b38013c810629e408afdddf2e	enhancement(security, networking, influxdb_metrics sink): add TLS settings to influxdb_logs and influxdb_metrics sinks (#4037)	Mathieu Stefani	Mon Oct 12 00:39:38 2020 +0200
+19585c3a9dbfe82590d92d96fb72a606e0f4b255	fix(aws_s3 sink): Propagate close for Fanout and buffers::disk::Writer (#4275)	Raphael Taylor-Davies	Mon Oct 12 23:37:26 2020 +0100
+d4f9c0d33b03b7cf506d6dcb0cea41dcbabd7687	enhancement(influxdb_metrics sink): Add a tags configuration options to add user-defined tags (#4068)	Mathieu Stefani	Tue Oct 13 15:26:22 2020 +0200
+594242f7c2550458eaa34e021be28668cb1be946	enhancement(debian platform): Add vector user to adm in debian packaging (#4544)	James Turnbull	Tue Oct 13 16:36:46 2020 -0400
+1e95458540596b7e0058684afc8ac97caa84e992	enhancement(statsd sink)!: Support all socket types in statsd sink (#3557)	Do Duy	Wed Oct 14 17:21:43 2020 +0700
+dae23aa69f2190aa9de46ad375531cf31d3fa470	fix!(prometheus source): Do not automatically append /metrics (#4276)	Jesse Szwedko	Wed Oct 14 09:39:32 2020 -0400
+fe05027693a157269f089dbc3ebd5b9a251973b1	feat(azure_monitor_logs sink): Add support for dedicated Azure region (#4507)	Nazar Mishturak	Wed Oct 14 17:22:29 2020 +0300
+2f2583b59062e686c9458d10c2679060c4600e4c	fix(http source)!: Don't dedot keys (#4103)	Daniel Jin	Wed Oct 14 13:51:30 2020 -0400
+93dd72459df1bfdd6cd35499588d21859f15135c	enhancement(sinks, networking, compression): Add compression level (#3032)	Kirill Fomichev	Thu Oct 15 18:47:13 2020 +0300
+b7ec1a94f4e6d59288519c0a085afed8cbc00ad9	enhancement(kubernetes_logs source): Allow using custom selectors (#4182)	MOZGIII	Fri Oct 16 01:22:03 2020 +0300
+73709ea6962d00e5424fb38fa4b05d0411e43a19	feat(observability): `vector top`, v1 (#4431)	Lee Benson	Fri Oct 16 08:27:32 2020 +0100
+f1b99881b5d1db81c52a487d390c888a6550859c	enhancement(aws service, kubernetes platform, auth): Support assume_role with EKS web identity (#4406)	Raphael Taylor-Davies	Fri Oct 16 14:32:19 2020 +0100
+20bc89ab8cf1979c35b15a98ebcf4e2ec51a758e	enhancement(reduce transform)!: Rename "identifier_fields" to "group_by" (#4580)	Jean Mertz	Fri Oct 16 16:30:56 2020 +0200
+b99af35ef731f2070917715b1b8143cbe1523bc4	enhancement(reduce transform): "concat_newline" strategy merges using newline (#4579)	Jean Mertz	Fri Oct 16 16:31:22 2020 +0200
+ea224e12940f3ad4cdc87f1077a813dadce777a0	fix(apache_metrics source): Sanitize URL when tagging metrics (#4410)	Jesse Szwedko	Fri Oct 16 17:19:41 2020 -0400
+986e62cb8d2565d7f230d9375439551325bb7596	feat(new sink): New `humio_metrics` sink. (#4531)	FungusHumungus	Fri Oct 16 23:35:15 2020 +0100
+12db2a2435c524c24e747b35a35b155c4360d877	fix(sinks, networking): Treat all hyper::Error results as retriable (#4575)	Bruce Guenter	Fri Oct 16 21:05:12 2020 -0600
+16bed3642aff5851c41da67f37ba1e6d80276563	enhancement(kubernetes_logs source): Advanced container filtering (#4586)	MOZGIII	Sat Oct 17 06:06:11 2020 +0300
+fe965704308dc1f405bd38c0f098ef4118a8c0bc	enhancement(remap transform): Add `parse_url` function (#4428)	Jean Mertz	Sat Oct 17 05:06:33 2020 +0200
+1ec7a8ba70435e290326cad207009bbe61d71636	enhancement(datadog_logs sink, networking): Support datadog logs new HTTPS transport (#4164)	FungusHumungus	Sun Oct 18 01:43:36 2020 +0100
+4c67be50157cd651dc728f5bde0f22552cd0bd49	enhancement(logplex source, auth): Basic auth support (#4385)	Kirill Fomichev	Sun Oct 18 11:07:59 2020 +0300
+ba55fd0305af6d060c06c216a29310d1776c4e20	enhancement(datadog service): Added region configuration parameter (#4174)	FungusHumungus	Sun Oct 18 10:42:00 2020 +0100
+0e40d1fee9eb16d0c86957764debd172620407e9	fix(journald source): Handle non-ASCII data in all values (#4608)	Bruce Guenter	Sun Oct 18 08:14:33 2020 -0600
+e982c684d9a6e6bf97134a31a3162d3a04a2d4b2	fix(loki sink): Send auth header for healthchecks (#4604)	Jesse Szwedko	Sun Oct 18 10:14:59 2020 -0400
