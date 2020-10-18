@@ -295,22 +295,45 @@ impl SourceShutdownCoordinator {
         deadline: Instant,
     ) -> impl Future01<Item = bool, Error = ()> {
         async move {
+            // Call `shutdown_force_trigger.disable()` on drop.
+            let shutdown_force_trigger = ShutdownForceTriggerStorage {
+                trigger: Some(shutdown_force_trigger),
+            };
+
             let fut = shutdown_complete_tripwire.then(tripwire_handler);
             if timeout_at(deadline, fut).await.is_ok() {
-                shutdown_force_trigger.disable();
+                shutdown_force_trigger.into_inner().disable();
                 true
             } else {
                 error!(
                     "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
                     name,
                 );
-                shutdown_force_trigger.cancel();
+                shutdown_force_trigger.into_inner().cancel();
                 false
             }
         }
         .map(Ok)
         .boxed()
         .compat()
+    }
+}
+
+struct ShutdownForceTriggerStorage {
+    trigger: Option<Trigger>,
+}
+
+impl ShutdownForceTriggerStorage {
+    fn into_inner(mut self) -> Trigger {
+        self.trigger.take().unwrap()
+    }
+}
+
+impl Drop for ShutdownForceTriggerStorage {
+    fn drop(&mut self) {
+        if let Some(trigger) = self.trigger.take() {
+            trigger.disable();
+        }
     }
 }
 
