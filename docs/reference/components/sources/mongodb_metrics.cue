@@ -191,7 +191,7 @@ components: sources: mongodb_metrics: {
 			}
 		}
 		mongodb_mongod_locks_time_acquiring_global_seconds_total: {
-			description: ""
+			description: "Amount of time that any database has spent waiting for the global lock."
 			type:        "counter"
 			tags: {
 				endpoint: _endpoint
@@ -293,7 +293,7 @@ components: sources: mongodb_metrics: {
 			}
 		}
 		mongodb_mongod_metrics_record_moves_total: {
-			description: ""
+			description: "Moves reports the total number of times documents move within the on-disk representation of the MongoDB data set. Documents move as a result of operations that increase the size of the document beyond their allocated record size."
 			type:        "counter"
 			tags: {
 				endpoint: _endpoint
@@ -349,20 +349,20 @@ components: sources: mongodb_metrics: {
 			}
 		}
 		mongodb_mongodb_mongod_metrics_repl_executor_queue: {
-			description: ""
+			description: "Number of queued operations in the replication executor."
 			type:        "gauge"
 			tags: {
 				endpoint: _endpoint
 				host:     _host
 				type: {
-					description: ""
+					description: "Queue type."
 					required:    true
 					examples: ["network_in_progress", "sleepers"]
 				}
 			}
 		}
 		mongodb_mongodb_mongod_metrics_repl_executor_unsignaled_events: {
-			description: ""
+			description: "Number of unsignaled events in the replication executor."
 			type:        "gauge"
 			tags: {
 				endpoint: _endpoint
