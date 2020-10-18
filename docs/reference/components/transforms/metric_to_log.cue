@@ -60,6 +60,7 @@ components: transforms: metric_to_log: {
 				host_tag: "host"
 			}
 			input: metric: {
+				kind:      "absolute"
 				name:      "histogram"
 				timestamp: "2020-08-01T21:15:47+00:00"
 				tags: {

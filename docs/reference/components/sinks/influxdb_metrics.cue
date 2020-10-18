@@ -79,6 +79,7 @@ components: sinks: influxdb_metrics: {
 			title:  "Counter"
 			configuration: {}
 			input: metric: {
+				kind: "incremental"
 				name: _name
 				counter: {
 					value: _value
@@ -95,6 +96,7 @@ components: sinks: influxdb_metrics: {
 			title: "Distribution"
 			configuration: {}
 			input: metric: {
+				kind: "incremental"
 				name: _name
 				distribution: {
 					values: [1.0, 5.0, 3.0]
@@ -114,6 +116,7 @@ components: sinks: influxdb_metrics: {
 			title:  "Gauge"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				gauge: {
 					value: _value
@@ -130,6 +133,7 @@ components: sinks: influxdb_metrics: {
 			title: "Histogram"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				histogram: {
 					buckets: [1.0, 2.1, 3.0]
@@ -150,6 +154,7 @@ components: sinks: influxdb_metrics: {
 			title:  "Set"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				set: {
 					values: ["first", "another", "last"]
@@ -166,6 +171,7 @@ components: sinks: influxdb_metrics: {
 			title: "Summary"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				summary: {
 					quantiles: [0.01, 0.5, 0.99]
