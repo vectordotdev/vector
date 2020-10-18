@@ -100,14 +100,14 @@ components: sinks: influxdb_metrics: {
 				name: _name
 				distribution: {
 					values: [1.0, 5.0, 3.0]
-					sample_rates: [1.5, 2.0, 3.0]
+					sample_rates: [1, 2, 3]
 					statistic: "histogram"
 				}
 				tags: {
 					host: _host
 				}
 			}
-			output: "ns.\(_name),metric_type=distribution,host=\(_host) avg=3,count=3,max=5,median=3,min=1,quantile_0.95=4,sum=9 1542182950000000011"
+			output: "ns.\(_name),metric_type=distribution,host=\(_host) avg=3.333333,count=6,max=5,median=3,min=1,quantile_0.95=5,sum=20 1542182950000000011"
 		},
 		{
 			_host:  _values.local_host

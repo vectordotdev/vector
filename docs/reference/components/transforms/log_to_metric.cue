@@ -284,7 +284,7 @@ components: transforms: log_to_metric: {
 				}
 				distribution: {
 					values: [54.2]
-					sample_rates: [1.0]
+					sample_rates: [1]
 					statistic: "histogram"
 				}
 			}}]
@@ -320,7 +320,7 @@ components: transforms: log_to_metric: {
 				}
 				distribution: {
 					values: [54.2]
-					sample_rates: [1.0]
+					sample_rates: [1]
 					statistic: "summary"
 				}
 			}}]
