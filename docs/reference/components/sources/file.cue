@@ -98,7 +98,6 @@ components: sources: file: {
 							checksum:         "Read `bytes` bytes from the head of the file to uniquely identify files via a checksum."
 							device_and_inode: "Uses the [device and inode](\(urls.inode)) to unique identify files."
 						}
-						examples: ["checksum", "device_and_inode"]
 					}
 				}
 				bytes: {
