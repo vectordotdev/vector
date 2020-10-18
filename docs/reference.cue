@@ -84,10 +84,7 @@ _values: {
 	// It is used for SEO purposes and should be full of relevant keywords.
 	description?: =~"[.]$"
 
-	// `title` is the human friendly title for the component.
-	//
-	// For example, the `http` sink has a `HTTP` title.
-	title: string
+	env_vars: #EnvVars
 
 	// `type` is the component identifier. This is set automatically.
 	type: Type
@@ -152,6 +149,11 @@ _values: {
 
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
+
+	// `title` is the human friendly title for the component.
+	//
+	// For example, the `http` sink has a `HTTP` title.
+	title: string
 }
 
 // `#CompressionAlgorithm` specified data compression algorithm.
@@ -206,6 +208,12 @@ _values: {
 //                 text: "Encodes the data via text/plain"
 //                }
 #Enum: [Name=_]: string
+
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+	type: string: default: null
+}}
 
 #Event: {
 	close({log: #LogEvent}) |
