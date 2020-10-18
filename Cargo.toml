@@ -395,7 +395,6 @@ sinks = [
   "sinks-clickhouse",
   "sinks-console",
   "sinks-datadog",
-  "sinks-signalfx",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -410,6 +409,7 @@ sinks = [
   "sinks-papertrail",
   "sinks-prometheus",
   "sinks-sematext",
+  "sinks-signalfx",
   "sinks-socket",
   "sinks-splunk_hec",
   "sinks-statsd",
@@ -425,8 +425,7 @@ sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
-sinks-datadog = []
-sinks-signalfx = []
+sinks-datadog = ["bytesize"]
 sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
@@ -440,6 +439,7 @@ sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = []
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
+sinks-signalfx = []
 sinks-socket = []
 sinks-papertrail = []
 sinks-splunk_hec = ["bytesize"]
