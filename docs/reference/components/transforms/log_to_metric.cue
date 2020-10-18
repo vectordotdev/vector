@@ -1,33 +1,26 @@
 package metadata
 
 components: transforms: log_to_metric: {
-	title:             "Log to Metric"
-	short_description: "Accepts log events and allows you to convert logs into one or more metrics."
-	long_description:  "Accepts log events and allows you to convert logs into one or more metrics."
+	title: "Log to Metric"
 
 	classes: {
-		commonly_used: true
-		function:      "convert"
+		commonly_used: false
+		development:   "stable"
 		egress_method: "batch"
 	}
 
 	features: {
-	}
-
-	statuses: {
-		development: "stable"
+		convert: {}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
@@ -40,7 +33,7 @@ components: transforms: log_to_metric: {
 			description: "A table of key/value pairs representing the keys to be added to the event."
 			required:    true
 			warnings: []
-			type: object: {
+			type: array: items: type: object: {
 				examples: []
 				options: {
 					field: {
@@ -53,13 +46,13 @@ components: transforms: log_to_metric: {
 					}
 					increment_by_value: {
 						description: """
-                If `true` the metric will be incremented by the `field` value.
-                If `false` the metric will be incremented by 1 regardless of the `field` value.
-                """
+	                If `true` the metric will be incremented by the `field` value.
+	                If `false` the metric will be incremented by 1 regardless of the `field` value.
+	                """
 						required: false
 						common:   false
 						warnings: []
-						relevant_when: #"`type` = `"counter"`"#
+						relevant_when: #"type = "counter""#
 						type: bool: {
 							default: false
 						}
@@ -88,9 +81,9 @@ components: transforms: log_to_metric: {
 							options: {
 								"*": {
 									description: """
-                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
-                      Environment variables and field interpolation is allowed.
-                      """
+	                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+	                      Environment variables and field interpolation is allowed.
+	                      """
 									required: true
 									warnings: []
 									type: "*": {}
@@ -119,7 +112,7 @@ components: transforms: log_to_metric: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	output: metrics: {

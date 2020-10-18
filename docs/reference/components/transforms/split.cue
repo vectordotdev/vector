@@ -1,32 +1,26 @@
 package metadata
 
 components: transforms: split: {
-	title:             "Split"
-	short_description: "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
-	long_description:  "Accepts log events and allows you to split a field's value on a _literal_ separator and zip the tokens into ordered field names."
+	title: "Split"
 
 	classes: {
 		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "stable"
+	features: {
+		shape: {}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
@@ -60,7 +54,7 @@ components: transforms: split: {
 		}
 		separator: {
 			common:      true
-			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`][urls.unicode_whitespace]."
+			description: "The separator to split the field on. If no separator is given, it will split on all whitespace. 'Whitespace' is defined according to the terms of the [Unicode Derived Core Property `White_Space`](\(urls.unicode_whitespace))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -73,7 +67,7 @@ components: transforms: split: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [

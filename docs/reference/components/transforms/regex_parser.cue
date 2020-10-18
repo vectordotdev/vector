@@ -1,32 +1,32 @@
 package metadata
 
 components: transforms: regex_parser: {
-	title:             "Regex Parser"
-	short_description: "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
-	long_description:  "Accepts log events and allows you to parse a log field's value with a [Regular Expression][urls.regex]."
+	title: "Regex Parser"
 
 	classes: {
-		commonly_used: true
+		commonly_used: false
+		development:   "stable"
 		egress_method: "stream"
-		function:      "parse"
 	}
 
-	features: {}
-
-	statuses: {
-		development: "stable"
+	features: {
+		parse: {
+			format: {
+				name:     "regular expressions"
+				url:      urls.regex
+				versions: null
+			}
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
 		requirements: []
@@ -87,7 +87,7 @@ components: transforms: regex_parser: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	examples: [
@@ -122,21 +122,60 @@ components: transforms: regex_parser: {
 	how_it_works: {
 		failed_parsing: {
 			title: "Failed Parsing"
-			body: #"""
+			body: """
 				By default, if the input message text does not match any of the configured regular expression patterns, this transform will log an error message but leave the log event unchanged. If you instead wish to have this transform drop the event, set `drop_failed = true`.
+				"""
+		}
+		flags: {
+			title: "Flags"
+			body: #"""
+				Regex flags can be toggled with the `(?flags)` syntax. The available flags are:
+
+				| Flag | Descriuption |
+				| :--- | :----------- |
+				| `i`  | case-insensitive: letters match both upper and lower case |
+				| `m`  | multi-line mode: ^ and $ match begin/end of line |
+				| `s`  | allow . to match `\n` |
+				| `U`  | swap the meaning of `x*` and `x*?` |
+				| `u`  | Unicode support (enabled by default) |
+				| `x`  | ignore whitespace and allow line comments (starting with `#`)
+
+				For example, to enable the case-insensitive flag you can write:
+
+				```text
+				(?i)Hello world
+				```
+
+				More info can be found in the [Regex grouping and flags documentation](#(urls.regex_grouping_and_flags)).
+				"""#
+		}
+		named_captures: {
+			title: "Named Captures"
+			body: #"""
+				You can name Regex captures with the `<name>` syntax. For example:
+
+				```text
+				^(?P<timestamp>\w*) (?P<level>\w*) (?P<message>.*)$
+				```
+
+				Will capture `timestamp`, `level`, and `message`. All values are extracted as
+				`string` values and must be coerced with the `types` table.
+
+				More info can be found in the [Regex grouping and flags
+				documentation](#(urls.regex_grouping_and_flags)).
 				"""#
 		}
 		regex_debugger: {
 			title: "Regex Debugger"
-			body: #"""
+			body: """
 				If you are having difficulty with your regular expression not matching text, you may try debugging your patterns at [Regex 101][regex_tester]. This site includes a regular expression tester and debugger. The regular expression engine used by Vector is most similar to the "Go" implementation, so make sure that is selected in the "Flavor" menu.
-				"""#
+				"""
 		}
 		regex_syntax: {
 			title: "Regex Syntax"
-			body: #"""
+			body: """
 				Vector uses the Rust standard regular expression engine for pattern matching. Its syntax shares most of the features of Perl-style regular expressions, with a few exceptions. You can find examples of patterns in the [Rust regex module documentation][rust_regex_syntax].
-				"""#
+				"""
 		}
 	}
 }

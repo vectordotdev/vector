@@ -2,9 +2,7 @@ use self::proto::{event_wrapper::Event as EventProto, metric::Value as MetricPro
 use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
-use lazy_static::lazy_static;
 use std::collections::{BTreeMap, HashMap};
-use string_cache::DefaultAtom as Atom;
 
 pub mod discriminant;
 pub mod merge;
@@ -28,11 +26,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
-pub const PARTIAL_STR: &str = "_partial"; // TODO: clean up the _STR suffix after we get rid of atoms
-
-lazy_static! {
-    pub static ref PARTIAL: Atom = Atom::from(PARTIAL_STR);
-}
+pub const PARTIAL: &str = "_partial";
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {
@@ -388,7 +382,7 @@ impl From<Bytes> for Event {
             .insert(log_schema().message_key(), message);
         event
             .as_mut_log()
-            .insert(Atom::from(log_schema().timestamp_key()), Utc::now());
+            .insert(log_schema().timestamp_key(), Utc::now());
 
         event
     }
@@ -434,7 +428,7 @@ mod test {
             "message": "raw log line",
             "foo": "bar",
             "bar": "baz",
-            "timestamp": event.as_log().get(&Atom::from(log_schema().timestamp_key())),
+            "timestamp": event.as_log().get(log_schema().timestamp_key()),
         });
 
         let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
@@ -498,9 +492,9 @@ mod test {
     fn event_iteration_order() {
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
-        log.insert(&Atom::from("lZDfzKIL"), Value::from("tOVrjveM"));
-        log.insert(&Atom::from("o9amkaRY"), Value::from("pGsfG7Nr"));
-        log.insert(&Atom::from("YRjhxXcg"), Value::from("nw8iM5Jr"));
+        log.insert("lZDfzKIL", Value::from("tOVrjveM"));
+        log.insert("o9amkaRY", Value::from("pGsfG7Nr"));
+        log.insert("YRjhxXcg", Value::from("nw8iM5Jr"));
 
         let collected: Vec<_> = log.all_fields().collect();
         assert_eq!(

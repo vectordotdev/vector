@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub struct SplitEventProcessed;
@@ -13,7 +12,7 @@ impl InternalEvent for SplitEventProcessed {
 
 #[derive(Debug)]
 pub struct SplitFieldMissing<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl<'a> InternalEvent for SplitFieldMissing<'a> {
@@ -32,7 +31,7 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
 
 #[derive(Debug)]
 pub struct SplitConvertFailed<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
     pub error: crate::types::Error,
 }
 

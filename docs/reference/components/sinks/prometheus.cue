@@ -1,60 +1,64 @@
 package metadata
 
 components: sinks: prometheus: {
-	title:             "Prometheus"
-	short_description: "Exposes metric events to [Prometheus][urls.prometheus] metrics service."
-	long_description:  "[Prometheus][urls.prometheus] is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	_port: 9598
+
+	title:       "Prometheus"
+	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
 		commonly_used: true
-		egress_method: "aggregate"
-		function:      "transmit"
+		delivery:      "best_effort"
+		development:   "beta"
+		egress_method: "expose"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      false
-		compression: enabled: false
-		encoding: codec: enabled: false
 		healthcheck: enabled: false
-		request: enabled:     false
-		tls: enabled:         false
-	}
+		exposes: {
+			for: {
+				name:     "Prometheus"
+				thing:    "a \(name) database"
+				url:      urls.prometheus
+				versions: ">= 1.0"
 
-	statuses: {
-		delivery:    "best_effort"
-		development: "beta"
+				interface: {
+					socket: {
+						api: {
+							title: "Prometheus text exposition format"
+							url:   urls.prometheus_text_based_exposition_format
+						}
+						direction: "incoming"
+						port:      _port
+						protocols: ["http"]
+						ssl: "disabled"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
 		platforms: {
-			triples: {
-				"aarch64-unknown-linux-gnu":  true
-				"aarch64-unknown-linux-musl": true
-				"x86_64-apple-darwin":        true
-				"x86_64-pc-windows-msv":      true
-				"x86_64-unknown-linux-gnu":   true
-				"x86_64-unknown-linux-musl":  true
-			}
+			"aarch64-unknown-linux-gnu":  true
+			"aarch64-unknown-linux-musl": true
+			"x86_64-apple-darwin":        true
+			"x86_64-pc-windows-msv":      true
+			"x86_64-unknown-linux-gnu":   true
+			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			#"""
-				[Prometheus][urls.prometheus] version `>= 1.0` is required.
-				"""#,
-		]
+		requirements: []
 		warnings: [
-			#"""
+			"""
 				High cardinality metric names and labels are discouraged by
 				Prometheus as they can provide performance and reliability
 				problems. You should consider alternative strategies to reduce
 				the cardinality. Vector offers a [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit]
 				as a way to protect against this.
-				"""#,
-			#"""
-				This component exposes a configured port. You must ensure your
-				network allows access to this port.
-				"""#,
+				""",
 		]
 		notices: []
 	}
@@ -65,7 +69,7 @@ components: sinks: prometheus: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9598"]
+				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
 		buckets: {
@@ -90,7 +94,7 @@ components: sinks: prometheus: {
 		}
 		namespace: {
 			common:      true
-			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions][urls.prometheus_metric_naming]."
+			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -138,11 +142,11 @@ components: sinks: prometheus: {
 					host: _host
 				}
 			}
-			output: #"""
+			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) counter
 				\(_name) \(_value)
-				"""#
+				"""
 		},
 		{
 			_host:  _values.local_host
@@ -159,11 +163,11 @@ components: sinks: prometheus: {
 					host: _host
 				}
 			}
-			output: #"""
+			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) gauge
 				\(_name) \(_value)
-				"""#
+				"""
 		},
 		{
 			_host: _values.local_host
@@ -182,7 +186,7 @@ components: sinks: prometheus: {
 					host: _host
 				}
 			}
-			output: #"""
+			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) histogram
 				\(_name)_bucket{le="0.005"} 0
@@ -199,7 +203,7 @@ components: sinks: prometheus: {
 				\(_name)_bucket{le="+Inf"} 0
 				\(_name)_sum 0.789
 				\(_name)_count 2
-				"""#
+				"""
 		},
 	]
 
@@ -208,8 +212,7 @@ components: sinks: prometheus: {
 			title: "Histogram Buckets"
 			body: #"""
 				Choosing the appropriate buckets for Prometheus histograms is a complicated
-				point of discussion. The [Histograms and Summaries Prometheus \
-				guide][urls.prometheus_histograms_guide] provides a good overview of histograms,
+				point of discussion. The [Histograms and Summaries Prometheus guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
 				buckets, summaries, and how you should think about configuring them. The buckets
 				you choose should align with your known range and distribution of values as
 				well as how you plan to report on them. The aforementioned guide provides
@@ -218,39 +221,26 @@ components: sinks: prometheus: {
 			sub_sections: [
 				{
 					title: "Default Buckets"
-					body: #"""
-						The `buckets` option defines the global default buckets for histograms:
-
-						```toml
-						<%= component.options.buckets.default %>
-						```
-
+					body: """
+						The `buckets` option defines the global default buckets for histograms.
 						These defaults are tailored to broadly measure the response time (in seconds)
 						of a network service. Most likely, however, you will be required to define
 						buckets customized to your use case.
-
-						<Alert type="warning">
-
-						Note: These values are in `<%= component.options.buckets.unit %>`, therefore,
-						your metric values should also be in `<%= component.options.buckets.unit %>`.
-						If this is not the case you should adjust your metric or buckets to coincide.
-
-						</Alert>
-						"""#
+						"""
 				},
 			]
 		}
 
 		memory_usage: {
 			title: "Memory Usage"
-			body: #"""
-				Like other Prometheus instances, the `<%= component.name %>` sink aggregates
+			body: """
+				Like other Prometheus instances, the `prometheus` sink aggregates
 				metrics in memory which keeps the memory footprint to a minimum if Prometheus
 				fails to scrape the Vector instance over an extended period of time. The
 				downside is that data will be lost if Vector is restarted. This is by design of
 				Prometheus' pull model approach, but is worth noting if restart Vector
 				frequently.
-				"""#
+				"""
 		}
 	}
 }
