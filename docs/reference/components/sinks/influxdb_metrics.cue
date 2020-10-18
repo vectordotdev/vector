@@ -94,6 +94,7 @@ components: sinks: influxdb_metrics: {
 			_host: _values.local_host
 			_name: "sparse_stats"
 			title: "Distribution"
+			notes: "For distributions with histogram, summary is computed."
 			configuration: {}
 			input: metric: {
 				kind: "incremental"
