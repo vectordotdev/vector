@@ -6,7 +6,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
+    compat::Sink01CompatExt,
     future::{self, BoxFuture},
     stream, FutureExt, StreamExt, TryFutureExt,
 };
@@ -90,7 +90,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                     .unwrap_or(addr)
             );
 
-            let tripwire = shutdown.clone().compat();
+            let tripwire = shutdown.clone();
             let tripwire = async move {
                 let _ = tripwire.await;
                 delay_for(Duration::from_secs(shutdown_timeout_secs)).await;
@@ -99,7 +99,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 
             listener
                 .accept_stream()
-                .take_until(shutdown.clone().compat())
+                .take_until(shutdown.clone())
                 .for_each(|connection| {
                     let shutdown = shutdown.clone();
                     let tripwire = tripwire.clone();
@@ -149,14 +149,13 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 }
 
 async fn handle_stream(
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     mut socket: MaybeTlsIncomingStream<TcpStream>,
     source: impl TcpSource,
     tripwire: BoxFuture<'static, ()>,
     host: Bytes,
     out: impl Sink<SinkItem = Event, SinkError = ()> + Send + 'static,
 ) {
-    let mut shutdown = shutdown.compat();
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
@@ -175,7 +174,7 @@ async fn handle_stream(
     stream::poll_fn(move |cx| {
         if let Some(fut) = shutdown.as_mut() {
             match fut.poll_unpin(cx) {
-                Poll::Ready(Ok(token)) => {
+                Poll::Ready(token) => {
                     debug!("Start graceful shutdown");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
@@ -191,9 +190,6 @@ async fn handle_stream(
                     }
 
                     _token = Some(token);
-                    shutdown = None;
-                }
-                Poll::Ready(Err(())) => {
                     shutdown = None;
                 }
                 Poll::Pending => {}

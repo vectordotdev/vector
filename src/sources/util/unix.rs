@@ -3,10 +3,7 @@ use crate::{
     shutdown::ShutdownSignal, sources::Source, Pipeline,
 };
 use bytes::Bytes;
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future, FutureExt, SinkExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use std::path::PathBuf;
 use tokio::net::{UnixListener, UnixStream};
@@ -38,7 +35,7 @@ where
             UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", ?listen_path, r#type = "unix");
 
-        let mut stream = listener.incoming().take_until(shutdown.clone().compat());
+        let mut stream = listener.incoming().take_until(shutdown.clone());
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(error) => {
@@ -67,7 +64,7 @@ where
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
-            let stream = socket.allow_read_until(shutdown.clone().compat().map(|_| ()));
+            let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
                 future::ready(match line {
                     Ok(line) => build_event(&host_key, received_from.clone(), &line).map(Ok),

@@ -95,7 +95,7 @@ pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String,
 
 impl RunningTopology {
     /// Returned future will finish once all current sources have finished.
-    pub fn sources_finished(&self) -> impl Future<Item = (), Error = ()> {
+    pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }
 
@@ -778,7 +778,6 @@ mod source_finished_tests {
         sources::generator::GeneratorConfig,
         test_util::start_topology,
     };
-    use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
     #[tokio::test]
@@ -797,9 +796,8 @@ mod source_finished_tests {
 
         let (topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
-        timeout(Duration::from_secs(2), topology.sources_finished().compat())
+        timeout(Duration::from_secs(2), topology.sources_finished())
             .await
-            .unwrap()
             .unwrap();
     }
 }
@@ -821,8 +819,7 @@ mod transient_state_tests {
         transforms::json_parser::JsonParserConfig,
         Error, Pipeline,
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Future;
+    use futures::{future, FutureExt, TryFutureExt};
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
 
@@ -854,11 +851,18 @@ mod transient_state_tests {
             shutdown: ShutdownSignal,
             out: Pipeline,
         ) -> Result<Source, Error> {
-            let source = shutdown
-                .map(|_| ())
-                .select(self.tripwire.clone().unwrap())
-                .map(|_| std::mem::drop(out))
-                .map_err(|_| ());
+            let source = future::select(
+                shutdown.map(|_| ()).boxed(),
+                self.tripwire
+                    .clone()
+                    .unwrap()
+                    .then(crate::stream::tripwire_handler)
+                    .boxed(),
+            )
+            .map(|_| std::mem::drop(out))
+            .unit_error()
+            .boxed()
+            .compat();
             Ok(Box::new(source))
         }
 
@@ -904,8 +908,7 @@ mod transient_state_tests {
 
         trigger_old.cancel();
 
-        let finished = topology.sources_finished();
-        finished.compat().await.unwrap();
+        topology.sources_finished().await;
 
         assert!(topology
             .reload_config_and_respawn(new_config.build().unwrap(), false)

@@ -159,10 +159,9 @@ macro_rules! tags {
 }
 
 impl HostMetricsConfig {
-    async fn run(self, mut out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run(self, mut out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         let interval = Duration::from_secs(self.scrape_interval_secs);
         let mut interval = time::interval(interval).map(|_| ());
-        let mut shutdown = shutdown.compat();
 
         loop {
             select! {

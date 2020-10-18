@@ -43,7 +43,7 @@ pub fn udp(
     address: SocketAddr,
     max_length: usize,
     host_key: String,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
     let mut out = out.sink_map_err(|e| error!("Error sending event: {:?}", e));
@@ -55,7 +55,6 @@ pub fn udp(
                 .expect("Failed to bind to udp listener socket");
             info!(message = "Listening.", %address);
 
-            let mut shutdown = shutdown.compat();
             let mut buf = BytesMut::with_capacity(max_length);
             loop {
                 buf.resize(max_length, 0);

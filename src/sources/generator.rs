@@ -10,10 +10,10 @@ use futures::{
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{future::Future, stream::iter_ok, Sink};
+use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use tokio::time::interval;
+use std::task::Poll;
+use tokio::time::{interval, Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -79,7 +79,7 @@ impl GeneratorConfig {
         let mut number: usize = 0;
 
         for _ in 0..self.count {
-            if shutdown.poll().expect("polling shutdown").is_ready() {
+            if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
                 break;
             }
 

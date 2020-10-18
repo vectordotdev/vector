@@ -50,10 +50,9 @@ impl SourceConfig for InternalMetricsConfig {
 async fn run(
     controller: &Controller,
     mut out: Pipeline,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
     let mut interval = interval(Duration::from_secs(2)).map(|_| ());
-    let mut shutdown = shutdown.compat();
 
     let mut run = true;
     while run {

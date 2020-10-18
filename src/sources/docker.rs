@@ -22,10 +22,7 @@ use bollard::{
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future,
-    sink::SinkExt,
-    FutureExt, Stream, StreamExt, TryFutureExt,
+    compat::Sink01CompatExt, future, sink::SinkExt, FutureExt, Stream, StreamExt, TryFutureExt,
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -145,7 +142,7 @@ impl SourceConfig for DockerConfig {
             async move {
                 Ok(tokio::select! {
                     _ = fut => {}
-                    _ = shutdown.compat() => {}
+                    _ = shutdown => {}
                 })
             }
             .boxed()
@@ -602,7 +599,7 @@ impl EventStreamBuilder {
             })
             .take_while(|v| future::ready(v.is_ok()))
             .filter_map(|v| future::ready(v.unwrap()))
-            .take_until(self.shutdown.clone().compat());
+            .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =
             if let Some(ref line_agg_config) = self.core.line_agg_config {

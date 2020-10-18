@@ -4,10 +4,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    stream, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use parser::parse;
 use serde::{Deserialize, Serialize};
@@ -66,7 +63,7 @@ fn statsd(addr: SocketAddr, shutdown: ShutdownSignal, out: Pipeline) -> super::S
             );
 
             let _ = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown.compat())
+                .take_until(shutdown)
                 .filter_map(|frame| async move {
                     match frame {
                         Ok((bytes, _sock)) => {

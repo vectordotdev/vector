@@ -111,7 +111,7 @@ fn kafka_source(
     let fut = async move {
         Arc::clone(&consumer)
             .start()
-            .take_until(shutdown.clone().compat())
+            .take_until(shutdown.clone())
             .then(move |message| {
                 let key_field = key_field.clone();
                 let consumer = Arc::clone(&consumer);

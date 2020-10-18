@@ -14,10 +14,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -268,7 +265,7 @@ pub fn udp(
             );
 
             let _ = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown.compat())
+                .take_until(shutdown)
                 .filter_map(|frame| {
                     let host_key = host_key.clone();
                     async move {
