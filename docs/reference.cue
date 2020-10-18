@@ -53,6 +53,22 @@ _values: {
 	}
 }
 
+#Commit: {
+	author:           string
+	breaking_change:  bool
+	date:             #Date
+	description:      string
+	deletions_count:  uint
+	files_count:      uint
+	insertions_count: uint
+	pr_number:        uint | null
+	scopes:           [string, ...] | []
+	sha:              #CommitSha
+	type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status"
+}
+
+#CommitSha: =~"^[a-z0-9]{40}$"
+
 // `#ComponentKind` represent the kind of component.
 #ComponentKind: "sink" | "source" | "transform"
 
@@ -146,6 +162,8 @@ _values: {
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
 
+#Date: =~"^\\d{4}-\\d{2}-\\d{2}"
+
 // `#DeliveryStatus` documents the delivery guarantee.
 //
 // * `at_least_once` - The event will be delivered at least once and
@@ -199,6 +217,8 @@ _values: {
 // * `log` - log event
 // * `metric` - metric event
 #EventType: "log" | "metric"
+
+#Fields: [Name=string]: #Fields | _
 
 #Interface: {
 	close({binary: #InterfaceBinary}) |
@@ -533,6 +553,14 @@ _values: {
 
 #Protocol: "http" | "tcp" | "udp" | "unix"
 
+#Releases: [Name=string]: {
+	codename: string
+	date:     string
+
+	commits: [#Commit, ...]
+	whats_next: #Any
+}
+
 #Runtime: {
 	name:    string
 	url:     string
@@ -809,7 +837,7 @@ data_model: close({
 	schema: #Schema
 })
 
-#Fields: [Name=string]: #Fields | _
+releases: #Releases
 
 remap: {
 	errors: [Name=string]: {
