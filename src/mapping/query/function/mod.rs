@@ -133,6 +133,7 @@ build_signatures! {
     round => RoundFn,
     floor => FloorFn,
     ceil => CeilFn,
+    parse_syslog => ParseSyslogFn,
 }
 
 /// A parameter definition accepted by a function.

@@ -129,7 +129,7 @@ http = "0.2"
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
-syslog_loose = { version = "0.4.0", optional = true }
+syslog_loose = { version = "0.4.0" }
 derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
@@ -322,7 +322,7 @@ sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sour
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
 sources-statsd = ["tokio-util/udp", "listenfd", "sources-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose", "sources-utils-unix"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sources-utils-unix"]
 sources-tls = []
 sources-vector = ["listenfd" ,"sources-tls"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
