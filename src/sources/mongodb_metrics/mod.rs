@@ -165,7 +165,7 @@ impl MongoDBMetrics {
             .await
             .context(InvalidEndpoint)?;
         client_options.direct_connection = Some(true);
-        tags.insert("host".into(), client_options.hosts[0].hostname.clone());
+        tags.insert("host".into(), client_options.hosts[0].to_string());
         let client = Client::with_options(client_options).context(InvalidClientOptions)?;
 
         let endpoint = Self::sanitize_endpoint(endpoint)?;
