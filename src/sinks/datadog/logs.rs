@@ -28,6 +28,7 @@ use std::{io::Write, time::Duration};
 #[serde(deny_unknown_fields)]
 pub struct DatadogLogsConfig {
     endpoint: Option<String>,
+    region: Option<super::Region>,
     api_key: String,
     encoding: EncodingConfig<Encoding>,
     tls: Option<TlsConfig>,
@@ -62,7 +63,10 @@ impl DatadogLogsConfig {
     fn get_endpoint(&self) -> &str {
         self.endpoint
             .as_deref()
-            .unwrap_or("https://http-intake.logs.datadoghq.eu/v1/input")
+            .unwrap_or_else(|| match self.region {
+                Some(super::Region::Eu) => "https://http-intake.logs.datadoghq.eu",
+                None | Some(super::Region::Us) => "https://http-intake.logs.datadoghq.com",
+            })
     }
 
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
@@ -113,7 +117,7 @@ impl DatadogLogsConfig {
 
     /// Build the request, GZipping the contents if the config specifies.
     fn build_request(&self, body: Vec<u8>) -> crate::Result<http::Request<Vec<u8>>> {
-        let uri = self.get_endpoint();
+        let uri = format!("{}/v1/input", self.get_endpoint());
         let request = Request::post(uri)
             .header("Content-Type", "text/plain")
             .header("DD-API-KEY", self.api_key.clone());

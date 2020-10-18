@@ -36,12 +36,25 @@ components: sinks: _datadog: {
 			}
 		}
 		endpoint: {
-			common:      false
-			description: "The endpoint to send logs to."
-			required:    false
+			common:        false
+			description:   "The endpoint to send data to."
+			relevant_when: "region is not set"
+			required:      false
 			type: string: {
-				default: "intake.logs.datadoghq.com:10516"
+				default: null
 				examples: ["127.0.0.1:8080", "example.com:12345"]
+			}
+		}
+		region: {
+			description:   "The region to send data to."
+			required:      false
+			relevant_when: "endpoint is not set"
+			warnings: []
+			type: string: {
+				enum: {
+					us: "United States"
+					eu: "Europe"
+				}
 			}
 		}
 	}
