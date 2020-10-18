@@ -4,7 +4,7 @@ releases: "0.11.0": {
   date:     "2020-10-18"
   codename: ""
 
-  whats_next: []
+  whats_next: ["test"]
 
   commits: [
     {sha: "5308b865614987b50bbeecf2167d37ddfc326f55", date: "2020-07-22 11:15:07 -0400", description: "Initial `kubernetes_logs` implementation", pr_number: 2653, scopes: ["new source"], type: "feat", breaking_change: false, author: "MOZGIII", files_count: 60, insertions_count: 6078, deletions_count: 25},
@@ -167,3 +167,4 @@ releases: "0.11.0": {
     {sha: "0e40d1fee9eb16d0c86957764debd172620407e9", date: "2020-10-18 08:14:33 -0400", description: "Handle non-ASCII data in all values", pr_number: 4608, scopes: ["journald source"], type: "fix", breaking_change: false, author: "Bruce Guenter", files_count: 1, insertions_count: 23, deletions_count: 11},
     {sha: "e982c684d9a6e6bf97134a31a3162d3a04a2d4b2", date: "2020-10-18 10:14:59 -0400", description: "Send auth header for healthchecks", pr_number: 4604, scopes: ["loki sink"], type: "fix", breaking_change: false, author: "Jesse Szwedko", files_count: 1, insertions_count: 48, deletions_count: 2},
   ]
+}

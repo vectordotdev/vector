@@ -34,7 +34,7 @@ module Vector
           sha = line_parts.fetch(0)
           message = line_parts.fetch(1)
           author = line_parts.fetch(2)
-          date = Time.parse(line_parts.fetch(3))
+          date = Time.parse(line_parts.fetch(3)).utc
 
           attributes =
             {

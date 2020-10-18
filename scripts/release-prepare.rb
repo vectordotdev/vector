@@ -106,7 +106,7 @@ def create_log_file!(current_commits, new_version)
     end
   end
 
-  true
+  release_log_path
 end
 
 def create_release_file!(new_version)
@@ -166,6 +166,7 @@ def create_release_file!(new_version)
             commits: [
               #{cue_commits.join("\n    ")}
             ]
+          }
           EOF
         )
       end
@@ -299,8 +300,9 @@ last_tag = `git describe --tags --abbrev=0`.chomp
 last_version = Util::Version.new(last_tag.gsub(/^v/, ''))
 current_commits = get_commits_since(last_version)
 new_version = get_new_version(last_version, current_commits)
-create_log_file!(current_commits, new_version)
+log_file_path = create_log_file!(current_commits, new_version)
 create_release_file!(new_version)
+File.delete(log_file_path)
 
 #Util::Printer.title("Migrating all nightly associated highlights to #{new_version}...")
 
