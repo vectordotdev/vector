@@ -255,6 +255,7 @@ impl MongoDBMetrics {
     }
 
     async fn collect(self: Arc<Self>) -> stream::BoxStream<'static, Metric> {
+        // `up` metric is `1` if collection is successful, otherwise `0`.
         let (up_value, metrics) = match Arc::clone(&self).collect_server_status().await {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
