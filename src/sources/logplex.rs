@@ -5,7 +5,7 @@ use crate::{
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource},
+    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };
@@ -24,6 +24,7 @@ use warp::http::{HeaderMap, StatusCode};
 pub struct LogplexConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
+    auth: Option<HttpSourceAuthConfig>,
 }
 
 inventory::submit! {
@@ -33,7 +34,7 @@ inventory::submit! {
 impl GenerateConfig for LogplexConfig {}
 
 #[derive(Clone, Default)]
-struct LogplexSource {}
+struct LogplexSource;
 
 impl HttpSource for LogplexSource {
     fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
@@ -52,7 +53,7 @@ impl SourceConfig for LogplexConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource::default();
-        source.run(self.address, "events", &self.tls, out, shutdown)
+        source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
@@ -169,7 +170,7 @@ fn line_to_event(line: String) -> Event {
 
 #[cfg(test)]
 mod tests {
-    use super::LogplexConfig;
+    use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
@@ -183,32 +184,38 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
 
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(auth: Option<HttpSourceAuthConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
-            LogplexConfig { address, tls: None }
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    sender,
-                )
-                .await
-                .unwrap()
-                .compat()
-                .await
-                .unwrap()
+            LogplexConfig {
+                address,
+                tls: None,
+                auth,
+            }
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap()
         });
         wait_for_tcp(address).await;
         (recv, address)
     }
 
-    async fn send(address: SocketAddr, body: &str) -> u16 {
+    async fn send(address: SocketAddr, body: &str, auth: Option<HttpSourceAuthConfig>) -> u16 {
         let len = body.lines().count();
-        reqwest::Client::new()
-            .post(&format!("http://{}/events", address))
-            .header("Logplex-Msg-Count", len)
+        let mut req = reqwest::Client::new().post(&format!("http://{}/events", address));
+        if let Some(auth) = auth {
+            req = req.basic_auth(auth.username, Some(auth.password));
+        }
+        req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
             .header("Logplex-Drain-Token", "drain-bar")
             .body(body.to_owned())
@@ -225,9 +232,14 @@ mod tests {
 
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
-        let (rx, addr) = source().await;
+        let auth = HttpSourceAuthConfig {
+            username: "vector_user".to_owned(),
+            password: "vector_pass".to_owned(),
+        };
 
-        assert_eq!(200, send(addr, body).await);
+        let (rx, addr) = source(Some(auth.clone())).await;
+
+        assert_eq!(200, send(addr, body, Some(auth)).await);
 
         let mut events = collect_n(rx, body.lines().count()).await.unwrap();
         let event = events.remove(0);

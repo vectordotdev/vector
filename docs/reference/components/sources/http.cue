@@ -58,7 +58,7 @@ components: sources: http: {
 
 	configuration: {
 		address: {
-			description: "The address to listen for connections on"
+			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
 			type: string: examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
 		}
@@ -82,6 +82,33 @@ components: sources: http: {
 			type: array: {
 				default: null
 				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
+			}
+		}
+		auth: {
+			common:      false
+			description: "Options for HTTP Basic Authentication."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					username: {
+						description: "The basic authentication user name."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${HTTP_USERNAME}", "username"]
+						}
+					}
+					password: {
+						description: "The basic authentication password."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${HTTP_PASSWORD}", "password"]
+						}
+					}
+				}
 			}
 		}
 	}
