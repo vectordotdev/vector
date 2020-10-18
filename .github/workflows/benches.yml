@@ -34,3 +34,8 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make bench
+      - name: Store benchmark result
+        uses: rhysd/github-action-benchmark@v1
+        with:
+           tool: 'cargo'
+           output-file-path: output.txt
