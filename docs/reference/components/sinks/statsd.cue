@@ -42,9 +42,9 @@ components: sinks: statsd: {
 			counter:      true
 			distribution: true
 			gauge:        true
-			histogram:    true
+			histogram:    false
 			set:          true
-			summary:      true
+			summary:      false
 		}
 	}
 

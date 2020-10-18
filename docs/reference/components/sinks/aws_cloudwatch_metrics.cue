@@ -105,9 +105,9 @@ components: sinks: aws_cloudwatch_metrics: {
 			counter:      true
 			distribution: true
 			gauge:        true
-			histogram:    true
+			histogram:    false
 			set:          false
-			summary:      true
+			summary:      false
 		}
 	}
 }
