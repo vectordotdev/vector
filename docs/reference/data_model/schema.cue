@@ -99,7 +99,7 @@ data_model: schema: {
 								description: "The statistic to be calculated from the values."
 								required:    true
 								warnings: []
-								type: string: enum: #DistributionStatistic & {
+								type: string: enum: {
 									histogram: "Counts values in buckets."
 									summary:   "Calculates quantiles of values."
 								}
