@@ -748,13 +748,15 @@ _values: {
 	//      }
 	enum?: #Enum
 
-	// `examples` demonstrates example values. This should be used when
-	// examples cannot be derived from the `default` or `enum` options.
-	examples: [...string] | *[
-			for k, v in enum {
-			k
-		},
-	]
+	if enum == _|_ {
+		// `examples` demonstrates example values. This should be used when
+		// examples cannot be derived from the `default` or `enum` options.
+		examples: [...string] | *[
+				for k, v in enum {
+				k
+			},
+		]
+	}
 
 	// `templateable` means that the option supports dynamic templated
 	// values.
