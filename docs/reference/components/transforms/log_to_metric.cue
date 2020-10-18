@@ -276,7 +276,7 @@ components: transforms: log_to_metric: {
 				time:    54.2
 			}
 			output: [{metric: {
-				kind: "absolute"
+				kind: "incremental"
 				name: "time_ms"
 				tags: {
 					status: "200"
@@ -312,7 +312,7 @@ components: transforms: log_to_metric: {
 				time:    54.2
 			}
 			output: [{metric: {
-				kind: "absolute"
+				kind: "incremental"
 				name: "time_ms"
 				tags: {
 					status: "200"
@@ -350,7 +350,7 @@ components: transforms: log_to_metric: {
 				remote_addr: "233.221.232.22"
 			}
 			output: [{metric: {
-				kind: "absolute"
+				kind: "incremental"
 				name: "remote_addr"
 				tags: {
 					host: "10.22.11.222"

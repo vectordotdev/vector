@@ -154,7 +154,7 @@ components: sinks: influxdb_metrics: {
 			title:  "Set"
 			configuration: {}
 			input: metric: {
-				kind: "absolute"
+				kind: "incremental"
 				name: _name
 				set: {
 					values: ["first", "another", "last"]
