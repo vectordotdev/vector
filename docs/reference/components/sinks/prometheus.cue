@@ -253,7 +253,7 @@ components: sinks: prometheus: {
 				# TYPE \(_name) summary
 				\(_name){quantile="0.5"} 0
 				\(_name){quantile="0.75"} 1
-				\(_name){quantile="0.95"} 4 
+				\(_name){quantile="0.95"} 4
 				\(_name)_sum 6
 				\(_name)_count 6
 				\(_name)_min 0
@@ -283,7 +283,7 @@ components: sinks: prometheus: {
 				# TYPE \(_name) summary
 				\(_name){host="\(_host)",quantile="0.01"} 1.5
 				\(_name){host="\(_host)",quantile="0.5"} 2
-				\(_name){host="\(_host)",quantile="0.99"} 3 
+				\(_name){host="\(_host)",quantile="0.99"} 3
 				\(_name)_sum{host="\(_host)"} 12
 				\(_name)_count{host="\(_host)"} 6		
 				"""
