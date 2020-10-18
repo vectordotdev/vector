@@ -55,7 +55,6 @@ components: sinks: _datadog: {
 					us: "United States"
 					eu: "Europe"
 				}
-				examples: [ "us"]
 			}
 		}
 	}
