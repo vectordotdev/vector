@@ -64,9 +64,9 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
-							default: string
+							default:      string
+							templateable: true
 						}
-						templateable: true
 					}
 					tags: {
 						description: "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
@@ -85,11 +85,11 @@ components: transforms: log_to_metric: {
 								"*": {
 									description: """
 	                      Key/value pairs representing [metric tags][docs.data-model.metric#tags].
+	                      Environment variables and field interpolation is allowed.
 	                      """
 									required: true
 									warnings: []
 									type: "*": {}
-									templateable: true
 								}
 							}
 						}
