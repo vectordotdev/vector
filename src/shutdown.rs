@@ -116,8 +116,8 @@ impl SourceShutdownCoordinator {
         let shutdown_signal =
             ShutdownSignal::new(shutdown_begun_tripwire, shutdown_complete_trigger);
 
-        // `force_shutdown_tripwire` resolved even on success when we should *not* be shutting down.
-        // `tripwire_handler` will check resolved value and never resolve future if this not required.
+        // `force_shutdown_tripwire` resolves even if canceled when we should *not* be shutting down.
+        // `tripwire_handler` handles cancel by never resolving.
         let force_shutdown_tripwire = force_shutdown_tripwire.then(tripwire_handler);
         (shutdown_signal, force_shutdown_tripwire)
     }
