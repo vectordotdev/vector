@@ -55,7 +55,7 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "signal", "io-std", "macros", "rt-core", "rt-threaded", "uds", "sync", "process"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "signal", "sync"] }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-util = { version = "0.3.1", features = ["codec"] }
@@ -114,7 +114,7 @@ chrono = { version = "0.4.19", features = ["serde"] }
 rand = "0.5.5"
 regex = "1.3.9"
 bytes = { version = "0.5.6", features = ["serde"] }
-stream-cancel = "0.4.3"
+stream-cancel = "0.6.2"
 hyper = "0.13"
 hyper-openssl = "0.8"
 openssl = "0.10.30"
