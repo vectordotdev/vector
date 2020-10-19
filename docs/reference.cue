@@ -276,9 +276,9 @@ _values: {
 
 	if Args.kind == "source" {
 		collect?:  #FeaturesCollect
-		receive?:  #FeaturesReceive
 		generate?: #FeaturesGenerate
 		multiline: #FeaturesMultiline
+		receive?:  #FeaturesReceive
 	}
 
 	if Args.kind == "transform" {
@@ -307,17 +307,11 @@ _values: {
 		exposes?: #FeaturesExpose
 		send?:    #FeaturesSend & {_args: Args}
 	}
+
+	descriptions: [Name=string]: string
 }
 
 #FeaturesCollect: {
-	if checkpoint.enabled {
-		description: "Efficiently collects data and checkpoints your position to ensure data is not lost between restarts."
-	}
-
-	if !checkpoint.enabled {
-		description: "Efficiently collects data."
-	}
-
 	checkpoint: close({
 		enabled: bool
 	})
@@ -327,12 +321,9 @@ _values: {
 }
 
 #FeaturesConvert: {
-	description: "Converts data into specific types for enhanced quality and processing."
 }
 
 #FeaturesEnrich: {
-	description: "Enriches data with useful context"
-
 	from: close({
 		name:     string
 		url:      string
@@ -341,26 +332,20 @@ _values: {
 }
 
 #FeaturesExpose: {
-	description: "Exposes data for pull-based collection from downstream clients."
-	for:         #Service
+	for: #Service
 }
 
 #FeaturesFilter: {
-	description: "Filters data for bandwidth reduction or routing."
 }
 
 #FeaturesGenerate: {
-	description: "Generates data for testing."
 }
 
 #FeaturesMultiline: {
-	description: "Merges multi-line logs into one event."
-	enabled:     bool
+	enabled: bool
 }
 
 #FeaturesParse: {
-	description: "Structures data to improve its quality and simply processing."
-
 	format: close({
 		name:     string
 		url:      string | null
@@ -369,30 +354,24 @@ _values: {
 }
 
 #FeaturesProgram: {
-	description: "Efficiently collects data."
-	runtime:     #Runtime
+	runtime: #Runtime
 }
 
 #FeaturesReceive: {
-	description: "Receives data from upstream clients."
-	from?:       #Service
-	tls:         #FeaturesTLS & {_args: {mode: "accept"}}
+	from?: #Service
+	tls:   #FeaturesTLS & {_args: {mode: "accept"}}
 }
 
 #FeaturesReduce: {
-	description: "Reduces multiple events into single events to reduce volume."
 }
 
 #FeaturesRoute: {
-	description: "Routes data for building directed acyclic graph pipelines."
 }
 
 #FeaturesSanitize: {
-	description: "Sanitizes data to remove unwanted values often for privacy and compliance."
 }
 
 #FeaturesShape: {
-	description: "Shapes and transforms data for enhanced quality and processing."
 }
 
 #FeaturesSend: {
@@ -401,8 +380,6 @@ _values: {
 		kind:          string
 	}
 	let Args = _args
-
-	description: "Efficiently sends data to downstream clients."
 
 	if Args.egress_method == "batch" {
 		// `batch` describes how the component batches data. This is only
@@ -471,8 +448,6 @@ _values: {
 	}
 	let Args = _args
 	enabled: bool
-
-	description: "Securely transmits data via Transport Layer Security (TLS)."
 
 	if enabled {
 		can_enable:             bool

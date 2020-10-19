@@ -307,6 +307,66 @@ components: {
 			}
 		}
 
+		features: {
+			descriptions: {
+				if features.buffer != _|_ {
+					if features.buffer.enabled == true {
+						buffer: "Buffer your data in-memory or on-disk for performance and durability."
+					}
+				}
+
+				if features.collect != _|_ {
+					if features.collect.from != _|_ {
+						collect_context: "Enriches data with useful \(features.collect.from.name) context."
+					}
+
+					if features.collect.checkpoint.enabled != _|_ {
+						checkpoint: "Efficiently collects data and checkpoints your position to ensure data is not lost between restarts."
+					}
+
+					if features.collect.tls.enabled != _|_ {
+						tls_collect: "Securely collects data via Transport Layer Security (TLS)."
+					}
+				}
+
+				if features.multiline != _|_ {
+					if features.multiline.enabled == true {
+						multiline: "Merges multi-line logs into one event."
+					}
+				}
+
+				if features.receive != _|_ {
+					if features.receive.from != _|_ {
+						receive_context: "Enriches data with useful \(features.receive.from.name) context."
+					}
+
+					if features.receive.tls.enabled != _|_ {
+						tls_receive: "Securely receives data via Transport Layer Security (TLS)."
+					}
+				}
+
+				if features.send != _|_ {
+					if features.send.batch != _|_ {
+						if features.send.batch.enabled {
+							batch: "Batches data to maximize throughput."
+						}
+					}
+
+					if features.send.compression.enabled != _|_ {
+						compress: "Compresses data to optimize bandwidth."
+					}
+
+					if features.send.request.enabled != _|_ {
+						request: "Automatically retries failed requests, with backoff."
+					}
+
+					if features.send.tls.enabled != _|_ {
+						tls_send: "Securely transmits data via Transport Layer Security (TLS)."
+					}
+				}
+			}
+		}
+
 		if Kind == "source" || Kind == "transform" {
 			output: {
 				_passthrough_counter: {
