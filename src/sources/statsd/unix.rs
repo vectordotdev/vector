@@ -1,9 +1,5 @@
 use crate::{
-    internal_events::{StatsdEventReceived, StatsdInvalidRecord},
-    shutdown::ShutdownSignal,
-    sources::util::build_unix_source,
-    sources::Source,
-    Event, Pipeline,
+    shutdown::ShutdownSignal, sources::util::build_unix_source, sources::Source, Event, Pipeline,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -16,18 +12,7 @@ pub struct UnixConfig {
 }
 
 fn build_event(_: &str, _: Option<Bytes>, line: &str) -> Option<Event> {
-    match super::parser::parse(line) {
-        Ok(metric) => {
-            emit!(StatsdEventReceived {
-                byte_size: line.len()
-            });
-            Some(Event::Metric(metric))
-        }
-        Err(error) => {
-            emit!(StatsdInvalidRecord { error, text: &line });
-            None
-        }
-    }
+    super::parse_event(line)
 }
 
 pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) -> Source {

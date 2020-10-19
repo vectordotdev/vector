@@ -105,6 +105,21 @@ impl SourceConfig for StatsdConfig {
     }
 }
 
+pub(self) fn parse_event(line: &str) -> Option<Event> {
+    match parse(line) {
+        Ok(metric) => {
+            emit!(StatsdEventReceived {
+                byte_size: line.len()
+            });
+            Some(Event::Metric(metric))
+        }
+        Err(error) => {
+            emit!(StatsdInvalidRecord { error, text: line });
+            None
+        }
+    }
+}
+
 async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
     let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
 
@@ -126,18 +141,7 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
                     let packet = String::from_utf8_lossy(bytes.as_ref());
                     let metrics = packet
                         .lines()
-                        .filter_map(|line| match parse(line) {
-                            Ok(metric) => {
-                                emit!(StatsdEventReceived {
-                                    byte_size: line.len()
-                                });
-                                Some(Ok(Event::Metric(metric)))
-                            }
-                            Err(error) => {
-                                emit!(StatsdInvalidRecord { error, text: line });
-                                None
-                            }
-                        })
+                        .filter_map(|line| parse_event(line).map(Ok))
                         .collect::<Vec<_>>();
                     Some(stream::iter(metrics))
                 }
@@ -167,18 +171,7 @@ impl TcpSource for StatsdTcpSource {
 
     fn build_event(&self, line: Bytes, _host: Bytes) -> Option<Event> {
         let line = String::from_utf8_lossy(line.as_ref());
-        match parse(&line) {
-            Ok(metric) => {
-                emit!(StatsdEventReceived {
-                    byte_size: line.len()
-                });
-                Some(Event::Metric(metric))
-            }
-            Err(error) => {
-                emit!(StatsdInvalidRecord { error, text: &line });
-                None
-            }
-        }
+        parse_event(&line)
     }
 }
 
