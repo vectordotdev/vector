@@ -8,6 +8,7 @@ components: sinks: [Name=string]: {
 	if strings.HasPrefix(Name, "aws_") {
 		configuration: {
 			assume_role: {
+				category:    "Auth"
 				common:      false
 				description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
 				required:    false
@@ -34,6 +35,40 @@ components: sinks: [Name=string]: {
 				relevant_when: "endpoint = null"
 				type: string: {
 					examples: ["us-east-1"]
+				}
+			}
+		}
+
+		env_vars: {
+			AWS_ACCESS_KEY_ID: {
+				description:   "Used for AWS authentication when communicating with AWS services."
+				relevant_when: "endpoint = null"
+				type: string: {
+					examples: ["AKIAIOSFODNN7EXAMPLE"]
+				}
+			}
+
+			AWS_CREDENTIAL_EXPIRATION: {
+				description:   "Expiration time in RFC 3339 format (e.g. 1996-12-19T16:39:57-08:00). If unset, credentials won't expire."
+				relevant_when: "endpoint = null"
+				type: string: {
+					examples: ["/path/to/credentials.json"]
+				}
+			}
+
+			AWS_SECRET_ACCESS_KEY: {
+				description:   "Used for AWS authentication when communicating with AWS services."
+				relevant_when: "endpoint = null"
+				type: string: {
+					examples: ["/path/to/credentials.json"]
+				}
+			}
+
+			AWS_SESSION_TOKEN: {
+				description:   "Used for AWS authentication when communicating with AWS services."
+				relevant_when: "endpoint = null"
+				type: string: {
+					examples: ["/path/to/credentials.json"]
 				}
 			}
 		}

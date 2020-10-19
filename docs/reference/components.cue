@@ -121,16 +121,16 @@ components: {
 				}
 			}
 
-			_tls: {
+			_tls_accept: {
 				_args: {
-					can_enable:          bool
-					can_verify_hostname: bool | *false
-					enabled_default:     bool
+					can_enable:             bool
+					can_verify_certificate: bool | *true
+					enabled_default:        bool
 				}
 				let Args = _args
 
 				common:      false
-				description: "Configures the TLS options for connections from this source."
+				description: "Configures the TLS options for incoming connections."
 				required:    false
 				type: object: options: {
 					if Args.can_enable {
@@ -179,17 +179,89 @@ components: {
 						}
 					}
 
-					verify_certificate: {
+					if Args.can_verify_certificate {
+						verify_certificate: {
+							common:      false
+							description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
+							required:    false
+							type: bool: default: false
+						}
+					}
+				}
+			}
+
+			_tls_connect: {
+				_args: {
+					can_enable:             bool
+					can_verify_certificate: bool | *true
+					can_verify_hostname:    bool | *false
+					enabled_default:        bool
+				}
+				let Args = _args
+
+				common:      false
+				description: "Configures the TLS options for incoming connections."
+				required:    false
+				type: object: options: {
+					if Args.can_enable {
+						enabled: {
+							common:      true
+							description: "Enable TLS during connections to the remote."
+							required:    false
+							type: bool: default: Args.enabled_default
+						}
+					}
+
+					ca_file: {
 						common:      false
-						description: "If `true`, Vector will require a TLS certificate from the connecting host and terminate the connection if the certificate is not valid. If `false` (the default), Vector will not request a certificate from the client."
+						description: "Absolute path to an additional CA certificate file, in DER or PEM format (X.509), or an inline CA certificate in PEM format."
 						required:    false
-						type: bool: default: false
+						type: string: {
+							default: null
+							examples: ["/path/to/certificate_authority.crt"]
+						}
+					}
+					crt_file: {
+						common:      true
+						description: "Absolute path to a certificate file used to identify this connection, in DER or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If this is set and is not a PKCS#12 archive, `key_file` must also be set."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["/path/to/host_certificate.crt"]
+						}
+					}
+					key_file: {
+						common:      true
+						description: "Absolute path to a private key file used to identify this connection, in DER or PEM format (PKCS#8), or an inline private key in PEM format. If this is set, `crt_file` must also be set."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["/path/to/host_certificate.key"]
+						}
+					}
+					key_pass: {
+						common:      false
+						description: "Pass phrase used to unlock the encrypted key file. This has no effect unless `key_file` is set."
+						required:    false
+						type: string: {
+							default: null
+							examples: ["${KEY_PASS_ENV_VAR}", "PassWord1"]
+						}
+					}
+
+					if Args.can_verify_certificate {
+						verify_certificate: {
+							common:      false
+							description: "If `true` (the default), Vector will validate the TLS certificate of the remote host."
+							required:    false
+							type: bool: default: true
+						}
 					}
 
 					if Args.can_verify_hostname {
 						verify_hostname: {
 							common:      false
-							description: "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote host name."
+							description: "If `true` (the default), Vector will validate the configured remote host name against the remote host's TLS certificate. Do NOT set this to `false` unless you understand the risks of not verifying the remote hostname."
 							required:    false
 							type: bool: default: true
 						}
@@ -203,7 +275,16 @@ components: {
 				required:    false
 				warnings: []
 				type: object: {
-					examples: [{"status": "int"}, {"duration": "float"}, {"success": "bool"}, {"timestamp": "timestamp|%F"}, {"timestamp": "timestamp|%a %b %e %T %Y"}, {"parent": {"child": "int"}}]
+					examples: [
+						{
+							status:            "int"
+							duration:          "float"
+							success:           "bool"
+							timestamp_iso8601: "timestamp|%F"
+							timestamp_custom:  "timestamp|%a %b %e %T %Y"
+							parent: {"child": "int"}
+						},
+					]
 					options: {}
 				}
 			}
@@ -226,6 +307,66 @@ components: {
 			}
 		}
 
+		features: {
+			descriptions: {
+				if features.buffer != _|_ {
+					if features.buffer.enabled == true {
+						buffer: "Buffers data in-memory or on-disk for performance and durability."
+					}
+				}
+
+				if features.collect != _|_ {
+					if features.collect.from != _|_ {
+						collect_context: "Enriches data with useful \(features.collect.from.name) context."
+					}
+
+					if features.collect.checkpoint.enabled != _|_ {
+						checkpoint: "Efficiently collects data and checkpoints read positions to ensure data is not lost between restarts."
+					}
+
+					if features.collect.tls.enabled != _|_ {
+						tls_collect: "Securely collects data via Transport Layer Security (TLS)."
+					}
+				}
+
+				if features.multiline != _|_ {
+					if features.multiline.enabled == true {
+						multiline: "Merges multi-line logs into one event."
+					}
+				}
+
+				if features.receive != _|_ {
+					if features.receive.from != _|_ {
+						receive_context: "Enriches data with useful \(features.receive.from.name) context."
+					}
+
+					if features.receive.tls.enabled != _|_ {
+						tls_receive: "Securely receives data via Transport Layer Security (TLS)."
+					}
+				}
+
+				if features.send != _|_ {
+					if features.send.batch != _|_ {
+						if features.send.batch.enabled {
+							batch: "Batches data to maximize throughput."
+						}
+					}
+
+					if features.send.compression.enabled != _|_ {
+						compress: "Compresses data to optimize bandwidth."
+					}
+
+					if features.send.request.enabled != _|_ {
+						request: "Automatically retries failed requests, with backoff."
+					}
+
+					if features.send.tls.enabled != _|_ {
+						tls_send: "Securely transmits data via Transport Layer Security (TLS)."
+					}
+				}
+			}
+		}
+
 		if Kind == "source" || Kind == "transform" {
 			output: {
 				_passthrough_counter: {
@@ -238,6 +379,18 @@ components: {
 						}
 					}
 					type: "counter"
+				}
+
+				_passthrough_distribution: {
+					description: data_model.schema.metric.type.object.options.distribution.description
+					tags: {
+						"*": {
+							description: "Any tags present on the metric."
+							examples: [_values.local_host]
+							required: false
+						}
+					}
+					type: "gauge"
 				}
 
 				_passthrough_gauge: {
@@ -287,21 +440,6 @@ components: {
 					}
 					type: "gauge"
 				}
-			}
-		}
-
-		how_it_works: {
-			if (Kind == "source") {
-				if components["\(Kind)s"][Name].features.receive != _|_ {
-					if components["\(Kind)s"][Name].features.receive.tls.enabled {
-						tls: {
-							title: "Transport Layer Security (TLS)"
-							body:  """
-                  Vector uses [Openssl](\(urls.openssl)) for TLS protocols. You can
-                  adjust TLS behavior via the `tls.*` options.
-                  """
-						}
-					}}
 			}
 		}
 	}}

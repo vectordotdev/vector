@@ -17,6 +17,10 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 
+#[cfg(feature = "api-client")]
+#[macro_use]
+extern crate prettytable;
+
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
@@ -58,6 +62,8 @@ pub mod stream;
 pub mod template;
 pub mod test_util;
 pub mod tls;
+#[cfg(feature = "api-client")]
+pub mod top;
 pub mod topology;
 pub mod trace;
 pub mod transforms;

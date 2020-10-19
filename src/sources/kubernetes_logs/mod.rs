@@ -70,6 +70,9 @@ pub struct Config {
 
     /// Specifies the field names for metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
+
+    /// A list of glob patterns to exclude from reading the files.
+    exclude_paths_glob_patterns: Vec<PathBuf>,
 }
 
 inventory::submit! {
@@ -134,6 +137,7 @@ struct Source {
     fields_spec: pod_metadata_annotator::FieldsSpec,
     field_selector: String,
     label_selector: String,
+    exclude_paths: Vec<glob::Pattern>,
 }
 
 impl Source {
@@ -151,6 +155,17 @@ impl Source {
 
         let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
 
+        let exclude_paths = config
+            .exclude_paths_glob_patterns
+            .iter()
+            .map(|pattern| {
+                let pattern = pattern
+                    .to_str()
+                    .ok_or_else(|| "glob pattern is not a valid UTF-8 string")?;
+                Ok(glob::Pattern::new(pattern)?)
+            })
+            .collect::<crate::Result<Vec<_>>>()?;
+
         Ok(Self {
             client,
             data_dir,
@@ -158,6 +173,7 @@ impl Source {
             fields_spec: config.annotation_fields.clone(),
             field_selector,
             label_selector,
+            exclude_paths,
         })
     }
 
@@ -173,6 +189,7 @@ impl Source {
             fields_spec,
             field_selector,
             label_selector,
+            exclude_paths,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -193,7 +210,7 @@ impl Source {
         );
         let reflector_process = reflector.run();
 
-        let paths_provider = K8sPathsProvider::new(state_reader.clone());
+        let paths_provider = K8sPathsProvider::new(state_reader.clone(), exclude_paths);
         let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
 
         // TODO: maybe some of the parameters have to be configurable.

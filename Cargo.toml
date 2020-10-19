@@ -13,7 +13,7 @@ default-run = "vector"
 [[bin]]
 name = "graphql-schema"
 path = "src/api/schema/gen.rs"
-required-features = ["api"]
+required-features = ["default-no-api-client"]
 
 [profile.bench]
 debug = true
@@ -55,7 +55,7 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "signal", "io-std", "macros", "rt-core", "rt-threaded", "uds", "sync", "process"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "signal", "sync"] }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-util = { version = "0.3.1", features = ["codec"] }
@@ -88,7 +88,7 @@ rusoto_signature = { version = "0.45.0", optional = true }
 tower = { version = "0.3.1", git = "https://github.com/tower-rs/tower", rev = "43168944220ed32dab83cb4f11f7b97abc5818d5", features = ["buffer", "limit", "retry", "timeout", "util"] }
 
 # Serde
-serde = { version = "1.0.116", features = ["derive"] }
+serde = { version = "1.0.117", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
 
 # Prost
@@ -103,16 +103,21 @@ smpl_jwt = { version = "0.5.0", optional = true }
 async-graphql = { version = "2.0.0", optional = true }
 async-graphql-warp = { version = "2.0.0", optional = true }
 
+# API client
+prettytable-rs = { version = "0.8.0", optional = true }
+human_format = { version = "1.0.3", optional = true }
+num-format = { version = "0.4.0", optional = true }
+
 # External libs
 derivative = "1.0"
 chrono = { version = "0.4.19", features = ["serde"] }
 rand = "0.5.5"
 regex = "1.3.9"
 bytes = { version = "0.5.6", features = ["serde"] }
-stream-cancel = "0.4.3"
+stream-cancel = "0.6.2"
 hyper = "0.13"
 hyper-openssl = "0.8"
-openssl = "0.10.26"
+openssl = "0.10.30"
 openssl-probe = "0.1.2"
 flate2 = "1.0.6"
 async-compression = { version = "0.3.5", features = ["tokio-02", "gzip"] }
@@ -144,7 +149,7 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
 url = "2.1.1"
-base64 = { version = "0.12.3", optional = true }
+base64 = { version = "0.13.0", optional = true }
 bollard = { version = "0.8.0", optional = true }
 listenfd = { version = "0.3.3", optional = true }
 inventory = "0.1"
@@ -219,13 +224,14 @@ reqwest = { version = "0.10.6", features = ["json"] }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-musl = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+default-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
+default-cmake = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "vector-api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-msvc = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
+default-no-api-client = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -260,6 +266,14 @@ kubernetes = ["k8s-openapi", "evmap"]
 api = [
   "async-graphql",
   "async-graphql-warp",
+]
+
+# API client
+api-client = [
+  "vector-api-client",
+  "prettytable-rs",
+  "human_format",
+  "num-format",
 ]
 
 # Sources
@@ -386,7 +400,7 @@ sinks = [
   "sinks-gcp",
   "sinks-honeycomb",
   "sinks-http",
-  "sinks-humio_logs",
+  "sinks-humio",
   "sinks-influxdb",
   "sinks-kafka",
   "sinks-logdna",
@@ -410,13 +424,13 @@ sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
-sinks-datadog = []
+sinks-datadog = ["bytesize"]
 sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
 sinks-honeycomb = ["bytesize"]
 sinks-http = ["bytesize"]
-sinks-humio_logs = ["sinks-splunk_hec"]
+sinks-humio = ["transforms-metric_to_log", "sinks-splunk_hec"]
 sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
@@ -471,7 +485,7 @@ es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
-humio-integration-tests = ["sinks-humio_logs"]
+humio-integration-tests = ["sinks-humio"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]

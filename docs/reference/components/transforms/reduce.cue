@@ -56,7 +56,7 @@ components: transforms: reduce: {
 				unit:    "milliseconds"
 			}
 		}
-		identifier_fields: {
+		group_by: {
 			common:      true
 			description: "An ordered list of fields by which to group events. Each group is combined independently, allowing you to keep independent events separate. When no fields are specified, all events will be combined in a single group. Events missing a specified field will be combined in their own group."
 			required:    false
@@ -100,12 +100,13 @@ components: transforms: reduce: {
 						warnings: []
 						type: string: {
 							enum: {
-								array:   "Each value is appended to an array."
-								concat:  "Concatenate each string value (delimited with a space)."
-								discard: "Discard all but the first value found."
-								sum:     "Sum all numeric values."
-								max:     "The maximum of all numeric values."
-								min:     "The minimum of all numeric values."
+								array:          "Each value is appended to an array."
+								concat:         "Concatenate each string value (delimited with a space)."
+								concat_newline: "Concatenate each string value (delimited with a newline)."
+								discard:        "Discard all but the first value found."
+								sum:            "Sum all numeric values."
+								max:            "The maximum of all numeric values."
+								min:            "The minimum of all numeric values."
 							}
 						}
 					}

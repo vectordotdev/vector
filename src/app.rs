@@ -13,6 +13,8 @@ use futures::{
 };
 use futures01::sync::mpsc;
 
+#[cfg(feature = "api-client")]
+use crate::top;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 
@@ -87,8 +89,6 @@ impl Application {
 
         metrics::init().expect("metrics initialization failed");
 
-        info!("Log level {:?} is enabled.", level);
-
         if let Some(threads) = root_opts.threads {
             if threads < 1 {
                 error!("The `threads` argument must be greater or equal to 1.");
@@ -118,12 +118,16 @@ impl Application {
                         SubCommand::List(l) => list::cmd(&l),
                         SubCommand::Test(t) => unit_test::cmd(&t).await,
                         SubCommand::Generate(g) => generate::cmd(&g),
+                        #[cfg(feature = "api-client")]
+                        SubCommand::Top(t) => top::cmd(&t).await,
                         #[cfg(windows)]
                         SubCommand::Service(s) => service::cmd(&s),
                     };
 
                     return Err(code);
                 };
+
+                info!("Log level {:?} is enabled.", level);
 
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
@@ -207,7 +211,7 @@ impl Application {
 
             let signals = signal::signals();
             tokio::pin!(signals);
-            let mut sources_finished = topology.sources_finished().compat();
+            let mut sources_finished = topology.sources_finished();
             let mut graceful_crash = graceful_crash.compat();
 
             let signal = loop {
@@ -240,7 +244,7 @@ impl Application {
                                     break SignalTo::Shutdown;
                                 }
                             }
-                            sources_finished = topology.sources_finished().compat();
+                            sources_finished = topology.sources_finished();
                         } else {
                             emit!(VectorConfigLoadFailed);
                         }

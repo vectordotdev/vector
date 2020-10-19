@@ -6,6 +6,16 @@ import (
 
 components: sinks: [Name=string]: {
 	if strings.HasPrefix(Name, "gcp_") {
+		env_vars: {
+			GOOGLE_APPLICATION_CREDENTIALS: {
+				description:   "The filename for a Google Cloud service account credentials JSON file used for authentication."
+				relevant_when: "endpoint = null"
+				type: string: {
+					examples: ["/path/to/credentials.json"]
+				}
+			}
+		}
+
 		how_it_works: {
 			gcp_authentication: {
 				title: "GCP Authentication"
