@@ -49,9 +49,25 @@ _values: {
 		// For example, "AWS" is a service provider for many services, and
 		// a user on AWS can use this to filter for AWS supported
 		// components.
-		service_providers: [...string]
+		service_providers: [...string] | *[]
 	}
 }
+
+#Commit: {
+	author:           string
+	breaking_change:  bool
+	date:             #Date
+	description:      string
+	deletions_count:  uint
+	files_count:      uint
+	insertions_count: uint
+	pr_number:        uint | null
+	scopes:           [string, ...] | []
+	sha:              #CommitSha
+	type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status"
+}
+
+#CommitSha: =~"^[a-z0-9]{40}$"
 
 // `#ComponentKind` represent the kind of component.
 #ComponentKind: "sink" | "source" | "transform"
@@ -68,10 +84,7 @@ _values: {
 	// It is used for SEO purposes and should be full of relevant keywords.
 	description?: =~"[.]$"
 
-	// `title` is the human friendly title for the component.
-	//
-	// For example, the `http` sink has a `HTTP` title.
-	title: string
+	env_vars: #EnvVars
 
 	// `type` is the component identifier. This is set automatically.
 	type: Type
@@ -136,6 +149,11 @@ _values: {
 
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
+
+	// `title` is the human friendly title for the component.
+	//
+	// For example, the `http` sink has a `HTTP` title.
+	title: string
 }
 
 // `#CompressionAlgorithm` specified data compression algorithm.
@@ -145,6 +163,8 @@ _values: {
 #CompressionAlgorithm: "none" | "gzip"
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
+
+#Date: =~"^\\d{4}-\\d{2}-\\d{2}"
 
 // `#DeliveryStatus` documents the delivery guarantee.
 //
@@ -177,7 +197,7 @@ _values: {
 //
 // * `batch` - one or more events at a time
 // * `stream` - one event at a time
-#EgressMethod: "aggregate" | "batch" | "stream"
+#EgressMethod: "batch" | "expose" | "stream"
 
 #EncodingCodec: "json" | "ndjson" | "text"
 
@@ -189,6 +209,12 @@ _values: {
 //                }
 #Enum: [Name=_]: string
 
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+	type: string: default: null
+}}
+
 #Event: {
 	close({log: #LogEvent}) |
 	close({metric: #MetricEvent})
@@ -199,6 +225,8 @@ _values: {
 // * `log` - log event
 // * `metric` - metric event
 #EventType: "log" | "metric"
+
+#Fields: [Name=string]: #Fields | _
 
 #Interface: {
 	close({binary: #InterfaceBinary}) |
@@ -249,25 +277,20 @@ _values: {
 	if Args.kind == "source" {
 		collect?:  #FeaturesCollect
 		receive?:  #FeaturesReceive
-		generate?: close({})
-
-		// `multiline` should be enabled for sources that offer the ability
-		// to merge multiple lines together.
-		multiline: close({
-			enabled: bool
-		})
+		generate?: #FeaturesGenerate
+		multiline: #FeaturesMultiline
 	}
 
 	if Args.kind == "transform" {
-		convert?:  close({})
+		convert?:  #FeaturesConvert
 		enrich?:   #FeaturesEnrich
-		filter?:   close({})
+		filter?:   #FeaturesFilter
 		parse?:    #FeaturesParse
 		program?:  #FeaturesProgram
-		reduce?:   close({})
-		route?:    close({})
-		sanitize?: close({})
-		shape?:    close({})
+		reduce?:   #FeaturesReduce
+		route?:    #FeaturesRoute
+		sanitize?: #FeaturesSanitize
+		shape?:    #FeaturesShape
 	}
 
 	if Args.kind == "sink" {
@@ -281,14 +304,20 @@ _values: {
 			enabled: bool
 		})
 
-		exposes?: close({})
+		exposes?: #FeaturesExpose
 		send?:    #FeaturesSend & {_args: Args}
 	}
 }
 
 #FeaturesCollect: {
-	// `checkpoint` describes how the component checkpoints its read
-	// position.
+	if checkpoint.enabled {
+		description: "Efficiently collects data and checkpoints your position to ensure data is not lost between restarts."
+	}
+
+	if !checkpoint.enabled {
+		description: "Efficiently collects data."
+	}
+
 	checkpoint: close({
 		enabled: bool
 	})
@@ -297,7 +326,13 @@ _values: {
 	tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
 }
 
+#FeaturesConvert: {
+	description: "Converts data into specific types for enhanced quality and processing."
+}
+
 #FeaturesEnrich: {
+	description: "Enriches data with useful context"
+
 	from: close({
 		name:     string
 		url:      string
@@ -305,7 +340,27 @@ _values: {
 	})
 }
 
+#FeaturesExpose: {
+	description: "Exposes data for pull-based collection from downstream clients."
+	for:         #Service
+}
+
+#FeaturesFilter: {
+	description: "Filters data for bandwidth reduction or routing."
+}
+
+#FeaturesGenerate: {
+	description: "Generates data for testing."
+}
+
+#FeaturesMultiline: {
+	description: "Merges multi-line logs into one event."
+	enabled:     bool
+}
+
 #FeaturesParse: {
+	description: "Structures data to improve its quality and simply processing."
+
 	format: close({
 		name:     string
 		url:      string | null
@@ -314,12 +369,30 @@ _values: {
 }
 
 #FeaturesProgram: {
-	runtime: #Runtime
+	description: "Efficiently collects data."
+	runtime:     #Runtime
 }
 
 #FeaturesReceive: {
-	from?: #Service
-	tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+	description: "Receives data from upstream clients."
+	from?:       #Service
+	tls:         #FeaturesTLS & {_args: {mode: "accept"}}
+}
+
+#FeaturesReduce: {
+	description: "Reduces multiple events into single events to reduce volume."
+}
+
+#FeaturesRoute: {
+	description: "Routes data for building directed acyclic graph pipelines."
+}
+
+#FeaturesSanitize: {
+	description: "Sanitizes data to remove unwanted values often for privacy and compliance."
+}
+
+#FeaturesShape: {
+	description: "Shapes and transforms data for enhanced quality and processing."
 }
 
 #FeaturesSend: {
@@ -328,6 +401,8 @@ _values: {
 		kind:          string
 	}
 	let Args = _args
+
+	description: "Efficiently sends data to downstream clients."
 
 	if Args.egress_method == "batch" {
 		// `batch` describes how the component batches data. This is only
@@ -396,6 +471,8 @@ _values: {
 	}
 	let Args = _args
 	enabled: bool
+
+	description: "Securely transmits data via Transport Layer Security (TLS)."
 
 	if enabled {
 		can_enable:             bool
@@ -528,6 +605,14 @@ _values: {
 }
 
 #Protocol: "http" | "tcp" | "udp" | "unix"
+
+#Releases: [Name=string]: {
+	codename: string
+	date:     string
+
+	commits: [#Commit, ...]
+	whats_next: #Any
+}
 
 #Runtime: {
 	name:    string
@@ -744,13 +829,15 @@ _values: {
 	//      }
 	enum?: #Enum
 
-	// `examples` demonstrates example values. This should be used when
-	// examples cannot be derived from the `default` or `enum` options.
-	examples: [...string] | *[
-			for k, v in enum {
-			k
-		},
-	]
+	if enum == _|_ {
+		// `examples` demonstrates example values. This should be used when
+		// examples cannot be derived from the `default` or `enum` options.
+		examples: [...string] | *[
+				for k, v in enum {
+				k
+			},
+		]
+	}
 
 	// `templateable` means that the option supports dynamic templated
 	// values.
@@ -803,7 +890,7 @@ data_model: close({
 	schema: #Schema
 })
 
-#Fields: [Name=string]: #Fields | _
+releases: #Releases
 
 remap: {
 	errors: [Name=string]: {

@@ -13,7 +13,7 @@ use crate::{
 };
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
-    future, FutureExt, StreamExt,
+    future, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::{sync::mpsc, Future, Stream};
 use std::collections::HashMap;
@@ -75,11 +75,13 @@ pub async fn build_pieces(
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
         // has failed to shut down gracefully within its allotted time window and instead should be
-        // forcibly shut down.  We accomplish this by select()-ing on the server Task with the
-        // force_shutdown_tripwire.  That means that if the force_shutdown_tripwire resolves while
+        // forcibly shut down. We accomplish this by select()-ing on the server Task with the
+        // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
         let server = server
-            .select(force_shutdown_tripwire)
+            .select(Box::new(
+                force_shutdown_tripwire.unit_error().boxed().compat(),
+            ))
             .map(|_| debug!("Finished"))
             .map_err(|_| ())
             .compat();

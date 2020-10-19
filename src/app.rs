@@ -211,7 +211,7 @@ impl Application {
 
             let signals = signal::signals();
             tokio::pin!(signals);
-            let mut sources_finished = topology.sources_finished().compat();
+            let mut sources_finished = topology.sources_finished();
             let mut graceful_crash = graceful_crash.compat();
 
             let signal = loop {
@@ -244,7 +244,7 @@ impl Application {
                                     break SignalTo::Shutdown;
                                 }
                             }
-                            sources_finished = topology.sources_finished().compat();
+                            sources_finished = topology.sources_finished();
                         } else {
                             emit!(VectorConfigLoadFailed);
                         }

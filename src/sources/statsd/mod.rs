@@ -8,10 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future, stream, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use parser::parse;
 use serde::{Deserialize, Serialize};
@@ -134,7 +131,7 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
     );
 
     let _ = UdpFramed::new(socket, BytesCodec::new())
-        .take_until(shutdown.compat())
+        .take_until(shutdown)
         .filter_map(|frame| {
             future::ready(match frame {
                 Ok((bytes, _sock)) => {

@@ -4,7 +4,7 @@ use crate::{
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource},
+    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };
@@ -26,6 +26,7 @@ pub struct SimpleHttpConfig {
     #[serde(default)]
     headers: Vec<String>,
     tls: Option<TlsConfig>,
+    auth: Option<HttpSourceAuthConfig>,
 }
 
 inventory::submit! {
@@ -79,7 +80,7 @@ impl SourceConfig for SimpleHttpConfig {
             encoding: self.encoding,
             headers: self.headers.clone(),
         };
-        source.run(self.address, "", &self.tls, out, shutdown)
+        source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
@@ -234,6 +235,7 @@ mod tests {
                 encoding,
                 headers,
                 tls: None,
+                auth: None,
             }
             .build(
                 "default",

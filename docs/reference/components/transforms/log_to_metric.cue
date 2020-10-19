@@ -59,10 +59,13 @@ components: transforms: log_to_metric: {
 					}
 					name: {
 						description: "The name of the metric. Defaults to `<field>_total` for `counter` and `<field>` for `gauge`."
-						required:    true
+						required:    false
+						common:      true
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
+							default:      string
+							templateable: true
 						}
 					}
 					tags: {
@@ -116,16 +119,16 @@ components: transforms: log_to_metric: {
 	}
 
 	output: metrics: {
-		counter:   output._passthrough_counter
-		gauge:     output._passthrough_gauge
-		histogram: output._passthrough_histogram
-		set:       output._passthrough_set
-		summary:   output._passthrough_summary
+		counter:      output._passthrough_counter
+		distribution: output._passthrough_distribution
+		gauge:        output._passthrough_gauge
+		set:          output._passthrough_set
 	}
 
 	examples: [
 		{
-			title: "Counters"
+			title: "Counter"
+			notes: "This example demonstrates counting HTTP status codes."
 			configuration: {
 				metrics: [
 					{
@@ -145,7 +148,7 @@ components: transforms: log_to_metric: {
 				status:  200
 			}
 			output: [{metric: {
-				name: "time_ms"
+				name: "response_total"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -156,25 +159,54 @@ components: transforms: log_to_metric: {
 			}}]
 		},
 		{
-			title: "Gauge"
+			title: "Sum"
+			notes: "In this example we'll demonstrate computing a sum by computing the total of orders placed."
+			configuration: {
+				metrics: [
+					{
+						type:               "counter"
+						field:              "total"
+						name:               "order_total"
+						increment_by_value: true
+						tags: {
+							host: "{{host}}"
+						}
+					},
+				]
+			}
+			input: log: {
+				host:    "10.22.11.222"
+				message: "Order placed for $122.20"
+				total:   122.2
+			}
+			output: [{metric: {
+				name: "order_total"
+				tags: {
+					host: "10.22.11.222"
+				}
+				counter: {
+					value: 122.2
+				}
+			}}]
+		},
+		{
+			title: "Gauges"
+			notes: "In this example we'll demonstrate creating a gauge that represents the current CPU load averages."
 			configuration: {
 				metrics: [
 					{
 						type:  "gauge"
 						field: "1m_load_avg"
-						name:  "1m_load_avg"
 						tags: host: "{{host}}"
 					},
 					{
 						type:  "gauge"
 						field: "5m_load_avg"
-						name:  "5m_load_avg"
 						tags: host: "{{host}}"
 					},
 					{
 						type:  "gauge"
 						field: "15m_load_avg"
-						name:  "15m_load_avg"
 						tags: host: "{{host}}"
 					},
 				]
@@ -217,7 +249,8 @@ components: transforms: log_to_metric: {
 			]
 		},
 		{
-			title: "Histograms"
+			title: "Histogram"
+			notes: "This example demonstrates capturing timings in your logs."
 			configuration: {
 				metrics: [
 					{
@@ -251,11 +284,12 @@ components: transforms: log_to_metric: {
 			}}]
 		},
 		{
-			title: "Sets"
+			title: "Summary"
+			notes: "This example demonstrates capturing timings in your logs to compute summary."
 			configuration: {
 				metrics: [
 					{
-						type:  "histogram"
+						type:  "summary"
 						field: "time"
 						name:  "time_ms"
 						tags: {
@@ -266,15 +300,52 @@ components: transforms: log_to_metric: {
 				]
 			}
 			input: log: {
-				host:        "10.22.11.222"
-				message:     "Sent 200 in 54.2ms"
-				remote_addr: "233.221.232.22"
+				host:    "10.22.11.222"
+				message: "Sent 200 in 54.2ms"
+				status:  200
+				time:    54.2
 			}
 			output: [{metric: {
 				name: "time_ms"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
+				}
+				distribution: {
+					values: [54.2]
+					sample_rates: [1.0]
+					statistic: "summary"
+				}
+			}}]
+		},
+		{
+			title: "Set"
+			notes: """
+				In this example we'll demonstrate how to use sets. Sets are primarly a Statsd concept
+				that represent the number of unique values seens for a given metric.
+				The idea is that you pass the unique/high-cardinality value as the metric value
+				and the metric store will count the number of unique values seen.
+				"""
+			configuration: {
+				metrics: [
+					{
+						type:  "set"
+						field: "remote_addr"
+						tags: {
+							host: "{{host}}"
+						}
+					},
+				]
+			}
+			input: log: {
+				host:        "10.22.11.222"
+				message:     "Sent 200 in 54.2ms"
+				remote_addr: "233.221.232.22"
+			}
+			output: [{metric: {
+				name: "remote_addr"
+				tags: {
+					host: "10.22.11.222"
 				}
 				set: {
 					values: ["233.221.232.22"]

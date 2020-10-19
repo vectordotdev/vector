@@ -4,7 +4,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -39,7 +39,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             let _ = warp::serve(svc)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().compat().map(|_| ()),
+                    shutdown.clone().map(|_| ()),
                 )
                 .await;
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
@@ -74,6 +74,7 @@ mod tests {
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
+    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::{
