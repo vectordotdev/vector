@@ -387,7 +387,11 @@ type = "json_parser"
 [sinks.sink0]
 healthcheck = true
 inputs = ["transform0"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -414,7 +418,11 @@ type = "json_parser"
 [sinks.sink0]
 healthcheck = true
 inputs = ["transform0"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -435,7 +443,11 @@ type = "stdin"
 [sinks.sink0]
 healthcheck = true
 inputs = ["source0"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -452,7 +464,11 @@ when_full = "block"
 [sinks.sink0]
 healthcheck = true
 inputs = ["TODO"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -470,6 +486,9 @@ when_full = "block"
 inputs = []
 type = "add_fields"
 
+[transforms.transform0.fields]
+name = "TODO"
+
 [transforms.transform1]
 inputs = ["transform0"]
 drop_field = true
@@ -478,6 +497,7 @@ type = "json_parser"
 
 [transforms.transform2]
 inputs = ["transform1"]
+fields = []
 type = "remove_fields"
 "#
             .to_string())
@@ -490,6 +510,9 @@ type = "remove_fields"
 inputs = []
 type = "add_fields"
 
+[transforms.transform0.fields]
+name = "TODO"
+
 [transforms.transform1]
 inputs = ["transform0"]
 drop_field = true
@@ -498,6 +521,7 @@ type = "json_parser"
 
 [transforms.transform2]
 inputs = ["transform1"]
+fields = []
 type = "remove_fields"
 "#
             .to_string())
