@@ -1,24 +1,49 @@
 use crate::{
+    buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    internal_events::NatsEventSent,
+    internal_events::{NatsEventProcessed, NatsEventSendFail, NatsEventSendSuccess},
+    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     sinks::util::StreamSink,
+    template::{Template, TemplateError},
 };
 use async_trait::async_trait;
-use futures::{future, stream::BoxStream, FutureExt, StreamExt};
+use futures::{stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
+use std::convert::TryFrom;
+
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("invalid subject template: {}", source))]
+    SubjectTemplate { source: TemplateError },
+}
 
 /**
  * Code dealing with the SinkConfig struct.
- *
- * DEV: Start with the bare minimum for now.
  */
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct NatsSinkConfig {
-    url: String,
+    encoding: EncodingConfigWithDefault<Encoding>,
+    #[serde(default = "default_name")]
+    name: String,
     subject: String,
+    url: String,
+}
+
+fn default_name() -> String {
+    String::from("vector")
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[derivative(Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    #[derivative(Default)]
+    Text,
+    Json,
 }
 
 inventory::submit! {
@@ -32,11 +57,10 @@ impl GenerateConfig for NatsSinkConfig {}
 impl SinkConfig for NatsSinkConfig {
     async fn build(
         &self,
-        _cx: SinkContext,
+        cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = NatsSink::new(self.clone());
-        let healthcheck = future::ok(()).boxed();
-
+        let sink = NatsSink::new(self.clone(), cx.acker())?;
+        let healthcheck = healthcheck(self.clone()).boxed();
         Ok((super::VectorSink::Stream(Box::new(sink)), healthcheck))
     }
 
@@ -49,52 +73,135 @@ impl SinkConfig for NatsSinkConfig {
     }
 }
 
+impl NatsSinkConfig {
+    fn to_nats_options(&self) -> crate::Result<nats::Options> {
+        // Set reconnect_buffer_size on the nats client to 0 bytes so that the
+        // client doesn't buffer internally (to avoid message loss).
+
+        let options = nats::Options::new()
+            .with_name(&self.name)
+            .reconnect_buffer_size(0);
+
+        Ok(options)
+    }
+
+    async fn connect(&self) -> crate::Result<nats::asynk::Connection> {
+        self.to_nats_options()?
+            .connect_async(&self.url)
+            .map_err(|e| e.into())
+            .await
+    }
+}
+
+async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
+    config.connect().map_ok(|_| ()).await
+}
+
 /**
  * Code dealing with the Sink struct.
  */
 
-#[derive(Clone)]
 pub struct NatsSink {
-    nc: nats::Connection,
-    subject: String,
+    encoding: EncodingConfig<Encoding>,
+    options: nats::Options,
+    subject: Template,
+    url: String,
+
+    acker: Acker,
 }
 
 impl NatsSink {
-    fn new(config: NatsSinkConfig) -> Self {
-        let options = nats::Options::new();
-        let nc = options.connect(&config.url).unwrap();
+    fn new(config: NatsSinkConfig, acker: Acker) -> crate::Result<Self> {
+        Ok(NatsSink {
+            acker,
+            options: config.to_nats_options()?,
+            subject: Template::try_from(config.subject).context(SubjectTemplate)?,
+            url: config.url,
 
-        Self {
-            nc,
-            subject: config.subject,
-        }
+            // DEV: the following causes a move; needs to be last.
+            encoding: config.encoding.into(),
+        })
     }
 }
 
 #[async_trait]
 impl StreamSink for NatsSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        // E0507: nats::Options does not implement Clone or Copy.
+        let nc = std::mem::replace(&mut self.options, nats::Options::new())
+            .connect_async(&self.url)
+            .await
+            .map_err(|_| ())?;
+
         while let Some(event) = input.next().await {
-            match event {
-                Event::Log(log) => {
-                    let body = log
-                        .get(crate::config::log_schema().message_key())
-                        .map(|v| v.to_string_lossy())
-                        .unwrap_or_else(|| "".into());
+            let subject = self.subject.render_string(&event).map_err(|missing_keys| {
+                error!(message = "Missing keys for subject", ?missing_keys);
+            })?;
 
-                    let message_len = body.len();
+            if let Some(buf) = encode_event(event, &self.encoding) {
+                let message_len = buf.len();
 
-                    if self.nc.publish(&self.subject, body).is_ok() {
-                        emit!(NatsEventSent {
+                match nc.publish(&subject, buf).await {
+                    Ok(_) => {
+                        emit!(NatsEventSendSuccess {
                             byte_size: message_len,
                         });
+                        self.acker.ack(1);
+                    }
+                    Err(error) => {
+                        emit!(NatsEventSendFail { error });
                     }
                 }
-                Event::Metric(_metric) => {}
             }
+
+            emit!(NatsEventProcessed {});
         }
 
         Ok(())
+    }
+}
+
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<String> {
+    encoding.apply_rules(&mut event);
+
+    match encoding.codec() {
+        Encoding::Json => serde_json::to_string(event.as_log())
+            .map_err(|error| {
+                error!("Error encoding json: {}.", error);
+            })
+            .ok(),
+        Encoding::Text => event
+            .as_log()
+            .get(crate::config::log_schema().message_key())
+            .map(|v| v.to_string_lossy()),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{encode_event, Encoding, EncodingConfig};
+    use crate::event::{Event, Value};
+
+    #[test]
+    fn encodes_raw_logs() {
+        let event = Event::from("foo");
+        assert_eq!(
+            "foo",
+            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+        );
+    }
+
+    #[test]
+    fn encodes_log_events() {
+        let mut event = Event::new_empty_log();
+        let log = event.as_mut_log();
+        log.insert("x", Value::from("23"));
+        log.insert("z", Value::from(25));
+        log.insert("a", Value::from("0"));
+
+        let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
+        let expected = r#"{"a":"0","x":"23","z":25}"#;
+        assert_eq!(encoded.unwrap(), expected);
     }
 }
 
@@ -103,50 +210,63 @@ impl StreamSink for NatsSink {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string, trace_init};
-    use std::{
-        sync::{Arc, Mutex},
-        time::Duration,
-    };
+    use futures::stream::StreamExt;
+    use std::{thread, time::Duration};
 
     #[tokio::test]
     async fn nats_happy() {
         // Publish `N` messages to NATS.
         //
-        // Observe with a second subscriber that at least some of the messages
-        // were received.
-        //
-        // NATS operates with at_most_once delivery semantics
-        // - https://docs.nats.io/faq#does-nats-guarantee-message-delivery
-        //
-        // All messages should be accountable in the local integration test
-        // case, but, to prevent flakiness initially, validate the basic
-        // acceptable outcome.
+        // Verify with a separate subscriber that the messages were
+        // successfully published.
 
         trace_init();
 
         let subject = format!("test-{}", random_string(10));
 
         let cnf = NatsSinkConfig {
-            url: "nats://127.0.0.1:4222".to_owned(),
+            encoding: EncodingConfigWithDefault::from(Encoding::Text),
             subject: subject.clone(),
+            url: "nats://127.0.0.1:4222".to_owned(),
+            ..Default::default()
         };
 
         // Establish the consumer subscription.
-        let consumer = NatsSink::new(cnf.clone());
-        let num_recv_events: Arc<Mutex<u32>> = Arc::new(Mutex::new(0));
-        let sub = consumer.nc.subscribe(&subject).unwrap();
+        let consumer = cnf.clone().connect().await.unwrap();
+        let mut sub = consumer.subscribe(&subject).await.unwrap();
 
         // Publish events.
-        let mut sink = NatsSink::new(cnf.clone());
+        let (acker, ack_counter) = Acker::new_for_testing();
+        let mut sink = NatsSink::new(cnf.clone(), acker).unwrap();
         let num_events = 1_000;
-        let (_input_lines, events) = random_lines_with_stream(100, num_events);
+        let (input, events) = random_lines_with_stream(100, num_events);
 
         let _ = sink.run(Box::pin(events)).await.unwrap();
 
+        // Unsubscribe from the channel.
+        thread::sleep(Duration::from_secs(3));
+        let _ = sub.drain().await.unwrap();
+
         // Observe that there are delivered events.
-        for _msg in sub.timeout_iter(Duration::from_secs(3)) {
-            *num_recv_events.lock().unwrap() += 1;
+        let mut failures: u32 = 0;
+        let mut output = Vec::new();
+
+        while failures < 100 {
+            if let Some(msg) = sub.next().await {
+                let value = std::str::from_utf8(&msg.data).unwrap();
+                output.push(value.to_owned());
+            } else {
+                failures += 1;
+                thread::sleep(Duration::from_millis(50));
+            }
         }
-        assert!(*num_recv_events.lock().unwrap() > 0);
+
+        assert_eq!(output.len(), input.len());
+        assert_eq!(output, input);
+
+        assert_eq!(
+            ack_counter.load(std::sync::atomic::Ordering::Relaxed),
+            num_events
+        );
     }
 }
