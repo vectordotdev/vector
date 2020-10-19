@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: mongodb_metrics: {
-	title:             "MongoDB Metrics"
-	long_description:  "[MongoDB][urls.mongodb] is a general purpose, document-based, distributed database built for modern application developers and for the cloud era."
-	short_description: "Collect metrics from a MongoDB server."
+	title:       "MongoDB Metrics"
+	description: "[MongoDB][urls.mongodb] is a general purpose, document-based, distributed database built for modern application developers and for the cloud era."
 
 	classes: {
 		commonly_used: false
@@ -11,13 +10,31 @@ components: sources: mongodb_metrics: {
 		deployment_roles: ["daemon", "sidecar"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "MongoDB Server"
+				thing:    "a \(name)"
+				url:      urls.mongodb
+				versions: null
+
+				interface: {
+					socket: {
+						api: {
+							title: "MongoDB serverStatus command"
+							url:   urls.mongodb_command_server_status
+						}
+						direction: "outgoing"
+						protocols: ["tcp"]
+						ssl: "optional"
+					}
+				}
+			}
+		}
+		multiline: enabled: false
 	}
 
 	support: {
