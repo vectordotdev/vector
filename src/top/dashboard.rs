@@ -60,7 +60,11 @@ impl<'a> Widgets<'a> {
     }
 
     fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let items = self.config.topology_state.rows().iter().map(|r| {
+        let items = self.config.topology_state.rows().map(|r| {
+            let r = r
+                .lock()
+                .expect("Unable to get lock on topology data. Please report");
+
             Row::StyledData(
                 vec![
                     r.name.clone(),

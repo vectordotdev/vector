@@ -1,4 +1,8 @@
 use num_format::{Locale, ToFormattedString};
+use std::{
+    collections::{btree_map, BTreeMap},
+    sync::{Arc, Mutex},
+};
 use tui::widgets::TableState;
 
 pub static TOPOLOGY_HEADERS: [&'static str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
@@ -32,22 +36,29 @@ impl TopologyRow {
             _ => self.errors.to_string(),
         }
     }
+
+    pub fn update_events_processed(&mut self, errors: i64) {
+        self.errors = errors;
+    }
 }
 
 pub struct TopologyState {
     state: TableState,
-    rows: Vec<TopologyRow>,
+    rows: BTreeMap<String, Arc<Mutex<TopologyRow>>>,
 }
 
 impl TopologyState {
     pub fn new(rows: Vec<TopologyRow>) -> Self {
         Self {
             state: TableState::default(),
-            rows,
+            rows: rows
+                .into_iter()
+                .map(|r| (r.name.clone(), Arc::new(Mutex::new(r))))
+                .collect(),
         }
     }
 
-    pub fn rows(&self) -> &Vec<TopologyRow> {
-        &self.rows
+    pub fn rows(&self) -> btree_map::Values<String, Arc<Mutex<TopologyRow>>> {
+        self.rows.values()
     }
 }
