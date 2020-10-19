@@ -66,7 +66,17 @@ inventory::submit! {
     SinkDescription::new::<PulsarSinkConfig>("pulsar")
 }
 
-impl GenerateConfig for PulsarSinkConfig {}
+impl GenerateConfig for PulsarSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoint: "pulsar://127.0.0.1:6650".to_string(),
+            topic: "topic-1234".to_string(),
+            encoding: Encoding::Text.into(),
+            auth: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
@@ -205,6 +215,11 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PulsarSinkConfig>();
+    }
 
     #[test]
     fn pulsar_event_json() {
