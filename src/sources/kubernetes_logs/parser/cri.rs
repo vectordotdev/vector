@@ -90,9 +90,9 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
-    use super::*;
     use super::super::test_util;
     use super::Cri;
+    use super::*;
     use crate::event::LogEvent;
 
     fn make_long_string(base: &str, len: usize) -> String {

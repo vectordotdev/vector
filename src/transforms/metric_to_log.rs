@@ -109,7 +109,9 @@ mod tests {
         let event = Event::Metric(metric);
         let mut transformer = MetricToLog::new(Some("host".into()));
 
-        transformer.transform_one(event).map(|event| event.into_log())
+        transformer
+            .transform_one(event)
+            .map(|event| event.into_log())
     }
 
     fn ts() -> DateTime<Utc> {

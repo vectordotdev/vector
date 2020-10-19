@@ -7,8 +7,8 @@ use crate::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
         AddFieldsTemplateRenderingError,
     },
-    transforms::{Transform, FunctionTransform},
     template::Template,
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};

@@ -44,9 +44,9 @@ impl FunctionTransform for Picker {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::{cri, docker, test_util};
-    use crate::{event::LogEvent, Event, transforms::Transform};
+    use super::*;
+    use crate::{event::LogEvent, transforms::Transform, Event};
 
     /// Picker has to work for all test cases for underlying parsers.
     fn cases() -> Vec<(String, LogEvent)> {
