@@ -278,12 +278,7 @@ _values: {
 		collect?:  #FeaturesCollect
 		receive?:  #FeaturesReceive
 		generate?: #FeaturesGenerate
-
-		// `multiline` should be enabled for sources that offer the ability
-		// to merge multiple lines together.
-		multiline: close({
-			enabled: bool
-		})
+		multiline: #FeaturesMultiline
 	}
 
 	if Args.kind == "transform" {
@@ -315,7 +310,13 @@ _values: {
 }
 
 #FeaturesCollect: {
-	description: "Efficiently collects data."
+	if checkpoint.enabled {
+		description: "Efficiently collects data and checkpoints your position to ensure data is not lost between restarts."
+	}
+
+	if !checkpoint.enabled {
+		description: "Efficiently collects data."
+	}
 
 	checkpoint: close({
 		enabled: bool
@@ -350,6 +351,11 @@ _values: {
 
 #FeaturesGenerate: {
 	description: "Generates data for testing."
+}
+
+#FeaturesMultiline: {
+	description: "Merges multi-line logs into one event."
+	enabled:     bool
 }
 
 #FeaturesParse: {
