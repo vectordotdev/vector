@@ -17,7 +17,11 @@ components: sinks: nats: {
 	features: {
 		buffer: enabled:      false
 		compression: enabled: false
-		encoding: codec: enabled: false
+		encoding: codec: {
+			enabled: true
+			default: null
+			enum: ["json", "text"]
+		}
 		healthcheck: enabled: true
 		request: enabled:     false
 		tls: enabled:         false
@@ -54,6 +58,15 @@ components: sinks: nats: {
 			warnings: []
 			type: string: {
 				examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
+			}
+		}
+		name: {
+			common:      false
+			description: "A name assigned to the NATS connection."
+			required:    false
+			type: string: {
+				default: "vector"
+				examples: ["foo", "API Name Option Example"]
 			}
 		}
 	}
