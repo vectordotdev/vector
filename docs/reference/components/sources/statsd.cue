@@ -77,7 +77,7 @@ components: sources: statsd: {
 			}
 		}
 		path: {
-			description: "The unix socket path. *This should be absolute path*."
+			description: "The unix socket path. *This should be an absolute path*."
 			groups: ["unix"]
 			required: true
 			warnings: []
