@@ -76,6 +76,7 @@ pub struct GcsSinkConfig {
     tls: Option<TlsOptions>,
 }
 
+#[cfg(test)]
 fn default_config(e: Encoding) -> GcsSinkConfig {
     GcsSinkConfig {
         bucket: Default::default(),
