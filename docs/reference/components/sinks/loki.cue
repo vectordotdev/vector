@@ -118,8 +118,25 @@ components: sinks: loki: {
 			required:    true
 			warnings: []
 			type: object: {
-				examples: [{"forwarder": "vector"}, {"event": "{{ event_field }}"}, {"key": "value"}]
-				options: {}
+				examples: [
+					{
+						"forwarder": "vector"
+						"event":     "{{ event_field }}"
+						"key":       "value"
+					},
+				]
+				options: {
+					"*": {
+						common:      false
+						description: "Any Loki label"
+						required:    false
+						type: string: {
+							default: null
+							examples: ["vector", "{{ event_field }}"]
+							templateable: true
+						}
+					}
+				}
 			}
 		}
 		remove_label_fields: {

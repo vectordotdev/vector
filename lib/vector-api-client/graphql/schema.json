@@ -914,6 +914,18 @@
                   }
                 }
               }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating events processed for the current sink",
+              "isDeprecated": false,
+              "name": "eventsProcessed",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
+              }
             }
           ],
           "inputFields": null,
@@ -1010,6 +1022,18 @@
                     }
                   }
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating events processed for the current source",
+              "isDeprecated": false,
+              "name": "eventsProcessed",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
               }
             }
           ],
@@ -1248,6 +1272,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "eventsProcessed",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
               }
             }
           ],
@@ -1569,6 +1605,18 @@
                     }
                   }
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating events processed for the current transform",
+              "isDeprecated": false,
+              "name": "eventsProcessed",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessed",
+                "ofType": null
               }
             }
           ],

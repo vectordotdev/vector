@@ -60,11 +60,25 @@ components: sources: [Name=string]: {
 			}
 		}
 
+		if sources[Name].features.collect != _|_ {
+			if sources[Name].features.collect.tls != _|_ {
+				if sources[Name].features.collect.tls.enabled {
+					tls: configuration._tls_connect & {_args: {
+						can_enable:             sources[Name].features.collect.tls.can_enable
+						can_verify_certificate: sources[Name].features.collect.tls.can_enable
+						can_verify_hostname:    sources[Name].features.collect.tls.can_verify_hostname
+						enabled_default:        sources[Name].features.collect.tls.enabled_default
+					}}
+				}
+			}
+		}
+
 		if sources[Name].features.receive != _|_ {
 			if sources[Name].features.receive.tls.enabled {
-				tls: configuration._tls & {_args: {
-					can_enable:      sources[Name].features.receive.tls.can_enable
-					enabled_default: sources[Name].features.receive.tls.enabled_default
+				tls: configuration._tls_accept & {_args: {
+					can_enable:             sources[Name].features.receive.tls.can_enable
+					can_verify_certificate: sources[Name].features.receive.tls.can_enable
+					enabled_default:        sources[Name].features.receive.tls.enabled_default
 				}}
 			}
 		}
@@ -74,7 +88,7 @@ components: sources: [Name=string]: {
 		logs?: [Name=string]: {
 			fields: {
 				_current_timestamp: {
-					description: "The exact time the event was ingested into Vector."
+					description: string | *"The exact time the event was ingested into Vector."
 					required:    true
 					type: timestamp: {}
 				}
@@ -95,6 +109,14 @@ components: sources: [Name=string]: {
 	}
 
 	how_it_works: {
+		_tls: {
+			title: "Transport Layer Security (TLS)"
+			body:  """
+				  Vector uses [Openssl](\(urls.openssl)) for TLS protocols. You can
+				  adjust TLS behavior via the `tls.*` options.
+				  """
+		}
+
 		if sources[Name].features.collect != _|_ {
 			if sources[Name].features.collect.checkpoint.enabled {
 				checkpointing: {
@@ -117,6 +139,20 @@ components: sources: [Name=string]: {
 				By default, the `\( Name )` source will augment events with helpful
 				context keys as shown in the "Output" section.
 				"""
+		}
+
+		if sources[Name].features.collect != _|_ {
+			if sources[Name].features.collect.tls != _|_ {
+				if sources[Name].features.collect.tls.enabled {
+					tls: _tls
+				}
+			}
+		}
+
+		if sources[Name].features.receive != _|_ {
+			if sources[Name].features.receive.tls.enabled {
+				tls: _tls
+			}
 		}
 	}
 }

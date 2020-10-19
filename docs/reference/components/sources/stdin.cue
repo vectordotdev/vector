@@ -44,6 +44,7 @@ components: sources: stdin: {
 
 	configuration: {
 		host_key: {
+			category:    "Context"
 			common:      false
 			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
 			required:    false
@@ -88,5 +89,15 @@ components: sources: stdin: {
 				message:   _line
 				host:      _values.local_host
 			}
-		}]
+		},
+	]
+
+	how_it_works: {
+		line_delimiters: {
+			title: "Line Delimiters"
+			body: """
+				Each line is read until a new line delimiter, the `0xA` byte, is found.
+				"""
+		}
+	}
 }

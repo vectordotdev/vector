@@ -280,7 +280,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(Compat01As03Sink::new(tx), shutdown.compat());
+            let result = file_server.run(Compat01As03Sink::new(tx), shutdown);
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -724,7 +724,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -761,7 +761,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -798,7 +798,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -1475,5 +1475,57 @@ mod tests {
                 "hooray".into(),
             ]
         );
+    }
+
+    // TODO: Renable test for Mac after https://github.com/timberio/vector/issues/4196 has been resolved
+    // TODO: and check if the original issue has been resolved https://github.com/timberio/vector/issues/3780.
+    #[cfg(not(target_os = "macos"))]
+    #[tokio::test]
+    async fn remove_file() {
+        let n = 5;
+        let remove_after = 1;
+
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            remove_after: Some(remove_after),
+            glob_minimum_cooldown: 100,
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source.compat());
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+        for i in 0..n {
+            writeln!(&mut file, "{}", i).unwrap();
+        }
+        std::mem::drop(file);
+
+        for _ in 0..10 {
+            // Wait for remove grace period to end.
+            delay_for(Duration::from_secs(remove_after + 1)).await;
+
+            if File::open(&path).is_err() {
+                break;
+            }
+        }
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(rx.collect().compat()).await;
+        assert_eq!(received.len(), n);
+
+        match File::open(&path) {
+            Ok(_) => panic!("File wasn't removed"),
+            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
+        }
     }
 }
