@@ -8,19 +8,17 @@ use crate::{
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
-use futures01::Sink;
-use parser::parse;
+use futures::{compat::Sink01CompatExt, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio_util::{codec::BytesCodec, udp::UdpFramed};
 
 pub mod parser;
-
 #[cfg(unix)]
 mod unix;
 
+use parser::parse;
 #[cfg(unix)]
 use unix::{statsd_unix, UnixConfig};
 
@@ -118,8 +116,6 @@ pub(self) fn parse_event(line: &str) -> Option<Event> {
 }
 
 async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
-    let out = out.sink_map_err(|e| error!("Error sending metric: {:?}", e));
-
     let socket = UdpSocket::bind(&config.address)
         .map_err(|error| emit!(StatsdSocketError::bind(error)))
         .await?;
@@ -130,27 +126,27 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
         r#type = "udp"
     );
 
-    let _ = UdpFramed::new(socket, BytesCodec::new())
-        .take_until(shutdown)
-        .filter_map(|frame| {
-            future::ready(match frame {
-                Ok((bytes, _sock)) => {
-                    let packet = String::from_utf8_lossy(bytes.as_ref());
-                    let metrics = packet
-                        .lines()
-                        .filter_map(|line| parse_event(line).map(Ok))
-                        .collect::<Vec<_>>();
-                    Some(stream::iter(metrics))
+    let mut stream = UdpFramed::new(socket, BytesCodec::new()).take_until(shutdown);
+    let mut out = out.sink_compat();
+    while let Some(frame) = stream.next().await {
+        match frame {
+            Ok((bytes, _sock)) => {
+                let packet = String::from_utf8_lossy(bytes.as_ref());
+                let metrics = packet.lines().filter_map(parse_event).map(Ok);
+
+                // Need `boxed` to resolve a lifetime issue
+                // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
+                let mut metrics = stream::iter(metrics).boxed();
+                if let Err(error) = out.send_all(&mut metrics).await {
+                    error!("Error sending metric: {:?}", error);
+                    break;
                 }
-                Err(error) => {
-                    emit!(StatsdSocketError::read(error));
-                    None
-                }
-            })
-        })
-        .flatten()
-        .forward(out.sink_compat())
-        .await;
+            }
+            Err(error) => {
+                emit!(StatsdSocketError::read(error));
+            }
+        }
+    }
 
     Ok(())
 }
