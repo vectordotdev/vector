@@ -8,7 +8,7 @@ use crate::{
 use chrono::Utc;
 use futures::{
     compat::{Future01CompatExt, Sink01CompatExt},
-    future, stream, FutureExt, StreamExt, TryFutureExt,
+    future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
 use mongodb::{
@@ -19,8 +19,11 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, sync::Arc};
-use tokio::time::{interval, Duration};
+use std::collections::BTreeMap;
+use tokio::{
+    select,
+    time::{interval, Duration},
+};
 use url::{ParseError, Url};
 
 mod types;
@@ -127,23 +130,33 @@ impl SourceConfig for MongoDBMetricsConfig {
     ) -> crate::Result<super::Source> {
         let mongodb = MongoDBMetrics::new(&self.endpoint, &self.namespace).await?;
 
-        let out = out
+        let mut out = out
             .sink_map_err(|e| error!("error sending metric: {:?}", e))
             .sink_compat();
 
-        let task = interval(Duration::from_secs(self.scrape_interval_secs))
-            .take_until(shutdown.compat())
-            .filter_map(move |_| {
-                let mongodb = Arc::clone(&mongodb);
-                async { Some(mongodb.collect().await) }
-            })
-            .flatten()
-            .map(Event::Metric)
-            .map(Ok)
-            .forward(out)
-            .inspect(|_| info!("finished sending"));
+        let mut interval = interval(Duration::from_secs(self.scrape_interval_secs)).map(|_| ());
+        let mut shutdown = shutdown.compat();
 
-        Ok(Box::new(task.boxed().compat()))
+        Ok(Box::new(
+            async move {
+                loop {
+                    select! {
+                        _ = &mut shutdown => break,
+                        Some(()) = interval.next() => (),
+                        else => break,
+                    };
+
+                    let metrics = mongodb.collect().await;
+                    let mut stream = metrics.map(Event::Metric).map(Ok);
+                    if let Err(()) = out.send_all(&mut stream).await {
+                        error!(message = "Error sending mongodb metrics");
+                    }
+                }
+            }
+            .map(Ok)
+            .boxed()
+            .compat(),
+        ))
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -158,7 +171,7 @@ impl SourceConfig for MongoDBMetricsConfig {
 impl MongoDBMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
-    async fn new(endpoint: &str, namespace: &str) -> Result<Arc<MongoDBMetrics>, BuildError> {
+    async fn new(endpoint: &str, namespace: &str) -> Result<MongoDBMetrics, BuildError> {
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
 
         let mut client_options = ClientOptions::parse(endpoint)
@@ -180,12 +193,12 @@ impl MongoDBMetrics {
             serde_json::to_string(&build_info).unwrap()
         );
 
-        Ok(Arc::new(Self {
+        Ok(Self {
             client,
             endpoint,
             namespace: namespace.to_owned(),
             tags,
-        }))
+        })
     }
 
     /// Remove `username` and `password` from URL endpoint.
@@ -254,9 +267,9 @@ impl MongoDBMetrics {
         }
     }
 
-    async fn collect(self: Arc<Self>) -> stream::BoxStream<'static, Metric> {
+    async fn collect(&self) -> stream::BoxStream<'static, Metric> {
         // `up` metric is `1` if collection is successful, otherwise `0`.
-        let (up_value, metrics) = match Arc::clone(&self).collect_server_status().await {
+        let (up_value, metrics) = match self.collect_server_status().await {
             Ok(metrics) => (1.0, metrics),
             Err(error) => {
                 match error {
@@ -285,7 +298,7 @@ impl MongoDBMetrics {
 
     /// Collect metrics from `serverStatus` command.
     /// https://docs.mongodb.com/manual/reference/command/serverStatus/
-    async fn collect_server_status(self: Arc<Self>) -> Result<Vec<Metric>, CollectError> {
+    async fn collect_server_status(&self) -> Result<Vec<Metric>, CollectError> {
         let mut metrics = vec![];
 
         let command = doc! { "serverStatus": 1, "opLatencies": { "histograms": true }};
