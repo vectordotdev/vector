@@ -192,7 +192,7 @@ impl<L> Controller<L> {
             && inner.reached_limit
             && !inner.had_back_pressure
             && current_rtt.is_some()
-            && current_rtt.unwrap() <= past_rtt
+            && current_rtt.unwrap() <= past_rtt + threshold / 10.0
         {
             // Increase (additive) the current concurrency limit
             self.semaphore.add_permits(1);
