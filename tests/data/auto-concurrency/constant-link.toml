@@ -6,17 +6,16 @@ requests = 500
 delay = 0.100
 
 [stats.in_flight]
-max = [22, 29]
-mean = [10.0, 14.0]
+max = [30, 31]
+mean = [15.0, 16.0]
 
 [controller.in_flight]
-max = [22, 29]
-mean = [10.0, 14.0]
+max = [30, 31]
+mean = [15.0, 16.0]
 
 [controller.concurrency_limit]
-max = [22, 30]
-mode = [10, 30]
-mean = [10.0, 15.0]
+max = [22, 32]
+mean = [16.0, 18.0]
 
 [controller.observed_rtt]
 min = [0.100, 0.102]
