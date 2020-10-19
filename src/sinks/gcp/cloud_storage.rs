@@ -76,7 +76,6 @@ pub struct GcsSinkConfig {
     tls: Option<TlsOptions>,
 }
 
-#[cfg(test)]
 fn default_config(e: Encoding) -> GcsSinkConfig {
     GcsSinkConfig {
         bucket: Default::default(),
@@ -148,7 +147,16 @@ inventory::submit! {
     SinkDescription::new::<GcsSinkConfig>(NAME)
 }
 
-impl GenerateConfig for GcsSinkConfig {}
+impl GenerateConfig for GcsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"bucket = "my-bucket"
+            credentials_path = "/path/to/credentials.json"
+            encoding.codec = "ndjson""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
@@ -461,6 +469,11 @@ mod tests {
     use crate::event::Event;
 
     use std::collections::HashMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GcsSinkConfig>();
+    }
 
     #[test]
     fn gcs_encode_event_text() {
