@@ -1,6 +1,8 @@
 #![macro_use]
 
 mod not;
+mod util;
+
 pub(in crate::mapping) use not::NotFn;
 
 use super::Function;
@@ -128,6 +130,9 @@ build_signatures! {
     parse_url => ParseUrlFn,
     starts_with => StartsWithFn,
     ends_with => EndsWithFn,
+    round => RoundFn,
+    floor => FloorFn,
+    ceil => CeilFn,
 }
 
 /// A parameter definition accepted by a function.
