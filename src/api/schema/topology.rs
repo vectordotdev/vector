@@ -165,7 +165,10 @@ impl Sink {
 #[derive(Clone, Interface)]
 #[graphql(
     field(name = "name", type = "String"),
-    field(name = "events_processed_total", type = "Option<metrics::EventsProcessedTotal>")
+    field(
+        name = "events_processed_total",
+        type = "Option<metrics::EventsProcessedTotal>"
+    )
 )]
 pub enum Topology {
     Source(Source),
