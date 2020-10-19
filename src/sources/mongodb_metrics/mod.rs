@@ -7,8 +7,7 @@ use crate::{
 };
 use chrono::Utc;
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
+    compat::Sink01CompatExt, future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
 use mongodb::{
@@ -125,17 +124,16 @@ impl SourceConfig for MongoDBMetricsConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
+        mut shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        let mut interval = interval(Duration::from_secs(self.scrape_interval_secs)).map(|_| ());
+
         let mongodb = MongoDBMetrics::new(&self.endpoint, &self.namespace).await?;
 
         let mut out = out
             .sink_map_err(|e| error!("error sending metric: {:?}", e))
             .sink_compat();
-
-        let mut interval = interval(Duration::from_secs(self.scrape_interval_secs)).map(|_| ());
-        let mut shutdown = shutdown.compat();
 
         Ok(Box::new(
             async move {
