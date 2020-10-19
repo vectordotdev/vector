@@ -91,6 +91,7 @@ components: sinks: gcp_cloud_storage: {
 
 	configuration: {
 		acl: {
+			category:    "ACL"
 			common:      false
 			description: "Predefined ACL to apply to the created objects. For more information, see [Predefined ACLs][urls.gcs_predefined_acl]. If this is not set, GCS will apply a default ACL when the object is created."
 			required:    false
@@ -116,6 +117,7 @@ components: sinks: gcp_cloud_storage: {
 			}
 		}
 		credentials_path: {
+			category:    "Auth"
 			common:      true
 			description: "The filename for a Google Cloud service account credentials JSON file used to authenticate access to the Cloud Storage API. If this is unset, Vector checks the `GOOGLE_APPLICATION_CREDENTIALS` environment variable for a filename.\n\nIf no filename is named, Vector will attempt to fetch an instance service account for the compute instance the program is running on. If Vector is not running on a GCE instance, you must define a credentials file as above."
 			required:    false
@@ -126,6 +128,7 @@ components: sinks: gcp_cloud_storage: {
 			}
 		}
 		filename_append_uuid: {
+			category:    "File Naming"
 			common:      false
 			description: "Whether or not to append a UUID v4 token to the end of the file. This ensures there are no name collisions high volume use cases."
 			required:    false
@@ -133,6 +136,7 @@ components: sinks: gcp_cloud_storage: {
 			type: bool: default: true
 		}
 		filename_extension: {
+			category:    "File Naming"
 			common:      false
 			description: "The filename extension to use in the object name."
 			required:    false
@@ -142,6 +146,7 @@ components: sinks: gcp_cloud_storage: {
 			}
 		}
 		filename_time_format: {
+			category:    "File Naming"
 			common:      false
 			description: "The format of the resulting object file name. [`strftime` specifiers][urls.strptime_specifiers] are supported."
 			required:    false
@@ -151,6 +156,7 @@ components: sinks: gcp_cloud_storage: {
 			}
 		}
 		key_prefix: {
+			category:    "File Naming"
 			common:      true
 			description: "A prefix to apply to all object key names. This should be used to partition your objects, and it's important to end this value with a `/` if you want this to be the root GCS \"folder\"."
 			required:    false
@@ -172,6 +178,7 @@ components: sinks: gcp_cloud_storage: {
 			}
 		}
 		storage_class: {
+			category:    "Storage"
 			common:      false
 			description: "The storage class for the created objects. See [the GCP storage classes][urls.gcs_storage_classes] for more details."
 			required:    false
