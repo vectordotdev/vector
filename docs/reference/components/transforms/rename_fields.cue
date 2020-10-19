@@ -1,17 +1,17 @@
 package metadata
 
 components: transforms: rename_fields: {
-	title:             "Rename Fields"
-	short_description: "Accepts log events and allows you to rename one or more log fields."
+	title: "Rename Fields"
 
 	classes: {
 		commonly_used: false
 		development:   "stable"
 		egress_method: "stream"
-		function:      "schema"
 	}
 
-	features: {}
+	features: {
+		shape: {}
+	}
 
 	support: {
 		platforms: {
@@ -40,14 +40,19 @@ components: transforms: rename_fields: {
 			description: "A table of old-key/new-key pairs representing the keys to be moved in the event."
 			required:    true
 			warnings: [
-				#"""
+				"""
 					Vector makes no guarantee on the order of execution. If two rename
 					operations must be performed in a specific order, it is recommended to
 					split them up across two separate rename transforms.
-					"""#,
+					""",
 			]
 			type: object: {
-				examples: [{"old_field_name": "new_field_name"}, {"parent": {"old_child_name": "parent.new_child_name"}}]
+				examples: [
+					{
+						"old_field_name": "new_field_name"
+						"parent": {"old_child_name": "parent.new_child_name"}
+					},
+				]
 				options: {}
 			}
 		}
@@ -55,7 +60,7 @@ components: transforms: rename_fields: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 
 	how_it_works: {
@@ -65,7 +70,7 @@ components: transforms: rename_fields: {
 			sub_sections: [
 				{
 					title: "Key Conflicts"
-					body: #"""
+					body: """
 						Keys specified in this transform will replace existing keys.
 
 						<Alert type="warning">
@@ -75,11 +80,11 @@ components: transforms: rename_fields: {
 						them up across two separate rename transforms.
 
 						</Alert>
-						"""#
+						"""
 				},
 				{
 					title: "Nested Key Conflicts"
-					body: #"""
+					body: """
 						Keys are renamed in a deep fashion. They will not replace any ancestor
 						objects. For example, given the following `log` event:
 
@@ -112,7 +117,7 @@ components: transforms: rename_fields: {
 						```
 
 						Notice that `parent.child1` field was preserved.
-						"""#
+						"""
 				},
 			]
 		}

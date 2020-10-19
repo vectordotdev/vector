@@ -1,10 +1,9 @@
 package metadata
 
 components: sources: docker: {
-	title:             "Docker"
-	short_description: "Collects logs through the Docker API"
-	long_description: """
-		[Docker][urls.docker] is an open platform for developing, shipping, and running
+	title:       "Docker"
+	description: """
+		[Docker](\(urls.docker)) is an open platform for developing, shipping, and running
 		applications and services. Docker enables you to separate your services from
 		your infrastructure so you can ship quickly. With Docker, you can manage your
 		infrastructure in the same ways you manage your services. By taking advantage
@@ -19,21 +18,33 @@ components: sources: docker: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "stream"
-		function:      "collect"
+	}
+
+	env_vars: {
+		DOCKER_HOST: {
+			description: "The Docker host to connect to."
+			type: string: {
+				examples: ["unix:///var/run/docker.sock"]
+			}
+		}
+
+		DOCKER_VERIFY_TLS: {
+			description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."
+			type: string: {
+				enum: {
+					"true":  "true"
+					"false": "false"
+				}
+			}
+		}
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  true
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			docker_engine: {
-				required: true
-				title:    "Docker Engine"
-				type:     "external"
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Docker Engine"
+				thing:    "the \(name)"
 				url:      urls.docker_engine
 				versions: ">= 1.24"
 
@@ -50,10 +61,10 @@ components: sources: docker: {
 				}
 
 				setup: [
-					#"""
-						Ensure that [Docker is setup][urls.docker_setup] and running.
-						"""#,
-					#"""
+					"""
+						Ensure that [Docker is setup](\(urls.docker_setup)) and running.
+						""",
+					"""
 						Ensure that the Docker Engine is properly exposing logs:
 
 						```bash
@@ -62,14 +73,17 @@ components: sources: docker: {
 
 						If you receive an error it's likely that you do not have
 						the proper Docker logging drivers installed. The Docker
-						Engine requires either the [`json-file`][urls.docker_logging_driver_json_file] (default)
+						Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
 						or [`journald`](docker_logging_driver_journald) Docker
 						logging driver to be installed.
-						"""#,
+						""",
 				]
 			}
 		}
+		multiline: enabled: true
+	}
 
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -81,14 +95,14 @@ components: sources: docker: {
 
 		requirements: []
 		warnings: [
-			#"""
+			"""
 				Collecting logs directly from the Docker Engine is known to have
 				performance problems for very large setups. If you have a large
 				setup, please consider alternative collection methods, such as the
-				Docker [`syslog`][urls.docker_logging_driver_syslog] or
-				[Docker `journald` driver][urls.docker_logging_driver_journald]
+				Docker [`syslog`](\(urls.docker_logging_driver_syslog)) or
+				[Docker `journald` driver](\(urls.docker_logging_driver_journald))
 				drivers.
-				"""#,
+				""",
 		]
 		notices: []
 	}
@@ -118,13 +132,13 @@ components: sources: docker: {
 			}
 		}
 		include_labels: {
-			common: true
+			common:      true
 			description: """
 				A list of container object labels to match against when
 				filtering running containers. This should follow the
-				described label's synatx in [docker object labels docs][urls.docker_object_labels].
+				described label's synatx in [docker object labels docs](\(urls.docker_object_labels)).
 				"""
-			required: false
+			required:    false
 			type: array: {
 				default: null
 				items: type: string: examples: ["com.example.vendor=Timber Inc.", "com.example.name=Vector"]
@@ -185,7 +199,7 @@ components: sources: docker: {
 					type: string: examples: ["Started GET / for 127.0.0.1 at 2012-03-10 14:28:14 +0100"]
 				}
 				stream: {
-					description: "The [standard stream][urls.standard_streams] that the log was collected from."
+					description: "The [standard stream](\(urls.standard_streams)) that the log was collected from."
 					required:    true
 					type: string: enum: {
 						stdout: "The STDOUT stream"
@@ -219,8 +233,8 @@ components: sources: docker: {
 			input: """
 				 ```json
 				 {
-				   "stream": \(_stream),
-				   "message": \(_message)
+				   "stream": "\(_stream)",
+				   "message": "\(_message)"
 				 }
 				```
 				"""
@@ -238,7 +252,7 @@ components: sources: docker: {
 	how_it_works: {
 		message_merging: {
 			title: "Merging Split Messages"
-			body: #"""
+			body: """
 				Docker, by default, will split log messages that exceed 16kb. This can be a
 				rather frustrating problem because it produces malformed log messages that are
 				difficult to work with. Vector's `docker` source solves this by default,
@@ -246,7 +260,7 @@ components: sources: docker: {
 				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the
 				`partial_event_marker_field` option.
-				"""#
+				"""
 		}
 	}
 }

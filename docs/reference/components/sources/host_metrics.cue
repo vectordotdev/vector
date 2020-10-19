@@ -1,9 +1,8 @@
 package metadata
 
 components: sources: host_metrics: {
-	title:             "Host Metrics"
-	long_description:  "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
-	short_description: "Gather host-based metrics."
+	title:       "Host Metrics"
+	description: "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
 
 	classes: {
 		commonly_used: false
@@ -11,13 +10,19 @@ components: sources: host_metrics: {
 		deployment_roles: ["daemon"]
 		development:   "beta"
 		egress_method: "batch"
-		function:      "collect"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "host"
+				thing:    "a \(name)"
+				url:      urls.host
+				versions: null
+			}
+		}
+		multiline: enabled: false
 	}
 
 	support: {
@@ -31,9 +36,7 @@ components: sources: host_metrics: {
 		}
 
 		notices: []
-
 		requirements: []
-
 		warnings: []
 	}
 
@@ -82,11 +85,11 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: examples: ["sda", "dm-*"]
@@ -95,11 +98,11 @@ components: sources: host_metrics: {
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: []
 								items: type: string: examples: ["sda", "dm-*"]
@@ -122,11 +125,11 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather usage metrics.
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: examples: ["sda", "dm-*"]
@@ -135,11 +138,11 @@ components: sources: host_metrics: {
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather usage metrics.
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: []
 								items: type: string: examples: ["sda", "dm-*"]
@@ -155,11 +158,11 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
 								Defaults to including all filesystems.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: examples: ["ntfs", "ext*"]
@@ -168,11 +171,11 @@ components: sources: host_metrics: {
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
 								Defaults to excluding no filesystems.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: []
 								items: type: string: examples: ["ntfs", "ext*"]
@@ -188,11 +191,11 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of mount point path patterns for which to gather usage metrics.
 								Defaults to including all mount points.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: examples: ["/home", "/raid*"]
@@ -201,11 +204,11 @@ components: sources: host_metrics: {
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of mount point path patterns for which to gather usage metrics.
 								Defaults to excluding no mount points.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: []
 								items: type: string: examples: ["/home", "/raid*"]
@@ -228,11 +231,11 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather network utilization metrics.
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: ["*"]
 								items: type: string: examples: ["sda", "dm-*"]
@@ -241,11 +244,11 @@ components: sources: host_metrics: {
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather network utilization metrics.
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
+								"""
 							type: array: {
 								default: []
 								items: type: string: examples: ["sda", "dm-*"]

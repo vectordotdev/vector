@@ -7,10 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future, stream, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
@@ -76,7 +73,7 @@ fn prometheus(
         .sink_map_err(|e| error!("error sending metric: {:?}", e))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
-        .take_until(shutdown.compat())
+        .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {

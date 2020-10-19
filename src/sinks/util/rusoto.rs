@@ -40,6 +40,9 @@ pub fn client(resolver: Resolver) -> crate::Result<Client> {
 
 #[derive(Debug, Snafu)]
 enum RusotoError {
+    #[snafu(display("Failed to create request dispatcher"))]
+    DispatcherError,
+
     #[snafu(display("Invalid AWS credentials: {}", source))]
     InvalidAWSCredentials { source: CredentialsError },
 }
@@ -110,7 +113,14 @@ impl AwsCredentialsProvider {
     pub fn new(region: &Region, assume_role: Option<String>) -> crate::Result<Self> {
         if let Some(role) = assume_role {
             debug!("using sts assume role credentials for AWS.");
-            let sts = StsClient::new(region.clone());
+
+            let dispatcher = rusoto_core::request::HttpClient::new()
+                .map_err(|_| RusotoError::DispatcherError)?;
+
+            let mut credentials = CustomChainProvider::new();
+            credentials.set_timeout(Duration::from_secs(8));
+
+            let sts = StsClient::new_with(dispatcher, credentials, region.clone());
 
             let provider = StsAssumeRoleSessionCredentialsProvider::new(
                 sts,
