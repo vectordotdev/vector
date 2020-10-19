@@ -236,21 +236,21 @@ mod tests {
     fn is_dynamic() {
         assert_eq!(
             true,
-            Template::try_from("/kube-demo/%F").unwrap().is_dynamic()
+            Template::try_from("/kube-top/%F").unwrap().is_dynamic()
         );
         assert_eq!(
             false,
-            Template::try_from("/kube-demo/echo").unwrap().is_dynamic()
+            Template::try_from("/kube-top/echo").unwrap().is_dynamic()
         );
         assert_eq!(
             true,
-            Template::try_from("/kube-demo/{{ foo }}")
+            Template::try_from("/kube-top/{{ foo }}")
                 .unwrap()
                 .is_dynamic()
         );
         assert_eq!(
             true,
-            Template::try_from("/kube-demo/{{ foo }}/%F")
+            Template::try_from("/kube-top/{{ foo }}/%F")
                 .unwrap()
                 .is_dynamic()
         );

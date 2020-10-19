@@ -21,7 +21,7 @@ fn parse_event_artifact(path: impl AsRef<Path>) -> vector::Result<Event> {
 }
 
 pub fn protobuf(c: &mut Criterion) {
-    let input = parse_event_artifact("tests/data/wasm/protobuf/demo.json").unwrap();
+    let input = parse_event_artifact("tests/data/wasm/protobuf/top.json").unwrap();
     let cloned_input = input.clone();
     c.bench(
         "wasm/protobuf",

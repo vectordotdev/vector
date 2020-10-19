@@ -105,10 +105,11 @@ async-graphql-warp = { version = "2.0.0", optional = true }
 slab = { version = "0.4.2", optional = true }
 
 # API client
-prettytable-rs = { version = "0.8.0", optional = true }
 human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
-anymap = {version = "0.12.1", optional = true }
+anymap = { version = "0.12.1", optional = true }
+termion = { version = "1.5.5", optional = true }
+tui = { version = "0.12.0", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -274,10 +275,11 @@ api = [
 # API client
 api-client = [
   "vector-api-client",
-  "prettytable-rs",
   "human_format",
   "num-format",
   "anymap",
+  "termion",
+  "tui"
 ]
 
 # Sources

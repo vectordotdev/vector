@@ -73,7 +73,7 @@ Before we explore how to improve `LogEvent`, we must make sure we're familiar wi
 The `LogEvent` currently meets our needs from several ergonomics angles (notably the flattening code), but we often must twist it in painful ways to work with it (notably buffers to flatmaps to `BTree` style APIs).
 
 ```rust
-//! src/event/mod.rs
+//! src/event/top
 #[derive(PartialEq, Debug, Clone)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
@@ -124,7 +124,7 @@ The `Atom` type is deprecated, please use `String` and adapt any `Atom` usages t
 The current `LogEvent` API is as follows *(documentation, if it exists, is included)*:
 
 ```rust
-//! Summarized from src/event/mod.rs
+//! Summarized from src/event/top
 impl LogEvent {
     pub fn new() -> Self;
     pub fn get(&self, key: &Atom) -> Option<&Value>;
