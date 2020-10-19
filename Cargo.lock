@@ -6176,6 +6176,7 @@ dependencies = [
  "anyhow",
  "anymap",
  "approx",
+ "arc-swap",
  "assert_cmd",
  "async-compression",
  "async-graphql",

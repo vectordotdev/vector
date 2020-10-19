@@ -7,6 +7,7 @@ use tui::widgets::TableState;
 
 pub static TOPOLOGY_HEADERS: [&'static str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
 
+#[derive(Debug, Clone)]
 pub struct TopologyRow {
     pub name: String,
     pub topology_type: String,
@@ -31,14 +32,14 @@ impl TopologyRow {
     }
 
     pub fn format_throughput(&self) -> String {
-        match self.errors {
-            0 => "--".into(),
-            _ => self.errors.to_string(),
+        match self.throughput {
+            0.00 => "--".into(),
+            _ => self.throughput.to_string(),
         }
     }
 
-    pub fn update_events_processed(&mut self, errors: i64) {
-        self.errors = errors;
+    pub fn update_events_processed(&mut self, val: i64) {
+        self.events_processed = val;
     }
 }
 
@@ -60,5 +61,9 @@ impl TopologyState {
 
     pub fn rows(&self) -> btree_map::Values<String, Arc<Mutex<TopologyRow>>> {
         self.rows.values()
+    }
+
+    pub fn get_row(&self, name: &str) -> Option<&Arc<Mutex<TopologyRow>>> {
+        self.rows.get(name)
     }
 }

@@ -2,6 +2,7 @@ use super::{
     events::{Event, Events},
     state::{TopologyState, TOPOLOGY_HEADERS},
 };
+use arc_swap::ArcSwap;
 use std::io::Stdout;
 use termion::event::Key;
 use termion::raw::{IntoRawMode, RawTerminal};
@@ -22,7 +23,7 @@ const INVARIANT: &str =
 
 pub struct Config {
     pub url: url::Url,
-    pub topology_state: TopologyState,
+    pub topology_state: ArcSwap<TopologyState>,
 }
 
 pub struct Widgets<'a> {
@@ -60,7 +61,8 @@ impl<'a> Widgets<'a> {
     }
 
     fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let items = self.config.topology_state.rows().map(|r| {
+        let lock = self.config.topology_state.load();
+        let items = lock.rows().map(|r| {
             let r = r
                 .lock()
                 .expect("Unable to get lock on topology data. Please report");
