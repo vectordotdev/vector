@@ -1,7 +1,7 @@
 use crate::{
     event::Event,
     stream::VecStreamExt,
-    transforms::{StreamTransform, FunctionTransform},
+    transforms::{FunctionTransform, StreamTransform},
 };
 use futures::{
     compat::Stream01CompatExt,
@@ -68,7 +68,7 @@ where
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut maybe = None;
         self.hook_process(event, |event| maybe = Some(event));
-        maybe
+        output.extend(maybe.into_iter());
     }
 }
 
@@ -78,8 +78,8 @@ where
 {
     fn transform(
         mut self: Box<Self>,
-        input_rx: BoxStream<Event>,
-    ) -> BoxStream<Event>
+        input_rx: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
     where
         Self: 'static,
     {

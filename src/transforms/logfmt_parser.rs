@@ -1,8 +1,8 @@
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
-    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ impl TransformConfig for LogfmtConfig {
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
         let conversions = parse_conversion_map(&self.types)?;
 
-        Ok(Transform::from(Logfmt {
+        Ok(Transform::function(Logfmt {
             field,
             drop_field: self.drop_field,
             conversions,
@@ -134,7 +134,7 @@ mod tests {
         .await
         .unwrap();
 
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

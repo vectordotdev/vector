@@ -2,8 +2,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{CoercerConversionFailed, CoercerEventProcessed},
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
-    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(CoercerConfig);
 impl TransformConfig for CoercerConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
         let types = parse_conversion_map(&self.types)?;
-        Ok(Transform::from(Coercer {
+        Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,
         }))
@@ -73,7 +73,8 @@ impl FunctionTransform for Coercer {
                     }
                 }
             }
-            return Some(new_event);
+            output.push(new_event);
+            return;
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
@@ -86,7 +87,7 @@ impl FunctionTransform for Coercer {
                 }
             }
         }
-        Some(Event::Log(log))
+        output.push(Event::Log(log));
     }
 }
 
@@ -129,7 +130,8 @@ mod tests {
         .build(TransformContext::new_test())
         .await
         .unwrap();
-        coercer.transform(event).unwrap().into_log()
+        let coercer = coercer.as_function();
+        coercer.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

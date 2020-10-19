@@ -149,7 +149,7 @@ mod tests {
         fields.insert("some_key".into(), "some_val".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let key = Lookup::from_str("some_key").unwrap().to_string();
         let kv = new_event.as_log().get_flat(&key);
@@ -165,7 +165,7 @@ mod tests {
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let key = Lookup::from_str("some_key").unwrap().to_string();
         let kv = new_event.as_log().get_flat(&key);
@@ -184,7 +184,7 @@ mod tests {
 
         let mut augment = AddFields::new(fields, false).unwrap();
 
-        let new_event = augment.transform(event.clone()).unwrap();
+        let new_event = augment.transform_one(event.clone()).unwrap();
 
         assert_eq!(new_event, event);
     }
@@ -214,7 +214,7 @@ mod tests {
 
         let mut transform = AddFields::new(fields, false).unwrap();
 
-        let event = transform.transform(event).unwrap().into_log();
+        let event = transform.transform_one(event).unwrap().into_log();
 
         tracing::error!(?event);
         assert_eq!(event["float"], 4.5.into());

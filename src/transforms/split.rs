@@ -2,8 +2,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
+    transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
-    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -40,7 +40,7 @@ impl TransformConfig for SplitConfig {
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
 
-        Ok(Box::new(Split::new(
+        Ok(Transform::function(Split::new(
             self.field_names.clone(),
             self.separator.clone(),
             field,
@@ -137,8 +137,7 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::split;
-    use super::SplitConfig;
+    use super::*;
     use crate::event::{LogEvent, Value};
     use crate::{
         config::{TransformConfig, TransformContext},
@@ -193,7 +192,7 @@ mod tests {
         .await
         .unwrap();
 
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

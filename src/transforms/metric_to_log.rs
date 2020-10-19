@@ -5,8 +5,8 @@ use crate::{
     },
     event::{self, Event, LogEvent},
     internal_events::{MetricToLogEventProcessed, MetricToLogFailedSerialize},
+    transforms::{FunctionTransform, Transform},
     types::Conversion,
-    transforms::{Transform, FunctionTransform},
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -28,7 +28,7 @@ impl GenerateConfig for MetricToLogConfig {}
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        MetricToLog::new(self.host_tag.clone()).map(Transform::from)
+        Ok(Transform::function(MetricToLog::new(self.host_tag.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -109,7 +109,7 @@ mod tests {
         let event = Event::Metric(metric);
         let mut transformer = MetricToLog::new(Some("host".into()));
 
-        transformer.transform(event).map(|event| event.into_log())
+        transformer.transform_one(event).map(|event| event.into_log())
     }
 
     fn ts() -> DateTime<Utc> {

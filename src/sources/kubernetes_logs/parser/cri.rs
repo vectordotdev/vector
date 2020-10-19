@@ -2,8 +2,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
-        Transform,
-        FunctionTransform,
+        FunctionTransform, Transform,
     },
 };
 use snafu::{OptionExt, Snafu};
@@ -21,8 +20,7 @@ pub const MULTILINE_TAG: &str = "multiline_tag";
 ///
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
 pub struct Cri {
-    // TODO: patch `RegexParser` to expose the concrete type on build.
-    regex_parser: Transform,
+    regex_parser: Box<dyn FunctionTransform>,
 }
 
 impl Cri {
@@ -39,7 +37,14 @@ impl Cri {
                 "timestamp|%+".to_owned(),
             );
 
-            RegexParser::build(&rp_config).expect("regexp patterns are static, should never fail")
+            let parser = RegexParser::build(&rp_config)
+                .expect("regexp patterns are static, should never fail");
+            match parser {
+                Transform::Function(f) => f,
+                _ => unreachable!(
+                    "The regex parser should not implement stream. Please report this."
+                ),
+            }
         };
 
         Self { regex_parser }
@@ -48,9 +53,12 @@ impl Cri {
 
 impl FunctionTransform for Cri {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let mut event = self.regex_parser.transform(event)?;
-        normalize_event(event.as_mut_log()).ok()?;
-        Some(event)
+        let mut buf = Vec::with_capacity(1);
+        self.regex_parser.transform(&mut buf, event);
+        if let Some(event) = buf.into_iter().next() {
+            normalize_event(event.as_mut_log()).ok();
+            output.push(event);
+        }
     }
 }
 
@@ -82,6 +90,7 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
+    use super::*;
     use super::super::test_util;
     use super::Cri;
     use crate::event::LogEvent;
@@ -148,6 +157,6 @@ pub mod tests {
 
     #[test]
     fn test_parsing() {
-        test_util::test_parser(Cri::new, cases());
+        test_util::test_parser(|| Transform::function(Cri::new()), cases());
     }
 }

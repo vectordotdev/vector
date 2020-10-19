@@ -5,8 +5,8 @@ use crate::{
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
-    transforms::{Transform, FunctionTransform},
     serde::Fields,
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,7 @@ impl TransformConfig for RenameFieldsConfig {
                 value.to_string().parse::<Lookup>()?,
             );
         }
-        Ok(Box::new(RenameFields::new(
+        Ok(Transform::function(RenameFields::new(
             fields,
             self.drop_empty.unwrap_or(false),
         )?))
@@ -66,7 +66,7 @@ impl RenameFields {
 }
 
 impl FunctionTransform for RenameFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
@@ -89,7 +89,7 @@ impl FunctionTransform for RenameFields {
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -115,7 +115,7 @@ mod tests {
 
         let mut transform = RenameFields::new(fields, false).unwrap();
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
 
         assert!(new_event.as_log().get("to_move").is_none());
         assert_eq!(new_event.as_log()["moved"], "some value".into());

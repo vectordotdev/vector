@@ -3,7 +3,7 @@ use crate::{
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -51,7 +51,7 @@ impl Default for MergeConfig {
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Ok(Box::new(Merge::from(self.clone())))
+        Ok(Transform::function(Merge::from(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -117,7 +117,7 @@ impl FunctionTransform for Merge {
             }
 
             // Do not emit the event yet.
-            return None;
+            return;
         }
 
         // We got non-partial event. Attempt to get a partial event merge
@@ -127,7 +127,10 @@ impl FunctionTransform for Merge {
         // then return the merged event.
         let log_event_merge_state = match self.log_event_merge_states.remove(&discriminant) {
             Some(log_event_merge_state) => log_event_merge_state,
-            None => return Some(Event::Log(event)),
+            None => {
+                output.push(Event::Log(event));
+                return;
+            }
         };
 
         // Merge in the final non-partial event and consume the merge state in
@@ -135,13 +138,13 @@ impl FunctionTransform for Merge {
         let merged_event = log_event_merge_state.merge_in_final_event(event, &self.fields);
 
         // Return the merged event.
-        Some(Event::Log(merged_event))
+        output.push(Event::Log(merged_event));
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Merge, MergeConfig};
+    use super::*;
     use crate::event::{self, Event};
 
     #[test]
@@ -162,7 +165,7 @@ mod test {
         let sample_event = Event::from("hello world");
 
         // Once processed by the transform.
-        let merged_event = merge.transform(sample_event.clone()).unwrap();
+        let merged_event = merge.transform_one(sample_event.clone()).unwrap();
 
         // Should be returned as is.
         assert_eq!(merged_event, sample_event);
@@ -176,9 +179,9 @@ mod test {
         let partial_event_2 = make_partial(Event::from("lo "));
         let non_partial_event = Event::from("world");
 
-        assert!(merge.transform(partial_event_1).is_none());
-        assert!(merge.transform(partial_event_2).is_none());
-        let merged_event = merge.transform(non_partial_event).unwrap();
+        assert!(merge.transform_one(partial_event_1).is_none());
+        assert!(merge.transform_one(partial_event_2).is_none());
+        let merged_event = merge.transform_one(non_partial_event).unwrap();
 
         assert_eq!(
             merged_event
@@ -220,12 +223,12 @@ mod test {
         let s2_non_partial_event = make_event("sum", "s2");
 
         // Simulate events arriving in non-trivial order.
-        assert!(merge.transform(s1_partial_event_1).is_none());
-        assert!(merge.transform(s2_partial_event_1).is_none());
-        assert!(merge.transform(s1_partial_event_2).is_none());
-        let s1_merged_event = merge.transform(s1_non_partial_event).unwrap();
-        assert!(merge.transform(s2_partial_event_2).is_none());
-        let s2_merged_event = merge.transform(s2_non_partial_event).unwrap();
+        assert!(merge.transform_one(s1_partial_event_1).is_none());
+        assert!(merge.transform_one(s2_partial_event_1).is_none());
+        assert!(merge.transform_one(s1_partial_event_2).is_none());
+        let s1_merged_event = merge.transform_one(s1_non_partial_event).unwrap();
+        assert!(merge.transform_one(s2_partial_event_2).is_none());
+        let s2_merged_event = merge.transform_one(s2_non_partial_event).unwrap();
 
         assert_eq!(
             s1_merged_event

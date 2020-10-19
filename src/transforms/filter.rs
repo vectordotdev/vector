@@ -2,7 +2,7 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    transforms::{Transform, FunctionTransform}
+    transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,7 @@ impl GenerateConfig for FilterConfig {}
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Filter::new(self.condition.build()?).map(Transform::function)
+        Ok(Transform::function(Filter::new(self.condition.build()?)))
     }
 
     fn input_type(&self) -> DataType {
@@ -51,9 +51,7 @@ impl Filter {
 impl FunctionTransform for Filter {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
-            Some(event)
-        } else {
-            None
+            output.push(event);
         }
     }
 }

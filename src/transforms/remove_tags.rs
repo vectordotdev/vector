@@ -1,8 +1,8 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     internal_events::RemoveTagsEventProcessed,
+    transforms::{FunctionTransform, Transform},
     Event,
-    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 
@@ -26,7 +26,7 @@ impl GenerateConfig for RemoveTagsConfig {}
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Ok(Box::new(RemoveTags::new(self.tags.clone())))
+        Ok(Transform::function(RemoveTags::new(self.tags.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -96,7 +96,7 @@ mod tests {
         });
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 1);
@@ -120,7 +120,7 @@ mod tests {
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
 
         assert!(metric.tags.is_none());
     }
@@ -138,7 +138,7 @@ mod tests {
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
 
         assert!(metric.tags.is_none());
     }

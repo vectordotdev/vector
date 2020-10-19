@@ -1,5 +1,6 @@
 use crate::Event;
 use snafu::Snafu;
+use futures::compat::Stream01CompatExt;
 
 pub mod util;
 
@@ -70,21 +71,83 @@ pub enum Transform {
 }
 
 impl Transform {
-    fn function(v: dyn FunctionTransform) -> Self {
-        Transform::Function(Box::from(v))
+    pub fn function(v: impl FunctionTransform + 'static) -> Self {
+        Transform::Function(Box::new(v))
     }
-    fn stream(v: dyn StreamTransform) -> Self {
-        Transform::Stream(Box::from(v))
+    pub fn as_function(&mut self) -> &mut Box<dyn FunctionTransform> {
+        match self {
+            Transform::Function(t) => t,
+            Transform::Stream(_) => panic!("Called `Transform::as_function` on something that was not a function variant."),
+        }
+    }
+    pub fn stream(v: impl StreamTransform + 'static) -> Self {
+        Transform::Stream(Box::new(v))
+    }
+    pub fn as_stream(&mut self) -> &mut Box<dyn StreamTransform> {
+        match self {
+            Transform::Function(_) => panic!("Called `Transform::as_stream` on something that was not a stream variant."),
+            Transform::Stream(t) => t,
+        }
     }
 }
 
-pub trait FunctionTransform {
+impl Transform {
+    /// A handy test function that inputs and outputs only one event.
+    ///
+    /// In a prior time, Vector primarily used this API to handle events.
+    /// However, it's now customary to only implement `transform` which handles multiple output events and can
+    /// have it's allocation more effectively controlled.
+    #[cfg_attr(not(test), deprecated = "Use `transform` and `output.extend(events)` or `output.push(event)`.")]
+    pub fn transform_one(&mut self, event: Event) -> Option<Event> {
+        #[allow(deprecated)]
+        match self {
+            Transform::Function(t) => t.transform_one(event),
+            Transform::Stream(t) => t.transform_one(event),
+        }
+    }
+}
+
+pub trait FunctionTransform: Send {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event);
+
+    /// A handy test function that inputs and outputs only one event.
+    ///
+    /// In a prior time, Vector primarily used this API to handle events.
+    /// However, it's now customary to only implement `transform` which handles multiple output events and can
+    /// have it's allocation more effectively controlled.
+    #[cfg_attr(not(test), deprecated = "Use `transform` and `output.extend(events)` or `output.push(event)`.")]
+    fn transform_one(&mut self, event: Event) -> Option<Event> {
+        let buf = Vec::with_capacity(1);
+        self.transform(&mut buf, event);
+        buf.into_iter().next()
+    }
 }
 
-pub trait StreamTransform {
-    fn transform(self: Box<Self>, stream: Box<dyn futures::Stream<Item=Event>>)
-        -> Box<dyn futures::Stream<Item=Event>>;
+pub trait StreamTransform: Send {
+    fn transform(
+        self: Box<Self>,
+        stream: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static;
+
+
+    /// A handy test function that inputs and outputs only one event.
+    ///
+    /// In a prior time, Vector primarily used this API to handle events.
+    /// However, it's now customary to only implement `transform` which handles multiple output events and can
+    /// have it's allocation more effectively controlled.
+    #[cfg_attr(not(test), deprecated = "Use `transform` and `output.extend(events)` or `output.push(event)`.")]
+    fn transform_one(self: Box<Self>, event: Event) -> Option<Event>
+    where Self: 'static {
+        let mut in_buf = vec![event];
+        let in_stream = futures01::stream::iter_ok(in_buf);
+
+        let out_stream = self.transform(Box::new(in_stream)).compat();
+        let out_iter = futures::executor::block_on_stream(out_stream);
+
+        out_iter.next().transpose().ok().flatten()
+    }
 }
 
 #[derive(Debug, Snafu)]

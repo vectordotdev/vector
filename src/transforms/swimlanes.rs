@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ pub struct SwimlaneConfig {
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
     async fn build(&self, _ctx: TransformContext) -> crate::Result<Transform> {
-        Ok(Box::new(Swimlane::new(self.condition.build()?)))
+        Ok(Transform::function(Swimlane::new(self.condition.build()?)))
     }
 
     fn input_type(&self) -> DataType {
@@ -51,10 +51,9 @@ impl FunctionTransform for Swimlane {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
             emit!(SwimlanesEventProcessed);
-            Some(event)
+            output.push(event);
         } else {
             emit!(SwimlanesEventDiscarded);
-            None
         }
     }
 }

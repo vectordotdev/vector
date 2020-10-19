@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     sinks::util::http::HttpClient,
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
 };
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
@@ -164,7 +164,7 @@ impl TransformConfig for Ec2Metadata {
 }
 
 impl FunctionTransform for Ec2MetadataTransform {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
 
         if let Some(read_ref) = self.state.read() {
@@ -175,7 +175,7 @@ impl FunctionTransform for Ec2MetadataTransform {
             });
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -504,7 +504,7 @@ mod integration_tests {
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
@@ -538,7 +538,7 @@ mod integration_tests {
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), None);
@@ -566,7 +566,7 @@ mod integration_tests {
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(
@@ -591,7 +591,7 @@ mod integration_tests {
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));

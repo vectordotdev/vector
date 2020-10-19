@@ -7,6 +7,7 @@ use crate::{
     event::{Event, Value},
     transforms::Transform,
 };
+use futures::compat::Stream01CompatExt;
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -114,7 +115,19 @@ fn walk(
 
     if let Some(target) = transforms.get_mut(node) {
         for input in inputs.clone() {
-            target.transform.transform_into(&mut results, input);
+            match target.transform {
+                Transform::Function(t) => t.transform(&mut results, input),
+                Transform::Stream(t) => {
+                    let mut in_buf = vec![input];
+                    let in_stream = futures01::stream::iter_ok(in_buf);
+                    let out_stream = t.transform(Box::new(in_stream));
+                    let out_stream_compat = out_stream.compat();
+                    // TODO(new-transform-enum): Handle Many
+                    let out_iter = futures::executor::block_on_stream(out_stream_compat);
+                    let out = out_iter.next().transpose().ok().flatten(); // Force unpinning.
+                    results.extend(out.into_iter());
+                }
+            }
         }
         targets = target.next.clone();
     }

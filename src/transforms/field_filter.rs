@@ -26,10 +26,10 @@ impl TransformConfig for FieldFilterConfig {
             message =
                 r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#
         );
-        FieldFilter::new(
+        Ok(Transform::function(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),
-        ).map(Transform::from)
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -64,9 +64,7 @@ impl FunctionTransform for FieldFilter {
             .map(|f| f.as_bytes())
             .map_or(false, |b| b == self.value.as_bytes())
         {
-            Some(event)
-        } else {
-            None
+            output.push(event);
         }
     }
 }

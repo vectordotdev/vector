@@ -5,8 +5,8 @@ use crate::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
     },
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
-    transforms::{Transform, FunctionTransform},
 };
 use grok::Pattern;
 use serde::{Deserialize, Serialize};
@@ -52,15 +52,14 @@ impl TransformConfig for GrokParserConfig {
 
         Ok(grok
             .compile(&self.pattern, true)
-            .map(|p| {
-                Transform::stateless(GrokParser {
-                    pattern: p,
-                    field: field.clone(),
-                    drop_field: self.drop_field,
-                    types,
-                    paths: HashMap::new(),
-                })
+            .map(|p| GrokParser {
+                pattern: p,
+                field: field.clone(),
+                drop_field: self.drop_field,
+                types,
+                paths: HashMap::new(),
             })
+            .map(Transform::function)
             .context(InvalidGrok)?)
     }
 
@@ -124,7 +123,7 @@ impl FunctionTransform for GrokParser {
             });
         }
 
-        Some(Event::Log(event))
+        output.push(Event::Log(event));
     }
 }
 
@@ -161,7 +160,7 @@ mod tests {
         .build(TransformContext::new_test())
         .await
         .unwrap();
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

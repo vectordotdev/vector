@@ -9,6 +9,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     shutdown::SourceShutdownCoordinator,
+    transforms::Transform,
     Pipeline,
 };
 use futures::{
@@ -116,11 +117,18 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
 
-        let transform = transform
-            .transform_stream(filter_event_type(input_rx, input_type))
-            .forward(output)
-            .map(|_| debug!("Finished"))
-            .compat();
+        let transform = match transform {
+            Transform::Function(t) => {
+                // TODO(new-transform-enum): Handle
+                unimplemented!();
+            }
+            Transform::Stream(t) => t
+                .transform(filter_event_type(input_rx, input_type))
+                .forward(output)
+                .map(|_| debug!("Finished"))
+                .compat(),
+        };
+
         let task = Task::new(name, typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));

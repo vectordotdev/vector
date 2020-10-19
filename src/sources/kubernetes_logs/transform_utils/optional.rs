@@ -13,8 +13,8 @@ pub struct Optional<T: FunctionTransform>(pub Option<T>);
 impl<T: FunctionTransform> FunctionTransform for Optional<T> {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         match self.0 {
-            Some(ref mut val) => val.transform(event),
-            None => Some(event),
+            Some(ref mut val) => val.transform(output, event),
+            None => output.push(event),
         }
     }
 }

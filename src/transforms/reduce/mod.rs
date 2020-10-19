@@ -4,14 +4,13 @@ use crate::{
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
     internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
-    transforms::{StreamTransform, FunctionTransform, Transform}
+    transforms::{FunctionTransform, StreamTransform, Transform},
 };
 use async_stream::stream;
 use futures::{
     compat::{Compat, Compat01As03},
     stream, StreamExt,
 };
-use futures01::Stream as Stream01;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -53,7 +52,7 @@ impl_generate_config_from_default!(ReduceConfig);
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self).map(Transform::from)
+        Reduce::new(self).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -230,8 +229,8 @@ impl FunctionTransform for Reduce {
 impl StreamTransform for Reduce {
     fn transform(
         self: Box<Self>,
-        input_rx: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
-    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+        input_rx: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>
     where
         Self: 'static,
     {
@@ -257,7 +256,7 @@ impl StreamTransform for Reduce {
                       true
                     }
                     Some(Ok(event)) => {
-                      me.transform_into(&mut output, event);
+                      (me as Box<dyn FunctionTransform>).transform(&mut output, event);
                       false
                     }
                     Some(Err(())) => panic!("Unexpected error reading channel"),
@@ -279,7 +278,7 @@ impl StreamTransform for Reduce {
 
 #[cfg(test)]
 mod test {
-    use super::ReduceConfig;
+    use super::*;
     use crate::{
         config::{TransformConfig, TransformContext},
         event::Value,
@@ -305,30 +304,31 @@ identifier_fields = [ "request_id" ]
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap();
+        .unwrap()
+        .as_function();
 
         let mut outputs = Vec::new();
 
         let mut e = Event::from("test message 1");
         e.as_mut_log().insert("counter", 1);
         e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 2");
         e.as_mut_log().insert("counter", 2);
         e.as_mut_log().insert("request_id", "2");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 3");
         e.as_mut_log().insert("counter", 3);
         e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 4");
         e.as_mut_log().insert("counter", 4);
         e.as_mut_log().insert("request_id", "1");
         e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -344,7 +344,7 @@ identifier_fields = [ "request_id" ]
         e.as_mut_log().insert("request_id", "2");
         e.as_mut_log().insert("extra_field", "value1");
         e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -375,7 +375,8 @@ merge_strategies.baz = "max"
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap();
+        .unwrap()
+        .as_function();
 
         let mut outputs = Vec::new();
 
@@ -385,7 +386,7 @@ merge_strategies.baz = "max"
         e.as_mut_log().insert("baz", 2);
         e.as_mut_log().insert("request_id", "1");
 
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 2");
         e.as_mut_log().insert("foo", "second foo");
@@ -393,7 +394,7 @@ merge_strategies.baz = "max"
         e.as_mut_log().insert("baz", "not number");
         e.as_mut_log().insert("request_id", "1");
 
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 3");
         e.as_mut_log().insert("foo", 10);
@@ -402,7 +403,7 @@ merge_strategies.baz = "max"
         e.as_mut_log().insert("request_id", "1");
         e.as_mut_log().insert("test_end", "yep");
 
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -433,30 +434,31 @@ identifier_fields = [ "request_id" ]
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap();
+        .unwrap()
+        .as_function();
 
         let mut outputs = Vec::new();
 
         let mut e = Event::from("test message 1");
         e.as_mut_log().insert("counter", 1);
         e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 2");
         e.as_mut_log().insert("counter", 2);
         // e.as_mut_log().insert("request_id", "");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 3");
         e.as_mut_log().insert("counter", 3);
         e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 4");
         e.as_mut_log().insert("counter", 4);
         e.as_mut_log().insert("request_id", "1");
         e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -471,7 +473,7 @@ identifier_fields = [ "request_id" ]
         e.as_mut_log().insert("counter", 5);
         e.as_mut_log().insert("extra_field", "value1");
         e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -501,7 +503,8 @@ merge_strategies.bar = "concat"
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap();
+        .unwrap()
+        .as_function();
 
         let mut outputs = Vec::new();
 
@@ -509,26 +512,26 @@ merge_strategies.bar = "concat"
         e.as_mut_log().insert("foo", json!([1, 3]));
         e.as_mut_log().insert("bar", json!([1, 3]));
         e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 2");
         e.as_mut_log().insert("foo", json!([2, 4]));
         e.as_mut_log().insert("bar", json!([2, 4]));
         e.as_mut_log().insert("request_id", "2");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 3");
         e.as_mut_log().insert("foo", json!([5, 7]));
         e.as_mut_log().insert("bar", json!([5, 7]));
         e.as_mut_log().insert("request_id", "1");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 4");
         e.as_mut_log().insert("foo", json!("done"));
         e.as_mut_log().insert("bar", json!("done"));
         e.as_mut_log().insert("request_id", "1");
         e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(
@@ -548,14 +551,14 @@ merge_strategies.bar = "concat"
         e.as_mut_log().insert("foo", json!([6, 8]));
         e.as_mut_log().insert("bar", json!([6, 8]));
         e.as_mut_log().insert("request_id", "2");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         let mut e = Event::from("test message 6");
         e.as_mut_log().insert("foo", json!("done"));
         e.as_mut_log().insert("bar", json!("done"));
         e.as_mut_log().insert("request_id", "2");
         e.as_mut_log().insert("test_end", "yep");
-        reduce.transform_into(&mut outputs, e);
+        reduce.transform(&mut outputs, e);
 
         assert_eq!(outputs.len(), 1);
         assert_eq!(

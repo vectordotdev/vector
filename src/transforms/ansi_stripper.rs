@@ -5,9 +5,8 @@ use crate::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
         ANSIStripperFieldMissing,
     },
-    Event,
-    Result,
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
+    Event, Result,
 };
 use serde::{Deserialize, Serialize};
 
@@ -32,7 +31,7 @@ impl TransformConfig for AnsiStripperConfig {
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
 
-        Ok(Transform::from(AnsiStripper { field }))
+        Ok(Transform::function(AnsiStripper { field }))
     }
 
     fn input_type(&self) -> DataType {
@@ -53,7 +52,7 @@ pub struct AnsiStripper {
 }
 
 impl FunctionTransform for AnsiStripper {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
@@ -72,16 +71,14 @@ impl FunctionTransform for AnsiStripper {
 
         emit!(ANSIStripperEventProcessed);
 
-        Some(event)
+        output.push(event);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::AnsiStripper;
-    use crate::{
-        event::{Event, Value},
-    };
+    use super::*;
+    use crate::event::{Event, Value};
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {
@@ -91,7 +88,7 @@ mod tests {
                 };
 
                 let event = Event::from($in);
-                let event = transform.transform(event).unwrap();
+                let event = transform.transform_one(event).unwrap();
 
                 assert_eq!(
                     event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),

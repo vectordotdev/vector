@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
     mapping::{parser::parse as parse_mapping, Mapping},
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
     Result,
 };
 use serde::{Deserialize, Serialize};
@@ -26,7 +26,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
     async fn build(&self, _cx: TransformContext) -> Result<Transform> {
-        Remap::new(self.clone()).map(Transform::from)
+        Remap::new(self.clone()).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -58,7 +58,7 @@ impl Remap {
 }
 
 impl FunctionTransform for Remap {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemapEventProcessed);
 
         if let Err(error) = self.mapping.execute(&mut event) {
@@ -68,11 +68,11 @@ impl FunctionTransform for Remap {
             });
 
             if self.drop_on_err {
-                return None;
+                return;
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -107,7 +107,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let result = tform.transform(event).unwrap();
+        let result = tform.transform_one(event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
         assert_eq!(get_field_string(&result, "copy_from"), "buz");
         assert_eq!(get_field_string(&result, "foo"), "bar");

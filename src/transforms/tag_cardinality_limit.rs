@@ -4,7 +4,7 @@ use crate::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
     },
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
     Event,
 };
 use bloom::{BloomFilter, ASMS};
@@ -75,7 +75,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {}
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::from(TagCardinalityLimit::new(self.clone())))
+        Ok(Transform::function(TagCardinalityLimit::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -193,7 +193,7 @@ impl TagCardinalityLimit {
 }
 
 impl FunctionTransform for TagCardinalityLimit {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(TagCardinalityLimitEventProcessed);
         match event.as_mut_metric().tags {
             Some(ref mut tags_map) => {
@@ -205,7 +205,7 @@ impl FunctionTransform for TagCardinalityLimit {
                                     tag_key: &key,
                                     tag_value: &value,
                                 });
-                                return None;
+                                return;
                             }
                         }
                     }
@@ -225,16 +225,16 @@ impl FunctionTransform for TagCardinalityLimit {
                         }
                     }
                 }
-                Some(event)
+                output.push(event)
             }
-            None => Some(event),
-        }
+            None => output.push(event),
+        };
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{LimitExceededAction, TagCardinalityLimit, TagCardinalityLimitConfig};
+    use super::*;
     use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
     use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
@@ -296,9 +296,9 @@ mod tests {
             vec![("tag1".into(), "val3".into())].into_iter().collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3);
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3);
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);
@@ -341,9 +341,9 @@ mod tests {
         .collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone()).unwrap();
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3.clone()).unwrap();
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);
@@ -405,9 +405,9 @@ mod tests {
         .collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone()).unwrap();
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3.clone()).unwrap();
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);

@@ -3,8 +3,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
+    transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
-    transforms::{Transform, FunctionTransform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -39,12 +39,12 @@ impl TransformConfig for TokenizerConfig {
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
 
-        Tokenizer::new(
+        Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
             field,
             drop_field,
             types,
-        ).map(Transform::from)
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -91,7 +91,7 @@ impl Tokenizer {
 }
 
 impl FunctionTransform for Tokenizer {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -116,7 +116,7 @@ impl FunctionTransform for Tokenizer {
 
         emit!(TokenizerEventProcessed);
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -154,7 +154,7 @@ mod tests {
         .await
         .unwrap();
 
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

@@ -89,7 +89,7 @@ struct TimerConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Lua::new(&self)
+        Lua::new(&self).map(Transform::function)
     }
 
     pub fn input_type(&self) -> DataType {
@@ -343,20 +343,19 @@ fn format_error(error: &rlua::Error) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_error, Lua};
+    use super::*;
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
             Event, Value,
         },
         test_util::trace_init,
-        transforms::Transform,
+        transforms::{StreamTransform},
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::{stream, Stream};
+    use futures::{compat::Stream01CompatExt, StreamExt};
 
-    fn from_config(config: &str) -> crate::Result<Lua> {
-        Lua::new(&toml::from_str(config).unwrap())
+    fn from_config(config: &str) -> crate::Result<Box<Lua>> {
+        Lua::new(&toml::from_str(config).unwrap()).map(Box::new)
     }
 
     #[test]
@@ -376,7 +375,7 @@ mod tests {
 
         let event = Event::from("program me");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["hello"], "goodbye".into());
     }
@@ -399,7 +398,7 @@ mod tests {
 
         let event = Event::from("Hello, my name is Bob.");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["name"], "Bob".into());
     }
@@ -421,7 +420,7 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("name", "Bob");
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert!(event.as_log().get("name").is_none());
     }
@@ -442,13 +441,13 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("name", "Bob");
-        let event = transform.transform(event);
+        let event = transform.transform_one(event);
 
         assert!(event.is_none());
     }
 
-    #[test]
-    fn lua_duplicate_event() {
+    #[tokio::test]
+    async fn lua_duplicate_event() {
         trace_init();
 
         let mut transform = from_config(
@@ -464,8 +463,9 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("host", "127.0.0.1");
-        let mut out = Vec::new();
-        transform.transform_into(&mut out, event);
+        let mut input = futures01::stream::iter_ok(Vec::new().into_iter());
+        let output = transform.transform(Box::new(input));
+        let out = output.compat().collect::<Vec<_>>().await;
 
         assert_eq!(out.len(), 2);
     }
@@ -490,7 +490,7 @@ mod tests {
         .unwrap();
 
         let event = Event::new_empty_log();
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["result"], "empty".into());
     }
@@ -510,7 +510,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log()["number"], Value::Integer(3));
     }
 
@@ -529,7 +529,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log()["number"], Value::Float(3.14159));
     }
 
@@ -548,7 +548,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log()["bool"], Value::Boolean(true));
     }
 
@@ -567,7 +567,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log().get("junk"), None);
     }
 
@@ -608,7 +608,7 @@ mod tests {
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log().get("result"), None);
     }
 
@@ -690,7 +690,7 @@ mod tests {
 
         let mut transform = from_config(&config).unwrap();
         let event = Event::new_empty_log();
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["new field"], "new value".into());
     }
@@ -716,7 +716,7 @@ mod tests {
         event.as_mut_log().insert("name", "Bob");
         event.as_mut_log().insert("friend", "Alice");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["name"], "nameBob".into());
         assert_eq!(event.as_log()["friend"], "friendAlice".into());
@@ -753,7 +753,7 @@ mod tests {
             value: MetricValue::Counter { value: 2.0 },
         });
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event, expected);
     }
@@ -773,15 +773,14 @@ mod tests {
         )
         .unwrap();
 
-        let n = 10;
+        let n: usize = 10;
 
         let events = (0..n).map(|i| Event::from(format!("program me {}", i)));
 
-        let stream =
-            Transform::transform_stream(Box::new(transform), Box::new(stream::iter_ok(events)));
+        let mut input = futures01::stream::iter_ok(events);
+        let output = transform.transform(Box::new(input));
+        let out = output.compat().collect::<Vec<_>>().await;
 
-        let results = stream.collect().compat().await.unwrap();
-
-        assert_eq!(results.len(), n);
+        assert_eq!(out.len(), n);
     }
 }

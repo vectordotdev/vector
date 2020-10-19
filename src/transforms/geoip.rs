@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
     Result,
 };
 use serde::{Deserialize, Serialize};
@@ -37,7 +37,7 @@ impl GenerateConfig for GeoipConfig {}
 impl TransformConfig for GeoipConfig {
     async fn build(&self, _cx: TransformContext) -> Result<Transform> {
         let reader = maxminddb::Reader::open_readfile(self.database.clone())?;
-        Ok(Box::new(Geoip::new(
+        Ok(Transform::function(Geoip::new(
             reader,
             self.source.clone(),
             self.target.clone(),
@@ -183,7 +183,7 @@ impl FunctionTransform for Geoip {
 #[cfg(feature = "transforms-json_parser")]
 #[cfg(test)]
 mod tests {
-    use super::Geoip;
+    use super::*;
     use crate::{
         event::Event,
         transforms::json_parser::{JsonParser, JsonParserConfig},
@@ -194,11 +194,11 @@ mod tests {
     fn geoip_city_lookup_success() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#);
-        let event = parser.transform(event).unwrap();
+        let event = parser.transform_one(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, "remote_addr".into(), "geo".to_string());
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "Boxford");
@@ -220,11 +220,11 @@ mod tests {
     fn geoip_city_lookup_partial_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#);
-        let event = parser.transform(event).unwrap();
+        let event = parser.transform_one(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, "remote_addr".into(), "geo".to_string());
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "");
@@ -246,11 +246,11 @@ mod tests {
     fn geoip_city_lookup_no_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
-        let event = parser.transform(event).unwrap();
+        let event = parser.transform_one(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-City-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, "remote_addr".into(), "geo".to_string());
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("city_name", "");
@@ -272,11 +272,11 @@ mod tests {
     fn geoip_isp_lookup_success() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#);
-        let event = parser.transform(event).unwrap();
+        let event = parser.transform_one(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoIP2-ISP-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, "remote_addr".to_string(), "geo".to_string());
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "701");
@@ -298,11 +298,11 @@ mod tests {
     fn geoip_isp_lookup_partial_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#);
-        let event = parser.transform(event).unwrap();
+        let event = parser.transform_one(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoLite2-ASN-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, "remote_addr".to_string(), "geo".to_string());
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "6939");
@@ -321,11 +321,11 @@ mod tests {
     fn geoip_isp_lookup_no_results() {
         let mut parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
-        let event = parser.transform(event).unwrap();
+        let event = parser.transform_one(event).unwrap();
         let reader = maxminddb::Reader::open_readfile("tests/data/GeoLite2-ASN-Test.mmdb").unwrap();
 
         let mut augment = Geoip::new(reader, "remote_addr".to_string(), "geo".to_string());
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
         exp_geoip_attr.insert("autonomous_system_number", "0");

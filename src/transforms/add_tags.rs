@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,10 @@ impl GenerateConfig for AddTagsConfig {}
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(AddTags::new(self.tags.clone(), self.overwrite)))
+        Ok(Transform::function(AddTags::new(
+            self.tags.clone(),
+            self.overwrite,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -89,7 +92,7 @@ impl FunctionTransform for AddTags {
 
 #[cfg(test)]
 mod tests {
-    use super::AddTags;
+    use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
@@ -115,7 +118,7 @@ mod tests {
         .collect();
 
         let mut transform = AddTags::new(map, true);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 2);
@@ -141,7 +144,7 @@ mod tests {
 
         let mut transform = AddTags::new(map, false);
 
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));

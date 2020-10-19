@@ -5,8 +5,8 @@ use crate::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
         RegexParserMissingField, RegexParserTargetExists,
     },
+    transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
-    transforms::{Transform, FunctionTransform},
 };
 use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
@@ -185,7 +185,7 @@ impl RegexParser {
 
         let types = parse_check_conversion_map(&config.types, names)?;
 
-        Ok(Box::new(RegexParser::new(
+        Ok(Transform::function(RegexParser::new(
             regexset,
             patterns,
             field,
@@ -235,7 +235,7 @@ impl RegexParser {
 }
 
 impl FunctionTransform for RegexParser {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
         emit!(RegexParserEventProcessed);
@@ -246,7 +246,12 @@ impl FunctionTransform for RegexParser {
                 Some(id) => id,
                 None => {
                     emit!(RegexParserFailedMatch { value });
-                    return if self.drop_failed { None } else { Some(event) };
+                    if self.drop_failed {
+                        return;
+                    } else {
+                        output.push(event);
+                        return;
+                    };
                 }
             };
 
@@ -265,7 +270,8 @@ impl FunctionTransform for RegexParser {
                             log.remove(target_field);
                         } else {
                             emit!(RegexParserTargetExists { target_field });
-                            return Some(event);
+                            output.push(event);
+                            return;
                         }
                     }
                 }
@@ -279,16 +285,17 @@ impl FunctionTransform for RegexParser {
                 if self.drop_field {
                     log.remove(&self.field);
                 }
-                return Some(event);
+                output.push(event);
+                return;
             }
         } else {
             emit!(RegexParserMissingField { field: &self.field });
         }
 
         if self.drop_failed {
-            None
+            ();
         } else {
-            Some(event)
+            output.push(event);
         }
     }
 }
@@ -321,7 +328,7 @@ mod tests {
         .await
         .unwrap();
 
-        parser.transform(event).map(|event| event.into_log())
+        parser.transform_one(event).map(|event| event.into_log())
     }
 
     #[tokio::test]
