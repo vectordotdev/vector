@@ -89,8 +89,8 @@ pub struct UnixSocketEventSent {
 
 impl InternalEvent for UnixSocketEventSent {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1, "mode" => "unix");
-        counter!("bytes_processed", self.byte_size as u64, "mode" => "unix");
+        counter!("events_processed_total", 1, "mode" => "unix");
+        counter!("processed_bytes_total", self.byte_size as u64, "mode" => "unix");
     }
 }
 

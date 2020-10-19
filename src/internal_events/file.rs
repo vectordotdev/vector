@@ -21,11 +21,11 @@ impl InternalEvent for FileEventReceived<'_> {
 
     fn emit_metrics(&self) {
         counter!(
-            "events_processed", 1,
+            "events_processed_total", 1,
             "file" => self.file.to_owned(),
         );
         counter!(
-            "bytes_processed", self.byte_size as u64,
+            "processed_bytes_total", self.byte_size as u64,
             "file" => self.file.to_owned(),
         );
     }

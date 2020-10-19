@@ -6,7 +6,7 @@ pub struct SamplerEventProcessed;
 
 impl InternalEvent for SamplerEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -15,6 +15,6 @@ pub struct SamplerEventDiscarded;
 
 impl InternalEvent for SamplerEventDiscarded {
     fn emit_metrics(&self) {
-        counter!("events_discarded", 1);
+        counter!("events_discarded_total", 1);
     }
 }

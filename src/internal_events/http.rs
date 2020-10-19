@@ -17,8 +17,8 @@ impl InternalEvent for HTTPEventsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", self.events_count as u64);
-        counter!("bytes_processed", self.byte_size as u64);
+        counter!("events_processed_total", self.events_count as u64);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -39,6 +39,6 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_bad_requests", 1);
+        counter!("http_bad_requests_total", 1);
     }
 }

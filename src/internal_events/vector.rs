@@ -9,8 +9,8 @@ pub struct VectorEventSent {
 
 impl InternalEvent for VectorEventSent {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
-        counter!("bytes_processed", self.byte_size as u64);
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -25,8 +25,8 @@ impl InternalEvent for VectorEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
-        counter!("bytes_processed", self.byte_size as u64);
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
