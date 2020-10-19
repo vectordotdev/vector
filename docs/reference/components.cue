@@ -311,7 +311,7 @@ components: {
 			descriptions: {
 				if features.buffer != _|_ {
 					if features.buffer.enabled == true {
-						buffer: "Buffer your data in-memory or on-disk for performance and durability."
+						buffer: "Buffers data in-memory or on-disk for performance and durability."
 					}
 				}
 
@@ -321,7 +321,7 @@ components: {
 					}
 
 					if features.collect.checkpoint.enabled != _|_ {
-						checkpoint: "Efficiently collects data and checkpoints your position to ensure data is not lost between restarts."
+						checkpoint: "Efficiently collects data and checkpoints read positions to ensure data is not lost between restarts."
 					}
 
 					if features.collect.tls.enabled != _|_ {

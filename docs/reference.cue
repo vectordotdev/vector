@@ -614,10 +614,6 @@ _values: {
 	// read.
 	category?: string
 
-	if strings.HasSuffix(name, "_key") {
-		category: "Mapping"
-	}
-
 	if type.object != _|_ {
 		category: strings.ToTitle(name)
 	}
