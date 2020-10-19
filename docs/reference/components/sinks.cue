@@ -11,7 +11,7 @@ components: sinks: [Name=string]: {
 		if sinks[Name].features.send != _|_ && sinks[Name].features.send.batch != _|_ {
 			if sinks[Name].features.send.batch.enabled {
 				batch: {
-					common:      false
+					common:      sinks[Name].features.send.batch.common
 					description: "Configures the sink batching behavior."
 					required:    false
 					type: object: {
@@ -63,17 +63,19 @@ components: sinks: [Name=string]: {
 					examples: []
 					options: {
 						max_events: {
-							common:      true
-							description: "The maximum number of [events][docs.data-model] allowed in the buffer."
-							required:    false
+							common:        true
+							description:   "The maximum number of [events][docs.data-model] allowed in the buffer."
+							required:      false
+							relevant_when: "type = \"memory\""
 							type: uint: {
 								default: 500
 								unit:    "events"
 							}
 						}
 						max_size: {
-							description: "The maximum size of the buffer on the disk."
-							required:    true
+							description:   "The maximum size of the buffer on the disk."
+							required:      true
+							relevant_when: "type = \"disk\""
 							type: uint: {
 								examples: [104900000]
 								unit: "bytes"
@@ -257,7 +259,7 @@ components: sinks: [Name=string]: {
 							}
 							timeout_secs: {
 								common:      true
-								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
+								description: "The maximum time a request can take before being aborted. It is highly recommended that you do not lower this value below the service's internal timeout, as this could create orphaned requests, pile on retries, and result in duplicate data downstream."
 								required:    false
 								type: uint: {
 									default: sinks[Name].features.send.request.timeout_secs
@@ -272,15 +274,57 @@ components: sinks: [Name=string]: {
 
 		if sinks[Name].features.send != _|_ {
 			if sinks[Name].features.send.tls.enabled {
-				tls: configuration._tls & {_args: {
-					can_enable:      sinks[Name].features.send.tls.can_enable
-					enabled_default: sinks[Name].features.send.tls.enabled_default
+				tls: configuration._tls_connect & {_args: {
+					can_enable:             sinks[Name].features.send.tls.can_enable
+					can_verify_certificate: sinks[Name].features.send.tls.can_enable
+					can_verify_hostname:    sinks[Name].features.send.tls.can_verify_hostname
+					enabled_default:        sinks[Name].features.send.tls.enabled_default
 				}}
 			}
 		}
 	}
 
 	how_it_works: {
+		if sinks[Name].features.buffer.enabled {
+			if sinks[Name].features.send != _|_ {
+				if sinks[Name].features.send.batch != _|_ {
+					if sinks[Name].features.send.batch.enabled {
+						buffers_batches: {
+							title: "Buffers & Batches"
+							body: #"""
+									<SVG src="/img/buffers-and-batches-serial.svg" />
+
+									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
+									differently, instead of treating them as global concepts, Vector treats them
+									as sink specific concepts. This isolates sinks, ensuring services disruptions
+									are contained and delivery guarantees are honored.
+
+									*Batches* are flushed when 1 of 2 conditions are met:
+
+									1. The batch age meets or exceeds the configured `timeout_secs`.
+									2. The batch size meets or exceeds the configured <% if component.options.batch.children.respond_to?(:max_size) %>`max_size`<% else %>`max_events`<% end %>.
+
+									*Buffers* are controlled via the [`buffer.*`](#buffer) options.
+									"""#
+						}
+					}
+				}
+			}
+
+			if sinks[Name].features.send == _|_ {
+				buffers: {
+					title: "Buffers"
+					body: """
+						<SVG src="/img/buffers.svg" />
+
+						This component buffers events as shown in
+						the diagram above. This helps to smooth out data processing if the downstream
+						service applies backpressure. Buffers are controlled via the
+						[`buffer.*`](#buffer) options.
+						"""
+				}
+			}
+		}
 		if sinks[Name].features.healthcheck.enabled {
 			healthchecks: {
 				title: "Health Checks"

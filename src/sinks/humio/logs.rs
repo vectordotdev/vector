@@ -4,6 +4,7 @@ use crate::{
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
+    sinks::{Healthcheck, VectorSink},
     template::Template,
 };
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,7 @@ pub struct HumioLogsConfig {
     token: String,
     // Deprecated name
     #[serde(alias = "host")]
-    endpoint: Option<String>,
+    pub(in crate::sinks::humio) endpoint: Option<String>,
     source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -26,10 +27,10 @@ pub struct HumioLogsConfig {
     event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
-    pub host_key: String,
+    host_key: String,
 
     #[serde(default)]
-    pub compression: Compression,
+    compression: Compression,
 
     #[serde(default)]
     request: TowerRequestConfig,
@@ -69,10 +70,7 @@ impl From<Encoding> for splunk_hec::Encoding {
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]
 impl SinkConfig for HumioLogsConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         self.build_hec_config().build(cx).await
     }
 

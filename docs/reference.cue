@@ -49,9 +49,25 @@ _values: {
 		// For example, "AWS" is a service provider for many services, and
 		// a user on AWS can use this to filter for AWS supported
 		// components.
-		service_providers: [...string]
+		service_providers: [...string] | *[]
 	}
 }
+
+#Commit: {
+	author:           string
+	breaking_change:  bool
+	date:             #Date
+	description:      string
+	deletions_count:  uint
+	files_count:      uint
+	insertions_count: uint
+	pr_number:        uint | null
+	scopes:           [string, ...] | []
+	sha:              #CommitSha
+	type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status"
+}
+
+#CommitSha: =~"^[a-z0-9]{40}$"
 
 // `#ComponentKind` represent the kind of component.
 #ComponentKind: "sink" | "source" | "transform"
@@ -68,10 +84,7 @@ _values: {
 	// It is used for SEO purposes and should be full of relevant keywords.
 	description?: =~"[.]$"
 
-	// `title` is the human friendly title for the component.
-	//
-	// For example, the `http` sink has a `HTTP` title.
-	title: string
+	env_vars: #EnvVars
 
 	// `type` is the component identifier. This is set automatically.
 	type: Type
@@ -136,6 +149,11 @@ _values: {
 
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
+
+	// `title` is the human friendly title for the component.
+	//
+	// For example, the `http` sink has a `HTTP` title.
+	title: string
 }
 
 // `#CompressionAlgorithm` specified data compression algorithm.
@@ -145,6 +163,8 @@ _values: {
 #CompressionAlgorithm: "none" | "gzip"
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
+
+#Date: =~"^\\d{4}-\\d{2}-\\d{2}"
 
 // `#DeliveryStatus` documents the delivery guarantee.
 //
@@ -177,7 +197,7 @@ _values: {
 //
 // * `batch` - one or more events at a time
 // * `stream` - one event at a time
-#EgressMethod: "aggregate" | "batch" | "stream"
+#EgressMethod: "batch" | "expose" | "stream"
 
 #EncodingCodec: "json" | "ndjson" | "text"
 
@@ -189,6 +209,12 @@ _values: {
 //                }
 #Enum: [Name=_]: string
 
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+	type: string: default: null
+}}
+
 #Event: {
 	close({log: #LogEvent}) |
 	close({metric: #MetricEvent})
@@ -199,6 +225,8 @@ _values: {
 // * `log` - log event
 // * `metric` - metric event
 #EventType: "log" | "metric"
+
+#Fields: [Name=string]: #Fields | _
 
 #Interface: {
 	close({binary: #InterfaceBinary}) |
@@ -247,27 +275,22 @@ _values: {
 	let Args = _args
 
 	if Args.kind == "source" {
-		collect?: #FeaturesCollect & {_args: {kind: Args.kind}}
-		receive?: #FeaturesReceive & {_args: {kind: Args.kind}}
-		test?:    close({})
-
-		// `multiline` should be enabled for sources that offer the ability
-		// to merge multiple lines together.
-		multiline: close({
-			enabled: bool
-		})
+		collect?:  #FeaturesCollect
+		generate?: #FeaturesGenerate
+		multiline: #FeaturesMultiline
+		receive?:  #FeaturesReceive
 	}
 
 	if Args.kind == "transform" {
-		convert?:  close({})
+		convert?:  #FeaturesConvert
 		enrich?:   #FeaturesEnrich
-		filter?:   close({})
+		filter?:   #FeaturesFilter
 		parse?:    #FeaturesParse
 		program?:  #FeaturesProgram
-		reduce?:   close({})
-		route?:    close({})
-		sanitize?: close({})
-		shape?:    close({})
+		reduce?:   #FeaturesReduce
+		route?:    #FeaturesRoute
+		sanitize?: #FeaturesSanitize
+		shape?:    #FeaturesShape
 	}
 
 	if Args.kind == "sink" {
@@ -281,25 +304,23 @@ _values: {
 			enabled: bool
 		})
 
-		exposes?: close({})
+		exposes?: #FeaturesExpose
 		send?:    #FeaturesSend & {_args: Args}
 	}
+
+	descriptions: [Name=string]: string
 }
 
 #FeaturesCollect: {
-	_args: {
-		kind: string
-	}
-	let Args = _args
-
-	// `checkpoint` describes how the component checkpoints its read
-	// position.
 	checkpoint: close({
 		enabled: bool
 	})
 
 	from?: #Service
-	tls?:  #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
+}
+
+#FeaturesConvert: {
 }
 
 #FeaturesEnrich: {
@@ -310,10 +331,24 @@ _values: {
 	})
 }
 
+#FeaturesExpose: {
+	for: #Service
+}
+
+#FeaturesFilter: {
+}
+
+#FeaturesGenerate: {
+}
+
+#FeaturesMultiline: {
+	enabled: bool
+}
+
 #FeaturesParse: {
 	format: close({
 		name:     string
-		url:      string
+		url:      string | null
 		versions: string | null
 	})
 }
@@ -323,13 +358,20 @@ _values: {
 }
 
 #FeaturesReceive: {
-	_args: {
-		kind: string
-	}
-	let Args = _args
-
 	from?: #Service
-	tls:   #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+}
+
+#FeaturesReduce: {
+}
+
+#FeaturesRoute: {
+}
+
+#FeaturesSanitize: {
+}
+
+#FeaturesShape: {
 }
 
 #FeaturesSend: {
@@ -347,7 +389,7 @@ _values: {
 			common:       bool
 			max_bytes:    uint | null
 			max_events:   uint | null
-			timeout_secs: uint8
+			timeout_secs: uint16
 		})
 	}
 
@@ -395,14 +437,14 @@ _values: {
 
 	// `tls` describes if the component secures network communication
 	// via TLS.
-	tls: #FeaturesTLS & {_args: {kind: Args.kind}}
+	tls: #FeaturesTLS & {_args: {mode: "connect"}}
 
 	to?: #Service
 }
 
 #FeaturesTLS: {
 	_args: {
-		kind: string
+		mode: "accept" | "connect"
 	}
 	let Args = _args
 	enabled: bool
@@ -410,7 +452,7 @@ _values: {
 	if enabled {
 		can_enable:             bool
 		can_verify_certificate: bool
-		if Args.kind == "sink" {
+		if Args.mode == "connect" {
 			can_verify_hostname: bool
 		}
 		enabled_default: bool
@@ -457,6 +499,7 @@ _values: {
 #MetricEvent: {
 	name: string
 	tags: [Name=string]: string
+	timestamp?: string
 	close({counter: #MetricEventCounter}) |
 	close({distribution: #MetricEventDistribution}) |
 	close({gauge: #MetricEventGauge}) |
@@ -514,6 +557,8 @@ _values: {
 
 #MetricType: "counter" | "gauge" | "histogram" | "summary"
 
+#Object: {[_=string]: #Any}
+
 #Output: {
 	logs?:    #LogOutput
 	metrics?: #MetricOutput
@@ -536,10 +581,18 @@ _values: {
 
 #Protocol: "http" | "tcp" | "udp" | "unix"
 
+#Releases: [Name=string]: {
+	codename: string
+	date:     string
+
+	commits: [#Commit, ...]
+	whats_next: #Any
+}
+
 #Runtime: {
 	name:    string
 	url:     string
-	version: string
+	version: string | null
 }
 
 #Service: {
@@ -560,10 +613,6 @@ _values: {
 	// "Context" category to make generated configuration examples easier to
 	// read.
 	category?: string
-
-	if strings.HasSuffix(name, "_key") {
-		category: "Mapping"
-	}
 
 	if type.object != _|_ {
 		category: strings.ToTitle(name)
@@ -728,7 +777,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples: [...#Any]
+	examples: [#Object] | *[]
 
 	// `options` represent the child options for this option.
 	options: #Schema
@@ -751,13 +800,15 @@ _values: {
 	//      }
 	enum?: #Enum
 
-	// `examples` demonstrates example values. This should be used when
-	// examples cannot be derived from the `default` or `enum` options.
-	examples: [...string] | *[
-			for k, v in enum {
-			k
-		},
-	]
+	if enum == _|_ {
+		// `examples` demonstrates example values. This should be used when
+		// examples cannot be derived from the `default` or `enum` options.
+		examples: [...string] | *[
+				for k, v in enum {
+				k
+			},
+		]
+	}
 
 	// `templateable` means that the option supports dynamic templated
 	// values.
@@ -809,3 +860,38 @@ components: close({
 data_model: close({
 	schema: #Schema
 })
+
+releases: #Releases
+
+remap: {
+	errors: [Name=string]: {
+		description: string
+		name:        Name
+	}
+
+	functions: [Name=string]: {
+		arguments: [
+			...{
+				required: bool
+
+				if !required {
+					name: string
+				}
+
+				type: "float" | "int" | "string"
+			},
+		]
+		category:    "coerce" | "parse"
+		description: string
+		examples: [
+			{
+				title:  string
+				input:  #Fields
+				source: string
+				output: #Fields
+			},
+			...,
+		]
+		name: Name
+	}
+}

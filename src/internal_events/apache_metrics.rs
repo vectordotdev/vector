@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use crate::sources::apache_metrics;
-use http::Uri;
 use metrics::{counter, histogram};
 use std::time::Instant;
 
@@ -39,12 +38,12 @@ impl InternalEvent for ApacheMetricsRequestCompleted {
 }
 
 #[derive(Debug)]
-pub struct ApacheMetricsParseError {
+pub struct ApacheMetricsParseError<'a> {
     pub error: apache_metrics::ParseError,
-    pub url: Uri,
+    pub url: &'a str,
 }
 
-impl InternalEvent for ApacheMetricsParseError {
+impl InternalEvent for ApacheMetricsParseError<'_> {
     fn emit_logs(&self) {
         error!(message = "Parsing error.", url = %self.url, error = %self.error);
         debug!(
@@ -60,12 +59,12 @@ impl InternalEvent for ApacheMetricsParseError {
 }
 
 #[derive(Debug)]
-pub struct ApacheMetricsErrorResponse {
+pub struct ApacheMetricsErrorResponse<'a> {
     pub code: hyper::StatusCode,
-    pub url: Uri,
+    pub url: &'a str,
 }
 
-impl InternalEvent for ApacheMetricsErrorResponse {
+impl InternalEvent for ApacheMetricsErrorResponse<'_> {
     fn emit_logs(&self) {
         error!(message = "HTTP error response.", url = %self.url, code = %self.code);
     }
@@ -76,12 +75,12 @@ impl InternalEvent for ApacheMetricsErrorResponse {
 }
 
 #[derive(Debug)]
-pub struct ApacheMetricsHttpError {
+pub struct ApacheMetricsHttpError<'a> {
     pub error: hyper::Error,
-    pub url: Uri,
+    pub url: &'a str,
 }
 
-impl InternalEvent for ApacheMetricsHttpError {
+impl InternalEvent for ApacheMetricsHttpError<'_> {
     fn emit_logs(&self) {
         error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
     }

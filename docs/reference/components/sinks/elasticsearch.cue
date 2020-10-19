@@ -152,7 +152,12 @@ components: sinks: elasticsearch: {
 			required:    false
 			warnings: []
 			type: object: {
-				examples: [{"Authorization": "${ELASTICSEARCH_TOKEN}"}, {"X-Powered-By": "Vector"}]
+				examples: [
+					{
+						"Authorization": "${ELASTICSEARCH_TOKEN}"
+						"X-Powered-By":  "Vector"
+					},
+				]
 				options: {}
 			}
 		}
@@ -174,6 +179,7 @@ components: sinks: elasticsearch: {
 			type: string: {
 				default: "vector-%F"
 				examples: ["application-{{ application_id }}-%Y-%m-%d", "vector-%Y-%m-%d"]
+				templateable: true
 			}
 		}
 		pipeline: {
