@@ -83,6 +83,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b602bfe940d21c130f3895acd65221e8a61270debe89d628b9cb4e3ccb8569b"
 
 [[package]]
+name = "anymap"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33954243bd79057c2de7338850b85983a44588021f8a5fee574a8888c6de4344"
+
+[[package]]
 name = "approx"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6173,6 +6179,7 @@ name = "vector"
 version = "0.11.0"
 dependencies = [
  "anyhow",
+ "anymap",
  "approx",
  "assert_cmd",
  "async-compression",
@@ -6279,6 +6286,7 @@ dependencies = [
  "sha-1 0.9.1",
  "sha2",
  "sha3",
+ "slab",
  "smpl_jwt",
  "snafu",
  "stream-cancel",
