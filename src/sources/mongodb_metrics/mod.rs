@@ -27,7 +27,6 @@ use tokio::{
     select,
     time::{interval, Duration},
 };
-use url::{ParseError, Url};
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
@@ -67,10 +66,6 @@ enum BuildError {
     InvalidEndpoint { source: MongoError },
     #[snafu(display("invalid client options: {:?}", source))]
     InvalidClientOptions { source: MongoError },
-    #[snafu(display("invalid endpoint: {:?}", source))]
-    ParseEndpointError { source: ParseError },
-    #[snafu(display("error on username/password removal: {:?}", error))]
-    SanitizeEndpointError { error: &'static str },
     #[snafu(display("failed to execute `isMaster` command: {:?}", source))]
     CommandIsMasterMongoError { source: MongoError },
     #[snafu(display("failed to parse `isMaster` response: {:?}", source))]
@@ -191,11 +186,12 @@ impl MongoDBMetrics {
             .await
             .context(InvalidEndpoint)?;
         client_options.direct_connection = Some(true);
-        tags.insert("host".into(), client_options.hosts[0].to_string());
-        let client = Client::with_options(client_options).context(InvalidClientOptions)?;
 
-        let endpoint = Self::sanitize_endpoint(endpoint)?;
+        let endpoint = Self::sanitize_endpoint(endpoint, &client_options);
         tags.insert("endpoint".into(), endpoint.clone());
+        tags.insert("host".into(), client_options.hosts[0].to_string());
+
+        let client = Client::with_options(client_options).context(InvalidClientOptions)?;
 
         let node_type = Self::get_node_type(&client).await?;
         let build_info = Self::get_build_info(&client).await?;
@@ -214,18 +210,62 @@ impl MongoDBMetrics {
         })
     }
 
-    /// Remove `username` and `password` from URL endpoint.
-    fn sanitize_endpoint(endpoint: &str) -> Result<String, BuildError> {
-        let mut url = Url::parse(endpoint).context(ParseEndpointError)?;
-        url.set_username("")
-            .map_err(|_| BuildError::SanitizeEndpointError {
-                error: "failed to remove username from MongoDB endpoint",
-            })?;
-        url.set_password(None)
-            .map_err(|_| BuildError::SanitizeEndpointError {
-                error: "failed to remove password from MongoDB endpoint",
-            })?;
-        Ok(url.to_string())
+    /// Remove credentials from endpoint.
+    /// `.unwrap()` is safe because endpoint was already verified by `ClientOptions`.
+    /// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
+    /// See URL components at https://docs.mongodb.com/manual/reference/connection-string/#components
+    fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
+        let mut endpoint = endpoint.to_owned();
+        if options.credential.is_some() {
+            let start = endpoint.find("://").unwrap() + 3;
+
+            // Split `username:password@host[:port]` and `/defaultauthdb?<options>`
+            let pre_slash = match endpoint[start..].find('/') {
+                Some(index) => {
+                    let mut segments = endpoint[start..].split_at(index);
+                    // If we have databases and options
+                    if segments.1.len() > 1 {
+                        let lstart = start + segments.0.len() + 1;
+                        let post_slash = &segments.1[1..];
+                        if let Some(index) = post_slash.find('?') {
+                            let segments = post_slash.split_at(index);
+                            // If we have options
+                            if segments.1.len() > 1 {
+                                // Remove auth options
+                                let options = segments.1[1..]
+                                    .split('&')
+                                    .filter(|pair| {
+                                        let (key, _) = pair.split_at(pair.find('=').unwrap());
+                                        !matches!(
+                                            key.to_lowercase().as_str(),
+                                            "authsource"
+                                                | "authmechanism"
+                                                | "authmechanismproperties"
+                                        )
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("&");
+
+                                // Update endpoint
+                                endpoint = format!(
+                                    "{}{}",
+                                    &endpoint[..lstart + segments.0.len() + 1],
+                                    &options
+                                );
+                            }
+                        }
+                        segments = endpoint[start..].split_at(index);
+                    }
+                    segments.0
+                }
+                None => &endpoint[start..],
+            };
+
+            // Remove `username:password@`
+            let end = pre_slash.rfind('@').unwrap() + 1;
+            endpoint = format!("{}{}", &endpoint[0..start], &endpoint[start + end..]);
+        }
+        endpoint
     }
 
     /// Finding node type for client with `isMaster` command.
@@ -1007,6 +1047,14 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<MongoDBMetricsConfig>();
+    }
+
+    #[tokio::test]
+    async fn sanitize_endpoint() {
+        let endpoint = "mongodb://myDBReader:D1fficultP%40ssw0rd@mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?authSource=admin&tls=true";
+        let client_options = ClientOptions::parse(endpoint).await.unwrap();
+        let endpoint = MongoDBMetrics::sanitize_endpoint(endpoint, &client_options);
+        assert_eq!(&endpoint, "mongodb://mongos0.example.com:27017,mongos1.example.com:27017,mongos2.example.com:27017/?tls=true");
     }
 }
 
