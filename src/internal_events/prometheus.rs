@@ -56,7 +56,7 @@ impl<'a> InternalEvent for PrometheusParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors", 1);
+        counter!("parse_errors_total", 1);
     }
 }
 

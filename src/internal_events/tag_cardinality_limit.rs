@@ -29,7 +29,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingEvent<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("tag_value_limit_exceeded", 1);
+        counter!("tag_value_limit_exceeded_total", 1);
     }
 }
 
@@ -49,7 +49,7 @@ impl<'a> InternalEvent for TagCardinalityLimitRejectingTag<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("tag_value_limit_exceeded", 1);
+        counter!("tag_value_limit_exceeded_total", 1);
     }
 }
 
@@ -66,6 +66,6 @@ impl<'a> InternalEvent for TagCardinalityValueLimitReached<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("value_limit_reached", 1);
+        counter!("value_limit_reached_total", 1);
     }
 }

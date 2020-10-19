@@ -70,7 +70,7 @@ impl InternalEvent for ApacheMetricsErrorResponse<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_error_response", 1);
+        counter!("http_error_response_total", 1);
     }
 }
 
@@ -86,6 +86,6 @@ impl InternalEvent for ApacheMetricsHttpError<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_request_errors", 1);
+        counter!("http_request_errors_total", 1);
     }
 }

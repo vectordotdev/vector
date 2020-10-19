@@ -41,6 +41,6 @@ impl InternalEvent for VectorProtoDecodeError {
     }
 
     fn emit_metrics(&self) {
-        counter!("protobuf_decode_errors", 1);
+        counter!("protobuf_decode_errors_total", 1);
     }
 }

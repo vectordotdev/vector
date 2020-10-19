@@ -29,8 +29,8 @@ impl InternalEvent for StatsdInvalidRecord<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("invalid_record", 1,);
-        counter!("invalid_record_bytes", self.text.len() as u64,);
+        counter!("invalid_record_total", 1,);
+        counter!("invalid_record_bytes_total", self.text.len() as u64,);
     }
 }
 

@@ -28,6 +28,6 @@ impl InternalEvent for StdinReadFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("stdin_reads_failed", 1);
+        counter!("stdin_reads_failed_total", 1);
     }
 }

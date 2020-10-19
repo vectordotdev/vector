@@ -40,7 +40,7 @@ impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_events_processed", 1);
+        counter!("container_events_processed_total", 1);
     }
 }
 
@@ -76,7 +76,7 @@ impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("containers_unwatched", 1);
+        counter!("containers_unwatched_total", 1);
     }
 }
 
@@ -97,7 +97,7 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("communication_errors", 1);
+        counter!("communication_errors_total", 1);
     }
 }
 

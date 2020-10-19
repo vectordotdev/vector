@@ -219,7 +219,7 @@ impl InternalEvent for FileCheckpointed {
     }
 
     fn emit_metrics(&self) {
-        counter!("checkpoints", self.count as u64);
+        counter!("checkpoints_total", self.count as u64);
     }
 }
 
@@ -234,7 +234,7 @@ impl InternalEvent for FileCheckpointWriteFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("checkpoint_write_errors", 1);
+        counter!("checkpoint_write_errors_total", 1);
     }
 }
 
