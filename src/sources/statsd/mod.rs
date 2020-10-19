@@ -183,6 +183,7 @@ mod test {
     };
     use futures::{compat::Future01CompatExt, TryStreamExt};
     use futures01::Stream;
+    use tokio::io::AsyncWriteExt;
     use tokio::sync::mpsc;
     use tokio::time::{delay_for, Duration};
 
@@ -234,7 +235,6 @@ mod test {
             let addr = in_addr;
             tokio::spawn(async move {
                 while let Some(bytes) = receiver.recv().await {
-                    use tokio::io::AsyncWriteExt;
                     tokio::net::TcpStream::connect(addr)
                         .await
                         .unwrap()
@@ -260,7 +260,6 @@ mod test {
             let path = in_path;
             tokio::spawn(async move {
                 while let Some(bytes) = receiver.recv().await {
-                    use tokio::io::AsyncWriteExt;
                     tokio::net::UnixStream::connect(&path)
                         .await
                         .unwrap()
