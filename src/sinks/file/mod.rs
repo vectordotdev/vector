@@ -26,6 +26,7 @@ use tokio::{
 };
 mod bytes_path;
 use bytes_path::BytesPath;
+use std::convert::TryFrom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -48,7 +49,17 @@ inventory::submit! {
     SinkDescription::new::<FileSinkConfig>("file")
 }
 
-impl GenerateConfig for FileSinkConfig {}
+impl GenerateConfig for FileSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            path: Template::try_from("TODO").unwrap(),
+            idle_timeout_secs: None,
+            encoding: Default::default(),
+            compression: Default::default(),
+        })
+        .unwrap()
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -336,6 +347,11 @@ mod tests {
     };
     use futures::stream;
     use std::convert::TryInto;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<FileSinkConfig>();
+    }
 
     #[tokio::test]
     async fn single_partition() {
