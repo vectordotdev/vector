@@ -22,7 +22,7 @@ impl Function for CeilFn {
         let precision = optional!(ctx, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(ctx, self.query,
                             Value::Float(f) => {
-                                Value::Float(round_to_precision(f, precision, |f| f.ceil()))
+                                Value::Float(round_to_precision(f, precision, f64::ceil))
                             },
                             v@Value::Integer(_) => v
         );
