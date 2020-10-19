@@ -1,7 +1,9 @@
 use crate::{
     config::{self, GlobalOptions, SourceConfig, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
-    internal_events::{MongoDBMetricsBsonParseError, MongoDBMetricsRequestError},
+    internal_events::{
+        MongoDBMetricsBsonParseError, MongoDBMetricsCollectCompleted, MongoDBMetricsRequestError,
+    },
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
@@ -18,7 +20,7 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Instant};
 use tokio::{
     select,
     time::{interval, Duration},
@@ -144,7 +146,13 @@ impl SourceConfig for MongoDBMetricsConfig {
                         else => break,
                     };
 
+                    let start = Instant::now();
                     let metrics = mongodb.collect().await;
+                    emit!(MongoDBMetricsCollectCompleted {
+                        start,
+                        end: Instant::now()
+                    });
+
                     let mut stream = metrics.map(Event::Metric).map(Ok);
                     if let Err(()) = out.send_all(&mut stream).await {
                         error!(message = "Error sending mongodb metrics");

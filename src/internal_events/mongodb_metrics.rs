@@ -1,6 +1,24 @@
 use super::InternalEvent;
-use metrics::counter;
+use metrics::{counter, histogram};
 use mongodb::{bson, error::Error as MongoError};
+use std::time::Instant;
+
+#[derive(Debug)]
+pub struct MongoDBMetricsCollectCompleted {
+    pub start: Instant,
+    pub end: Instant,
+}
+
+impl InternalEvent for MongoDBMetricsCollectCompleted {
+    fn emit_logs(&self) {
+        debug!(message = "Collect completed.");
+    }
+
+    fn emit_metrics(&self) {
+        counter!("collect_completed", 1);
+        histogram!("collect_duration_nanoseconds", self.end - self.start);
+    }
+}
 
 pub struct MongoDBMetricsRequestError<'a> {
     pub error: MongoError,
