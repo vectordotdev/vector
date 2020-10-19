@@ -25,6 +25,6 @@ impl InternalEvent for DedupeEventDiscarded {
     }
 
     fn emit_metrics(&self) {
-        counter!("duplicate_events_discarded_total", 1);
+        counter!("events_discarded_total", 1);
     }
 }
