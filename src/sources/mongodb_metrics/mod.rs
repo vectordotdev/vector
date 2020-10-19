@@ -9,7 +9,9 @@ use crate::{
 };
 use chrono::Utc;
 use futures::{
-    compat::Sink01CompatExt, future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
+    compat::Sink01CompatExt,
+    future::{join_all, ready, try_join_all},
+    stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
 use mongodb::{
@@ -90,7 +92,7 @@ enum CollectError {
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 struct MongoDBMetricsConfig {
-    endpoint: String,
+    endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     #[serde(default = "default_namespace")]
@@ -131,7 +133,12 @@ impl SourceConfig for MongoDBMetricsConfig {
     ) -> crate::Result<super::Source> {
         let mut interval = interval(Duration::from_secs(self.scrape_interval_secs)).map(|_| ());
 
-        let mongodb = MongoDBMetrics::new(&self.endpoint, &self.namespace).await?;
+        let sources = try_join_all(
+            self.endpoints
+                .iter()
+                .map(|endpoint| MongoDBMetrics::new(endpoint, &self.namespace)),
+        )
+        .await?;
 
         let mut out = out
             .sink_map_err(|e| error!("error sending metric: {:?}", e))
@@ -147,13 +154,13 @@ impl SourceConfig for MongoDBMetricsConfig {
                     };
 
                     let start = Instant::now();
-                    let metrics = mongodb.collect().await;
+                    let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
                     emit!(MongoDBMetricsCollectCompleted {
                         start,
                         end: Instant::now()
                     });
 
-                    let mut stream = metrics.map(Event::Metric).map(Ok);
+                    let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
                     if let Err(()) = out.send_all(&mut stream).await {
                         error!(message = "Error sending mongodb metrics");
                     }
@@ -293,7 +300,7 @@ impl MongoDBMetrics {
             }
         };
 
-        stream::once(future::ready(self.create_metric(
+        stream::once(ready(self.create_metric(
             "up",
             gauge!(up_value),
             tags!(self.tags),
@@ -1007,11 +1014,11 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures::compat::Stream01CompatExt;
+    use futures::compat::{Future01CompatExt, Stream01CompatExt};
     use tokio::time::{timeout, Duration};
 
     async fn test_instance(endpoint: &'static str) {
-        let host = "localhost";
+        let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
         let (sender, recv) = Pipeline::new_test();
@@ -1019,7 +1026,7 @@ mod integration_tests {
 
         tokio::spawn(async move {
             MongoDBMetricsConfig {
-                endpoint: endpoint.to_owned(),
+                endpoints: vec![endpoint.to_owned()],
                 scrape_interval_secs: 15,
                 namespace: namespace.to_owned(),
             }
@@ -1060,7 +1067,7 @@ mod integration_tests {
             // validate basic tags
             let tags = metric.tags.expect("existed tags");
             assert_eq!(tags.get("endpoint").map(String::as_ref), Some(endpoint));
-            assert_eq!(tags.get("host").map(String::as_ref), Some(host));
+            assert_eq!(tags.get("host"), Some(&host));
         }
     }
 
