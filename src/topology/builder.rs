@@ -118,7 +118,7 @@ pub async fn build_pieces(
         let (output, control) = Fanout::new();
 
         let transform = match transform {
-            Transform::Function(t) => {
+            Transform::Function(_t) => {
                 // TODO(new-transform-enum): Handle
                 unimplemented!();
             }

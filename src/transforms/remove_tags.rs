@@ -49,7 +49,7 @@ impl RemoveTags {
 }
 
 impl FunctionTransform for RemoveTags {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemoveTagsEventProcessed);
 
         let tags = &mut event.as_mut_metric().tags;

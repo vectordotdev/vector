@@ -503,8 +503,8 @@ merge_strategies.bar = "concat"
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap()
-        .as_function();
+        .unwrap();
+        let reduce = reduce.as_function();
 
         let mut outputs = Vec::new();
 

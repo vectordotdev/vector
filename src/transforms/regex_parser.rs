@@ -44,7 +44,7 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        RegexParser::build(&self).map(Transform::from)
+        RegexParser::build(&self)
     }
 
     fn input_type(&self) -> DataType {

@@ -127,7 +127,7 @@ pub trait FunctionTransform: Send {
         deprecated = "Use `transform` and `output.extend(events)` or `output.push(event)`."
     )]
     fn transform_one(&mut self, event: Event) -> Option<Event> {
-        let buf = Vec::with_capacity(1);
+        let mut buf = Vec::with_capacity(1);
         self.transform(&mut buf, event);
         buf.into_iter().next()
     }
@@ -154,11 +154,11 @@ pub trait StreamTransform: Send {
     where
         Self: 'static,
     {
-        let mut in_buf = vec![event];
+        let in_buf = vec![event];
         let in_stream = futures01::stream::iter_ok(in_buf);
 
         let out_stream = self.transform(Box::new(in_stream)).compat();
-        let out_iter = futures::executor::block_on_stream(out_stream);
+        let mut out_iter = futures::executor::block_on_stream(out_stream);
 
         out_iter.next().transpose().ok().flatten()
     }

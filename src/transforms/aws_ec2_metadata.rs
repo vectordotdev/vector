@@ -147,7 +147,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Transform::from(Ec2MetadataTransform { state: read }))
+        Ok(Transform::function(Ec2MetadataTransform { state: read }))
     }
 
     fn input_type(&self) -> DataType {

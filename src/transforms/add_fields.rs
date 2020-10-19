@@ -100,7 +100,7 @@ impl AddFields {
 }
 
 impl FunctionTransform for AddFields {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
