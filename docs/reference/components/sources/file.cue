@@ -75,6 +75,7 @@ components: sources: file: {
 			}
 		}
 		file_key: {
+			category:    "Context"
 			common:      false
 			description: "The key name added to each event with the full path of the file."
 			required:    false
@@ -132,6 +133,7 @@ components: sources: file: {
 			}
 		}
 		host_key: {
+			category:    "Context"
 			common:      false
 			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
 			required:    false
