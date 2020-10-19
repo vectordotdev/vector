@@ -40,6 +40,7 @@ impl GenerateConfig for SimpleHttpConfig {
             encoding: Default::default(),
             headers: Vec::new(),
             tls: None,
+            auth: None,
         })
         .unwrap()
     }
