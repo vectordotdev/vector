@@ -207,7 +207,7 @@ mod test {
             let addr = in_addr;
             tokio::spawn(async move {
                 let bind_addr = next_addr();
-                let mut socket = tokio::net::UdpSocket::bind(bind_addr).await.unwrap();
+                let mut socket = UdpSocket::bind(bind_addr).await.unwrap();
                 socket.connect(addr).await.unwrap();
                 while let Some(bytes) = receiver.recv().await {
                     socket.send(bytes).await.unwrap();
