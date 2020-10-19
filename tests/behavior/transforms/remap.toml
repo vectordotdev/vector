@@ -847,5 +847,5 @@
     [[tests.outputs.conditions]]
     "foo[0].equals" = "bar"
     "foo[1].equals" = "bat"
-    "foo[2].equals" = "fizzaxbbuzz"
+    "foo[2].equals" = "fizz buzz"
 
