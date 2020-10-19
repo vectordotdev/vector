@@ -126,6 +126,8 @@ build_signatures! {
     parse_duration => ParseDurationFn,
     format_number => FormatNumberFn,
     parse_url => ParseUrlFn,
+    starts_with => StartsWithFn,
+    ends_with => EndsWithFn,
 }
 
 /// A parameter definition accepted by a function.
