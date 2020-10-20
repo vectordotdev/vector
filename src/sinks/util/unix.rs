@@ -6,7 +6,7 @@ use crate::{
         UnixSocketEventSent,
     },
     sinks::util::{
-        acker_framed_write::AckerFramedWrite, encode_event, encoding::EncodingConfig, Encoding,
+        acker_bytes_sink::AckerBytesSink, encode_event, encoding::EncodingConfig, Encoding,
         StreamSink,
     },
     sinks::{Healthcheck, VectorSink},
@@ -142,7 +142,7 @@ impl UnixSink {
             .max_delay(Duration::from_secs(60))
     }
 
-    async fn connect(&mut self) -> AckerFramedWrite<UnixStream, BytesCodec> {
+    async fn connect(&mut self) -> AckerBytesSink<UnixStream> {
         let mut backoff = Self::fresh_backoff();
         loop {
             debug!(
@@ -152,9 +152,8 @@ impl UnixSink {
             match UnixStream::connect(self.path.clone()).await {
                 Ok(stream) => {
                     emit!(UnixSocketConnectionEstablished { path: &self.path });
-                    return AckerFramedWrite::new(
+                    return AckerBytesSink::new(
                         stream,
-                        BytesCodec::new(),
                         self.acker.clone(),
                         Box::new(|byte_size| emit!(UnixSocketEventSent { byte_size })),
                     );
@@ -191,7 +190,7 @@ impl StreamSink for UnixSink {
                     path: &self.path
                 });
             }
-            sink.ack_left();
+            sink.ack();
         }
 
         Ok(())
