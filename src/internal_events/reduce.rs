@@ -6,7 +6,7 @@ pub(crate) struct ReduceEventProcessed;
 
 impl InternalEvent for ReduceEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -15,6 +15,6 @@ pub(crate) struct ReduceStaleEventFlushed;
 
 impl InternalEvent for ReduceStaleEventFlushed {
     fn emit_metrics(&self) {
-        counter!("stale_events_flushed", 1);
+        counter!("stale_events_flushed_total", 1);
     }
 }

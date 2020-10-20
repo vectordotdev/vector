@@ -196,7 +196,7 @@ impl InternalEvent for ConcurrencyLimited {
         );
     }
     fn emit_metrics(&self) {
-        counter!("concurrency_limit_reached", 1,
+        counter!("concurrency_limit_reached_total", 1,
             "component_kind" => "sink",
             "component_type" => self.component,
         );

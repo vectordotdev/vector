@@ -83,8 +83,8 @@ async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) ->
             data.name,
             data.on.to_string(),
             r->formatter.kb(data
-                .events_processed
-                .map(|ep| ep.events_processed)
+                .events_processed_total
+                .map(|ep| ep.events_processed_total)
                 .unwrap_or(0.00))));
     }
 

@@ -66,8 +66,8 @@ impl Source {
     }
 
     /// Metric indicating events processed for the current source
-    async fn events_processed(&self) -> Option<metrics::EventsProcessed> {
-        metrics::topology_events_processed(self.0.name.clone())
+    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
+        metrics::topology_events_processed_total(self.0.name.clone())
     }
 }
 
@@ -111,8 +111,8 @@ impl Transform {
     }
 
     /// Metric indicating events processed for the current transform
-    async fn events_processed(&self) -> Option<metrics::EventsProcessed> {
-        metrics::topology_events_processed(self.0.name.clone())
+    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
+        metrics::topology_events_processed_total(self.0.name.clone())
     }
 }
 
@@ -157,15 +157,18 @@ impl Sink {
     }
 
     /// Metric indicating events processed for the current sink
-    async fn events_processed(&self) -> Option<metrics::EventsProcessed> {
-        metrics::topology_events_processed(self.0.name.clone())
+    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
+        metrics::topology_events_processed_total(self.0.name.clone())
     }
 }
 
 #[derive(Clone, Interface)]
 #[graphql(
     field(name = "name", type = "String"),
-    field(name = "events_processed", type = "Option<metrics::EventsProcessed>")
+    field(
+        name = "events_processed_total",
+        type = "Option<metrics::EventsProcessedTotal>"
+    )
 )]
 pub enum Topology {
     Source(Source),
