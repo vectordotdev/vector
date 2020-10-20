@@ -28,7 +28,7 @@ impl InternalEvent for SyslogUdpReadError {
     }
 
     fn emit_metrics(&self) {
-        counter!("socket_read_errors_total", 1, "mode" => "udp");
+        counter!("connection_read_errors_total", 1, "mode" => "udp");
     }
 }
 

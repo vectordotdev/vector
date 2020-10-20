@@ -70,6 +70,6 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
     }
 
     fn emit_metrics(&self) {
-        counter!("socket_errors_total", 1);
+        counter!("connection_errors_total", 1);
     }
 }

@@ -47,6 +47,6 @@ impl InternalEvent for SocketReceiveError {
     }
 
     fn emit_metrics(&self) {
-        counter!("socket_errors_total", 1, "mode" => self.mode.as_str());
+        counter!("connection_errors_total", 1, "mode" => self.mode.as_str());
     }
 }

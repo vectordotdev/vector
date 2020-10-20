@@ -52,10 +52,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketSendFailed<'_, E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("connections_send_errors_total", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix");
+        counter!("connection_send_errors_total", 1, "mode" => "unix");
     }
 }
 
@@ -75,10 +72,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketFlushFailed<'_, E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_flush_errors_total", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix");
+        counter!("connection_flush_errors_total", 1, "mode" => "unix");
     }
 }
 
@@ -110,10 +104,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketReceiveFailed<'_, E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_errors_total", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "unix");
+        counter!("connection_errors_total", 1, "mode" => "unix");
     }
 }
 
@@ -135,6 +126,6 @@ impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEven
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_errors_total", 1);
+        counter!("connection_errors_total", 1, "mode" => "unix");
     }
 }
