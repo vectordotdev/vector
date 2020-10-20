@@ -17,10 +17,9 @@ package prometheus;
 option go_package = "prompb";
 
 import "prometheus-types.proto";
-import "gogoproto/gogo.proto";
 
 message WriteRequest {
-  repeated prometheus.TimeSeries timeseries = 1 [(gogoproto.nullable) = false];
+  repeated prometheus.TimeSeries timeseries = 1 [(nullable) = false];
 }
 
 // ReadRequest represents a remote read request.

@@ -16,7 +16,11 @@ package prometheus;
 
 option go_package = "prompb";
 
-import "gogoproto/gogo.proto";
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool nullable = 65001;
+}
 
 message Sample {
   double value    = 1;
@@ -25,8 +29,8 @@ message Sample {
 
 // TimeSeries represents samples and labels for a single time series.
 message TimeSeries {
-  repeated Label labels   = 1 [(gogoproto.nullable) = false];
-  repeated Sample samples = 2 [(gogoproto.nullable) = false];
+  repeated Label labels   = 1 [(nullable) = false];
+  repeated Sample samples = 2 [(nullable) = false];
 }
 
 message Label {
@@ -35,7 +39,7 @@ message Label {
 }
 
 message Labels {
-  repeated Label labels = 1 [(gogoproto.nullable) = false];
+  repeated Label labels = 1 [(nullable) = false];
 }
 
 // Matcher specifies a rule, which can match or set of labels or not.
@@ -79,7 +83,7 @@ message Chunk {
 // ChunkedSeries represents single, encoded time series.
 message ChunkedSeries {
   // Labels should be sorted.
-  repeated Label labels = 1 [(gogoproto.nullable) = false];
+  repeated Label labels = 1 [(nullable) = false];
   // Chunks will be in start time order and may overlap.
-  repeated Chunk chunks = 2 [(gogoproto.nullable) = false];
+  repeated Chunk chunks = 2 [(nullable) = false];
 }
