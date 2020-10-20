@@ -53,7 +53,7 @@ inventory::submit! {
 
 impl GenerateConfig for AddFieldsConfig {
     fn generate_config() -> toml::Value {
-        toml::from_str(r#"fields.name = "TODO""#).unwrap()
+        toml::from_str(r#"fields.name = "field_name""#).unwrap()
     }
 }
 
