@@ -79,12 +79,6 @@ impl TcpSinkConfig {
         Ok(connector)
     }
 
-    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(TcpService, Healthcheck)> {
-        let connector = self.build_connector(cx)?;
-        let healthcheck = connector.healthcheck();
-        Ok((connector.into(), healthcheck))
-    }
-
     pub fn build<F>(
         &self,
         cx: SinkContext,
@@ -142,37 +136,6 @@ impl TcpConnector {
 impl Into<TcpSink> for TcpConnector {
     fn into(self) -> TcpSink {
         TcpSink::new(self.host, self.port, self.resolver, self.tls)
-    }
-}
-
-impl Into<TcpService> for TcpConnector {
-    fn into(self) -> TcpService {
-        TcpService { connector: self }
-    }
-}
-
-pub struct TcpService {
-    connector: TcpConnector,
-}
-
-impl tower::Service<Bytes> for TcpService {
-    type Response = ();
-    type Error = TcpError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, msg: Bytes) -> Self::Future {
-        use futures::SinkExt;
-        let connector = self.connector.clone();
-        async move {
-            let mut connection = connector.connect().await?;
-            connection.send(msg).await.context(SendError)?;
-            Ok(())
-        }
-        .boxed()
     }
 }
 

@@ -13,7 +13,6 @@ use futures::{compat::CompatSink, future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream, try_ready, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::task::{Context, Poll};
 use std::{path::PathBuf, time::Duration};
 use tokio::{
     net::UnixStream,
@@ -38,11 +37,6 @@ impl UnixSinkConfig {
         let healthcheck = connector.healthcheck().boxed();
 
         Ok((connector, healthcheck))
-    }
-
-    pub fn build_service(&self) -> crate::Result<(UnixService, Healthcheck)> {
-        let (connector, healthcheck) = self.build_connector()?;
-        Ok((connector.into(), healthcheck))
     }
 
     pub fn build<F>(
@@ -90,12 +84,6 @@ impl UnixConnector {
 impl Into<UnixSink> for UnixConnector {
     fn into(self) -> UnixSink {
         UnixSink::new(self.path)
-    }
-}
-
-impl Into<UnixService> for UnixConnector {
-    fn into(self) -> UnixService {
-        UnixService { connector: self }
     }
 }
 
@@ -237,34 +225,6 @@ impl Sink for UnixSink {
             }
             Ok(res) => Ok(res),
         }
-    }
-}
-
-pub struct UnixService {
-    connector: UnixConnector,
-}
-
-impl tower::Service<Bytes> for UnixService {
-    type Response = ();
-    type Error = UnixSocketError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, msg: Bytes) -> Self::Future {
-        use futures::SinkExt;
-        let connector = self.connector.clone();
-        async move {
-            connector
-                .connect()
-                .await?
-                .send(msg)
-                .await
-                .context(SendError)
-        }
-        .boxed()
     }
 }
 
