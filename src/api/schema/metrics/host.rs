@@ -23,7 +23,7 @@ impl MemoryMetrics {
         filter_host_metric(&self.0, "memory_available_bytes")
     }
 
-    /// Active bytes (Linux and macOS)
+    /// Active bytes (Linux/macOS only)
     async fn active_bytes(&self) -> Option<f64> {
         if cfg!(any(target_os = "linux", target_os = "macos")) {
             Some(filter_host_metric(&self.0, "memory_active_bytes"))
@@ -32,7 +32,7 @@ impl MemoryMetrics {
         }
     }
 
-    /// Buffers bytes (Linux)
+    /// Buffers bytes (Linux only)
     async fn buffers_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
             Some(filter_host_metric(&self.0, "memory_buffers_bytes"))
@@ -41,7 +41,7 @@ impl MemoryMetrics {
         }
     }
 
-    /// Cached bytes (Linux)
+    /// Cached bytes (Linux only)
     async fn cached_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
             Some(filter_host_metric(&self.0, "memory_cached_bytes"))
@@ -50,7 +50,7 @@ impl MemoryMetrics {
         }
     }
 
-    /// Shared bytes (Linux)
+    /// Shared bytes (Linux only)
     async fn shared_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
             Some(filter_host_metric(&self.0, "memory_shared_bytes"))
@@ -59,7 +59,7 @@ impl MemoryMetrics {
         }
     }
 
-    /// Used bytes (Linux)
+    /// Used bytes (Linux only)
     async fn used_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
             Some(filter_host_metric(&self.0, "memory_used_bytes"))
@@ -68,7 +68,7 @@ impl MemoryMetrics {
         }
     }
 
-    /// Inactive bytes (macOS)
+    /// Inactive bytes (macOS only)
     async fn inactive_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "macos") {
             Some(filter_host_metric(&self.0, "memory_inactive_bytes"))
@@ -77,7 +77,7 @@ impl MemoryMetrics {
         }
     }
 
-    /// Wired bytes (macOS)
+    /// Wired bytes (macOS only)
     async fn wired_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "macos") {
             Some(filter_host_metric(&self.0, "memory_wired_bytes"))
@@ -158,6 +158,60 @@ impl LoadAverageMetrics {
     }
 }
 
+pub struct NetworkMetrics(Vec<Metric>);
+
+#[Object]
+impl NetworkMetrics {
+    /// Total bytes received
+    async fn receive_bytes_total(&self) -> f64 {
+        filter_host_metric(&self.0, "network_receive_bytes_total")
+    }
+
+    /// Total errors received
+    async fn receive_errs_total(&self) -> f64 {
+        filter_host_metric(&self.0, "network_receive_errs_total")
+    }
+
+    /// Total packets received
+    async fn receive_packets_total(&self) -> f64 {
+        filter_host_metric(&self.0, "network_receive_packets_total")
+    }
+
+    /// Total bytes transmitted
+    async fn transmit_bytes_total(&self) -> f64 {
+        filter_host_metric(&self.0, "network_transmit_bytes_total")
+    }
+
+    /// Total errors transmitted
+    async fn transmit_errs_total(&self) -> f64 {
+        filter_host_metric(&self.0, "network_transmit_errs_total")
+    }
+
+    /// Total transmission packets dropped (Linux/Windows only)
+    async fn transmit_packets_drop_total(&self) -> Option<f64> {
+        if cfg!(any(target_os = "linux", target_os = "windows")) {
+            Some(filter_host_metric(
+                &self.0,
+                "network_transmit_packets_drop_total",
+            ))
+        } else {
+            None
+        }
+    }
+
+    /// Total transmission packets (Linux/Windows only)
+    async fn transmit_packets_total(&self) -> Option<f64> {
+        if cfg!(any(target_os = "linux", target_os = "windows")) {
+            Some(filter_host_metric(
+                &self.0,
+                "network_transmit_packets_total",
+            ))
+        } else {
+            None
+        }
+    }
+}
+
 pub struct HostMetrics(HostMetricsConfig);
 
 impl HostMetrics {
@@ -192,6 +246,11 @@ impl HostMetrics {
         } else {
             None
         }
+    }
+
+    /// Network metrics
+    async fn network(&self) -> NetworkMetrics {
+        NetworkMetrics(self.0.network_metrics().await)
     }
 }
 

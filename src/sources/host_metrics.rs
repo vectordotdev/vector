@@ -428,7 +428,7 @@ impl HostMetricsConfig {
         result
     }
 
-    async fn network_metrics(&self) -> Vec<Metric> {
+    pub async fn network_metrics(&self) -> Vec<Metric> {
         match heim::net::io_counters().await {
             Ok(counters) => {
                 counters
