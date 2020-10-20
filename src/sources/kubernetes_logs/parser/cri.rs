@@ -52,10 +52,10 @@ impl Cri {
 }
 
 impl FunctionTransform for Cri {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut buf = Vec::with_capacity(1);
         self.regex_parser.transform(&mut buf, event);
-        if let Some(event) = buf.into_iter().next() {
+        if let Some(mut event) = buf.into_iter().next() {
             normalize_event(event.as_mut_log()).ok();
             output.push(event);
         }

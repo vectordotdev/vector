@@ -1,8 +1,4 @@
-use crate::{
-    event::Event,
-    stream::VecStreamExt,
-    transforms::{FunctionTransform, StreamTransform},
-};
+use crate::{event::Event, stream::VecStreamExt, transforms::TaskTransform};
 use futures::{
     compat::Stream01CompatExt,
     future,
@@ -50,6 +46,12 @@ pub trait RuntimeTransform {
     fn timers(&self) -> Vec<Timer> {
         Vec::new()
     }
+
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+        let mut maybe = None;
+        self.hook_process(event, |event| maybe = Some(event));
+        output.extend(maybe.into_iter());
+    }
 }
 
 #[derive(Debug)]
@@ -60,19 +62,7 @@ enum Message {
     Timer(Timer),
 }
 
-impl<T> FunctionTransform for T
-where
-    T: RuntimeTransform + Send,
-{
-    // used only in config tests (cannot be put behind `#[cfg(test)`])
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        let mut maybe = None;
-        self.hook_process(event, |event| maybe = Some(event));
-        output.extend(maybe.into_iter());
-    }
-}
-
-impl<T> StreamTransform for T
+impl<T> TaskTransform for T
 where
     T: RuntimeTransform + Send,
 {

@@ -38,6 +38,8 @@ where
     for (message, expected) in cases {
         let input = Event::from(message);
         let mut parser = (builder)();
+        let parser = parser.as_function();
+
         let output = parser
             .transform_one(input)
             .expect("parser failed to parse the event");

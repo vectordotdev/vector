@@ -57,7 +57,7 @@ impl AddTags {
 }
 
 impl FunctionTransform for AddTags {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddTagsEventProcessed);
 
         if !self.tags.is_empty() {

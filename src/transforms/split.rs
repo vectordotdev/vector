@@ -191,6 +191,7 @@ mod tests {
         .build(TransformContext::new_test())
         .await
         .unwrap();
+        let parser = parser.as_function();
 
         parser.transform_one(event).unwrap().into_log()
     }

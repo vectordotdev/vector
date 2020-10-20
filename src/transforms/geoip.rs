@@ -98,7 +98,7 @@ struct City<'a> {
 }
 
 impl FunctionTransform for Geoip {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let mut isp: ISP = Default::default();
         let mut city: City = Default::default();
         let target_field = self.target.clone();

@@ -4,7 +4,7 @@ use crate::{
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
     internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
-    transforms::{FunctionTransform, StreamTransform, Transform},
+    transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
 use futures::{
@@ -52,7 +52,7 @@ impl_generate_config_from_default!(ReduceConfig);
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Reduce::new(self).map(Transform::function)
+        Reduce::new(self).map(Transform::task)
     }
 
     fn input_type(&self) -> DataType {
@@ -187,10 +187,8 @@ impl Reduce {
             .drain()
             .for_each(|(_, s)| output.push(Event::from(s.flush())));
     }
-}
 
-impl FunctionTransform for Reduce {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform_one(&mut self, output: &mut Vec<Event>, event: Event) {
         let ends_here = self
             .ends_when
             .as_ref()
@@ -226,7 +224,7 @@ impl FunctionTransform for Reduce {
     }
 }
 
-impl StreamTransform for Reduce {
+impl TaskTransform for Reduce {
     fn transform(
         self: Box<Self>,
         input_rx: Box<dyn futures01::Stream<Item = Event, Error = ()> + Send>,
@@ -256,7 +254,7 @@ impl StreamTransform for Reduce {
                       true
                     }
                     Some(Ok(event)) => {
-                      (me as Box<dyn FunctionTransform>).transform(&mut output, event);
+                      me.transform_one(&mut output, event);
                       false
                     }
                     Some(Err(())) => panic!("Unexpected error reading channel"),
@@ -304,8 +302,8 @@ identifier_fields = [ "request_id" ]
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap()
-        .as_function();
+        .unwrap();
+        let reduce = reduce.as_function();
 
         let mut outputs = Vec::new();
 
@@ -375,8 +373,8 @@ merge_strategies.baz = "max"
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap()
-        .as_function();
+        .unwrap();
+        let reduce = reduce.as_function();
 
         let mut outputs = Vec::new();
 
@@ -434,8 +432,8 @@ identifier_fields = [ "request_id" ]
         .unwrap()
         .build(TransformContext::new_test())
         .await
-        .unwrap()
-        .as_function();
+        .unwrap();
+        let reduce = reduce.as_function();
 
         let mut outputs = Vec::new();
 

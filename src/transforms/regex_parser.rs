@@ -292,9 +292,7 @@ impl FunctionTransform for RegexParser {
             emit!(RegexParserMissingField { field: &self.field });
         }
 
-        if self.drop_failed {
-            ();
-        } else {
+        if !self.drop_failed {
             output.push(event);
         }
     }
@@ -327,6 +325,7 @@ mod tests {
         .build(TransformContext::new_test())
         .await
         .unwrap();
+        let parser = parser.as_function();
 
         parser.transform_one(event).map(|event| event.into_log())
     }

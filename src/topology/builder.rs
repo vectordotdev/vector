@@ -122,7 +122,7 @@ pub async fn build_pieces(
                 // TODO(new-transform-enum): Handle
                 unimplemented!();
             }
-            Transform::Stream(t) => t
+            Transform::Task(t) => t
                 .transform(filter_event_type(input_rx, input_type))
                 .forward(output)
                 .map(|_| debug!("Finished"))

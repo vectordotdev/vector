@@ -29,7 +29,7 @@ use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::StreamSinkOld, Healthcheck, VectorSink};
 use vector::sources::Source;
 use vector::test_util::{temp_dir, temp_file};
-use vector::transforms::Transform;
+use vector::transforms::{Transform, FunctionTransform};
 use vector::Pipeline;
 
 pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
@@ -188,8 +188,8 @@ pub struct MockTransform {
     increase: f64,
 }
 
-impl Transform for MockTransform {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for MockTransform {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
@@ -235,7 +235,7 @@ impl Transform for MockTransform {
                 }
             },
         };
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -254,8 +254,8 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
-        Ok(Box::new(MockTransform {
+    async fn build(&self, _cx: TransformContext) -> Result<Transform, vector::Error> {
+        Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
         }))

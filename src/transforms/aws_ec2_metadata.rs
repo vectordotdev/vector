@@ -498,6 +498,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -532,6 +533,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -560,6 +562,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -585,6 +588,7 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;

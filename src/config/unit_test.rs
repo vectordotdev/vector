@@ -7,7 +7,6 @@ use crate::{
     event::{Event, Value},
     transforms::Transform,
 };
-use futures::compat::Stream01CompatExt;
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
@@ -113,20 +112,23 @@ fn walk(
     let mut results = Vec::new();
     let mut targets = Vec::new();
 
-    if let Some(target) = transforms.get_mut(node) {
-        for input in inputs.clone() {
-            match &mut target.transform {
-                Transform::Function(t) => t.transform(&mut results, input),
-                Transform::Stream(t) => {
-                    let in_buf = vec![input];
-                    let in_stream = futures01::stream::iter_ok(in_buf);
-                    let out_stream = t.transform(Box::new(in_stream));
-                    let out_stream_compat = out_stream.compat();
-                    // TODO(new-transform-enum): Handle Many
-                    let mut out_iter = futures::executor::block_on_stream(out_stream_compat);
-                    let out = out_iter.next().transpose().ok().flatten(); // Force unpinning.
-                    results.extend(out.into_iter());
+    // Use `remove` to take ownership.
+    if let Some(mut target) = transforms.remove(node) {
+        match target.transform {
+            Transform::Function(ref mut t) => {
+                for input in inputs.clone() {
+                    t.transform(&mut results, input)
                 }
+            }
+            Transform::Task(t) => {
+                use futures::compat::Stream01CompatExt;
+                let in_stream = futures01::stream::iter_ok(inputs.clone());
+                let out_stream = t.transform(Box::new(in_stream));
+                let out_stream_compat = out_stream.compat();
+                // TODO(new-transform-enum): Handle Many
+                let mut out_iter = futures::executor::block_on_stream(out_stream_compat);
+                let out = out_iter.next().transpose().ok().flatten(); // Force unpinning.
+                results.extend(out.into_iter());
             }
         }
         targets = target.next.clone();
