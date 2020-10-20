@@ -22,36 +22,36 @@ pub struct StateMaintenancePerformed;
 
 impl InternalEvent for StateItemAdded {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "item_added");
+        counter!("k8s_state_ops_total", 1, "op_kind" => "item_added");
     }
 }
 
 impl InternalEvent for StateItemUpdated {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "item_updated");
+        counter!("k8s_state_ops_total", 1, "op_kind" => "item_updated");
     }
 }
 
 impl InternalEvent for StateItemDeleted {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "item_deleted");
+        counter!("k8s_state_ops_total", 1, "op_kind" => "item_deleted");
     }
 }
 
 impl InternalEvent for StateResynced {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "resynced");
+        counter!("k8s_state_ops_total", 1, "op_kind" => "resynced");
     }
 }
 
 impl InternalEvent for StateMaintenanceRequested {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "maintenance_requested");
+        counter!("k8s_state_ops_total", 1, "op_kind" => "maintenance_requested");
     }
 }
 
 impl InternalEvent for StateMaintenancePerformed {
     fn emit_metrics(&self) {
-        counter!("k8s_state_ops", 1, "op_kind" => "maintenance_performed");
+        counter!("k8s_state_ops_total", 1, "op_kind" => "maintenance_performed");
     }
 }

@@ -84,10 +84,7 @@ _values: {
 	// It is used for SEO purposes and should be full of relevant keywords.
 	description?: =~"[.]$"
 
-	// `title` is the human friendly title for the component.
-	//
-	// For example, the `http` sink has a `HTTP` title.
-	title: string
+	env_vars: #EnvVars
 
 	// `type` is the component identifier. This is set automatically.
 	type: Type
@@ -152,6 +149,11 @@ _values: {
 
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
+
+	// `title` is the human friendly title for the component.
+	//
+	// For example, the `http` sink has a `HTTP` title.
+	title: string
 }
 
 // `#CompressionAlgorithm` specified data compression algorithm.
@@ -206,6 +208,12 @@ _values: {
 //                 text: "Encodes the data via text/plain"
 //                }
 #Enum: [Name=_]: string
+
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+	type: string: default: null
+}}
 
 #Event: {
 	close({log: #LogEvent}) |
@@ -268,26 +276,21 @@ _values: {
 
 	if Args.kind == "source" {
 		collect?:  #FeaturesCollect
+		generate?: #FeaturesGenerate
+		multiline: #FeaturesMultiline
 		receive?:  #FeaturesReceive
-		generate?: close({})
-
-		// `multiline` should be enabled for sources that offer the ability
-		// to merge multiple lines together.
-		multiline: close({
-			enabled: bool
-		})
 	}
 
 	if Args.kind == "transform" {
-		convert?:  close({})
+		convert?:  #FeaturesConvert
 		enrich?:   #FeaturesEnrich
-		filter?:   close({})
+		filter?:   #FeaturesFilter
 		parse?:    #FeaturesParse
 		program?:  #FeaturesProgram
-		reduce?:   close({})
-		route?:    close({})
-		sanitize?: close({})
-		shape?:    close({})
+		reduce?:   #FeaturesReduce
+		route?:    #FeaturesRoute
+		sanitize?: #FeaturesSanitize
+		shape?:    #FeaturesShape
 	}
 
 	if Args.kind == "sink" {
@@ -304,17 +307,20 @@ _values: {
 		exposes?: #FeaturesExpose
 		send?:    #FeaturesSend & {_args: Args}
 	}
+
+	descriptions: [Name=string]: string
 }
 
 #FeaturesCollect: {
-	// `checkpoint` describes how the component checkpoints its read
-	// position.
 	checkpoint: close({
 		enabled: bool
 	})
 
 	from?: #Service
 	tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
+}
+
+#FeaturesConvert: {
 }
 
 #FeaturesEnrich: {
@@ -327,6 +333,16 @@ _values: {
 
 #FeaturesExpose: {
 	for: #Service
+}
+
+#FeaturesFilter: {
+}
+
+#FeaturesGenerate: {
+}
+
+#FeaturesMultiline: {
+	enabled: bool
 }
 
 #FeaturesParse: {
@@ -344,6 +360,18 @@ _values: {
 #FeaturesReceive: {
 	from?: #Service
 	tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+}
+
+#FeaturesReduce: {
+}
+
+#FeaturesRoute: {
+}
+
+#FeaturesSanitize: {
+}
+
+#FeaturesShape: {
 }
 
 #FeaturesSend: {
@@ -585,10 +613,6 @@ _values: {
 	// "Context" category to make generated configuration examples easier to
 	// read.
 	category?: string
-
-	if strings.HasSuffix(name, "_key") {
-		category: "Mapping"
-	}
 
 	if type.object != _|_ {
 		category: strings.ToTitle(name)

@@ -473,6 +473,9 @@
     .b = contains(.bar, substring = "bar")
     .c = contains(.bar, substring = "BAR", case_sensitive = true)
     .d = contains(.bar, substring = "BAR", case_sensitive = false)
+    .e = contains(.foobar, substring = "oba")
+    .f = contains(.foobar, substring = "OBA", case_sensitive = true)
+    .g = contains(.foobar, substring = "OBA", case_sensitive = false)
   """
 [[tests]]
   name = "remap_function_contains"
@@ -482,6 +485,7 @@
     [tests.input.log_fields]
       foo = "foo"
       bar = "bar"
+      foobar = "foobar"
   [[tests.outputs]]
     extract_from = "remap_function_contains"
     [[tests.outputs.conditions]]
@@ -489,6 +493,63 @@
       "b.equals" = true
       "c.equals" = false
       "d.equals" = true
+      "e.equals" = true
+      "f.equals" = false
+      "g.equals" = true
+
+[transforms.remap_function_starts_with]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = starts_with(.foobar, substring = .foo)
+    .b = starts_with(.foobar, substring = "foo")
+    .c = starts_with(.foobar, substring = "bar")
+    .d = starts_with(.foobar, substring = "FOO", case_sensitive = true)
+    .e = starts_with(.foobar, substring = "FOO", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_starts_with"
+  [tests.input]
+    insert_at = "remap_function_starts_with"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_starts_with"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = false
+      "e.equals" = true
+
+[transforms.remap_function_ends_with]
+  inputs = []
+  type = "remap"
+  mapping = """
+    .a = ends_with(.foobar, substring = .bar)
+    .b = ends_with(.foobar, substring = "bar")
+    .c = ends_with(.foobar, substring = "foo")
+    .d = ends_with(.foobar, substring = "BAR", case_sensitive = true)
+    .e = ends_with(.foobar, substring = "BAR", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_ends_with"
+  [tests.input]
+    insert_at = "remap_function_ends_with"
+    type = "log"
+    [tests.input.log_fields]
+      bar = "bar"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_ends_with"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = false
+      "e.equals" = true
 
 [transforms.remap_function_slice]
   inputs = []

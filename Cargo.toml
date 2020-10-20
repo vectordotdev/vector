@@ -102,11 +102,13 @@ smpl_jwt = { version = "0.5.0", optional = true }
 # API
 async-graphql = { version = "2.0.0", optional = true }
 async-graphql-warp = { version = "2.0.0", optional = true }
+slab = { version = "0.4.2", optional = true }
 
 # API client
 prettytable-rs = { version = "0.8.0", optional = true }
 human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
+anymap = {version = "0.12.1", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -179,6 +181,7 @@ chrono-tz = "0.5.3"
 heim = { version = "0.1.0-beta.3", optional = true, features = ["full"] }
 uom = { version = "0.29.0", optional = true }
 rust_decimal = "1.8.1"
+mongodb = { version = "1.1.1", optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -266,6 +269,7 @@ kubernetes = ["k8s-openapi", "evmap"]
 api = [
   "async-graphql",
   "async-graphql-warp",
+  "slab"
 ]
 
 # API client
@@ -274,6 +278,7 @@ api-client = [
   "prettytable-rs",
   "human_format",
   "num-format",
+  "anymap",
 ]
 
 # Sources
@@ -289,6 +294,7 @@ sources = [
   "sources-journald",
   "sources-kafka",
   "sources-logplex",
+  "sources-mongodb_metrics",
   "sources-prometheus",
   "sources-socket",
   "sources-splunk_hec",
@@ -310,15 +316,17 @@ sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
 sources-logplex = ["warp", "sources-tls"]
+sources-mongodb_metrics = ["mongodb"]
 sources-prometheus = ["prometheus-parser"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
-sources-statsd = ["tokio-util/udp"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose", "sources-utils-unix"]
 sources-tls = []
 sources-vector = ["listenfd" ,"sources-tls"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
+sources-utils-unix = []
 
 # Transforms
 transforms = [
@@ -461,6 +469,7 @@ all-integration-tests = [
   "influxdb-integration-tests",
   "kafka-integration-tests",
   "loki-integration-tests",
+  "mongodb_metrics-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
 ]
@@ -489,6 +498,7 @@ humio-integration-tests = ["sinks-humio"]
 influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
+mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
