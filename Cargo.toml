@@ -318,14 +318,15 @@ sources-kafka = ["rdkafka"]
 sources-logplex = ["warp", "sources-tls"]
 sources-mongodb_metrics = ["mongodb"]
 sources-prometheus = ["prometheus-parser"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
-sources-statsd = ["tokio-util/udp"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose", "sources-utils-unix"]
 sources-tls = []
 sources-vector = ["listenfd" ,"sources-tls"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
+sources-utils-unix = []
 
 # Transforms
 transforms = [
