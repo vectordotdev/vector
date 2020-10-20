@@ -48,6 +48,8 @@ mod logplex;
 mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 mod metric_to_log;
+#[cfg(feature = "sources-mongodb_metrics")]
+mod mongodb_metrics;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
@@ -187,6 +189,8 @@ pub use self::vector::*;
 pub use self::wasm::*;
 #[cfg(windows)]
 pub use self::windows::*;
+#[cfg(feature = "sources-mongodb_metrics")]
+pub use mongodb_metrics::*;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}
