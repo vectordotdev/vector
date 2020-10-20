@@ -12,8 +12,13 @@ use windows_service::{
 const SERVICE_NAME: &str = "vector";
 const SERVICE_TYPE: ServiceType = ServiceType::OWN_PROCESS;
 
+const NO_ERROR: u32 = 0;
+const ERROR_FAIL_SHUTDOWN: u32 = 351;
+
 pub mod service_control {
-    use windows_service::service::{ServiceErrorControl, ServiceInfo, ServiceStartType};
+    use windows_service::service::{
+        ServiceErrorControl, ServiceExitCode, ServiceInfo, ServiceStartType, ServiceStatus,
+    };
     use windows_service::{
         service::{ServiceAccess, ServiceState},
         service_manager::{ServiceManager, ServiceManagerAccess},
@@ -21,20 +26,68 @@ pub mod service_control {
     };
 
     use crate::internal_events::{
-        WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceStart, WindowsServiceStop,
-        WindowsServiceUninstall,
+        WindowsServiceDoesNotExist, WindowsServiceInstall, WindowsServiceRestart,
+        WindowsServiceStart, WindowsServiceStop, WindowsServiceUninstall,
     };
-    use crate::vector_windows::SERVICE_TYPE;
+    use crate::vector_windows::{NO_ERROR, SERVICE_TYPE};
     use std::ffi::OsString;
+    use std::fmt;
     use std::time::Duration;
-    use std::{fmt, thread};
 
-    #[derive(Debug, Clone, PartialEq)]
+    use nom::lib::std::fmt::Formatter;
+    use snafu::ResultExt;
+
+    struct ErrorDisplay<'a> {
+        error: &'a windows_service::Error,
+    }
+
+    impl fmt::Display for ErrorDisplay<'_> {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            if let windows_service::Error::Winapi(ref win_error) = &self.error {
+                write!(f, "{}", win_error)
+            } else {
+                write!(f, "{}", &self.error)
+            }
+        }
+    }
+
+    fn error_display(error: &windows_service::Error) -> ErrorDisplay {
+        ErrorDisplay { error }
+    }
+
+    #[derive(Debug, snafu::Snafu)]
+    pub enum Error {
+        #[snafu(display("{}", error_display(source)))]
+        Service {
+            #[snafu(source)]
+            source: windows_service::Error,
+        },
+        #[snafu(display(
+            "Timeout occured after {:?} while waiting for state to become {:?}, but was {:?}",
+            timeout,
+            expected_state,
+            state
+        ))]
+        PollTimeout {
+            state: ServiceState,
+            expected_state: ServiceState,
+            timeout: Duration,
+        },
+    }
+
+    #[derive(Debug, Copy, Clone, PartialEq)]
     pub enum ControlAction {
         Install,
         Uninstall,
         Start,
         Stop,
+        Restart,
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    enum PollStatus {
+        NoTimeout(ServiceStatus),
+        Timeout(ServiceStatus),
     }
 
     impl fmt::Display for ControlAction {
@@ -66,24 +119,25 @@ pub mod service_control {
         }
     }
 
-    pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> Result<()> {
+    pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> crate::Result<()> {
         match action {
             ControlAction::Start => start_service(&service_def),
             ControlAction::Stop => stop_service(&service_def),
+            ControlAction::Restart => restart_service(&service_def),
             ControlAction::Install => install_service(&service_def),
             ControlAction::Uninstall => uninstall_service(&service_def),
         }
     }
 
-    fn start_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn start_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::START;
         let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status()?;
+        let service_status = service.query_status().context(Service)?;
 
         if service_status.current_state != ServiceState::StartPending
             || service_status.current_state != ServiceState::Running
         {
-            service.start(&[] as &[OsString])?;
+            service.start(&[] as &[OsString]).context(Service)?;
             emit!(WindowsServiceStart {
                 name: &*service_def.name.to_string_lossy(),
                 already_started: false,
@@ -98,15 +152,15 @@ pub mod service_control {
         Ok(())
     }
 
-    fn stop_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn stop_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP;
         let service = open_service(&service_def, service_access)?;
-        let service_status = service.query_status()?;
+        let service_status = service.query_status().context(Service)?;
 
         if service_status.current_state != ServiceState::StopPending
             || service_status.current_state != ServiceState::Stopped
         {
-            service.stop()?;
+            service.stop().context(Service)?;
             emit!(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
@@ -121,9 +175,37 @@ pub mod service_control {
         Ok(())
     }
 
-    fn install_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn restart_service(service_def: &ServiceDefinition) -> crate::Result<()> {
+        let service_access =
+            ServiceAccess::QUERY_STATUS | ServiceAccess::START | ServiceAccess::STOP;
+        let service = open_service(&service_def, service_access)?;
+        let service_status = service.query_status().context(Service)?;
+
+        if service_status.current_state == ServiceState::StartPending
+            || service_status.current_state == ServiceState::Running
+        {
+            service.stop()?;
+        }
+
+        let service_status = ensure_state(
+            &service,
+            ServiceState::Stopped,
+            Duration::from_secs(10),
+            Duration::from_secs(1),
+        )?;
+        handle_service_exit_code(service_status.exit_code);
+
+        service.start(&[] as &[OsString]).context(Service)?;
+        emit!(WindowsServiceRestart {
+            name: &*service_def.name.to_string_lossy()
+        });
+        Ok(())
+    }
+
+    fn install_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let manager_access = ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE;
-        let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
+        let service_manager =
+            ServiceManager::local_computer(None::<&str>, manager_access).context(Service)?;
 
         let service_info = ServiceInfo {
             name: service_def.name.clone(),
@@ -138,7 +220,9 @@ pub mod service_control {
             account_password: None,
         };
 
-        service_manager.create_service(&service_info, ServiceAccess::empty())?;
+        service_manager
+            .create_service(&service_info, ServiceAccess::empty())
+            .context(Service)?;
 
         emit!(WindowsServiceInstall {
             name: &*service_def.name.to_string_lossy(),
@@ -152,22 +236,29 @@ pub mod service_control {
         Ok(())
     }
 
-    fn uninstall_service(service_def: &ServiceDefinition) -> Result<()> {
+    fn uninstall_service(service_def: &ServiceDefinition) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
         let service = open_service(&service_def, service_access)?;
 
-        let service_status = service.query_status()?;
+        let service_status = service.query_status().context(Service)?;
         if service_status.current_state != ServiceState::Stopped {
-            service.stop()?;
+            service.stop().context(Service)?;
             emit!(WindowsServiceStop {
                 name: &*service_def.name.to_string_lossy(),
                 already_stopped: false,
             });
-            thread::sleep(Duration::from_secs(1));
         }
 
-        service.delete()?;
+        let service_status = ensure_state(
+            &service,
+            ServiceState::Stopped,
+            Duration::from_secs(10),
+            Duration::from_secs(1),
+        )?;
+        handle_service_exit_code(service_status.exit_code);
+
+        service.delete().context(Service)?;
 
         emit!(WindowsServiceUninstall {
             name: &*service_def.name.to_string_lossy(),
@@ -178,9 +269,10 @@ pub mod service_control {
     pub fn open_service(
         service_def: &ServiceDefinition,
         access: windows_service::service::ServiceAccess,
-    ) -> Result<windows_service::service::Service> {
+    ) -> crate::Result<windows_service::service::Service> {
         let manager_access = ServiceManagerAccess::CONNECT;
-        let service_manager = ServiceManager::local_computer(None::<&str>, manager_access)?;
+        let service_manager =
+            ServiceManager::local_computer(None::<&str>, manager_access).context(Service)?;
 
         let service = service_manager
             .open_service(&service_def.name, access)
@@ -189,8 +281,73 @@ pub mod service_control {
                     name: &*service_def.name.to_string_lossy(),
                 });
                 e
-            })?;
+            })
+            .context(Service)?;
         Ok(service)
+    }
+
+    fn handle_service_exit_code(exit_code: windows_service::service::ServiceExitCode) {
+        debug!(message="Service stopped.", exit_code = ?exit_code);
+
+        match exit_code {
+            ServiceExitCode::Win32(ec) if ec != NO_ERROR => {
+                warn!(message = "Service stopped with error", exit_code = ec);
+            }
+            ServiceExitCode::ServiceSpecific(ec) => {
+                warn!(message = "Service stopped with error", exit_code = ec);
+            }
+            _ => {}
+        };
+    }
+
+    fn poll_state(
+        service: &windows_service::service::Service,
+        state: ServiceState,
+        timeout: Duration,
+        wait_hint: Duration,
+    ) -> Result<PollStatus> {
+        let mut wait_index = 1;
+        let mut wait_time = Duration::default();
+
+        let poll_status = loop {
+            let service_status = service.query_status()?;
+            if service_status.current_state == state {
+                break PollStatus::NoTimeout(service_status);
+            }
+            debug!(
+                "Waiting for service to transition to state {:?}... {}",
+                state, wait_index
+            );
+            wait_index += 1;
+
+            wait_time += wait_hint;
+            if wait_time >= timeout {
+                break PollStatus::Timeout(service_status);
+            }
+
+            std::thread::sleep(wait_hint);
+        };
+
+        Ok(poll_status)
+    }
+
+    fn ensure_state(
+        service: &windows_service::service::Service,
+        state: ServiceState,
+        timeout: Duration,
+        wait_hint: Duration,
+    ) -> crate::Result<ServiceStatus> {
+        let poll_status = poll_state(&service, state, timeout, wait_hint)?;
+
+        match poll_status {
+            PollStatus::Timeout(status) => Err(Error::PollTimeout {
+                state: status.current_state,
+                expected_state: state,
+                timeout,
+            }
+            .into()),
+            PollStatus::NoTimeout(status) => Ok(status),
+        }
     }
 }
 
@@ -205,8 +362,6 @@ pub fn run() -> Result<()> {
 }
 
 fn run_service(_arguments: Vec<OsString>) -> Result<()> {
-    const ERROR_FAIL_SHUTDOWN: u32 = 351;
-
     let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
@@ -234,7 +389,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
                 service_type: SERVICE_TYPE,
                 current_state: ServiceState::Running,
                 controls_accepted: ServiceControlAccept::STOP,
-                exit_code: ServiceExitCode::Win32(0),
+                exit_code: ServiceExitCode::Win32(NO_ERROR),
                 checkpoint: 0,
                 wait_hint: Duration::default(),
                 process_id: None,
@@ -246,7 +401,7 @@ fn run_service(_arguments: Vec<OsString>) -> Result<()> {
             rt.block_on(async move {
                 shutdown_rx.recv().unwrap();
                 match topology.stop().compat().await {
-                    Ok(()) => ServiceExitCode::NO_ERROR,
+                    Ok(()) => ServiceExitCode::Win32(NO_ERROR),
                     Err(_) => ServiceExitCode::Win32(ERROR_FAIL_SHUTDOWN),
                 }
             })
