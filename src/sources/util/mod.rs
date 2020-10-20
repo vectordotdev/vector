@@ -1,4 +1,4 @@
-#[cfg(all(feature = "sources-tls", feature = "warp"))]
+#[cfg(feature = "sources-utils-http")]
 mod http;
 pub mod multiline_config;
 #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
@@ -6,7 +6,7 @@ mod tcp;
 #[cfg(all(unix, feature = "sources-utils-unix",))]
 mod unix;
 
-#[cfg(all(feature = "sources-tls", feature = "warp"))]
+#[cfg(feature = "sources-utils-http")]
 pub use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
