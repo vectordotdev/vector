@@ -310,9 +310,9 @@ impl HostMetrics {
 }
 
 /// Filters a Vec<Metric> by name, returning the inner `value` or 0.00 if not found
-fn filter_host_metric(metrics: &Vec<Metric>, name: &str) -> f64 {
+fn filter_host_metric(metrics: &[Metric], name: &str) -> f64 {
     metrics
-        .into_iter()
+        .iter()
         .find(|m| m.name == format!("host_{}", name))
         .map(|m| match m.value {
             MetricValue::Gauge { value } => value,
