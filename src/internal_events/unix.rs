@@ -12,7 +12,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_connections_established_total", 1);
+        counter!("connections_established_total", 1, "mode" => "unix");
     }
 }
 
@@ -32,7 +32,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketConnectionFailure<'_, E> 
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_connection_failures_total", 1);
+        counter!("connection_failures_total", 1, "mode" => "unix");
     }
 }
 
@@ -52,7 +52,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketSendFailed<'_, E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_send_errors_total", 1,
+        counter!("connections_send_errors_total", 1,
             "component_kind" => "sink",
             "component_type" => "socket",
             "mode" => "unix");
