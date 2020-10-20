@@ -73,10 +73,8 @@ impl GenerateConfig for StatsdSinkConfig {
     }
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "statsd")]
-impl SinkConfig for StatsdSinkConfig {
-    async fn build(
+impl StatsdSinkConfig {
+    async fn build_sink(
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
@@ -122,6 +120,17 @@ impl SinkConfig for StatsdSinkConfig {
             super::VectorSink::Futures01Sink(Box::new(sink)),
             healthcheck,
         ))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "statsd")]
+impl SinkConfig for StatsdSinkConfig {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        self.build_sink()
     }
 
     fn input_type(&self) -> DataType {
