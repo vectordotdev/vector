@@ -211,9 +211,12 @@ impl MongoDBMetrics {
     }
 
     /// Remove credentials from endpoint.
-    /// `.unwrap()` is safe because endpoint was already verified by `ClientOptions`.
+    /// URI components: https://docs.mongodb.com/manual/reference/connection-string/#components
+    /// It's not possible to use [url::Url](https://docs.rs/url/2.1.1/url/struct.Url.html) because connection string can have multiple hosts.
+    /// Would be nice to serialize [ClientOptions][https://docs.rs/mongodb/1.1.1/mongodb/options/struct.ClientOptions.html] to String, but it's not supported.
+    /// `endpoint` argument would not be required, but field `original_uri` in `ClieotnOptions` is private.
+    /// `.unwrap()` in function is safe because endpoint was already verified by `ClientOptions`.
     /// Based on ClientOptions::parse_uri -- https://github.com/mongodb/mongo-rust-driver/blob/09e1193f93dcd850ebebb7fb82f6ab786fd85de1/src/client/options/mod.rs#L708
-    /// See URL components at https://docs.mongodb.com/manual/reference/connection-string/#components
     fn sanitize_endpoint(endpoint: &str, options: &ClientOptions) -> String {
         let mut endpoint = endpoint.to_owned();
         if options.credential.is_some() {
@@ -227,11 +230,12 @@ impl MongoDBMetrics {
                     if segments.1.len() > 1 {
                         let lstart = start + segments.0.len() + 1;
                         let post_slash = &segments.1[1..];
+                        // Split `/defaultauthdb` and `?<options>`
                         if let Some(index) = post_slash.find('?') {
                             let segments = post_slash.split_at(index);
                             // If we have options
                             if segments.1.len() > 1 {
-                                // Remove auth options
+                                // Remove authentication options
                                 let options = segments.1[1..]
                                     .split('&')
                                     .filter(|pair| {
@@ -246,7 +250,7 @@ impl MongoDBMetrics {
                                     .collect::<Vec<_>>()
                                     .join("&");
 
-                                // Update endpoint
+                                // Update options in endpoint
                                 endpoint = format!(
                                     "{}{}",
                                     &endpoint[..lstart + segments.0.len() + 1],
