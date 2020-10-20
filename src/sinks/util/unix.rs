@@ -4,8 +4,9 @@ use crate::{
         UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketEventSent,
         UnixSocketFlushFailed, UnixSocketSendFailed,
     },
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSinkOld},
+    sinks::util::StreamSinkOld,
     sinks::{Healthcheck, VectorSink},
+    Event,
 };
 use bytes::Bytes;
 use futures::{compat::CompatSink, future::BoxFuture, FutureExt, TryFutureExt};
@@ -44,15 +45,18 @@ impl UnixSinkConfig {
         Ok((connector.into(), healthcheck))
     }
 
-    pub fn build(
+    pub fn build<F>(
         &self,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        encode_event: F,
+    ) -> crate::Result<(VectorSink, Healthcheck)>
+    where
+        F: Fn(Event) -> Option<Bytes> + Send + 'static,
+    {
         let (connector, healthcheck) = self.build_connector()?;
         let sink: UnixSink = connector.into();
         let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| stream::iter_ok(encode_event(event, &encoding)));
+            .with_flat_map(move |event| stream::iter_ok(encode_event(event)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

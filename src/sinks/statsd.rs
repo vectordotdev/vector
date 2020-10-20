@@ -103,8 +103,10 @@ impl StatsdSinkConfig {
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let (service, healthcheck) = config.build_service()?;
-                (Client::Unix(service), healthcheck)
+                let namespace = namespace.clone();
+                let encode_event =
+                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                return config.build(cx.clone(), encode_event);
             }
         };
         let service = StatsdSvc { client };
