@@ -89,7 +89,7 @@ impl InternalEvent for TcpFlushError {
     }
 
     fn emit_metrics(&self) {
-        counter!("flush_errors_total", 1, "mode" => "tcp");
+        counter!("connection_flush_errors_total", 1, "mode" => "tcp");
     }
 }
 
