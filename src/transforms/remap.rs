@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct RemapConfig {
-    pub mapping: String,
+    pub source: String,
     pub drop_on_err: bool,
 }
 
@@ -50,7 +50,7 @@ pub struct Remap {
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
         Ok(Remap {
-            mapping: parse_mapping(&config.mapping)?,
+            mapping: parse_mapping(&config.source)?,
             drop_on_err: config.drop_on_err,
         })
     }
@@ -97,7 +97,7 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            mapping: r#"  .foo = "bar"
+            source: r#"  .foo = "bar"
   .bar = "baz"
   .copy = .copy_from
 "#

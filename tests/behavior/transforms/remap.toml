@@ -1,7 +1,7 @@
 [transforms.remap_nested]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a.b = 123
     .x.y = 456
     .x.z = 789
@@ -22,7 +22,7 @@
 [transforms.remap_array]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a[0] = 0
     .a[1] = "1"
     .a[2] = 2.0
@@ -49,7 +49,7 @@
 [transforms.remap_arithmetic]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .result_a = .a * .b + .c - .d
     .result_b = .a * (.b + .c) - .d
     .result_c = .a + .b * .c / .d
@@ -76,7 +76,7 @@
 [transforms.remap_boolean_arithmetic]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .result_a = .a + .b > 9
     .result_b = .a * .b < 20
     .result_c = 1 >= .a / .b
@@ -103,7 +103,7 @@
 [transforms.remap_delete_only_fields]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     only_fields(.foo, .bar, .buz.second)
     del(.foo.second)
   """
@@ -132,7 +132,7 @@
 [transforms.remap_coercion]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .foo = to_string(.foo)
     .bar = to_int(.bar)
     .baz = to_float(.baz)
@@ -169,7 +169,7 @@
 [transforms.remap_quoted_path]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a."b.c" = ."d.e"
   """
 [[tests]]
@@ -188,7 +188,7 @@
 [transforms.remap_function_arguments]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = to_string(.in)
     .b = to_string(value = .in)
     .c = to_string(.in, 20)
@@ -229,7 +229,7 @@
 [transforms.remap_function_upcase]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = upcase(.a)
     .b = upcase(.b)
     .c.c = upcase(.c.c)
@@ -260,7 +260,7 @@
   inputs = []
   type = "remap"
   drop_on_err = true
-  mapping = """
+  source = """
     .a = upcase(.a)
     .b = upcase(.b)
   """
@@ -278,7 +278,7 @@
   inputs = []
   type = "remap"
   drop_on_err = true
-  mapping = """
+  source = """
     .a = downcase(.a)
     .b = downcase(.b)
     .c.c = downcase(.c.c)
@@ -309,7 +309,7 @@
   inputs = []
   type = "remap"
   drop_on_err = true
-  mapping = """
+  source = """
     .a = downcase(.a)
     .b = downcase(.b)
   """
@@ -326,7 +326,7 @@
 [transforms.remap_function_uuid_v4]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = uuid_v4()
 
     if uuid_v4() != "" {
@@ -349,7 +349,7 @@
 [transforms.remap_function_sha1]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = sha1(.a)
 
     if sha1(.b) == "62cdb7020ff920e5aa642c3d4066950dd1f01f4d" {
@@ -374,7 +374,7 @@
   inputs = []
   type = "remap"
   drop_on_err = true
-  mapping = """
+  source = """
     .a = sha1(.a)
     .b = sha1(.b)
   """
@@ -391,7 +391,7 @@
 [transforms.remap_function_md5]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = md5(.a)
 
     if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
@@ -416,7 +416,7 @@
   inputs = []
   type = "remap"
   drop_on_err = true
-  mapping = """
+  source = """
     .a = md5(.a)
     .b = md5(.b)
   """
@@ -433,7 +433,7 @@
 [transforms.remap_function_now]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = now()
   """
 [[tests]]
@@ -450,7 +450,7 @@
 [transforms.remap_function_format_timestamp]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = format_timestamp(to_timestamp(.foo), format = "%+")
   """
 [[tests]]
@@ -468,7 +468,7 @@
 [transforms.remap_function_contains]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = contains(.foo, substring = .bar)
     .b = contains(.bar, substring = "bar")
     .c = contains(.bar, substring = "BAR", case_sensitive = true)
@@ -500,7 +500,7 @@
 [transforms.remap_function_starts_with]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = starts_with(.foobar, substring = .foo)
     .b = starts_with(.foobar, substring = "foo")
     .c = starts_with(.foobar, substring = "bar")
@@ -527,7 +527,7 @@
 [transforms.remap_function_ends_with]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = ends_with(.foobar, substring = .bar)
     .b = ends_with(.foobar, substring = "bar")
     .c = ends_with(.foobar, substring = "foo")
@@ -554,7 +554,7 @@
 [transforms.remap_function_slice]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = slice(.foo + .bar, 1)
     .b = slice(.foo + .bar, 0, 1)
     .c = slice(.foo + .bar, start = -2)
@@ -579,7 +579,7 @@
 [transforms.remap_function_tokenize]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = tokenize(.a)
     .b = tokenize(.b)
   """
@@ -608,7 +608,7 @@
 [transforms.remap_function_sha2]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = sha2(.a)
 
     if sha2(.b) == "725eb523fe006a6ee0071380bd3b4c57590abd44b88614cd3eddf594e3afe1ac" {
@@ -632,7 +632,7 @@
 [transforms.remap_function_sha3]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = sha3(.a)
 
     if sha3(.b) == "03457d23880d7847fc3f58780dd58cda7237a7144ac6758e76d45cec0e06ba69440a855e913ef03790c618777f5b0ec25fc34c4b82d7538151745b120b4f8b37" {
@@ -656,7 +656,7 @@
 [transforms.remap_function_parse_duration]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = parse_duration(.a, "ms")
     .b = parse_duration("100ms", output = .b)
   """
@@ -677,7 +677,7 @@
 [transforms.remap_function_format_number]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = format_number(.a, scale = 2, decimal_separator = ",", grouping_separator = ".")
   """
 [[tests]]
@@ -695,7 +695,7 @@
 [transforms.remap_function_parse_url]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .parts = parse_url(.url)
   """
 [[tests]]
