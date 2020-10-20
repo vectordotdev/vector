@@ -6,7 +6,7 @@ use crate::{
     sinks::{Healthcheck, VectorSink},
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future, future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -53,9 +53,10 @@ impl UdpSinkConfig {
         Ok((connector, healthcheck))
     }
 
-    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
+    pub async fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
         let (connector, healthcheck) = self.build_connector(cx)?;
-        Ok((connector.into(), healthcheck))
+        let socket = connector.connect().await?;
+        Ok((UdpService { socket }, healthcheck))
     }
 
     pub fn build(
@@ -123,34 +124,33 @@ impl Into<UdpSink> for UdpConnector {
     }
 }
 
-impl Into<UdpService> for UdpConnector {
-    fn into(self) -> UdpService {
-        UdpService { connector: self }
-    }
-}
-
 pub struct UdpService {
-    connector: UdpConnector,
+    socket: UdpSocket,
 }
 
 impl tower::Service<Bytes> for UdpService {
     type Response = ();
     type Error = UdpError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
+    type Future = future::Ready<Result<(), Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, msg: Bytes) -> Self::Future {
-        let connector = self.connector.clone();
-        async move {
-            let socket = connector.connect().await?;
-            socket.send(&msg).context(SendError)?;
-            Ok(())
-        }
-        .boxed()
+        future::ready(udp_send(&mut self.socket, &msg).context(SendError))
     }
+}
+
+fn udp_send(socket: &mut UdpSocket, msg: &[u8]) -> Result<(), std::io::Error> {
+    let sent = socket.send(&msg)?;
+    if sent != msg.len() {
+        emit!(UdpSendIncomplete {
+            data_size: msg.len(),
+            sent,
+        });
+    }
+    Ok(())
 }
 
 pub struct UdpSink {
@@ -238,21 +238,13 @@ impl Sink for UdpSink {
                     message = "sending event.",
                     bytes = %line.len()
                 );
-                match socket.send(&line) {
+                match udp_send(socket, &line) {
                     Err(error) => {
                         self.state = State::Backoff(self.next_delay01());
                         error!(message = "send failed", %error);
                         Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(sent) => {
-                        if sent != line.len() {
-                            emit!(UdpSendIncomplete {
-                                data_size: line.len(),
-                                sent,
-                            });
-                        }
-                        Ok(AsyncSink::Ready)
-                    }
+                    Ok(_) => Ok(AsyncSink::Ready),
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),

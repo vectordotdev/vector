@@ -1,5 +1,5 @@
 #[cfg(unix)]
-use crate::sinks::util::unix::{UnixService, UnixSinkConfig};
+use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
@@ -7,7 +7,7 @@ use crate::{
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
-        tcp::{TcpService, TcpSinkConfig},
+        tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
     },
 };
@@ -22,14 +22,7 @@ use std::task::{Context, Poll};
 use tower::{Service, ServiceBuilder};
 
 pub struct StatsdSvc {
-    client: Client,
-}
-
-enum Client {
-    Tcp(TcpService),
-    Udp(UdpService),
-    #[cfg(unix)]
-    Unix(UnixService),
+    inner: UdpService,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -73,8 +66,10 @@ impl GenerateConfig for StatsdSinkConfig {
     }
 }
 
-impl StatsdSinkConfig {
-    fn build_sink(
+#[async_trait::async_trait]
+#[typetag::serde(name = "statsd")]
+impl SinkConfig for StatsdSinkConfig {
+    async fn build(
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
@@ -90,51 +85,40 @@ impl StatsdSinkConfig {
             .parse_config(self.batch)?;
         let namespace = self.namespace.clone();
 
-        let (client, healthcheck) = match &self.mode {
+        match &self.mode {
             Mode::Tcp(config) => {
                 let namespace = namespace.clone();
                 let encode_event =
                     move |event| encode_event(event, namespace.as_deref()).map(Into::into);
-                return config.build(cx.clone(), encode_event);
+                config.build(cx.clone(), encode_event)
             }
             Mode::Udp(config) => {
-                let (service, healthcheck) = config.build_service(cx.clone())?;
-                (Client::Udp(service), healthcheck)
+                let (service, healthcheck) = config.build_service(cx.clone()).await?;
+                let service = StatsdSvc { inner: service };
+                let sink = BatchSink::new(
+                    ServiceBuilder::new().service(service),
+                    Buffer::new(batch.size, Compression::None),
+                    batch.timeout,
+                    cx.acker(),
+                )
+                .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
+                .with_flat_map(move |event| {
+                    stream::iter_ok(encode_event(event, namespace.as_deref()))
+                });
+
+                Ok((
+                    super::VectorSink::Futures01Sink(Box::new(sink)),
+                    healthcheck,
+                ))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
                 let namespace = namespace.clone();
                 let encode_event =
                     move |event| encode_event(event, namespace.as_deref()).map(Into::into);
-                return config.build(cx.clone(), encode_event);
+                config.build(cx.clone(), encode_event)
             }
-        };
-        let service = StatsdSvc { client };
-
-        let sink = BatchSink::new(
-            ServiceBuilder::new().service(service),
-            Buffer::new(batch.size, Compression::None),
-            batch.timeout,
-            cx.acker(),
-        )
-        .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-        .with_flat_map(move |event| stream::iter_ok(encode_event(event, namespace.as_deref())));
-
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
-    }
-}
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "statsd")]
-impl SinkConfig for StatsdSinkConfig {
-    async fn build(
-        &self,
-        cx: SinkContext,
-    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        self.build_sink(cx)
+        }
     }
 
     fn input_type(&self) -> DataType {
@@ -239,21 +223,11 @@ impl Service<Vec<u8>> for StatsdSvc {
     type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match &mut self.client {
-            Client::Tcp(service) => service.poll_ready(cx).map_err(Into::into),
-            Client::Udp(service) => service.poll_ready(cx).map_err(Into::into),
-            #[cfg(unix)]
-            Client::Unix(service) => service.poll_ready(cx).map_err(Into::into),
-        }
+        self.inner.poll_ready(cx).map_err(Into::into)
     }
 
     fn call(&mut self, frame: Vec<u8>) -> Self::Future {
-        match &mut self.client {
-            Client::Tcp(service) => service.call(frame.into()).err_into().boxed(),
-            Client::Udp(service) => service.call(frame.into()).err_into().boxed(),
-            #[cfg(unix)]
-            Client::Unix(service) => service.call(frame.into()).err_into().boxed(),
-        }
+        self.inner.call(frame.into()).err_into().boxed()
     }
 }
 
