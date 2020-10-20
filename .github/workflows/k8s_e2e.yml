@@ -21,6 +21,7 @@ on:
       - "Makefile"
       - "rust-toolchain"
       - "distribution/**"
+  pull_request:
 
 env:
   AUTOINSTALL: true
