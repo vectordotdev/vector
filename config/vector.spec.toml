@@ -5442,8 +5442,7 @@ require('custom_module')
   # The host of your Elasticsearch cluster. This should be the full URL as shown
   # in the example.
   #
-  # * optional
-  # * no default
+  # * required
   # * type: string
   host = "http://10.24.32.122:9000"
 
