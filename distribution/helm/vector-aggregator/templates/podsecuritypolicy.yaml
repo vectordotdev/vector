@@ -14,12 +14,12 @@ spec:
     - 'configMap'
     - 'secret'
   allowedHostPaths:
-    {{- if  and not .Values.storage.persistentVolume.enabled .Values.storage.hostPath }}
+    {{- if eq .Values.storage.mode "hostPath" }}
     - pathPrefix: {{ .Values.storage.hostPath | quote }}
     {{- end }}
     {{- range .Values.extraVolumes }}
-    {{- if .hostPath }}
-    - pathPrefix: {{ .hostPath.path }}
+    {{- with .hostPath }}
+    - pathPrefix: {{ .path }}
     {{- end }}
     {{- end }}
   hostNetwork: false
