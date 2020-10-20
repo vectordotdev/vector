@@ -487,7 +487,7 @@ inputs = []
 type = "add_fields"
 
 [transforms.transform0.fields]
-name = "TODO"
+name = "field_name"
 
 [transforms.transform1]
 inputs = ["transform0"]
@@ -511,7 +511,7 @@ inputs = []
 type = "add_fields"
 
 [transforms.transform0.fields]
-name = "TODO"
+name = "field_name"
 
 [transforms.transform1]
 inputs = ["transform0"]
