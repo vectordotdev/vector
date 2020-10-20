@@ -401,7 +401,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn loadavg_metrics(&self) -> Vec<Metric> {
+    pub async fn loadavg_metrics(&self) -> Vec<Metric> {
         #[cfg(unix)]
         let result = match heim::cpu::os::unix::loadavg().await {
             Ok(loadavg) => {

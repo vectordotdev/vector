@@ -138,6 +138,26 @@ impl CPUMetrics {
     }
 }
 
+pub struct LoadAverageMetrics(Vec<Metric>);
+
+#[Object]
+impl LoadAverageMetrics {
+    /// Load 1 average
+    async fn load1(&self) -> f64 {
+        filter_host_metric(&self.0, "load1")
+    }
+
+    /// Load 5 average
+    async fn load5(&self) -> f64 {
+        filter_host_metric(&self.0, "load5")
+    }
+
+    /// Load 15 average
+    async fn load15(&self) -> f64 {
+        filter_host_metric(&self.0, "load15")
+    }
+}
+
 pub struct HostMetrics(HostMetricsConfig);
 
 impl HostMetrics {
@@ -163,6 +183,15 @@ impl HostMetrics {
     /// CPU metrics
     async fn cpu(&self) -> CPUMetrics {
         CPUMetrics(self.0.cpu_metrics().await)
+    }
+
+    /// Load average metrics (*nix only)
+    async fn load_average(&self) -> Option<LoadAverageMetrics> {
+        if cfg!(unix) {
+            Some(LoadAverageMetrics(self.0.loadavg_metrics().await))
+        } else {
+            None
+        }
     }
 }
 
