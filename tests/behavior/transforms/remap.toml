@@ -783,3 +783,28 @@
       "a.equals" = 92
       "b.equals" = 92.5
       "c.equals" = 92.49
+
+[transforms.remap_function_parse_syslog]
+  inputs = []
+  type = "remap"
+  mapping = """
+   .a = parse_syslog(.a)
+   """
+[[tests]]
+  name = "remap_function_parse_syslog"
+  [tests.input]
+    insert_at = "remap_function_parse_syslog"
+    type = "log"
+    [tests.input.log_fields]
+      a = "<28>1 2020-05-22T14:59:09.250-03:00 OX-XXX-MX204 OX-XXX-CONTEUDO:rpd 6589 - - bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+  [[tests.outputs]]
+  extract_from = "remap_function_parse_syslog"
+  [[tests.outputs.conditions]]
+    "a.facility.equals" = "daemon"
+    "a.severity.equals" = "warning"
+    "a.timestamp.equals" = "2020-05-22T17:59:09.250Z"
+    "a.hostname.equals" = "OX-XXX-MX204"
+    "a.appname.equals" = "OX-XXX-CONTEUDO:rpd"
+    "a.procid.equals" = 6589
+    "a.message.equals" = "bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
+
