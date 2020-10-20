@@ -212,6 +212,51 @@ impl NetworkMetrics {
     }
 }
 
+pub struct FileSystemMetrics(Vec<Metric>);
+
+#[Object]
+impl FileSystemMetrics {
+    /// Free bytes
+    async fn free_bytes(&self) -> f64 {
+        filter_host_metric(&self.0, "filesystem_free_bytes")
+    }
+
+    /// Total bytes
+    async fn total_bytes(&self) -> f64 {
+        filter_host_metric(&self.0, "filesystem_total_bytes")
+    }
+
+    /// Used bytes
+    async fn used_bytes(&self) -> f64 {
+        filter_host_metric(&self.0, "filesystem_used_bytes")
+    }
+}
+
+pub struct DiskMetrics(Vec<Metric>);
+
+#[Object]
+impl DiskMetrics {
+    /// Total bytes read
+    async fn read_bytes_total(&self) -> f64 {
+        filter_host_metric(&self.0, "disk_read_bytes_total")
+    }
+
+    /// Total reads completed
+    async fn reads_completed_total(&self) -> f64 {
+        filter_host_metric(&self.0, "disk_reads_completed_total")
+    }
+
+    /// Total bytes written
+    async fn written_bytes_total(&self) -> f64 {
+        filter_host_metric(&self.0, "disk_written_bytes_total")
+    }
+
+    /// Total writes completed
+    async fn writes_completed_total(&self) -> f64 {
+        filter_host_metric(&self.0, "disk_writes_completed_total")
+    }
+}
+
 pub struct HostMetrics(HostMetricsConfig);
 
 impl HostMetrics {
@@ -251,6 +296,16 @@ impl HostMetrics {
     /// Network metrics
     async fn network(&self) -> NetworkMetrics {
         NetworkMetrics(self.0.network_metrics().await)
+    }
+
+    /// Filesystem metrics
+    async fn filesystem(&self) -> FileSystemMetrics {
+        FileSystemMetrics(self.0.filesystem_metrics().await)
+    }
+
+    /// Disk metrics
+    async fn disk(&self) -> DiskMetrics {
+        DiskMetrics(self.0.disk_metrics().await)
     }
 }
 

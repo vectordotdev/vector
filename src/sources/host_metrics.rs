@@ -463,7 +463,7 @@ impl HostMetricsConfig {
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
-                                    counter.drop_recv() as f64,
+                                    counter.packets_recv() as f64,
                                     tags!["device" => interface],
                                 ),
                                 self.counter(
@@ -507,7 +507,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn filesystem_metrics(&self) -> Vec<Metric> {
+    pub async fn filesystem_metrics(&self) -> Vec<Metric> {
         match heim::disk::partitions().await {
             Ok(partitions) => {
                 partitions
@@ -602,7 +602,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn disk_metrics(&self) -> Vec<Metric> {
+    pub async fn disk_metrics(&self) -> Vec<Metric> {
         match heim::disk::io_counters().await {
             Ok(counters) => {
                 counters
