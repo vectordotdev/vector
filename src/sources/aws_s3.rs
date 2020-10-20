@@ -26,7 +26,6 @@ use tokio::{select, time};
 use tokio_util::codec::FramedRead;
 
 // TODO:
-// * Handle decompression
 // * Revisit configuration of queue. Should we take the URL instead?
 //   * At the least, support setting a differente queue owner
 // * Revisit configuration of SQS strategy (intrnal vs. external tagging)
@@ -36,7 +35,6 @@ use tokio_util::codec::FramedRead;
 // * Make sure we are handling shutdown well
 // * Consider any special handling of FIFO SQS queues
 // * Consider having helper methods stream data and have top-level forward to pipeline
-// * Integration tests
 // * Consider / decide on multi-region S3 support (handling messages referring to buckets in
 //   multiple regions)
 // * Consider / decide on custom endpoint support
@@ -45,14 +43,12 @@ use tokio_util::codec::FramedRead;
 // Future work:
 // * Additional codecs. Just treating like `file` source with newlines for now
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum Compression {
     Auto,
     None,
     Gzip,
-    Lz4,
-    Snappy,
     Zstd,
 }
 
@@ -310,40 +306,45 @@ impl SqsIngestor {
 
         match object.body {
             Some(body) => {
-                let stream = FramedRead::new(
-                    body.into_async_read(),
-                    BytesDelimitedCodec::new_with_max_length(b'\n', 100000),
-                )
-                .filter_map(|line| {
-                    let bucket_name = s3_event.s3.bucket.name.clone();
-                    let object_key = s3_event.s3.object.key.clone();
-                    let aws_region = s3_event.aws_region.clone();
-                    let metadata = metadata.clone();
+                let r = s3_object_decoder(
+                    self.compression,
+                    &s3_event.s3.object.key,
+                    object.content_encoding.as_deref(),
+                    object.content_type.as_deref(),
+                    body,
+                );
+                let stream =
+                    FramedRead::new(r, BytesDelimitedCodec::new_with_max_length(b'\n', 100000))
+                        .filter_map(|line| {
+                            let bucket_name = s3_event.s3.bucket.name.clone();
+                            let object_key = s3_event.s3.object.key.clone();
+                            let aws_region = s3_event.aws_region.clone();
+                            let metadata = metadata.clone();
 
-                    async move {
-                        match line {
-                            Ok(line) => {
-                                let mut event = Event::from(line);
+                            async move {
+                                match line {
+                                    Ok(line) => {
+                                        let mut event = Event::from(line);
 
-                                let log = event.as_mut_log();
-                                log.insert("bucket", bucket_name);
-                                log.insert("object", object_key);
-                                log.insert("region", aws_region);
+                                        let log = event.as_mut_log();
+                                        log.insert("bucket", bucket_name);
+                                        log.insert("object", object_key);
+                                        log.insert("region", aws_region);
 
-                                for (key, value) in &metadata {
-                                    log.insert(key, value.clone());
+                                        for (key, value) in &metadata {
+                                            log.insert(key, value.clone());
+                                        }
+
+                                        Some(Ok(event))
+                                    }
+                                    Err(err) => {
+                                        // TODO handling IO errors here?
+                                        dbg!(err);
+                                        None
+                                    }
                                 }
-
-                                Some(Ok(event))
                             }
-                            Err(err) => {
-                                // TODO handling IO errors here?
-                                dbg!(err);
-                                None
-                            }
-                        }
-                    }
-                });
+                        });
 
                 out.send_all(Compat::new(Box::pin(stream)))
                     .compat()
@@ -386,6 +387,80 @@ impl SqsIngestor {
     }
 }
 
+fn s3_object_decoder(
+    compression: Compression,
+    key: &str,
+    content_encoding: Option<&str>,
+    content_type: Option<&str>,
+    body: rusoto_s3::StreamingBody,
+) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
+    use async_compression::tokio_02::bufread;
+
+    let r = tokio::io::BufReader::new(body.into_async_read());
+
+    let mut compression = compression;
+    if let Auto = compression {
+        compression =
+            determine_compression(key, content_encoding, content_type).unwrap_or(Compression::None);
+    };
+
+    use Compression::*;
+    match compression {
+        Auto => unreachable!(), // is mapped above
+        None => Box::new(r),
+        Gzip => Box::new(bufread::GzipDecoder::new(r)),
+        Zstd => Box::new(bufread::ZstdDecoder::new(r)),
+    }
+}
+
+/// try to determine the compression given the:
+/// * content-encoding
+/// * content-type
+/// * key name (for file extension)
+///
+/// It will use this information in this order
+fn determine_compression(
+    key: &str,
+    content_encoding: Option<&str>,
+    content_type: Option<&str>,
+) -> Option<Compression> {
+    content_encoding
+        .and_then(|e| content_encoding_to_compression(e))
+        .or_else(|| content_type.and_then(|t| content_type_to_compression(t)))
+        .or_else(|| object_key_to_compression(key))
+}
+
+fn content_encoding_to_compression(content_encoding: &str) -> Option<Compression> {
+    use Compression::*;
+    match content_encoding {
+        "gzip" => Some(Gzip),
+        "zstd" => Some(Zstd),
+        _ => Option::None,
+    }
+}
+
+fn content_type_to_compression(content_type: &str) -> Option<Compression> {
+    use Compression::*;
+    match content_type {
+        "application/gzip" | "application/x-gzip" => Some(Gzip),
+        "application/zstd" => Some(Zstd),
+        _ => Option::None,
+    }
+}
+
+fn object_key_to_compression(key: &str) -> Option<Compression> {
+    let extension = std::path::Path::new(key)
+        .extension()
+        .and_then(std::ffi::OsStr::to_str);
+
+    use Compression::*;
+    extension.and_then(|extension| match extension {
+        "gz" => Some(Gzip),
+        "zst" => Some(Zstd),
+        _ => Option::None,
+    })
+}
+
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
@@ -423,16 +498,97 @@ struct S3Object {
     key: String,
 }
 
+mod test {
+    #[test]
+    fn determine_compression() {
+        use super::Compression;
+
+        let cases = vec![
+            ("out.log", Some("gzip"), None, Some(Compression::Gzip)),
+            (
+                "out.log",
+                None,
+                Some("application/gzip"),
+                Some(Compression::Gzip),
+            ),
+            ("out.log.gz", None, None, Some(Compression::Gzip)),
+            ("out.txt", None, None, None),
+        ];
+        for (key, content_encoding, content_type, expected) in cases {
+            assert_eq!(
+                super::determine_compression(key, content_encoding, content_type),
+                expected
+            );
+        }
+    }
+}
+
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::*;
-    use crate::test_util::{collect_n, random_lines};
+    use super::{AwsS3Config, Compression, SqsConfig, Strategy};
+    use crate::{
+        config::{GlobalOptions, SourceConfig},
+        shutdown::ShutdownSignal,
+        test_util::{collect_n, random_lines},
+        Pipeline,
+    };
+    use futures::compat::Future01CompatExt;
     use pretty_assertions::assert_eq;
-    use rusoto_s3::PutObjectRequest;
+    use rusoto_core::Region;
+    use rusoto_s3::{PutObjectRequest, S3Client, S3};
+    use rusoto_sqs::{Sqs, SqsClient};
 
     #[tokio::test]
     async fn s3_process_message() {
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        test_event(&key, None, None, logs.join("\n").into_bytes(), logs).await;
+    }
+
+    #[tokio::test]
+    async fn s3_process_message_gzip() {
+        use std::io::Read;
+
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs: Vec<String> = random_lines(100).take(10).collect();
+
+        let mut gz = flate2::read::GzEncoder::new(
+            std::io::Cursor::new(logs.join("\n").into_bytes()),
+            flate2::Compression::fast(),
+        );
+        let mut buffer = Vec::new();
+        gz.read_to_end(&mut buffer).unwrap();
+
+        test_event(&key, Some("gzip"), None, buffer, logs).await;
+    }
+
+    async fn config(queue_name: &str) -> AwsS3Config {
+        AwsS3Config {
+            strategy: Strategy::Sqs,
+            compression: Compression::Auto,
+            sqs: Some(SqsConfig {
+                queue_name: queue_name.to_string(),
+                region: Region::Custom {
+                    name: "minio".to_owned(),
+                    endpoint: "http://localhost:4566".to_owned(),
+                },
+                poll_secs: 1,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    // puts an object and asserts that the logs it gets back match
+    async fn test_event(
+        key: &str,
+        content_encoding: Option<&str>,
+        content_type: Option<&str>,
+        payload: Vec<u8>,
+        expected_lines: Vec<String>,
+    ) {
         let s3 = s3_client();
         let sqs = sqs_client();
 
@@ -441,14 +597,12 @@ mod integration_tests {
 
         let config = config(&queue).await;
 
-        let key = uuid::Uuid::new_v4().to_string();
-
-        let logs: Vec<String> = random_lines(100).take(10).collect();
-
         s3.put_object(PutObjectRequest {
-            bucket: bucket.clone(),
-            key: key.clone(),
-            body: Some(rusoto_core::ByteStream::from(logs.join("\n").into_bytes())),
+            bucket: bucket.to_owned(),
+            key: key.to_owned(),
+            body: Some(rusoto_core::ByteStream::from(payload)),
+            content_type: content_type.map(|t| t.to_owned()),
+            content_encoding: content_encoding.map(|t| t.to_owned()),
             ..Default::default()
         })
         .await
@@ -470,33 +624,17 @@ mod integration_tests {
                 .unwrap()
         });
 
-        let events = collect_n(rx, logs.len()).await.unwrap();
+        let events = collect_n(rx, expected_lines.len()).await.unwrap();
 
-        assert_eq!(logs.len(), events.len());
+        assert_eq!(expected_lines.len(), events.len());
         for (i, event) in events.iter().enumerate() {
-            let message: String = logs[i].to_owned();
+            let message = expected_lines[i].as_str();
 
             let log = event.as_log();
-            assert_eq!(log["message"], message.as_str().into());
-            assert_eq!(log["bucket"], bucket.as_str().into());
-            assert_eq!(log["object"], key.as_str().into());
+            assert_eq!(log["message"], message.into());
+            assert_eq!(log["bucket"], bucket.clone().into());
+            assert_eq!(log["object"], key.clone().into());
             assert_eq!(log["region"], "us-east-1".into());
-        }
-    }
-
-    async fn config(queue_name: &str) -> AwsS3Config {
-        AwsS3Config {
-            strategy: Strategy::Sqs,
-            sqs: Some(SqsConfig {
-                queue_name: queue_name.to_string(),
-                region: Region::Custom {
-                    name: "minio".to_owned(),
-                    endpoint: "http://localhost:4566".to_owned(),
-                },
-                poll_secs: 1,
-                ..Default::default()
-            }),
-            ..Default::default()
         }
     }
 
