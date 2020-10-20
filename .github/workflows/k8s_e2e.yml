@@ -48,6 +48,8 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
+    if: |
+      !github.event.pull_request || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -78,6 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+    if: |
+      !github.event.pull_request || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
     steps:
       - uses: actions/github-script@v2
         id: set-matrix
@@ -133,6 +137,8 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
+    if: |
+      !github.event.pull_request || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
     steps:
       - name: Checkout
         uses: actions/checkout@v2
