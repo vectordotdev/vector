@@ -142,10 +142,6 @@ jobs:
     strategy:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
-    if: |
-      !github.event.pull_request
-        || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
-        || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
       - name: Checkout
         uses: actions/checkout@v2
