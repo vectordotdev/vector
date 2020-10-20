@@ -28,7 +28,7 @@ impl InternalEvent for SyslogUdpReadError {
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_read_errors_total", 1, "mode" => "udp");
+        counter!("read_errors_total", 1, "mode" => "udp");
     }
 }
 
@@ -43,6 +43,6 @@ impl InternalEvent for SyslogUdpUtf8Error {
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_utf8_convert_errors_total", 1, "mode" => "udp");
+        counter!("utf8_convert_errors_total", 1, "mode" => "udp");
     }
 }

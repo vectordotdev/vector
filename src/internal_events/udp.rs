@@ -19,6 +19,6 @@ impl InternalEvent for UdpSendIncomplete {
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_send_errors_total", 1);
+        counter!("send_errors_total", 1);
     }
 }
