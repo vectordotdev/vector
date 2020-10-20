@@ -13,8 +13,8 @@ impl InternalEvent for ElasticSearchEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
-        counter!("bytes_processed", self.byte_size as u64);
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -33,6 +33,6 @@ impl<'a> InternalEvent for ElasticSearchMissingKeys<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("missing_keys", 1);
+        counter!("missing_keys_total", 1);
     }
 }

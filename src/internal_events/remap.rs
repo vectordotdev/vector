@@ -6,7 +6,7 @@ pub struct RemapEventProcessed;
 
 impl InternalEvent for RemapEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -34,6 +34,6 @@ impl InternalEvent for RemapFailedMapping {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_error", 1, "error_type" => "failed_mapping");
+        counter!("processing_errors_total", 1, "error_type" => "failed_mapping");
     }
 }

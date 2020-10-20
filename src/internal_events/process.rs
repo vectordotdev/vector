@@ -85,7 +85,7 @@ impl InternalEvent for VectorReloadFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_reload_errors", 1);
+        counter!("vector_reload_errors_total", 1);
     }
 }
 
@@ -101,7 +101,7 @@ impl InternalEvent for VectorConfigLoadFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("config_load_errors", 1);
+        counter!("config_load_errors_total", 1);
     }
 }
 
@@ -117,7 +117,7 @@ impl InternalEvent for VectorRecoveryFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_recover_errors", 1);
+        counter!("vector_recover_errors_total", 1);
     }
 }
 

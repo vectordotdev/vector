@@ -12,8 +12,8 @@ impl InternalEvent for StdinEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
-        counter!("bytes_processed", self.byte_size as u64);
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -28,6 +28,6 @@ impl InternalEvent for StdinReadFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("stdin_reads_failed", 1);
+        counter!("stdin_reads_failed_total", 1);
     }
 }

@@ -100,7 +100,7 @@
               "deprecationReason": null,
               "description": "Number of bytes processed",
               "isDeprecated": false,
-              "name": "bytesProcessed",
+              "name": "processedBytesTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -121,7 +121,7 @@
             }
           ],
           "kind": "OBJECT",
-          "name": "BytesProcessed",
+          "name": "ProcessedBytesTotal",
           "possibleTypes": null
         },
         {
@@ -155,7 +155,7 @@
               "deprecationReason": null,
               "description": "Number of events processed",
               "isDeprecated": false,
-              "name": "eventsProcessed",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -176,7 +176,7 @@
             }
           ],
           "kind": "OBJECT",
-          "name": "EventsProcessed",
+          "name": "EventsProcessedTotal",
           "possibleTypes": null
         },
         {
@@ -413,12 +413,12 @@
             },
             {
               "kind": "OBJECT",
-              "name": "EventsProcessed",
+              "name": "EventsProcessedTotal",
               "ofType": null
             },
             {
               "kind": "OBJECT",
-              "name": "BytesProcessed",
+              "name": "ProcessedBytesTotal",
               "ofType": null
             }
           ]
@@ -476,15 +476,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events total processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedMetrics",
+              "name": "eventsProcessedTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsProcessed",
+                  "name": "EventsTotalProcessed",
                   "ofType": null
                 }
               }
@@ -509,13 +509,13 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "bytesProcessedMetrics",
+              "name": "processedBytesTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "BytesProcessed",
+                  "name": "ProcessedBytesTotal",
                   "ofType": null
                 }
               }
@@ -611,15 +611,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events total processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedMetrics",
+              "name": "eventsProcessedTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsProcessed",
+                  "name": "EventsTotalProcessed",
                   "ofType": null
                 }
               }
@@ -644,13 +644,13 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "bytesProcessedMetrics",
+              "name": "processedBytesTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "BytesProcessed",
+                  "name": "ProcessedBytesTotal",
                   "ofType": null
                 }
               }
@@ -918,12 +918,12 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating events processed for the current sink",
+              "description": "Metric indicating total events processed for the current sink",
               "isDeprecated": false,
-              "name": "eventsProcessed",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsProcessed",
+                "name": "EventsTotalProcessed",
                 "ofType": null
               }
             }
@@ -1027,12 +1027,12 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating events processed for the current source",
+              "description": "Metric indicating total events processed for the current source",
               "isDeprecated": false,
-              "name": "eventsProcessed",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsProcessed",
+                "name": "EventsTotalProcessed",
                 "ofType": null
               }
             }
@@ -1173,15 +1173,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events processed total metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedMetrics",
+              "name": "eventsProcessedTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsProcessed",
+                  "name": "EventsProcessedTotal",
                   "ofType": null
                 }
               }
@@ -1206,13 +1206,13 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "bytesProcessedMetrics",
+              "name": "processedBytesTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "BytesProcessed",
+                  "name": "ProcessedBytesTotal",
                   "ofType": null
                 }
               }
@@ -1311,10 +1311,10 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
-              "name": "eventsProcessed",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsProcessed",
+                "name": "EventsProcessedTotal",
                 "ofType": null
               }
             }
@@ -1699,15 +1699,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events processed total metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedMetrics",
+              "name": "eventsProcessedTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsProcessed",
+                  "name": "EventsProcessedTotal",
                   "ofType": null
                 }
               }
@@ -1732,13 +1732,13 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "bytesProcessedMetrics",
+              "name": "processedBytesTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "BytesProcessed",
+                  "name": "ProcessedBytesTotal",
                   "ofType": null
                 }
               }
@@ -1883,12 +1883,12 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating events processed for the current transform",
+              "description": "Metric indicating total events processed for the current transform",
               "isDeprecated": false,
-              "name": "eventsProcessed",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsProcessed",
+                "name": "EventsProcessedTotal",
                 "ofType": null
               }
             }

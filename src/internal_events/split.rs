@@ -6,7 +6,7 @@ pub struct SplitEventProcessed;
 
 impl InternalEvent for SplitEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -25,7 +25,7 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "field_missing");
+        counter!("processing_errors_total", 1, "error_type" => "field_missing");
     }
 }
 
@@ -46,6 +46,6 @@ impl<'a> InternalEvent for SplitConvertFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "convert_failed");
+        counter!("processing_errors_total", 1, "error_type" => "convert_failed");
     }
 }

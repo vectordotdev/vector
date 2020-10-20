@@ -2,8 +2,8 @@ query TopologyQuery {
   topology {
     __typename
     name
-    eventsProcessed {
-      eventsProcessed
+    eventsProcessedTotal {
+      eventsProcessedTotal
     }
   }
 }
