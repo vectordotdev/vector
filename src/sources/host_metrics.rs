@@ -101,7 +101,7 @@ impl Namespace {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct HostMetricsConfig {
+pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
     scrape_interval_secs: u64,
 
@@ -274,7 +274,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn memory_metrics(&self) -> Vec<Metric> {
+    pub async fn memory_metrics(&self) -> Vec<Metric> {
         match heim::memory::memory().await {
             Ok(memory) => {
                 let timestamp = Utc::now();

@@ -49,7 +49,7 @@ version = "0.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "043164d8ba5c4c3035fec9bbee8647c0261d788f3474306f93bb65901cae0e86"
 dependencies = [
- "memchr",
+ "memchr 2.3.3",
 ]
 
 [[package]]
@@ -156,7 +156,7 @@ checksum = "9021768bcce77296b64648cc7a7460e3df99979b97ed5c925c38d1cc83778d98"
 dependencies = [
  "flate2",
  "futures-core",
- "memchr",
+ "memchr 2.3.3",
  "pin-project-lite",
  "tokio",
 ]
@@ -577,7 +577,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31accafdb70df7871592c058eca3985b71104e15ac32f64706022c58867da931"
 dependencies = [
  "lazy_static",
- "memchr",
+ "memchr 2.3.3",
  "regex-automata",
  "serde",
 ]
@@ -803,7 +803,7 @@ dependencies = [
  "ascii",
  "byteorder",
  "either",
- "memchr",
+ "memchr 2.3.3",
  "unreachable",
 ]
 
@@ -1117,7 +1117,7 @@ version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b2466559f260f48ad25fe6317b3c8dac77b5bdb5763ac7d9d6103530663bc90"
 dependencies = [
- "memchr",
+ "memchr 2.3.3",
 ]
 
 [[package]]
@@ -1191,7 +1191,7 @@ checksum = "9fb90051930c9a0f09e585762152048e23ac74d20c10590ef7cf01c0343c3046"
 dependencies = [
  "darwin-libproc-sys",
  "libc",
- "memchr",
+ "memchr 2.3.3",
 ]
 
 [[package]]
@@ -1706,7 +1706,7 @@ dependencies = [
  "fastrand",
  "futures-core",
  "futures-io",
- "memchr",
+ "memchr 2.3.3",
  "parking 2.0.0",
  "pin-project-lite",
  "waker-fn",
@@ -1721,7 +1721,7 @@ dependencies = [
  "fastrand",
  "futures-core",
  "futures-io",
- "memchr",
+ "memchr 2.3.3",
  "parking 2.0.0",
  "pin-project-lite",
  "waker-fn",
@@ -1773,7 +1773,7 @@ dependencies = [
  "futures-macro",
  "futures-sink",
  "futures-task",
- "memchr",
+ "memchr 2.3.3",
  "pin-project",
  "pin-utils",
  "proc-macro-hack",
@@ -2188,7 +2188,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "memchr",
+ "memchr 2.3.3",
  "ntapi",
  "ordered-float 1.0.2",
  "smol",
@@ -3069,6 +3069,15 @@ checksum = "490cc448043f947bae3cbee9c203358d62dbee0db12107a74be5c30ccfd09771"
 
 [[package]]
 name = "memchr"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "148fab2e51b4f1cfc66da2a7c32981d1d3c083a803978268bb11fe4b86925e7a"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "memchr"
 version = "2.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
@@ -3335,11 +3344,20 @@ checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 
 [[package]]
 name = "nom"
+version = "3.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05aec50c70fd288702bcd93284a8444607f3292dbdf2a30de5ea5dcdbe72287b"
+dependencies = [
+ "memchr 1.0.2",
+]
+
+[[package]]
+name = "nom"
 version = "4.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ad2a91a8e869eeb30b9cb3119ae87773a8f4ae617f41b1eb9c154b2905f7bd6"
 dependencies = [
- "memchr",
+ "memchr 2.3.3",
  "version_check 0.1.5",
 ]
 
@@ -3350,7 +3368,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffb4262d26ed83a1c0a33a38fe2bb15797329c85770da05e6b828ddb782627af"
 dependencies = [
  "lexical-core",
- "memchr",
+ "memchr 2.3.3",
  "version_check 0.9.2",
 ]
 
@@ -3995,7 +4013,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ca36dea94d187597e104a5c8e4b07576a8a45aa5db48a65e12940d3eb7461f55"
 dependencies = [
  "bitflags",
- "memchr",
+ "memchr 2.3.3",
  "unicase",
 ]
 
@@ -4376,7 +4394,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c3780fcf44b193bc4d09f36d2a3c87b251da4a046c87795a0d35f4f927ad8e6"
 dependencies = [
  "aho-corasick",
- "memchr",
+ "memchr 2.3.3",
  "regex-syntax",
  "thread_local",
 ]
@@ -5370,6 +5388,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "systemstat"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2078da8d09c6202bffd5e075946e65bfad5ce2cfa161edb15c5f014a8440adee"
+dependencies = [
+ "bytesize",
+ "chrono",
+ "lazy_static",
+ "libc",
+ "nom 3.2.1",
+ "time 0.1.43",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "target-lexicon"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5533,7 +5566,7 @@ dependencies = [
  "iovec",
  "lazy_static",
  "libc",
- "memchr",
+ "memchr 2.3.3",
  "mio",
  "mio-named-pipes",
  "mio-uds",
@@ -5945,7 +5978,7 @@ version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b40075910de3a912adbd80b5d8bad6ad10a23eeb1f5bf9d4006839e899ba5bc"
 dependencies = [
- "memchr",
+ "memchr 2.3.3",
  "unchecked-index",
 ]
 
@@ -6286,6 +6319,7 @@ dependencies = [
  "structopt",
  "syslog",
  "syslog_loose",
+ "systemstat",
  "task-compat",
  "tempfile",
  "tokio",
