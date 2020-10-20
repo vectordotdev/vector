@@ -248,6 +248,11 @@ mod tests {
     use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
     use std::collections::BTreeMap;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
+    }
+
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
         Event::Metric(Metric {
             name: "event".into(),
