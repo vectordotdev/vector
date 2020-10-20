@@ -39,10 +39,11 @@ spec:
           args:
             - --config
             - /etc/vector/*.toml
-          {{- with .Values.env }}
           env:
+            {{- include "libvector.globalEnv" . | nindent 12 }}
+            {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
-          {{- end }}
+            {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
