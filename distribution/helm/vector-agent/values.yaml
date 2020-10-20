@@ -136,7 +136,7 @@ kubernetesLogsSource:
 
 # The "built-in" vector sink, to send the logs to the vector aggregator.
 # Disabled by default when using `vector-agent` chart.
-# Enabled by default when usong `vector` chart, and automatically configured.
+# Enabled by default when using `vector` chart, and automatically configured.
 vectorSink:
   # Disable to omit the vector sink from being added.
   enabled: false
