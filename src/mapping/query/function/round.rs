@@ -71,6 +71,15 @@ mod tests {
                 RoundFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
             ),
             (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert("foo", Value::from(1234.5));
+                    event
+                },
+                Ok(Value::from(1235.0)),
+                RoundFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+            ),
+            (
                 Event::from(""),
                 Ok(Value::from(1235.0)),
                 RoundFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
