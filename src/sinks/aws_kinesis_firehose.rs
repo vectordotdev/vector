@@ -372,11 +372,11 @@ mod integration_tests {
         let total = response["hits"]["total"]["value"]
             .as_u64()
             .expect("Elasticsearch response does not include hits->total->value");
+        assert_eq!(input.len() as u64, total);
+
         let hits = response["hits"]["hits"]
             .as_array()
             .expect("Elasticsearch response does not include hits->hits");
-
-        assert_eq!(input.len() as u64, total);
         let input = input
             .into_iter()
             .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
