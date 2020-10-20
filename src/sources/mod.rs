@@ -25,6 +25,8 @@ pub mod kafka;
 pub mod kubernetes_logs;
 #[cfg(feature = "sources-logplex")]
 pub mod logplex;
+#[cfg(feature = "sources-mongodb_metrics")]
+pub mod mongodb_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sources-socket")]
