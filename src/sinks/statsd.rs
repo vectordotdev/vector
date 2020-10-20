@@ -92,8 +92,10 @@ impl StatsdSinkConfig {
 
         let (client, healthcheck) = match &self.mode {
             Mode::Tcp(config) => {
-                let (service, healthcheck) = config.build_service(cx.clone())?;
-                (Client::Tcp(service), healthcheck)
+                let namespace = namespace.clone();
+                let encode_event =
+                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                return config.build(cx.clone(), encode_event);
             }
             Mode::Udp(config) => {
                 let (service, healthcheck) = config.build_service(cx.clone())?;
