@@ -6,11 +6,10 @@ use crate::{
         TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
         TcpConnectionShutdown, TcpEventSent, TcpFlushError,
     },
-    sinks::util::{
-        encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld,
-    },
+    sinks::util::{SinkBuildError, StreamSinkOld},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
+    Event,
 };
 use bytes::Bytes;
 use futures::{
@@ -86,16 +85,19 @@ impl TcpSinkConfig {
         Ok((connector.into(), healthcheck))
     }
 
-    pub fn build(
+    pub fn build<F>(
         &self,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        encode_event: F,
+    ) -> crate::Result<(VectorSink, Healthcheck)>
+    where
+        F: Fn(Event) -> Option<Bytes> + Send + 'static,
+    {
         let connector = self.build_connector(cx.clone())?;
         let healthcheck = connector.healthcheck();
         let sink: TcpSink = connector.into();
         let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+            .with_flat_map(move |event| iter_ok(encode_event(event)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

@@ -74,7 +74,7 @@ impl GenerateConfig for StatsdSinkConfig {
 }
 
 impl StatsdSinkConfig {
-    async fn build_sink(
+    fn build_sink(
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
@@ -130,7 +130,7 @@ impl SinkConfig for StatsdSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        self.build_sink()
+        self.build_sink(cx)
     }
 
     fn input_type(&self) -> DataType {
