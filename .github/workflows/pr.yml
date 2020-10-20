@@ -177,7 +177,6 @@ jobs:
     container: timberio/ci_image
     steps:
       - uses: actions/checkout@v2
-      - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
       - run: make check-component-features
