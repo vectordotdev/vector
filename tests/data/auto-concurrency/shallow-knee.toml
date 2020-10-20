@@ -1,0 +1,36 @@
+[params]
+requests = 1000
+delay = 0.100
+concurrency.knee_start = 10
+concurrency.knee_exp = 1.1
+
+in_flight_limit = "auto"
+
+[stats.in_flight]
+max = [12, 12]
+mean = [9, 11]
+mode = [9, 12]
+
+[stats.rate]
+max = [108, 108]
+mean = [87, 88]
+
+[controller.concurrency_limit]
+max = [12, 12]
+mean = [9, 11]
+mode = [9, 12]
+
+[controller.in_flight]
+max = [12, 12]
+mean = [9, 11]
+mode = [9, 12]
+
+[controller.observed_rtt]
+min = [0.100, 0.102]
+max = [0.100, 0.123]
+mean = [0.106, 0.107]
+
+[controller.averaged_rtt]
+min = [0.100, 0.102]
+max = [0.100, 0.123]
+mean = [0.106, 0.107]
