@@ -283,6 +283,7 @@ mod test {
         Event,
     };
     use serde_json::json;
+    use futures::compat::Stream01CompatExt;
 
     #[test]
     fn generate_config() {
@@ -421,7 +422,7 @@ merge_strategies.baz = "max"
 
     #[tokio::test]
     async fn missing_identifier() {
-        let mut reduce = toml::from_str::<ReduceConfig>(
+        let reduce = toml::from_str::<ReduceConfig>(
             r#"
 identifier_fields = [ "request_id" ]
 
@@ -433,56 +434,52 @@ identifier_fields = [ "request_id" ]
         .build(TransformContext::new_test())
         .await
         .unwrap();
-        let reduce = reduce.as_function();
+        let reduce = reduce.into_task();
 
-        let mut outputs = Vec::new();
+        let mut e_1 = Event::from("test message 1");
+        e_1.as_mut_log().insert("counter", 1);
+        e_1.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 1");
-        e.as_mut_log().insert("counter", 1);
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform(&mut outputs, e);
+        let mut e_2 = Event::from("test message 2");
+        e_2.as_mut_log().insert("counter", 2);
 
-        let mut e = Event::from("test message 2");
-        e.as_mut_log().insert("counter", 2);
-        // e.as_mut_log().insert("request_id", "");
-        reduce.transform(&mut outputs, e);
+        let mut e_3 = Event::from("test message 3");
+        e_3.as_mut_log().insert("counter", 3);
+        e_3.as_mut_log().insert("request_id", "1");
 
-        let mut e = Event::from("test message 3");
-        e.as_mut_log().insert("counter", 3);
-        e.as_mut_log().insert("request_id", "1");
-        reduce.transform(&mut outputs, e);
+        let mut e_4 = Event::from("test message 4");
+        e_4.as_mut_log().insert("counter", 4);
+        e_4.as_mut_log().insert("request_id", "1");
+        e_4.as_mut_log().insert("test_end", "yep");
 
-        let mut e = Event::from("test message 4");
-        e.as_mut_log().insert("counter", 4);
-        e.as_mut_log().insert("request_id", "1");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform(&mut outputs, e);
+        let mut e_5 = Event::from("test message 5");
+        e_5.as_mut_log().insert("counter", 5);
+        e_5.as_mut_log().insert("extra_field", "value1");
+        e_5.as_mut_log().insert("test_end", "yep");
 
-        assert_eq!(outputs.len(), 1);
+        let inputs = vec![e_1, e_2, e_3, e_4];
+        let in_stream = Box::new(futures01::stream::iter_ok(inputs));
+        let mut out_stream = reduce.transform(in_stream).compat();
+
+        let output = out_stream.next().await.unwrap().unwrap();
+        let output = output.as_log();
         assert_eq!(
-            outputs.first().unwrap().as_log()["message"],
+            output["message"],
             "test message 1".into()
         );
-        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(8));
-
-        outputs.clear();
-
-        let mut e = Event::from("test message 5");
-        e.as_mut_log().insert("counter", 5);
-        e.as_mut_log().insert("extra_field", "value1");
-        e.as_mut_log().insert("test_end", "yep");
-        reduce.transform(&mut outputs, e);
-
-        assert_eq!(outputs.len(), 1);
+        assert_eq!(output["counter"], Value::from(8));
+        
+        let output = out_stream.next().await.unwrap().unwrap();
+        let output = output.as_log();
         assert_eq!(
-            outputs.first().unwrap().as_log()["message"],
+            output["message"],
             "test message 2".into()
         );
         assert_eq!(
-            outputs.first().unwrap().as_log()["extra_field"],
+            output["extra_field"],
             "value1".into()
         );
-        assert_eq!(outputs.first().unwrap().as_log()["counter"], Value::from(7));
+        assert_eq!(output["counter"], Value::from(7));
     }
 
     #[tokio::test]

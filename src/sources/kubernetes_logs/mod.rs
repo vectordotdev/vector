@@ -274,19 +274,15 @@ impl Source {
             event
         });
         let events = events
-            .filter_map(move |event| {
-                futures::future::ready({
-                    let mut buf = Vec::with_capacity(1);
-                    parser.transform(&mut buf, event);
-                    // TODO(new-transform-enum): Handle many
-                    buf.into_iter().next()
-                })
+            .flat_map(move |event| {
+                let mut buf = Vec::with_capacity(1);
+                parser.transform(&mut buf, event);
+                futures::stream::iter(buf)
             })
-            .filter_map(move |event| {
+            .flat_map(move |event| {
                 let mut buf = Vec::with_capacity(1);
                 partial_events_merger.transform(&mut buf, event);
-                // TODO(new-transform-enum): Handle many
-                futures::future::ready(buf.into_iter().next())
+                futures::stream::iter(buf)
             });
 
         let event_processing_loop = events.map(Ok).forward(out);
