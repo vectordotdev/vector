@@ -19,8 +19,8 @@ impl<'a> InternalEvent for DockerEventReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("vector_events_processed_total", 1);
+        counter!("vector_processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -40,7 +40,7 @@ impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_events_processed_total", 1);
+        counter!("vector_container_events_processed_total", 1);
     }
 }
 
@@ -58,7 +58,7 @@ impl<'a> InternalEvent for DockerContainerWatch<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("containers_watched_total", 1);
+        counter!("vector_containers_watched_total", 1);
     }
 }
 
@@ -76,7 +76,7 @@ impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("containers_unwatched_total", 1);
+        counter!("vector_containers_unwatched_total", 1);
     }
 }
 
@@ -97,7 +97,7 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("communication_errors_total", 1);
+        counter!("vector_communication_errors_total", 1);
     }
 }
 
@@ -118,7 +118,7 @@ impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_metadata_fetch_errors_total", 1);
+        counter!("vector_container_metadata_fetch_errors_total", 1);
     }
 }
 
@@ -139,7 +139,7 @@ impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("timestamp_parse_errors_total", 1);
+        counter!("vector_timestamp_parse_errors_total", 1);
     }
 }
 
@@ -162,6 +162,6 @@ impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("logging_driver_errors_total", 1);
+        counter!("vector_logging_driver_errors_total", 1);
     }
 }

@@ -6,7 +6,7 @@ pub(crate) struct TokenizerEventProcessed;
 
 impl InternalEvent for TokenizerEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("vector_events_processed_total", 1);
     }
 }
 
@@ -25,7 +25,7 @@ impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "field_missing");
+        counter!("vector_processing_errors_total", 1, "error_type" => "field_missing");
     }
 }
 
@@ -46,6 +46,6 @@ impl<'a> InternalEvent for TokenizerConvertFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "convert_failed");
+        counter!("vector_processing_errors_total", 1, "error_type" => "convert_failed");
     }
 }

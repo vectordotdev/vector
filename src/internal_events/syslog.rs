@@ -12,8 +12,8 @@ impl InternalEvent for SyslogEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("vector_events_processed_total", 1);
+        counter!("vector_processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -28,7 +28,7 @@ impl InternalEvent for SyslogUdpReadError {
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_read_errors_total", 1, "mode" => "udp");
+        counter!("vector_connection_read_errors_total", 1, "mode" => "udp");
     }
 }
 
@@ -43,6 +43,6 @@ impl InternalEvent for SyslogUdpUtf8Error {
     }
 
     fn emit_metrics(&self) {
-        counter!("utf8_convert_errors_total", 1, "mode" => "udp");
+        counter!("vector_utf8_convert_errors_total", 1, "mode" => "udp");
     }
 }

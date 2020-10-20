@@ -12,8 +12,8 @@ pub(crate) struct SplunkEventSent {
 
 impl InternalEvent for SplunkEventSent {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("vector_events_processed_total", 1);
+        counter!("vector_processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -32,7 +32,7 @@ impl InternalEvent for SplunkEventEncodeError {
     }
 
     fn emit_metrics(&self) {
-        counter!("encode_errors_total", 1);
+        counter!("vector_encode_errors_total", 1);
     }
 }
 
@@ -51,7 +51,7 @@ impl<'a> InternalEvent for SplunkSourceTypeMissingKeys<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("sourcetype_missing_keys_total", 1);
+        counter!("vector_sourcetype_missing_keys_total", 1);
     }
 }
 
@@ -70,7 +70,7 @@ impl<'a> InternalEvent for SplunkSourceMissingKeys<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("source_missing_keys_total", 1);
+        counter!("vector_source_missing_keys_total", 1);
     }
 }
 
@@ -89,7 +89,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("events_processed_total", 1);
+            counter!("vector_events_processed_total", 1);
         }
     }
 
@@ -108,7 +108,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("request_received_total", 1);
+            counter!("vector_request_received_total", 1);
         }
     }
 
@@ -144,7 +144,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("request_errors_total", 1);
+            counter!("vector_request_errors_total", 1);
         }
     }
 }

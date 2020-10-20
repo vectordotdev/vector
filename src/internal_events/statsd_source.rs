@@ -12,8 +12,8 @@ impl InternalEvent for StatsdEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1,);
-        counter!("processed_bytes_total", self.byte_size as u64,);
+        counter!("vector_events_processed_total", 1,);
+        counter!("vector_processed_bytes_total", self.byte_size as u64,);
     }
 }
 
@@ -29,8 +29,8 @@ impl InternalEvent for StatsdInvalidRecord<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("invalid_record_total", 1,);
-        counter!("invalid_record_bytes_total", self.text.len() as u64,);
+        counter!("vector_invalid_record_total", 1,);
+        counter!("vector_invalid_record_bytes_total", self.text.len() as u64,);
     }
 }
 
@@ -70,6 +70,6 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for StatsdSocketError
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_errors_total", 1);
+        counter!("vector_connection_errors_total", 1);
     }
 }

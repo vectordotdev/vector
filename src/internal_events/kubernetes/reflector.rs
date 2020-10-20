@@ -14,6 +14,6 @@ impl<E: std::fmt::Debug> InternalEvent for DesyncReceived<E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("k8s_reflector_desyncs_total", 1);
+        counter!("vector_k8s_reflector_desyncs_total", 1);
     }
 }

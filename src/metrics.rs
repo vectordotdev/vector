@@ -143,7 +143,7 @@ mod tests {
         }
         let _enter = span.enter();
 
-        counter!("labels_injected_total", 1);
+        counter!("vector_labels_injected_total", 1);
 
         let metric = super::capture_metrics(super::get_controller().unwrap())
             .map(|e| e.into_metric())

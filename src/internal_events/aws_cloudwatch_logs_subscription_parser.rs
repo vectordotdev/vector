@@ -10,7 +10,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("vector_events_processed_total", 1);
     }
 }
 
@@ -22,14 +22,14 @@ pub(crate) struct AwsCloudwatchLogsSubscriptionParserFailedParse {
 impl InternalEvent for AwsCloudwatchLogsSubscriptionParserFailedParse {
     fn emit_logs(&self) {
         warn!(
-            message = "Event failed to parse as a CloudWatch Logs subscirption JSON message.",
+            message = "Event failed to parse as a CloudWatch Logs subscription JSON message.",
             %self.error,
             rate_limit_secs = 30
         )
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1,
+        counter!("vector_processing_errors_total", 1,
             "error_type" => "failed_parse",
         );
     }

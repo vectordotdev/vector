@@ -6,7 +6,7 @@ pub struct LuaEventProcessed;
 
 impl InternalEvent for LuaEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("vector_events_processed_total", 1);
     }
 }
 
@@ -17,7 +17,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit_metrics(&self) {
-        gauge!("memory_used", self.used_memory as f64);
+        gauge!("vector_memory_used", self.used_memory as f64);
     }
 }
 
@@ -32,7 +32,7 @@ impl InternalEvent for LuaScriptError {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
+        counter!("vector_processing_errors_total", 1);
     }
 }
 
@@ -47,6 +47,6 @@ impl InternalEvent for LuaBuildError {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
+        counter!("vector_processing_errors_total", 1);
     }
 }

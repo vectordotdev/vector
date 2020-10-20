@@ -6,7 +6,7 @@ pub struct ANSIStripperEventProcessed;
 
 impl InternalEvent for ANSIStripperEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("vector_events_processed_total", 1);
     }
 }
 
@@ -25,7 +25,7 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "field_missing");
+        counter!("vector_processing_errors_total", 1, "error_type" => "field_missing");
     }
 }
 
@@ -44,7 +44,7 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "value_invalid");
+        counter!("vector_processing_errors_total", 1, "error_type" => "value_invalid");
     }
 }
 
@@ -65,6 +65,6 @@ impl InternalEvent for ANSIStripperFailed<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1);
+        counter!("vector_processing_errors_total", 1);
     }
 }

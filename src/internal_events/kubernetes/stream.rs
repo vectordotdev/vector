@@ -8,7 +8,7 @@ pub struct ChunkProcessed {
 
 impl InternalEvent for ChunkProcessed {
     fn emit_metrics(&self) {
-        counter!("k8s_stream_chunks_processed_total", 1);
-        counter!("k8s_stream_processed_bytes_total", self.byte_size as u64);
+        counter!("vector_k8s_stream_chunks_processed_total", 1);
+        counter!("vector_k8s_stream_processed_bytes_total", self.byte_size as u64);
     }
 }

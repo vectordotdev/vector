@@ -15,8 +15,8 @@ impl InternalEvent for MongoDBMetricsCollectCompleted {
     }
 
     fn emit_metrics(&self) {
-        counter!("collect_completed", 1);
-        histogram!("collect_duration_nanoseconds", self.end - self.start);
+        counter!("vector_collect_completed", 1);
+        histogram!("vector_collect_duration_nanoseconds", self.end - self.start);
     }
 }
 
@@ -31,7 +31,7 @@ impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("request_error", 1,
+        counter!("vector_request_error", 1,
             "component_kind" => "source",
             "component_type" => "mongodb_metrics",
         );
@@ -49,7 +49,7 @@ impl<'a> InternalEvent for MongoDBMetricsBsonParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("bson_parse_error", 1,
+        counter!("vector_bson_parse_error", 1,
             "component_kind" => "source",
             "component_type" => "mongodb_metrics",
         )

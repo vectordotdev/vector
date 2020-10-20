@@ -15,8 +15,8 @@ impl InternalEvent for ApacheMetricsEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", self.count as u64);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("vector_events_processed_total", self.count as u64);
+        counter!("vector_processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -32,8 +32,8 @@ impl InternalEvent for ApacheMetricsRequestCompleted {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_completed_total", 1);
-        histogram!("request_duration_nanoseconds", self.end - self.start);
+        counter!("vector_requests_completed_total", 1);
+        histogram!("vector_request_duration_nanoseconds", self.end - self.start);
     }
 }
 
@@ -54,7 +54,7 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors_total", 1);
+        counter!("vector_parse_errors_total", 1);
     }
 }
 
@@ -70,7 +70,7 @@ impl InternalEvent for ApacheMetricsErrorResponse<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_error_response_total", 1);
+        counter!("vector_http_error_response_total", 1);
     }
 }
 
@@ -86,6 +86,6 @@ impl InternalEvent for ApacheMetricsHttpError<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_request_errors_total", 1);
+        counter!("vector_http_request_errors_total", 1);
     }
 }

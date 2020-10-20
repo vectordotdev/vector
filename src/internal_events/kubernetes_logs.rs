@@ -18,8 +18,8 @@ impl InternalEvent for KubernetesLogsEventReceived<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("vector_events_processed_total", 1);
+        counter!("vector_processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -37,7 +37,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("k8s_event_annotation_failures_total", 1);
+        counter!("vector_k8s_event_annotation_failures_total", 1);
     }
 }
 
@@ -55,6 +55,6 @@ impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("k8s_docker_format_parse_failures_total", 1);
+        counter!("vector_k8s_docker_format_parse_failures_total", 1);
     }
 }

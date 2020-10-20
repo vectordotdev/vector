@@ -101,7 +101,7 @@ impl InternalEvent for VectorConfigLoadFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("config_load_errors_total", 1);
+        counter!("vector_config_load_errors_total", 1);
     }
 }
 

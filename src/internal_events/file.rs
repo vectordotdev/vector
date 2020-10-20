@@ -21,11 +21,11 @@ impl InternalEvent for FileEventReceived<'_> {
 
     fn emit_metrics(&self) {
         counter!(
-            "events_processed_total", 1,
+            "vector_events_processed_total", 1,
             "file" => self.file.to_owned(),
         );
         counter!(
-            "processed_bytes_total", self.byte_size as u64,
+            "vector_processed_bytes_total", self.byte_size as u64,
             "file" => self.file.to_owned(),
         );
     }
@@ -46,7 +46,7 @@ impl<'a> InternalEvent for FileChecksumFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "checksum_errors", 1,
+            "vector_checksum_errors", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -69,7 +69,7 @@ impl<'a> InternalEvent for FileFingerprintReadFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "fingerprint_read_errors", 1,
+            "vector_fingerprint_read_errors", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -93,7 +93,7 @@ impl<'a> InternalEvent for FileDeleteFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "file_delete_errors", 1,
+            "vector_file_delete_errors", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -114,7 +114,7 @@ impl<'a> InternalEvent for FileDeleted<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "files_deleted", 1,
+            "vector_files_deleted", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -135,7 +135,7 @@ impl<'a> InternalEvent for FileUnwatched<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "files_unwatched", 1,
+            "vector_files_unwatched", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -158,7 +158,7 @@ impl<'a> InternalEvent for FileWatchFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "file_watch_errors", 1,
+            "vector_file_watch_errors", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -181,7 +181,7 @@ impl<'a> InternalEvent for FileResumed<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "files_resumed", 1,
+            "vector_files_resumed", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -202,7 +202,7 @@ impl<'a> InternalEvent for FileAdded<'a> {
 
     fn emit_metrics(&self) {
         counter!(
-            "files_added", 1,
+            "vector_files_added", 1,
             "file" => self.path.to_string_lossy().into_owned(),
         );
     }
@@ -219,7 +219,7 @@ impl InternalEvent for FileCheckpointed {
     }
 
     fn emit_metrics(&self) {
-        counter!("checkpoints_total", self.count as u64);
+        counter!("vector_checkpoints_total", self.count as u64);
     }
 }
 
@@ -234,7 +234,7 @@ impl InternalEvent for FileCheckpointWriteFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("checkpoint_write_errors_total", 1);
+        counter!("vector_checkpoint_write_errors_total", 1);
     }
 }
 

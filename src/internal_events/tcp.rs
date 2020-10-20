@@ -16,7 +16,7 @@ impl InternalEvent for TcpConnectionEstablished {
     }
 
     fn emit_metrics(&self) {
-        counter!("connections_established_total", 1, "mode" => "tcp");
+        counter!("vector_connections_established_total", 1, "mode" => "tcp");
     }
 }
 
@@ -31,7 +31,7 @@ impl<E: std::error::Error> InternalEvent for TcpConnectionFailed<E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("connections_failed_total", 1, "mode" => "tcp");
+        counter!("vector_connections_failed_total", 1, "mode" => "tcp");
     }
 }
 
@@ -46,7 +46,7 @@ impl InternalEvent for TcpConnectionDisconnected {
     }
 
     fn emit_metrics(&self) {
-        counter!("connections_disconnected_total", 1, "mode" => "tcp");
+        counter!("vector_connections_disconnected_total", 1, "mode" => "tcp");
     }
 }
 
@@ -59,7 +59,7 @@ impl InternalEvent for TcpConnectionShutdown {
     }
 
     fn emit_metrics(&self) {
-        counter!("connections_shutdown_total", 1, "mode" => "tcp");
+        counter!("vector_connections_shutdown_total", 1, "mode" => "tcp");
     }
 }
 
@@ -74,7 +74,7 @@ impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionErro
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_errors_total", 1, "mode" => "tcp");
+        counter!("vector_connection_errors_total", 1, "mode" => "tcp");
     }
 }
 
@@ -89,7 +89,7 @@ impl InternalEvent for TcpFlushError {
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_flush_errors_total", 1, "mode" => "tcp");
+        counter!("vector_connection_flush_errors_total", 1, "mode" => "tcp");
     }
 }
 
@@ -104,7 +104,7 @@ impl InternalEvent for TcpEventSent {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-        counter!("processed_bytes_total", self.byte_size as u64);
+        counter!("vector_events_processed_total", 1);
+        counter!("vector_processed_bytes_total", self.byte_size as u64);
     }
 }

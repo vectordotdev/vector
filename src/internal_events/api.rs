@@ -19,6 +19,6 @@ impl InternalEvent for ApiStarted {
     }
 
     fn emit_metrics(&self) {
-        counter!("api_started_total", 1);
+        counter!("vector_api_started_total", 1);
     }
 }
