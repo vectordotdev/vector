@@ -7,15 +7,19 @@ jitter = 0.1
 # will typically reach high values of requests in flight.
 
 [stats.in_flight]
-max = [20, 35]
-mean = [9.0, 20.0]
+max = [20, 37]
+mean = [8.0, 20.0]
+
+[stats.rate]
+max = [175, 350]
+mean = [70, 150]
 
 [controller.in_flight]
-max = [20, 35]
-mean = [9.0, 20.0]
+max = [20, 37]
+mean = [8.0, 20.0]
 
 [controller.concurrency_limit]
-max = [20, 35]
+max = [20, 37]
 mean = [9.0, 20.0]
 
 [controller.observed_rtt]
