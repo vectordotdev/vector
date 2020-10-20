@@ -13,6 +13,8 @@ mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 mod aws_kinesis_streams;
+#[cfg(feature = "sinks-aws_sqs")]
+mod aws_sqs;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -110,6 +112,8 @@ pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
 pub use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-aws_sqs")]
+pub use self::aws_sqs::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;

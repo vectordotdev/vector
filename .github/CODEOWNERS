@@ -14,6 +14,7 @@
 /docs/reference/components/sinks/*_metrics.cue @lukesteensen
 /docs/reference/components/sinks/aws_kinesis_streams.cue @jszwedko
 /docs/reference/components/sinks/aws_s3.cue @jszwedko
+/docs/reference/components/sinks/aws_sqs.cue @fanatid
 /docs/reference/components/sinks/console.cue @lukesteensen
 /docs/reference/components/sinks/gcp @bruceg
 /docs/reference/components/sinks/http.cue @jszwedko

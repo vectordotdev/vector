@@ -4775,6 +4775,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_sqs"
+version = "0.45.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcd228a1b4ce3f3a40541ee8cef526ff3702b58a4779fb05c31e739174efda5e"
+dependencies = [
+ "async-trait",
+ "bytes 0.5.6",
+ "futures 0.3.5",
+ "rusoto_core",
+ "serde_urlencoded",
+ "xml-rs",
+]
+
+[[package]]
 name = "rusoto_sts"
 version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6547,6 +6561,7 @@ dependencies = [
  "rusoto_logs",
  "rusoto_s3",
  "rusoto_signature",
+ "rusoto_sqs",
  "rusoto_sts",
  "rust_decimal",
  "schannel",
