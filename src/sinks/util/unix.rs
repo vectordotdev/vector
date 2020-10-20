@@ -271,6 +271,7 @@ impl tower::Service<Bytes> for UnixService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sinks::util::{encode_event, Encoding};
     use crate::test_util::{random_lines_with_stream, CountReceiver};
     use tokio::net::UnixListener;
 
@@ -299,7 +300,10 @@ mod tests {
         // Set up Sink
         let config = UnixSinkConfig::new(out_path);
         let cx = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(cx, Encoding::Text.into()).unwrap();
+        let encoding = Encoding::Text.into();
+        let (sink, _healthcheck) = config
+            .build(cx, move |event| encode_event(event, &encoding))
+            .unwrap();
 
         // Send the test data
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
