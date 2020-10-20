@@ -13,6 +13,8 @@ spec:
     - 'hostPath'
     - 'configMap'
     - 'secret'
+    - 'persistentVolumeClaim'
+    - 'emptyDir'
   allowedHostPaths:
     {{- if eq .Values.storage.mode "hostPath" }}
     - pathPrefix: {{ .Values.storage.hostPath | quote }}
