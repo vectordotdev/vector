@@ -223,7 +223,7 @@ impl HostMetricsConfig {
         metrics.into_iter().map(Into::into)
     }
 
-    async fn cpu_metrics(&self) -> Vec<Metric> {
+    pub async fn cpu_metrics(&self) -> Vec<Metric> {
         match heim::cpu::times().await {
             Ok(times) => {
                 times
@@ -355,7 +355,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn swap_metrics(&self) -> Vec<Metric> {
+    pub async fn swap_metrics(&self) -> Vec<Metric> {
         match heim::memory::swap().await {
             Ok(swap) => {
                 let timestamp = Utc::now();

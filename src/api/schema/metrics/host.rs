@@ -10,23 +10,23 @@ pub struct MemoryMetrics(Vec<Metric>);
 impl MemoryMetrics {
     /// Total bytes
     async fn total_bytes(&self) -> f64 {
-        filter_host_metric(&self.0, "host_memory_total_bytes")
+        filter_host_metric(&self.0, "memory_total_bytes")
     }
 
     /// Free bytes
     async fn free_bytes(&self) -> f64 {
-        filter_host_metric(&self.0, "host_memory_free_bytes")
+        filter_host_metric(&self.0, "memory_free_bytes")
     }
 
     /// Available bytes
     async fn available_bytes(&self) -> f64 {
-        filter_host_metric(&self.0, "host_memory_available_bytes")
+        filter_host_metric(&self.0, "memory_available_bytes")
     }
 
     /// Active bytes (Linux and macOS)
     async fn active_bytes(&self) -> Option<f64> {
         if cfg!(any(target_os = "linux", target_os = "macos")) {
-            Some(filter_host_metric(&self.0, "host_memory_active_bytes"))
+            Some(filter_host_metric(&self.0, "memory_active_bytes"))
         } else {
             None
         }
@@ -35,7 +35,7 @@ impl MemoryMetrics {
     /// Buffers bytes (Linux)
     async fn buffers_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
-            Some(filter_host_metric(&self.0, "host_memory_buffers_bytes"))
+            Some(filter_host_metric(&self.0, "memory_buffers_bytes"))
         } else {
             None
         }
@@ -44,7 +44,7 @@ impl MemoryMetrics {
     /// Cached bytes (Linux)
     async fn cached_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
-            Some(filter_host_metric(&self.0, "host_memory_cached_bytes"))
+            Some(filter_host_metric(&self.0, "memory_cached_bytes"))
         } else {
             None
         }
@@ -53,7 +53,7 @@ impl MemoryMetrics {
     /// Shared bytes (Linux)
     async fn shared_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
-            Some(filter_host_metric(&self.0, "host_memory_shared_bytes"))
+            Some(filter_host_metric(&self.0, "memory_shared_bytes"))
         } else {
             None
         }
@@ -62,7 +62,7 @@ impl MemoryMetrics {
     /// Used bytes (Linux)
     async fn used_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "linux") {
-            Some(filter_host_metric(&self.0, "host_memory_used_bytes"))
+            Some(filter_host_metric(&self.0, "memory_used_bytes"))
         } else {
             None
         }
@@ -71,7 +71,7 @@ impl MemoryMetrics {
     /// Inactive bytes (macOS)
     async fn inactive_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "macos") {
-            Some(filter_host_metric(&self.0, "host_memory_inactive_bytes"))
+            Some(filter_host_metric(&self.0, "memory_inactive_bytes"))
         } else {
             None
         }
@@ -80,10 +80,61 @@ impl MemoryMetrics {
     /// Wired bytes (macOS)
     async fn wired_bytes(&self) -> Option<f64> {
         if cfg!(target_os = "macos") {
-            Some(filter_host_metric(&self.0, "host_memory_wired_bytes"))
+            Some(filter_host_metric(&self.0, "memory_wired_bytes"))
         } else {
             None
         }
+    }
+}
+
+pub struct SwapMetrics(Vec<Metric>);
+
+#[Object]
+impl SwapMetrics {
+    /// Swap free bytes
+    async fn free_bytes(&self) -> f64 {
+        filter_host_metric(&self.0, "memory_swap_free_bytes")
+    }
+
+    /// Swap total bytes
+    async fn total_bytes(&self) -> f64 {
+        filter_host_metric(&self.0, "memory_swap_total_bytes")
+    }
+
+    /// Swap used bytes
+    async fn used_bytes(&self) -> f64 {
+        filter_host_metric(&self.0, "memory_swap_used_bytes")
+    }
+
+    /// Swapped in bytes total (not available on Windows)
+    async fn swapped_in_bytes_total(&self) -> Option<f64> {
+        if cfg!(not(target_os = "windows")) {
+            Some(filter_host_metric(&self.0, "memory_swapped_in_bytes_total"))
+        } else {
+            None
+        }
+    }
+
+    /// Swapped out bytes total (not available on Windows)
+    async fn swapped_out_bytes_total(&self) -> Option<f64> {
+        if cfg!(not(target_os = "windows")) {
+            Some(filter_host_metric(
+                &self.0,
+                "memory_swapped_out_bytes_total",
+            ))
+        } else {
+            None
+        }
+    }
+}
+
+pub struct CPUMetrics(Vec<Metric>);
+
+#[Object]
+impl CPUMetrics {
+    /// CPU seconds total
+    async fn cpu_seconds_total(&self) -> f64 {
+        filter_host_metric(&self.0, "cpu_seconds_total")
     }
 }
 
@@ -99,9 +150,19 @@ impl HostMetrics {
 #[Object]
 /// Vector host metrics
 impl HostMetrics {
-    /// Memory metrics for the Vector host
+    /// Memory metrics
     async fn memory(&self) -> MemoryMetrics {
         MemoryMetrics(self.0.memory_metrics().await)
+    }
+
+    /// Swap metrics
+    async fn swap(&self) -> SwapMetrics {
+        SwapMetrics(self.0.swap_metrics().await)
+    }
+
+    /// CPU metrics
+    async fn cpu(&self) -> CPUMetrics {
+        CPUMetrics(self.0.cpu_metrics().await)
     }
 }
 
@@ -109,7 +170,7 @@ impl HostMetrics {
 fn filter_host_metric(metrics: &Vec<Metric>, name: &str) -> f64 {
     metrics
         .into_iter()
-        .find(|m| m.name == name)
+        .find(|m| m.name == format!("host_{}", name))
         .map(|m| match m.value {
             MetricValue::Gauge { value } => value,
             MetricValue::Counter { value } => value,
