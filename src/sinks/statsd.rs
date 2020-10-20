@@ -32,17 +32,24 @@ pub struct StatsdSinkConfig {
     pub namespace: Option<String>,
     #[serde(flatten)]
     pub mode: Mode,
-    #[serde(default)]
-    pub batch: BatchConfig,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 pub enum Mode {
     Tcp(TcpSinkConfig),
-    Udp(UdpSinkConfig),
+    Udp(StatsdUdpConfig),
     #[cfg(unix)]
     Unix(UnixSinkConfig),
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct StatsdUdpConfig {
+    #[serde(flatten)]
+    pub udp: UdpSinkConfig,
+
+    #[serde(default)]
+    pub batch: BatchConfig,
 }
 
 inventory::submit! {
@@ -57,9 +64,11 @@ impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
             namespace: None,
-            batch: Default::default(),
-            mode: Mode::Udp(UdpSinkConfig {
-                address: default_address().to_string(),
+            mode: Mode::Udp(StatsdUdpConfig {
+                batch: Default::default(),
+                udp: UdpSinkConfig {
+                    address: default_address().to_string(),
+                },
             }),
         })
         .unwrap()
@@ -73,16 +82,6 @@ impl SinkConfig for StatsdSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        // 1432 bytes is a recommended packet size to fit into MTU
-        // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
-        // However we need to leave some space for +1 extra trailing event in the buffer.
-        // Also one might keep an eye on server side limitations, like
-        // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch = BatchSettings::default()
-            .bytes(1300)
-            .events(1000)
-            .timeout(1)
-            .parse_config(self.batch)?;
         let namespace = self.namespace.clone();
 
         match &self.mode {
@@ -93,7 +92,17 @@ impl SinkConfig for StatsdSinkConfig {
                 config.build(cx.clone(), encode_event)
             }
             Mode::Udp(config) => {
-                let (service, healthcheck) = config.build_service(cx.clone()).await?;
+                // 1432 bytes is a recommended packet size to fit into MTU
+                // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
+                // However we need to leave some space for +1 extra trailing event in the buffer.
+                // Also one might keep an eye on server side limitations, like
+                // mentioned here https://github.com/DataDog/dd-agent/issues/2638
+                let batch = BatchSettings::default()
+                    .bytes(1300)
+                    .events(1000)
+                    .timeout(1)
+                    .parse_config(config.batch)?;
+                let (service, healthcheck) = config.udp.build_service(cx.clone()).await?;
                 let service = StatsdSvc { inner: service };
                 let sink = BatchSink::new(
                     ServiceBuilder::new().service(service),
@@ -382,13 +391,15 @@ mod test {
 
         let config = StatsdSinkConfig {
             namespace: Some("vector".into()),
-            batch: BatchConfig {
-                max_bytes: Some(512),
-                timeout_secs: Some(1),
-                ..Default::default()
-            },
-            mode: Mode::Udp(UdpSinkConfig {
-                address: addr.to_string(),
+            mode: Mode::Udp(StatsdUdpConfig {
+                batch: BatchConfig {
+                    max_bytes: Some(512),
+                    timeout_secs: Some(1),
+                    ..Default::default()
+                },
+                udp: UdpSinkConfig {
+                    address: addr.to_string(),
+                },
             }),
         };
 
