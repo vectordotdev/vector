@@ -350,7 +350,7 @@ mod tests {
             Event, Value,
         },
         test_util::trace_init,
-        transforms::{TaskTransform},
+        transforms::TaskTransform,
     };
     use futures::{compat::Stream01CompatExt, StreamExt};
 

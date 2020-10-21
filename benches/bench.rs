@@ -15,8 +15,7 @@ use vector::transforms::{
     coercer::CoercerConfig,
     json_parser::{JsonParser, JsonParserConfig},
     remap::{Remap, RemapConfig},
-    Transform,
-    FunctionTransform,
+    FunctionTransform, Transform,
 };
 use vector::{
     config::{self, log_schema, TransformConfig, TransformContext},
@@ -699,8 +698,14 @@ fn benchmark_remap(c: &mut Criterion) {
         move || {
             let mut result = Vec::with_capacity(1);
             tform.transform(&mut result, event.clone());
-            assert_eq!(result[0].as_log().get("foo").unwrap().to_string_lossy(), "bar");
-            assert_eq!(result[0].as_log().get("bar").unwrap().to_string_lossy(), "baz");
+            assert_eq!(
+                result[0].as_log().get("foo").unwrap().to_string_lossy(),
+                "bar"
+            );
+            assert_eq!(
+                result[0].as_log().get("bar").unwrap().to_string_lossy(),
+                "baz"
+            );
             assert_eq!(
                 result[0].as_log().get("copy").unwrap().to_string_lossy(),
                 "buz"
@@ -797,7 +802,10 @@ fn benchmark_remap(c: &mut Criterion) {
                 result[0].as_log().get("number").unwrap(),
                 &Value::Integer(1234)
             );
-            assert_eq!(result[0].as_log().get("bool").unwrap(), &Value::Boolean(true));
+            assert_eq!(
+                result[0].as_log().get("bool").unwrap(),
+                &Value::Boolean(true)
+            );
             assert_eq!(
                 result[0].as_log().get("timestamp").unwrap(),
                 &Value::Timestamp(timestamp),

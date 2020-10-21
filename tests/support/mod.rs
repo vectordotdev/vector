@@ -29,7 +29,7 @@ use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::StreamSinkOld, Healthcheck, VectorSink};
 use vector::sources::Source;
 use vector::test_util::{temp_dir, temp_file};
-use vector::transforms::{Transform, FunctionTransform};
+use vector::transforms::{FunctionTransform, Transform};
 use vector::Pipeline;
 
 pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {

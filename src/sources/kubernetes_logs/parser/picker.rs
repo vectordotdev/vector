@@ -69,7 +69,7 @@ mod tests {
             let input = Event::from(message);
             let mut picker = Picker::new();
             let output = picker.transform_one(input);
-            assert!(output.is_none());
+            assert!(output.is_none(), "Expected none: {:?}", output);
         }
     }
 }

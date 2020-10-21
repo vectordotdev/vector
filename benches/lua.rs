@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion};
+use futures::{compat::Stream01CompatExt, StreamExt};
 use indexmap::IndexMap;
 use std::str::FromStr;
 use transforms::lua::v2::LuaConfig;
@@ -7,10 +8,11 @@ use vector::{
     config::{TransformConfig, TransformContext},
     event::Lookup,
     test_util::runtime,
-    transforms::{self, FunctionTransform, TaskTransform, util::runtime_transform::RuntimeTransform},
+    transforms::{
+        self, util::runtime_transform::RuntimeTransform, FunctionTransform, TaskTransform,
+    },
     Event,
 };
-use futures::{StreamExt, compat::Stream01CompatExt};
 
 fn add_fields(c: &mut Criterion) {
     let num_events: usize = 100_000;
@@ -107,14 +109,17 @@ fn field_filter(c: &mut Criterion) {
                     })
                 },
                 |transform| {
-                    let inputs = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        });
+                    let inputs = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
                     let in_stream = futures01::stream::iter_ok(inputs);
-                    let out_stream = transform.into_task().transform(Box::new(in_stream)).compat().collect::<Vec<_>>();
+                    let out_stream = transform
+                        .into_task()
+                        .transform(Box::new(in_stream))
+                        .compat()
+                        .collect::<Vec<_>>();
                     let blocked = futures::executor::block_on(out_stream);
                     let num = blocked.len();
                     assert_eq!(num, num_events / 10);
@@ -160,14 +165,16 @@ fn field_filter(c: &mut Criterion) {
                     transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap()
                 },
                 |transform| {
-                    let inputs = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        });
+                    let inputs = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
                     let in_stream = futures01::stream::iter_ok(inputs);
-                    let out_stream = TaskTransform::transform(Box::new(transform), Box::new(in_stream)).compat().collect::<Vec<_>>();
+                    let out_stream =
+                        TaskTransform::transform(Box::new(transform), Box::new(in_stream))
+                            .compat()
+                            .collect::<Vec<_>>();
                     let blocked = futures::executor::block_on(out_stream);
                     let num = blocked.len();
                     assert_eq!(num, num_events / 10);

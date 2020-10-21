@@ -113,25 +113,33 @@ fn walk(
     let mut targets = Vec::new();
 
     // Use `remove` to take ownership.
-    if let Some(mut target) = transforms.remove(node) {
+    if let Some((key, mut target)) = transforms.remove_entry(node) {
         match target.transform {
             Transform::Function(ref mut t) => {
                 for input in inputs.clone() {
                     t.transform(&mut results, input)
                 }
+                targets = target.next.clone();
+                transforms.insert(key, target);
             }
             Transform::Task(t) => {
+                error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
                 use futures::compat::Stream01CompatExt;
                 let in_stream = futures01::stream::iter_ok(inputs.clone());
-                let out_stream = t.transform(Box::new(in_stream));
-                let out_stream_compat = out_stream.compat();
+                let out_stream = t.transform(Box::new(in_stream)).compat();
                 // TODO(new-transform-enum): Handle Many
-                let mut out_iter = futures::executor::block_on_stream(out_stream_compat);
-                let out = out_iter.next().transpose().ok().flatten(); // Force unpinning.
-                results.extend(out.into_iter());
+                let out_iter = futures::executor::block_on_stream(out_stream);
+                let out_iter_mapped = out_iter.flat_map(|v| match v {
+                    Err(e) => {
+                        error!("Stream transform experienced error: {:?}", e);
+                        None
+                    }
+                    Ok(v) => Some(v),
+                });
+                results.extend(out_iter_mapped);
+                targets = target.next.clone();
             }
         }
-        targets = target.next.clone();
     }
 
     for child in targets {
