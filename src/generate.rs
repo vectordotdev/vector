@@ -167,7 +167,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
             } else {
                 vec![transform_names
                     .get(i - 1)
-                    .unwrap_or(&"TODO".to_owned())
+                    .unwrap_or(&"component-name".to_owned())
                     .to_owned()]
             };
 
@@ -250,7 +250,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
                                 None
                             }
                         })
-                        .unwrap_or_else(|| vec!["TODO".to_owned()]),
+                        .unwrap_or_else(|| vec!["component-name".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
                     healthcheck: true,
                     inner: example,
@@ -463,7 +463,7 @@ when_full = "block"
 
 [sinks.sink0]
 healthcheck = true
-inputs = ["TODO"]
+inputs = ["component-name"]
 target = "stdout"
 type = "console"
 
