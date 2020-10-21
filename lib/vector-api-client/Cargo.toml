@@ -1,6 +1,6 @@
 [package]
 name = "vector-api-client"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 publish = false

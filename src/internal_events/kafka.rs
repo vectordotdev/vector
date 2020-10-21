@@ -12,8 +12,8 @@ impl InternalEvent for KafkaEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
-        counter!("bytes_processed", self.byte_size as u64);
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -28,7 +28,7 @@ impl InternalEvent for KafkaOffsetUpdateFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("consumer_offset_updates_failed", 1);
+        counter!("consumer_offset_updates_failed_total", 1);
     }
 }
 
@@ -43,7 +43,7 @@ impl InternalEvent for KafkaEventFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_failed", 1);
+        counter!("events_failed_total", 1);
     }
 }
 

@@ -34,3 +34,15 @@ jobs:
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: make bench
+      - name: Store benchmark result
+        uses: rhysd/github-action-benchmark@v1
+        with:
+           tool: 'cargo'
+           output-file-path: output.txt
+           fail-on-alert: true
+           # GitHub API token to make a commit comment
+           github-token: ${{ secrets.GITHUB_TOKEN }}
+           # Enable alert commit comment
+           comment-on-alert: true
+           # Mention folks in the commit comment
+           alert-comment-cc-users: '@jamtur01, @binarylogic'

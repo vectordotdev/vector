@@ -187,7 +187,7 @@ mod tests {
         )
     }
 
-    async fn new_events_processed_subscription(
+    async fn new_events_processed_total_subscription(
         client: &SubscriptionClient,
         num_results: usize,
         interval: i64,
@@ -196,26 +196,26 @@ mod tests {
         let _shutdown = emit_fake_generator_events();
 
         let subscription = client
-            .events_processed_metrics_subscription(interval)
+            .events_processed_total_metrics_subscription(interval)
             .await
             .unwrap();
 
         tokio::pin! {
-            let events_processed = subscription.stream().take(num_results);
+            let events_processed_total = subscription.stream().take(num_results);
         }
 
         let mut last_result = 0.0;
 
         for _ in 0..num_results {
-            let ep = events_processed
+            let ep = events_processed_total
                 .next()
                 .await
                 .unwrap()
                 .unwrap()
                 .data
                 .unwrap()
-                .events_processed_metrics
-                .events_processed;
+                .events_processed_total_metrics
+                .events_processed_total;
 
             assert!(ep > last_result);
             last_result = ep
@@ -290,13 +290,13 @@ mod tests {
 
     #[tokio::test]
     /// Tests for events processed metrics, using fake generator events
-    async fn api_graphql_event_processed_metrics() {
+    async fn api_graphql_event_processed_total_metrics() {
         let server = start_server();
         let client = new_subscription_client(server.addr()).await;
 
         let _metrics = init_metrics();
 
-        new_events_processed_subscription(&client, 3, 100).await;
+        new_events_processed_total_subscription(&client, 3, 100).await;
     }
 
     #[tokio::test]

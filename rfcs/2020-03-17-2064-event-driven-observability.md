@@ -20,7 +20,7 @@ messages
             file = file.as_str(),
             rate_limit_secs = 10
         );
-        counter!("events_processed", 1, "source" => "file");
+        counter!("events_processed_total", 1, "source" => "file");
         counter!("bytes_processed", msg.len() as u64, "source" => "file");
         create_event(msg, file, &host_key, &hostname, &file_key)
     })
@@ -100,7 +100,7 @@ impl InternalEvent for FileEventReceived<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1, "source" => "file");
+        counter!("events_processed_total", 1, "source" => "file");
         counter!("bytes_processed", self.byte_size as u64, "source" => "file");
     }
 }

@@ -10,6 +10,6 @@ impl InternalEvent for GeneratorEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }

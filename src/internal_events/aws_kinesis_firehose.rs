@@ -18,10 +18,7 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_received", 1,
-            "component_kind" => "source",
-            "component_type" => "aws_kinesis_firehose",
-        );
+        counter!("requests_received_total", 1);
     }
 }
 
@@ -41,10 +38,6 @@ impl<'a> InternalEvent for AwsKinesisFirehoseRequestError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "request_read_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "aws_kinesis_firehose",
-        );
+        counter!("request_read_errors_total", 1);
     }
 }
