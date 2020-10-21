@@ -92,28 +92,22 @@ impl UdpConnector {
         }
     }
 
-    fn connect(&self) -> BoxFuture<'static, Result<UdpSocket, UdpError>> {
-        let host = self.host.clone();
-        let port = self.port;
-        let resolver = self.resolver;
+    async fn connect(&self) -> Result<UdpSocket, UdpError> {
+        let ip = self
+            .resolver
+            .lookup_ip(self.host.clone())
+            .await
+            .context(DnsError)?
+            .next()
+            .ok_or(UdpError::NoAddresses)?;
 
-        async move {
-            let ip = resolver
-                .lookup_ip(host.clone())
-                .await
-                .context(DnsError)?
-                .next()
-                .ok_or(UdpError::NoAddresses)?;
+        let addr = SocketAddr::new(ip, self.port);
+        let bind_address = find_bind_address(&addr);
 
-            let addr = SocketAddr::new(ip, port);
-            let bind_address = find_bind_address(&addr);
+        let socket = UdpSocket::bind(bind_address).context(BindError)?;
+        socket.connect(addr).context(ConnectError)?;
 
-            let socket = UdpSocket::bind(bind_address).context(BindError)?;
-            socket.connect(addr).context(ConnectError)?;
-
-            Ok(socket)
-        }
-        .boxed()
+        Ok(socket)
     }
 
     async fn connect_backoff(self) -> UdpSocket {
@@ -133,7 +127,11 @@ impl UdpConnector {
     }
 
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
-        self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
+        let this = self.clone();
+        async move { this.connect().await }
+            .map_ok(|_| ())
+            .map_err(|e| e.into())
+            .boxed()
     }
 }
 
@@ -249,7 +247,9 @@ impl UdpSink {
         loop {
             self.state = match self.state {
                 State::Initializing => {
-                    State::Connecting(Box::new(self.connector.connect().compat()))
+                    let connector = self.connector.clone();
+                    let fut = async move { connector.connect().await };
+                    State::Connecting(Box::new(fut.boxed().compat()))
                 }
                 State::Connecting(ref mut fut) => match fut.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
