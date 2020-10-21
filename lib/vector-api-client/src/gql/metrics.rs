@@ -14,15 +14,15 @@ use graphql_client::GraphQLQuery;
 )]
 pub struct UptimeMetricsSubscription;
 
-/// EventsProcessedMetricsSubscription contains metrics on the number of events
+/// EventsProcessedTotalMetricsSubscription contains metrics on the number of events
 /// that have been processed by a Vector instance
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/events_processed_metrics.graphql",
+    query_path = "graphql/subscriptions/events_processed_total_metrics.graphql",
     response_derives = "Debug"
 )]
-pub struct EventsProcessedMetricsSubscription;
+pub struct EventsProcessedTotalMetricsSubscription;
 
 /// Extension methods for metrics subscriptions
 #[async_trait]
@@ -33,10 +33,10 @@ pub trait MetricsSubscriptionExt {
     ) -> crate::SubscriptionResult<UptimeMetricsSubscription>;
 
     /// Executes an events processed metrics subscription
-    async fn events_processed_metrics_subscription(
+    async fn events_processed_total_metrics_subscription(
         &self,
         interval: i64,
-    ) -> crate::SubscriptionResult<EventsProcessedMetricsSubscription>;
+    ) -> crate::SubscriptionResult<EventsProcessedTotalMetricsSubscription>;
 }
 
 #[async_trait]
@@ -50,15 +50,15 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
     }
 
     /// Executes an events processed metrics subscription
-    async fn events_processed_metrics_subscription(
+    async fn events_processed_total_metrics_subscription(
         &self,
         interval: i64,
-    ) -> SubscriptionResult<EventsProcessedMetricsSubscription> {
-        let request_body = EventsProcessedMetricsSubscription::build_query(
-            events_processed_metrics_subscription::Variables { interval },
+    ) -> SubscriptionResult<EventsProcessedTotalMetricsSubscription> {
+        let request_body = EventsProcessedTotalMetricsSubscription::build_query(
+            events_processed_total_metrics_subscription::Variables { interval },
         );
 
-        self.start::<EventsProcessedMetricsSubscription>(&request_body)
+        self.start::<EventsProcessedTotalMetricsSubscription>(&request_body)
             .await
     }
 }

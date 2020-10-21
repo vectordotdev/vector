@@ -6,7 +6,7 @@ pub struct LuaEventProcessed;
 
 impl InternalEvent for LuaEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -32,7 +32,7 @@ impl InternalEvent for LuaScriptError {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1);
+        counter!("processing_errors_total", 1);
     }
 }
 
@@ -47,6 +47,6 @@ impl InternalEvent for LuaBuildError {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1);
+        counter!("processing_errors_total", 1);
     }
 }

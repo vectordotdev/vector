@@ -7,7 +7,7 @@ pub struct WatchRequestInvoked;
 
 impl InternalEvent for WatchRequestInvoked {
     fn emit_metrics(&self) {
-        counter!("k8s_watch_requests_invoked", 1);
+        counter!("k8s_watch_requests_invoked_total", 1);
     }
 }
 
@@ -22,7 +22,7 @@ impl<E: Debug> InternalEvent for WatchRequestInvocationFailed<E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("k8s_watch_requests_failed", 1);
+        counter!("k8s_watch_requests_failed_total", 1);
     }
 }
 
@@ -31,7 +31,7 @@ pub struct WatchStreamItemObtained;
 
 impl InternalEvent for WatchStreamItemObtained {
     fn emit_metrics(&self) {
-        counter!("k8s_watch_stream_items_obtained", 1);
+        counter!("k8s_watch_stream_items_obtained_total", 1);
     }
 }
 
@@ -46,6 +46,6 @@ impl<E: Debug> InternalEvent for WatchStreamErrored<E> {
     }
 
     fn emit_metrics(&self) {
-        counter!("k8s_watch_stream_errors", 1);
+        counter!("k8s_watch_stream_errors_total", 1);
     }
 }
