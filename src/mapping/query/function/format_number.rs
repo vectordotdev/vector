@@ -34,16 +34,16 @@ impl FormatNumberFn {
 }
 
 impl Function for FormatNumberFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let value = required!(ctx, self.query,
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let value = required_value!(ctx, self.query,
             Value::Integer(v) => Decimal::from_i64(v),
             Value::Float(v) => Decimal::from_f64(v),
         )
         .ok_or("unable to parse number")?;
 
-        let scale = optional!(ctx, self.scale, Value::Integer(v) => v);
-        let grouping_separator = optional!(ctx, self.grouping_separator, Value::Bytes(v) => v);
-        let decimal_separator = optional!(ctx, self.decimal_separator, Value::Bytes(v) => v)
+        let scale = optional_value!(ctx, self.scale, Value::Integer(v) => v);
+        let grouping_separator = optional_value!(ctx, self.grouping_separator, Value::Bytes(v) => v);
+        let decimal_separator = optional_value!(ctx, self.decimal_separator, Value::Bytes(v) => v)
             .unwrap_or_else(|| Bytes::from("."));
 
         // Split integral and fractional part of float.
@@ -97,29 +97,32 @@ impl Function for FormatNumberFn {
         // Join results, using configured decimal separator.
         Ok(Value::from(
             parts.join(&String::from_utf8_lossy(&decimal_separator[..])),
-        ))
+        ).into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                                      | QueryValue::Value(Value::Float(_)))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "scale",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: false,
             },
             Parameter {
                 keyword: "decimal_separator",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: false,
             },
             Parameter {
                 keyword: "grouping_separator",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: false,
             },
         ]
@@ -159,7 +162,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("1234.567")),
+                Ok(QueryValue::from_value("1234.567")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(1234.567))),
                     None,
@@ -169,7 +172,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("1234.56")),
+                Ok(QueryValue::from_value("1234.56")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(1234.567))),
                     Some(2),
@@ -179,7 +182,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("1234,56")),
+                Ok(QueryValue::from_value("1234,56")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(1234.567))),
                     Some(2),
@@ -189,7 +192,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("1 234,56")),
+                Ok(QueryValue::from_value("1 234,56")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(1234.567))),
                     Some(2),
@@ -199,7 +202,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("11.222.333.444,567")),
+                Ok(QueryValue::from_value("11.222.333.444,567")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(11222333444.56789))),
                     Some(3),
@@ -209,7 +212,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("100")),
+                Ok(QueryValue::from_value("100")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(100.0))),
                     None,
@@ -219,7 +222,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("100.00")),
+                Ok(QueryValue::from_value("100.00")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(100.0))),
                     Some(2),
@@ -229,7 +232,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("123")),
+                Ok(QueryValue::from_value("123")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(123.45))),
                     Some(0),
@@ -239,7 +242,7 @@ mod tests {
             ),
             (
                 Event::from(""),
-                Ok(Value::from("12345.00")),
+                Ok(QueryValue::from_value("12345.00")),
                 FormatNumberFn::new(
                     Box::new(Literal::from(Value::from(12345))),
                     Some(2),

@@ -26,29 +26,36 @@ impl ParseTimestampFn {
 }
 
 impl Function for ParseTimestampFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let format = match self.format.execute(ctx)? {
-            Value::Bytes(b) => format!("timestamp|{}", String::from_utf8_lossy(&b)),
+            QueryValue::Value(Value::Bytes(b)) => {
+                format!("timestamp|{}", String::from_utf8_lossy(&b))
+            }
             v => unexpected_type!(v),
         };
 
         let conversion: Conversion = format.parse().map_err(|e| format!("{}", e))?;
 
         let result = match self.query.execute(ctx) {
-            Ok(v) => match v {
-                Value::Bytes(_) => conversion.convert(v).map_err(|e| e.to_string()),
-                Value::Timestamp(_) => Ok(v),
-                _ => unexpected_type!(v),
+            Ok(value) => match value {
+                QueryValue::Value(value @ Value::Bytes(_)) => conversion
+                    .convert(value)
+                    .map(Into::into)
+                    .map_err(|e| e.to_string()),
+                QueryValue::Value(Value::Timestamp(_)) => Ok(value),
+                _ => unexpected_type!(value),
             },
             Err(err) => Err(err),
         };
+
         if result.is_err() {
             if let Some(v) = &self.default {
                 return match v.execute(ctx)? {
-                    Value::Bytes(v) => conversion
+                    QueryValue::Value(Value::Bytes(v)) => conversion
                         .convert(Value::Bytes(v))
+                        .map(Into::into)
                         .map_err(|e| e.to_string()),
-                    Value::Timestamp(v) => Ok(Value::Timestamp(v)),
+                    QueryValue::Value(Value::Timestamp(v)) => Ok(Value::Timestamp(v).into()),
                     v => unexpected_type!(v),
                 };
             }
@@ -60,17 +67,17 @@ impl Function for ParseTimestampFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_)) | QueryValue::Value(Value::Timestamp(_))),
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_)) | QueryValue::Value(Value::Timestamp(_))),
                 required: false,
             },
         ]
@@ -173,7 +180,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }
