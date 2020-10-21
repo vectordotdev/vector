@@ -60,6 +60,11 @@ impl<'a> Widgets<'a> {
         f.render_widget(w, area);
     }
 
+    /// Render host metrics gauges
+    fn host_metrics<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {}
+
+    /// Renders a topology table, showing sources, transforms and sinks in tabular form, with
+    /// statistics pulled from `topology_state`
     fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
         let lock = self.config.topology_state.load();
         let items = lock.rows().map(|r| {
@@ -95,6 +100,7 @@ impl<'a> Widgets<'a> {
         f.render_widget(w, area);
     }
 
+    /// Renders a box showing instructions on how to exit from `vector top`
     fn quit_box<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
         let text = vec![Spans::from("To quit, press ESC or 'q'")];
 

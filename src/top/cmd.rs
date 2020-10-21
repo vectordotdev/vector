@@ -9,7 +9,7 @@ use std::{error::Error, io, sync::Arc};
 use url::Url;
 use vector_api_client::{
     gql::{HealthQueryExt, TopologyQueryExt},
-    Client,
+    Client, SubscriptionClient,
 };
 
 /// Executes a toplogy query to the GraphQL server, and creates an initial TopologyState
@@ -39,6 +39,9 @@ async fn get_topology_state(client: &Client) -> Result<ArcSwap<TopologyState>, (
 
     Ok(ArcSwap::from(Arc::new(TopologyState::new(rows))))
 }
+
+/// Spawns the host
+async fn spawn_host_metrics(client: &SubscriptionClient) {}
 
 /// CLI command func for displaying Vector topology, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets

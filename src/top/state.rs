@@ -1,6 +1,6 @@
 use num_format::{Locale, ToFormattedString};
 use std::{
-    collections::{btree_map, BTreeMap},
+    collections::btree_map,
     sync::{Arc, Mutex},
 };
 use tui::widgets::TableState;
@@ -45,7 +45,7 @@ impl TopologyRow {
 
 pub struct TopologyState {
     state: TableState,
-    rows: BTreeMap<String, Arc<Mutex<TopologyRow>>>,
+    rows: btree_map::BTreeMap<String, Arc<Mutex<TopologyRow>>>,
 }
 
 impl TopologyState {
@@ -65,5 +65,22 @@ impl TopologyState {
 
     pub fn get_row(&self, name: &str) -> Option<&Arc<Mutex<TopologyRow>>> {
         self.rows.get(name)
+    }
+}
+
+pub struct HostMetricsState {
+    memory_free_bytes: f64,
+    memory_available_bytes: f64,
+}
+
+impl HostMetricsState {
+    /// Update memory free bytes
+    pub fn update_memory_free_bytes(&mut self, val: f64) {
+        self.memory_free_bytes = val;
+    }
+
+    /// Update memory available bytes
+    pub fn update_memory_available_bytes(&mut self, val: f64) {
+        self.memory_available_bytes = val;
     }
 }
