@@ -2,7 +2,7 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
-        FunctionTransform, Transform,
+        FunctionTransform,
     },
 };
 use snafu::{OptionExt, Snafu};
@@ -39,12 +39,7 @@ impl Cri {
 
             let parser = RegexParser::build(&rp_config)
                 .expect("regexp patterns are static, should never fail");
-            match parser {
-                Transform::Function(f) => f,
-                _ => unreachable!(
-                    "The regex parser should not implement stream. Please report this."
-                ),
-            }
+            parser.into_function()
         };
 
         Self { regex_parser }
@@ -94,9 +89,8 @@ enum NormalizationError {
 #[cfg(test)]
 pub mod tests {
     use super::super::test_util;
-    use super::Cri;
     use super::*;
-    use crate::event::LogEvent;
+    use crate::{event::LogEvent, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()

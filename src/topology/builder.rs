@@ -128,14 +128,12 @@ pub async fn build_pieces(
                     t.transform(&mut buf, v);
                     futures01::stream::iter_ok(buf.into_iter())
                 }).flatten().boxed();
-                let forwarded = Box::new(transformed).forward(output);
-                forwarded
+                Box::new(transformed).forward(output)
             }
             Transform::Task(t) => {
                 let filtered = filter_event_type(input_rx, input_type);
                 let transformed = t.transform(filtered);
-                let forwarded = Box::new(transformed).forward(output);
-                forwarded
+                Box::new(transformed).forward(output)
             },
         }.map(|_| debug!("Finished")).compat();
 
