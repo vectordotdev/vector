@@ -27,7 +27,6 @@ use snafu::Snafu;
 use std::{
     convert::TryInto,
     fmt,
-    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -36,7 +35,7 @@ use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct KinesisService {
-    client: Arc<KinesisClient>,
+    client: KinesisClient,
     config: KinesisSinkConfig,
 }
 
@@ -142,8 +141,6 @@ impl KinesisService {
         client: KinesisClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(client);
-
         let batch = BatchSettings::default()
             .bytes(5_000_000)
             .events(500)
@@ -187,7 +184,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
 
         let sizes: Vec<usize> = records.iter().map(|record| record.data.len()).collect();
 
-        let client = Arc::clone(&self.client);
+        let client = self.client.clone();
         let request = PutRecordsInput {
             records,
             stream_name: self.config.stream_name.clone(),
