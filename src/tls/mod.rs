@@ -7,13 +7,13 @@ use std::{fmt::Debug, net::SocketAddr, path::PathBuf};
 use tokio::net::TcpStream;
 use tokio_openssl::{HandshakeError, SslStream};
 
-#[cfg(feature = "sources-tls")]
+#[cfg(feature = "tls")]
 mod incoming;
 mod maybe_tls;
 mod outgoing;
 mod settings;
 
-#[cfg(all(feature = "sources-tls", feature = "listenfd"))]
+#[cfg(all(feature = "tls", feature = "listenfd"))]
 pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
 pub(crate) use maybe_tls::MaybeTls;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
