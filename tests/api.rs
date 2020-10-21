@@ -181,7 +181,7 @@ mod tests {
                 .unwrap()
                 .data
                 .unwrap()
-                .uptime_metrics
+                .uptime
                 .seconds
                 > 0.00
         )
