@@ -9,7 +9,7 @@ use crate::{
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future, future::BoxFuture, FutureExt};
 use futures01::Sink;
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
@@ -214,17 +214,14 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let client = self.client.clone();
         let input = self.encode_events(items);
+        if input.metric_data.is_empty() {
+            return future::ready(Ok(())).boxed();
+        }
 
-        Box::pin(async move {
-            if input.metric_data.is_empty() {
-                Ok(())
-            } else {
-                debug!(message = "Sending data.", ?input);
-                client.put_metric_data(input).await
-            }
-        })
+        debug!(message = "Sending data.", ?input);
+        let client = self.client.clone();
+        Box::pin(async move { client.put_metric_data(input).await })
     }
 }
 
