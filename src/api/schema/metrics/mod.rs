@@ -13,8 +13,8 @@ use std::sync::Arc;
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
-pub use bytes_processed::BytesProcessed;
-pub use events_processed::EventsProcessed;
+pub use bytes_processed::ProcessedBytesTotal;
+pub use events_processed::EventsProcessedTotal;
 pub use host::HostMetrics;
 pub use uptime::Uptime;
 
@@ -48,7 +48,7 @@ pub struct MetricsSubscription;
 #[Subscription]
 impl MetricsSubscription {
     /// Metrics for how long the Vector instance has been running
-    async fn uptime_metrics(
+    async fn uptime(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Uptime> {
@@ -59,23 +59,23 @@ impl MetricsSubscription {
     }
 
     /// Events processed metrics
-    async fn events_processed_total_metrics(
+    async fn events_processed_total(
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = EventsProcessedTotal> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "events_processed_total" => Some(EventsProcessedTotal(m)),
+            "events_processed_total" => Some(EventsProcessedTotal::new(m)),
             _ => None,
         })
     }
 
     /// Bytes processed metrics
-    async fn processed_bytes_total_metrics(
+    async fn processed_bytes_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ProcessedBytesTotal> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "processed_bytes_total" => Some(ProcessedBytesTotal(m)),
+            "processed_bytes_total" => Some(ProcessedBytesTotal::new(m)),
             _ => None,
         })
     }

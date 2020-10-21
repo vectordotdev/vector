@@ -1,5 +1,0 @@
-subscription UptimeMetricsSubscription {
-  uptimeMetrics {
-    seconds
-  }
-}

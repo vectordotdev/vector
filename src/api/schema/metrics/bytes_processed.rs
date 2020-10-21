@@ -2,23 +2,23 @@ use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 
-pub struct BytesProcessed(Metric);
+pub struct ProcessedBytesTotal(Metric);
 
-impl BytesProcessed {
+impl ProcessedBytesTotal {
     pub fn new(m: Metric) -> Self {
         Self(m)
     }
 }
 
 #[Object]
-impl BytesProcessed {
+impl ProcessedBytesTotal {
     /// Metric timestamp
     pub async fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.0.timestamp
     }
 
-    /// Number of bytes processed
-    pub async fn bytes_processed(&self) -> f64 {
+    /// Total number of bytes processed
+    pub async fn bytes_processed_total(&self) -> f64 {
         match self.0.value {
             MetricValue::Counter { value } => value,
             _ => 0.00,
@@ -26,7 +26,7 @@ impl BytesProcessed {
     }
 }
 
-impl From<Metric> for BytesProcessed {
+impl From<Metric> for ProcessedBytesTotal {
     fn from(m: Metric) -> Self {
         Self(m)
     }

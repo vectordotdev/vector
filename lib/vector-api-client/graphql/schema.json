@@ -86,21 +86,9 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric timestamp",
+              "description": "CPU seconds total",
               "isDeprecated": false,
-              "name": "timestamp",
-              "type": {
-                "kind": "SCALAR",
-                "name": "DateTime",
-                "ofType": null
-              }
-            },
-            {
-              "args": [],
-              "deprecationReason": null,
-              "description": "Number of bytes processed",
-              "isDeprecated": false,
-              "name": "processedBytesTotal",
+              "name": "cpuSecondsTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -113,15 +101,9 @@
             }
           ],
           "inputFields": null,
-          "interfaces": [
-            {
-              "kind": "INTERFACE",
-              "name": "MetricType",
-              "ofType": null
-            }
-          ],
+          "interfaces": [],
           "kind": "OBJECT",
-          "name": "ProcessedBytesTotal",
+          "name": "CPUMetrics",
           "possibleTypes": null
         },
         {
@@ -132,6 +114,81 @@
           "interfaces": null,
           "kind": "SCALAR",
           "name": "DateTime",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total bytes read",
+              "isDeprecated": false,
+              "name": "readBytesTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total reads completed",
+              "isDeprecated": false,
+              "name": "readsCompletedTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total bytes written",
+              "isDeprecated": false,
+              "name": "writtenBytesTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total writes completed",
+              "isDeprecated": false,
+              "name": "writesCompletedTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "DiskMetrics",
           "possibleTypes": null
         },
         {
@@ -153,7 +210,7 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Number of events processed",
+              "description": "Total number of events processed",
               "isDeprecated": false,
               "name": "eventsProcessedTotal",
               "type": {
@@ -177,6 +234,65 @@
           ],
           "kind": "OBJECT",
           "name": "EventsProcessedTotal",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Free bytes",
+              "isDeprecated": false,
+              "name": "freeBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total bytes",
+              "isDeprecated": false,
+              "name": "totalBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Used bytes",
+              "isDeprecated": false,
+              "name": "usedBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "FileSystemMetrics",
           "possibleTypes": null
         },
         {
@@ -355,6 +471,125 @@
           "possibleTypes": null
         },
         {
+          "description": "Vector host metrics",
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Memory metrics",
+              "isDeprecated": false,
+              "name": "memory",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "MemoryMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Swap metrics",
+              "isDeprecated": false,
+              "name": "swap",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SwapMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "CPU metrics",
+              "isDeprecated": false,
+              "name": "cpu",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "CPUMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Load average metrics (*nix only)",
+              "isDeprecated": false,
+              "name": "loadAverage",
+              "type": {
+                "kind": "OBJECT",
+                "name": "LoadAverageMetrics",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Network metrics",
+              "isDeprecated": false,
+              "name": "network",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "NetworkMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Filesystem metrics",
+              "isDeprecated": false,
+              "name": "filesystem",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "FileSystemMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Disk metrics",
+              "isDeprecated": false,
+              "name": "disk",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "DiskMetrics",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "HostMetrics",
+          "possibleTypes": null
+        },
+        {
           "description": null,
           "enumValues": null,
           "fields": null,
@@ -372,6 +607,208 @@
           "interfaces": null,
           "kind": "SCALAR",
           "name": "Int",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Load 1 average",
+              "isDeprecated": false,
+              "name": "load1",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Load 5 average",
+              "isDeprecated": false,
+              "name": "load5",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Load 15 average",
+              "isDeprecated": false,
+              "name": "load15",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "LoadAverageMetrics",
+          "possibleTypes": null
+        },
+        {
+          "description": "Host memory metrics",
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total bytes",
+              "isDeprecated": false,
+              "name": "totalBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Free bytes",
+              "isDeprecated": false,
+              "name": "freeBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Available bytes",
+              "isDeprecated": false,
+              "name": "availableBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Active bytes (Linux/macOS only)",
+              "isDeprecated": false,
+              "name": "activeBytes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Buffers bytes (Linux only)",
+              "isDeprecated": false,
+              "name": "buffersBytes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Cached bytes (Linux only)",
+              "isDeprecated": false,
+              "name": "cachedBytes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Shared bytes (Linux only)",
+              "isDeprecated": false,
+              "name": "sharedBytes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Used bytes (Linux only)",
+              "isDeprecated": false,
+              "name": "usedBytes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Inactive bytes (macOS only)",
+              "isDeprecated": false,
+              "name": "inactiveBytes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Wired bytes (macOS only)",
+              "isDeprecated": false,
+              "name": "wiredBytes",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "MemoryMetrics",
           "possibleTypes": null
         },
         {
@@ -428,6 +865,172 @@
           "enumValues": null,
           "fields": [
             {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Vector host metrics",
+              "isDeprecated": false,
+              "name": "hostMetrics",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "HostMetrics",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "MetricsQuery",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Vector host metrics",
+              "isDeprecated": false,
+              "name": "hostMetrics",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "HostMetrics",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Configured Topology (source/transform/sink)",
+              "isDeprecated": false,
+              "name": "topology",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INTERFACE",
+                      "name": "Topology",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Configured sources",
+              "isDeprecated": false,
+              "name": "sources",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Source",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Configured transforms",
+              "isDeprecated": false,
+              "name": "transforms",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Transform",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Configured sinks",
+              "isDeprecated": false,
+              "name": "sinks",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Sink",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Returns `true` to denote the GraphQL server is reachable",
+              "isDeprecated": false,
+              "name": "health",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "MetricsQuery_TopologyQuery_HealthQuery_MergedObjectTail",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
               "args": [
                 {
                   "defaultValue": "1000",
@@ -447,7 +1050,7 @@
               "deprecationReason": null,
               "description": "Metrics for how long the Vector instance has been running",
               "isDeprecated": false,
-              "name": "uptimeMetrics",
+              "name": "uptime",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -476,15 +1079,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events total processed metrics",
+              "description": "Events processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedTotalMetrics",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsTotalProcessed",
+                  "name": "EventsProcessedTotal",
                   "ofType": null
                 }
               }
@@ -509,7 +1112,7 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "processedBytesTotalMetrics",
+              "name": "processedBytesTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -582,7 +1185,7 @@
               "deprecationReason": null,
               "description": "Metrics for how long the Vector instance has been running",
               "isDeprecated": false,
-              "name": "uptimeMetrics",
+              "name": "uptime",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -611,15 +1214,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events total processed metrics",
+              "description": "Events processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedTotalMetrics",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsTotalProcessed",
+                  "name": "EventsProcessedTotal",
                   "ofType": null
                 }
               }
@@ -644,7 +1247,7 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "processedBytesTotalMetrics",
+              "name": "processedBytesTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -728,6 +1331,182 @@
           "description": null,
           "enumValues": null,
           "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total bytes received",
+              "isDeprecated": false,
+              "name": "receiveBytesTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total errors received",
+              "isDeprecated": false,
+              "name": "receiveErrsTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total packets received",
+              "isDeprecated": false,
+              "name": "receivePacketsTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total bytes transmitted",
+              "isDeprecated": false,
+              "name": "transmitBytesTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total errors transmitted",
+              "isDeprecated": false,
+              "name": "transmitErrsTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total transmission packets dropped (Linux/Windows only)",
+              "isDeprecated": false,
+              "name": "transmitPacketsDropTotal",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total transmission packets (Linux/Windows only)",
+              "isDeprecated": false,
+              "name": "transmitPacketsTotal",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "NetworkMetrics",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric timestamp",
+              "isDeprecated": false,
+              "name": "timestamp",
+              "type": {
+                "kind": "SCALAR",
+                "name": "DateTime",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Total number of bytes processed",
+              "isDeprecated": false,
+              "name": "bytesProcessedTotal",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [
+            {
+              "kind": "INTERFACE",
+              "name": "MetricType",
+              "ofType": null
+            }
+          ],
+          "kind": "OBJECT",
+          "name": "ProcessedBytesTotal",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Vector host metrics",
+              "isDeprecated": false,
+              "name": "hostMetrics",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "HostMetrics",
+                  "ofType": null
+                }
+              }
+            },
             {
               "args": [],
               "deprecationReason": null,
@@ -918,12 +1697,12 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating total events processed for the current sink",
+              "description": "Metric indicating events processed for the current sink",
               "isDeprecated": false,
               "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsTotalProcessed",
+                "name": "EventsProcessedTotal",
                 "ofType": null
               }
             }
@@ -1027,12 +1806,12 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating total events processed for the current source",
+              "description": "Metric indicating events processed for the current source",
               "isDeprecated": false,
               "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
-                "name": "EventsTotalProcessed",
+                "name": "EventsProcessedTotal",
                 "ofType": null
               }
             }
@@ -1144,7 +1923,7 @@
               "deprecationReason": null,
               "description": "Metrics for how long the Vector instance has been running",
               "isDeprecated": false,
-              "name": "uptimeMetrics",
+              "name": "uptime",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1173,9 +1952,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed total metrics",
+              "description": "Events processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedTotalMetrics",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1206,7 +1985,7 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "processedBytesTotalMetrics",
+              "name": "processedBytesTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1284,6 +2063,89 @@
           "interfaces": [],
           "kind": "OBJECT",
           "name": "Subscription",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Swap free bytes",
+              "isDeprecated": false,
+              "name": "freeBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Swap total bytes",
+              "isDeprecated": false,
+              "name": "totalBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Swap used bytes",
+              "isDeprecated": false,
+              "name": "usedBytes",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Float",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Swapped in bytes total (not available on Windows)",
+              "isDeprecated": false,
+              "name": "swappedInBytesTotal",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Swapped out bytes total (not available on Windows)",
+              "isDeprecated": false,
+              "name": "swappedOutBytesTotal",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "SwapMetrics",
           "possibleTypes": null
         },
         {
@@ -1670,7 +2532,7 @@
               "deprecationReason": null,
               "description": "Metrics for how long the Vector instance has been running",
               "isDeprecated": false,
-              "name": "uptimeMetrics",
+              "name": "uptime",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1699,9 +2561,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed total metrics",
+              "description": "Events processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedTotalMetrics",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1732,7 +2594,7 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "processedBytesTotalMetrics",
+              "name": "processedBytesTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1883,7 +2745,7 @@
             {
               "args": [],
               "deprecationReason": null,
-              "description": "Metric indicating total events processed for the current transform",
+              "description": "Metric indicating events processed for the current transform",
               "isDeprecated": false,
               "name": "eventsProcessedTotal",
               "type": {
