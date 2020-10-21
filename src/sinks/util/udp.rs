@@ -166,13 +166,11 @@ impl tower::Service<Bytes> for UdpService {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match &mut self.state {
             UdpServiceState::Connected(_) => Poll::Ready(Ok(())),
-            UdpServiceState::Connecting(fut) => match fut.poll_unpin(cx) {
-                Poll::Ready(socket) => {
-                    self.state = UdpServiceState::Connected(socket);
-                    Poll::Ready(Ok(()))
-                }
-                Poll::Pending => Poll::Pending,
-            },
+            UdpServiceState::Connecting(fut) => {
+                let socket = futures::ready!(fut.poll_unpin(cx));
+                self.state = UdpServiceState::Connected(socket);
+                Poll::Ready(Ok(()))
+            }
         }
     }
 
