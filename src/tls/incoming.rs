@@ -22,7 +22,7 @@ use tokio::{
 use tokio_openssl::{HandshakeError, SslStream};
 
 impl TlsSettings {
-    pub fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
+    pub(crate) fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
@@ -36,7 +36,7 @@ impl TlsSettings {
 }
 
 impl MaybeTlsSettings {
-    pub async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
+    pub(crate) async fn bind(&self, addr: &SocketAddr) -> crate::tls::Result<MaybeTlsListener> {
         let listener = TcpListener::bind(addr).await.context(TcpBind)?;
 
         let acceptor = match self {
@@ -48,13 +48,13 @@ impl MaybeTlsSettings {
     }
 }
 
-pub struct MaybeTlsListener {
+pub(crate) struct MaybeTlsListener {
     listener: TcpListener,
     acceptor: Option<SslAcceptor>,
 }
 
 impl MaybeTlsListener {
-    pub async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
+    pub(crate) async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
         self.listener
             .accept()
             .await
@@ -70,7 +70,7 @@ impl MaybeTlsListener {
         (self.accept().await, self)
     }
 
-    pub fn accept_stream(
+    pub(crate) fn accept_stream(
         self,
     ) -> impl Stream<Item = crate::tls::Result<MaybeTlsIncomingStream<TcpStream>>> {
         let mut accept = Box::pin(self.into_accept());

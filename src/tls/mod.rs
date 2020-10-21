@@ -14,8 +14,8 @@ mod outgoing;
 mod settings;
 
 #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
-pub use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
-pub use maybe_tls::MaybeTls;
+pub(crate) use incoming::{MaybeTlsIncomingStream, MaybeTlsListener};
+pub(crate) use maybe_tls::MaybeTls;
 pub use settings::{MaybeTlsSettings, TlsConfig, TlsOptions, TlsSettings};
 
 pub type Result<T> = std::result::Result<T, TlsError>;
