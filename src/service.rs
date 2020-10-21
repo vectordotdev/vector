@@ -168,17 +168,16 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
             &service_definition,
             vector_windows::service_control::ControlAction::Stop,
         ),
-        _ => unreachable!(),
+        ControlAction::Restart => vector_windows::service_control::control(
+            &service_definition,
+            vector_windows::service_control::ControlAction::Restart,
+        ),
     };
 
     match res {
         Ok(()) => exitcode::OK,
         Err(err) => {
-            if let windows_service::Error::Winapi(win_err) = err {
-                error!(message="Error controlling service.", %win_err)
-            } else {
-                error!(message="Error controlling service.", %err)
-            }
+            error!(message="Error controlling service.", %err);
             exitcode::SOFTWARE
         }
     }

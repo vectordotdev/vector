@@ -1,10 +1,12 @@
+use super::{broker::Broker, metrics};
 use crate::config::{Config, DataType};
-use async_graphql::{Enum, Interface, Object};
+use async_graphql::{Enum, Interface, Object, Subscription};
 use lazy_static::lazy_static;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, RwLock},
 };
+use tokio::stream::{Stream, StreamExt};
 
 const INVARIANT: &str =
     "It is an invariant for the API to be active but not have a TOPOLOGY. Please report this.";
@@ -62,6 +64,11 @@ impl Source {
             _ => None,
         })
     }
+
+    /// Metric indicating events processed for the current source
+    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
+        metrics::topology_events_processed_total(self.0.name.clone())
+    }
 }
 
 #[derive(Clone)]
@@ -101,6 +108,11 @@ impl Transform {
             Topology::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
             _ => None,
         })
+    }
+
+    /// Metric indicating events processed for the current transform
+    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
+        metrics::topology_events_processed_total(self.0.name.clone())
     }
 }
 
@@ -143,15 +155,32 @@ impl Sink {
             })
             .collect()
     }
+
+    /// Metric indicating events processed for the current sink
+    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
+        metrics::topology_events_processed_total(self.0.name.clone())
+    }
 }
 
 #[derive(Clone, Interface)]
-#[graphql(field(name = "name", type = "String"))]
+#[graphql(
+    field(name = "name", type = "String"),
+    field(
+        name = "events_processed_total",
+        type = "Option<metrics::EventsProcessedTotal>"
+    )
+)]
 pub enum Topology {
     Source(Source),
     Transform(Transform),
     Sink(Sink),
 }
+
+#[derive(Clone)]
+pub struct TopologyAdded(Topology);
+
+#[derive(Clone)]
+pub struct TopologyRemoved(Topology);
 
 lazy_static! {
     static ref TOPOLOGY: Arc<RwLock<HashMap<String, Topology>>> =
@@ -184,6 +213,22 @@ impl TopologyQuery {
     }
 }
 
+#[derive(Default)]
+pub struct TopologySubscription;
+
+#[Subscription]
+impl TopologySubscription {
+    /// Subscribes to all newly added topology
+    async fn topology_added(&self) -> impl Stream<Item = Topology> {
+        Broker::<TopologyAdded>::subscribe().map(|t| t.0)
+    }
+
+    /// Subscribes to all removed topology
+    async fn topology_removed(&self) -> impl Stream<Item = Topology> {
+        Broker::<TopologyRemoved>::subscribe().map(|t| t.0)
+    }
+}
+
 fn filter_topology<T>(map_func: impl Fn((&String, &Topology)) -> Option<T>) -> Vec<T> {
     TOPOLOGY
         .read()
@@ -212,6 +257,16 @@ fn get_sinks() -> Vec<Sink> {
         Topology::Sink(s) => Some(s.clone()),
         _ => None,
     })
+}
+
+/// Returns the current topology names as a HashSet
+fn get_topology_names() -> HashSet<String> {
+    TOPOLOGY
+        .read()
+        .expect(INVARIANT)
+        .keys()
+        .cloned()
+        .collect::<HashSet<String>>()
 }
 
 /// Update the 'global' configuration that will be consumed by topology queries
@@ -251,6 +306,34 @@ pub fn update_config(config: &Config) {
         );
     }
 
+    // Get the names of existing topology
+    let existing_topology_names = get_topology_names();
+    let new_topology_names = new_topology
+        .iter()
+        .map(|(name, _)| name.clone())
+        .collect::<HashSet<String>>();
+
+    // Publish all topology that has been removed
+    existing_topology_names
+        .difference(&new_topology_names)
+        .for_each(|name| {
+            Broker::publish(TopologyRemoved(
+                TOPOLOGY
+                    .read()
+                    .expect(INVARIANT)
+                    .get(name)
+                    .expect(INVARIANT)
+                    .clone(),
+            ))
+        });
+
+    // Publish all topology that has been added
+    new_topology_names
+        .difference(&existing_topology_names)
+        .for_each(|name| {
+            Broker::publish(TopologyAdded(new_topology.get(name).unwrap().clone()));
+        });
+
     // override the old hashmap
-    *TOPOLOGY.write().expect(INVARIANT) = new_topology
+    *TOPOLOGY.write().expect(INVARIANT) = new_topology;
 }

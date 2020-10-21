@@ -57,7 +57,7 @@ pub struct S3SinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    #[serde(default = "Compression::default_gzip")]
+    #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -300,7 +300,12 @@ impl Service<Request> for S3Sink {
             ..Default::default()
         };
 
-        Box::pin(async move { client.put_object(request).await }.instrument(info_span!("request")))
+        Box::pin(async move {
+            client
+                .put_object(request)
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
@@ -511,7 +516,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -522,7 +527,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -571,7 +576,7 @@ mod integration_tests {
         assert!(key.ends_with(".log"));
 
         let obj = get_object(key).await;
-        assert_eq!(obj.content_encoding, None);
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
 
         let response_lines = get_lines(obj).await;
         assert_eq!(lines, response_lines);
@@ -627,7 +632,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = S3SinkConfig {
-            compression: Compression::Gzip,
+            compression: Compression::gzip_default(),
             filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };
@@ -683,7 +688,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4572".to_owned(),
+            endpoint: "http://localhost:4566".to_owned(),
         };
 
         use rusoto_core::HttpClient;
@@ -707,7 +712,7 @@ mod integration_tests {
                 timeout_secs: Some(5),
                 ..Default::default()
             },
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4572".to_owned()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             ..Default::default()
         }
     }

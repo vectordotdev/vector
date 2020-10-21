@@ -1,34 +1,51 @@
 package metadata
 
 components: sinks: socket: {
-	title:             "Socket"
-	short_description: "Streams log events to a [socket][urls.socket], such as a [TCP][urls.tcp], [UDP][urls.udp], or [UDS][urls.uds] socket."
+	title: "Socket"
 
 	classes: {
 		commonly_used: true
 		delivery:      "best_effort"
 		development:   "stable"
 		egress_method: "stream"
-		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      true
-		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: {
-			enabled:                true
-			can_enable:             true
-			can_verify_certificate: true
-			can_verify_hostname:    true
-			enabled_default:        false
+		send: {
+			compression: enabled: false
+			encoding: {
+				enabled: true
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
+			}
+			request: enabled: false
+			tls: {
+				enabled:                true
+				can_enable:             true
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
+			to: {
+				name:     "socket receiver"
+				thing:    "a \(name)"
+				url:      urls.socket
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["tcp", "udp", "unix"]
+						ssl: "required"
+					}
+				}
+			}
 		}
 	}
 
@@ -83,6 +100,6 @@ components: sinks: socket: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }

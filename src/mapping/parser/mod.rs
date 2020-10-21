@@ -9,6 +9,8 @@ use crate::{
             arithmetic::Operator,
             function::{Argument, ArgumentList, FunctionSignature, NotFn},
             path::Path as QueryPath,
+            query_value::QueryValue,
+            regex::Regex,
             Literal,
         },
         Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
@@ -286,13 +288,13 @@ fn positional_item_from_pair(
     index: usize,
     signature: &FunctionSignature,
 ) -> Result<()> {
-    let resolver = query_arithmetic_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
-
     let parameter = signature.parameters().get(index).cloned().ok_or(format!(
         "unknown positional argument '{}' for function: '{}'",
         index,
         signature.as_str()
     ))?;
+
+    let resolver = argument_item_from_pair(pair.into_inner().next().ok_or(TOKEN_ERR)?)?;
 
     let keyword = parameter.keyword.to_owned();
     let argument = Argument::new(resolver, parameter);
@@ -300,6 +302,43 @@ fn positional_item_from_pair(
     list.push(argument, Some(keyword));
 
     Ok(())
+}
+
+fn argument_item_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
+    let inner = pair.into_inner().next().ok_or(TOKEN_ERR)?;
+    match inner.as_rule() {
+        Rule::query_arithmetic_boolean => query_arithmetic_from_pair(inner),
+        Rule::regex => regex_from_pair(inner),
+        _ => unexpected_parser_sytax!(inner),
+    }
+}
+
+fn regex_from_pair(pair: Pair<Rule>) -> Result<Box<dyn query::Function>> {
+    match pair.as_rule() {
+        Rule::regex => {
+            let mut inner = pair.into_inner();
+            let pattern = inner.next().ok_or(TOKEN_ERR)?.as_str();
+            let (global, insensitive, multiline) = inner
+                .next()
+                .map(|flags| {
+                    flags
+                        .as_str()
+                        .chars()
+                        .fold((false, false, false), |(g, i, m), flag| match flag {
+                            'g' => (true, i, m),
+                            'i' => (g, true, m),
+                            'm' => (g, i, true),
+                            _ => (g, i, m),
+                        })
+                })
+                .unwrap_or((false, false, false));
+
+            let regex = Regex::new(pattern.into(), multiline, insensitive, global)?;
+
+            Ok(Box::new(Literal::from(QueryValue::from(regex))))
+        }
+        _ => unexpected_parser_sytax!(pair),
+    }
 }
 
 fn keyword_item_from_pair(
@@ -507,7 +546,7 @@ mod tests {
     use super::*;
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
-        ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, StripAnsiEscapeCodesFn,
+        ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
         StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
         TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
@@ -590,6 +629,28 @@ mod tests {
                 // Same here as above.
                 r#".foo."invalid \k escape".sequence = "foo""#,
                 vec![" 1:6\n", "= expected path_field_name or quoted_path_segment"],
+            ),
+            (
+                // An invalid regex.
+                // Technically this isn't a (pest) parser error, so the error doesn't include the
+                // line and column numbers of the offending regex.
+                r#".foo = split(.foo, /[aa/)"#,
+                vec!["invalid regex: regex parse error:"],
+            ),
+            (
+                // Regexes can't be parsed as part of a path
+                r#".foo = split(.foo, ./[aa]/)"#,
+                vec![" 1:21\n", "= expected path_field_name, quoted_path_segment, or path_coalesce"],
+            ),
+            (
+                // We cannot assign a regular expression to a field.
+                r#".foo = /ab/i"#,
+                vec![" 1:8\n", "= expected query"],
+            ),
+            (
+                // We cannot assign to a regular expression.
+                r#"/ab/ = .foo"#,
+                vec![" 1:1\n", "= expected if_statement, target_path, or function"],
             ),
         ];
 
@@ -1215,6 +1276,19 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(ParseDurationFn::new(Box::new(QueryPath::from("foo")), "s")),
+                ))]),
+            ),
+            (
+                r#".foo = split(.bar, /a/i, 2)"#,
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "foo".to_string(),
+                    Box::new(SplitFn::new(
+                        Box::new(QueryPath::from("bar")),
+                        Box::new(Literal::from(QueryValue::from(
+                            Regex::new("a".to_string(), false, true, false).unwrap(),
+                        ))),
+                        Some(Box::new(Literal::from(Value::from(2)))),
+                    )),
                 ))]),
             ),
         ];

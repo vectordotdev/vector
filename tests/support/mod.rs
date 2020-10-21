@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
-use futures::{future, FutureExt};
+use futures::{future, FutureExt, TryFutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -142,7 +142,7 @@ impl SourceConfig for MockSourceConfig {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(shutdown);
+        let mut shutdown = Some(shutdown.unit_error().boxed().compat());
         let mut _token = None;
         let source = futures01::future::lazy(move || {
             stream::poll_fn(move || {

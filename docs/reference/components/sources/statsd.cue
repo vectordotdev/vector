@@ -1,11 +1,10 @@
 package metadata
 
 components: sources: statsd: {
-	_port: 8126
+	_port: 8125
 
-	title:             "StatsD"
-	short_description: "Ingests data through the [StatsD UDP protocol][urls.statsd_udp_protocol] and outputs metric events."
-	long_description:  "[StatsD][urls.statsd] is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy][urls.etsy] in Node."
+	title:       "StatsD"
+	description: "[StatsD](\(urls.statsd)) is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy](\(urls.etsy)) in Node."
 
 	classes: {
 		commonly_used: false
@@ -13,21 +12,14 @@ components: sources: statsd: {
 		deployment_roles: ["aggregator"]
 		development:   "stable"
 		egress_method: "stream"
-		function:      "receive"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	support: {
-		dependencies: {
-			statsd_client: {
-				required: true
-				title:    "StatsD Client"
-				type:     "external"
+		multiline: enabled: false
+		receive: {
+			from: {
+				name:     "StatsD"
+				thing:    "a \(name) client"
 				url:      urls.statsd
 				versions: null
 
@@ -41,8 +33,12 @@ components: sources: statsd: {
 					ssl: "optional"
 				}
 			}
-		}
 
+			tls: enabled: false
+		}
+	}
+
+	support: {
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -59,26 +55,62 @@ components: sources: statsd: {
 
 	configuration: {
 		address: {
-			description: "UDP socket address to bind to."
-			required:    true
+			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
+			groups: ["tcp", "udp"]
+			required: true
 			warnings: []
 			type: string: {
-				examples: ["127.0.0.1:\(_port)"]
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
 		}
+		mode: {
+			description: "The type of socket to use."
+			groups: ["tcp", "udp", "unix"]
+			required: true
+			warnings: []
+			type: string: {
+				enum: {
+					tcp:  "TCP Socket."
+					udp:  "UDP Socket."
+					unix: "Unix Domain Socket."
+				}
+			}
+		}
+		path: {
+			description: "The unix socket path. *This should be an absolute path*."
+			groups: ["unix"]
+			required: true
+			warnings: []
+			type: string: {
+				examples: ["/path/to/socket"]
+			}
+		}
+		shutdown_timeout_secs: {
+			common:      false
+			description: "The timeout before a connection is forcefully closed during shutdown."
+			groups: ["tcp"]
+			required: false
+			warnings: []
+			type: uint: {
+				default: 30
+				unit:    "seconds"
+			}
+		}
+
 	}
 
 	output: metrics: {
-		counter:   output._passthrough_counter
-		gauge:     output._passthrough_gauge
-		histogram: output._passthrough_histogram
-		set:       output._passthrough_set
+		counter:      output._passthrough_counter
+		distribution: output._passthrough_distribution
+		gauge:        output._passthrough_gauge
+		histogram:    output._passthrough_histogram
+		set:          output._passthrough_set
 	}
 
 	how_it_works: {
 		timestamps: {
 			title: "Timestamps"
-			body: #"""
+			body: """
 				StatsD protocol does not provide support for sending metric
 				timestamps. You'll notice that each parsed metric is assigned a
 				`null` timestamp, which is a special value which means "a real
@@ -86,7 +118,7 @@ components: sources: statsd: {
 				timestamps will be substituted by current time by downstream
 				sinks or 3rd party services during sending/ingestion. See the
 				[metric][docs.data-model.metric] data model page for more info.
-				"""#
+				"""
 		}
 	}
 }

@@ -159,7 +159,7 @@ impl SubscriptionClient {
         let (mut ws_tx, mut ws_rx) = futures::StreamExt::split(ws);
 
         // Create a multi producer channel for sending messages back upstream
-        let (tx, mut rx) = broadcast::channel::<Payload>(100);
+        let (tx, mut rx) = broadcast::channel::<Payload>(20);
 
         // Spawn a handler for receiving payloads back from the client.
         let spawned_subscriptions = Arc::clone(&subscriptions);

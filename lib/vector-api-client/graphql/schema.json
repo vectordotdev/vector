@@ -100,7 +100,7 @@
               "deprecationReason": null,
               "description": "Number of bytes processed",
               "isDeprecated": false,
-              "name": "bytesProcessed",
+              "name": "processedBytesTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -121,7 +121,7 @@
             }
           ],
           "kind": "OBJECT",
-          "name": "BytesProcessed",
+          "name": "ProcessedBytesTotal",
           "possibleTypes": null
         },
         {
@@ -155,7 +155,7 @@
               "deprecationReason": null,
               "description": "Number of events processed",
               "isDeprecated": false,
-              "name": "eventsProcessed",
+              "name": "eventsProcessedTotal",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -176,7 +176,7 @@
             }
           ],
           "kind": "OBJECT",
-          "name": "EventsProcessed",
+          "name": "EventsProcessedTotal",
           "possibleTypes": null
         },
         {
@@ -413,12 +413,12 @@
             },
             {
               "kind": "OBJECT",
-              "name": "EventsProcessed",
+              "name": "EventsProcessedTotal",
               "ofType": null
             },
             {
               "kind": "OBJECT",
-              "name": "BytesProcessed",
+              "name": "ProcessedBytesTotal",
               "ofType": null
             }
           ]
@@ -476,15 +476,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events total processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedMetrics",
+              "name": "eventsProcessedTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsProcessed",
+                  "name": "EventsTotalProcessed",
                   "ofType": null
                 }
               }
@@ -509,13 +509,13 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "bytesProcessedMetrics",
+              "name": "processedBytesTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "BytesProcessed",
+                  "name": "ProcessedBytesTotal",
                   "ofType": null
                 }
               }
@@ -611,15 +611,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events total processed metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedMetrics",
+              "name": "eventsProcessedTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsProcessed",
+                  "name": "EventsTotalProcessed",
                   "ofType": null
                 }
               }
@@ -644,13 +644,13 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "bytesProcessedMetrics",
+              "name": "processedBytesTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "BytesProcessed",
+                  "name": "ProcessedBytesTotal",
                   "ofType": null
                 }
               }
@@ -914,6 +914,18 @@
                   }
                 }
               }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating total events processed for the current sink",
+              "isDeprecated": false,
+              "name": "eventsProcessedTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsTotalProcessed",
+                "ofType": null
+              }
             }
           ],
           "inputFields": null,
@@ -1011,6 +1023,18 @@
                   }
                 }
               }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating total events processed for the current source",
+              "isDeprecated": false,
+              "name": "eventsProcessedTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsTotalProcessed",
+                "ofType": null
+              }
             }
           ],
           "inputFields": null,
@@ -1069,6 +1093,38 @@
           "enumValues": null,
           "fields": [
             {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all newly added topology",
+              "isDeprecated": false,
+              "name": "topologyAdded",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Topology",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all removed topology",
+              "isDeprecated": false,
+              "name": "topologyRemoved",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Topology",
+                  "ofType": null
+                }
+              }
+            },
+            {
               "args": [
                 {
                   "defaultValue": "1000",
@@ -1117,15 +1173,15 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events processed total metrics",
               "isDeprecated": false,
-              "name": "eventsProcessedMetrics",
+              "name": "eventsProcessedTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "EventsProcessed",
+                  "name": "EventsProcessedTotal",
                   "ofType": null
                 }
               }
@@ -1150,13 +1206,13 @@
               "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
-              "name": "bytesProcessedMetrics",
+              "name": "processedBytesTotalMetrics",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "BytesProcessed",
+                  "name": "ProcessedBytesTotal",
                   "ofType": null
                 }
               }
@@ -1248,6 +1304,18 @@
                   "name": "String",
                   "ofType": null
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "eventsProcessedTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessedTotal",
+                "ofType": null
               }
             }
           ],
@@ -1510,6 +1578,247 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Subscribes to all newly added topology",
+              "isDeprecated": false,
+              "name": "topologyAdded",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Topology",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all removed topology",
+              "isDeprecated": false,
+              "name": "topologyRemoved",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Topology",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "TopologySubscription",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all newly added topology",
+              "isDeprecated": false,
+              "name": "topologyAdded",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Topology",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Subscribes to all removed topology",
+              "isDeprecated": false,
+              "name": "topologyRemoved",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "Topology",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Metrics for how long the Vector instance has been running",
+              "isDeprecated": false,
+              "name": "uptimeMetrics",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Uptime",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": null,
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Events processed total metrics",
+              "isDeprecated": false,
+              "name": "eventsProcessedTotalMetrics",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "EventsProcessedTotal",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Bytes processed metrics",
+              "isDeprecated": false,
+              "name": "processedBytesTotalMetrics",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ProcessedBytesTotal",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "All metrics",
+              "isDeprecated": false,
+              "name": "metrics",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INTERFACE",
+                  "name": "MetricType",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Heartbeat, containing the UTC timestamp of the last server-sent payload",
+              "isDeprecated": false,
+              "name": "heartbeat",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Heartbeat",
+                  "ofType": null
+                }
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "TopologySubscription_MetricsSubscription_HealthSubscription_MergedObjectTail",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Transform name",
               "isDeprecated": false,
               "name": "name",
@@ -1569,6 +1878,18 @@
                     }
                   }
                 }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Metric indicating total events processed for the current transform",
+              "isDeprecated": false,
+              "name": "eventsProcessedTotal",
+              "type": {
+                "kind": "OBJECT",
+                "name": "EventsProcessedTotal",
+                "ofType": null
               }
             }
           ],

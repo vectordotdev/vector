@@ -11,9 +11,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use futures::{
-    compat::Future01CompatExt, future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -441,7 +439,7 @@ impl PrometheusSink {
 
         let server = Server::bind(&self.config.address)
             .serve(new_service)
-            .with_graceful_shutdown(tripwire.compat().map(|_| ()))
+            .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
             .map_err(|e| eprintln!("server error: {}", e));
 
         tokio::spawn(server);
