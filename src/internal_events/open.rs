@@ -102,7 +102,7 @@ mod tests {
         let handles = (0..n)
             .map(|_| {
                 let gauge = gauge.clone();
-                let value = value.clone();
+                let value = Arc::clone(&value);
                 thread::spawn(move || {
                     let mut work = 0;
                     for _ in 0..m {
