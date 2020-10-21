@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rand::random;
@@ -27,7 +27,6 @@ use snafu::Snafu;
 use std::{
     convert::TryInto,
     fmt,
-    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -36,7 +35,7 @@ use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct KinesisService {
-    client: Arc<KinesisClient>,
+    client: KinesisClient,
     config: KinesisSinkConfig,
 }
 
@@ -142,8 +141,6 @@ impl KinesisService {
         client: KinesisClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(client);
-
         let batch = BatchSettings::default()
             .bytes(5_000_000)
             .events(500)
@@ -185,13 +182,25 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
             events = %records.len(),
         );
 
-        let client = Arc::clone(&self.client);
+        let sizes: Vec<usize> = records.iter().map(|record| record.data.len()).collect();
+
+        let client = self.client.clone();
         let request = PutRecordsInput {
             records,
             stream_name: self.config.stream_name.clone(),
         };
 
-        Box::pin(async move { client.put_records(request).await }.instrument(info_span!("request")))
+        Box::pin(async move {
+            client
+                .put_records(request)
+                .inspect_ok(|_| {
+                    for byte_size in sizes {
+                        emit!(AwsKinesisStreamsEventSent { byte_size });
+                    }
+                })
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
@@ -288,13 +297,8 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
-    let data = Bytes::from(data);
-
-    emit!(AwsKinesisStreamsEventSent {
-        byte_size: data.len()
-    });
     Some(PutRecordsRequestEntry {
-        data,
+        data: Bytes::from(data),
         partition_key,
         ..Default::default()
     })
