@@ -184,9 +184,12 @@ impl Service<Vec<Record>> for KinesisFirehoseService {
             delivery_stream_name: self.config.stream_name.clone(),
         };
 
-        Box::pin(
-            async move { client.put_record_batch(request).await }.instrument(info_span!("request")),
-        )
+        Box::pin(async move {
+            client
+                .put_record_batch(request)
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
