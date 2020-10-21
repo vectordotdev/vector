@@ -595,12 +595,11 @@ mod tests {
 
     #[test]
     fn encode_counter() {
-        let now = Utc::now().timestamp();
         let interval = 60;
         let events = vec![
             Metric {
                 name: "total".into(),
-                timestamp: None,
+                timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: 1.5 },
@@ -625,7 +624,7 @@ mod tests {
 
         assert_eq!(
             json,
-            format!("{{\"series\":[{{\"metric\":\"ns.total\",\"type\":\"count\",\"interval\":60,\"points\":[[{},1.5]],\"tags\":null}},{{\"metric\":\"ns.check\",\"type\":\"count\",\"interval\":60,\"points\":[[1542182950,1.0]],\"tags\":[\"empty_tag:\",\"normal_tag:value\",\"true_tag:true\"]}}]}}", now)
+            r#"{"series":[{"metric":"ns.total","type":"count","interval":60,"points":[[1542182950,1.5]],"tags":null},{"metric":"ns.check","type":"count","interval":60,"points":[[1542182950,1.0]],"tags":["empty_tag:","normal_tag:value","true_tag:true"]}]}"#
         );
     }
 
