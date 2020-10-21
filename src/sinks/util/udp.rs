@@ -130,7 +130,7 @@ impl UdpConnector {
         let this = self.clone();
         async move { this.connect().await }
             .map_ok(|_| ())
-            .map_err(|e| e.into())
+            .err_into()
             .boxed()
     }
 }
