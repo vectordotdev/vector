@@ -4,6 +4,8 @@ use std::collections::BTreeMap;
 pub mod parser;
 pub mod query;
 
+use query::query_value::QueryValue;
+
 pub type Result<T> = std::result::Result<T, String>;
 
 pub(self) trait Function: Send + core::fmt::Debug {
@@ -26,9 +28,13 @@ impl Assignment {
 
 impl Function for Assignment {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        let v = self.function.execute(&target)?;
-        target.as_mut_log().insert(&self.path, v);
-        Ok(())
+        match self.function.execute(&target)? {
+            QueryValue::Value(v) => {
+                target.as_mut_log().insert(&self.path, v);
+                Ok(())
+            }
+            _ => Err("assignment must be from a value".to_string()),
+        }
     }
 }
 
@@ -117,8 +123,8 @@ impl IfStatement {
 impl Function for IfStatement {
     fn apply(&self, target: &mut Event) -> Result<()> {
         match self.query.execute(target)? {
-            Value::Boolean(true) => self.true_statement.apply(target),
-            Value::Boolean(false) => self.false_statement.apply(target),
+            QueryValue::Value(Value::Boolean(true)) => self.true_statement.apply(target),
+            QueryValue::Value(Value::Boolean(false)) => self.false_statement.apply(target),
             _ => Err("query returned non-boolean value".to_string()),
         }
     }
@@ -218,7 +224,7 @@ impl Function for MergeFn {
         let deep = match &self.deep {
             None => false,
             Some(deep) => match deep.execute(target)? {
-                Value::Boolean(value) => value,
+                QueryValue::Value(Value::Boolean(value)) => value,
                 _ => return Err("deep parameter passed to merge is a non-boolean value".into()),
             },
         };
@@ -229,7 +235,7 @@ impl Function for MergeFn {
         ))?;
 
         match (to_value, from_value) {
-            (Value::Map(ref mut map1), Value::Map(ref map2)) => {
+            (Value::Map(ref mut map1), QueryValue::Value(Value::Map(ref map2))) => {
                 merge_maps(map1, &map2, deep);
                 Ok(())
             }

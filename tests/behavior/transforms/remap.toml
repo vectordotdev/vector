@@ -808,3 +808,43 @@
     "a.procid.equals" = 6589
     "a.message.equals" = "bgp_listen_accept: %DAEMON-4: Connection attempt from unconfigured neighbor: 2001:XXX::219:166+57284"
 
+[transforms.remap_function_split_regex]
+  inputs=[]
+  type = "remap"
+  mapping = """
+    .foo = split(.foo, /a.b/i, 3)
+  """
+[[tests]]
+  name = "remap_function_split_regex"
+  [tests.input]
+    insert_at = "remap_function_split_regex"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "barAbBbataabfizzaxbbuzz"
+  [[tests.outputs]]
+    extract_from = "remap_function_split_regex"
+    [[tests.outputs.conditions]]
+    "foo[0].equals" = "bar"
+    "foo[1].equals" = "bat"
+    "foo[2].equals" = "fizzaxbbuzz"
+
+[transforms.remap_function_split_string]
+  inputs=[]
+  type = "remap"
+  mapping = """
+    .foo = split(.foo, " ", 3)
+  """
+[[tests]]
+  name = "remap_function_split_string"
+  [tests.input]
+    insert_at = "remap_function_split_string"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "bar bat fizz buzz"
+  [[tests.outputs]]
+    extract_from = "remap_function_split_string"
+    [[tests.outputs.conditions]]
+    "foo[0].equals" = "bar"
+    "foo[1].equals" = "bat"
+    "foo[2].equals" = "fizz buzz"
+

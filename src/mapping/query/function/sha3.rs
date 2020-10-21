@@ -17,9 +17,9 @@ impl Sha3Fn {
 }
 
 impl Function for Sha3Fn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let value = required!(ctx, self.query, Value::Bytes(v) => v);
-        let variant = optional!(ctx, self.variant, Value::Bytes(v) => v);
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let value = required_value!(ctx, self.query, Value::Bytes(v) => v);
+        let variant = optional_value!(ctx, self.variant, Value::Bytes(v) => v);
 
         let hash = match variant.as_deref() {
             Some(b"SHA3-224") => encode::<Sha3_224>(&value),
@@ -34,19 +34,19 @@ impl Function for Sha3Fn {
             }
         };
 
-        Ok(Value::Bytes(hash.into()))
+        Ok(Value::Bytes(hash.into()).into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "variant",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: false,
             },
         ]
@@ -129,7 +129,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 

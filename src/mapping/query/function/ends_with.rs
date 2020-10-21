@@ -26,43 +26,43 @@ impl EndsWithFn {
 }
 
 impl Function for EndsWithFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let substring = {
-            let bytes = required!(ctx, self.substring, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.substring, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
         let value = {
-            let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
         let ends_with = value.ends_with(&substring)
-            || optional!(ctx, self.case_sensitive, Value::Boolean(b) => b)
+            || optional_value!(ctx, self.case_sensitive, Value::Boolean(b) => b)
                 .iter()
                 .filter(|&case_sensitive| !case_sensitive)
                 .any(|_| {
                     value.to_lowercase().ends_with(&substring.to_lowercase())
                 });
 
-        Ok(Value::from(ends_with))
+        Ok(Value::from(ends_with).into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "case_sensitive",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Boolean(_))),
                 required: false,
             },
         ]
@@ -146,7 +146,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

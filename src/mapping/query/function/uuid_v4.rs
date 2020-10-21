@@ -12,11 +12,11 @@ impl UuidV4Fn {
 }
 
 impl Function for UuidV4Fn {
-    fn execute(&self, _: &Event) -> Result<Value> {
+    fn execute(&self, _: &Event) -> Result<QueryValue> {
         let mut buf = [0; 36];
         let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
 
-        Ok(Value::Bytes(Bytes::copy_from_slice(uuid.as_bytes())))
+        Ok(Value::Bytes(Bytes::copy_from_slice(uuid.as_bytes())).into())
     }
 }
 
@@ -35,7 +35,7 @@ mod tests {
     #[test]
     fn uuid_v4() {
         match UuidV4Fn::new().execute(&Event::from("")).unwrap() {
-            Value::Bytes(value) => {
+            QueryValue::Value(Value::Bytes(value)) => {
                 uuid::Uuid::parse_str(std::str::from_utf8(&value).unwrap()).expect("valid UUID V4")
             }
             _ => panic!("unexpected uuid_v4 output"),

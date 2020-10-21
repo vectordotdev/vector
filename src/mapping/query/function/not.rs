@@ -12,10 +12,11 @@ impl NotFn {
 }
 
 impl Function for NotFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         self.query.execute(ctx).and_then(|v| match v {
-            Value::Boolean(b) => Ok(Value::Boolean(!b)),
-            _ => Err(format!("unable to perform NOT on {:?} value", v)),
+            QueryValue::Value(Value::Boolean(b)) => Ok(Value::Boolean(!b).into()),
+            QueryValue::Value(v) => Err(format!("unable to perform NOT on {:?} value", v)),
+            v => Err(format!("unable to perform NOT on {:?} value", v)),
         })
     }
 }
@@ -51,7 +52,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }
