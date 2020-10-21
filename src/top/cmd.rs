@@ -27,10 +27,10 @@ async fn get_topology_state(client: &Client) -> Result<ArcSwap<TopologyState>, (
         .map(|d| TopologyRow {
             name: d.name,
             topology_type: d.on.to_string(),
-            events_processed: d
-                .events_processed
+            events_processed_total: d
+                .events_processed_total
                 .as_ref()
-                .map(|ep| ep.events_processed as i64)
+                .map(|ep| ep.events_processed_total as i64)
                 .unwrap_or(0),
             errors: 0,
             throughput: 0.00,
@@ -89,8 +89,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 
             cloned.load().rows().for_each(|r| {
                 let mut r = r.lock().unwrap();
-                let events_processed = r.events_processed;
-                r.update_events_processed(events_processed + rng.gen_range::<i64>(0, 50));
+                let events_processed_total = r.events_processed_total;
+                r.update_events_processed_total(
+                    events_processed_total + rng.gen_range::<i64>(0, 50),
+                );
             });
         }
     });

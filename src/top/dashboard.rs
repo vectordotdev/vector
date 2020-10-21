@@ -76,7 +76,7 @@ impl<'a> Widgets<'a> {
                 vec![
                     r.name.clone(),
                     r.topology_type.clone(),
-                    r.format_events_processed(),
+                    r.format_events_processed_total(),
                     r.format_errors(),
                     r.format_throughput(),
                 ]

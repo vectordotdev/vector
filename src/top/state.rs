@@ -11,16 +11,16 @@ pub static TOPOLOGY_HEADERS: [&'static str; 5] = ["Name", "Type", "Events", "Err
 pub struct TopologyRow {
     pub name: String,
     pub topology_type: String,
-    pub events_processed: i64,
+    pub events_processed_total: i64,
     pub errors: i64,
     pub throughput: f64,
 }
 
 impl TopologyRow {
-    pub fn format_events_processed(&self) -> String {
-        match self.events_processed {
+    pub fn format_events_processed_total(&self) -> String {
+        match self.events_processed_total {
             0 => "--".into(),
-            _ => self.events_processed.to_formatted_string(&Locale::en),
+            _ => self.events_processed_total.to_formatted_string(&Locale::en),
         }
     }
 
@@ -38,8 +38,8 @@ impl TopologyRow {
         }
     }
 
-    pub fn update_events_processed(&mut self, val: i64) {
-        self.events_processed = val;
+    pub fn update_events_processed_total(&mut self, val: i64) {
+        self.events_processed_total = val;
     }
 }
 
