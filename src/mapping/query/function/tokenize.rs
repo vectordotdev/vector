@@ -14,25 +14,28 @@ impl TokenizeFn {
 }
 
 impl Function for TokenizeFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = {
-            let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
-        Ok(tokenize::parse(&value)
+        let tokens: Value = tokenize::parse(&value)
             .into_iter()
             .map(|token| match token {
                 "" | "-" => Value::Null,
                 _ => Value::from(token.to_owned()),
             })
-            .collect())
+            .collect::<Vec<_>>()
+            .into();
+
+        Ok(tokens.into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }
@@ -70,7 +73,7 @@ mod tests {
                 )];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 

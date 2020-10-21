@@ -125,6 +125,8 @@ inventory::submit! {
     SourceDescription::new::<HostMetricsConfig>("host_metrics")
 }
 
+impl_generate_config_from_default!(HostMetricsConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "host_metrics")]
 impl SourceConfig for HostMetricsConfig {
@@ -157,10 +159,9 @@ macro_rules! tags {
 }
 
 impl HostMetricsConfig {
-    async fn run(self, mut out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run(self, mut out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         let interval = Duration::from_secs(self.scrape_interval_secs);
         let mut interval = time::interval(interval).map(|_| ());
-        let mut shutdown = shutdown.compat();
 
         loop {
             select! {

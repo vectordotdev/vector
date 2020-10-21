@@ -1,9 +1,11 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+    },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource},
+    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };
@@ -15,21 +17,24 @@ use std::{
     net::SocketAddr,
     str::FromStr,
 };
-use string_cache::DefaultAtom as Atom;
+
 use warp::http::{HeaderMap, StatusCode};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
     tls: Option<TlsConfig>,
+    auth: Option<HttpSourceAuthConfig>,
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<LogplexConfig>("logplex")
+    SourceDescription::new::<LogplexConfig>("logplex")
 }
 
+impl GenerateConfig for LogplexConfig {}
+
 #[derive(Clone, Default)]
-struct LogplexSource {}
+struct LogplexSource;
 
 impl HttpSource for LogplexSource {
     fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
@@ -48,7 +53,7 @@ impl SourceConfig for LogplexConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource::default();
-        source.run(self.address, "events", &self.tls, out, shutdown)
+        source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
     }
 
     fn output_type(&self) -> DataType {
@@ -156,17 +161,16 @@ fn line_to_event(line: String) -> Event {
     };
 
     // Add source type
-    event.as_mut_log().try_insert(
-        &Atom::from(log_schema().source_type_key()),
-        Bytes::from("logplex"),
-    );
+    event
+        .as_mut_log()
+        .try_insert(log_schema().source_type_key(), Bytes::from("logplex"));
 
     event
 }
 
 #[cfg(test)]
 mod tests {
-    use super::LogplexConfig;
+    use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
@@ -179,34 +183,39 @@ mod tests {
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
-    use string_cache::DefaultAtom as Atom;
 
-    async fn source() -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(auth: Option<HttpSourceAuthConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
-            LogplexConfig { address, tls: None }
-                .build(
-                    "default",
-                    &GlobalOptions::default(),
-                    ShutdownSignal::noop(),
-                    sender,
-                )
-                .await
-                .unwrap()
-                .compat()
-                .await
-                .unwrap()
+            LogplexConfig {
+                address,
+                tls: None,
+                auth,
+            }
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                sender,
+            )
+            .await
+            .unwrap()
+            .compat()
+            .await
+            .unwrap()
         });
         wait_for_tcp(address).await;
         (recv, address)
     }
 
-    async fn send(address: SocketAddr, body: &str) -> u16 {
+    async fn send(address: SocketAddr, body: &str, auth: Option<HttpSourceAuthConfig>) -> u16 {
         let len = body.lines().count();
-        reqwest::Client::new()
-            .post(&format!("http://{}/events", address))
-            .header("Logplex-Msg-Count", len)
+        let mut req = reqwest::Client::new().post(&format!("http://{}/events", address));
+        if let Some(auth) = auth {
+            req = req.basic_auth(auth.username, Some(auth.password));
+        }
+        req.header("Logplex-Msg-Count", len)
             .header("Logplex-Frame-Id", "frame-foo")
             .header("Logplex-Drain-Token", "drain-bar")
             .body(body.to_owned())
@@ -223,30 +232,32 @@ mod tests {
 
         let body = r#"267 <158>1 2020-01-08T22:33:57.353034+00:00 host heroku router - at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#;
 
-        let (rx, addr) = source().await;
+        let auth = HttpSourceAuthConfig {
+            username: "vector_user".to_owned(),
+            password: "vector_pass".to_owned(),
+        };
 
-        assert_eq!(200, send(addr, body).await);
+        let (rx, addr) = source(Some(auth.clone())).await;
+
+        assert_eq!(200, send(addr, body, Some(auth)).await);
 
         let mut events = collect_n(rx, body.lines().count()).await.unwrap();
         let event = events.remove(0);
         let log = event.as_log();
 
         assert_eq!(
-            log[&Atom::from(log_schema().message_key())],
+            log[log_schema().message_key()],
             r#"at=info method=GET path="/cart_link" host=lumberjack-store.timber.io request_id=05726858-c44e-4f94-9a20-37df73be9006 fwd="73.75.38.87" dyno=web.1 connect=1ms service=22ms status=304 bytes=656 protocol=http"#.into()
         );
         assert_eq!(
-            log[&Atom::from(log_schema().timestamp_key())],
+            log[log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&Atom::from(log_schema().host_key())], "host".into());
-        assert_eq!(
-            log[&Atom::from(log_schema().source_type_key())],
-            "logplex".into()
-        );
+        assert_eq!(log[&log_schema().host_key()], "host".into());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -255,22 +266,16 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
+        assert_eq!(log[log_schema().message_key()], "foo bar baz".into());
         assert_eq!(
-            log[&Atom::from(log_schema().message_key())],
-            "foo bar baz".into()
-        );
-        assert_eq!(
-            log[&Atom::from(log_schema().timestamp_key())],
+            log[log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&Atom::from(log_schema().host_key())], "host".into());
-        assert_eq!(
-            log[&Atom::from(log_schema().source_type_key())],
-            "logplex".into()
-        );
+        assert_eq!(log[log_schema().host_key()], "host".into());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -280,14 +285,11 @@ mod tests {
         let log = event.as_log();
 
         assert_eq!(
-            log[&Atom::from(log_schema().message_key())],
+            log[log_schema().message_key()],
             "what am i doing here".into()
         );
-        assert!(log.get(&Atom::from(log_schema().timestamp_key())).is_some());
-        assert_eq!(
-            log[&Atom::from(log_schema().source_type_key())],
-            "logplex".into()
-        );
+        assert!(log.get(log_schema().timestamp_key()).is_some());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 
     #[test]
@@ -296,21 +298,15 @@ mod tests {
         let event = super::line_to_event(body.into());
         let log = event.as_log();
 
+        assert_eq!(log[log_schema().message_key()], "i'm not that long".into());
         assert_eq!(
-            log[&Atom::from(log_schema().message_key())],
-            "i'm not that long".into()
-        );
-        assert_eq!(
-            log[&Atom::from(log_schema().timestamp_key())],
+            log[log_schema().timestamp_key()],
             "2020-01-08T22:33:57.353034+00:00"
                 .parse::<DateTime<Utc>>()
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&Atom::from(log_schema().host_key())], "host".into());
-        assert_eq!(
-            log[&Atom::from(log_schema().source_type_key())],
-            "logplex".into()
-        );
+        assert_eq!(log[log_schema().host_key()], "host".into());
+        assert_eq!(log[log_schema().source_type_key()], "logplex".into());
     }
 }

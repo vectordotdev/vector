@@ -1,7 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
-use string_cache::DefaultAtom as Atom;
 
 #[cfg(feature = "sources-splunk_hec")]
 pub(crate) use self::source::*;
@@ -13,16 +12,8 @@ pub(crate) struct SplunkEventSent {
 
 impl InternalEvent for SplunkEventSent {
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -41,20 +32,16 @@ impl InternalEvent for SplunkEventEncodeError {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "encode_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("encode_errors_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct SplunkSourceTypeMissingKeys {
-    pub keys: Vec<Atom>,
+pub struct SplunkSourceTypeMissingKeys<'a> {
+    pub keys: &'a [String],
 }
 
-impl InternalEvent for SplunkSourceTypeMissingKeys {
+impl<'a> InternalEvent for SplunkSourceTypeMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template for sourcetype, leaving empty.",
@@ -64,20 +51,16 @@ impl InternalEvent for SplunkSourceTypeMissingKeys {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "sourcetype_missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("sourcetype_missing_keys_total", 1);
     }
 }
 
 #[derive(Debug)]
-pub struct SplunkSourceMissingKeys {
-    pub keys: Vec<Atom>,
+pub struct SplunkSourceMissingKeys<'a> {
+    pub keys: &'a [String],
 }
 
-impl InternalEvent for SplunkSourceMissingKeys {
+impl<'a> InternalEvent for SplunkSourceMissingKeys<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Failed to render template for source, leaving empty.",
@@ -87,11 +70,7 @@ impl InternalEvent for SplunkSourceMissingKeys {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "source_missing_keys", 1,
-            "component_kind" => "sink",
-            "component_type" => "splunk_hec",
-        );
+        counter!("source_missing_keys_total", 1);
     }
 }
 
@@ -110,11 +89,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "events_processed", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("events_processed_total", 1);
         }
     }
 
@@ -133,11 +108,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "request_received", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("request_received_total", 1);
         }
     }
 
@@ -173,11 +144,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!(
-                "request_errors", 1,
-                "component_kind" => "source",
-                "component_type" => "splunk_hec",
-            );
+            counter!("request_errors_total", 1);
         }
     }
 }

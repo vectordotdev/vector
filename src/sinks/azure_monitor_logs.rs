@@ -23,7 +23,10 @@ use openssl::{base64, hash, pkey, sign};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use string_cache::DefaultAtom as Atom;
+
+fn default_host() -> String {
+    "ods.opinsights.azure.com".into()
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -32,6 +35,8 @@ pub struct AzureMonitorLogsConfig {
     pub shared_key: String,
     pub log_type: String,
     pub azure_resource_id: Option<String>,
+    #[serde(default = "default_host")]
+    pub host: String,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
@@ -68,6 +73,8 @@ lazy_static! {
 inventory::submit! {
     SinkDescription::new::<AzureMonitorLogsConfig>("azure_monitor_logs")
 }
+
+impl_generate_config_from_default!(AzureMonitorLogsConfig);
 
 /// Max number of bytes in request body
 const MAX_BATCH_SIZE_MB: u64 = 30;
@@ -154,7 +161,7 @@ impl HttpSink for AzureMonitorLogsSink {
         let mut log = event.into_log();
         let timestamp_key = log_schema().timestamp_key();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(&Atom::from(timestamp_key)) {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
             ts
         } else {
             chrono::Utc::now()
@@ -178,8 +185,8 @@ impl HttpSink for AzureMonitorLogsSink {
 impl AzureMonitorLogsSink {
     fn new(config: &AzureMonitorLogsConfig) -> crate::Result<AzureMonitorLogsSink> {
         let url = format!(
-            "https://{}.ods.opinsights.azure.com{}?api-version={}",
-            config.customer_id, RESOURCE, API_VERSION
+            "https://{}.{}{}?api-version={}",
+            config.customer_id, config.host, RESOURCE, API_VERSION
         );
         let uri: Uri = url.parse()?;
 
@@ -261,8 +268,9 @@ impl AzureMonitorLogsSink {
             len, CONTENT_TYPE, X_MS_DATE, rfc1123date, RESOURCE
         );
         let mut signer = sign::Signer::new(hash::MessageDigest::sha256(), &self.shared_key)?;
+        signer.update(string_to_hash.as_bytes())?;
 
-        let signature = signer.sign_oneshot_to_vec(string_to_hash.as_bytes())?;
+        let signature = signer.sign_to_vec()?;
         let signature_base64 = base64::encode_block(&signature);
 
         Ok(format!(
@@ -302,6 +310,11 @@ mod tests {
     use crate::event::LogEvent;
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
+    }
 
     fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
         let now = chrono::Utc::now();
@@ -430,6 +443,30 @@ mod tests {
         if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
+    }
+
+    #[test]
+    fn correct_host() {
+        let config_default = toml::from_str::<AzureMonitorLogsConfig>(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type = "Vector"
+        "#,
+        )
+        .expect("Config parsing failed without custom host");
+        assert_eq!(config_default.host, default_host());
+
+        let config_cn = toml::from_str::<AzureMonitorLogsConfig>(
+            r#"
+            customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+            shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+            log_type = "Vector"
+            host = "ods.opinsights.azure.cn"
+        "#,
+        )
+        .expect("Config parsing failed with .cn custom host");
+        assert_eq!(config_cn.host, "ods.opinsights.azure.cn");
     }
 
     #[tokio::test]

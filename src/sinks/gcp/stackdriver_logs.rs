@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -59,7 +58,7 @@ pub struct StackdriverConfig {
 struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
-    severity_key: Option<Atom>,
+    severity_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -96,6 +95,8 @@ inventory::submit! {
     SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
+impl_generate_config_from_default!(StackdriverConfig);
+
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         rate_limit_num: Some(1000),
@@ -124,10 +125,7 @@ impl SinkConfig for StackdriverConfig {
         let sink = StackdriverSink {
             config: self.clone(),
             creds,
-            severity_key: self
-                .severity_key
-                .as_ref()
-                .map(|key| Atom::from(key.as_str())),
+            severity_key: self.severity_key.clone(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -178,7 +176,7 @@ impl HttpSink for StackdriverSink {
         entry.insert("severity".into(), json!(severity));
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(&Atom::from(log_schema().timestamp_key())) {
+        if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
@@ -276,6 +274,11 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
 
     #[test]
     fn encode_valid() {

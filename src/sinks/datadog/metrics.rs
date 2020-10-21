@@ -41,8 +41,9 @@ struct DatadogState {
 pub struct DatadogConfig {
     pub namespace: Option<String>,
     // Deprecated name
-    #[serde(alias = "host", default = "default_endpoint")]
-    pub endpoint: String,
+    #[serde(alias = "host")]
+    pub endpoint: Option<String>,
+    pub region: Option<super::Region>,
     pub api_key: String,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -69,8 +70,15 @@ struct DatadogRequest<T> {
     series: Vec<T>,
 }
 
-pub fn default_endpoint() -> String {
-    String::from("https://api.datadoghq.com")
+impl DatadogConfig {
+    fn get_endpoint(&self) -> &str {
+        self.endpoint
+            .as_deref()
+            .unwrap_or_else(|| match self.region {
+                Some(super::Region::Eu) => "https://api.datadoghq.eu",
+                None | Some(super::Region::Us) => "https://api.datadoghq.com",
+            })
+    }
 }
 
 // https://github.com/DataDog/datadogpy/blob/1f143ab875e5994a94345ed373ac308c9f69b0ec/datadog/api/distributions.py#L9-L11
@@ -145,6 +153,8 @@ inventory::submit! {
     SinkDescription::new::<DatadogConfig>("datadog_metrics")
 }
 
+impl_generate_config_from_default!(DatadogConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
@@ -158,7 +168,7 @@ impl SinkConfig for DatadogConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let uri = DatadogEndpoint::build_uri(&self.endpoint)?;
+        let uri = DatadogEndpoint::build_uri(&self.get_endpoint())?;
         let timestamp = Utc::now().timestamp();
 
         let sink = DatadogSink {
@@ -241,7 +251,7 @@ fn build_uri(host: &str, endpoint: &'static str) -> crate::Result<Uri> {
 }
 
 async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}/api/v1/validate", config.endpoint)
+    let uri = format!("{}/api/v1/validate", config.get_endpoint())
         .parse::<Uri>()
         .context(UriParseError)?;
 
@@ -496,6 +506,11 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DatadogConfig>();
+    }
+
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
     }
@@ -521,7 +536,7 @@ mod tests {
         .unwrap();
 
         let timestamp = Utc::now().timestamp();
-        let uri = DatadogEndpoint::build_uri(&default_endpoint()).unwrap();
+        let uri = DatadogEndpoint::build_uri(&sink.get_endpoint()).unwrap();
         let sink = DatadogSink {
             config: sink,
             endpoint_data: uri
@@ -580,12 +595,11 @@ mod tests {
 
     #[test]
     fn encode_counter() {
-        let now = Utc::now().timestamp();
         let interval = 60;
         let events = vec![
             Metric {
                 name: "total".into(),
-                timestamp: None,
+                timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: 1.5 },
@@ -610,7 +624,7 @@ mod tests {
 
         assert_eq!(
             json,
-            format!("{{\"series\":[{{\"metric\":\"ns.total\",\"type\":\"count\",\"interval\":60,\"points\":[[{},1.5]],\"tags\":null}},{{\"metric\":\"ns.check\",\"type\":\"count\",\"interval\":60,\"points\":[[1542182950,1.0]],\"tags\":[\"empty_tag:\",\"normal_tag:value\",\"true_tag:true\"]}}]}}", now)
+            r#"{"series":[{"metric":"ns.total","type":"count","interval":60,"points":[[1542182950,1.5]],"tags":null},{"metric":"ns.check","type":"count","interval":60,"points":[[1542182950,1.0]],"tags":["empty_tag:","normal_tag:value","true_tag:true"]}]}"#
         );
     }
 

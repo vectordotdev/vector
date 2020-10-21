@@ -40,7 +40,6 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::{collections::VecDeque, fmt::Debug};
-use string_cache::DefaultAtom as Atom;
 
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration<E> {
@@ -49,7 +48,7 @@ pub trait EncodingConfiguration<E> {
     fn codec(&self) -> &E;
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
-    fn except_fields(&self) -> &Option<Vec<Atom>>;
+    fn except_fields(&self) -> &Option<Vec<String>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
     fn apply_only_fields(&self, event: &mut Event) {
@@ -67,7 +66,7 @@ pub trait EncodingConfiguration<E> {
                         })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(&Atom::from(removal));
+                        log_event.remove(removal);
                     }
                 }
                 Event::Metric(_) => {
@@ -233,13 +232,13 @@ mod tests {
             log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(!event.as_mut_log().contains(&Atom::from("a.b.c")));
-        assert!(!event.as_mut_log().contains(&Atom::from("b")));
-        assert!(!event.as_mut_log().contains(&Atom::from("b[1].x")));
-        assert!(!event.as_mut_log().contains(&Atom::from("c[0].y")));
+        assert!(!event.as_mut_log().contains("a.b.c"));
+        assert!(!event.as_mut_log().contains("b"));
+        assert!(!event.as_mut_log().contains("b[1].x"));
+        assert!(!event.as_mut_log().contains("c[0].y"));
 
-        assert!(event.as_mut_log().contains(&Atom::from("a.b.d")));
-        assert!(event.as_mut_log().contains(&Atom::from("c[0].x")));
+        assert!(event.as_mut_log().contains("a.b.d"));
+        assert!(event.as_mut_log().contains("c[0].x"));
     }
 
     const TOML_ONLY_FIELD: &str = r#"
@@ -263,13 +262,13 @@ mod tests {
             log.insert("c[0].y", 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(event.as_mut_log().contains(&Atom::from("a.b.c")));
-        assert!(event.as_mut_log().contains(&Atom::from("b")));
-        assert!(event.as_mut_log().contains(&Atom::from("b[1].x")));
-        assert!(event.as_mut_log().contains(&Atom::from("c[0].y")));
+        assert!(event.as_mut_log().contains("a.b.c"));
+        assert!(event.as_mut_log().contains("b"));
+        assert!(event.as_mut_log().contains("b[1].x"));
+        assert!(event.as_mut_log().contains("c[0].y"));
 
-        assert!(!event.as_mut_log().contains(&Atom::from("a.b.d")));
-        assert!(!event.as_mut_log().contains(&Atom::from("c[0].x")));
+        assert!(!event.as_mut_log().contains("a.b.d"));
+        assert!(!event.as_mut_log().contains("c[0].x"));
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = r#"
@@ -283,7 +282,7 @@ mod tests {
         let mut event = Event::from("Demo");
         let timestamp = event
             .as_mut_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
+            .get(log_schema().timestamp_key())
             .unwrap()
             .clone();
         let timestamp = timestamp.as_timestamp().unwrap();
@@ -295,7 +294,7 @@ mod tests {
 
         match event
             .as_mut_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
+            .get(log_schema().timestamp_key())
             .unwrap()
         {
             Value::Integer(_) => {}
@@ -304,7 +303,7 @@ mod tests {
                 e
             ),
         }
-        match event.as_mut_log().get(&Atom::from("another")).unwrap() {
+        match event.as_mut_log().get("another").unwrap() {
             Value::Integer(_) => {}
             e => panic!(
                 "Timestamp was not transformed into a Unix timestamp. Was {:?}",

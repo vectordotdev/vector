@@ -1,67 +1,78 @@
+#[cfg(unix)]
+use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    buffers::Acker,
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     internal_events::StatsdInvalidMetricReceived,
     sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
+    sinks::util::{
+        tcp::TcpSinkConfig,
+        udp::{UdpService, UdpSinkConfig},
+    },
 };
-use futures::{future, FutureExt};
+use futures::{future, FutureExt, TryFutureExt};
 use futures01::{stream, Sink};
 use serde::{Deserialize, Serialize};
-use snafu::{ResultExt, Snafu};
+
 use std::collections::BTreeMap;
 use std::fmt::Display;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::task::{Context, Poll};
 use tower::{Service, ServiceBuilder};
 
-#[derive(Debug, Snafu)]
-enum BuildError {
-    #[snafu(display("failed to bind to UDP listener socket, error = {:?}", source))]
-    SocketBindError { source: std::io::Error },
-}
-
 pub struct StatsdSvc {
-    client: Client,
-}
-
-pub struct Client {
-    socket: UdpSocket,
-    address: SocketAddr,
-}
-
-impl Client {
-    pub fn new(address: SocketAddr) -> crate::Result<Self> {
-        let from = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0);
-        let socket = UdpSocket::bind(&from).context(SocketBindError)?;
-        Ok(Client { socket, address })
-    }
-
-    pub fn send(&self, buf: &[u8]) -> usize {
-        self.socket
-            .send_to(buf, &self.address)
-            .map_err(|e| error!("Error sending datagram: {:?}", e))
-            .unwrap_or_default()
-    }
+    inner: UdpService,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(deny_unknown_fields)]
+// TODO: add back when serde-rs/serde#1358 is addressed
+// #[serde(deny_unknown_fields)]
 pub struct StatsdSinkConfig {
     pub namespace: Option<String>,
-    #[serde(default = "default_address")]
-    pub address: SocketAddr,
+    #[serde(flatten)]
+    pub mode: Mode,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum Mode {
+    Tcp(TcpSinkConfig),
+    Udp(StatsdUdpConfig),
+    #[cfg(unix)]
+    Unix(UnixSinkConfig),
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct StatsdUdpConfig {
+    #[serde(flatten)]
+    pub udp: UdpSinkConfig,
+
     #[serde(default)]
     pub batch: BatchConfig,
 }
 
-pub fn default_address() -> SocketAddr {
+inventory::submit! {
+    SinkDescription::new::<StatsdSinkConfig>("statsd")
+}
+
+fn default_address() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8125)
 }
 
-inventory::submit! {
-    SinkDescription::new_without_default::<StatsdSinkConfig>("statsd")
+impl GenerateConfig for StatsdSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(&Self {
+            namespace: None,
+            mode: Mode::Udp(StatsdUdpConfig {
+                batch: Default::default(),
+                udp: UdpSinkConfig {
+                    address: default_address().to_string(),
+                },
+            }),
+        })
+        .unwrap()
+    }
 }
 
 #[async_trait::async_trait]
@@ -71,8 +82,50 @@ impl SinkConfig for StatsdSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink = StatsdSvc::new(self.clone(), cx.acker())?;
-        Ok((sink, future::ok(()).boxed()))
+        let namespace = self.namespace.clone();
+
+        match &self.mode {
+            Mode::Tcp(config) => {
+                let encode_event =
+                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                config.build(cx, encode_event)
+            }
+            Mode::Udp(config) => {
+                // 1432 bytes is a recommended packet size to fit into MTU
+                // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
+                // However we need to leave some space for +1 extra trailing event in the buffer.
+                // Also one might keep an eye on server side limitations, like
+                // mentioned here https://github.com/DataDog/dd-agent/issues/2638
+                let batch = BatchSettings::default()
+                    .bytes(1300)
+                    .events(1000)
+                    .timeout(1)
+                    .parse_config(config.batch)?;
+                let (service, healthcheck) = config.udp.build_service(cx.clone())?;
+                let service = StatsdSvc { inner: service };
+                let sink = BatchSink::new(
+                    ServiceBuilder::new().service(service),
+                    Buffer::new(batch.size, Compression::None),
+                    batch.timeout,
+                    cx.acker(),
+                )
+                .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
+                .with_flat_map(move |event| {
+                    stream::iter_ok(encode_event(event, namespace.as_deref()))
+                });
+
+                Ok((
+                    super::VectorSink::Futures01Sink(Box::new(sink)),
+                    healthcheck,
+                ))
+            }
+            #[cfg(unix)]
+            Mode::Unix(config) => {
+                let encode_event =
+                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                config.build(cx, encode_event)
+            }
+        }
     }
 
     fn input_type(&self) -> DataType {
@@ -81,38 +134,6 @@ impl SinkConfig for StatsdSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "statsd"
-    }
-}
-
-impl StatsdSvc {
-    pub fn new(config: StatsdSinkConfig, acker: Acker) -> crate::Result<super::VectorSink> {
-        // 1432 bytes is a recommended packet size to fit into MTU
-        // https://github.com/statsd/statsd/blob/master/docs/metric_types.md#multi-metric-packets
-        // However we need to leave some space for +1 extra trailing event in the buffer.
-        // Also one might keep an eye on server side limitations, like
-        // mentioned here https://github.com/DataDog/dd-agent/issues/2638
-        let batch = BatchSettings::default()
-            .bytes(1300)
-            .events(1000)
-            .timeout(1)
-            .parse_config(config.batch)?;
-        let namespace = config.namespace.clone();
-
-        let client = Client::new(config.address)?;
-        let service = StatsdSvc { client };
-
-        let svc = ServiceBuilder::new().service(service);
-
-        let sink = BatchSink::new(
-            svc,
-            Buffer::new(batch.size, Compression::None),
-            batch.timeout,
-            acker,
-        )
-        .sink_map_err(|e| error!("Fatal statsd sink error: {}", e))
-        .with_flat_map(move |event| stream::iter_ok(encode_event(event, namespace.as_deref())));
-
-        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
 }
 
@@ -205,20 +226,15 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
 
 impl Service<Vec<u8>> for StatsdSvc {
     type Response = ();
-    type Error = tokio::io::Error;
-    type Future = future::Ready<Result<(), Self::Error>>;
+    type Error = crate::Error;
+    type Future = future::BoxFuture<'static, Result<(), Self::Error>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, mut frame: Vec<u8>) -> Self::Future {
-        // remove trailing delimiter
-        if let Some(b'\n') = frame.last() {
-            frame.pop();
-        };
-        self.client.send(frame.as_ref());
-        future::ok(())
+    fn call(&mut self, frame: Vec<u8>) -> Self::Future {
+        self.inner.call(frame.into()).err_into().boxed()
     }
 }
 
@@ -226,9 +242,8 @@ impl Service<Vec<u8>> for StatsdSvc {
 mod test {
     use super::*;
     use crate::{
-        buffers::Acker,
         event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
-        test_util::{collect_n, trace_init},
+        test_util::*,
         Event,
     };
     use bytes::Bytes;
@@ -236,8 +251,14 @@ mod test {
     use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
+
     #[cfg(feature = "sources-statsd")]
     use {crate::sources::statsd::parser::parse, std::str::from_utf8};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StatsdSinkConfig>();
+    }
 
     fn tags() -> BTreeMap<String, String> {
         vec![
@@ -364,16 +385,24 @@ mod test {
     async fn test_send_to_statsd() {
         trace_init();
 
+        let addr = next_addr();
+
         let config = StatsdSinkConfig {
             namespace: Some("vector".into()),
-            address: default_address(),
-            batch: BatchConfig {
-                max_bytes: Some(512),
-                timeout_secs: Some(1),
-                ..Default::default()
-            },
+            mode: Mode::Udp(StatsdUdpConfig {
+                batch: BatchConfig {
+                    max_bytes: Some(512),
+                    timeout_secs: Some(1),
+                    ..Default::default()
+                },
+                udp: UdpSinkConfig {
+                    address: addr.to_string(),
+                },
+            }),
         };
-        let sink = StatsdSvc::new(config, Acker::Null).unwrap();
+
+        let context = SinkContext::new_test();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let events = vec![
             Event::Metric(Metric {
@@ -397,7 +426,7 @@ mod test {
         ];
         let (tx, rx) = mpsc::channel(1);
 
-        let socket = UdpSocket::bind(default_address()).await.unwrap();
+        let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {
             UdpFramed::new(socket, BytesCodec::new())
                 .map_err(|e| error!("Error reading line: {:?}", e))
@@ -415,7 +444,7 @@ mod test {
         let messages = collect_n(rx, 1).await.unwrap();
         assert_eq!(
             messages[0],
-            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01"),
+            Bytes::from("vector.counter:1.5|c|#empty_tag:,normal_tag:value,true_tag\nvector.histogram:2|h|@0.01\n"),
         );
     }
 }

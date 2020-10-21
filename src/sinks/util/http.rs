@@ -349,8 +349,8 @@ impl RetryLogic for HttpRetryLogic {
     type Error = hyper::Error;
     type Response = hyper::Response<Bytes>;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_connect() || error.is_closed()
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {

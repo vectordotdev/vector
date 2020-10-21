@@ -5,15 +5,20 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
-use futures::{future, FutureExt};
+use futures::{future, FutureExt, TryFutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
+use std::{
+    fs::{create_dir, OpenOptions},
+    io::Write,
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
 };
-use string_cache::DefaultAtom as Atom;
+
 use tracing::{error, info};
 use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
@@ -23,6 +28,7 @@ use vector::event::{metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
 use vector::sinks::{util::StreamSinkOld, Healthcheck, VectorSink};
 use vector::sources::Source;
+use vector::test_util::{temp_dir, temp_file};
 use vector::transforms::Transform;
 use vector::Pipeline;
 
@@ -59,6 +65,33 @@ pub fn source_with_event_counter() -> (Pipeline, MockSourceConfig, Arc<AtomicUsi
 
 pub fn transform(suffix: &str, increase: f64) -> MockTransformConfig {
     MockTransformConfig::new(suffix.to_owned(), increase)
+}
+
+/// Creates a file with given content
+pub fn create_file(config: &str) -> PathBuf {
+    let path = temp_file();
+    overwrite_file(path.clone(), config);
+    path
+}
+
+/// Overwrites file with given content
+pub fn overwrite_file(path: PathBuf, config: &str) {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+        .unwrap();
+
+    file.write_all(config.as_bytes()).unwrap();
+    file.flush().unwrap();
+    file.sync_all().unwrap();
+}
+
+pub fn create_directory() -> PathBuf {
+    let path = temp_dir();
+    create_dir(path.clone()).unwrap();
+    path
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -109,7 +142,7 @@ impl SourceConfig for MockSourceConfig {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(shutdown);
+        let mut shutdown = Some(shutdown.unit_error().boxed().compat());
         let mut _token = None;
         let source = futures01::future::lazy(move || {
             stream::poll_fn(move || {
@@ -160,7 +193,7 @@ impl Transform for MockTransform {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
-                    .get(&Atom::from(vector::config::log_schema().message_key()))
+                    .get(vector::config::log_schema().message_key())
                     .unwrap()
                     .to_string_lossy();
                 v.push_str(&self.suffix);

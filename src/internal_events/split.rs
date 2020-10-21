@@ -1,27 +1,23 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub struct SplitEventProcessed;
 
 impl InternalEvent for SplitEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "split",
-        );
+        counter!("events_processed_total", 1);
     }
 }
 
 #[derive(Debug)]
 pub struct SplitFieldMissing<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl<'a> InternalEvent for SplitFieldMissing<'a> {
     fn emit_logs(&self) {
-        debug!(
+        warn!(
             message = "Field does not exist.",
             field = %self.field,
             rate_limit_secs = 10
@@ -29,23 +25,19 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "split",
-            "error_type" => "field_missing",
-        );
+        counter!("processing_errors_total", 1, "error_type" => "field_missing");
     }
 }
 
 #[derive(Debug)]
 pub struct SplitConvertFailed<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
     pub error: crate::types::Error,
 }
 
 impl<'a> InternalEvent for SplitConvertFailed<'a> {
     fn emit_logs(&self) {
-        debug!(
+        warn!(
             message = "Could not convert types.",
             field = %self.field,
             error = %self.error,
@@ -54,10 +46,6 @@ impl<'a> InternalEvent for SplitConvertFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "split",
-            "error_type" => "convert_failed",
-        );
+        counter!("processing_errors_total", 1, "error_type" => "convert_failed");
     }
 }

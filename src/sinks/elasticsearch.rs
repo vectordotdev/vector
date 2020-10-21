@@ -98,6 +98,8 @@ inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
+impl_generate_config_from_default!(ElasticSearchConfig);
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
@@ -183,7 +185,9 @@ impl HttpSink for ElasticSearchCommon {
             .index
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys { keys: missing_keys });
+                emit!(ElasticSearchMissingKeys {
+                    keys: &missing_keys
+                });
             })
             .ok()?;
 
@@ -291,8 +295,8 @@ impl RetryLogic for ElasticSearchRetryLogic {
     type Error = hyper::Error;
     type Response = hyper::Response<Bytes>;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_connect() || error.is_closed()
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
@@ -480,7 +484,7 @@ async fn finish_signer(
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &mut Event) {
-    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(&k.as_ref().into())) {
+    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(k)) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()
@@ -496,7 +500,11 @@ mod tests {
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
 
     #[test]
     fn removes_and_sets_id_from_custom_field() {
@@ -508,7 +516,7 @@ mod tests {
         maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({"_id": "bar"}), action);
-        assert_eq!(None, event.as_log().get(&Atom::from("foo")));
+        assert_eq!(None, event.as_log().get("foo"));
     }
 
     #[test]
@@ -555,7 +563,7 @@ mod tests {
             index: Some(String::from("{{ idx }}")),
             encoding: EncodingConfigWithDefault {
                 codec: Encoding::Default,
-                except_fields: Some(vec![Atom::from("idx"), Atom::from("timestamp")]),
+                except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
                 ..Default::default()
             },
             endpoint: String::from("https://example.com"),
@@ -593,7 +601,6 @@ mod integration_tests {
     use serde_json::{json, Value};
     use std::fs::File;
     use std::io::Read;
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -647,25 +654,33 @@ mod integration_tests {
             .send()
             .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
             .await
             .unwrap();
 
-        assert_eq!(1, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
+        assert_eq!(1, total);
 
-        let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
+        let hits = response["hits"]["hits"]
+            .as_array()
+            .expect("Elasticsearch response does not include hits->hits");
 
-        let doc = hit.document().unwrap();
-        assert_eq!(None, doc["my_id"].as_str());
+        let hit = hits.iter().next().unwrap();
+        assert_eq!("42", hit["_id"]);
 
-        let value = hit.into_document().unwrap();
+        let value = hit
+            .get("_source")
+            .expect("Elasticsearch hit missing _source");
+        assert_eq!(None, value["my_id"].as_str());
+
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&Atom::from(crate::config::log_schema().timestamp_key())],
+            "timestamp": input_event.as_log()[crate::config::log_schema().timestamp_key()],
         });
-        assert_eq!(expected, value);
+        assert_eq!(&expected, value);
     }
 
     #[tokio::test]
@@ -791,22 +806,31 @@ mod integration_tests {
             .send()
             .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
             .await
             .unwrap();
 
-        if break_events {
-            assert_ne!(input.len() as u64, response.total());
-        } else {
-            assert_eq!(input.len() as u64, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
 
+        if break_events {
+            assert_ne!(input.len() as u64, total);
+        } else {
+            assert_eq!(input.len() as u64, total);
+
+            let hits = response["hits"]["hits"]
+                .as_array()
+                .expect("Elasticsearch response does not include hits->hits");
             let input = input
                 .into_iter()
                 .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
                 .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
+            for hit in hits {
+                let hit = hit
+                    .get("_source")
+                    .expect("Elasticsearch hit missing _source");
+                assert!(input.contains(&hit));
             }
         }
     }

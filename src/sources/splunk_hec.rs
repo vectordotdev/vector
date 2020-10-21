@@ -15,7 +15,6 @@ use flate2::read::GzDecoder;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{Async, Future, Sink, Stream};
 use http::StatusCode;
-use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
@@ -23,16 +22,14 @@ use std::{
     io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
-use string_cache::DefaultAtom as Atom;
+
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
-lazy_static! {
-    pub static ref CHANNEL: Atom = Atom::from("splunk_channel");
-    pub static ref INDEX: Atom = Atom::from("splunk_index");
-    pub static ref SOURCE: Atom = Atom::from("splunk_source");
-    pub static ref SOURCETYPE: Atom = Atom::from("splunk_sourcetype");
-}
+pub const CHANNEL: &str = "splunk_channel";
+pub const INDEX: &str = "splunk_index";
+pub const SOURCE: &str = "splunk_source";
+pub const SOURCETYPE: &str = "splunk_sourcetype";
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -47,8 +44,10 @@ pub struct SplunkConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SplunkConfig>("splunk_hec")
+    SourceDescription::new::<SplunkConfig>("splunk_hec")
 }
+
+impl_generate_config_from_default!(SplunkConfig);
 
 impl SplunkConfig {
     #[cfg(test)]
@@ -119,7 +118,7 @@ impl SourceConfig for SplunkConfig {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().compat().map(|_| ()),
+                    shutdown.clone().map(|_| ()),
                 )
                 .await;
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
@@ -429,9 +428,9 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process channel field
         if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
-            log.insert(CHANNEL.clone(), guid);
+            log.insert(CHANNEL, guid);
         } else if let Some(guid) = self.channel.as_ref() {
-            log.insert(CHANNEL.clone(), guid.clone());
+            log.insert(CHANNEL, guid.clone());
         }
 
         // Process fields field
@@ -597,7 +596,7 @@ fn raw_event(
     log.insert(log_schema().message_key(), message);
 
     // Add channel
-    log.insert(CHANNEL.clone(), channel);
+    log.insert(CHANNEL, channel);
 
     // Add host
     if let Some(host) = host {
@@ -608,10 +607,9 @@ fn raw_event(
     log.insert(log_schema().timestamp_key(), Utc::now());
 
     // Add source type
-    event.as_mut_log().try_insert(
-        &Atom::from(log_schema().source_type_key()),
-        Bytes::from("splunk_hec"),
-    );
+    event
+        .as_mut_log()
+        .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
 
     emit!(SplunkHECEventReceived);
 
@@ -765,7 +763,11 @@ mod tests {
     use futures::{compat::Future01CompatExt, future, stream, StreamExt};
     use futures01::sync::mpsc;
     use std::net::SocketAddr;
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SplunkConfig>();
+    }
 
     /// Splunk token
     const TOKEN: &str = "token";
@@ -871,16 +873,10 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            message.into()
-        );
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().source_type_key())],
+            event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -890,20 +886,14 @@ mod tests {
         trace_init();
 
         let message = "one_simple_text_event";
-        let (sink, source) = start(Encoding::Text, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            message.into()
-        );
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().source_type_key())],
+            event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -921,16 +911,10 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
+            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
-                event.as_log()[&Atom::from(log_schema().message_key())],
-                msg.into()
-            );
-            assert!(event
-                .as_log()
-                .get(&Atom::from(log_schema().timestamp_key()))
-                .is_some());
-            assert_eq!(
-                event.as_log()[&Atom::from(log_schema().source_type_key())],
+                event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
             );
         }
@@ -941,20 +925,14 @@ mod tests {
         trace_init();
 
         let message = "one_simple_json_event";
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            message.into()
-        );
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().source_type_key())],
+            event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -964,7 +942,7 @@ mod tests {
         trace_init();
 
         let n = 200;
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -972,16 +950,10 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
+            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
-                event.as_log()[&Atom::from(log_schema().message_key())],
-                msg.into()
-            );
-            assert!(event
-                .as_log()
-                .get(&Atom::from(log_schema().timestamp_key()))
-                .is_some());
-            assert_eq!(
-                event.as_log()[&Atom::from(log_schema().source_type_key())],
+                event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
             );
         }
@@ -991,7 +963,7 @@ mod tests {
     async fn json_event() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
@@ -999,14 +971,11 @@ mod tests {
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
-        assert_eq!(event.as_log()[&"name".into()], "bob".into());
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
+        assert_eq!(event.as_log()["greeting"], "hello".into());
+        assert_eq!(event.as_log()["name"], "bob".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().source_type_key())],
+            event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -1015,17 +984,14 @@ mod tests {
     async fn line_to_message() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            "hello".into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
     }
 
     #[tokio::test]
@@ -1038,17 +1004,11 @@ mod tests {
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            message.into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().source_type_key())],
+            event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -1080,15 +1040,12 @@ mod tests {
 
         let message = "no_authorization";
         let (source, address) = source_with(None).await;
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip).await;
+        let (sink, health) = sink(address, Encoding::Text, Compression::gzip_default()).await;
         assert!(health.await.is_ok());
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            message.into()
-        );
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
     }
 
     #[tokio::test]
@@ -1104,16 +1061,10 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
+        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
-            event.as_log()[&Atom::from(log_schema().message_key())],
-            "first".into()
-        );
-        assert!(event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-            .is_some());
-        assert_eq!(
-            event.as_log()[&Atom::from(log_schema().source_type_key())],
+            event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
         );
     }
@@ -1133,19 +1084,19 @@ mod tests {
         let events = collect_n(source, 3).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             "first".into()
         );
         assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(
-            events[1].as_log()[&Atom::from(log_schema().message_key())],
+            events[1].as_log()[log_schema().message_key()],
             "second".into()
         );
         assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(
-            events[2].as_log()[&Atom::from(log_schema().message_key())],
+            events[2].as_log()[log_schema().message_key()],
             "third".into()
         );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());

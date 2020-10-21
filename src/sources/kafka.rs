@@ -73,8 +73,10 @@ fn default_auto_offset_reset() -> String {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<KafkaSourceConfig>("kafka")
+    SourceDescription::new::<KafkaSourceConfig>("kafka")
 }
+
+impl_generate_config_from_default!(KafkaSourceConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
@@ -109,7 +111,7 @@ fn kafka_source(
     let fut = async move {
         Arc::clone(&consumer)
             .start()
-            .take_until(shutdown.clone().compat())
+            .take_until(shutdown.clone())
             .then(move |message| {
                 let key_field = key_field.clone();
                 let consumer = Arc::clone(&consumer);
@@ -230,6 +232,11 @@ mod test {
     use super::{kafka_source, KafkaSourceConfig};
     use crate::{shutdown::ShutdownSignal, Pipeline};
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KafkaSourceConfig>();
+    }
+
     fn make_config() -> KafkaSourceConfig {
         KafkaSourceConfig {
             bootstrap_servers: "localhost:9092".to_string(),
@@ -277,7 +284,6 @@ mod integration_test {
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
     };
-    use string_cache::DefaultAtom as Atom;
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
@@ -339,20 +345,14 @@ mod integration_test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             "my message".into()
         );
+        assert_eq!(events[0].as_log()["message_key"], "my key".into());
         assert_eq!(
-            events[0].as_log()[&Atom::from("message_key")],
-            "my key".into()
-        );
-        assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
+            events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().timestamp_key())],
-            now.into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
     }
 }

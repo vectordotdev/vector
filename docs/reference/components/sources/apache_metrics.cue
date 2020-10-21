@@ -1,25 +1,71 @@
 package metadata
 
 components: sources: apache_metrics: {
-	title:             "Apache HTTPD Metrics"
-	long_description:  "fill me in"
-	short_description: "Collect metrics from an Apache HTTPD server."
+	_config_path: "/etc/apache2/httpd.conf"
+	_path:        "/server-status"
+
+	title: "Apache HTTP Server (HTTPD) Metrics"
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon", "sidecar"]
-		function: "collect"
+		development:   "beta"
+		egress_method: "batch"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
+		multiline: enabled: false
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "Apache HTTP server (HTTPD)"
+				thing:    "an \(name)"
+				url:      urls.apache
+				versions: null
 
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+				interface: {
+					socket: {
+						api: {
+							title: "Apache HTTP Server Status Module"
+							url:   urls.apache_mod_status
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "disabled"
+					}
+				}
+
+				setup: [
+					"""
+						[Install the Apache HTTP server](\(urls.apache_install)).
+						""",
+					"""
+						Enable the [Apache Status module](\(urls.apache_mod_status))
+						in your Apache config:
+
+						```text file="\(_config_path)"
+						<Location "\(_path)">
+						    SetHandler server-status
+						    Require host example.com
+						</Location>
+						```
+						""",
+					"""
+						Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
+						for more detailed metrics (see [Output](#output)). Note,
+						this defaults to `On` in Apache >= 2.3.6.
+
+						```text file="\(_config_path)"
+						ExtendedStatus On
+						```
+						""",
+					"""
+						Start or reload Apache to apply the config changes.
+						""",
+				]
+			}
+		}
 	}
 
 	support: {
@@ -32,21 +78,8 @@ components: sources: apache_metrics: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			#"""
-				The Apache [Status module (`mod_status`)][urls.apache_mod_status] must
-				be enabled and configured for this source to work.
-				"""#,
-		]
-
-		warnings: [
-			"""
-				The [`ExtendedStatus` option][urls.apache_extended_status] has been
-				known to cause performance problems. If enabled, please monitor
-				performance carefully.
-				""",
-		]
-
+		requirements: []
+		warnings: []
 		notices: []
 	}
 
@@ -54,8 +87,8 @@ components: sources: apache_metrics: {
 		endpoints: {
 			description: "mod_status endpoints to scrape metrics from."
 			required:    true
-			type: "[string]": {
-				examples: [["http://localhost:8080/server-status/?auto"]]
+			type: array: {
+				items: type: string: examples: ["http://localhost:8080/server-status/?auto"]
 			}
 		}
 		interval_secs: {
@@ -78,7 +111,7 @@ components: sources: apache_metrics: {
 		_host: {
 			description: "The hostname of the Apache HTTP server"
 			required:    true
-			examples: ["localhost"]
+			examples: [_values.local_host]
 		}
 		apache_access_total: {
 			description:   "The total number of time the Apache server has been accessed."
@@ -187,26 +220,5 @@ components: sources: apache_metrics: {
 		}
 	}
 
-	how_it_works: {
-		mod_status: {
-			title: "Apache Status Module (mod_status)"
-			body: #"""
-				This source works by scraping the configured
-				[Apache Status module][urls.apache_mod_status] endpoint
-				which exposes basic metrics about Apache's runtime.
-				"""#
-			sub_sections: [
-				{
-					title: "Extended Status"
-					body: #"""
-						The Apache Status module offers an
-						[`ExtendedStatus` directive][urls.apache_extended_status]
-						that includes additional detailed runtime metrics with
-						your configured `mod_status` endpoint. Vector will
-						recognize these metrics and expose them accordingly.
-						"""#
-				},
-			]
-		}
-	}
+	how_it_works: {}
 }

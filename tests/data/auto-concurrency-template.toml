@@ -4,12 +4,27 @@ delay = 0.050
 # Delete any of these that are not needed
 interval =
 jitter = 0
-concurrency_scale = 0
-concurrency_defer = 0
+
+concurrency.scale = 0
+concurrency.knee_start = 0
+concurrency.knee_exp = 0.0
+concurrency.limit = 0
+concurrency.action = "defer" | "drop"
+
+rate.scale = 0
+rate.knee_start = 0
+rate.knee_exp = 0.0
+rate.limit = 0
+rate.action = "defer" | "drop"
+
 in_flight_limit = "auto"
-concurrency_drop = 0
 
 [stats.in_flight]
+max = [,]
+mean = [,]
+mode = [,]
+
+[stats.rate]
 max = [,]
 mean = [,]
 mode = [,]

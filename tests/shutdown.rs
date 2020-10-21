@@ -6,7 +6,6 @@ use nix::{
     unistd::Pid,
 };
 use std::{
-    fs::OpenOptions,
     io::Write,
     net::SocketAddr,
     path::PathBuf,
@@ -14,7 +13,10 @@ use std::{
     thread::sleep,
     time::{Duration, Instant},
 };
-use vector::test_util::{next_addr, temp_dir, temp_file};
+use vector::test_util::{next_addr, temp_file};
+
+mod support;
+use crate::support::{create_directory, create_file, overwrite_file};
 
 const STDIO_CONFIG: &'static str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
@@ -48,33 +50,6 @@ const PROMETHEUS_SINK_CONFIG: &'static str = r#"
         address = "${VECTOR_TEST_ADDRESS}"
         namespace = "service"
 "#;
-
-/// Creates a file with given content
-fn create_file(config: &str) -> PathBuf {
-    let path = temp_file();
-    overwrite_file(path.clone(), config);
-    path
-}
-
-/// Overwrites file with given content
-fn overwrite_file(path: PathBuf, config: &str) {
-    let mut file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(path)
-        .unwrap();
-
-    file.write_all(config.as_bytes()).unwrap();
-    file.flush().unwrap();
-    file.sync_all().unwrap();
-}
-
-fn create_directory() -> PathBuf {
-    let path = temp_dir();
-    Command::new("mkdir").arg(path.clone()).assert().success();
-    path
-}
 
 fn source_config(source: &str) -> String {
     format!(
@@ -345,6 +320,7 @@ fn timely_shutdown_socket_unix() {
 
 #[test]
 fn timely_shutdown_splunk_hec() {
+    vector::test_util::trace_init();
     test_timely_shutdown(source_vector(
         r#"
     type = "splunk_hec"
@@ -354,15 +330,18 @@ fn timely_shutdown_splunk_hec() {
 
 #[test]
 fn timely_shutdown_statsd() {
+    vector::test_util::trace_init();
     test_timely_shutdown(source_vector(
         r#"
     type = "statsd"
+    mode = "tcp"
     address = "${VECTOR_TEST_ADDRESS}""#,
     ));
 }
 
 #[test]
 fn timely_shutdown_syslog_tcp() {
+    vector::test_util::trace_init();
     test_timely_shutdown(source_vector(
         r#"
         type = "syslog"

@@ -3,12 +3,13 @@ use crate::{
     Error,
 };
 use bytes::Bytes;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
 use serde::Deserialize;
+use stream_cancel::{Trigger, Tripwire};
 use tokio::sync::mpsc;
 
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
@@ -25,7 +26,7 @@ pub fn build_test_server(
     addr: std::net::SocketAddr,
 ) -> (
     mpsc::Receiver<(http::request::Parts, Bytes)>,
-    stream_cancel::Trigger,
+    Trigger,
     impl std::future::Future<Output = Result<(), ()>>,
 ) {
     let (tx, rx) = mpsc::channel(100);
@@ -47,10 +48,10 @@ pub fn build_test_server(
         }
     });
 
-    let (trigger, tripwire) = stream_cancel::Tripwire::new();
+    let (trigger, tripwire) = Tripwire::new();
     let server = Server::bind(&addr)
         .serve(service)
-        .with_graceful_shutdown(tripwire.compat().map(|_| ()))
+        .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
         .map_err(|e| panic!("Server error: {}", e));
 
     (rx, trigger, server)

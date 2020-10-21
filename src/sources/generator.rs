@@ -10,10 +10,10 @@ use futures::{
     future::{FutureExt, TryFutureExt},
     stream::StreamExt,
 };
-use futures01::{future::Future, stream::iter_ok, Sink};
+use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use tokio::time::interval;
+use std::task::Poll;
+use tokio::time::{interval, Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -42,6 +42,8 @@ impl GeneratorConfig {
 inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
 }
+
+impl_generate_config_from_default!(GeneratorConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
@@ -77,7 +79,7 @@ impl GeneratorConfig {
         let mut number: usize = 0;
 
         for _ in 0..self.count {
-            if shutdown.poll().expect("polling shutdown").is_ready() {
+            if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
                 break;
             }
 
@@ -117,7 +119,11 @@ mod tests {
     use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GeneratorConfig>();
+    }
 
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
@@ -132,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn copies_lines() {
-        let message_key = Atom::from(log_schema().message_key());
+        let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 1"#,
@@ -171,7 +177,7 @@ mod tests {
 
     #[tokio::test]
     async fn adds_sequence() {
-        let message_key = Atom::from(log_schema().message_key());
+        let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"lines = ["one", "two"]
                count = 2

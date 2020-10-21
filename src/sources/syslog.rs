@@ -2,7 +2,9 @@ use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
 use crate::sources::util::build_unix_source;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+    },
     event::{Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
@@ -12,10 +14,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -72,8 +71,10 @@ impl SyslogConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SyslogConfig>("syslog")
+    SourceDescription::new::<SyslogConfig>("syslog")
 }
+
+impl GenerateConfig for SyslogConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
@@ -264,7 +265,7 @@ pub fn udp(
             );
 
             let _ = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown.compat())
+                .take_until(shutdown)
                 .filter_map(|frame| {
                     let host_key = host_key.clone();
                     async move {

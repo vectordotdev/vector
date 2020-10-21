@@ -25,11 +25,12 @@
 /docs/reference/components/sinks/statsd.cue @lukesteensen
 /docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
 
-/docs/reference/components/sources/apache_metrics/ @jszwedko
+/docs/reference/components/sources/apache_metrics.cue @jszwedko
 /docs/reference/components/sources/docker.cue @fanatid
 /docs/reference/components/sources/generator.cue @bruceg
 /docs/reference/components/sources/host_metrics.cue @bruceg
 /docs/reference/components/sources/journald.cue @bruceg
+/docs/reference/components/sources/mongodb_metrics.cue @fanatid
 /docs/reference/components/sources/stdin.cue @bruceg
 /docs/reference/components/sources/syslog.cue @lukesteensen
 /docs/reference/components/sources/tcp.cue @bruceg
@@ -62,6 +63,7 @@
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
 /lib/k8s-test-framework/ @MOZGIII @JeanMertz
+/lib/k8s-e2e-tests/ @MOZGIII @JeanMertz
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
 
@@ -126,10 +128,12 @@
 /src/sinks/util/auto_concurrency @bruceg
 
 /src/sources/apache_metrics/ @jszwedko
+/src/sources/aws_kinesis_firehose/ @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/host_metrics.rs @bruceg
 /src/sources/journald.rs @bruceg
+/src/sources/mongodb_metrics/ @fanatid
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen
 /src/sources/tcp.rs @bruceg
@@ -143,6 +147,7 @@
 
 /src/transforms/add_tags.rs @lukesteensen
 /src/transforms/ansi_stripper.rs @JeanMertz
+/src/transforms/aws_cloudwatch_logs_subscription_parser.rs @jszwedko
 /src/transforms/coercer.rs @bruceg
 /src/transforms/filter.rs @bruceg
 /src/transforms/field_filter.rs @lukesteensen
@@ -161,7 +166,6 @@
 
 /tests/buffering.rs @MOZGIII
 /tests/data/wasm/ @hoverbear @JeanMertz
-/tests/kubernetes-e2e.rs @MOZGIII @JeanMertz
 /tests/shutdown.rs @ktff
 /tests/cli.rs @ktff
 

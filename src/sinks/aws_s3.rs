@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
-use string_cache::DefaultAtom as Atom;
+
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -57,7 +57,7 @@ pub struct S3SinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    #[serde(default = "Compression::default_gzip")]
+    #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -138,6 +138,8 @@ pub enum Encoding {
 inventory::submit! {
     SinkDescription::new::<S3SinkConfig>("aws_s3")
 }
+
+impl_generate_config_from_default!(S3SinkConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_s3")]
@@ -298,7 +300,12 @@ impl Service<Request> for S3Sink {
             ..Default::default()
         };
 
-        Box::pin(async move { client.put_object(request).await }.instrument(info_span!("request")))
+        Box::pin(async move {
+            client
+                .put_object(request)
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
@@ -400,7 +407,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&Atom::from(log_schema().message_key()))
+                .get(log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -417,6 +424,11 @@ mod tests {
     use crate::event::Event;
 
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<S3SinkConfig>();
+    }
 
     #[test]
     fn s3_encode_event_text() {
@@ -504,7 +516,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -515,7 +527,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -564,7 +576,7 @@ mod integration_tests {
         assert!(key.ends_with(".log"));
 
         let obj = get_object(key).await;
-        assert_eq!(obj.content_encoding, None);
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
 
         let response_lines = get_lines(obj).await;
         assert_eq!(lines, response_lines);
@@ -620,7 +632,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = S3SinkConfig {
-            compression: Compression::Gzip,
+            compression: Compression::gzip_default(),
             filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };
@@ -676,7 +688,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4572".to_owned(),
+            endpoint: "http://localhost:4566".to_owned(),
         };
 
         use rusoto_core::HttpClient;
@@ -700,7 +712,7 @@ mod integration_tests {
                 timeout_secs: Some(5),
                 ..Default::default()
             },
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4572".to_owned()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             ..Default::default()
         }
     }

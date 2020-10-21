@@ -15,16 +15,22 @@ impl ToIntegerFn {
 }
 
 impl Function for ToIntegerFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         match self.query.execute(ctx) {
-            Ok(v) => match v {
-                Value::Integer(_) => Ok(v),
-                Value::Float(f) => Ok(Value::Integer(f as i64)),
-                Value::Bytes(_) => Conversion::Integer.convert(v).map_err(|e| e.to_string()),
-                Value::Boolean(b) => Ok(Value::Integer(if b { 1 } else { 0 })),
-                Value::Timestamp(t) => Ok(Value::Integer(t.timestamp())),
-                _ => unexpected_type!(v),
-            },
+            Ok(QueryValue::Value(value)) => {
+                match value {
+                    Value::Integer(_) => Ok(value.into()),
+                    Value::Float(f) => Ok(Value::Integer(f as i64).into()),
+                    Value::Bytes(_) => Conversion::Integer
+                        .convert(value)
+                        .map(Into::into)
+                        .map_err(|e| e.to_string()),
+                    Value::Boolean(b) => Ok(Value::Integer(if b { 1 } else { 0 }).into()),
+                    Value::Timestamp(t) => Ok(Value::Integer(t.timestamp()).into()),
+                    _ => unexpected_type!(value),
+                }
+            }
+            Ok(query) => unexpected_type!(query),
             Err(err) => Err(err),
         }
         .or_else(|err| match &self.default {
@@ -102,7 +108,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

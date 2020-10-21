@@ -22,7 +22,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use futures::{stream::Fuse, Stream, StreamExt};
+use futures::{future, stream::Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use std::{
     pin::Pin,
@@ -107,4 +107,15 @@ where
         Poll::Ready(None) => Poll::Ready(None),
         Poll::Pending => b.poll_next(cx),
     }
+}
+
+pub(crate) async fn tripwire_handler(closed: bool) {
+    future::poll_fn(|_| {
+        if closed {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    })
+    .await
 }

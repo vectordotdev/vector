@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
     sinks::{
         influxdb::{
@@ -13,13 +13,13 @@ use crate::{
         },
         Healthcheck, VectorSink,
     },
+    tls::{TlsOptions, TlsSettings},
 };
 use futures01::Sink;
 use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
@@ -41,6 +41,7 @@ pub struct InfluxDBLogsConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Debug)]
@@ -69,8 +70,10 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<InfluxDBLogsConfig>("influxdb_logs")
+    SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
+
+impl GenerateConfig for InfluxDBLogsConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
@@ -81,7 +84,8 @@ impl SinkConfig for InfluxDBLogsConfig {
         tags.insert(log_schema().host_key().to_string());
         tags.insert(log_schema().source_type_key().to_string());
 
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls_settings)?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
@@ -149,12 +153,10 @@ impl HttpSink for InfluxDBLogsSink {
         let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
-        let timestamp = encode_timestamp(
-            match event.remove(&Atom::from(log_schema().timestamp_key())) {
-                Some(Value::Timestamp(ts)) => Some(ts),
-                _ => None,
-            },
-        );
+        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+            Some(Value::Timestamp(ts)) => Some(ts),
+            _ => None,
+        });
 
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
@@ -205,7 +207,7 @@ impl InfluxDBLogsConfig {
 }
 
 impl Value {
-    pub fn to_field(&self) -> Field {
+    fn to_field(&self) -> Field {
         match self {
             Value::Integer(num) => Field::Int(*num),
             Value::Float(num) => Field::Float(*num),
@@ -229,7 +231,6 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
-    use string_cache::DefaultAtom as Atom;
 
     #[test]
     fn test_config_without_tags() {
@@ -257,7 +258,7 @@ mod tests {
             "ns",
             vec![],
         );
-        sink.encoding.except_fields = Some(vec![Atom::from("host")]);
+        sink.encoding.except_fields = Some(vec!["host".into()]);
 
         let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -660,6 +661,7 @@ mod integration_tests {
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),
+            tls: None,
         };
 
         let (sink, _) = config.build(cx).await.unwrap();

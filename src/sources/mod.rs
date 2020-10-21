@@ -3,6 +3,8 @@ use snafu::Snafu;
 
 #[cfg(feature = "sources-apache_metrics")]
 pub mod apache_metrics;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+pub mod aws_kinesis_firehose;
 #[cfg(feature = "sources-docker")]
 pub mod docker;
 #[cfg(feature = "sources-file")]
@@ -23,6 +25,8 @@ pub mod kafka;
 pub mod kubernetes_logs;
 #[cfg(feature = "sources-logplex")]
 pub mod logplex;
+#[cfg(feature = "sources-mongodb_metrics")]
+pub mod mongodb_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sources-socket")]

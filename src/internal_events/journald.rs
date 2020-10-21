@@ -12,14 +12,8 @@ impl InternalEvent for JournaldEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -35,13 +29,7 @@ impl InternalEvent for JournaldInvalidRecord {
     }
 
     fn emit_metrics(&self) {
-        counter!("invalid_record", 1,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
-        counter!("invalid_record_bytes", self.text.len() as u64,
-                 "component_kind" => "source",
-                 "component_name" => "journald",
-        );
+        counter!("invalid_record_total", 1);
+        counter!("invalid_record_bytes_total", self.text.len() as u64);
     }
 }

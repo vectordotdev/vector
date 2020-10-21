@@ -71,9 +71,8 @@ impl InternalEvent for WasmHostcallProgress {
     }
 
     fn emit_metrics(&self) {
-        counter!("wasm_hostcall", 1,
-            "component_kind" => self.role.as_const_str(),
-            "component_type" => "wasm",
+        counter!("wasm_hostcall_total", 1,
+            "component_role" => self.role.as_const_str(),
             "state" => self.state.as_const_str(),
             "call" => self.call,
         );

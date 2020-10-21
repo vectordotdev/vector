@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet};
 use std::num::{ParseFloatError, ParseIntError};
 use std::path::PathBuf;
 use std::str::FromStr;
-use string_cache::DefaultAtom as Atom;
 
 lazy_static! {
     pub static ref DEFAULT_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
@@ -71,13 +70,13 @@ impl FromStr for Conversion {
 
 /// Helper function to parse a conversion map and check against a list of names
 pub fn parse_check_conversion_map(
-    types: &HashMap<Atom, String>,
-    names: &[Atom],
-) -> Result<HashMap<Atom, Conversion>, ConversionError> {
+    types: &HashMap<String, String>,
+    names: &[impl AsRef<str>],
+) -> Result<HashMap<String, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
-    let names: HashSet<Atom> = names.iter().map(|s| s.into()).collect();
+    let names = names.iter().map(|s| s.as_ref()).collect::<HashSet<_>>();
     for name in types.keys() {
-        if !names.contains(name) {
+        if !names.contains(name.as_str()) {
             warn!(
                 message = "Field was specified in the types but is not a valid field name.",
                 field = &name[..]
@@ -90,19 +89,6 @@ pub fn parse_check_conversion_map(
 
 /// Helper function to parse a mapping of conversion descriptions into actual Conversion values.
 pub fn parse_conversion_map(
-    types: &HashMap<Atom, String>,
-) -> Result<HashMap<Atom, Conversion>, ConversionError> {
-    types
-        .iter()
-        .map(|(field, typename)| {
-            typename
-                .parse::<Conversion>()
-                .map(|conv| (field.clone(), conv))
-        })
-        .collect()
-}
-
-pub fn parse_conversion_map_no_atoms(
     types: &HashMap<String, String>,
 ) -> Result<HashMap<String, Conversion>, ConversionError> {
     types
@@ -110,7 +96,7 @@ pub fn parse_conversion_map_no_atoms(
         .map(|(field, typename)| {
             typename
                 .parse::<Conversion>()
-                .map(|conv| (field.to_string(), conv))
+                .map(|conv| (field.clone(), conv))
         })
         .collect()
 }

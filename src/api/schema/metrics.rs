@@ -1,10 +1,17 @@
 use crate::event::{Event, Metric, MetricValue};
-use crate::metrics::{capture_metrics, get_controller};
+use crate::metrics::{capture_metrics, get_controller, Controller};
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
 use chrono::{DateTime, Utc};
+use lazy_static::lazy_static;
+use std::sync::Arc;
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
+
+lazy_static! {
+    static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
+        Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
+}
 
 pub struct Uptime(Metric);
 
@@ -30,17 +37,17 @@ impl From<Metric> for Uptime {
     }
 }
 
-pub struct EventsProcessed(Metric);
+pub struct EventsProcessedTotal(Metric);
 
 #[Object]
-impl EventsProcessed {
+impl EventsProcessedTotal {
     /// Metric timestamp
     async fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.0.timestamp
     }
 
     /// Number of events processed
-    async fn events_processed(&self) -> f64 {
+    async fn events_processed_total(&self) -> f64 {
         match self.0.value {
             MetricValue::Counter { value } => value,
             _ => 0.00,
@@ -48,23 +55,23 @@ impl EventsProcessed {
     }
 }
 
-impl From<Metric> for EventsProcessed {
+impl From<Metric> for EventsProcessedTotal {
     fn from(m: Metric) -> Self {
         Self(m)
     }
 }
 
-pub struct BytesProcessed(Metric);
+pub struct ProcessedBytesTotal(Metric);
 
 #[Object]
-impl BytesProcessed {
+impl ProcessedBytesTotal {
     /// Metric timestamp
     async fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.0.timestamp
     }
 
     /// Number of bytes processed
-    async fn bytes_processed(&self) -> f64 {
+    async fn processed_bytes_total(&self) -> f64 {
         match self.0.value {
             MetricValue::Counter { value } => value,
             _ => 0.00,
@@ -72,17 +79,18 @@ impl BytesProcessed {
     }
 }
 
-impl From<Metric> for BytesProcessed {
+impl From<Metric> for ProcessedBytesTotal {
     fn from(m: Metric) -> Self {
         Self(m)
     }
 }
 
-#[Interface(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
+#[derive(Interface)]
+#[graphql(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
 pub enum MetricType {
     Uptime(Uptime),
-    EventsProcessed(EventsProcessed),
-    BytesProcessed(BytesProcessed),
+    EventsProcessedTotal(EventsProcessedTotal),
+    ProcessedBytesTotal(ProcessedBytesTotal),
 }
 
 #[derive(Default)]
@@ -93,7 +101,7 @@ impl MetricsSubscription {
     /// Metrics for how long the Vector instance has been running
     async fn uptime_metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Uptime> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(Uptime(m)),
@@ -102,23 +110,23 @@ impl MetricsSubscription {
     }
 
     /// Events processed metrics
-    async fn events_processed_metrics(
+    async fn events_processed_total_metrics(
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = EventsProcessed> {
+    ) -> impl Stream<Item = EventsProcessedTotal> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "events_processed" => Some(EventsProcessed(m)),
+            "events_processed_total" => Some(EventsProcessedTotal(m)),
             _ => None,
         })
     }
 
     /// Bytes processed metrics
-    async fn bytes_processed_metrics(
+    async fn processed_bytes_total_metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = BytesProcessed> {
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ProcessedBytesTotal> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "bytes_processed" => Some(BytesProcessed(m)),
+            "processed_bytes_total" => Some(ProcessedBytesTotal(m)),
             _ => None,
         })
     }
@@ -126,12 +134,12 @@ impl MetricsSubscription {
     /// All metrics
     async fn metrics(
         &self,
-        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(MetricType::Uptime(m.into())),
-            "events_processed" => Some(MetricType::EventsProcessed(m.into())),
-            "bytes_processed" => Some(MetricType::BytesProcessed(m.into())),
+            "events_processed_total" => Some(MetricType::EventsProcessedTotal(m.into())),
+            "processed_bytes_total" => Some(MetricType::ProcessedBytesTotal(m.into())),
             _ => None,
         })
     }
@@ -152,4 +160,21 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
             }
         }
     }
+}
+
+/// Get the events processed by topology component name
+pub fn topology_events_processed_total(topology_name: String) -> Option<EventsProcessedTotal> {
+    let key = String::from("component_name");
+
+    capture_metrics(&GLOBAL_CONTROLLER)
+        .find(|ev| match ev {
+            Event::Metric(m)
+                if m.name.as_str().eq("events_processed_total")
+                    && m.tag_matches(&key, &topology_name) =>
+            {
+                true
+            }
+            _ => false,
+        })
+        .map(|ev| EventsProcessedTotal(ev.into_metric()))
 }

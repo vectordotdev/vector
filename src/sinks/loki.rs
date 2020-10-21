@@ -13,7 +13,7 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
@@ -29,7 +29,6 @@ use futures::FutureExt;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -67,8 +66,10 @@ enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<LokiConfig>("loki")
+    SinkDescription::new::<LokiConfig>("loki")
 }
+
+impl GenerateConfig for LokiConfig {}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
@@ -139,18 +140,13 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let timestamp = match event
-            .as_log()
-            .get(&Atom::from(log_schema().timestamp_key()))
-        {
+        let timestamp = match event.as_log().get(log_schema().timestamp_key()) {
             Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
             _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
-            event
-                .as_mut_log()
-                .remove(&Atom::from(log_schema().timestamp_key()));
+            event.as_mut_log().remove(log_schema().timestamp_key());
         }
 
         self.encoding.apply_rules(&mut event);
@@ -160,7 +156,7 @@ impl HttpSink for LokiConfig {
 
             Encoding::Text => event
                 .as_log()
-                .get(&Atom::from(log_schema().message_key()))
+                .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
         };
@@ -200,7 +196,11 @@ impl HttpSink for LokiConfig {
 async fn healthcheck(config: LokiConfig, mut client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}ready", config.endpoint);
 
-    let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+
+    if let Some(auth) = &config.auth {
+        auth.apply(&mut req);
+    }
 
     let res = client.send(req).await?;
 
@@ -215,8 +215,10 @@ async fn healthcheck(config: LokiConfig, mut client: HttpClient) -> crate::Resul
 mod tests {
     use super::*;
     use crate::sinks::util::http::HttpSink;
-    use crate::sinks::util::test::load_sink;
+    use crate::sinks::util::test::{build_test_server, load_sink};
+    use crate::test_util;
     use crate::Event;
+    use futures::StreamExt;
 
     #[test]
     fn interpolate_labels() {
@@ -280,6 +282,46 @@ mod tests {
         assert_eq!(record.event.event, expected_line);
 
         assert_eq!(record.labels[0], ("bar".to_string(), "bar".to_string()));
+    }
+
+    #[tokio::test]
+    async fn healthcheck_includes_auth() {
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+			auth.strategy = "basic"
+			auth.user = "username"
+			auth.password = "some_password"
+        "#,
+        )
+        .unwrap();
+
+        let addr = test_util::next_addr();
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = endpoint
+            .clone()
+            .parse::<http::Uri>()
+            .expect("could not create URI")
+            .into();
+
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
+
+        let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
+        let client = HttpClient::new(cx.resolver(), tls).expect("could not cerate HTTP client");
+
+        healthcheck(config.clone(), client)
+            .await
+            .expect("healthcheck failed");
+
+        let output = rx.take(1).collect::<Vec<_>>().await;
+        assert_eq!(
+            Some(&http::header::HeaderValue::from_static(
+                "Basic dXNlcm5hbWU6c29tZV9wYXNzd29yZA=="
+            )),
+            output[0].0.headers.get("authorization")
+        );
     }
 }
 

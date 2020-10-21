@@ -1,14 +1,13 @@
-use super::Function;
+use super::{query_value::QueryValue, Function};
 use crate::{
-    event::{util::log::get_value, Event, PathIter, Value},
+    event::{util::log::get_value, Event, PathIter},
     mapping::Result,
 };
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub(in crate::mapping) struct Path {
     // TODO: Switch to String once Event API is cleaned up.
-    path: Vec<Vec<Atom>>,
+    path: Vec<Vec<String>>,
 }
 
 impl From<&str> for Path {
@@ -22,14 +21,9 @@ impl From<&str> for Path {
 impl From<Vec<Vec<String>>> for Path {
     fn from(path: Vec<Vec<String>>) -> Self {
         Self {
-            // TODO: Switch to String once Event API is cleaned up.
             path: path
                 .iter()
-                .map(|c| {
-                    c.iter()
-                        .map(|p| Atom::from(p.replace(".", "\\.")))
-                        .collect()
-                })
+                .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect())
                 .collect(),
         }
     }
@@ -41,18 +35,14 @@ impl From<Vec<Vec<&str>>> for Path {
             // TODO: Switch to String once Event API is cleaned up.
             path: path
                 .iter()
-                .map(|c| {
-                    c.iter()
-                        .map(|p| Atom::from(p.replace(".", "\\.")))
-                        .collect()
-                })
+                .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect())
                 .collect(),
         }
     }
 }
 
 impl Function for Path {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         // Event.as_log returns a LogEvent struct rather than a naked
         // IndexMap<_, Value>, which means specifically for the first item in
         // the path we need to manually call .get.
@@ -96,13 +86,14 @@ impl Function for Path {
                 })?;
         }
 
-        Ok(value.clone())
+        Ok(value.clone().into())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::Value;
     use serde_json::json;
 
     #[test]
@@ -192,7 +183,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

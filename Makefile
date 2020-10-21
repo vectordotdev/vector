@@ -1,6 +1,5 @@
 # .PHONY: $(MAKECMDGOALS) all
 .DEFAULT_GOAL := help
-RUN := $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))/scripts/docker-compose-run.sh)
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
@@ -172,9 +171,6 @@ build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${DEFAULT_FEATURES}
 
-.PHONY: build-all
-build-all: build-x86_64-unknown-linux-musl build-aarch64-unknown-linux-musl ## Build the project in release mode for all supported platforms
-
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
@@ -285,39 +281,39 @@ test-behavior: ## Runs behaviorial test
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
-test-integration: test-integration-pulsar test-integration-splunk
+test-integration: test-integration-mongodb_metrics test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
 start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
-start-test-integration: start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-mongodb_metrics start-integration-pulsar start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
 stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
-stop-test-integration: stop-integration-pulsar stop-integration-splunk
+stop-test-integration: stop-integration-mongodb_metrics stop-integration-pulsar stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-aws -p 8111:8111 -p 4568:4568 -p 4572:4572 -p 4582:4582 -p 4571:4571 -p 4573:4573 -p 6000:6000
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-aws -p 4566:4566 -p 4571:4571 -p 6000:6000
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
-	 -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 \
-	 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 localstack/localstack:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-aws
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 8111:8111 --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
-	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 4568:4568 -p 4572:4572 \
-	 -p 4582:4582 -p 4571:4571 -p 4573:4573 --name vector_localstack_aws \
-	 -e SERVICES=kinesis:4568,s3:4572,cloudwatch:4582,elasticsearch:4571,firehose:4573 \
-	 localstack/localstack@sha256:f21f1fc770ee4bfd5012afdc902154c56b7fb18c14cf672de151b65569c8251e
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
+	 -p 4566:4566 -p 4571:4571 \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 localstack/localstack:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
 endif
@@ -492,7 +488,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-humio
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib ::humio_logs::integration_tests:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features humio-integration-tests --lib "::humio::.*::integration_tests::" -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-humio
 endif
@@ -500,22 +496,30 @@ endif
 .PHONY: start-integration-influxdb
 start-integration-influxdb:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-influxdb -p 8086:8086 -p 9999:9999
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-influxdb -p 8086:8086 -p 8087:8087 -p 9999:9999
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1_tls \
+	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 \
+	 -e INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/localhost.crt -e INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/localhost.key \
+	 -v $(PWD)/tests/data:/etc/ssl:ro influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v2 \
 	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-rc influxd --reporting-disabled --http-bind-address=:9999
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-influxdb
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 8086:8086 --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 8087:8087 --name vector_influxdb_v1_tls \
+	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 \
+	 -e INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/localhost.crt -e INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/localhost.key \
+	 -v $(PWD)/tests/data:/etc/ssl:ro influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb -p 9999:9999 --name vector_influxdb_v2 \
 	 -e INFLUXDB_REPORTING_DISABLED=true  quay.io/influxdb/influxdb:2.0.0-rc influxd --reporting-disabled --http-bind-address=:9999
 endif
 
 .PHONY: stop-integration-influxdb
 stop-integration-influxdb:
-	$(CONTAINER_TOOL) rm --force vector_influxdb_v1 vector_influxdb_v2 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_influxdb_v1 vector_influxdb_v1_tls vector_influxdb_v2 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-influxdb 2>/dev/null; true
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-influxdb 2>/dev/null; true
@@ -530,7 +534,7 @@ ifeq ($(AUTOSPAWN), true)
 	$(MAKE) start-integration-influxdb
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib ::influxdb::integration_tests:: -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features influxdb-integration-tests --lib integration_tests:: --  ::influxdb --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-influxdb
 endif
@@ -619,6 +623,48 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features loki-integration-tests --lib ::loki:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-loki
+endif
+
+# https://docs.mongodb.com/manual/tutorial/deploy-shard-cluster/
+.PHONY: start-integration-mongodb_metrics
+start-integration-mongodb_metrics:
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-mongodb_metrics -p 27017:27017 -p 27018:27018 -p 27019:27019
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics1 mongo:4.2.10 mongod --configsvr --replSet vector
+	sleep 1
+	$(CONTAINER_TOOL) exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
+	$(CONTAINER_TOOL) exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics --name vector_mongodb_metrics2 mongo:4.2.10 mongod
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-mongodb_metrics
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics -p 27018:27018 -p 27019:27019 --name vector_mongodb_metrics1 mongo:4.2.10 mongod --configsvr --replSet vector
+	sleep 1
+	$(CONTAINER_TOOL) exec vector_mongodb_metrics1 mongo --port 27019 --eval 'rs.initiate({_id:"vector",configsvr:true,members:[{_id:0,host:"127.0.0.1:27019"}]})'
+	$(CONTAINER_TOOL) exec -d vector_mongodb_metrics1 mongos --port 27018 --configdb vector/127.0.0.1:27019
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-mongodb_metrics -p 27017:27017 --name vector_mongodb_metrics2 mongo:4.2.10 mongod
+endif
+
+.PHONY: stop-integration-mongodb_metrics
+stop-integration-mongodb_metrics:
+	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics1 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_mongodb_metrics2 2>/dev/null; true
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-mongodb_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-mongodb_metrics 2>/dev/null; true
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-mongodb_metrics 2>/dev/null; true
+endif
+
+.PHONY: test-integration-mongodb_metrics
+test-integration-mongodb_metrics: ## Runs MongoDB Metrics integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-mongodb_metrics
+	$(MAKE) start-integration-mongodb_metrics
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-mongodb_metrics
 endif
 
 .PHONY: start-integration-pulsar
@@ -733,7 +779,7 @@ test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
 
 .PHONY: bench
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}"
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}" | tee bench_output.txt
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-wasm
@@ -750,7 +796,8 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-style check-markdown check-docs
 check-all: check-version check-examples check-component-features
-check-all: check-scripts check-kubernetes-yaml
+check-all: check-scripts
+check-all: check-helm-lint check-helm-dependencies check-kubernetes-yaml
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -788,9 +835,13 @@ check-examples: ## Check that the config/examples files are valid
 check-scripts: ## Check that scipts do not have common mistakes
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-scripts.sh
 
-.PHONY: check-helm
-check-helm: ## Check that the Helm Chart passes helm lint
-	${MAYBE_ENVIRONMENT_EXEC} helm lint distribution/helm/vector
+.PHONY: check-helm-lint
+check-helm-lint: ## Check that Helm charts pass helm lint
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-helm-lint.sh
+
+.PHONY: check-helm-dependencies
+check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh validate
 
 .PHONY: check-kubernetes-yaml
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
@@ -839,27 +890,23 @@ package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux
 
 # debs
 
-.PHONY: package-deb
-package-deb: ## Build the deb package
-	$(RUN) package-deb
-
 .PHONY: package-deb-x86_64
 package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
-	$(RUN) package-deb-x86_64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
-	$(RUN) package-deb-aarch64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
 # rpms
 
 .PHONY: package-rpm-x86_64
 package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
-	$(RUN) package-rpm-x86_64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
-	$(RUN) package-rpm-aarch64
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
 
 ##@ Releasing
 
@@ -906,59 +953,6 @@ release-helm: ## Package and release Helm Chart
 sync-install: ## Sync the install.sh script for access via sh.vector.dev
 	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
-##@ Verifying
-
-.PHONY: verify
-verify: verify-rpm verify-deb ## Default target, verify all packages
-
-.PHONY: verify-rpm
-verify-rpm: verify-rpm-amazonlinux-1 verify-rpm-amazonlinux-2 verify-rpm-centos-7 ## Verify all rpm packages
-
-.PHONY: verify-rpm-amazonlinux-1
-verify-rpm-amazonlinux-1: package-rpm-x86_64 ## Verify the rpm package on Amazon Linux 1
-	$(RUN) verify-rpm-amazonlinux-1
-
-.PHONY: verify-rpm-amazonlinux-2
-verify-rpm-amazonlinux-2: package-rpm-x86_64 ## Verify the rpm package on Amazon Linux 2
-	$(RUN) verify-rpm-amazonlinux-2
-
-.PHONY: verify-rpm-centos-7
-verify-rpm-centos-7: package-rpm-x86_64 ## Verify the rpm package on CentOS 7
-	$(RUN) verify-rpm-centos-7
-
-.PHONY: verify-deb
-verify-deb: ## Verify all deb packages
-verify-deb: verify-deb-artifact-on-deb-8 verify-deb-artifact-on-deb-9 verify-deb-artifact-on-deb-10
-verify-deb: verify-deb-artifact-on-ubuntu-14-04 verify-deb-artifact-on-ubuntu-16-04 verify-deb-artifact-on-ubuntu-18-04 verify-deb-artifact-on-ubuntu-20-04
-
-.PHONY: verify-deb-artifact-on-deb-8
-verify-deb-artifact-on-deb-8: package-deb-x86_64 ## Verify the deb package on Debian 8
-	$(RUN) verify-deb-artifact-on-deb-8
-
-.PHONY: verify-deb-artifact-on-deb-9
-verify-deb-artifact-on-deb-9: package-deb-x86_64 ## Verify the deb package on Debian 9
-	$(RUN) verify-deb-artifact-on-deb-9
-
-.PHONY: verify-deb-artifact-on-deb-10
-verify-deb-artifact-on-deb-10: package-deb-x86_64 ## Verify the deb package on Debian 10
-	$(RUN) verify-deb-artifact-on-deb-10
-
-.PHONY: verify-deb-artifact-on-ubuntu-14-04
-verify-deb-artifact-on-ubuntu-14-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 14.04
-	$(RUN) verify-deb-artifact-on-ubuntu-14-04
-
-.PHONY: verify-deb-artifact-on-ubuntu-16-04
-verify-deb-artifact-on-ubuntu-16-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 16.04
-	$(RUN) verify-deb-artifact-on-ubuntu-16-04
-
-.PHONY: verify-deb-artifact-on-ubuntu-18-04
-verify-deb-artifact-on-ubuntu-18-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 18.04
-	$(RUN) verify-deb-artifact-on-ubuntu-18-04
-
-.PHONY: verify-deb-artifact-on-ubuntu-20-04
-verify-deb-artifact-on-ubuntu-20-04: package-deb-x86_64 ## Verify the deb package on Ubuntu 20.04
-	$(RUN) verify-deb-artifact-on-ubuntu-20-04
-
 ##@ Utility
 
 .PHONY: build-ci-docker-images
@@ -973,14 +967,6 @@ clean: environment-clean ## Clean everything
 fmt: ## Format code
 	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-style.sh --fix
-
-.PHONY: init-target-dir
-init-target-dir: ## Create target directory owned by the current user
-	$(RUN) init-target-dir
-
-.PHONY: load-qemu-binfmt
-load-qemu-binfmt: ## Load `binfmt-misc` kernel module which required to use `qemu-user`
-	$(RUN) load-qemu-binfmt
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
@@ -1003,10 +989,6 @@ ci-sweep: ## Sweep up the CI to try to get more disk space.
 	df -h
 endif
 
-.PHONY: target-graph
-target-graph: ## Display dependencies between targets in this Makefile
-	@cd $(shell realpath $(shell dirname $(firstword $(MAKEFILE_LIST)))) && docker-compose run --rm target-graph $(TARGET)
-
 .PHONY: version
 version: ## Get the current Vector version
 	@scripts/version.sh
@@ -1014,6 +996,10 @@ version: ## Get the current Vector version
 .PHONY: git-hooks
 git-hooks: ## Add Vector-local git hooks for commit sign-off
 	@scripts/install-git-hooks.sh
+
+.PHONY: update-helm-dependencies
+update-helm-dependencies: ## Recursively update the dependencies of the Helm charts in the proper order
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/helm-dependencies.sh update
 
 .PHONY: update-kubernetes-yaml
 update-kubernetes-yaml: ## Regenerate the Kubernetes YAML config

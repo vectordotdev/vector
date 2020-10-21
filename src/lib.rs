@@ -17,14 +17,19 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 
+#[cfg(feature = "api-client")]
+#[macro_use]
+extern crate prettytable;
+
 #[cfg(feature = "jemallocator")]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
+#[macro_use]
+pub mod config;
 pub mod buffers;
 pub mod cli;
 pub mod conditions;
-pub mod config;
 pub mod dns;
 pub mod event;
 pub mod expiring_hash_map;
@@ -35,8 +40,6 @@ pub mod wasm;
 pub mod internal_events;
 #[cfg(feature = "api")]
 pub mod api;
-#[cfg(feature = "api_client")]
-pub mod api_client;
 pub mod app;
 pub mod async_read;
 pub mod heartbeat;
@@ -59,6 +62,8 @@ pub mod stream;
 pub mod template;
 pub mod test_util;
 pub mod tls;
+#[cfg(feature = "api-client")]
+pub mod top;
 pub mod topology;
 pub mod trace;
 pub mod transforms;
@@ -75,12 +80,18 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn get_version() -> String {
+pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+
     #[cfg(not(feature = "nightly"))]
     let pkg_version = built_info::PKG_VERSION;
 
+    pkg_version
+}
+
+pub fn get_version() -> String {
+    let pkg_version = vector_version();
     let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
     let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
         .unwrap()

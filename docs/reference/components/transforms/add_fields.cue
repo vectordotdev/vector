@@ -1,28 +1,20 @@
 package metadata
 
 components: transforms: add_fields: {
-	title:             "#{component.title}"
-	short_description: "Accepts log events and allows you to add one or more log fields."
-	long_description:  "Accepts log events and allows you to add one or more log fields."
-
-	_features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
+	title: "Add Fields"
 
 	classes: {
 		commonly_used: false
-		function:      "schema"
+		development:   "stable"
+		development:   "stable"
+		egress_method: "stream"
 	}
 
-	statuses: {
-		development: "stable"
+	features: {
+		shape: {}
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -51,7 +43,7 @@ components: transforms: add_fields: {
 						int_field:       1
 						float_field:     1.2
 						bool_field:      true
-						timestamp_field: "1979-05-27 00:32:00 -0700"
+						timestamp_field: "1979-05-27T00:32:00-0700"
 						parent: child_field: "child_value"
 						list_field: ["first", "second", "third"]
 					},
@@ -68,27 +60,32 @@ components: transforms: add_fields: {
 		}
 		overwrite: {
 			common:      true
-			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values.\n"
+			description: "By default, fields will be overridden. Set this to `false` to avoid overwriting values."
 			required:    false
 			warnings: []
 			type: bool: default: true
 		}
 	}
 
+	input: {
+		logs:    true
+		metrics: null
+	}
+
 	how_it_works: {
 		conflicts: {
 			title: "Conflicts"
-			body: ""
+			body:  ""
 			sub_sections: [
 				{
 					title: "Key Conflicts"
-					body: #"""
+					body: """
 						Keys specified in this transform will replace existing keys.
-						"""#
+						"""
 				},
 				{
 					title: "Nested Key Conflicts"
-					body: #"""
+					body: """
 						Nested keys are added in a _deep_ fashion. They will not replace any ancestor
 						objects. For example, given the following `log` event:
 
@@ -120,18 +117,18 @@ components: transforms: add_fields: {
 						```
 
 						Notice that `parent.child1` field was preserved.
-						"""#
+						"""
 				},
 			]
 		}
 		types: {
 			title: "Types"
-			body: #"""
+			body: """
 				All supported [configuration value types][docs.configuration#types] are
 				accepted. This includes primitive types (`string`, `int`, `float`, `boolean`)
 				and special types, such as [arrays](#arrays) and
 				[nested fields](#nested-fields).
-				"""#
+				"""
 		}
 	}
 }

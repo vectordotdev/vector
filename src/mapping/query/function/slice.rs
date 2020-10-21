@@ -22,14 +22,14 @@ impl SliceFn {
 }
 
 impl Function for SliceFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let range = |len: i64| {
-            let start = match required!(ctx, self.start, Value::Integer(v) => v) {
+            let start = match required_value!(ctx, self.start, Value::Integer(v) => v) {
                 start if start < 0 => start + len,
                 start => start,
             };
 
-            let end = match optional!(ctx, self.end, Value::Integer(v) => v) {
+            let end = match optional_value!(ctx, self.end, Value::Integer(v) => v) {
                 Some(end) if end < 0 => end + len,
                 Some(end) => end,
                 None => len,
@@ -45,14 +45,16 @@ impl Function for SliceFn {
             }
         };
 
-        required! {
+        required_value! {
             ctx, self.query,
             Value::Bytes(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
-                .map(Value::from),
+                .map(Value::from)
+                .map(Into::into),
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
-                .map(Value::from),
+                .map(Value::from)
+                .map(Into::into),
         }
     }
 
@@ -60,17 +62,17 @@ impl Function for SliceFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_) | Value::Array(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_)) | QueryValue::Value(Value::Array(_))),
                 required: true,
             },
             Parameter {
                 keyword: "start",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: true,
             },
             Parameter {
                 keyword: "end",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: false,
             },
         ]
@@ -162,7 +164,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 
@@ -213,7 +215,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 

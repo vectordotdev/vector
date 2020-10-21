@@ -84,7 +84,7 @@ struct VectorLabelFilter;
 impl LabelFilter for VectorLabelFilter {
     fn should_include_label(&self, label: &Label) -> bool {
         let key = label.key();
-        key == "topology_component_name" || key == "topology_component_type"
+        key == "component_name" || key == "component_type" || key == "component_kind"
     }
 }
 
@@ -132,8 +132,9 @@ mod tests {
         let span = span!(
             Level::ERROR,
             "my span",
-            topology_component_name = "my_component_name",
-            topology_component_type = "my_component_type",
+            component_name = "my_component_name",
+            component_type = "my_component_type",
+            component_kind = "my_component_kind",
             some_other_label = "qwerty"
         );
         // See https://github.com/tokio-rs/tracing/issues/978
@@ -142,7 +143,7 @@ mod tests {
         }
         let _enter = span.enter();
 
-        counter!("labels_injected", 1);
+        counter!("labels_injected_total", 1);
 
         let metric = super::capture_metrics(super::get_controller().unwrap())
             .map(|e| e.into_metric())
@@ -151,14 +152,9 @@ mod tests {
 
         let expected_tags = Some(
             vec![
-                (
-                    "topology_component_name".to_owned(),
-                    "my_component_name".to_owned(),
-                ),
-                (
-                    "topology_component_type".to_owned(),
-                    "my_component_type".to_owned(),
-                ),
+                ("component_name".to_owned(), "my_component_name".to_owned()),
+                ("component_type".to_owned(), "my_component_type".to_owned()),
+                ("component_kind".to_owned(), "my_component_kind".to_owned()),
             ]
             .into_iter()
             .collect(),

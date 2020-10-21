@@ -74,9 +74,8 @@ impl InternalEvent for WasmCompilationProgress {
     }
 
     fn emit_metrics(&self) {
-        counter!("wasm_compilation", 1,
-            "component_kind" => self.role.as_const_str(),
-            "component_type" => "wasm",
+        counter!("wasm_compilation_total", 1,
+            "component_role" => self.role.as_const_str(),
             "state" => self.state.as_const_str(),
         );
     }

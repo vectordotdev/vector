@@ -1,25 +1,28 @@
 package metadata
 
 components: sources: host_metrics: {
-	title:             "Host Metrics"
-	long_description:  "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
-	short_description: "Gather host-based metrics."
+	title:       "Host Metrics"
+	description: "The host metrics source examines system data sources on the local system and generates metrics describing utilization of various system resources."
 
 	classes: {
 		commonly_used: false
+		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
-		function: "collect"
+		development:   "beta"
+		egress_method: "batch"
 	}
 
 	features: {
-		checkpoint: enabled: false
-		multiline: enabled:  false
-		tls: enabled:        false
-	}
-
-	statuses: {
-		delivery:    "at_least_once"
-		development: "beta"
+		collect: {
+			checkpoint: enabled: false
+			from: {
+				name:     "host"
+				thing:    "a \(name)"
+				url:      urls.host
+				versions: null
+			}
+		}
+		multiline: enabled: false
 	}
 
 	support: {
@@ -33,9 +36,7 @@ components: sources: host_metrics: {
 		}
 
 		notices: []
-
 		requirements: []
-
 		warnings: []
 	}
 
@@ -44,9 +45,9 @@ components: sources: host_metrics: {
 			description: "The list of host metric collector services to use. Defaults to all collectors."
 			common:      true
 			required:    false
-			type: "[string]": {
+			type: array: {
 				default: ["cpu", "disk", "filesystem", "load", "memory", "network"]
-				enum: {
+				items: type: string: enum: {
 					cpu:        "Metrics related to CPU utilization."
 					disk:       "Metrics related to disk I/O utilization."
 					filesystem: "Metrics related to filesystem space utilization."
@@ -84,27 +85,27 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: ["*"]
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather I/O utilization metrics.
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: []
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 					}
@@ -124,27 +125,27 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather usage metrics.
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: ["*"]
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather usage metrics.
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: []
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 					}
@@ -157,27 +158,27 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
 								Defaults to including all filesystems.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: ["*"]
-								examples: [["ntfs"], ["ext*"]]
+								items: type: string: examples: ["ntfs", "ext*"]
 							}
 						}
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of filesystem name patterns for which to gather usage metrics.
 								Defaults to excluding no filesystems.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: []
-								examples: [["ntfs"], ["ext*"]]
+								items: type: string: examples: ["ntfs", "ext*"]
 							}
 						}
 					}
@@ -190,27 +191,27 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of mount point path patterns for which to gather usage metrics.
 								Defaults to including all mount points.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: ["*"]
-								examples: [["/home"], ["/raid*"]]
+								items: type: string: examples: ["/home", "/raid*"]
 							}
 						}
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of mount point path patterns for which to gather usage metrics.
 								Defaults to excluding no mount points.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: []
-								examples: [["/home"], ["/raid*"]]
+								items: type: string: examples: ["/home", "/raid*"]
 							}
 						}
 					}
@@ -230,27 +231,27 @@ components: sources: host_metrics: {
 						includes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather network utilization metrics.
 								Defaults to including all devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: ["*"]
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 						excludes: {
 							required: false
 							common:   false
-							description: #"""
+							description: """
 								The list of device name patterns for which to gather network utilization metrics.
 								Defaults to excluding no devices.
 								The patterns are matched using [globbing](#globbing).
-								"""#
-							type: "[string]": {
+								"""
+							type: array: {
 								default: []
-								examples: [["sda"], ["dm-*"]]
+								items: type: string: examples: ["sda", "dm-*"]
 							}
 						}
 					}
@@ -264,7 +265,7 @@ components: sources: host_metrics: {
 			host: {
 				description: "The hostname of the originating system."
 				required:    true
-				examples: ["myhostname"]
+				examples: [_values.local_host]
 			}
 			collector: {
 				description: "Which collector this metric comes from."
