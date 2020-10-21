@@ -18,16 +18,27 @@ use lazy_static::lazy_static;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
-    GetQueueAttributesRequest, SendMessageBatchError, SendMessageBatchRequest,
-    SendMessageBatchRequestEntry, SendMessageBatchResult, Sqs, SqsClient,
+    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageBatchError,
+    SendMessageBatchRequest, SendMessageBatchRequestEntry, SendMessageBatchResult, Sqs, SqsClient,
 };
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::{
     convert::TryInto,
     task::{Context, Poll},
 };
 use tower::Service;
 use tracing_futures::Instrument;
+
+#[derive(Debug, Snafu)]
+enum HealthcheckError {
+    #[snafu(display("GetQueueAttributes failed: {}", source))]
+    GetQueueAttributes {
+        source: RusotoError<GetQueueAttributesError>,
+    },
+    #[snafu(display("Queue is not FIFO"))]
+    IsNotFifo,
+}
 
 #[derive(Clone)]
 pub struct SqsSink {
@@ -98,11 +109,23 @@ impl SqsSinkConfig {
     pub async fn healthcheck(self, client: SqsClient) -> crate::Result<()> {
         client
             .get_queue_attributes(GetQueueAttributesRequest {
+                attribute_names: Some(vec!["FifoQueue".to_owned()]),
                 queue_url: self.queue_url.clone(),
-                ..Default::default()
             })
             .await
-            .map(|_| ())
+            .context(GetQueueAttributes)
+            .and_then(|result| {
+                if self.queue_url.ends_with(".fifo") {
+                    let fifo = result
+                        .attributes
+                        .and_then(|attrs| attrs.get("FifoQueue").map(|fifo| fifo == "true"))
+                        .unwrap_or(false);
+                    if !fifo {
+                        return Err(HealthcheckError::IsNotFifo);
+                    }
+                }
+                Ok(())
+            })
             .map_err(Into::into)
     }
 
@@ -132,6 +155,7 @@ impl SqsSink {
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
+        let fifo = config.queue_url.ends_with(".fifo");
 
         let sqs = SqsSink {
             client,
@@ -147,7 +171,7 @@ impl SqsSink {
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal sqs sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &encoding)));
+            .with_flat_map(move |e| iter_ok(encode_event(e, &encoding, fifo)));
 
         Ok(sink)
     }
@@ -216,10 +240,6 @@ impl EncodedLength for SendMessageBatchRequestEntry {
         length_prefix
             + self.message_body.len()
             + self
-                .message_deduplication_id
-                .as_ref()
-                .map_or(0, |id| length_prefix + id.len())
-            + self
                 .message_group_id
                 .as_ref()
                 .map_or(0, |id| length_prefix + id.len())
@@ -249,6 +269,7 @@ impl RetryLogic for SqsRetryLogic {
 fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
+    fifo: bool,
 ) -> Option<SendMessageBatchRequestEntry> {
     encoding.apply_rules(&mut event);
 
@@ -262,14 +283,15 @@ fn encode_event(
     };
 
     Some(SendMessageBatchRequestEntry {
-        id: gen_id(),
+        id: gen_id(30),
         message_body,
+        message_group_id: if fifo { Some(gen_id(128)) } else { None },
         ..Default::default()
     })
 }
 
-fn gen_id() -> String {
-    thread_rng().sample_iter(&Alphanumeric).take(30).collect()
+fn gen_id(len: usize) -> String {
+    thread_rng().sample_iter(&Alphanumeric).take(len).collect()
 }
 
 #[cfg(test)]
@@ -280,7 +302,7 @@ mod tests {
     #[test]
     fn sqs_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into()).unwrap();
+        let event = encode_event(message.clone().into(), &Encoding::Text.into(), false).unwrap();
 
         assert_eq!(&event.message_body, &message);
     }
@@ -290,7 +312,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json.into()).unwrap();
+        let event = encode_event(event, &Encoding::Json.into(), false).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_str(&event.message_body).unwrap();
 
@@ -320,7 +342,7 @@ mod integration_tests {
         };
 
         let queue_name = gen_queue_name();
-        ensure_queue(region.clone(), queue_name.clone(), false).await;
+        ensure_queue(region.clone(), queue_name.clone()).await;
         let queue_url = get_queue_url(region.clone(), queue_name.clone()).await;
 
         let client = SqsClient::new(region);
@@ -336,6 +358,8 @@ mod integration_tests {
             request: Default::default(),
             assume_role: None,
         };
+
+        config.clone().healthcheck(client.clone()).await.unwrap();
 
         let sink = SqsSink::new(config, cx, client.clone()).unwrap();
 
@@ -370,10 +394,10 @@ mod integration_tests {
         assert_eq!(input_lines.len(), response.messages.unwrap().len());
     }
 
-    async fn ensure_queue(region: Region, queue_name: String, fifo: bool) {
+    async fn ensure_queue(region: Region, queue_name: String) {
         let client = SqsClient::new(region);
 
-        let attributes: Option<HashMap<String, String>> = if fifo {
+        let attributes: Option<HashMap<String, String>> = if queue_name.ends_with(".fifo") {
             let mut hash_map = HashMap::new();
             hash_map.insert("FifoQueue".into(), "true".into());
             Some(hash_map)
