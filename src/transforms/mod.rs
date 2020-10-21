@@ -64,6 +64,9 @@ pub mod tokenizer;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
+/// Transforms come in two variants. Functions, or tasks.
+///
+/// While function transforms can be run out of order, or concurrently, task transforms act as a coordination or barrier point.
 pub enum Transform {
     Function(Box<dyn FunctionTransform>),
     Task(Box<dyn TaskTransform>),
@@ -86,7 +89,9 @@ impl Transform {
     pub fn as_function(&mut self) -> &mut Box<dyn FunctionTransform> {
         match self {
             Transform::Function(t) => t,
-            Transform::Task(_) => panic!("Called `Transform::as_function` on something that was not a function variant."),
+            Transform::Task(_) => panic!(
+                "Called `Transform::as_function` on something that was not a function variant."
+            ),
         }
     }
     /// Transmute the inner transform into a function transform.
@@ -97,7 +102,9 @@ impl Transform {
     pub fn into_function(self) -> Box<dyn FunctionTransform> {
         match self {
             Transform::Function(t) => t,
-            Transform::Task(_) => panic!("Called `Transform::into_function` on something that was not a function variant."),
+            Transform::Task(_) => panic!(
+                "Called `Transform::into_function` on something that was not a function variant."
+            ),
         }
     }
     /// Create a new task transform.
@@ -128,12 +135,17 @@ impl Transform {
     /// If the transform is a [`FunctionTransform`] this will panic.
     pub fn into_task(self) -> Box<dyn TaskTransform> {
         match self {
-            Transform::Function(_) => panic!("Called `Transform::into_task` on something that was not a task variant."),
+            Transform::Function(_) => {
+                panic!("Called `Transform::into_task` on something that was not a task variant.")
+            }
             Transform::Task(t) => t,
         }
     }
 }
 
+/// Transforms that are simple, and don't require attention to coordination.
+/// You can run them as simple functions over events in any order.
+///
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a `TaskTransform` or vice versa.
@@ -156,6 +168,10 @@ pub trait FunctionTransform: Send {
     }
 }
 
+/// Transforms that tend to be more complicated runtime style components.
+///
+/// These require coordination and map a stream of some `T` to some `U`.
+///
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a `TaskTransform` or vice versa.

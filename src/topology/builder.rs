@@ -122,20 +122,26 @@ pub async fn build_pieces(
         let transform = match transform {
             Transform::Function(mut t) => {
                 let filtered = filter_event_type(input_rx, input_type);
-                #[allow(deprecated)] // `boxed()` here is deprecated, but the replacement won't work until we adopt futures 0.3 here.
-                let transformed = filtered.map(move |v| {
-                    let mut buf = Vec::with_capacity(1);
-                    t.transform(&mut buf, v);
-                    futures01::stream::iter_ok(buf.into_iter())
-                }).flatten().boxed();
+                #[allow(deprecated)]
+                // `boxed()` here is deprecated, but the replacement won't work until we adopt futures 0.3 here.
+                let transformed = filtered
+                    .map(move |v| {
+                        let mut buf = Vec::with_capacity(1);
+                        t.transform(&mut buf, v);
+                        futures01::stream::iter_ok(buf.into_iter())
+                    })
+                    .flatten()
+                    .boxed();
                 Box::new(transformed).forward(output)
             }
             Transform::Task(t) => {
                 let filtered = filter_event_type(input_rx, input_type);
                 let transformed = t.transform(filtered);
                 Box::new(transformed).forward(output)
-            },
-        }.map(|_| debug!("Finished")).compat();
+            }
+        }
+        .map(|_| debug!("Finished"))
+        .compat();
 
         let task = Task::new(name, typetag, transform);
 

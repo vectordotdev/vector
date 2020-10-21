@@ -452,7 +452,6 @@ fn benchmark_regex(c: &mut Criterion) {
                         .into_iter()
                         .for_each(|line| {
                             parser.as_function().transform(&mut output, Event::from(&line[..]))
-                            
                         });
                     assert_eq!(output.len(), num_lines);
                 },
@@ -699,18 +698,9 @@ fn benchmark_remap(c: &mut Criterion) {
             let mut result = Vec::with_capacity(1);
             tform.transform(&mut result, event.clone());
             let output_1 = result[0].as_log();
-            assert_eq!(
-                output_1.get("foo").unwrap().to_string_lossy(),
-                "bar"
-            );
-            assert_eq!(
-                output_1.get("bar").unwrap().to_string_lossy(),
-                "baz"
-            );
-            assert_eq!(
-                output_1.get("copy").unwrap().to_string_lossy(),
-                "buz"
-            );
+            assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
+            assert_eq!(output_1.get("bar").unwrap().to_string_lossy(), "baz");
+            assert_eq!(output_1.get("copy").unwrap().to_string_lossy(), "buz");
         }
     };
 
@@ -801,14 +791,8 @@ fn benchmark_remap(c: &mut Criterion) {
             let mut result = Vec::with_capacity(1);
             tform.as_function().transform(&mut result, event.clone());
             let output_1 = result[0].as_log();
-            assert_eq!(
-                output_1.get("number").unwrap(),
-                &Value::Integer(1234)
-            );
-            assert_eq!(
-                output_1.get("bool").unwrap(),
-                &Value::Boolean(true)
-            );
+            assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
+            assert_eq!(output_1.get("bool").unwrap(), &Value::Boolean(true));
             assert_eq!(
                 output_1.get("timestamp").unwrap(),
                 &Value::Timestamp(timestamp),
