@@ -5,6 +5,8 @@ use std::sync::{
     Arc,
 };
 
+pub type OpenTokenDyn = OpenToken<Box<dyn Fn(usize) + 'static + Send>>;
+
 #[derive(Debug)]
 pub struct ConnectionOpen {
     pub count: usize,
@@ -36,6 +38,12 @@ impl OpenGauge {
             gauge: self.gauge,
             emitter,
         }
+    }
+}
+
+impl Default for OpenGauge {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -75,4 +83,47 @@ fn gauge_add(gauge: &AtomicUsize, add: isize, emitter: impl Fn(usize)) {
     // In the worst case scenario we will emit `n^2 / 2` times when there are `n` parallel
     // updates in proggress. This scenario has higher chance of happening during shutdown.
     // In most cases `n` will be small, and futher limited by the number of active threads.
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem::drop;
+    use std::thread;
+
+    /// If this failes at any run, then the algorithm in `gauge_add` is faulty.
+    #[test]
+    fn eventualy_consistent() {
+        let n = 8;
+        let m = 1000;
+        let gauge = OpenGauge::new();
+        let value = Arc::new(AtomicUsize::new(0));
+
+        let handles = (0..n)
+            .map(|_| {
+                let gauge = gauge.clone();
+                let value = value.clone();
+                thread::spawn(move || {
+                    let mut work = 0;
+                    for _ in 0..m {
+                        let token = gauge
+                            .clone()
+                            .open(|count| value.store(count, Ordering::Release));
+                        // Do some work
+                        for i in 0..100 {
+                            work += i;
+                        }
+                        drop(token);
+                    }
+                    work
+                })
+            })
+            .collect::<Vec<_>>();
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+
+        assert_eq!(0, value.load(Ordering::Acquire));
+    }
 }
