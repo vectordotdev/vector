@@ -297,6 +297,7 @@ mod integration_tests {
     };
     use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
+    use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
     use rusoto_firehose::{
         CreateDeliveryStreamInput, ElasticsearchDestinationConfiguration, KinesisFirehose,
         KinesisFirehoseClient,
@@ -310,14 +311,14 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: "http://localhost:4573".into(),
+            endpoint: "http://localhost:4566".into(),
         };
 
         ensure_stream(region, stream.clone()).await;
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4573".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: EncodingConfig::from(Encoding::Json), // required for ES destination w/ localstack
             compression: Compression::None,
             batch: BatchConfig {
@@ -364,27 +365,55 @@ mod integration_tests {
             .send()
             .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
             .await
-            .unwrap();
+            .expect("could not issue Elasticsearch search request");
 
-        assert_eq!(input.len() as u64, response.total());
+        let total = response["hits"]["total"]["value"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total->value");
+        assert_eq!(input.len() as u64, total);
+
+        let hits = response["hits"]["hits"]
+            .as_array()
+            .expect("Elasticsearch response does not include hits->hits");
         let input = input
             .into_iter()
             .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
             .collect::<Vec<_>>();
-        for hit in response.into_hits() {
-            let event = hit.into_document().unwrap();
-            assert!(input.contains(&event));
+        for hit in hits {
+            let hit = hit
+                .get("_source")
+                .expect("Elasticsearch hit missing _source");
+            assert!(input.contains(&hit));
         }
     }
 
+    /// creates ES domain with the given name and returns the ARN
+    async fn ensure_elasticsearch_domain(region: Region, domain_name: String) -> String {
+        let client = EsClient::new(region);
+
+        let req = CreateElasticsearchDomainRequest {
+            domain_name,
+            ..Default::default()
+        };
+
+        match client.create_elasticsearch_domain(req).await {
+            Ok(res) => res.domain_status.expect("no domain status").arn,
+            Err(e) => panic!("Unable to create the Elasticsearch domain {:?}", e),
+        }
+    }
+
+    /// creates ES domain and Firehose delivery stream
     async fn ensure_stream(region: Region, delivery_stream_name: String) {
+        let es_domain_arn =
+            ensure_elasticsearch_domain(region.clone(), delivery_stream_name.clone()).await;
+
         let client = KinesisFirehoseClient::new(region);
 
         let es_config = ElasticsearchDestinationConfiguration {
             index_name: delivery_stream_name.clone(),
-            domain_arn: Some("doesn't matter".into()),
+            domain_arn: Some(es_domain_arn),
             role_arn: "doesn't matter".into(),
             type_name: Some("doesn't matter".into()),
             ..Default::default()
@@ -398,7 +427,7 @@ mod integration_tests {
 
         match client.create_delivery_stream(req).await {
             Ok(_) => (),
-            Err(e) => println!("Unable to create the delivery stream {:?}", e),
+            Err(e) => panic!("Unable to create the delivery stream {:?}", e),
         };
     }
 
