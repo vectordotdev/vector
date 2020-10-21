@@ -5,10 +5,11 @@ use crate::{
     dns::Resolver,
     event::{Event, LogEvent, Value},
     region::RegionOrEndpoint,
+    rusoto,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
+        BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,

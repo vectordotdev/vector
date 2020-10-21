@@ -1,6 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue, StatisticKind},
+    http::HttpClient,
     sinks::{
         influxdb::{
             encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
@@ -8,7 +9,7 @@ use crate::{
         },
         util::{
             encode_namespace,
-            http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            http::{HttpBatchService, HttpRetryLogic},
             statistic::{validate_quantiles, DistributionStatistic},
             BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
         },

@@ -4,8 +4,6 @@ pub mod buffer;
 pub mod encoding;
 pub mod http;
 pub mod retries;
-#[cfg(feature = "rusoto_core")]
-pub mod rusoto;
 pub mod service;
 pub mod sink;
 pub mod statistic;

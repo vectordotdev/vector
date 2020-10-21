@@ -4,10 +4,10 @@ use crate::{
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
     region::RegionOrEndpoint,
+    rusoto,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto,
         sink::Response,
         BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },

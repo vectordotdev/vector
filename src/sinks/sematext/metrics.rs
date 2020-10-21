@@ -2,10 +2,11 @@ use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
+    http::HttpClient,
     internal_events::SematextMetricsInvalidMetricReceived,
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
-        http::{HttpBatchService, HttpClient, HttpRetryLogic},
+        http::{HttpBatchService, HttpRetryLogic},
         BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},

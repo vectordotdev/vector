@@ -3,8 +3,9 @@ use crate::{
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
     region::RegionOrEndpoint,
+    rusoto,
     sinks::util::{
-        retries::RetryLogic, rusoto, BatchConfig, BatchSettings, Compression, MetricBuffer,
+        retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
         TowerRequestConfig,
     },
 };

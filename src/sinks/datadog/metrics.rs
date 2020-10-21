@@ -4,10 +4,11 @@ use crate::{
         metric::{Metric, MetricKind, MetricValue, StatisticKind},
         Event,
     },
+    http::HttpClient,
     sinks::{
         util::{
             encode_namespace,
-            http::{HttpBatchService, HttpClient, HttpRetryLogic},
+            http::{HttpBatchService, HttpRetryLogic},
             BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
             PartitionInnerBuffer, TowerRequestConfig,
         },

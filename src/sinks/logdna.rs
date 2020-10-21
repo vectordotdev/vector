@@ -1,9 +1,10 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::HttpClient,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{Auth, BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };

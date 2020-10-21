@@ -3,11 +3,11 @@ use crate::{
     dns::Resolver,
     event::Event,
     region::RegionOrEndpoint,
+    rusoto,
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto,
         sink::Response,
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
