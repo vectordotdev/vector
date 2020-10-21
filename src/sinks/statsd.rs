@@ -86,10 +86,9 @@ impl SinkConfig for StatsdSinkConfig {
 
         match &self.mode {
             Mode::Tcp(config) => {
-                let namespace = namespace.clone();
                 let encode_event =
                     move |event| encode_event(event, namespace.as_deref()).map(Into::into);
-                config.build(cx.clone(), encode_event)
+                config.build(cx, encode_event)
             }
             Mode::Udp(config) => {
                 // 1432 bytes is a recommended packet size to fit into MTU
@@ -122,10 +121,9 @@ impl SinkConfig for StatsdSinkConfig {
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let namespace = namespace.clone();
                 let encode_event =
                     move |event| encode_event(event, namespace.as_deref()).map(Into::into);
-                config.build(cx.clone(), encode_event)
+                config.build(cx, encode_event)
             }
         }
     }
