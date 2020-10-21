@@ -14,19 +14,20 @@ impl StripAnsiEscapeCodesFn {
 }
 
 impl Function for StripAnsiEscapeCodesFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
 
         strip_ansi_escapes::strip(&bytes)
             .map(Bytes::from)
             .map(Value::from)
+            .map(Into::into)
             .map_err(|e| e.to_string())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }
@@ -84,7 +85,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

@@ -85,19 +85,18 @@ fn message_to_value(message: Message<&str>) -> Value {
 }
 
 impl Function for ParseSyslogFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let message =
-            required!(ctx, self.query, Value::Bytes(v) => String::from_utf8_lossy(&v).into_owned());
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let message = required_value!(ctx, self.query, Value::Bytes(v) => String::from_utf8_lossy(&v).into_owned());
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
 
-        Ok(message_to_value(parsed))
+        Ok(message_to_value(parsed).into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }
@@ -198,15 +197,15 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 
     #[test]
     fn handles_empty_sd_element() {
-        fn there_is_map_called_empty(value: Value) -> Result<bool> {
+        fn there_is_map_called_empty(value: QueryValue) -> Result<bool> {
             match value {
-                Value::Map(map) => {
+                QueryValue::Value(Value::Map(map)) => {
                     Ok(map.iter().find(|(key, _)| (&key[..]).starts_with("empty")) == None)
                 }
                 _ => Err("Result was not a map".to_string()),

@@ -13,10 +13,13 @@ impl ParseJsonFn {
 }
 
 impl Function for ParseJsonFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         match self.query.execute(ctx)? {
-            Value::Bytes(b) => serde_json::from_slice(&b)
-                .map(|v: serde_json::Value| v.into())
+            QueryValue::Value(Value::Bytes(b)) => serde_json::from_slice(&b)
+                .map(|v: serde_json::Value| {
+                    let v: Value = v.into();
+                    v.into()
+                })
                 .map_err(|err| format!("unable to parse json {}", err)),
             v => unexpected_type!(v),
         }
@@ -25,7 +28,7 @@ impl Function for ParseJsonFn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }
@@ -76,7 +79,7 @@ mod tests {
                         .insert("foo", Value::from("{\"field\": \"value\"}"));
                     event
                 },
-                Ok(Value::Map({
+                Ok(Value::from({
                     let mut map = BTreeMap::new();
                     map.insert("field".into(), Value::from("value"));
                     map
@@ -97,7 +100,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }
