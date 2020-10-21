@@ -61,7 +61,7 @@ impl SinkConfig for SocketSinkConfig {
         let encode_event = move |event| encode_event(event, &encoding);
         match &self.mode {
             Mode::Tcp(config) => config.build(cx, encode_event),
-            Mode::Udp(config) => config.build(cx, self.encoding.clone()),
+            Mode::Udp(config) => config.build(cx, encode_event),
             #[cfg(unix)]
             Mode::Unix(config) => config.build(cx, encode_event),
         }
