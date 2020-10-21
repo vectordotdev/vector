@@ -338,7 +338,7 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: "http://localhost:4576".into(),
+            endpoint: "http://localhost:4566".into(),
         };
 
         let queue_name = gen_queue_name();
@@ -349,7 +349,7 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4576".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             batch: BatchConfig {
                 max_events: Some(2),
