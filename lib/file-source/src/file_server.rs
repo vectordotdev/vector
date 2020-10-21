@@ -310,10 +310,13 @@ where
             // call. Also since we are using block_on here and in the above code,
             // this should be run in it's own thread. `spawn_blocking` fulfills
             // all of these requirements.
-            match block_on(select(
-                shutdown,
-                delay_for(Duration::from_millis(backoff as u64)),
-            )) {
+            let sleep = async move {
+                if backoff > 0 {
+                    delay_for(Duration::from_millis(backoff as u64)).await;
+                }
+            };
+            futures::pin_mut!(sleep);
+            match block_on(select(shutdown, sleep)) {
                 Either::Left((_, _)) => return Ok(Shutdown),
                 Either::Right((_, future)) => shutdown = future,
             }
