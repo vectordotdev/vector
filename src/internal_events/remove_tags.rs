@@ -6,6 +6,6 @@ pub struct RemoveTagsEventProcessed;
 
 impl InternalEvent for RemoveTagsEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }

@@ -129,7 +129,7 @@ http = "0.2"
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
-syslog_loose = { version = "0.4.0", optional = true }
+syslog_loose = { version = "0.4.0" }
 derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
@@ -311,21 +311,23 @@ sources-docker = ["bollard"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
 sources-host_metrics = ["heim", "uom"]
-sources-http = ["warp", "sources-tls"]
+sources-http = ["sources-utils-http"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
-sources-logplex = ["warp", "sources-tls"]
+sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-prometheus = ["prometheus-parser"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls"]
-sources-splunk_hec = ["bytesize", "warp", "sources-tls"]
-sources-statsd = ["tokio-util/udp"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sources-utils-unix"]
+sources-splunk_hec = ["bytesize", "sources-utils-http"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "syslog_loose"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sources-utils-unix"]
 sources-tls = []
 sources-vector = ["listenfd" ,"sources-tls"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
+sources-utils-http = ["sources-tls", "warp"]
+sources-utils-unix = []
 
 # Transforms
 transforms = [

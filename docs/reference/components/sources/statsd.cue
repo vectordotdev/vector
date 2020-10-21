@@ -1,7 +1,7 @@
 package metadata
 
 components: sources: statsd: {
-	_port: 8126
+	_port: 8125
 
 	title:       "StatsD"
 	description: "[StatsD](\(urls.statsd)) is a standard and, by extension, a set of tools that can be used to send, collect, and aggregate custom metrics from any application. Originally, StatsD referred to a daemon written by [Etsy](\(urls.etsy)) in Node."
@@ -55,13 +55,48 @@ components: sources: statsd: {
 
 	configuration: {
 		address: {
-			description: "UDP socket address to bind to."
-			required:    true
+			description: "The address to listen for connections on, or `systemd#N` to use the Nth socket passed by systemd socket activation. If an address is used it _must_ include a port."
+			groups: ["tcp", "udp"]
+			required: true
 			warnings: []
 			type: string: {
-				examples: ["127.0.0.1:\(_port)"]
+				examples: ["0.0.0.0:\(_port)", "systemd", "systemd#3"]
 			}
 		}
+		mode: {
+			description: "The type of socket to use."
+			groups: ["tcp", "udp", "unix"]
+			required: true
+			warnings: []
+			type: string: {
+				enum: {
+					tcp:  "TCP Socket."
+					udp:  "UDP Socket."
+					unix: "Unix Domain Socket."
+				}
+			}
+		}
+		path: {
+			description: "The unix socket path. *This should be an absolute path*."
+			groups: ["unix"]
+			required: true
+			warnings: []
+			type: string: {
+				examples: ["/path/to/socket"]
+			}
+		}
+		shutdown_timeout_secs: {
+			common:      false
+			description: "The timeout before a connection is forcefully closed during shutdown."
+			groups: ["tcp"]
+			required: false
+			warnings: []
+			type: uint: {
+				default: 30
+				unit:    "seconds"
+			}
+		}
+
 	}
 
 	output: metrics: {

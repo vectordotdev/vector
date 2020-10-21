@@ -10,10 +10,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "aws_cloudwatch_logs_subscription_parser",
-        );
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -32,9 +29,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserFailedParse {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "aws_cloudwatch_logs_subscription_parser",
+        counter!("processing_errors_total", 1,
             "error_type" => "failed_parse",
         );
     }
