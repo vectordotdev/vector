@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rand::random;
@@ -27,7 +27,6 @@ use snafu::Snafu;
 use std::{
     convert::TryInto,
     fmt,
-    sync::Arc,
     task::{Context, Poll},
 };
 
@@ -36,7 +35,7 @@ use tracing_futures::Instrument;
 
 #[derive(Clone)]
 pub struct KinesisService {
-    client: Arc<KinesisClient>,
+    client: KinesisClient,
     config: KinesisSinkConfig,
 }
 
@@ -142,8 +141,6 @@ impl KinesisService {
         client: KinesisClient,
         cx: SinkContext,
     ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
-        let client = Arc::new(client);
-
         let batch = BatchSettings::default()
             .bytes(5_000_000)
             .events(500)
@@ -185,13 +182,25 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
             events = %records.len(),
         );
 
-        let client = Arc::clone(&self.client);
+        let sizes: Vec<usize> = records.iter().map(|record| record.data.len()).collect();
+
+        let client = self.client.clone();
         let request = PutRecordsInput {
             records,
             stream_name: self.config.stream_name.clone(),
         };
 
-        Box::pin(async move { client.put_records(request).await }.instrument(info_span!("request")))
+        Box::pin(async move {
+            client
+                .put_records(request)
+                .inspect_ok(|_| {
+                    for byte_size in sizes {
+                        emit!(AwsKinesisStreamsEventSent { byte_size });
+                    }
+                })
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
@@ -288,13 +297,8 @@ fn encode_event(
             .unwrap_or_default(),
     };
 
-    let data = Bytes::from(data);
-
-    emit!(AwsKinesisStreamsEventSent {
-        byte_size: data.len()
-    });
     Some(PutRecordsRequestEntry {
-        data,
+        data: Bytes::from(data),
         partition_key,
         ..Default::default()
     })
@@ -393,7 +397,7 @@ mod integration_tests {
 
         let region = Region::Custom {
             name: "localstack".into(),
-            endpoint: "http://localhost:4568".into(),
+            endpoint: "http://localhost:4566".into(),
         };
 
         ensure_stream(region.clone(), stream.clone()).await;
@@ -401,7 +405,7 @@ mod integration_tests {
         let config = KinesisSinkConfig {
             stream_name: stream.clone(),
             partition_key_field: None,
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4568".into()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             compression: Compression::None,
             batch: BatchConfig {
@@ -489,6 +493,13 @@ mod integration_tests {
             Ok(_) => (),
             Err(e) => panic!("Unable to check the stream {:?}", e),
         };
+
+        // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors
+        // during PutRecords
+        //
+        // I initially tried using `wait_for` with `DescribeStream` but localstack would
+        // successfully return the stream before it was able to accept PutRecords requests
+        delay_for(Duration::from_secs(1)).await;
     }
 
     fn gen_stream() -> String {
