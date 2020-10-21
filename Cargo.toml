@@ -301,12 +301,11 @@ sources = [
   "sources-statsd",
   "sources-stdin",
   "sources-syslog",
-  "sources-tls",
   "sources-vector",
   "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
-sources-aws_kinesis_firehose = ["base64", "sources-tls", "warp"]
+sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
 sources-docker = ["bollard"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
@@ -318,15 +317,15 @@ sources-kafka = ["rdkafka"]
 sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-prometheus = ["prometheus-parser"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sources-utils-unix"]
-sources-splunk_hec = ["bytesize", "sources-utils-http"]
-sources-statsd = ["tokio-util/udp", "listenfd", "sources-tls", "sources-utils-unix"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
+sources-splunk_hec = ["bytesize", "tls", "warp"]
+sources-statsd = ["tokio-util/udp", "listenfd", "tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-tls", "sources-utils-unix"]
-sources-tls = []
-sources-vector = ["listenfd" ,"sources-tls"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
+tls = []
+sources-vector = ["listenfd" ,"tls"]
 sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
-sources-utils-http = ["sources-tls", "warp"]
+sources-utils-http = ["tls", "warp"]
 sources-utils-unix = []
 
 # Transforms

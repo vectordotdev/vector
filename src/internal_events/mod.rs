@@ -166,7 +166,7 @@ pub use self::rename_fields::*;
 pub use self::sampler::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
-#[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
+#[cfg(feature = "sources-socket")]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
