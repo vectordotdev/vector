@@ -20,9 +20,7 @@ impl InternalEvent for SematextMetricsInvalidMetricReceived {
 
     fn emit_metrics(&self) {
         counter!(
-            "processing_errors", 1,
-            "component_kind" => "sink",
-            "component_type" => "sematext_metrics",
+            "processing_errors_total", 1,
             "error_type" => "invalid_metric",
         );
     }

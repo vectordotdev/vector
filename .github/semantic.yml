@@ -123,6 +123,7 @@ scopes:
   - kafka source # Anything `kafka` source related
   - kubernetes_logs source # Anything `kubernetes_logs` source related
   - logplex source # Anything `logplex` source related
+  - mongodb_metrics # Anything `mongodb_metrics` source related
   - prometheus source # Anything `prometheus` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related

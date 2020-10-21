@@ -181,6 +181,8 @@ jobs:
       - run: make slim-builds
       - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
       - run: make check-component-features
+        env:
+          RUSTFLAGS: "-D warnings"
 
   checks:
     name: Checks
