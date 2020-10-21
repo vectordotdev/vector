@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext,
+        SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -48,6 +49,7 @@ impl SourceConfig for LogplexConfig {
     async fn build(
         &self,
         _: &str,
+        _cx: SourceContext,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

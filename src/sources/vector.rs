@@ -1,6 +1,8 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
+    },
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
@@ -48,6 +50,7 @@ impl SourceConfig for VectorConfig {
     async fn build(
         &self,
         _name: &str,
+        _cx: SourceContext,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
@@ -51,6 +51,7 @@ impl SourceConfig for GeneratorConfig {
     async fn build(
         &self,
         _name: &str,
+        _cx: SourceContext,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

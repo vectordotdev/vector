@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext,
+        SourceDescription,
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
@@ -72,6 +73,7 @@ impl SourceConfig for SimpleHttpConfig {
     async fn build(
         &self,
         _: &str,
+        _cx: SourceContext,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

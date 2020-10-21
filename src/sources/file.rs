@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
@@ -150,6 +150,7 @@ impl SourceConfig for FileConfig {
     async fn build(
         &self,
         name: &str,
+        _cx: SourceContext,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

@@ -6,7 +6,8 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext,
+        SourceDescription,
     },
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
@@ -75,6 +76,7 @@ impl SourceConfig for SocketConfig {
     async fn build(
         &self,
         _name: &str,
+        _cx: SourceContext,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

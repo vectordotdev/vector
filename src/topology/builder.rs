@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, SinkContext, TransformContext},
+    config::{DataType, SinkContext, SourceContext, TransformContext},
     dns::Resolver,
     event::Event,
     shutdown::SourceShutdownCoordinator,
@@ -53,13 +53,14 @@ pub async fn build_pieces(
     {
         let (tx, rx) = mpsc::channel(1000);
         let pipeline = Pipeline::from_sender(tx);
+        let cx = SourceContext { resolver };
 
         let typetag = source.source_type();
 
         let (shutdown_signal, force_shutdown_tripwire) = shutdown_coordinator.register_source(name);
 
         let server = match source
-            .build(&name, &config.global, shutdown_signal, pipeline)
+            .build(&name, cx, &config.global, shutdown_signal, pipeline)
             .await
         {
             Err(error) => {

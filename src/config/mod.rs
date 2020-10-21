@@ -153,6 +153,7 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     async fn build(
         &self,
         name: &str,
+        cx: SourceContext,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,
@@ -161,6 +162,21 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn output_type(&self) -> DataType;
 
     fn source_type(&self) -> &'static str;
+}
+
+#[derive(Debug, Clone)]
+pub struct SourceContext {
+    pub(super) resolver: Resolver,
+}
+
+impl SourceContext {
+    pub fn new_test() -> Self {
+        Self { resolver: Resolver }
+    }
+
+    pub fn resolver(&self) -> Resolver {
+        self.resolver
+    }
 }
 
 pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;

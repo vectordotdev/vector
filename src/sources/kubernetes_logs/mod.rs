@@ -12,7 +12,9 @@ use crate::internal_events::{
 };
 use crate::kubernetes as k8s;
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
+    },
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
@@ -98,6 +100,7 @@ impl SourceConfig for Config {
     async fn build(
         &self,
         name: &str,
+        _cx: SourceContext,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

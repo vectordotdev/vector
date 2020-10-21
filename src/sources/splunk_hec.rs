@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -79,6 +79,7 @@ impl SourceConfig for SplunkConfig {
     async fn build(
         &self,
         _: &str,
+        _cx: SourceContext,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

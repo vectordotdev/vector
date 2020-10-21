@@ -1,5 +1,7 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{
+        DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceContext, SourceDescription,
+    },
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -26,6 +28,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     async fn build(
         &self,
         _: &str,
+        _cx: SourceContext,
         _: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

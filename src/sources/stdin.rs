@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceContext, SourceDescription},
     event::Event,
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
@@ -47,6 +47,7 @@ impl SourceConfig for StdinConfig {
     async fn build(
         &self,
         _name: &str,
+        _cx: SourceContext,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

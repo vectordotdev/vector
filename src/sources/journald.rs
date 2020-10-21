@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceContext, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
@@ -90,6 +90,7 @@ impl SourceConfig for JournaldConfig {
     async fn build(
         &self,
         name: &str,
+        _cx: SourceContext,
         globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,
