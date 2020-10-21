@@ -102,7 +102,7 @@ impl SinkConfig for StatsdSinkConfig {
                     .events(1000)
                     .timeout(1)
                     .parse_config(config.batch)?;
-                let (service, healthcheck) = config.udp.build_service(cx.clone()).await?;
+                let (service, healthcheck) = config.udp.build_service(cx.clone())?;
                 let service = StatsdSvc { inner: service };
                 let sink = BatchSink::new(
                     ServiceBuilder::new().service(service),

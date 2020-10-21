@@ -54,10 +54,9 @@ impl UdpSinkConfig {
         Ok((connector, healthcheck))
     }
 
-    pub async fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
+    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
         let (connector, healthcheck) = self.build_connector(cx)?;
-        let socket = connector.connect().await?;
-        Ok((UdpService { socket }, healthcheck))
+        Ok((connector.into(), healthcheck))
     }
 
     pub fn build<F>(
@@ -117,6 +116,22 @@ impl UdpConnector {
         .boxed()
     }
 
+    async fn connect_backoff(self) -> UdpSocket {
+        let mut backoff = ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(Duration::from_secs(60));
+
+        loop {
+            match self.connect().await {
+                Ok(socket) => return socket,
+                Err(error) => {
+                    error!(message = "Unable to connect UDP socket.", %error);
+                    delay_for(backoff.next().unwrap()).await;
+                }
+            }
+        }
+    }
+
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
         self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
     }
@@ -128,8 +143,21 @@ impl Into<UdpSink> for UdpConnector {
     }
 }
 
+enum UdpServiceState {
+    Connecting(BoxFuture<'static, UdpSocket>),
+    Connected(UdpSocket),
+}
+
 pub struct UdpService {
-    socket: UdpSocket,
+    state: UdpServiceState,
+}
+
+impl Into<UdpService> for UdpConnector {
+    fn into(self) -> UdpService {
+        UdpService {
+            state: UdpServiceState::Connecting(self.connect_backoff().boxed()),
+        }
+    }
 }
 
 impl tower::Service<Bytes> for UdpService {
@@ -137,12 +165,26 @@ impl tower::Service<Bytes> for UdpService {
     type Error = UdpError;
     type Future = future::Ready<Result<(), Self::Error>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match &mut self.state {
+            UdpServiceState::Connected(_) => Poll::Ready(Ok(())),
+            UdpServiceState::Connecting(fut) => match fut.poll_unpin(cx) {
+                Poll::Ready(socket) => {
+                    self.state = UdpServiceState::Connected(socket);
+                    Poll::Ready(Ok(()))
+                }
+                Poll::Pending => Poll::Pending,
+            },
+        }
     }
 
     fn call(&mut self, msg: Bytes) -> Self::Future {
-        future::ready(udp_send(&mut self.socket, &msg).context(SendError))
+        match &mut self.state {
+            UdpServiceState::Connecting(_) => unreachable!(),
+            UdpServiceState::Connected(socket) => {
+                future::ready(udp_send(socket, &msg).context(SendError))
+            }
+        }
     }
 }
 
