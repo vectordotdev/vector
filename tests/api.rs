@@ -165,7 +165,7 @@ mod tests {
     }
 
     async fn new_uptime_subscription(client: &SubscriptionClient) {
-        let subscription = client.uptime_metrics_subscription().await.unwrap();
+        let subscription = client.uptime_subscription().await.unwrap();
 
         tokio::pin! {
             let uptime = subscription.stream().skip(1);
@@ -181,7 +181,7 @@ mod tests {
                 .unwrap()
                 .data
                 .unwrap()
-                .uptime_metrics
+                .uptime
                 .seconds
                 > 0.00
         )
@@ -196,7 +196,7 @@ mod tests {
         let _shutdown = emit_fake_generator_events();
 
         let subscription = client
-            .events_processed_total_metrics_subscription(interval)
+            .events_processed_total_subscription(interval)
             .await
             .unwrap();
 
@@ -214,7 +214,7 @@ mod tests {
                 .unwrap()
                 .data
                 .unwrap()
-                .events_processed_total_metrics
+                .events_processed_total
                 .events_processed_total;
 
             assert!(ep > last_result);
