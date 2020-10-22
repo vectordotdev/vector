@@ -19,6 +19,9 @@ pub enum Error {
     #[error(r#"expected "{0}", got "{1}""#)]
     Expected(&'static str, &'static str),
 
+    #[error(r#"unable to coerce "{0}" into "{1}""#)]
+    Coerce(&'static str, &'static str),
+
     #[error("unable to calculate remainder of values type {0} and {1}")]
     Rem(&'static str, &'static str),
 
@@ -102,31 +105,31 @@ impl From<&str> for Value {
 }
 
 impl TryFrom<&Value> for f64 {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(*v),
-            _ => Err(()),
+            _ => Err(Error::Coerce(value.kind(), Value::Float(0.0).kind())),
         }
     }
 }
 
 impl TryFrom<&Value> for i64 {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         match value {
             Value::Integer(v) => Ok(*v),
             Value::Float(v) => Ok(*v as i64),
-            _ => Err(()),
+            _ => Err(Error::Coerce(value.kind(), Value::Integer(0).kind())),
         }
     }
 }
 
 impl TryFrom<&Value> for String {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(value: &Value) -> std::result::Result<Self, Self::Error> {
         use Value::*;
@@ -137,13 +140,13 @@ impl TryFrom<&Value> for String {
             Float(v) => Ok(format!("{}", v)),
             Boolean(v) => Ok(format!("{}", v)),
             Null => Ok("".to_owned()),
-            _ => Err(()),
+            _ => Err(Error::Coerce(value.kind(), Value::String("".into()).kind())),
         }
     }
 }
 
 impl TryFrom<Value> for String {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
         (&value).try_into()
@@ -151,7 +154,7 @@ impl TryFrom<Value> for String {
 }
 
 impl TryFrom<Value> for i64 {
-    type Error = ();
+    type Error = Error;
 
     fn try_from(value: Value) -> std::result::Result<Self, Self::Error> {
         (&value).try_into()
@@ -205,12 +208,12 @@ impl Value {
 
     /// Similar to [`std::ops::Div`], but fallible (e.g. `TryDiv`).
     pub fn try_div(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Div(self.kind(), rhs.kind());
+        let err = || Error::Div(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv / i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv / f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv / i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv / f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)
@@ -218,18 +221,18 @@ impl Value {
 
     /// Similar to [`std::ops::Add`], but fallible (e.g. `TryAdd`).
     pub fn try_add(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Add(self.kind(), rhs.kind());
+        let err = || Error::Add(self.kind(), rhs.kind());
 
         let value = match &self {
             Value::String(lhv) => format!(
                 "{}{}",
                 String::from_utf8_lossy(&lhv),
-                String::try_from(&rhs).map_err(err)?
+                String::try_from(&rhs).map_err(|_| err())?
             )
             .into(),
-            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)
@@ -237,12 +240,12 @@ impl Value {
 
     /// Similar to [`std::ops::Sub`], but fallible (e.g. `TrySub`).
     pub fn try_sub(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Sub(self.kind(), rhs.kind());
+        let err = || Error::Sub(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)
@@ -286,12 +289,12 @@ impl Value {
 
     /// Similar to [`std::ops::Rem`], but fallible (e.g. `TryRem`).
     pub fn try_rem(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Rem(self.kind(), rhs.kind());
+        let err = || Error::Rem(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv % i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv % f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv % i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv % f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)
@@ -299,12 +302,12 @@ impl Value {
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
     pub fn try_gt(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Rem(self.kind(), rhs.kind());
+        let err = || Error::Rem(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv > i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv > f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv > i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv > f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)
@@ -312,12 +315,12 @@ impl Value {
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
     pub fn try_ge(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Ge(self.kind(), rhs.kind());
+        let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv >= i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv >= f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv >= i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv >= f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)
@@ -325,12 +328,12 @@ impl Value {
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
     pub fn try_lt(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Ge(self.kind(), rhs.kind());
+        let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv < i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv < f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv < i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv < f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)
@@ -338,12 +341,12 @@ impl Value {
 
     /// Similar to [`std::cmp::Ord`], but fallible (e.g. `TryOrd`).
     pub fn try_le(self, rhs: Self) -> Result<Self, Error> {
-        let err = |_| Error::Ge(self.kind(), rhs.kind());
+        let err = || Error::Ge(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv <= i64::try_from(&rhs).map_err(err)?).into(),
-            Value::Float(lhv) => (lhv <= f64::try_from(&rhs).map_err(err)?).into(),
-            _ => return Err(err(())),
+            Value::Integer(lhv) => (lhv <= i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv <= f64::try_from(&rhs).map_err(|_| err())?).into(),
+            _ => return Err(err()),
         };
 
         Ok(value)

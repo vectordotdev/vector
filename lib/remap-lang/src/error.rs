@@ -1,6 +1,4 @@
-use crate::expression::{self, assignment, function, if_statement, not, path, variable};
-use crate::parser::Rule;
-use crate::value;
+use crate::{expression, function, parser::Rule, value};
 use std::fmt;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -14,35 +12,17 @@ pub enum Error {
     #[error("unexpected token sequence")]
     Rule(#[from] Rule),
 
-    #[error("runtime error")]
-    Runtime,
-
-    #[error("expression error")]
+    #[error(transparent)]
     Expression(#[from] expression::Error),
 
-    #[error(r#"error for function "{0}""#)]
-    Function(String, #[source] function::Error),
+    #[error("function error")]
+    Function(#[from] function::Error),
 
     #[error("regex error")]
     Regex(#[from] regex::Error),
 
-    #[error("assignment error")]
-    Assignment(#[from] assignment::Error),
-
     #[error("value error")]
     Value(#[from] value::Error),
-
-    #[error("path error")]
-    Path(#[from] path::Error),
-
-    #[error("not operation error")]
-    Not(#[from] not::Error),
-
-    #[error("if-statement error")]
-    IfStatement(#[from] if_statement::Error),
-
-    #[error("variable error")]
-    Variable(#[from] variable::Error),
 
     #[error("unknown error")]
     Unknown,

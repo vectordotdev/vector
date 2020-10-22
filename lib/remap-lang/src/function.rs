@@ -1,10 +1,19 @@
-use crate::{Error, Expr, Expression, Result, Value};
+use crate::{Expr, Expression, Result, Value};
 use core::convert::TryInto;
 use std::collections::HashMap;
 
 mod split;
 
 pub(crate) use split::Split;
+
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum Error {
+    #[error(r#"expected expression argument, got regex"#)]
+    ArgumentExprRegex,
+
+    #[error(r#"missing required argument "{0}""#)]
+    Required(String),
+}
 
 #[derive(Copy, Clone)]
 pub(crate) struct Parameter {
@@ -46,17 +55,19 @@ impl ArgumentList {
     pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Box<Expr>>> {
         self.0
             .remove(keyword)
-            .map(|v| v.try_into().map(Box::new))
+            .map(|v| v.try_into().map(Box::new).map_err(Into::into))
             .transpose()
     }
 
     pub fn required(&mut self, keyword: &str) -> Result<Argument> {
-        self.0.remove(keyword).ok_or(Error::Unknown /* TODO */)
+        self.0
+            .remove(keyword)
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
     pub fn required_expr(&mut self, keyword: &str) -> Result<Box<Expr>> {
         self.required(keyword)
-            .and_then(TryInto::try_into)
+            .and_then(|v| v.try_into().map_err(Into::into))
             .map(Box::new)
     }
 
@@ -81,7 +92,7 @@ impl TryInto<Expr> for Argument {
     fn try_into(self) -> std::result::Result<Expr, Self::Error> {
         match self {
             Argument::Expression(expr) => Ok(expr),
-            Argument::Regex(_) => Err(Error::Unknown /* TODO */),
+            Argument::Regex(_) => Err(Error::ArgumentExprRegex),
         }
     }
 }

@@ -1,4 +1,5 @@
-use crate::{Error as E, Expression, Object, Result, State, Value};
+use super::Error as E;
+use crate::{Expression, Object, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -22,7 +23,7 @@ impl Expression for Variable {
         state
             .variable(&self.ident)
             .cloned()
-            .ok_or_else(|| E::from(Error::Undefined(self.ident.to_owned())))
+            .ok_or_else(|| E::from(Error::Undefined(self.ident.to_owned())).into())
             .map(Some)
     }
 }

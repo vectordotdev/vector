@@ -1,7 +1,6 @@
+use super::Error as E;
 use crate::function::Split;
-use crate::{
-    Argument, ArgumentList, Error as E, Expression, Function as _, Object, Result, State, Value,
-};
+use crate::{Argument, ArgumentList, Expression, Function as _, Object, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -39,9 +38,10 @@ impl Function {
         // check function arity
         if arguments.len() > parameters.len() {
             return Err(E::Function(
-                ident,
+                ident.clone(),
                 Error::Arity(parameters.len(), arguments.len()),
-            ));
+            )
+            .into());
         }
 
         // Keeps track of positional argument indices.
@@ -80,10 +80,7 @@ impl Function {
             .filter(|(_, p)| p.required)
             .filter(|(_, p)| !list.keywords().contains(&p.keyword))
             .map(|(i, p)| {
-                Err(E::Function(
-                    ident.clone(),
-                    Error::Required(p.keyword.to_owned(), i),
-                ))
+                Err(E::Function(ident.clone(), Error::Required(p.keyword.to_owned(), i)).into())
             })
             .collect::<Result<_>>()?;
 

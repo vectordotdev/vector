@@ -1,4 +1,5 @@
-use crate::{Error as E, Expr, Expression, Object, Result, State, Value};
+use super::Error as E;
+use crate::{Expr, Expression, Object, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {

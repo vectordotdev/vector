@@ -1,4 +1,5 @@
-use crate::{Error as E, Expression, Object, Result, State, Value};
+use super::Error as E;
+use crate::{Expression, Object, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -25,7 +26,7 @@ impl Expression for Path {
         object
             .find(&self.path)
             .map_err(|e| E::from(Error::Resolve(e)))?
-            .ok_or_else(|| E::from(Error::Missing(self.path.to_owned())))
+            .ok_or_else(|| E::from(Error::Missing(self.path.to_owned())).into())
             .map(Some)
     }
 }

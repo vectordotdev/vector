@@ -1,6 +1,6 @@
 use crate::{
-    Argument, ArgumentList, Error, Expr, Expression, Function, Object, Parameter, Result, State,
-    Value,
+    expression::Error, Argument, ArgumentList, Expr, Expression, Function, Object, Parameter,
+    Result, State, Value,
 };
 use std::convert::{TryFrom, TryInto};
 
@@ -57,33 +57,29 @@ impl Expression for SplitFn {
         let string: String = self
             .value
             .execute(state, object)?
-            .ok_or(Error::Unknown /* TODO */)?
-            .try_into()
-            .map_err(|_| Error::Unknown /* TODO */)?;
+            .ok_or(Error::Missing)?
+            .try_into()?;
 
         let limit: usize = self
             .limit
             .as_ref()
-            .and_then(|v| v.execute(state, object).transpose())
+            .and_then(|expr| expr.execute(state, object).transpose())
             .transpose()?
-            .map(|v| i64::try_from(v).map_err(|_| Error::Unknown /* TODO */))
+            .map(i64::try_from)
             .transpose()?
-            .map(TryFrom::try_from)
-            .transpose()
-            .map_err(|_| Error::Unknown /* TODO */)?
+            .and_then(|i| usize::try_from(i).ok())
             .unwrap_or(usize::MAX);
 
         let value = match &self.pattern {
-            Argument::Regex(regex) => regex
+            Argument::Regex(pattern) => pattern
                 .splitn(&string, limit as usize)
                 .collect::<Vec<_>>()
                 .into(),
             Argument::Expression(expr) => {
                 let pattern: String = expr
                     .execute(state, object)?
-                    .ok_or(Error::Unknown)?
-                    .try_into()
-                    .map_err(|_| Error::Unknown)?;
+                    .ok_or(Error::Missing)?
+                    .try_into()?;
 
                 string.splitn(limit, &pattern).collect::<Vec<_>>().into()
             }

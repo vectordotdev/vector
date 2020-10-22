@@ -1,4 +1,5 @@
-use crate::{value, Error as E, Expr, Expression, Object, Result, State, Value};
+use super::Error as E;
+use crate::{value, Expr, Expression, Object, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -22,10 +23,11 @@ impl Expression for Not {
         self.expression.execute(state, object).and_then(|opt| {
             opt.map(|v| match v {
                 Value::Boolean(b) => Ok(Value::Boolean(!b)),
-                _ => Err(E::Not(Error::Value(value::Error::Expected(
+                _ => Err(E::from(Error::from(value::Error::Expected(
                     Value::Boolean(true).kind(),
                     v.kind(),
-                )))),
+                )))
+                .into()),
             })
             .transpose()
         })

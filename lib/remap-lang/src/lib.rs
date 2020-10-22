@@ -93,9 +93,10 @@ mod tests {
             // (r#".foo == .bar"#, Ok(Some(Value::Boolean(false)))),
             (
                 r#".foo == .bar"#,
-                Err(Error::Path(expression::path::Error::Missing(
-                    ".foo".to_owned(),
-                ))),
+                Err(
+                    expression::Error::Path(expression::path::Error::Missing(".foo".to_owned()))
+                        .into(),
+                ),
             ),
             (r#".foo = (null || "bar")"#, Ok(Some("bar".into()))),
             (r#"!false"#, Ok(Some(true.into()))),

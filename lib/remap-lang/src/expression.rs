@@ -22,8 +22,26 @@ pub(super) use variable::Variable;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
-    #[error("expected expression, not none")]
+    #[error("expected expression, got none")]
     Missing,
+
+    #[error(r#"error for function "{0}""#)]
+    Function(String, #[source] function::Error),
+
+    #[error("assignment error")]
+    Assignment(#[from] assignment::Error),
+
+    #[error("path error")]
+    Path(#[from] path::Error),
+
+    #[error("not operation error")]
+    Not(#[from] not::Error),
+
+    #[error("if-statement error")]
+    IfStatement(#[from] if_statement::Error),
+
+    #[error("variable error")]
+    Variable(#[from] variable::Error),
 }
 
 pub trait Expression: std::fmt::Debug {
