@@ -145,7 +145,7 @@ components: sinks: prometheus: {
 			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) counter
-				\(_name) \(_value)
+				\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
@@ -166,7 +166,7 @@ components: sinks: prometheus: {
 			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) gauge
-				\(_name) \(_value)
+				\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
@@ -181,9 +181,6 @@ components: sinks: prometheus: {
 					counts: [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]
 					count: 2
 					sum:   0.789
-				}
-				tags: {
-					host: _host
 				}
 			}
 			output: """
@@ -203,6 +200,92 @@ components: sinks: prometheus: {
 				\(_name)_bucket{le="+Inf"} 0
 				\(_name)_sum 0.789
 				\(_name)_count 2
+				"""
+		},
+		{
+			_host: _values.local_host
+			_name: "request_retries"
+			title: "Distribution to histogram"
+			notes: "Histogram will be computed out of values and then passed to prometheus."
+			configuration: {
+				buckets: [0.0, 1.0, 3.0]
+			}
+			input: metric: {
+				name: _name
+				distribution: {
+					values: [0.0, 1.0, 4.0]
+					sample_rates: [4, 2, 1]
+					statistic: "histogram"
+				}
+				tags: {
+					host: _host
+				}
+			}
+			output: """
+				# HELP \(_name) \(_name)
+				# TYPE \(_name) histogram
+				\(_name)_bucket{host="\(_host)",le="0"} 4
+				\(_name)_bucket{host="\(_host)",le="1"} 6
+				\(_name)_bucket{host="\(_host)",le="3"} 6
+				\(_name)_bucket{host="\(_host)",le="+Inf"} 7
+				\(_name)_sum{host="\(_host)"} 6
+				\(_name)_count{host="\(_host)"} 7
+				"""
+		},
+		{
+			_host: _values.local_host
+			_name: "request_retries"
+			title: "Distribution to summary"
+			notes: "Summary will be computed out of values and then passed to prometheus."
+			configuration: {
+				quantiles: [0.5, 0.75, 0.95]
+			}
+			input: metric: {
+				name: _name
+				distribution: {
+					values: [0.0, 1.0, 4.0]
+					sample_rates: [3, 2, 1]
+					statistic: "summary"
+				}
+			}
+			output: """
+				# HELP \(_name) \(_name)
+				# TYPE \(_name) summary
+				\(_name){quantile="0.5"} 0
+				\(_name){quantile="0.75"} 1
+				\(_name){quantile="0.95"} 4
+				\(_name)_sum 6
+				\(_name)_count 6
+				\(_name)_min 0
+				\(_name)_max 4
+				\(_name)_avg 1				
+				"""
+		},
+		{
+			_host: _values.local_host
+			_name: "requests"
+			title: "Summary"
+			configuration: {}
+			input: metric: {
+				name: _name
+				summary: {
+					quantiles: [0.01, 0.5, 0.99]
+					values: [1.5, 2.0, 3.0]
+					count: 6
+					sum:   12.0
+				}
+				tags: {
+					host: _host
+				}
+			}
+			output: """
+				# HELP \(_name) \(_name)
+				# TYPE \(_name) summary
+				\(_name){host="\(_host)",quantile="0.01"} 1.5
+				\(_name){host="\(_host)",quantile="0.5"} 2
+				\(_name){host="\(_host)",quantile="0.99"} 3
+				\(_name)_sum{host="\(_host)"} 12
+				\(_name)_count{host="\(_host)"} 6		
 				"""
 		},
 	]
