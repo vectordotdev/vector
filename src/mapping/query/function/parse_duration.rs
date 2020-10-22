@@ -48,14 +48,14 @@ impl ParseDurationFn {
 }
 
 impl Function for ParseDurationFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = {
-            let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
         let conversion_factor = {
-            let bytes = required!(ctx, self.output, Value::Bytes(v) => v);
+            let bytes = required_value!(ctx, self.output, Value::Bytes(v) => v);
             let output = String::from_utf8_lossy(&bytes).into_owned();
 
             UNITS
@@ -79,19 +79,19 @@ impl Function for ParseDurationFn {
             .to_f64()
             .ok_or(format!("unable to format duration: '{}'", number))?;
 
-        Ok(Value::from(number))
+        Ok(Value::from(number).into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
             Parameter {
                 keyword: "output",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
         ]
@@ -180,7 +180,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

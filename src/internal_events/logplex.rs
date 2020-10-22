@@ -20,7 +20,7 @@ impl<'a> InternalEvent for HerokuLogplexRequestReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_received", 1);
+        counter!("requests_received_total", 1);
     }
 }
 
@@ -39,6 +39,6 @@ impl InternalEvent for HerokuLogplexRequestReadError {
     }
 
     fn emit_metrics(&self) {
-        counter!("request_read_errors", 1);
+        counter!("request_read_errors_total", 1);
     }
 }

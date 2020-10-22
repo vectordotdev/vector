@@ -5,34 +5,25 @@ use crate::{
         UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
         UnixSocketEventSent,
     },
-    sinks::util::{
-        acker_bytes_sink::AckerBytesSink, encode_event, encoding::EncodingConfig, Encoding,
-        StreamSink,
+    sinks::{
+        util::{AckerBytesSink, StreamSink},
+        Healthcheck, VectorSink,
     },
-    sinks::{Healthcheck, VectorSink},
     Event,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream::BoxStream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{
-    path::PathBuf,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
 use tokio::{net::UnixStream, time::delay_for};
 use tokio_retry::strategy::ExponentialBackoff;
-use tokio_util::codec::{BytesCodec, FramedWrite};
 
 #[derive(Debug, Snafu)]
-pub enum UnixStreamError {
+pub enum HealthcheckError {
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: tokio::io::Error },
-    #[snafu(display("Send error: {}", source))]
-    SendError { source: tokio::io::Error },
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -46,92 +37,44 @@ impl UnixSinkConfig {
         Self { path }
     }
 
-    fn build_connector(&self) -> crate::Result<(UnixConnector, Healthcheck)> {
-        let connector = UnixConnector::new(self.path.clone());
-        let healthcheck = connector.healthcheck().boxed();
-        Ok((connector, healthcheck))
-    }
-
-    pub fn build_service(&self) -> crate::Result<(UnixService, Healthcheck)> {
-        let (connector, healthcheck) = self.build_connector()?;
-        Ok((connector.into(), healthcheck))
-    }
-
     pub fn build(
         &self,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
+        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let (connector, healthcheck) = self.build_connector()?;
-        let sink = UnixSink::new(connector.path, cx.acker(), encoding);
-        Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
-    }
-}
-
-#[derive(Clone)]
-struct UnixConnector {
-    path: PathBuf,
-}
-
-impl UnixConnector {
-    fn new(path: PathBuf) -> Self {
-        Self { path }
-    }
-
-    fn connect(
-        &self,
-    ) -> BoxFuture<'static, Result<FramedWrite<UnixStream, BytesCodec>, UnixStreamError>> {
-        let path = self.path.clone();
-
-        async move {
-            let stream = UnixStream::connect(&path).await.context(ConnectError)?;
-            Ok(FramedWrite::new(stream, BytesCodec::new()))
-        }
-        .boxed()
+        let sink = UnixSink::new(self.path.clone(), cx.acker(), encode_event);
+        Ok((VectorSink::Stream(Box::new(sink)), self.healthcheck()))
     }
 
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
-        self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
+        let path = self.path.clone();
+
+        Box::pin(async move {
+            UnixStream::connect(&path)
+                .await
+                .context(ConnectError)
+                .map(|_| ())
+                .map_err(Into::into)
+        })
     }
 }
 
-impl From<UnixConnector> for UnixService {
-    fn from(connector: UnixConnector) -> UnixService {
-        UnixService { connector }
-    }
-}
-
-pub struct UnixService {
-    connector: UnixConnector,
-}
-
-impl tower::Service<Bytes> for UnixService {
-    type Response = ();
-    type Error = UnixStreamError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, msg: Bytes) -> Self::Future {
-        let connect = self.connector.connect();
-        async move { connect.await?.send(msg).await.context(SendError) }.boxed()
-    }
-}
-
-pub struct UnixSink {
+struct UnixSink {
     path: PathBuf,
     acker: Acker,
-    encoding: EncodingConfig<Encoding>,
+    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
 }
 
 impl UnixSink {
-    pub fn new(path: PathBuf, acker: Acker, encoding: EncodingConfig<Encoding>) -> Self {
+    pub fn new(
+        path: PathBuf,
+        acker: Acker,
+        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+    ) -> Self {
         Self {
             path,
             acker,
-            encoding,
+            encode_event: Arc::new(encode_event),
         }
     }
 
@@ -173,10 +116,10 @@ impl UnixSink {
 #[async_trait]
 impl StreamSink for UnixSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let encoding = self.encoding.clone();
+        let encode_event = Arc::clone(&self.encode_event);
         let mut input = input
             // We send event empty events because `AckerBytesSink` `ack` and `emit!` for us.
-            .map(|event| match encode_event(event, &encoding) {
+            .map(|event| match encode_event(event) {
                 Some(bytes) => bytes,
                 None => Bytes::new(),
             })
@@ -201,6 +144,7 @@ impl StreamSink for UnixSink {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sinks::util::{encode_event, Encoding};
     use crate::test_util::{random_lines_with_stream, CountReceiver};
     use tokio::net::UnixListener;
 
@@ -212,10 +156,10 @@ mod tests {
     async fn unix_sink_healthcheck() {
         let good_path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
-        assert!(UnixConnector::new(good_path).healthcheck().await.is_ok());
+        assert!(UnixSinkConfig::new(good_path).healthcheck().await.is_ok());
 
         let bad_path = temp_uds_path("no_one_listening");
-        assert!(UnixConnector::new(bad_path).healthcheck().await.is_err());
+        assert!(UnixSinkConfig::new(bad_path).healthcheck().await.is_err());
     }
 
     #[tokio::test]
@@ -229,7 +173,10 @@ mod tests {
         // Set up Sink
         let config = UnixSinkConfig::new(out_path);
         let cx = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(cx, Encoding::Text.into()).unwrap();
+        let encoding = Encoding::Text.into();
+        let (sink, _healthcheck) = config
+            .build(cx, move |event| encode_event(event, &encoding))
+            .unwrap();
 
         // Send the test data
         let (input_lines, events) = random_lines_with_stream(100, num_lines);

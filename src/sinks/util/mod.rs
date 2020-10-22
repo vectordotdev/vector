@@ -25,6 +25,7 @@ use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
 
+pub use acker_bytes_sink::AckerBytesSink;
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
 pub use buffer::metrics::{MetricBuffer, MetricEntry};

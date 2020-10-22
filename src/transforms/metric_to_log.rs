@@ -22,7 +22,14 @@ inventory::submit! {
     TransformDescription::new::<MetricToLogConfig>("metric_to_log")
 }
 
-impl GenerateConfig for MetricToLogConfig {}
+impl GenerateConfig for MetricToLogConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            host_tag: Some("host-tag".to_string()),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
@@ -103,6 +110,11 @@ mod tests {
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<MetricToLogConfig>();
+    }
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
