@@ -2,13 +2,12 @@
 
 program    = _{ SOI ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ EOI }
 expression = _{ statement | boolean_expr | block }
-statement  = _{ assignment | if_statement | abort }
+statement  = _{ assignment | if_statement }
 
 // Statements ------------------------------------------------------------------
 
 assignment   = { target ~ "=" ~ expression }
 if_statement = { "if" ~ (boolean_expr | group) ~ block ~ ("else" ~ block)? }
-abort        = { "abort" ~ expression? }
 
 // Primary ---------------------------------------------------------------------
 

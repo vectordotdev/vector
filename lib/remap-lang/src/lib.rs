@@ -91,12 +91,6 @@ mod tests {
     fn it_works() {
         let cases: Vec<(&str, Result<Option<Value>>)> = vec![
             (r#"$foo = null || "bar""#, Ok(Some("bar".into()))),
-            (r#"abort "foo""#, Err(Error::Abort(Some("foo".to_owned())))),
-            (
-                r#"abort "foo" + "bar""#,
-                Err(Error::Abort(Some("foobar".to_owned()))),
-            ),
-            (r#"abort"#, Err(Error::Abort(None))),
             // (r#".foo == .bar"#, Ok(Some(Value::Boolean(false)))),
             (
                 r#".foo == .bar"#,

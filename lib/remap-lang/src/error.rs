@@ -47,12 +47,6 @@ pub enum Error {
     #[error("variable error")]
     Variable(#[from] variable::Error),
 
-    #[error("program manually aborted{}", match .0 {
-        Some(s) => format!(": {}", s),
-        None => "".to_owned(),
-    })]
-    Abort(Option<String>),
-
     #[error("unknown error")]
     Unknown,
 }
@@ -74,7 +68,6 @@ impl fmt::Display for Rule {
         }
 
         rules_str![
-            abort,
             addition,
             argument,
             arguments,

@@ -2,8 +2,8 @@
 
 use crate::{
     expression::{
-        Abort, Arithmetic, Assignment, Constant, Function, IfStatement, Literal, Noop, Not, Path,
-        Target, Variable,
+        Arithmetic, Assignment, Constant, Function, IfStatement, Literal, Noop, Not, Path, Target,
+        Variable,
     },
     Argument, Error, Expr, Operator, Result, Value,
 };
@@ -24,7 +24,7 @@ pub(crate) fn pairs_to_expressions(pairs: Pairs<R>) -> Result<Vec<Expr>> {
 
     for pair in pairs {
         match pair.as_rule() {
-            R::assignment | R::boolean_expr | R::block | R::if_statement | R::abort => {
+            R::assignment | R::boolean_expr | R::block | R::if_statement => {
                 expressions.push(expression_from_pair(pair)?)
             }
             R::EOI => (),
@@ -48,7 +48,6 @@ fn expression_from_pair(pair: Pair<R>) -> Result<Expr> {
         R::boolean_expr => boolean_expr_from_pairs(pair.into_inner()),
         R::block => block_from_pairs(pair.into_inner()),
         R::if_statement => if_statement_from_pairs(pair.into_inner()),
-        R::abort => abort_from_pair(pair.into_inner().next()),
         _ => Err(e(R::expression)),
     }
 }
@@ -69,13 +68,6 @@ fn target_from_pair(pair: Pair<R>) -> Result<Target> {
         R::path => Ok(Target::Path(pair.as_str().to_owned())),
         _ => Err(e(R::target)),
     }
-}
-
-/// Parse abort statement.
-fn abort_from_pair(pair: Option<Pair<R>>) -> Result<Expr> {
-    let reason = pair.map(expression_from_pair).transpose()?;
-
-    Ok(Expr::from(Abort::new(reason.map(Box::new))))
 }
 
 /// Parse block expressions.
