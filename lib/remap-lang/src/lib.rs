@@ -116,10 +116,11 @@ mod tests {
             ),
             (
                 r#"{
-                    $foo = "bar"
+                    $foo = "foo"
+                    $foo = $foo + "bar"
                     $foo
                 }"#,
-                Ok(Some("bar".into())),
+                Ok(Some("foobar".into())),
             ),
         ];
 
