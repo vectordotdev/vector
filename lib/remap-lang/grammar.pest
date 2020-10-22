@@ -11,9 +11,8 @@ if_statement = { "if" ~ (boolean_expr | group) ~ block ~ ("else" ~ block)? }
 
 // Primary ---------------------------------------------------------------------
 
-primary  =  { value | constant | variable | path | group }
+primary  =  { value | variable | path | group }
 value    =  { string | float | integer | boolean | null }
-constant = ${ ASCII_ALPHA_UPPER ~ (ASCII_ALPHA_UPPER | "_")* }
 variable = ${ "$" ~ ident }
 group    =  { "(" ~ expression ~ ")" }
 

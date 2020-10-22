@@ -4,7 +4,6 @@ use std::collections::HashMap;
 #[derive(Debug, Default)]
 pub struct State {
     variables: HashMap<String, Value>,
-    constants: HashMap<String, Value>,
 }
 
 impl State {
@@ -14,9 +13,5 @@ impl State {
 
     pub fn variables_mut(&mut self) -> &mut HashMap<String, Value> {
         &mut self.variables
-    }
-
-    pub fn constant(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.constants.get(key.as_ref())
     }
 }

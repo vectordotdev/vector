@@ -1,4 +1,4 @@
-use crate::expression::{self, assignment, constant, function, if_statement, not, path, variable};
+use crate::expression::{self, assignment, function, if_statement, not, path, variable};
 use crate::parser::Rule;
 use crate::value;
 use std::fmt;
@@ -41,9 +41,6 @@ pub enum Error {
     #[error("if-statement error")]
     IfStatement(#[from] if_statement::Error),
 
-    #[error("constant error")]
-    Constant(#[from] constant::Error),
-
     #[error("variable error")]
     Variable(#[from] variable::Error),
 
@@ -78,7 +75,6 @@ impl fmt::Display for Rule {
             call,
             char,
             comparison,
-            constant,
             EOI,
             equality,
             expression,

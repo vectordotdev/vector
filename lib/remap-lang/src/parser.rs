@@ -2,8 +2,7 @@
 
 use crate::{
     expression::{
-        Arithmetic, Assignment, Constant, Function, IfStatement, Literal, Noop, Not, Path, Target,
-        Variable,
+        Arithmetic, Assignment, Function, IfStatement, Literal, Noop, Not, Path, Target, Variable,
     },
     Argument, Error, Expr, Operator, Result, Value,
 };
@@ -129,7 +128,6 @@ fn primary_from_pair(pair: Pair<R>) -> Result<Expr> {
 
     match pair.as_rule() {
         R::value => value_from_pair(pair.into_inner().next().ok_or(e(R::value))?),
-        R::constant => constant_from_pair(pair),
         R::variable => variable_from_pair(pair),
         R::path => path_from_pair(pair),
         R::group => expression_from_pair(pair.into_inner().next().ok_or(e(R::group))?),
@@ -227,11 +225,6 @@ fn variable_from_pair(pair: Pair<R>) -> Result<Expr> {
     let ident = pair.into_inner().next().ok_or(e(R::variable))?;
 
     Ok(Expr::from(Variable::new(ident.as_str().to_owned())))
-}
-
-/// Parse a [`Constant`] value, e.g. "FOO"
-fn constant_from_pair(pair: Pair<R>) -> Result<Expr> {
-    Ok(Expr::from(Constant::new(pair.as_str().to_owned())))
 }
 
 fn escaped_string_from_pair(pair: Pair<R>) -> Result<String> {
