@@ -176,20 +176,6 @@ impl Value {
         }
     }
 
-    pub fn to_string_lossy(&self) -> String {
-        use Value::*;
-
-        match self {
-            String(b) => StdString::from_utf8_lossy(&b).into_owned(),
-            Integer(num) => format!("{}", num),
-            Float(num) => format!("{}", num),
-            Boolean(b) => format!("{}", b),
-            Map(_) => "<map>".to_owned(),
-            Array(_) => "<array>".to_owned(),
-            Null => "<null>".to_owned(),
-        }
-    }
-
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
     pub fn try_mul(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Mul(self.kind(), rhs.kind());
@@ -358,6 +344,10 @@ impl Value {
         use Value::*;
 
         match self {
+            // FIXME: when cmoparing ints to floats, always change the int to
+            // float, not the other way around
+            //
+            // Do the same for multiplication, etc.
             Integer(lhv) => i64::try_from(rhs).map(|rhv| *lhv == rhv).unwrap_or(false),
             Float(lhv) => f64::try_from(rhs).map(|rhv| *lhv == rhv).unwrap_or(false),
             _ => self == rhs,
