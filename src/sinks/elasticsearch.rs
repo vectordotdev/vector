@@ -592,7 +592,7 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         dns::Resolver,
-        sinks::util::http::HttpClient,
+        http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
         Event,

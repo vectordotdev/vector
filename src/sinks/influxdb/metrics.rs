@@ -856,16 +856,13 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         event::metric::{Metric, MetricKind, MetricValue},
-        sinks::{
-            influxdb::{
-                metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
-                test_util::{
-                    cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, DATABASE, ORG,
-                    TOKEN,
-                },
-                InfluxDB1Settings, InfluxDB2Settings,
+        http::HttpClient,
+        sinks::influxdb::{
+            metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
+            test_util::{
+                cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, DATABASE, ORG, TOKEN,
             },
-            util::http::HttpClient,
+            InfluxDB1Settings, InfluxDB2Settings,
         },
         tls::TlsOptions,
         Event,
