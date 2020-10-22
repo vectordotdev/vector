@@ -8,6 +8,7 @@ use hyper::{
     client::{Client, HttpConnector},
 };
 use hyper_openssl::HttpsConnector;
+use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     task::{Context, Poll},
@@ -128,5 +129,29 @@ impl<B> fmt::Debug for HttpClient<B> {
             .field("client", &self.client)
             .field("user_agent", &self.user_agent)
             .finish()
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
+pub enum Auth {
+    Basic { user: String, password: String },
+    Bearer { token: String },
+}
+
+impl Auth {
+    pub fn apply<B>(&self, req: &mut Request<B>) {
+        use headers::{Authorization, HeaderMapExt};
+
+        match &self {
+            Auth::Basic { user, password } => {
+                let auth = Authorization::basic(&user, &password);
+                req.headers_mut().typed_insert(auth);
+            }
+            Auth::Bearer { token } => match Authorization::bearer(&token) {
+                Ok(auth) => req.headers_mut().typed_insert(auth),
+                Err(error) => error!(message = "invalid bearer token", %token, %error),
+            },
+        }
     }
 }

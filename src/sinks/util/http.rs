@@ -6,9 +6,8 @@ use crate::{buffers::Acker, event::Event, http::HttpClient};
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
-use http::{Request, StatusCode};
+use http::StatusCode;
 use hyper::body::{self, Body};
-use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     future::Future,
@@ -246,30 +245,6 @@ impl RetryLogic for HttpRetryLogic {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-pub enum Auth {
-    Basic { user: String, password: String },
-    Bearer { token: String },
-}
-
-impl Auth {
-    pub fn apply<B>(&self, req: &mut Request<B>) {
-        use headers::{Authorization, HeaderMapExt};
-
-        match &self {
-            Auth::Basic { user, password } => {
-                let auth = Authorization::basic(&user, &password);
-                req.headers_mut().typed_insert(auth);
-            }
-            Auth::Bearer { token } => match Authorization::bearer(&token) {
-                Ok(auth) => req.headers_mut().typed_insert(auth),
-                Err(error) => error!(message = "invalid bearer token", %token, %error),
-            },
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -313,7 +288,9 @@ mod test {
         let request = b"hello".to_vec();
         let client = HttpClient::new(resolver, None).unwrap();
         let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
-            Box::pin(ready(Request::post(&uri).body(body).map_err(Into::into)))
+            Box::pin(ready(
+                http::Request::post(&uri).body(body).map_err(Into::into),
+            ))
         });
 
         let (tx, rx) = futures01::sync::mpsc::channel(10);

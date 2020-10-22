@@ -15,11 +15,11 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    http::HttpClient,
+    http::{Auth, HttpClient},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, TowerRequestConfig, UriSerde,
     },
     template::Template,
