@@ -906,3 +906,28 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "peas, beans, chips and more beans"
 
+[transforms.remap_function_flatten_array]
+  inputs=[]
+  type = "remap"
+  mapping = """
+    .foo = flatten(parse_json(.foo))
+  """
+[[tests]]
+  name = "remap_function_flatten_array"
+  [tests.input]
+    insert_at = "remap_function_flatten_array"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "[1, 2, [3, 4, [5, 6], 7], [8, 9]]"
+  [[tests.outputs]]
+    extract_from = "remap_function_flatten_array"
+    [[tests.outputs.conditions]]
+    "foo[0].equals" = 1
+    "foo[1].equals" = 2
+    "foo[2].equals" = 3
+    "foo[3].equals" = 4
+    "foo[4].equals" = 5
+    "foo[5].equals" = 6
+    "foo[6].equals" = 7
+    "foo[7].equals" = 8
+    "foo[8].equals" = 9

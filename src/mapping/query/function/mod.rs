@@ -160,6 +160,7 @@ build_signatures! {
     parse_syslog => ParseSyslogFn,
     split => SplitFn,
     replace => ReplaceFn,
+    flatten => FlattenFn,
 }
 
 /// A parameter definition accepted by a function.
