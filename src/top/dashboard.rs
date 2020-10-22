@@ -3,17 +3,17 @@ use super::{
     state::{WidgetsState, TOPOLOGY_HEADERS},
 };
 use std::io::Stdout;
-use termion::event::Key;
-use termion::raw::{IntoRawMode, RawTerminal};
-use termion::screen::AlternateScreen;
-use tui::layout::Rect;
-use tui::widgets::Wrap;
+use termion::{
+    event::Key,
+    raw::{IntoRawMode, RawTerminal},
+    screen::AlternateScreen,
+};
 use tui::{
     backend::{Backend, TermionBackend},
-    layout::{Alignment, Constraint, Layout},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
-    widgets::{Block, Borders, Paragraph, Row, Table},
+    widgets::{Block, Borders, Paragraph, Row, Table, Wrap},
     Frame, Terminal,
 };
 
@@ -54,7 +54,8 @@ impl Widgets {
     /// Renders a topology table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `topology_state`
     fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let items = self.state.topology().load().rows().into_iter().map(|r| {
+        let topology = self.state.topology();
+        let items = topology.rows().into_iter().map(|r| {
             Row::StyledData(
                 vec![
                     r.name.clone(),

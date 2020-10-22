@@ -3,7 +3,7 @@ use super::{
     state::{TopologyRow, TopologyState, WidgetsState},
 };
 use crate::config;
-use arc_swap::ArcSwap;
+use std::sync::Arc;
 use url::Url;
 use vector_api_client::{
     gql::{HealthQueryExt, TopologyQueryExt},
@@ -16,7 +16,7 @@ use vector_api_client::{
 async fn update_topology(
     interval: u64,
     client: Client,
-    topology_state: ArcSwap<TopologyState>,
+    topology_state: Arc<TopologyState>,
 ) -> Result<(), ()> {
     // Loop every `interval` ms to update topology
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(interval));
@@ -44,13 +44,10 @@ async fn update_topology(
                 errors: 0,
                 throughput: 0.00,
             })
-            .collect();
+            .collect::<Vec<_>>();
 
-        // Swap the
-        topology_state.swap(topology_state.load().with_swapped_rows(rows));
+        topology_state.update_rows(rows);
     }
-
-    unreachable!("not possible")
 }
 
 /// CLI command func for displaying Vector topology, and communicating with a local/remote
@@ -77,16 +74,18 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         }
     }
 
-    // Create initial topology; spawn updater
-    let topology_state = TopologyState::arc_new();
+    // Create initial topology, to be shared by the API client and dashboard renderer
+    let topology_state = Arc::new(TopologyState::new());
+
+    // Update dashboard based on the provided refresh interval
     tokio::spawn(update_topology(
         opts.refresh_interval,
         client,
-        ArcSwap::clone(&topology_state),
+        Arc::clone(&topology_state),
     ));
 
-    // Spawn a new dashboard with the configured widgets
-    let state = WidgetsState::new(url, ArcSwap::clone(&topology_state));
+    // Render a dashboard with the configured widgets
+    let state = WidgetsState::new(url, Arc::clone(&topology_state));
     let widgets = Widgets::new(state);
 
     Dashboard::new().run(&widgets);

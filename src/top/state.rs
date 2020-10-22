@@ -1,8 +1,12 @@
-use arc_swap::ArcSwap;
 use num_format::{Locale, ToFormattedString};
-use std::{collections::btree_map::BTreeMap, sync::Arc};
+use std::{
+    collections::btree_map::BTreeMap,
+    sync::{Arc, Mutex},
+};
 
 pub static TOPOLOGY_HEADERS: [&'static str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
+pub static ACQUIRE_LOCK_INVARIANT: &'static str =
+    "Unable to acquire topology lock. Please report this.";
 
 #[derive(Debug, Clone)]
 pub struct TopologyRow {
@@ -48,70 +52,66 @@ impl TopologyRow {
 }
 
 pub struct TopologyState {
-    rows: BTreeMap<String, Arc<TopologyRow>>,
+    rows: Mutex<BTreeMap<String, TopologyRow>>,
 }
 
 impl TopologyState {
     /// Creates new, empty topology state
     pub fn new() -> Self {
         Self {
-            state: TableState::default(),
-            rows: BTreeMap::new(),
+            rows: Mutex::new(BTreeMap::new()),
         }
-    }
-
-    /// Convenience method that calls Self::new, and returns the result as ArcSwap<Self>
-    pub fn arc_new() -> ArcSwap<Self> {
-        ArcSwap::from(Arc::new(Self::new()))
     }
 
     /// Immutable method that returns a new Arc<Self> containing updated rows. Rows that
     /// don't exist in `rows` will be deleted; new rows will be added, and existing
     /// rows will be updated
-    pub fn with_swapped_rows(&self, rows: Vec<TopologyRow>) -> Arc<Self> {
+    pub fn update_rows(&self, rows: Vec<TopologyRow>) {
         let rows = rows
             .into_iter()
             .map(|r| {
                 (
                     r.name.clone(),
-                    Arc::new(match self.rows.get(&r.name) {
+                    match self.rows.lock().expect(ACQUIRE_LOCK_INVARIANT).get(&r.name) {
                         Some(existing) if existing.topology_type == r.topology_type => {
                             // TODO - update values > 0. For now, just return row
                             r
                         }
                         _ => r,
-                    }),
+                    },
                 )
             })
             .collect();
 
-        let mut topology = Self::new();
-        topology.rows = rows;
-
-        Arc::new(topology)
+        *self.rows.lock().expect(ACQUIRE_LOCK_INVARIANT) = rows;
     }
 
     /// Returns a cloned copy of topology rows
-    pub fn rows(&self) -> Vec<Arc<TopologyRow>> {
-        self.rows.values().map(|r| Arc::clone(r)).collect()
+    pub fn rows(&self) -> Vec<TopologyRow> {
+        self.rows
+            .lock()
+            .expect(ACQUIRE_LOCK_INVARIANT)
+            .values()
+            .cloned()
+            .collect()
     }
 }
 
 /// Contains the aggregate state required to render each widget in a dashboard
 pub struct WidgetsState {
     url: url::Url,
-    topology: ArcSwap<TopologyState>,
+    topology: Arc<TopologyState>,
 }
 
 impl WidgetsState {
     /// Returns new widgets state
-    pub fn new(url: url::Url, topology: ArcSwap<TopologyState>) -> Self {
+    pub fn new(url: url::Url, topology: Arc<TopologyState>) -> Self {
         Self { url, topology }
     }
 
     /// Returns a thread-safe clone of current topology state
-    pub fn topology(&self) -> ArcSwap<TopologyState> {
-        ArcSwap::clone(&self.topology)
+    pub fn topology(&self) -> Arc<TopologyState> {
+        Arc::clone(&self.topology)
     }
 
     /// Returns a string representation of the URL
