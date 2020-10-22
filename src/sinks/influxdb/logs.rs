@@ -73,7 +73,19 @@ inventory::submit! {
     SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
 
-impl GenerateConfig for InfluxDBLogsConfig {}
+impl GenerateConfig for InfluxDBLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "http://localhost:8086/"
+            namespace = "my-namespace"
+            tags = []
+            org = "my-org"
+            bucket = "my-bucket"
+            token = "${INFLUXDB_TOKEN}""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
@@ -231,6 +243,11 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<InfluxDBLogsConfig>();
+    }
 
     #[test]
     fn test_config_without_tags() {

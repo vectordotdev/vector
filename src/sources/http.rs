@@ -33,7 +33,18 @@ inventory::submit! {
     SourceDescription::new::<SimpleHttpConfig>("http")
 }
 
-impl GenerateConfig for SimpleHttpConfig {}
+impl GenerateConfig for SimpleHttpConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "0.0.0.0:80".parse().unwrap(),
+            encoding: Default::default(),
+            headers: Vec::new(),
+            tls: None,
+            auth: None,
+        })
+        .unwrap()
+    }
+}
 
 #[derive(Clone)]
 struct SimpleHttpSource {
@@ -222,6 +233,11 @@ mod tests {
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
     use std::net::SocketAddr;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SimpleHttpConfig>();
+    }
 
     async fn source(
         encoding: Encoding,

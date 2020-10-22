@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
@@ -51,7 +51,7 @@ inventory::submit! {
     SinkDescription::new::<NewRelicLogsConfig>("new_relic_logs")
 }
 
-impl GenerateConfig for NewRelicLogsConfig {}
+impl_generate_config_from_default!(NewRelicLogsConfig);
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -161,6 +161,11 @@ mod tests {
     use hyper::Method;
     use serde_json::Value;
     use std::io::BufRead;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<NewRelicLogsConfig>();
+    }
 
     #[test]
     fn new_relic_logs_check_config_no_auth() {

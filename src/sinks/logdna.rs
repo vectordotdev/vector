@@ -52,7 +52,15 @@ inventory::submit! {
     SinkDescription::new::<LogdnaConfig>("logdna")
 }
 
-impl GenerateConfig for LogdnaConfig {}
+impl GenerateConfig for LogdnaConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"hostname = "hostname"
+            api_key = "${LOGDNA_API_KEY}""#,
+        )
+        .unwrap()
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -249,6 +257,11 @@ mod tests {
     };
     use futures::{stream, StreamExt};
     use serde_json::json;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogdnaConfig>();
+    }
 
     #[test]
     fn encode_event() {

@@ -37,7 +37,15 @@ inventory::submit! {
     SinkDescription::new::<VectorSinkConfig>("vector")
 }
 
-impl GenerateConfig for VectorSinkConfig {}
+impl GenerateConfig for VectorSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "127.0.0.1:5000".to_string(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
@@ -93,4 +101,12 @@ fn encode_event(event: Event) -> Option<Bytes> {
     event.encode(&mut out).unwrap();
 
     Some(out.into())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::VectorSinkConfig>();
+    }
 }

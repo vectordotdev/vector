@@ -16,7 +16,15 @@ inventory::submit! {
     TransformDescription::new::<FieldFilterConfig>("field_filter")
 }
 
-impl GenerateConfig for FieldFilterConfig {}
+impl GenerateConfig for FieldFilterConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            field: String::new(),
+            value: String::new(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "field_filter")]
@@ -68,5 +76,13 @@ impl Transform for FieldFilter {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::FieldFilterConfig>();
     }
 }

@@ -20,7 +20,11 @@ inventory::submit! {
     TransformDescription::new::<AnsiStripperConfig>("ansi_stripper")
 }
 
-impl GenerateConfig for AnsiStripperConfig {}
+impl GenerateConfig for AnsiStripperConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { field: None }).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
@@ -77,11 +81,16 @@ impl Transform for AnsiStripper {
 
 #[cfg(test)]
 mod tests {
-    use super::AnsiStripper;
+    use super::{AnsiStripper, AnsiStripperConfig};
     use crate::{
         event::{Event, Value},
         transforms::Transform,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AnsiStripperConfig>();
+    }
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {

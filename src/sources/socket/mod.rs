@@ -67,7 +67,15 @@ inventory::submit! {
     SourceDescription::new::<SocketConfig>("socket")
 }
 
-impl GenerateConfig for SocketConfig {}
+impl GenerateConfig for SocketConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"mode = "tcp"
+            address = "0.0.0.0:9000""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
@@ -170,6 +178,11 @@ mod test {
         tokio::{net::UnixStream, task::yield_now},
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SocketConfig>();
+    }
 
     //////// TCP TESTS ////////
     #[tokio::test]

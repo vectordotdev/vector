@@ -31,7 +31,16 @@ inventory::submit! {
     SinkDescription::new::<SocketSinkConfig>("socket")
 }
 
-impl GenerateConfig for SocketSinkConfig {}
+impl GenerateConfig for SocketSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"address = "92.12.333.224:5000"
+            mode = "tcp"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(
@@ -95,6 +104,11 @@ mod test {
     };
     use tokio::{net::TcpListener, time::timeout};
     use tokio_util::codec::{FramedRead, LinesCodec};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SocketSinkConfig>();
+    }
 
     async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
