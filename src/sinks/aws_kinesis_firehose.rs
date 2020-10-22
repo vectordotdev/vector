@@ -296,7 +296,7 @@ mod integration_tests {
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchConfig,
         },
-        test_util::{random_events_with_stream, random_string},
+        test_util::{random_events_with_stream, random_string, wait_for},
     };
     use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
@@ -317,7 +317,10 @@ mod integration_tests {
             endpoint: "http://localhost:4566".into(),
         };
 
-        ensure_stream(region, stream.clone()).await;
+        let elasticseacrh_arn = ensure_elasticsearch_domain(region.clone(), stream.clone()).await;
+
+        ensure_elasticesarch_delivery_stream(region, stream.clone(), elasticseacrh_arn.clone())
+            .await;
 
         let config = KinesisFirehoseSinkConfig {
             stream_name: stream.clone(),
@@ -401,22 +404,28 @@ mod integration_tests {
             ..Default::default()
         };
 
-        match client.create_elasticsearch_domain(req).await {
+        let arn = match client.create_elasticsearch_domain(req).await {
             Ok(res) => res.domain_status.expect("no domain status").arn,
             Err(e) => panic!("Unable to create the Elasticsearch domain {:?}", e),
-        }
+        };
+
+        // wait for ES to be available; it starts up when the ES domain is created
+        wait_for(|| async { reqwest::get("http://localhost:4571").await.is_ok() }).await;
+
+        arn
     }
 
-    /// creates ES domain and Firehose delivery stream
-    async fn ensure_stream(region: Region, delivery_stream_name: String) {
-        let es_domain_arn =
-            ensure_elasticsearch_domain(region.clone(), delivery_stream_name.clone()).await;
-
+    /// creates Firehose delivery stream to ship to Elasticsearch
+    async fn ensure_elasticesarch_delivery_stream(
+        region: Region,
+        delivery_stream_name: String,
+        elasticseacrh_arn: String,
+    ) {
         let client = KinesisFirehoseClient::new(region);
 
         let es_config = ElasticsearchDestinationConfiguration {
             index_name: delivery_stream_name.clone(),
-            domain_arn: Some(es_domain_arn),
+            domain_arn: Some(elasticseacrh_arn),
             role_arn: "doesn't matter".into(),
             type_name: Some("doesn't matter".into()),
             ..Default::default()
