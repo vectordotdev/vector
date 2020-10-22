@@ -1,4 +1,3 @@
-mod context;
 mod error;
 mod expression;
 mod function;
