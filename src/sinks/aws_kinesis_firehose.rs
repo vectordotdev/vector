@@ -414,16 +414,15 @@ mod integration_tests {
         wait_for_duration(
             || async {
                 reqwest::get("http://localhost:4571/_cluster/health")
-                    .and_then(|res| async move {
-                        res.json::<Value>().await.map(|v| {
-                            v.get("status")
-                                .and_then(|status| status.as_str())
-                                .map(|status| status == "green")
-                                .unwrap_or(false)
-                        })
-                    })
+                    .and_then(reqwest::Response::json::<Value>)
                     .await
-                    .unwrap_or(false)
+                    .map(|v| {
+                        v.get("status")
+                            .and_then(|status| status.as_str())
+                            .map(|status| status == "green")
+                            .unwrap_or(false)
+                    })
+                    .unwrap_or(false);
             },
             Duration::from_secs(30),
         )
