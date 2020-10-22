@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
-    rusoto::{self, region::RegionOrEndpoint},
+    rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -290,7 +290,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::SinkContext,
-        rusoto::region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         sinks::{
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchConfig,

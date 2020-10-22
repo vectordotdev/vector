@@ -3,7 +3,7 @@ use crate::{
     dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
-    rusoto::{self, region::RegionOrEndpoint},
+    rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
@@ -381,7 +381,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::SinkContext,
-        rusoto::region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
     use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};

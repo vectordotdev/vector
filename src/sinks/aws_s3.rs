@@ -2,7 +2,7 @@ use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
-    rusoto::{self, region::RegionOrEndpoint},
+    rusoto::{self, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -543,7 +543,7 @@ mod integration_tests {
         config::SinkContext,
         dns::Resolver,
         event::Event,
-        rusoto::region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};

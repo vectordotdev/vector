@@ -29,6 +29,7 @@ use std::{
 use tower::{Service, ServiceExt};
 
 pub mod region;
+pub use region::{region_from_endpoint, RegionOrEndpoint};
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
 

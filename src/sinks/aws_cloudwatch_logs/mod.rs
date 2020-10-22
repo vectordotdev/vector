@@ -4,7 +4,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{Event, LogEvent, Value},
-    rusoto::{self, region::RegionOrEndpoint},
+    rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
@@ -672,7 +672,7 @@ mod tests {
     use crate::{
         dns::Resolver,
         event::{Event, Value},
-        rusoto::region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
     };
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
@@ -851,7 +851,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        rusoto::region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
     use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
