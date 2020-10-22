@@ -10,6 +10,7 @@ use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     ser::{Serialize, Serializer},
 };
+use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fmt;
@@ -45,7 +46,15 @@ impl TryFrom<&str> for Template {
     type Error = TemplateError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
-        Template::try_from(src.to_owned())
+        Template::try_from(Cow::Borrowed(src))
+    }
+}
+
+impl TryFrom<String> for Template {
+    type Error = TemplateError;
+
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        Template::try_from(Cow::Owned(src))
     }
 }
 
@@ -57,10 +66,10 @@ impl TryFrom<PathBuf> for Template {
     }
 }
 
-impl TryFrom<String> for Template {
+impl TryFrom<Cow<'_, str>> for Template {
     type Error = TemplateError;
 
-    fn try_from(src: String) -> Result<Self, Self::Error> {
+    fn try_from(src: Cow<'_, str>) -> Result<Self, Self::Error> {
         let (has_error, is_dynamic) = StrftimeItems::new(&src)
             .fold((false, false), |pair, item| {
                 (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
@@ -70,7 +79,7 @@ impl TryFrom<String> for Template {
         } else {
             Ok(Template {
                 has_fields: RE.is_match(&src),
-                src,
+                src: src.into_owned(),
                 has_ts: is_dynamic,
             })
         }
