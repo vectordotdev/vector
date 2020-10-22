@@ -13,7 +13,6 @@ use expression::{Expr, Expression};
 use function::{Argument, ArgumentList, Function, Parameter};
 use operator::Operator;
 use state::State;
-// pub(crate) use context::Context;
 
 pub use error::Error;
 pub use program::Program;
