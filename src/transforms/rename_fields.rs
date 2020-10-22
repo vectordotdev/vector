@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    event::Lookup,
+    event::LookupBuf,
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
@@ -14,12 +14,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
-    pub fields: Fields<Lookup>,
+    pub fields: Fields<LookupBuf>,
     drop_empty: Option<bool>,
 }
 
 pub struct RenameFields {
-    fields: IndexMap<Lookup, Lookup>,
+    fields: IndexMap<LookupBuf, LookupBuf>,
     drop_empty: bool,
 }
 
@@ -40,8 +40,8 @@ impl TransformConfig for RenameFieldsConfig {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(
-                key.to_string().parse::<Lookup>()?,
-                value.to_string().parse::<Lookup>()?,
+                key.to_string().parse::<LookupBuf>()?,
+                value.to_string().parse::<LookupBuf>()?,
             );
         }
         Ok(Box::new(RenameFields::new(
@@ -64,7 +64,7 @@ impl TransformConfig for RenameFieldsConfig {
 }
 
 impl RenameFields {
-    pub fn new(fields: IndexMap<Lookup, Lookup>, drop_empty: bool) -> crate::Result<Self> {
+    pub fn new(fields: IndexMap<LookupBuf, LookupBuf>, drop_empty: bool) -> crate::Result<Self> {
         Ok(RenameFields { fields, drop_empty })
     }
 }
@@ -114,12 +114,12 @@ mod tests {
         event.as_mut_log().insert("do_not_move", "not moved");
         let mut fields = IndexMap::new();
         fields.insert(
-            Lookup::try_from("to_move").unwrap(),
-            Lookup::try_from("moved").unwrap(),
+            LookupBuf::try_from("to_move").unwrap(),
+            LookupBuf::try_from("moved").unwrap(),
         );
         fields.insert(
-            Lookup::try_from("not_present").unwrap(),
-            Lookup::try_from("should_not_exist").unwrap(),
+            LookupBuf::try_from("not_present").unwrap(),
+            LookupBuf::try_from("should_not_exist").unwrap(),
         );
 
         let mut transform = RenameFields::new(fields, false).unwrap();

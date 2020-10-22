@@ -1,10 +1,10 @@
-use super::*;
-use std::{fs, io::Read, path::Path};
+use crate::event::lookup::*;
+use std::{fs, io::Read, path::Path, str::FromStr};
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
 lazy_static::lazy_static! {
-    static ref SUFFICIENTLY_DECOMPOSED: [Segment; 9] = [
+    static ref SUFFICIENTLY_DECOMPOSED: [Segment<'static>; 9] = [
         Segment::field(r#"regular"#.to_string()),
         Segment::field(r#""quoted""#.to_string()),
         Segment::field(r#""quoted but spaces""#.to_string()),
@@ -30,7 +30,7 @@ fn we_dont_parse_plain_strings_in_from() {
     crate::test_util::trace_init();
     let input = "some_key.still_the_same_key.this.is.going.in.via.from.and.should.not.get.parsed";
     let lookup = Lookup::from(input);
-    assert_eq!(lookup[0], Segment::field(String::from(input)));
+    assert_eq!(lookup[0], Segment::field(input));
     assert_eq!(lookup.to_string(), input);
 }
 
@@ -39,7 +39,7 @@ fn simple() {
     crate::test_util::trace_init();
     let input = "some_key";
     let lookup = Lookup::from_str(input).unwrap();
-    assert_eq!(lookup[0], Segment::field(String::from("some_key")));
+    assert_eq!(lookup[0], Segment::field("some_key"));
     assert_eq!(lookup.to_string(), input);
 }
 
@@ -48,9 +48,9 @@ fn push() {
     crate::test_util::trace_init();
     let input = "some_key";
     let mut lookup = Lookup::from_str(input).unwrap();
-    lookup.push(Segment::field(String::from(input)));
-    assert_eq!(lookup[0], Segment::from(String::from("some_key")));
-    assert_eq!(lookup[1], Segment::from(String::from("some_key")));
+    lookup.push(Segment::field(input));
+    assert_eq!(lookup[0], Segment::from("some_key"));
+    assert_eq!(lookup[1], Segment::from("some_key"));
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn pop() {
     let input = "some_key";
     let mut lookup = Lookup::from_str(input).unwrap();
     let out = lookup.pop();
-    assert_eq!(out, Some(Segment::field(String::from("some_key"))));
+    assert_eq!(out, Some(Segment::field("some_key")));
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn array() {
     crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = Lookup::from_str(input).unwrap();
-    assert_eq!(lookup[0], Segment::field(String::from("foo")));
+    assert_eq!(lookup[0], Segment::field("foo"));
     assert_eq!(lookup[1], Segment::index(0));
     assert_eq!(lookup.to_string(), input);
 }
@@ -77,7 +77,7 @@ fn via_parse() {
     crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = input.parse::<Lookup>().unwrap();
-    assert_eq!(lookup[0], Segment::field(String::from("foo")));
+    assert_eq!(lookup[0], Segment::field("foo"));
     assert_eq!(lookup[1], Segment::index(0));
     assert_eq!(lookup.to_string(), input);
 }

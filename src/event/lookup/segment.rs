@@ -1,17 +1,20 @@
 use crate::mapping::parser::Rule;
 use pest::iterators::Pair;
 use std::fmt::{Display, Formatter};
+use crate::event::lookup::SegmentBuf;
 
 /// Segments are chunks of a lookup. They represent either a field or an index.
 /// A sequence of Segments can become a lookup.
+///
+/// If you need an owned, allocated version, see `SegmentBuf`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
-pub enum Segment {
-    Field(String),
+pub enum Segment<'a> {
+    Field(&'a str),
     Index(usize),
 }
 
-impl Segment {
-    pub const fn field(v: String) -> Segment {
+impl<'a> Segment<'a> {
+    pub const fn field(v: &'a str) -> Segment<'a> {
         Segment::Field(v)
     }
 
@@ -19,7 +22,7 @@ impl Segment {
         matches!(self, Segment::Field(_))
     }
 
-    pub const fn index(v: usize) -> Segment {
+    pub const fn index(v: usize) -> Segment<'a> {
         Segment::Index(v)
     }
 
@@ -28,7 +31,7 @@ impl Segment {
     }
 
     #[tracing::instrument(skip(segment))]
-    pub(crate) fn from_lookup(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
+    pub(crate) fn from_lookup(segment: Pair<'a, Rule>) -> crate::Result<Vec<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -56,7 +59,7 @@ impl Segment {
     }
 
     #[tracing::instrument(skip(segment))]
-    pub(crate) fn from_path_segment(segment: Pair<'_, Rule>) -> crate::Result<Vec<Segment>> {
+    pub(crate) fn from_path_segment(segment: Pair<'a, Rule>) -> crate::Result<Vec<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, ?rule, action = %"enter");
@@ -65,7 +68,7 @@ impl Segment {
             match inner_segment.as_rule() {
                 Rule::path_field_name => {
                     tracing::trace!(segment = %inner_segment.as_str(), rule = ?inner_segment.as_rule(), action = %"push");
-                    segments.push(Segment::field(inner_segment.as_str().to_owned()))
+                    segments.push(Segment::field(inner_segment.as_str()))
                 }
                 Rule::path_index => segments.push(Segment::from_path_index(inner_segment)?),
                 _ => {
@@ -83,7 +86,7 @@ impl Segment {
     }
 
     #[tracing::instrument(skip(segment))]
-    pub(crate) fn from_path_index(segment: Pair<'_, Rule>) -> crate::Result<Segment> {
+    pub(crate) fn from_path_index(segment: Pair<'a, Rule>) -> crate::Result<Segment<'a>> {
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next().expect(
@@ -107,7 +110,7 @@ impl Segment {
     }
 
     #[tracing::instrument(skip(segment))]
-    pub(crate) fn from_quoted_path_segment(segment: Pair<'_, Rule>) -> crate::Result<Segment> {
+    pub(crate) fn from_quoted_path_segment(segment: Pair<'a, Rule>) -> crate::Result<Segment<'a>> {
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");
         let segment = segment.into_inner().next()
@@ -116,7 +119,7 @@ impl Segment {
             Rule::inner_quoted_string => {
                 tracing::trace!(segment = %segment.as_str(), rule = ?segment.as_rule(), action = %"push");
                 Ok(Segment::field(
-                    String::from(r#"""#) + segment.as_str() + r#"""#,
+                    full_segment,
                 ))
             }
             _ => {
@@ -131,9 +134,17 @@ impl Segment {
         tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"exit");
         retval
     }
+
+    #[instrument]
+    pub(crate) fn as_segment_buf(&self) -> SegmentBuf {
+        match self {
+            Segment::Field(f) => SegmentBuf::field(f.to_string()),
+            Segment::Index(i) => SegmentBuf::index(*i),
+        }
+    }
 }
 
-impl Display for Segment {
+impl<'a> Display for Segment<'a> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {
             Segment::Index(i) => write!(formatter, "{}", i),
@@ -142,14 +153,20 @@ impl Display for Segment {
     }
 }
 
-impl From<String> for Segment {
-    fn from(s: String) -> Self {
+impl<'a> From<&'a str> for Segment<'a> {
+    fn from(s: &'a str) -> Self {
         Self::Field(s)
     }
 }
 
-impl From<usize> for Segment {
+impl<'a> From<usize> for Segment<'a> {
     fn from(u: usize) -> Self {
         Self::index(u)
+    }
+}
+
+impl<'a> From<&'a SegmentBuf> for Segment<'a> {
+    fn from(v: &'a SegmentBuf) -> Self {
+        v.as_segment()
     }
 }

@@ -2,7 +2,7 @@ use super::Transform;
 use crate::serde::Fields;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Lookup,
+    event::LookupBuf,
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
@@ -43,7 +43,7 @@ impl From<Value> for TemplateOrValue {
 
 #[derive(Clone)]
 pub struct AddFields {
-    fields: IndexMap<Lookup, TemplateOrValue>,
+    fields: IndexMap<LookupBuf, TemplateOrValue>,
     overwrite: bool,
 }
 
@@ -64,7 +64,7 @@ impl TransformConfig for AddFieldsConfig {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {
-            fields.insert(Lookup::from_str(&key)?, Value::try_from(value)?);
+            fields.insert(LookupBuf::from_str(&key)?, Value::try_from(value)?);
         }
         Ok(Box::new(AddFields::new(fields, self.overwrite)?))
     }
@@ -83,7 +83,7 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(mut fields: IndexMap<Lookup, Value>, overwrite: bool) -> crate::Result<Self> {
+    pub fn new(mut fields: IndexMap<LookupBuf, Value>, overwrite: bool) -> crate::Result<Self> {
         let mut with_templates = IndexMap::with_capacity(fields.len());
         for (k, v) in fields.drain(..) {
             let maybe_template = match v {
@@ -160,7 +160,7 @@ mod tests {
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let key = LookupBuf::from_str("some_key").unwrap().to_string();
         let kv = new_event.as_log().get_flat(&key);
 
         let val = "some_val".to_string();
@@ -176,7 +176,7 @@ mod tests {
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let key = LookupBuf::from_str("some_key").unwrap().to_string();
         let kv = new_event.as_log().get_flat(&key);
 
         let val = "augment me augment me".to_string();
@@ -204,22 +204,22 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
-        fields.insert(Lookup::from_str("float").unwrap(), Value::from(4.5));
-        fields.insert(Lookup::from_str("int").unwrap(), Value::from(4));
+        fields.insert(LookupBuf::from_str("float").unwrap(), Value::from(4.5));
+        fields.insert(LookupBuf::from_str("int").unwrap(), Value::from(4));
         fields.insert(
-            Lookup::from_str("string").unwrap(),
+            LookupBuf::from_str("string").unwrap(),
             Value::from("thisisastring"),
         );
-        fields.insert(Lookup::from_str("bool").unwrap(), Value::from(true));
+        fields.insert(LookupBuf::from_str("bool").unwrap(), Value::from(true));
         fields.insert(
-            Lookup::from_str("array").unwrap(),
+            LookupBuf::from_str("array").unwrap(),
             Value::from(vec![1_isize, 2, 3]),
         );
 
         let mut map = IndexMap::new();
         map.insert(String::from("key"), Value::from("value"));
 
-        fields.insert(Lookup::from_str("table").unwrap(), Value::from_iter(map));
+        fields.insert(LookupBuf::from_str("table").unwrap(), Value::from_iter(map));
 
         let mut transform = AddFields::new(fields, false).unwrap();
 

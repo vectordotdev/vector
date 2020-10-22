@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use indexmap::map::IndexMap;
 use std::convert::TryFrom;
 use std::{fs, io::Read, path::Path};
-use vector::event::Lookup;
+use vector::event::LookupBuf;
 
 const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 
@@ -47,7 +47,7 @@ fn lookup_to_string(c: &mut Criterion) {
                 b.iter_with_setup(
                     || input.clone(),
                     |input| {
-                        let lookup = Lookup::try_from(input).unwrap();
+                        let lookup = LookupBuf::try_from(input).unwrap();
                         black_box(lookup)
                     },
                 )
@@ -65,7 +65,7 @@ fn lookup_to_string(c: &mut Criterion) {
             move |b, ref param| {
                 let input = &(*param).clone();
                 b.iter_with_setup(
-                    || Lookup::try_from(input.clone()).unwrap(),
+                    || LookupBuf::try_from(input.clone()).unwrap(),
                     |input| {
                         let string = input.to_string();
                         black_box(string)
@@ -85,7 +85,7 @@ fn lookup_to_string(c: &mut Criterion) {
             move |b, ref param| {
                 let input = &(*param).clone();
                 b.iter_with_setup(
-                    || Lookup::try_from(input.clone()).unwrap(),
+                    || LookupBuf::try_from(input.clone()).unwrap(),
                     |input| {
                         let string = serde_json::to_string(&input);
                         black_box(string)
@@ -105,9 +105,9 @@ fn lookup_to_string(c: &mut Criterion) {
             move |b, ref param| {
                 let input = &(*param).clone();
                 b.iter_with_setup(
-                    || serde_json::to_string(&Lookup::try_from(input.clone()).unwrap()).unwrap(),
+                    || serde_json::to_string(&LookupBuf::try_from(input.clone()).unwrap()).unwrap(),
                     |input| {
-                        let lookup: Lookup = serde_json::from_str(&input).unwrap();
+                        let lookup: LookupBuf = serde_json::from_str(&input).unwrap();
                         black_box(lookup)
                     },
                 )
