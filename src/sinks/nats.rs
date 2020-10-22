@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    internal_events::{NatsEventProcessed, NatsEventSendFail, NatsEventSendSuccess},
+    internal_events::{NatsEventSendFail, NatsEventSendSuccess},
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     sinks::util::StreamSink,
     template::{Template, TemplateError},
@@ -138,42 +138,36 @@ impl StreamSink for NatsSink {
                 error!(message = "Missing keys for subject", ?missing_keys);
             })?;
 
-            if let Some(buf) = encode_event(event, &self.encoding) {
-                let message_len = buf.len();
+            let log = encode_event(event, &self.encoding);
+            let message_len = log.len();
 
-                match nc.publish(&subject, buf).await {
-                    Ok(_) => {
-                        emit!(NatsEventSendSuccess {
-                            byte_size: message_len,
-                        });
-                        self.acker.ack(1);
-                    }
-                    Err(error) => {
-                        emit!(NatsEventSendFail { error });
-                    }
+            match nc.publish(&subject, log).await {
+                Ok(_) => {
+                    emit!(NatsEventSendSuccess {
+                        byte_size: message_len,
+                    });
+                    self.acker.ack(1);
+                }
+                Err(error) => {
+                    emit!(NatsEventSendFail { error });
                 }
             }
-
-            emit!(NatsEventProcessed {});
         }
 
         Ok(())
     }
 }
 
-fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option<String> {
+fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String {
     encoding.apply_rules(&mut event);
 
     match encoding.codec() {
-        Encoding::Json => serde_json::to_string(event.as_log())
-            .map_err(|error| {
-                error!("Error encoding json: {}.", error);
-            })
-            .ok(),
+        Encoding::Json => serde_json::to_string(event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
             .get(crate::config::log_schema().message_key())
-            .map(|v| v.to_string_lossy()),
+            .map(|v| v.to_string_lossy())
+            .unwrap_or_default(),
     }
 }
 
@@ -187,7 +181,7 @@ mod test {
         let event = Event::from("foo");
         assert_eq!(
             "foo",
-            encode_event(event, &EncodingConfig::from(Encoding::Text)).unwrap()
+            encode_event(event, &EncodingConfig::from(Encoding::Text))
         );
     }
 
@@ -201,7 +195,7 @@ mod test {
 
         let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
         let expected = r#"{"a":"0","x":"23","z":25}"#;
-        assert_eq!(encoded.unwrap(), expected);
+        assert_eq!(encoded, expected);
     }
 }
 
