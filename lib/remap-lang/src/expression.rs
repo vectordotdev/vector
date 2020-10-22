@@ -48,15 +48,6 @@ pub enum Error {
 
 pub trait Expression: std::fmt::Debug {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
-
-    // TODO:
-    //
-    // 1. use `execute_safe` instead
-    // 2. override this in `Assignment` to error if the path doesn't exist, but
-    //    allow the value not to exist (resulting in no assignment happening).
-    fn execute_infallible(&self, state: &mut State, object: &mut dyn Object) -> Option<Value> {
-        self.execute(state, object).ok().flatten()
-    }
 }
 
 macro_rules! enum_dispatch {
