@@ -15,7 +15,10 @@ use vector_api_client::{
 /// Executes a toplogy query to the GraphQL server, and creates an initial TopologyState
 /// table based on the returned topology/metrics. This will contain all of the rows initially
 /// to render the topology table widget
-async fn get_topology_state(client: &Client) -> Result<ArcSwap<TopologyState>, ()> {
+async fn spawn_update_topology(
+    client: &Client,
+    topology_state: Arc<TopologyState>,
+) -> Result<(), ()> {
     let rows = client
         .topology_query()
         .await
@@ -37,7 +40,9 @@ async fn get_topology_state(client: &Client) -> Result<ArcSwap<TopologyState>, (
         })
         .collect();
 
-    Ok(ArcSwap::from(Arc::new(TopologyState::new(rows))))
+    topology_state.update_rows(rows);
+
+    Ok(())
 }
 
 /// Spawns the host
@@ -67,40 +72,33 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         }
     }
 
-    // Get initial topology
-    let topology_state = match get_topology_state(&client).await {
-        Ok(state) => state,
-        _ => {
-            eprintln!("Couldn't obtain Vector metrics");
-            return exitcode::UNAVAILABLE;
-        }
-    };
+    // Create initial topology; spawn updater
+    let topology_state = Arc::new(TopologyState::new());
+    spawn_update_topology(&client, Arc::clone(&topology_state));
 
-    let cloned = ArcSwap::clone(&topology_state);
-
-    tokio::spawn(async move {
-        use rand::Rng;
-
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(50));
-        loop {
-            interval.tick().await;
-
-            let mut rng = rand::thread_rng();
-
-            cloned.load().rows().for_each(|r| {
-                let mut r = r.lock().unwrap();
-                let events_processed_total = r.events_processed_total;
-                r.update_events_processed_total(
-                    events_processed_total + rng.gen_range::<i64>(0, 50),
-                );
-            });
-        }
-    });
+    // tokio::spawn(async move {
+    //     use rand::Rng;
+    //
+    //     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(50));
+    //     loop {
+    //         interval.tick().await;
+    //
+    //         let mut rng = rand::thread_rng();
+    //
+    //         cloned.load().rows().for_each(|r| {
+    //             let mut r = r.lock().unwrap();
+    //             let events_processed_total = r.events_processed_total;
+    //             r.update_events_processed_total(
+    //                 events_processed_total + rng.gen_range::<i64>(0, 50),
+    //             );
+    //         });
+    //     }
+    // });
 
     // Configure widgets, based on the user CLI options
     let config = Config {
         url,
-        topology_state: ArcSwap::clone(&topology_state),
+        topology_state: Arc::clone(&topology_state),
     };
 
     // Spawn a new dashboard with the configured widgets

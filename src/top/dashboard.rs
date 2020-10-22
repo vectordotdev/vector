@@ -2,8 +2,7 @@ use super::{
     events::{Event, Events},
     state::{TopologyState, TOPOLOGY_HEADERS},
 };
-use arc_swap::ArcSwap;
-use std::io::Stdout;
+use std::{io::Stdout, sync::Arc};
 use termion::event::Key;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
@@ -23,7 +22,7 @@ const INVARIANT: &str =
 
 pub struct Config {
     pub url: url::Url,
-    pub topology_state: ArcSwap<TopologyState>,
+    pub topology_state: Arc<TopologyState>,
 }
 
 pub struct Widgets<'a> {
@@ -66,24 +65,22 @@ impl<'a> Widgets<'a> {
     /// Renders a topology table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `topology_state`
     fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let lock = self.config.topology_state.load();
-        let items = lock.rows().map(|r| {
-            let r = r
-                .lock()
-                .expect("Unable to get lock on topology data. Please report");
-
-            Row::StyledData(
-                vec![
-                    r.name.clone(),
-                    r.topology_type.clone(),
-                    r.format_events_processed_total(),
-                    r.format_errors(),
-                    r.format_throughput(),
-                ]
-                .into_iter(),
-                Style::default().fg(Color::White),
-            )
-        });
+        let items = {
+            let read = self.config.topology_state.rows().values();
+            read.map(|r| {
+                Row::StyledData(
+                    vec![
+                        r.name.clone(),
+                        r.topology_type.clone(),
+                        r.format_events_processed_total(),
+                        r.format_errors(),
+                        r.format_throughput(),
+                    ]
+                    .into_iter(),
+                    Style::default().fg(Color::White),
+                )
+            })
+        };
 
         let w = Table::new(TOPOLOGY_HEADERS.iter(), items)
             .block(Block::default().borders(Borders::ALL).title("Topology"))

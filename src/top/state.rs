@@ -1,10 +1,11 @@
 use num_format::{Locale, ToFormattedString};
 use std::{
-    collections::btree_map,
-    sync::{Arc, Mutex},
+    collections::btree_map::BTreeMap,
+    sync::{Arc, Mutex, RwLock, RwLockReadGuard},
 };
 use tui::widgets::TableState;
 
+static ACQUIRE_LOCK_INVARIANT: &'static str = "Couldn't acquire topology lock. Please report.";
 pub static TOPOLOGY_HEADERS: [&'static str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
 
 #[derive(Debug, Clone)]
@@ -37,34 +38,46 @@ impl TopologyRow {
             _ => self.throughput.to_string(),
         }
     }
-
-    pub fn update_events_processed_total(&mut self, val: i64) {
-        self.events_processed_total = val;
-    }
 }
 
 pub struct TopologyState {
     state: TableState,
-    rows: btree_map::BTreeMap<String, Arc<Mutex<TopologyRow>>>,
+    rows: RwLock<BTreeMap<String, TopologyRow>>,
 }
 
 impl TopologyState {
-    pub fn new(rows: Vec<TopologyRow>) -> Self {
+    /// Creates new, empty topology state
+    pub fn new() -> Self {
         Self {
             state: TableState::default(),
-            rows: rows
-                .into_iter()
-                .map(|r| (r.name.clone(), Arc::new(Mutex::new(r))))
-                .collect(),
+            rows: RwLock::new(BTreeMap::new()),
         }
     }
 
-    pub fn rows(&self) -> btree_map::Values<String, Arc<Mutex<TopologyRow>>> {
-        self.rows.values()
+    /// Updates topology rows by merging in changes. Rows that don't exist in `rows` will be
+    /// deleted; new rows will be added, and existing rows will be updated
+    pub fn update_rows(&self, rows: Vec<TopologyRow>) {
+        let rows = rows
+            .into_iter()
+            .map(|r| {
+                (
+                    r.name.clone(),
+                    match self.rows.read().expect(ACQUIRE_LOCK_INVARIANT).get(&r.name) {
+                        Some(existing) if existing.topology_type == r.topology_type => {
+                            // TODO - update values > 0. For now, just return row
+                            r
+                        }
+                        _ => r,
+                    },
+                )
+            })
+            .collect();
+
+        *self.rows.write().expect(ACQUIRE_LOCK_INVARIANT) = rows;
     }
 
-    pub fn get_row(&self, name: &str) -> Option<&Arc<Mutex<TopologyRow>>> {
-        self.rows.get(name)
+    pub fn rows(&self) -> RwLockReadGuard<'_, BTreeMap<String, TopologyRow>> {
+        self.rows.read().expect(ACQUIRE_LOCK_INVARIANT)
     }
 }
 
