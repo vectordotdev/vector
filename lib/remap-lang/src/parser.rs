@@ -71,10 +71,6 @@ fn target_from_pair(pair: Pair<R>) -> Result<Target> {
 }
 
 /// Parse block expressions.
-///
-/// FIXME: This only executes the last expression, need to add
-///        `src/expression/block.rs`, run all expressions, and return the value
-///        of the last one.
 fn block_from_pairs(pairs: Pairs<R>) -> Result<Expr> {
     let mut expressions = vec![];
 
