@@ -566,7 +566,7 @@ fn scale(bytes: u64) -> String {
     let mut bytes = bytes as f32;
     let mut i = 0;
     while bytes > 1000.0 && i <= 3 {
-        bytes = bytes / 1000.0;
+        bytes /= 1000.0;
         i += 1;
     }
     format!("{:.3}{}/sec", bytes, units[i])
