@@ -1,4 +1,9 @@
-use crate::event::{Event, Metric, MetricValue};
+mod bytes_processed;
+mod events_processed;
+mod host;
+mod uptime;
+
+use crate::event::{Event, Metric};
 use crate::metrics::{capture_metrics, get_controller, Controller};
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
@@ -8,81 +13,14 @@ use std::sync::Arc;
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
+pub use bytes_processed::ProcessedBytesTotal;
+pub use events_processed::EventsProcessedTotal;
+pub use host::HostMetrics;
+pub use uptime::Uptime;
+
 lazy_static! {
     static ref GLOBAL_CONTROLLER: Arc<&'static Controller> =
         Arc::new(get_controller().expect("Metrics system not initialized. Please report."));
-}
-
-pub struct Uptime(Metric);
-
-#[Object]
-impl Uptime {
-    /// Metric timestamp
-    async fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.0.timestamp
-    }
-
-    /// Number of seconds the Vector instance has been alive
-    async fn seconds(&self) -> f64 {
-        match self.0.value {
-            MetricValue::Gauge { value } => value,
-            _ => 0.00,
-        }
-    }
-}
-
-impl From<Metric> for Uptime {
-    fn from(m: Metric) -> Self {
-        Self(m)
-    }
-}
-
-pub struct EventsProcessedTotal(Metric);
-
-#[Object]
-impl EventsProcessedTotal {
-    /// Metric timestamp
-    async fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.0.timestamp
-    }
-
-    /// Number of events processed
-    async fn events_processed_total(&self) -> f64 {
-        match self.0.value {
-            MetricValue::Counter { value } => value,
-            _ => 0.00,
-        }
-    }
-}
-
-impl From<Metric> for EventsProcessedTotal {
-    fn from(m: Metric) -> Self {
-        Self(m)
-    }
-}
-
-pub struct ProcessedBytesTotal(Metric);
-
-#[Object]
-impl ProcessedBytesTotal {
-    /// Metric timestamp
-    async fn timestamp(&self) -> Option<DateTime<Utc>> {
-        self.0.timestamp
-    }
-
-    /// Number of bytes processed
-    async fn processed_bytes_total(&self) -> f64 {
-        match self.0.value {
-            MetricValue::Counter { value } => value,
-            _ => 0.00,
-        }
-    }
-}
-
-impl From<Metric> for ProcessedBytesTotal {
-    fn from(m: Metric) -> Self {
-        Self(m)
-    }
 }
 
 #[derive(Interface)]
@@ -94,39 +32,50 @@ pub enum MetricType {
 }
 
 #[derive(Default)]
+pub struct MetricsQuery;
+
+#[Object]
+impl MetricsQuery {
+    /// Vector host metrics
+    async fn host_metrics(&self) -> HostMetrics {
+        HostMetrics::new()
+    }
+}
+
+#[derive(Default)]
 pub struct MetricsSubscription;
 
 #[Subscription]
 impl MetricsSubscription {
     /// Metrics for how long the Vector instance has been running
-    async fn uptime_metrics(
+    async fn uptime(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Uptime> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "uptime_seconds" => Some(Uptime(m)),
+            "uptime_seconds" => Some(Uptime::new(m)),
             _ => None,
         })
     }
 
     /// Events processed metrics
-    async fn events_processed_total_metrics(
+    async fn events_processed_total(
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = EventsProcessedTotal> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "events_processed_total" => Some(EventsProcessedTotal(m)),
+            "events_processed_total" => Some(EventsProcessedTotal::new(m)),
             _ => None,
         })
     }
 
     /// Bytes processed metrics
-    async fn processed_bytes_total_metrics(
+    async fn processed_bytes_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ProcessedBytesTotal> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "processed_bytes_total" => Some(ProcessedBytesTotal(m)),
+            "processed_bytes_total" => Some(ProcessedBytesTotal::new(m)),
             _ => None,
         })
     }
@@ -176,5 +125,5 @@ pub fn topology_events_processed_total(topology_name: String) -> Option<EventsPr
             }
             _ => false,
         })
-        .map(|ev| EventsProcessedTotal(ev.into_metric()))
+        .map(|ev| EventsProcessedTotal::new(ev.into_metric()))
 }

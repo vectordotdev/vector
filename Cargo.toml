@@ -104,12 +104,12 @@ smpl_jwt = { version = "0.5.0", optional = true }
 async-graphql = { version = "2.0.0", optional = true }
 async-graphql-warp = { version = "2.0.0", optional = true }
 slab = { version = "0.4.2", optional = true }
+anymap = {version = "0.12.1", optional = true }
 
 # API client
 prettytable-rs = { version = "0.8.0", optional = true }
 human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
-anymap = {version = "0.12.1", optional = true }
 
 # External libs
 derivative = "1.0"
@@ -269,7 +269,8 @@ kubernetes = ["k8s-openapi", "evmap"]
 api = [
   "async-graphql",
   "async-graphql-warp",
-  "slab"
+  "slab",
+  "anymap",
 ]
 
 # API client
@@ -278,7 +279,6 @@ api-client = [
   "prettytable-rs",
   "human_format",
   "num-format",
-  "anymap",
 ]
 
 # Sources

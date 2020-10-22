@@ -6,7 +6,11 @@ pub mod topology;
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
 
 #[derive(MergedObject, Default)]
-pub struct Query(health::HealthQuery, topology::TopologyQuery);
+pub struct Query(
+    health::HealthQuery,
+    topology::TopologyQuery,
+    metrics::MetricsQuery,
+);
 
 #[derive(MergedSubscription, Default)]
 pub struct Subscription(

@@ -101,7 +101,7 @@ impl Namespace {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct HostMetricsConfig {
+pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
     scrape_interval_secs: u64,
 
@@ -223,7 +223,7 @@ impl HostMetricsConfig {
         metrics.into_iter().map(Into::into)
     }
 
-    async fn cpu_metrics(&self) -> Vec<Metric> {
+    pub async fn cpu_metrics(&self) -> Vec<Metric> {
         match heim::cpu::times().await {
             Ok(times) => {
                 times
@@ -274,7 +274,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn memory_metrics(&self) -> Vec<Metric> {
+    pub async fn memory_metrics(&self) -> Vec<Metric> {
         match heim::memory::memory().await {
             Ok(memory) => {
                 let timestamp = Utc::now();
@@ -355,7 +355,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn swap_metrics(&self) -> Vec<Metric> {
+    pub async fn swap_metrics(&self) -> Vec<Metric> {
         match heim::memory::swap().await {
             Ok(swap) => {
                 let timestamp = Utc::now();
@@ -401,7 +401,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn loadavg_metrics(&self) -> Vec<Metric> {
+    pub async fn loadavg_metrics(&self) -> Vec<Metric> {
         #[cfg(unix)]
         let result = match heim::cpu::os::unix::loadavg().await {
             Ok(loadavg) => {
@@ -428,7 +428,7 @@ impl HostMetricsConfig {
         result
     }
 
-    async fn network_metrics(&self) -> Vec<Metric> {
+    pub async fn network_metrics(&self) -> Vec<Metric> {
         match heim::net::io_counters().await {
             Ok(counters) => {
                 counters
@@ -463,7 +463,7 @@ impl HostMetricsConfig {
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
-                                    counter.drop_recv() as f64,
+                                    counter.packets_recv() as f64,
                                     tags!["device" => interface],
                                 ),
                                 self.counter(
@@ -507,7 +507,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn filesystem_metrics(&self) -> Vec<Metric> {
+    pub async fn filesystem_metrics(&self) -> Vec<Metric> {
         match heim::disk::partitions().await {
             Ok(partitions) => {
                 partitions
@@ -602,7 +602,7 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn disk_metrics(&self) -> Vec<Metric> {
+    pub async fn disk_metrics(&self) -> Vec<Metric> {
         match heim::disk::io_counters().await {
             Ok(counters) => {
                 counters
