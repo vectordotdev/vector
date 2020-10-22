@@ -296,9 +296,9 @@ mod integration_tests {
             elasticsearch::{ElasticSearchAuth, ElasticSearchCommon, ElasticSearchConfig},
             util::BatchConfig,
         },
-        test_util::{random_events_with_stream, random_string, wait_for},
+        test_util::{random_events_with_stream, random_string, wait_for_duration},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
+    use futures::{compat::Sink01CompatExt, future::TryFutureExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_es::{CreateElasticsearchDomainRequest, Es, EsClient};
     use rusoto_firehose::{
@@ -410,7 +410,24 @@ mod integration_tests {
         };
 
         // wait for ES to be available; it starts up when the ES domain is created
-        wait_for(|| async { reqwest::get("http://localhost:4571").await.is_ok() }).await;
+        // This takes a long time
+        wait_for_duration(
+            || async {
+                reqwest::get("http://localhost:4571/_cluster/health")
+                    .and_then(|res| async move {
+                        res.json::<Value>().await.map(|v| {
+                            v.get("status")
+                                .and_then(|status| status.as_str())
+                                .map(|status| status == "green")
+                                .unwrap_or(false)
+                        })
+                    })
+                    .await
+                    .unwrap_or(false)
+            },
+            Duration::from_secs(30),
+        )
+        .await;
 
         arn
     }
