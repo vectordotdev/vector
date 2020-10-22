@@ -53,8 +53,7 @@ impl ArgumentList {
     }
 
     pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Box<Expr>>> {
-        self.0
-            .remove(keyword)
+        self.optional(keyword)
             .map(|v| v.try_into().map(Box::new).map_err(Into::into))
             .transpose()
     }
