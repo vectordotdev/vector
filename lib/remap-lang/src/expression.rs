@@ -2,6 +2,7 @@ use crate::{Object, Result, State, Value};
 
 pub(super) mod arithmetic;
 pub(super) mod assignment;
+mod block;
 pub(super) mod function;
 pub(super) mod if_statement;
 mod literal;
@@ -12,6 +13,7 @@ pub(super) mod variable;
 
 pub(super) use arithmetic::Arithmetic;
 pub(super) use assignment::{Assignment, Target};
+pub(super) use block::Block;
 pub(super) use function::Function;
 pub(super) use if_statement::IfStatement;
 pub(super) use literal::Literal;
@@ -95,6 +97,7 @@ macro_rules! enum_dispatch {
 enum_dispatch![
     Arithmetic,
     Assignment,
+    Block,
     Function,
     IfStatement,
     Literal,

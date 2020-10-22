@@ -2,7 +2,8 @@
 
 use crate::{
     expression::{
-        Arithmetic, Assignment, Function, IfStatement, Literal, Noop, Not, Path, Target, Variable,
+        Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
+        Variable,
     },
     Argument, Error, Expr, Operator, Result, Value,
 };
@@ -75,13 +76,13 @@ fn target_from_pair(pair: Pair<R>) -> Result<Target> {
 ///        `src/expression/block.rs`, run all expressions, and return the value
 ///        of the last one.
 fn block_from_pairs(pairs: Pairs<R>) -> Result<Expr> {
-    let mut expression = Expr::from(Noop);
+    let mut expressions = vec![];
 
     for pair in pairs {
-        expression = expression_from_pair(pair)?;
+        expressions.push(expression_from_pair(pair)?);
     }
 
-    Ok(expression)
+    Ok(Block::new(expressions).into())
 }
 
 /// Parse if-statement expressions.

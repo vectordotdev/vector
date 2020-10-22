@@ -112,6 +112,13 @@ mod tests {
                 r#"split("bar", pattern = /a/)"#,
                 Ok(Some(vec!["b", "r"].into())),
             ),
+            (
+                r#"{
+                    $foo = "bar"
+                    $foo
+                }"#,
+                Ok(Some("bar".into())),
+            ),
         ];
 
         for (script, result) in cases {
