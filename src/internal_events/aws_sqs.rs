@@ -8,15 +8,7 @@ pub struct AwsSqsEventSent {
 
 impl InternalEvent for AwsSqsEventSent {
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "aws_sqs",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "aws_sqs",
-        );
+        counter!("events_processed_total", 1);
+        counter!("bytes_processed_total", self.byte_size as u64);
     }
 }
