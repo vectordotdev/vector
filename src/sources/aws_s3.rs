@@ -33,8 +33,6 @@ use tokio_util::codec::FramedRead;
 //   * At the least, support setting a differente queue owner
 // * Revisit configuration of SQS strategy (intrnal vs. external tagging)
 // * Move AWS utils from sink to general
-// * Use multiline config
-// * Max line bytes
 // * Make sure we are handling shutdown well
 // * Consider any special handling of FIFO SQS queues
 // * Consider having helper methods stream data and have top-level forward to pipeline
