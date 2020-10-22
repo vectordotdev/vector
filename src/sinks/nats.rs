@@ -77,11 +77,9 @@ impl NatsSinkConfig {
     fn to_nats_options(&self) -> crate::Result<nats::Options> {
         // Set reconnect_buffer_size on the nats client to 0 bytes so that the
         // client doesn't buffer internally (to avoid message loss).
-
         let options = nats::Options::new()
             .with_name(&self.name)
-            .reconnect_buffer_size(0)
-            .into();
+            .reconnect_buffer_size(0);
 
         Ok(options)
     }
