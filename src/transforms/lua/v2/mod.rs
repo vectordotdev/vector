@@ -739,6 +739,7 @@ mod tests {
 
         let event = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -747,6 +748,7 @@ mod tests {
 
         let expected = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,

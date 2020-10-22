@@ -198,6 +198,7 @@ impl<'a> FromLua<'a> for Metric {
 
         Ok(Metric {
             name,
+            namespace: None,
             timestamp,
             tags,
             kind,
@@ -227,6 +228,7 @@ mod test {
     fn to_lua_counter_full() {
         let metric = Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
                 vec![("example tag".to_string(), "example value".to_string())]
@@ -259,6 +261,7 @@ mod test {
     fn to_lua_counter_minimal() {
         let metric = Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -277,6 +280,7 @@ mod test {
     fn to_lua_gauge() {
         let metric = Metric {
             name: "example gauge".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -290,6 +294,7 @@ mod test {
     fn to_lua_set() {
         let metric = Metric {
             name: "example set".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -313,6 +318,7 @@ mod test {
     fn to_lua_distribution() {
         let metric = Metric {
             name: "example distribution".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -338,6 +344,7 @@ mod test {
     fn to_lua_aggregated_histogram() {
         let metric = Metric {
             name: "example histogram".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -366,6 +373,7 @@ mod test {
     fn to_lua_aggregated_summary() {
         let metric = Metric {
             name: "example summary".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -398,6 +406,7 @@ mod test {
         }"#;
         let expected = Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -430,6 +439,7 @@ mod test {
         }"#;
         let expected = Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms(8, 9, 10)),
             tags: Some(
                 vec![("example tag".to_string(), "example value".to_string())]
@@ -454,6 +464,7 @@ mod test {
         }"#;
         let expected = Metric {
             name: "example gauge".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -474,6 +485,7 @@ mod test {
         }"#;
         let expected = Metric {
             name: "example set".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -500,6 +512,7 @@ mod test {
         }"#;
         let expected = Metric {
             name: "example distribution".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -526,6 +539,7 @@ mod test {
         }"#;
         let expected = Metric {
             name: "example histogram".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -554,6 +568,7 @@ mod test {
         }"#;
         let expected = Metric {
             name: "example summary".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,

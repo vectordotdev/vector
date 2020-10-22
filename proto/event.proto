@@ -58,6 +58,7 @@ message Metric {
     AggregatedHistogram aggregated_histogram = 9;
     AggregatedSummary aggregated_summary = 10;
   }
+  string namespace = 11;
 }
 
 message Counter {

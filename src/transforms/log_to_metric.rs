@@ -215,6 +215,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -231,6 +232,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -251,6 +253,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -271,6 +274,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Absolute,
@@ -292,6 +296,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -382,6 +387,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "status".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -413,6 +419,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "http_requests_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: Some(
                     vec![
@@ -448,6 +455,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -493,6 +501,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "amount_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -520,6 +529,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "memory_rss_bytes".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -594,6 +604,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -604,6 +615,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "status".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -647,6 +659,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "xyz_exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -657,6 +670,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "local_abc_status_set".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -686,6 +700,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "unique_user_ip".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -714,6 +729,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "response_time".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -744,6 +760,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "response_time".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,

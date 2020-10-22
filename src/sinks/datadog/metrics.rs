@@ -548,6 +548,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "total".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -555,6 +556,7 @@ mod tests {
             },
             Metric {
                 name: "check".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
@@ -562,6 +564,7 @@ mod tests {
             },
             Metric {
                 name: "unsupported".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
                 kind: MetricKind::Absolute,
@@ -599,6 +602,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -606,6 +610,7 @@ mod tests {
             },
             Metric {
                 name: "check".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
@@ -613,6 +618,7 @@ mod tests {
             },
             Metric {
                 name: "unsupported".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: Some(tags()),
                 kind: MetricKind::Absolute,
@@ -633,6 +639,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "unsupported".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -640,6 +647,7 @@ mod tests {
             },
             Metric {
                 name: "volume".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -659,6 +667,7 @@ mod tests {
     fn encode_set() {
         let events = vec![Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Incremental,
@@ -765,6 +774,7 @@ mod tests {
         // https://docs.datadoghq.com/developers/metrics/metrics_type/?tab=histogram#metric-type-definition
         let events = vec![Metric {
             name: "requests".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Incremental,
@@ -788,6 +798,7 @@ mod tests {
         // https://docs.datadoghq.com/developers/metrics/types/?tab=distribution#definition
         let events = vec![Metric {
             name: "requests".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Incremental,

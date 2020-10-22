@@ -174,6 +174,7 @@ mod test {
     fn encodes_counter() {
         let event = Event::Metric(Metric {
             name: "foos".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
                 vec![
@@ -197,6 +198,7 @@ mod test {
     fn encodes_set() {
         let event = Event::Metric(Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -214,6 +216,7 @@ mod test {
     fn encodes_histogram_without_timestamp() {
         let event = Event::Metric(Metric {
             name: "glork".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -233,6 +236,7 @@ mod test {
     fn encodes_metric_text() {
         let event = Event::Metric(Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
