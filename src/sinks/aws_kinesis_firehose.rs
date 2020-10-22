@@ -422,7 +422,7 @@ mod integration_tests {
                             .map(|status| status == "green")
                             .unwrap_or(false)
                     })
-                    .unwrap_or(false);
+                    .unwrap_or(false)
             },
             Duration::from_secs(30),
         )
