@@ -129,7 +129,13 @@ where
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
-                stats.report();
+                if stats.started_at.elapsed() > Duration::from_secs(1) {
+                    stats.report();
+                }
+
+                if stats.started_at.elapsed() > Duration::from_secs(10) {
+                    stats = TimingStats::default();
+                }
 
                 let start = time::Instant::now();
                 // Write any stored checkpoints (uses glob to find old checkpoints).
@@ -222,6 +228,7 @@ where
                         path = ?watcher.path,
                         bytes = ?sz
                     );
+                    stats.record_bytes(sz);
 
                     bytes_read += sz;
 
@@ -517,12 +524,19 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
 struct TimingStats {
     started_at: time::Instant,
     segments: BTreeMap<&'static str, Duration>,
+    events: usize,
+    bytes: usize,
 }
 
 impl TimingStats {
     fn record(&mut self, key: &'static str, duration: Duration) {
         let segment = self.segments.entry(key).or_default();
         *segment += duration;
+    }
+
+    fn record_bytes(&mut self, bytes: usize) {
+        self.events += 1;
+        self.bytes += bytes;
     }
 
     fn report(&self) {
@@ -535,8 +549,27 @@ impl TimingStats {
             .map(|(k, v)| (*k, v.as_secs_f32() / total.as_secs_f32()))
             .collect::<BTreeMap<_, _>>();
         ratios.insert("other", other.as_secs_f32() / total.as_secs_f32());
-        debug!(?ratios);
+        let (event_throughput, bytes_throughput) = if total.as_secs() > 0 {
+            (
+                self.events as u64 / total.as_secs(),
+                self.bytes as u64 / total.as_secs(),
+            )
+        } else {
+            (0, 0)
+        };
+        debug!(event_throughput = %scale(event_throughput), bytes_throughput = %scale(bytes_throughput), ?ratios);
     }
+}
+
+fn scale(bytes: u64) -> String {
+    let units = ["", "k", "m", "g"];
+    let mut bytes = bytes as f32;
+    let mut i = 0;
+    while bytes > 1000.0 && i <= 3 {
+        bytes = bytes / 1000.0;
+        i += 1;
+    }
+    format!("{:.3}{}/sec", bytes, units[i])
 }
 
 impl Default for TimingStats {
@@ -544,6 +577,8 @@ impl Default for TimingStats {
         Self {
             started_at: time::Instant::now(),
             segments: Default::default(),
+            events: Default::default(),
+            bytes: Default::default(),
         }
     }
 }
