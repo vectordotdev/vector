@@ -175,6 +175,7 @@ impl StreamSink for UnixSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let encoding = self.encoding.clone();
         let mut input = input
+            // We send event empty events because `AckerBytesSink` `ack` and `emit!` for us.
             .map(|event| match encode_event(event, &encoding) {
                 Some(bytes) => bytes,
                 None => Bytes::new(),
