@@ -219,30 +219,7 @@ impl Service<Vec<SendMessageBatchRequestEntry>> for SqsSink {
 
 impl EncodedLength for SendMessageBatchRequestEntry {
     fn encoded_length(&self) -> usize {
-        // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessageBatch.html
-        // Request example:
-        // https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue/
-        // ?Action=SendMessageBatch
-        // &SendMessageBatchRequestEntry.1.Id=test_msg_001
-        // &SendMessageBatchRequestEntry.1.MessageBody=test%20message%20body%201
-        // &SendMessageBatchRequestEntry.2.Id=test_msg_002
-        // &SendMessageBatchRequestEntry.2.MessageBody=test%20message%20body%202
-        // &SendMessageBatchRequestEntry.2.DelaySeconds=60
-        // &SendMessageBatchRequestEntry.2.MessageAttribute.1.Name=test_attribute_name_1
-        // &SendMessageBatchRequestEntry.2.MessageAttribute.1.Value.StringValue=test_attribute_value_1
-        // &SendMessageBatchRequestEntry.2.MessageAttribute.1.Value.DataType=String
-        // &Expires=2020-05-05T22%3A52%3A43PST
-        // &Version=2012-11-05
-        // &AUTHPARAMS
-
-        let length_prefix = 32; // SendMessageBatchRequestEntry.10.
-
-        length_prefix
-            + self.message_body.len()
-            + self
-                .message_group_id
-                .as_ref()
-                .map_or(0, |id| length_prefix + id.len())
+        self.message_body.len()
     }
 }
 
