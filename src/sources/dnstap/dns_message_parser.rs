@@ -739,7 +739,7 @@ fn format_rdata(rdata: &RData) -> Result<(Option<String>, Option<Vec<u8>>), DnsM
                         let mut final_issuer = String::new();
                         if let Some(name) = option_name {
                             final_issuer.push_str(&name.to_utf8());
-                            for keyvalue in vec_keyvalue.into_iter() {
+                            for keyvalue in vec_keyvalue.iter() {
                                 final_issuer.push_str("; ");
                                 final_issuer.push_str(&keyvalue.key());
                                 final_issuer.push_str("=");

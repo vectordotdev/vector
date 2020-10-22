@@ -67,12 +67,15 @@ impl Default for DnstapConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<DnstapConfig>("dnstap")
+    SourceDescription::new::<DnstapConfig>("dnstap")
 }
 
+impl_generate_config_from_default!(DnstapConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "dnstap")]
 impl SourceConfig for DnstapConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

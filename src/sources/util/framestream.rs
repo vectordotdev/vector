@@ -7,7 +7,7 @@ use crate::{
 };
 use bytes::{Buf, Bytes, BytesMut};
 use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
+    compat::Sink01CompatExt,
     executor::block_on,
     future,
     sink::{Sink, SinkExt},
@@ -19,8 +19,9 @@ use std::convert::TryInto;
 use std::fs;
 use std::marker::{Send, Sync};
 #[cfg(unix)]
-use std::os::unix::io::AsRawFd;
 use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
+use std::os::unix::io::AsRawFd;
 use std::{
     path::PathBuf,
     sync::{
@@ -391,9 +392,14 @@ pub fn build_framestream_unix_source(
                 nix::sys::socket::sockopt::RcvBuf,
                 &(socket_receive_buffer_size),
             );
-            let rcv_buf_size =
-                nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
-            info!("Unix socket receive buffer size modified to {}", rcv_buf_size.unwrap());
+            let rcv_buf_size = nix::sys::socket::getsockopt(
+                listener.as_raw_fd(),
+                nix::sys::socket::sockopt::RcvBuf,
+            );
+            info!(
+                "Unix socket receive buffer size modified to {}",
+                rcv_buf_size.unwrap()
+            );
         }
 
         // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
@@ -403,9 +409,14 @@ pub fn build_framestream_unix_source(
                 nix::sys::socket::sockopt::SndBuf,
                 &(socket_send_buffer_size),
             );
-            let snd_buf_size =
-                nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
-            info!("Unix socket buffer send size modified to {}", snd_buf_size.unwrap());
+            let snd_buf_size = nix::sys::socket::getsockopt(
+                listener.as_raw_fd(),
+                nix::sys::socket::sockopt::SndBuf,
+            );
+            info!(
+                "Unix socket buffer send size modified to {}",
+                snd_buf_size.unwrap()
+            );
         }
 
         // the permissions to unix socket are restricted from 0o700 to 0o777, which are 448 and 511 in decimal
@@ -428,7 +439,7 @@ pub fn build_framestream_unix_source(
 
         info!(message = "Listening...", ?path, r#type = "unix");
 
-        let mut stream = listener.incoming().take_until(shutdown.clone().compat());
+        let mut stream = listener.incoming().take_until(shutdown.clone());
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(e) => {
@@ -467,7 +478,7 @@ pub fn build_framestream_unix_source(
             let mut fs_reader = FrameStreamReader::new(Box::new(sock_sink), content_type);
             let frame_handler_copy = frame_handler.clone();
             let frames = sock_stream
-                .take_until(shutdown.clone().compat())
+                .take_until(shutdown.clone())
                 .map_err(move |error| {
                     emit!(UnixSocketError {
                         error,
@@ -500,29 +511,34 @@ pub fn build_framestream_unix_source(
                 tokio::spawn(handler.instrument(span));
             } else {
                 let handler = async move {
-                    frames.for_each(move |f| {
-                        let max_frame_handling_tasks =
-                            frame_handler_copy.max_frame_handling_tasks();
-                        let f_handler = frame_handler_copy.clone();
-                        let received_from_copy = received_from.clone();
-                        let event_sink_copy = event_sink.clone();
-                        let task_counter_copy = Arc::clone(&task_counter);
+                    frames
+                        .for_each(move |f| {
+                            let max_frame_handling_tasks =
+                                frame_handler_copy.max_frame_handling_tasks();
+                            let f_handler = frame_handler_copy.clone();
+                            let received_from_copy = received_from.clone();
+                            let event_sink_copy = event_sink.clone();
+                            let task_counter_copy = Arc::clone(&task_counter);
 
-                        let event_handler = move || {
-                            if let Some(evt) = f_handler.handle_event(received_from_copy, f) {
-                                if let Err(err) = event_sink_copy.wait().send(evt) {
-                                    error!("Encountered error '{:#?}' while sending event", err);
+                            let event_handler = move || {
+                                if let Some(evt) = f_handler.handle_event(received_from_copy, f) {
+                                    if let Err(err) = event_sink_copy.wait().send(evt) {
+                                        error!(
+                                            "Encountered error '{:#?}' while sending event",
+                                            err
+                                        );
+                                    }
                                 }
-                            }
-                        };
+                            };
 
-                        spawn_event_handling_tasks(
-                            event_handler,
-                            task_counter_copy,
-                            max_frame_handling_tasks,
-                        );
-                        future::ready(())
-                    }).await;
+                            spawn_event_handling_tasks(
+                                event_handler,
+                                task_counter_copy,
+                                max_frame_handling_tasks,
+                            );
+                            future::ready(())
+                        })
+                        .await;
                     info!("finished sending");
                 };
                 tokio::spawn(handler.instrument(span));
@@ -540,7 +556,7 @@ fn spawn_event_handling_tasks<F>(
     max_frame_handling_tasks: i32,
 ) -> JoinHandle<()>
 where
-    F: Send + Sync + Clone + FnOnce() -> () + 'static,
+    F: Send + Sync + Clone + FnOnce() + 'static,
 {
     wait_for_task_quota(&task_counter, max_frame_handling_tasks);
 
@@ -566,7 +582,10 @@ mod test {
         build_framestream_unix_source, spawn_event_handling_tasks, ControlField, ControlHeader,
         FrameHandler,
     };
-    use crate::{config::log_schema, test_util::{collect_n, collect_n_stream}};
+    use crate::{
+        config::log_schema,
+        test_util::{collect_n, collect_n_stream},
+    };
     use crate::{
         event::{self, Event},
         shutdown::SourceShutdownCoordinator,

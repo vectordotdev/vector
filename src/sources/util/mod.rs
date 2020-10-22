@@ -2,7 +2,7 @@
 mod body_decoding;
 mod encoding_config;
 #[cfg(feature = "sources-dnstap")]
-mod framestream;
+pub mod framestream;
 #[cfg(feature = "sources-utils-http")]
 mod http;
 pub mod multiline_config;

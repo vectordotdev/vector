@@ -5,8 +5,8 @@ use crate::{
 use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
-use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::{convert::TryInto, fmt::Debug};
 use trust_dns_proto::{
     rr::domain::Name,
     serialize::binary::{BinDecodable, BinDecoder},
@@ -50,7 +50,7 @@ impl<'a> DnstapParser<'a> {
 
     fn insert<V>(&mut self, key: &'static str, value: V) -> Option<Value>
     where
-        V: Into<Value>,
+        V: Into<Value> + Debug,
     {
         let mut node_path = self.parent_key_path.clone();
         node_path.push(PathComponent::Key(key.to_string()));
@@ -943,7 +943,7 @@ mod tests {
                     _ => false,
                 }));
             assert!(log_event.all_fields().any(|(key, value)| key
-                == "updateRequestData.header.qr"
+                == "requestData.header.qr"
                 && match *value {
                     Value::Integer(qr) => qr == 1,
                     _ => false,
@@ -957,7 +957,7 @@ mod tests {
                         _ => false,
                     }));
             assert!(log_event.all_fields().any(|(key, value)| key
-                == "updateRequestData.zone.domainName"
+                == "requestData.zone.zName"
                 && match value {
                     Value::Bytes(domain_name) =>
                         *domain_name == Bytes::from_static(b"example.com."),
