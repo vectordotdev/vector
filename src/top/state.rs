@@ -4,9 +4,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-pub static TOPOLOGY_HEADERS: [&'static str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
-pub static ACQUIRE_LOCK_INVARIANT: &'static str =
-    "Unable to acquire topology lock. Please report this.";
+pub static TOPOLOGY_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
+pub static ACQUIRE_LOCK_INVARIANT: &str = "Unable to acquire topology lock. Please report this.";
 
 #[derive(Debug, Clone)]
 pub struct TopologyRow {

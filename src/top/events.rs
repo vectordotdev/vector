@@ -48,7 +48,7 @@ impl Events {
         let ignore_exit_key = Arc::new(AtomicBool::new(false));
         let _input_handle = {
             let tx = tx.clone();
-            let ignore_exit_key = ignore_exit_key.clone();
+            let ignore_exit_key = Arc::clone(&ignore_exit_key);
             thread::spawn(move || {
                 let stdin = io::stdin();
                 for evt in stdin.keys() {
