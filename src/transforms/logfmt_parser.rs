@@ -2,6 +2,9 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::{Event, Value},
+    internal_events::{
+        LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
+    },
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -80,12 +83,10 @@ impl Transform for Logfmt {
                             event.as_mut_log().insert(key, value);
                         }
                         Err(error) => {
-                            debug!(
-                                message = "Could not convert types.",
-                                key = &key[..],
-                                %error,
-                                rate_limit_secs = 30
-                            );
+                            emit!(LogfmtParserConversionFailed {
+                                name: key.as_ref(),
+                                error
+                            });
                         }
                     }
                 } else {
@@ -97,12 +98,10 @@ impl Transform for Logfmt {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = %self.field,
-                rate_limit_secs = 30
-            );
+            emit!(LogfmtParserMissingField { field: &self.field });
         };
+
+        emit!(LogfmtParserEventProcessed {});
 
         Some(event)
     }
