@@ -1,20 +1,23 @@
+use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     event::Event,
+    line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     sinks::util::rusoto,
     Pipeline,
 };
+use bytes::Bytes;
 use codec::BytesDelimitedCodec;
 use futures::{
     compat::{Compat, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
+    stream::{Stream, StreamExt},
 };
 use futures01::Sink;
 use rusoto_core::{Region, RusotoError};
-use rusoto_s3::{GetObjectRequest, S3Client, S3};
+use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
 use rusoto_sqs::{
     DeleteMessageError, DeleteMessageRequest, GetQueueUrlError, GetQueueUrlRequest, Message,
     ReceiveMessageError, ReceiveMessageRequest, Sqs, SqsClient,
@@ -71,19 +74,17 @@ impl Default for Strategy {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 struct AwsS3Config {
-    #[serde(default)]
     compression: Compression,
 
-    #[serde(default)]
     strategy: Strategy,
 
-    #[serde(default)]
     sqs: Option<SqsConfig>,
 
-    #[serde(default)]
     assume_role: Option<String>,
+
+    multiline: Option<MultilineConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -126,9 +127,15 @@ impl SourceConfig for AwsS3Config {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        let multiline_config: Option<line_agg::Config> = self
+            .multiline
+            .as_ref()
+            .map(|config| config.try_into())
+            .map_or(Ok(None), |r| r.map(Some))?;
+
         match self.strategy {
             Strategy::Sqs => Ok(Box::new(
-                self.create_sqs_ingestor()
+                self.create_sqs_ingestor(multiline_config)
                     .await?
                     .run(out, shutdown)
                     .boxed()
@@ -146,20 +153,11 @@ impl SourceConfig for AwsS3Config {
     }
 }
 
-#[derive(Debug, Snafu)]
-enum CreateSqsIngestorError {
-    #[snafu(display("Unable to initialize: {}", source))]
-    Initialize { source: SqsIngestorNewError },
-    #[snafu(display("Unable to create AWS client: {}", source))]
-    Client { source: crate::Error },
-    #[snafu(display("Unable to create AWS credentials provider: {}", source))]
-    Credentials { source: crate::Error },
-    #[snafu(display("sqs configuration required when strategy=sqs"))]
-    ConfigMissing,
-}
-
 impl AwsS3Config {
-    async fn create_sqs_ingestor(&self) -> Result<SqsIngestor, CreateSqsIngestorError> {
+    async fn create_sqs_ingestor(
+        &self,
+        multiline: Option<line_agg::Config>,
+    ) -> Result<SqsIngestor, CreateSqsIngestorError> {
         match self.sqs {
             Some(ref sqs) => {
                 // TODO:
@@ -176,13 +174,31 @@ impl AwsS3Config {
                         .with_context(|| Credentials {})?;
                 let s3_client = S3Client::new_with(client.clone(), creds, sqs.region.clone());
 
-                SqsIngestor::new(sqs_client, s3_client, sqs.clone(), self.compression)
-                    .await
-                    .with_context(|| Initialize {})
+                SqsIngestor::new(
+                    sqs_client,
+                    s3_client,
+                    sqs.clone(),
+                    self.compression,
+                    multiline,
+                )
+                .await
+                .with_context(|| Initialize {})
             }
             None => Err(CreateSqsIngestorError::ConfigMissing {}),
         }
     }
+}
+
+#[derive(Debug, Snafu)]
+enum CreateSqsIngestorError {
+    #[snafu(display("Unable to initialize: {}", source))]
+    Initialize { source: SqsIngestorNewError },
+    #[snafu(display("Unable to create AWS client: {}", source))]
+    Client { source: crate::Error },
+    #[snafu(display("Unable to create AWS credentials provider: {}", source))]
+    Credentials { source: crate::Error },
+    #[snafu(display("sqs configuration required when strategy=sqs"))]
+    ConfigMissing,
 }
 
 #[derive(Debug, Snafu)]
@@ -196,10 +212,27 @@ enum SqsIngestorNewError {
     MissingQueueUrl { name: String },
 }
 
+#[derive(Debug, Snafu)]
+enum ProcessingError {
+    #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
+    GetObject {
+        source: RusotoError<GetObjectError>,
+        bucket: String,
+        key: String,
+    },
+    #[snafu(display("Failed to read all of s3://{}/{}: {}", bucket, key, error))]
+    ReadObject {
+        error: String,
+        bucket: String,
+        key: String,
+    },
+}
+
 struct SqsIngestor {
     s3_client: S3Client,
     sqs_client: SqsClient,
 
+    multiline: Option<line_agg::Config>,
     compression: Compression,
 
     queue_url: String,
@@ -214,6 +247,7 @@ impl SqsIngestor {
         s3_client: S3Client,
         config: SqsConfig,
         compression: Compression,
+        multiline: Option<line_agg::Config>,
     ) -> Result<SqsIngestor, SqsIngestorNewError> {
         let queue_url_result = sqs_client
             .get_queue_url(GetQueueUrlRequest {
@@ -236,6 +270,7 @@ impl SqsIngestor {
             sqs_client,
 
             compression,
+            multiline,
 
             queue_url,
             poll_interval: Duration::from_secs(config.poll_secs),
@@ -265,20 +300,28 @@ impl SqsIngestor {
                             self.delete_message(receipt_handle).await.unwrap();
                         }
                     }
-                    Err(()) => {} // TODO emit error
+                    Err(_err) => {} // TODO emit error
                 }
             }
         }
     }
 
-    async fn handle_sqs_message(&self, message: Message, out: Pipeline) -> Result<(), ()> {
+    async fn handle_sqs_message(
+        &self,
+        message: Message,
+        out: Pipeline,
+    ) -> Result<(), ProcessingError> {
         let s3_event: S3Event =
             serde_json::from_str(message.body.unwrap_or_default().as_ref()).unwrap();
 
         self.handle_s3_event(s3_event, out).map_ok(|_| ()).await
     }
 
-    async fn handle_s3_event(&self, s3_event: S3Event, out: Pipeline) -> Result<(), ()> {
+    async fn handle_s3_event(
+        &self,
+        s3_event: S3Event,
+        out: Pipeline,
+    ) -> Result<(), ProcessingError> {
         for record in s3_event.records {
             self.handle_s3_event_record(record, out.clone()).await?
         }
@@ -289,7 +332,7 @@ impl SqsIngestor {
         &self,
         s3_event: S3EventRecord,
         out: Pipeline,
-    ) -> Result<(), ()> {
+    ) -> Result<(), ProcessingError> {
         let object = self
             .s3_client
             .get_object(GetObjectRequest {
@@ -298,7 +341,10 @@ impl SqsIngestor {
                 ..Default::default()
             })
             .await
-            .unwrap();
+            .context(GetObject {
+                bucket: s3_event.s3.bucket.name.clone(),
+                key: s3_event.s3.object.key.clone(),
+            })?;
 
         // TODO assert event type
 
@@ -313,47 +359,76 @@ impl SqsIngestor {
                     object.content_type.as_deref(),
                     body,
                 );
-                let stream =
-                    FramedRead::new(r, BytesDelimitedCodec::new_with_max_length(b'\n', 100000))
-                        .filter_map(|line| {
-                            let bucket_name = s3_event.s3.bucket.name.clone();
-                            let object_key = s3_event.s3.object.key.clone();
-                            let aws_region = s3_event.aws_region.clone();
-                            let metadata = metadata.clone();
 
-                            async move {
-                                match line {
-                                    Ok(line) => {
-                                        let mut event = Event::from(line);
-
-                                        let log = event.as_mut_log();
-                                        log.insert("bucket", bucket_name);
-                                        log.insert("object", object_key);
-                                        log.insert("region", aws_region);
-
-                                        for (key, value) in &metadata {
-                                            log.insert(key, value.clone());
-                                        }
-
-                                        Some(Ok(event))
-                                    }
-                                    Err(err) => {
-                                        // TODO handling IO errors here?
-                                        dbg!(err);
-                                        None
-                                    }
+                // Record the read error saw to propagate up later so we avoid ack'ing the SQS
+                // message
+                //
+                // String is used as we cannot take clone std::io::Error to take ownership in
+                // closure
+                let mut read_error: Option<String> = None;
+                let mut lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
+                    FramedRead::new(r, BytesDelimitedCodec::new(b'\n'))
+                        .take_while(|r| {
+                            futures::future::ready(match r {
+                                Ok(_) => true,
+                                Err(err) => {
+                                    read_error = Some(err.to_string());
+                                    //TODO
+                                    false
                                 }
-                            }
-                        });
+                            })
+                        })
+                        .map(|r| r.unwrap()),
+                );
+                if let Some(config) = &self.multiline {
+                    lines = Box::new(
+                        LineAgg::new(
+                            lines.map(|line| ((), line, ())),
+                            line_agg::Logic::new(config.clone()),
+                        )
+                        .map(|(_src, line, _context)| line),
+                    );
+                }
+
+                let stream = lines.filter_map(|line| {
+                    let bucket_name = s3_event.s3.bucket.name.clone();
+                    let object_key = s3_event.s3.object.key.clone();
+                    let aws_region = s3_event.aws_region.clone();
+                    let metadata = metadata.clone();
+
+                    async move {
+                        let mut event = Event::from(line);
+
+                        let log = event.as_mut_log();
+                        log.insert("bucket", bucket_name);
+                        log.insert("object", object_key);
+                        log.insert("region", aws_region);
+
+                        for (key, value) in &metadata {
+                            log.insert(key, value.clone());
+                        }
+
+                        Some(Ok(event))
+                    }
+                });
 
                 out.send_all(Compat::new(Box::pin(stream)))
                     .compat()
                     .await
                     .map_err(|error| {
                         error!(message = "Error sending S3 Logs", %error);
-                        ()
                     })
-                    .map(|_| ())
+                    .ok();
+
+                read_error
+                    .map(|error| {
+                        Err(ProcessingError::ReadObject {
+                            error,
+                            bucket: s3_event.s3.bucket.name.clone(),
+                            key: s3_event.s3.object.key.clone(),
+                        })
+                    })
+                    .unwrap_or(Ok(()))
             }
             None => Ok(()),
         }
@@ -529,7 +604,9 @@ mod integration_tests {
     use super::{AwsS3Config, Compression, SqsConfig, Strategy};
     use crate::{
         config::{GlobalOptions, SourceConfig},
+        line_agg,
         shutdown::ShutdownSignal,
+        sources::util::MultilineConfig,
         test_util::{collect_n, random_lines},
         Pipeline,
     };
@@ -544,7 +621,7 @@ mod integration_tests {
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(&key, None, None, logs.join("\n").into_bytes(), logs).await;
+        test_event(&key, None, None, None, logs.join("\n").into_bytes(), logs).await;
     }
 
     #[tokio::test]
@@ -561,13 +638,38 @@ mod integration_tests {
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(&key, Some("gzip"), None, buffer, logs).await;
+        test_event(&key, Some("gzip"), None, None, buffer, logs).await;
     }
 
-    async fn config(queue_name: &str) -> AwsS3Config {
+    #[tokio::test]
+    async fn s3_process_message_multiline() {
+        let key = uuid::Uuid::new_v4().to_string();
+        let logs: Vec<String> = vec!["abc", "def", "geh"]
+            .into_iter()
+            .map(ToOwned::to_owned)
+            .collect();
+
+        test_event(
+            &key,
+            None,
+            None,
+            Some(MultilineConfig {
+                start_pattern: "abc".to_owned(),
+                mode: line_agg::Mode::ContinueThrough,
+                condition_pattern: "def".to_owned(),
+                timeout_ms: 1000,
+            }),
+            logs.join("\n").into_bytes(),
+            vec!["abc\ndef\ngeh".to_owned()],
+        )
+        .await;
+    }
+
+    async fn config(queue_name: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
+            multiline,
             sqs: Some(SqsConfig {
                 queue_name: queue_name.to_string(),
                 region: Region::Custom {
@@ -586,6 +688,7 @@ mod integration_tests {
         key: &str,
         content_encoding: Option<&str>,
         content_type: Option<&str>,
+        multiline: Option<MultilineConfig>,
         payload: Vec<u8>,
         expected_lines: Vec<String>,
     ) {
@@ -595,7 +698,7 @@ mod integration_tests {
         let queue = create_queue(&sqs).await;
         let bucket = create_bucket(&s3, &queue).await;
 
-        let config = config(&queue).await;
+        let config = config(&queue, multiline).await;
 
         s3.put_object(PutObjectRequest {
             bucket: bucket.to_owned(),
