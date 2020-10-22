@@ -60,7 +60,9 @@ pub trait Object: std::fmt::Debug {
     /// error if needed.
     fn insert(&mut self, path: &str, value: Value) -> std::result::Result<(), String>;
 
-    // TODO: come up with best interface to expose path to implementers.
+    /// Find a value for a given path.
+    ///
+    /// See [`Object::insert`] for more details.
     fn find(&self, path: &str) -> std::result::Result<Option<Value>, String>;
 }
 
