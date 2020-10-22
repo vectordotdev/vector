@@ -21,7 +21,7 @@ use std::{
 
 use tracing::{error, info};
 use vector::config::{
-    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
+    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext, TransformConfig,
     TransformContext,
 };
 use vector::event::{metric::MetricValue, Event, Value};
@@ -135,6 +135,7 @@ impl SourceConfig for MockSourceConfig {
     async fn build(
         &self,
         _name: &str,
+        _cx: SourceContext,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,

@@ -749,7 +749,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
 mod tests {
     use super::{parse_timestamp, SplunkConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        config::{log_schema, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::Event,
         shutdown::ShutdownSignal,
         sinks::{
@@ -788,6 +788,7 @@ mod tests {
             }
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,

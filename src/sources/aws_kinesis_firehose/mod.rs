@@ -96,6 +96,7 @@ mod tests {
             }
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,

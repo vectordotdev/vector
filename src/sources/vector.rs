@@ -101,7 +101,7 @@ mod test {
     use super::VectorConfig;
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+        config::{GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
         event::{
             metric::{MetricKind, MetricValue},
             Metric,
@@ -121,6 +121,7 @@ mod test {
         let server = source
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,

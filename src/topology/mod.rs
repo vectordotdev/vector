@@ -810,7 +810,7 @@ mod source_finished_tests {
 ))]
 mod transient_state_tests {
     use crate::{
-        config::{Config, DataType, GlobalOptions, SourceConfig},
+        config::{Config, DataType, GlobalOptions, SourceConfig, SourceContext},
         shutdown::ShutdownSignal,
         sinks::blackhole::BlackholeConfig,
         sources::stdin::StdinConfig,
@@ -847,6 +847,7 @@ mod transient_state_tests {
         async fn build(
             &self,
             _name: &str,
+            _cx: SourceContext,
             _globals: &GlobalOptions,
             shutdown: ShutdownSignal,
             out: Pipeline,

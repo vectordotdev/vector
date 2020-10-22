@@ -327,6 +327,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         }
         .build(
             "default",
+            SourceContext::new_test(),
             &GlobalOptions::default(),
             ShutdownSignal::noop(),
             tx,
@@ -395,6 +396,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         }
         .build(
             "default",
+            SourceContext::new_test(),
             &GlobalOptions::default(),
             ShutdownSignal::noop(),
             tx,
@@ -436,6 +438,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         }
         .build(
             "default",
+            SourceContext::new_test(),
             &GlobalOptions::default(),
             ShutdownSignal::noop(),
             tx,

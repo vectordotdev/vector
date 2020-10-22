@@ -136,7 +136,7 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
+        config::{log_schema, GlobalOptions, SourceConfig, SourceContext},
         dns::Resolver,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSink,
@@ -182,6 +182,7 @@ mod test {
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
@@ -208,6 +209,7 @@ mod test {
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
@@ -241,6 +243,7 @@ mod test {
         let server = SocketConfig::from(config)
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
@@ -289,6 +292,7 @@ mod test {
         let server = SocketConfig::from(config)
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
@@ -339,6 +343,7 @@ mod test {
         let server = SocketConfig::from(config)
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 tx,
@@ -388,7 +393,13 @@ mod test {
 
         // Start TCP Source
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
-            .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+            .build(
+                source_name,
+                SourceContext::new_test(),
+                &GlobalOptions::default(),
+                shutdown_signal,
+                tx,
+            )
             .await
             .unwrap()
             .compat();
@@ -430,7 +441,13 @@ mod test {
             shutdown_timeout_secs: 1,
             ..TcpConfig::new(addr.into())
         })
-        .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
+        .build(
+            source_name,
+            SourceContext::new_test(),
+            &GlobalOptions::default(),
+            shutdown_signal,
+            tx,
+        )
         .await
         .unwrap()
         .compat();
@@ -526,6 +543,7 @@ mod test {
         let server = SocketConfig::from(UdpConfig::new(addr))
             .build(
                 source_name,
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 shutdown_signal,
                 sender,
@@ -692,6 +710,7 @@ mod test {
         let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,

@@ -175,7 +175,7 @@ mod tests {
     use super::{HttpSourceAuthConfig, LogplexConfig};
     use crate::shutdown::ShutdownSignal;
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
+        config::{log_schema, GlobalOptions, SourceConfig, SourceContext},
         event::Event,
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
@@ -197,6 +197,7 @@ mod tests {
             }
             .build(
                 "default",
+                SourceContext::new_test(),
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
                 sender,

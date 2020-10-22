@@ -7,7 +7,7 @@ use futures01::{Async, AsyncSink, Sink, Stream};
 use serde::{Deserialize, Serialize};
 use tokio::time::{delay_for, Duration};
 use vector::{
-    config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
+    config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig, SourceContext},
     shutdown::ShutdownSignal,
     test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
     Event, Pipeline,
@@ -188,6 +188,7 @@ impl SourceConfig for ErrorSourceConfig {
     async fn build(
         &self,
         _name: &str,
+        _cx: SourceContext,
         _globals: &GlobalOptions,
         _shutdown: ShutdownSignal,
         _out: Pipeline,
@@ -255,6 +256,7 @@ impl SourceConfig for PanicSourceConfig {
     async fn build(
         &self,
         _name: &str,
+        _cx: SourceContext,
         _globals: &GlobalOptions,
         _shutdown: ShutdownSignal,
         _out: Pipeline,
