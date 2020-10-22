@@ -192,7 +192,7 @@ mod tests {
         Event,
     };
 
-    fn parse_log(
+    async fn parse_log(
         text: &str,
         separator: Option<String>,
         field_split: Option<String>,
@@ -222,15 +222,15 @@ mod tests {
         parser.transform(event).unwrap().into_log()
     }
 
-    #[test]
-    fn it_separates_whitespace() {
-        let log = parse_log("foo=bar beep=bop", None, None, true, &[], None, None, None);
-        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
+    #[tokio::test]
+    async fn it_separates_whitespace() {
+        let log = parse_log("foo=bar beep=bop", None, None, true, &[], None, None, None).await;
+        assert_eq!(log["foo"], Value::Bytes("bar".into()));
+        assert_eq!(log["beep"], Value::Bytes("bop".into()));
     }
 
-    #[test]
-    fn it_separates_csv_kv() {
+    #[tokio::test]
+    async fn it_separates_csv_kv() {
         let log = parse_log(
             "foo=bar, beep=bop, score=10",
             Some(",".to_string()),
@@ -240,13 +240,14 @@ mod tests {
             None,
             None,
             None,
-        );
-        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
+        )
+        .await;
+        assert_eq!(log["foo"], Value::Bytes("bar".into()));
+        assert_eq!(log["beep"], Value::Bytes("bop".into()));
     }
 
-    #[test]
-    fn it_handles_whitespace_in_fields() {
+    #[tokio::test]
+    async fn it_handles_whitespace_in_fields() {
         let log = parse_log(
             "foo:bar, beep : bop, score :10",
             Some(",".to_string()),
@@ -256,14 +257,15 @@ mod tests {
             None,
             None,
             None,
-        );
-        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
-        assert_eq!(log[&"score".to_string()], Value::Integer(10));
+        )
+        .await;
+        assert_eq!(log["foo"], Value::Bytes("bar".into()));
+        assert_eq!(log["beep"], Value::Bytes("bop".into()));
+        assert_eq!(log["score"], Value::Integer(10));
     }
 
-    #[test]
-    fn it_handles_multi_char_splitters() {
+    #[tokio::test]
+    async fn it_handles_multi_char_splitters() {
         let log = parse_log(
             "foo=>bar || beep => bop || score=>10",
             Some("||".to_string()),
@@ -273,15 +275,16 @@ mod tests {
             None,
             None,
             None,
-        );
+        )
+        .await;
 
-        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
-        assert_eq!(log[&"score".to_string()], Value::Integer(10));
+        assert_eq!(log["foo"], Value::Bytes("bar".into()));
+        assert_eq!(log["beep"], Value::Bytes("bop".into()));
+        assert_eq!(log["score"], Value::Integer(10));
     }
 
-    #[test]
-    fn it_handles_splitters_in_value() {
+    #[tokio::test]
+    async fn it_handles_splitters_in_value() {
         let log = parse_log(
             "foo==bar, beep=bop=bap , score=10",
             Some(",".to_string()),
@@ -291,14 +294,15 @@ mod tests {
             None,
             None,
             None,
-        );
-        assert_eq!(log[&"foo".to_string()], Value::Bytes("=bar".into()));
-        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop=bap".into()));
-        assert_eq!(log[&"score".to_string()], Value::Integer(10));
+        )
+        .await;
+        assert_eq!(log["foo"], Value::Bytes("=bar".into()));
+        assert_eq!(log["beep"], Value::Bytes("bop=bap".into()));
+        assert_eq!(log["score"], Value::Integer(10));
     }
 
-    #[test]
-    fn it_handles_empty_values() {
+    #[tokio::test]
+    async fn it_handles_empty_values() {
         let log = parse_log(
             "foo::0, bop::beep, score::",
             Some(",".to_string()),
@@ -308,13 +312,14 @@ mod tests {
             None,
             None,
             None,
-        );
-        assert!(log.contains(&"score".to_string()));
-        assert_eq!(log[&"score".to_string()], Value::Bytes("".into()))
+        )
+        .await;
+        assert!(log.contains("score"));
+        assert_eq!(log["score"], Value::Bytes("".into()))
     }
 
-    #[test]
-    fn it_handles_empty_keys() {
+    #[tokio::test]
+    async fn it_handles_empty_keys() {
         let log = parse_log(
             "foo::0, ::beep, score::12",
             Some(",".to_string()),
@@ -324,14 +329,15 @@ mod tests {
             None,
             None,
             None,
-        );
-        assert!(log.contains(&"foo".to_string()));
-        assert!(!log.contains(&"beep".to_string()));
-        assert!(log.contains(&"score".to_string()));
+        )
+        .await;
+        assert!(log.contains("foo"));
+        assert!(!log.contains("beep"));
+        assert!(log.contains("score"));
     }
 
-    #[test]
-    fn it_accepts_brackets() {
+    #[tokio::test]
+    async fn it_accepts_brackets() {
         let log = parse_log(
             r#"{"foo"}:0, ""bop":[beep], [score]:78"#,
             Some(",".to_string()),
@@ -341,12 +347,13 @@ mod tests {
             None,
             Some("\"{}".to_string()),
             None,
-        );
-        assert_eq!(log[&"bop".to_string()], Value::Bytes("[beep]".into()))
+        )
+        .await;
+        assert_eq!(log["bop"], Value::Bytes("[beep]".into()))
     }
 
-    #[test]
-    fn it_trims_keys() {
+    #[tokio::test]
+    async fn it_trims_keys() {
         let log = parse_log(
             "{\"foo\"}:0, \"\"bop\":beep, {({score})}:78",
             Some(",".to_string()),
@@ -356,14 +363,15 @@ mod tests {
             None,
             Some("\"{}".to_string()),
             None,
-        );
-        assert!(log.contains(&"foo".to_string()));
-        assert!(log.contains(&"bop".to_string()));
+        )
+        .await;
+        assert!(log.contains("foo"));
+        assert!(log.contains("bop"));
         assert!(log.contains(&"({score})".to_string()));
     }
 
-    #[test]
-    fn it_trims_values() {
+    #[tokio::test]
+    async fn it_trims_values() {
         let log = parse_log(
             "foo:{\"0\"}, bop:\"beep\", score:{78}",
             Some(",".to_string()),
@@ -373,9 +381,10 @@ mod tests {
             None,
             None,
             Some("\"{}".to_string()),
-        );
-        assert_eq!(log[&"foo".to_string()], Value::Integer(0));
-        assert_eq!(log[&"bop".to_string()], Value::Bytes("beep".into()));
-        assert_eq!(log[&"score".to_string()], Value::Integer(78));
+        )
+        .await;
+        assert_eq!(log["foo"], Value::Integer(0));
+        assert_eq!(log["bop"], Value::Bytes("beep".into()));
+        assert_eq!(log["score"], Value::Integer(78));
     }
 }
