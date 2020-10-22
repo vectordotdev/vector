@@ -1,5 +1,3 @@
-#![cfg(feature = "rusoto_core")]
-
 use crate::{dns::Resolver, tls::MaybeTlsSettings};
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -29,6 +27,8 @@ use std::{
     time::Duration,
 };
 use tower::{Service, ServiceExt};
+
+pub mod region;
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
 

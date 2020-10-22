@@ -4,8 +4,10 @@ use crate::{
     event::Event,
     http::HttpClient,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region::{region_from_endpoint, RegionOrEndpoint},
-    rusoto,
+    rusoto::{
+        self,
+        region::{region_from_endpoint, RegionOrEndpoint},
+    },
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},

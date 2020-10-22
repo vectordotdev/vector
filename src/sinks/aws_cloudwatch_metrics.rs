@@ -2,8 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
-    region::RegionOrEndpoint,
-    rusoto,
+    rusoto::{self, region::RegionOrEndpoint},
     sinks::util::{
         retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
         TowerRequestConfig,
@@ -437,7 +436,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         event::{metric::StatisticKind, Event},
-        region::RegionOrEndpoint,
+        rusoto::region::RegionOrEndpoint,
         test_util::random_string,
     };
     use chrono::offset::TimeZone;
