@@ -13,7 +13,7 @@ pub use cmd::cmd;
 pub struct Opts {
     /// How often the screen refreshes (in milliseconds)
     #[structopt(default_value = "500", short = "i", long)]
-    refresh_interval: i32,
+    refresh_interval: u64,
 
     #[structopt(short, long)]
     url: Option<Url>,

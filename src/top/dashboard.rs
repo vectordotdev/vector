@@ -1,8 +1,8 @@
 use super::{
     events::{Event, Events},
-    state::{TopologyState, TOPOLOGY_HEADERS},
+    state::{WidgetsState, TOPOLOGY_HEADERS},
 };
-use std::{io::Stdout, sync::Arc};
+use std::io::Stdout;
 use termion::event::Key;
 use termion::raw::{IntoRawMode, RawTerminal};
 use termion::screen::AlternateScreen;
@@ -12,7 +12,7 @@ use tui::{
     backend::{Backend, TermionBackend},
     layout::{Alignment, Constraint, Layout},
     style::{Color, Modifier, Style},
-    text::{Span, Spans, Text},
+    text::{Span, Spans},
     widgets::{Block, Borders, Paragraph, Row, Table},
     Frame, Terminal,
 };
@@ -20,33 +20,25 @@ use tui::{
 const INVARIANT: &str =
     "Unable to create terminal session for the Vector top dashboard. Please report this.";
 
-pub struct Config {
-    pub url: url::Url,
-    pub topology_state: Arc<TopologyState>,
-}
-
-pub struct Widgets<'a> {
+pub struct Widgets {
     constraints: Vec<Constraint>,
-    config: &'a Config,
+    state: WidgetsState,
 }
 
-impl<'a> Widgets<'a> {
-    pub fn new(config: &'a Config) -> Self {
+impl Widgets {
+    pub fn new(state: WidgetsState) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
             Constraint::Length(3),
         ];
 
-        Self {
-            constraints,
-            config,
-        }
+        Self { constraints, state }
     }
 
     /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to
     fn title<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![Spans::from(self.config.url.as_str())];
+        let text = vec![Spans::from(self.state.url())];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
             "Vector",
@@ -59,28 +51,22 @@ impl<'a> Widgets<'a> {
         f.render_widget(w, area);
     }
 
-    /// Render host metrics gauges
-    fn host_metrics<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {}
-
     /// Renders a topology table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `topology_state`
     fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let items = {
-            let read = self.config.topology_state.rows().values();
-            read.map(|r| {
-                Row::StyledData(
-                    vec![
-                        r.name.clone(),
-                        r.topology_type.clone(),
-                        r.format_events_processed_total(),
-                        r.format_errors(),
-                        r.format_throughput(),
-                    ]
-                    .into_iter(),
-                    Style::default().fg(Color::White),
-                )
-            })
-        };
+        let items = self.state.topology().load().rows().into_iter().map(|r| {
+            Row::StyledData(
+                vec![
+                    r.name.clone(),
+                    r.topology_type.clone(),
+                    r.format_events_processed_total(),
+                    r.format_errors(),
+                    r.format_throughput(),
+                ]
+                .into_iter(),
+                Style::default().fg(Color::White),
+            )
+        });
 
         let w = Table::new(TOPOLOGY_HEADERS.iter(), items)
             .block(Block::default().borders(Borders::ALL).title("Topology"))
@@ -142,7 +128,7 @@ impl Dashboard {
 
     /// Run the current dashboard by rendering out to the terminal. This will block until the
     /// user exists by pressing `q`
-    pub fn run(&mut self, widgets: &Widgets<'_>) {
+    pub fn run(&mut self, widgets: &Widgets) {
         let events = Events::new();
 
         loop {

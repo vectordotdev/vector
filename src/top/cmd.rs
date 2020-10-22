@@ -1,52 +1,57 @@
 use super::{
-    dashboard::{Config, Dashboard, Widgets},
-    events::{Event, Events},
-    state::{TopologyRow, TopologyState},
+    dashboard::{Dashboard, Widgets},
+    state::{TopologyRow, TopologyState, WidgetsState},
 };
 use crate::config;
 use arc_swap::ArcSwap;
-use std::{error::Error, io, sync::Arc};
 use url::Url;
 use vector_api_client::{
     gql::{HealthQueryExt, TopologyQueryExt},
-    Client, SubscriptionClient,
+    Client,
 };
 
 /// Executes a toplogy query to the GraphQL server, and creates an initial TopologyState
 /// table based on the returned topology/metrics. This will contain all of the rows initially
 /// to render the topology table widget
-async fn spawn_update_topology(
-    client: &Client,
-    topology_state: Arc<TopologyState>,
+async fn update_topology(
+    interval: u64,
+    client: Client,
+    topology_state: ArcSwap<TopologyState>,
 ) -> Result<(), ()> {
-    let rows = client
-        .topology_query()
-        .await
-        .map_err(|_| ())?
-        .data
-        .ok_or_else(|| ())?
-        .topology
-        .into_iter()
-        .map(|d| TopologyRow {
-            name: d.name,
-            topology_type: d.on.to_string(),
-            events_processed_total: d
-                .events_processed_total
-                .as_ref()
-                .map(|ep| ep.events_processed_total as i64)
-                .unwrap_or(0),
-            errors: 0,
-            throughput: 0.00,
-        })
-        .collect();
+    // Loop every `interval` ms to update topology
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(interval));
 
-    topology_state.update_rows(rows);
+    loop {
+        interval.tick().await;
 
-    Ok(())
+        // Execute a query to get the latest topology, and aggregate metrics for each resource
+        let rows = client
+            .topology_query()
+            .await
+            .map_err(|_| ())?
+            .data
+            .ok_or_else(|| ())?
+            .topology
+            .into_iter()
+            .map(|d| TopologyRow {
+                name: d.name,
+                topology_type: d.on.to_string(),
+                events_processed_total: d
+                    .events_processed_total
+                    .as_ref()
+                    .map(|ep| ep.events_processed_total as i64)
+                    .unwrap_or(0),
+                errors: 0,
+                throughput: 0.00,
+            })
+            .collect();
+
+        // Swap the
+        topology_state.swap(topology_state.load().with_swapped_rows(rows));
+    }
+
+    unreachable!("not possible")
 }
-
-/// Spawns the host
-async fn spawn_host_metrics(client: &SubscriptionClient) {}
 
 /// CLI command func for displaying Vector topology, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
@@ -73,36 +78,17 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Create initial topology; spawn updater
-    let topology_state = Arc::new(TopologyState::new());
-    spawn_update_topology(&client, Arc::clone(&topology_state));
-
-    // tokio::spawn(async move {
-    //     use rand::Rng;
-    //
-    //     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(50));
-    //     loop {
-    //         interval.tick().await;
-    //
-    //         let mut rng = rand::thread_rng();
-    //
-    //         cloned.load().rows().for_each(|r| {
-    //             let mut r = r.lock().unwrap();
-    //             let events_processed_total = r.events_processed_total;
-    //             r.update_events_processed_total(
-    //                 events_processed_total + rng.gen_range::<i64>(0, 50),
-    //             );
-    //         });
-    //     }
-    // });
-
-    // Configure widgets, based on the user CLI options
-    let config = Config {
-        url,
-        topology_state: Arc::clone(&topology_state),
-    };
+    let topology_state = TopologyState::arc_new();
+    tokio::spawn(update_topology(
+        opts.refresh_interval,
+        client,
+        ArcSwap::clone(&topology_state),
+    ));
 
     // Spawn a new dashboard with the configured widgets
-    let widgets = Widgets::new(&config);
+    let state = WidgetsState::new(url, ArcSwap::clone(&topology_state));
+    let widgets = Widgets::new(state);
+
     Dashboard::new().run(&widgets);
 
     exitcode::OK
