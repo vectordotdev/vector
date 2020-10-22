@@ -1,5 +1,0 @@
-subscription EventsProcessedTotalMetricsSubscription($interval: Int!) {
-  eventsProcessedTotalMetrics(interval: $interval) {
-    eventsProcessedTotal
-  }
-}
