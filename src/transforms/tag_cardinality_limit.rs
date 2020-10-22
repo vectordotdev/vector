@@ -69,7 +69,16 @@ inventory::submit! {
     TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
-impl GenerateConfig for TagCardinalityLimitConfig {}
+impl GenerateConfig for TagCardinalityLimitConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            mode: Mode::Exact,
+            value_limit: default_value_limit(),
+            limit_exceeded_action: default_limit_exceeded_action(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
@@ -238,6 +247,11 @@ mod tests {
     use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
     use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
+    }
 
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
         Event::Metric(Metric {

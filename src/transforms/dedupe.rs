@@ -18,8 +18,6 @@ pub enum FieldMatchConfig {
     MatchFields(Vec<String>),
     #[serde(rename = "ignore")]
     IgnoreFields(Vec<String>),
-    #[serde(skip)]
-    Default,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -28,11 +26,11 @@ pub struct CacheConfig {
     pub num_events: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
-    #[serde(default = "default_field_match_config")]
-    pub fields: FieldMatchConfig,
+    #[serde(default)]
+    pub fields: Option<FieldMatchConfig>,
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
 }
@@ -41,34 +39,24 @@ fn default_cache_config() -> CacheConfig {
     CacheConfig { num_events: 5000 }
 }
 
-/// Note that the value returned by this is just a placeholder.  To get the real default you must
-/// call fill_default() on the parsed DedupeConfig instance.
-fn default_field_match_config() -> FieldMatchConfig {
-    FieldMatchConfig::Default
-}
-
 impl DedupeConfig {
     /// We cannot rely on Serde to populate the default since we want it to be based on the user's
     /// configured log_schema, which we only know about after we've already parsed the config.
-    pub fn fill_default(&self) -> Self {
-        let fields = match &self.fields {
-            FieldMatchConfig::MatchFields(x) => FieldMatchConfig::MatchFields(x.clone()),
-            FieldMatchConfig::IgnoreFields(y) => FieldMatchConfig::IgnoreFields(y.clone()),
-            FieldMatchConfig::Default => FieldMatchConfig::MatchFields(vec![
+    pub fn fill_default_fields_match(&self) -> FieldMatchConfig {
+        match &self.fields {
+            Some(FieldMatchConfig::MatchFields(x)) => FieldMatchConfig::MatchFields(x.clone()),
+            Some(FieldMatchConfig::IgnoreFields(y)) => FieldMatchConfig::IgnoreFields(y.clone()),
+            None => FieldMatchConfig::MatchFields(vec![
                 log_schema().timestamp_key().into(),
                 log_schema().host_key().into(),
                 log_schema().message_key().into(),
             ]),
-        };
-        Self {
-            fields,
-            cache: self.cache.clone(),
         }
     }
 }
 
 pub struct Dedupe {
-    config: DedupeConfig,
+    fields: FieldMatchConfig,
     cache: LruCache<CacheEntry, bool>,
 }
 
@@ -76,13 +64,21 @@ inventory::submit! {
     TransformDescription::new::<DedupeConfig>("dedupe")
 }
 
-impl GenerateConfig for DedupeConfig {}
+impl GenerateConfig for DedupeConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            fields: None,
+            cache: default_cache_config(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Dedupe::new(self.fill_default())))
+        Ok(Box::new(Dedupe::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -142,8 +138,9 @@ fn type_id_for_value(val: &Value) -> TypeId {
 impl Dedupe {
     pub fn new(config: DedupeConfig) -> Self {
         let num_entries = config.cache.num_events;
+        let fields = config.fill_default_fields_match();
         Self {
-            config,
+            fields,
             cache: LruCache::new(num_entries),
         }
     }
@@ -176,16 +173,13 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
             CacheEntry::Ignore(entry)
         }
-        FieldMatchConfig::Default => {
-            panic!("Dedupe transform config contains Default FieldMatchConfig while running");
-        }
     }
 }
 
 impl Transform for Dedupe {
     fn transform(&mut self, event: Event) -> Option<Event> {
         emit!(DedupeEventProcessed);
-        let cache_entry = build_cache_entry(&event, &self.config.fields);
+        let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
             emit!(DedupeEventDiscarded { event });
             None
@@ -202,10 +196,15 @@ mod tests {
     use crate::{event::Event, event::Value, transforms::Transform};
     use std::collections::BTreeMap;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DedupeConfig>();
+    }
+
     fn make_match_transform(num_events: usize, fields: Vec<String>) -> Dedupe {
         Dedupe::new(DedupeConfig {
             cache: CacheConfig { num_events },
-            fields: { FieldMatchConfig::MatchFields(fields) },
+            fields: Some(FieldMatchConfig::MatchFields(fields)),
         })
     }
 
@@ -216,7 +215,7 @@ mod tests {
 
         Dedupe::new(DedupeConfig {
             cache: CacheConfig { num_events },
-            fields: { FieldMatchConfig::IgnoreFields(fields) },
+            fields: Some(FieldMatchConfig::IgnoreFields(fields)),
         })
     }
 

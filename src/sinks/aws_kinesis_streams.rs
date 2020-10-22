@@ -74,7 +74,16 @@ inventory::submit! {
     SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
 }
 
-impl GenerateConfig for KinesisSinkConfig {}
+impl GenerateConfig for KinesisSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"region = "us-east-1"
+            stream_name = "my-stream"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
@@ -318,6 +327,11 @@ mod tests {
     use super::*;
     use crate::{event::Event, test_util::random_string};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KinesisSinkConfig>();
+    }
 
     #[test]
     fn kinesis_encode_event_text() {

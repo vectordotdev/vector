@@ -69,7 +69,15 @@ inventory::submit! {
     SinkDescription::new::<LokiConfig>("loki")
 }
 
-impl GenerateConfig for LokiConfig {}
+impl GenerateConfig for LokiConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "http://localhost:3100"
+            labels = {}"#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
@@ -219,6 +227,11 @@ mod tests {
     use crate::test_util;
     use crate::Event;
     use futures::StreamExt;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LokiConfig>();
+    }
 
     #[test]
     fn interpolate_labels() {

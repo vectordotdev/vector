@@ -74,7 +74,19 @@ inventory::submit! {
     SourceDescription::new::<SyslogConfig>("syslog")
 }
 
-impl GenerateConfig for SyslogConfig {}
+impl GenerateConfig for SyslogConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            mode: Mode::Tcp {
+                address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
+                tls: None,
+            },
+            host_key: None,
+            max_length: default_max_length(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
@@ -400,6 +412,11 @@ mod test {
     use super::{event_from_str, SyslogConfig};
     use crate::{config::log_schema, event::Event};
     use chrono::prelude::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SyslogConfig>();
+    }
 
     #[test]
     fn config_tcp() {

@@ -35,7 +35,15 @@ inventory::submit! {
     SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
 
-impl GenerateConfig for HoneycombConfig {}
+impl GenerateConfig for HoneycombConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"api_key = "${HONEYCOMB_API_KEY}"
+            dataset = "my-honeycomb-dataset""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
@@ -154,5 +162,12 @@ async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::
             status, body
         )
         .into())
+    }
+}
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::HoneycombConfig>();
     }
 }

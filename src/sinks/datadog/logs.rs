@@ -57,7 +57,15 @@ inventory::submit! {
     SinkDescription::new::<DatadogLogsConfig>("datadog_logs")
 }
 
-impl GenerateConfig for DatadogLogsConfig {}
+impl GenerateConfig for DatadogLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"api_key = "${DATADOG_API_KEY_ENV_VAR}"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 impl DatadogLogsConfig {
     fn get_endpoint(&self) -> &str {
@@ -283,6 +291,11 @@ mod tests {
         test_util::{next_addr, random_lines_with_stream},
     };
     use futures::StreamExt;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
 
     #[tokio::test]
     async fn smoke_text() {

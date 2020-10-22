@@ -71,7 +71,16 @@ inventory::submit! {
     SinkDescription::new::<KinesisFirehoseSinkConfig>("aws_kinesis_firehose")
 }
 
-impl GenerateConfig for KinesisFirehoseSinkConfig {}
+impl GenerateConfig for KinesisFirehoseSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"region = "us-east-1"
+            stream_name = "my-stream"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_firehose")]
@@ -259,6 +268,11 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KinesisFirehoseSinkConfig>();
+    }
 
     #[test]
     fn firehose_encode_event_text() {
