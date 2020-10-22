@@ -514,7 +514,7 @@ _values: {
 
 #MetricEventDistribution: {
 	values: [float, ...]
-	sample_rates: [float, ...]
+	sample_rates: [uint, ...]
 	statistic: "histogram" | "summary"
 }
 
