@@ -718,7 +718,6 @@
       "parts.query.hello.equals" = "world"
       "parts.fragment.equals" = "configuration"
 
-<<<<<<< HEAD
 [transforms.remap_function_ceil]
   inputs = []
   type = "remap"

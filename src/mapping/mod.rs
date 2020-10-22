@@ -287,10 +287,13 @@ impl LogFn {
 
 impl Function for LogFn {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        let msg = self.msg.execute(target)?;
+        let msg = match self.msg.execute(target)? {
+            QueryValue::Value(value) => value,
+            _ => return Err("can only log Value parameters".to_string()),
+        };
         let msg = msg.into_bytes();
-        let level = self.level.unwrap_or(LogLevel::Info);
         let string = String::from_utf8_lossy(&msg);
+        let level = self.level.unwrap_or(LogLevel::Info);
 
         match level {
             LogLevel::Trace => trace!("{:?}", string),
