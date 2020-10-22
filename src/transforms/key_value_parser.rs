@@ -11,33 +11,40 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
-#[derive(Debug, Default, Derivative, Deserialize, Serialize)]
+#[derive(Debug, Derivative, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
+#[derivative(Default)]
 pub struct KeyValueConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     pub field_split: Option<String>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
     pub separator: Option<String>,
-    pub target_field: Option<Atom>,
+    pub target_field: Option<String>,
     pub trim_key: Option<String>,
     pub trim_value: Option<String>,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
     TransformDescription::new::<KeyValueConfig>("key_value_parser")
 }
 
+impl_generate_config_from_default!(KeyValueConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let conversions = parse_conversion_map(&self.types)?;
-        let field = self.field.as_ref().unwrap_or(&log_schema().message_key());
+        let field = self
+            .field
+            .clone()
+            .unwrap_or_else(|| log_schema().message_key().to_string());
+
         let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
         let trim_value = self.trim_value.as_ref().map(|key| key.chars().collect());
@@ -47,8 +54,10 @@ impl TransformConfig for KeyValueConfig {
             && self
                 .target_field
                 .as_ref()
-                .map(|target_field| field != target_field)
+                .map(|target_field| &field != target_field)
                 .unwrap_or(true);
+        let target_field = self.target_field.clone();
+        let overwrite_target = self.overwrite_target;
 
         let mut field_split = self.field_split.clone().unwrap_or_else(|| "=".to_string());
         if field_split.is_empty() {
@@ -58,11 +67,11 @@ impl TransformConfig for KeyValueConfig {
         Ok(Box::new(KeyValue {
             conversions,
             drop_field,
-            field: field.clone(),
+            field,
             field_split,
-            overwrite_target: self.overwrite_target,
+            overwrite_target,
             separator,
-            target_field: self.target_field.clone(),
+            target_field,
             trim_key,
             trim_value,
         }))
@@ -82,19 +91,19 @@ impl TransformConfig for KeyValueConfig {
 }
 
 pub struct KeyValue {
-    conversions: HashMap<Atom, Conversion>,
+    conversions: HashMap<String, Conversion>,
     drop_field: bool,
-    field: Atom,
+    field: String,
     field_split: String,
     overwrite_target: bool,
     separator: String,
-    target_field: Option<Atom>,
+    target_field: Option<String>,
     trim_key: Option<Vec<char>>,
     trim_value: Option<Vec<char>>,
 }
 
 impl KeyValue {
-    fn parse_pair(&self, pair: &str) -> Option<(Atom, String)> {
+    fn parse_pair(&self, pair: &str) -> Option<(String, String)> {
         let pair = pair.trim();
         let field_split = &self.field_split;
 
@@ -115,7 +124,7 @@ impl KeyValue {
             None => val,
         };
 
-        Some((Atom::from(key), val.to_string()))
+        Some((key.to_string(), val.to_string()))
     }
 }
 
@@ -144,7 +153,7 @@ impl Transform for KeyValue {
 
             for (mut key, val) in pairs {
                 if let Some(target_field) = self.target_field.to_owned() {
-                    key = Atom::from(format!("{}.{}", target_field, key));
+                    key = format!("{}.{}", target_field, key);
                 }
 
                 if let Some(conv) = self.conversions.get(&key) {
@@ -166,7 +175,7 @@ impl Transform for KeyValue {
             }
         } else {
             emit!(KeyValueFieldDoesNotExist {
-                field: self.field.as_ref().into()
+                field: self.field.to_string()
             });
         };
 
@@ -182,7 +191,6 @@ mod tests {
         event::{LogEvent, Value},
         Event,
     };
-    use string_cache::DefaultAtom as Atom;
 
     fn parse_log(
         text: &str,
@@ -190,7 +198,7 @@ mod tests {
         field_split: Option<String>,
         drop_field: bool,
         types: &[(&str, &str)],
-        target_field: Option<Atom>,
+        target_field: Option<String>,
         trim_key: Option<String>,
         trim_value: Option<String>,
     ) -> LogEvent {
@@ -208,6 +216,7 @@ mod tests {
             trim_value,
         }
         .build(TransformContext::new_test())
+        .await
         .unwrap();
 
         parser.transform(event).unwrap().into_log()
@@ -216,8 +225,8 @@ mod tests {
     #[test]
     fn it_separates_whitespace() {
         let log = parse_log("foo=bar beep=bop", None, None, true, &[], None, None, None);
-        assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
+        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
+        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
     }
 
     #[test]
@@ -232,8 +241,8 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
+        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
+        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
     }
 
     #[test]
@@ -248,9 +257,9 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
-        assert_eq!(log[&"score".into()], Value::Integer(10));
+        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
+        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
+        assert_eq!(log[&"score".to_string()], Value::Integer(10));
     }
 
     #[test]
@@ -266,9 +275,9 @@ mod tests {
             None,
         );
 
-        assert_eq!(log[&"foo".into()], Value::Bytes("bar".into()));
-        assert_eq!(log[&"beep".into()], Value::Bytes("bop".into()));
-        assert_eq!(log[&"score".into()], Value::Integer(10));
+        assert_eq!(log[&"foo".to_string()], Value::Bytes("bar".into()));
+        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop".into()));
+        assert_eq!(log[&"score".to_string()], Value::Integer(10));
     }
 
     #[test]
@@ -283,9 +292,9 @@ mod tests {
             None,
             None,
         );
-        assert_eq!(log[&"foo".into()], Value::Bytes("=bar".into()));
-        assert_eq!(log[&"beep".into()], Value::Bytes("bop=bap".into()));
-        assert_eq!(log[&"score".into()], Value::Integer(10));
+        assert_eq!(log[&"foo".to_string()], Value::Bytes("=bar".into()));
+        assert_eq!(log[&"beep".to_string()], Value::Bytes("bop=bap".into()));
+        assert_eq!(log[&"score".to_string()], Value::Integer(10));
     }
 
     #[test]
@@ -300,8 +309,8 @@ mod tests {
             None,
             None,
         );
-        assert!(log.contains(&"score".into()));
-        assert_eq!(log[&"score".into()], Value::Bytes("".into()))
+        assert!(log.contains(&"score".to_string()));
+        assert_eq!(log[&"score".to_string()], Value::Bytes("".into()))
     }
 
     #[test]
@@ -316,9 +325,9 @@ mod tests {
             None,
             None,
         );
-        assert!(log.contains(&"foo".into()));
-        assert!(!log.contains(&"beep".into()));
-        assert!(log.contains(&"score".into()));
+        assert!(log.contains(&"foo".to_string()));
+        assert!(!log.contains(&"beep".to_string()));
+        assert!(log.contains(&"score".to_string()));
     }
 
     #[test]
@@ -333,7 +342,7 @@ mod tests {
             Some("\"{}".to_string()),
             None,
         );
-        assert_eq!(log[&"bop".into()], Value::Bytes("[beep]".into()))
+        assert_eq!(log[&"bop".to_string()], Value::Bytes("[beep]".into()))
     }
 
     #[test]
@@ -348,9 +357,9 @@ mod tests {
             Some("\"{}".to_string()),
             None,
         );
-        assert!(log.contains(&"foo".into()));
-        assert!(log.contains(&"bop".into()));
-        assert!(log.contains(&"({score})".into()));
+        assert!(log.contains(&"foo".to_string()));
+        assert!(log.contains(&"bop".to_string()));
+        assert!(log.contains(&"({score})".to_string()));
     }
 
     #[test]
@@ -365,8 +374,8 @@ mod tests {
             None,
             Some("\"{}".to_string()),
         );
-        assert_eq!(log[&"foo".into()], Value::Integer(0));
-        assert_eq!(log[&"bop".into()], Value::Bytes("beep".into()));
-        assert_eq!(log[&"score".into()], Value::Integer(78));
+        assert_eq!(log[&"foo".to_string()], Value::Integer(0));
+        assert_eq!(log[&"bop".to_string()], Value::Bytes("beep".into()));
+        assert_eq!(log[&"score".to_string()], Value::Integer(78));
     }
 }

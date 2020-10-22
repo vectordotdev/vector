@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub(crate) struct KeyValueEventProcessed;
@@ -16,7 +15,7 @@ impl InternalEvent for KeyValueEventProcessed {
 
 #[derive(Debug)]
 pub(crate) struct KeyValueParseFailed {
-    pub key: Atom,
+    pub key: String,
     pub error: crate::types::Error,
 }
 
@@ -41,7 +40,7 @@ impl InternalEvent for KeyValueParseFailed {
 
 #[derive(Debug)]
 pub(crate) struct KeyValueTargetExists<'a> {
-    pub target_field: &'a Atom,
+    pub target_field: &'a String,
 }
 
 impl<'a> InternalEvent for KeyValueTargetExists<'a> {
@@ -64,7 +63,7 @@ impl<'a> InternalEvent for KeyValueTargetExists<'a> {
 
 #[derive(Debug)]
 pub(crate) struct KeyValueFieldDoesNotExist {
-    pub field: Atom,
+    pub field: String,
 }
 
 impl InternalEvent for KeyValueFieldDoesNotExist {
@@ -87,5 +86,5 @@ impl InternalEvent for KeyValueFieldDoesNotExist {
 
 #[derive(Debug)]
 pub(crate) struct KeyValueMultipleSplitResults {
-    pub pair: Atom,
+    pub pair: String,
 }
