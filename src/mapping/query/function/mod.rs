@@ -159,6 +159,7 @@ build_signatures! {
     ceil => CeilFn,
     parse_syslog => ParseSyslogFn,
     split => SplitFn,
+    replace => ReplaceFn,
 }
 
 /// A parameter definition accepted by a function.

@@ -866,3 +866,43 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "this should be unchanged"
 
+[transforms.remap_function_replace_regex]
+  inputs=[]
+  type = "remap"
+  mapping = """
+    .bip = replace(.foo, /Eggs/gi, "beans")
+    .bar = replace(.foo, /Eggs/i, "beans")
+    .zop = replace(.foo, /Eggs/, "beans")
+  """
+[[tests]]
+  name = "remap_function_replace_regex"
+  [tests.input]
+    insert_at = "remap_function_replace_regex"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "peas, eggs, chips and more eggs"
+  [[tests.outputs]]
+    extract_from = "remap_function_replace_regex"
+    [[tests.outputs.conditions]]
+    "bip.equals" = "peas, beans, chips and more beans"
+    "bar.equals" = "peas, beans, chips and more eggs"
+    "zop.equals" = "peas, eggs, chips and more eggs"
+
+[transforms.remap_function_replace_string]
+  inputs=[]
+  type = "remap"
+  mapping = """
+    .foo = replace(.foo, "eggs", "beans")
+  """
+[[tests]]
+  name = "remap_function_replace_string"
+  [tests.input]
+    insert_at = "remap_function_replace_string"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "peas, eggs, chips and more eggs"
+  [[tests.outputs]]
+    extract_from = "remap_function_replace_string"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "peas, beans, chips and more beans"
+
