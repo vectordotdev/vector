@@ -502,7 +502,7 @@ async fn healthcheck(
         return Ok(());
     }
 
-    let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
+    let group_name = config.group_name.get_ref().to_owned();
     let expected_group_name = group_name.clone();
 
     let request = DescribeLogGroupsRequest {

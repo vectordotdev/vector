@@ -22,7 +22,6 @@ lazy_static! {
 #[derive(Debug, Default, Clone)]
 pub struct Template {
     src: String,
-    src_bytes: Bytes,
     has_ts: bool,
     has_fields: bool,
 }
@@ -46,19 +45,7 @@ impl TryFrom<&str> for Template {
     type Error = TemplateError;
 
     fn try_from(src: &str) -> Result<Self, Self::Error> {
-        let (has_error, is_dynamic) = StrftimeItems::new(src).fold((false, false), |pair, item| {
-            (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
-        });
-        if has_error {
-            Err(TemplateError::StrftimeError)
-        } else {
-            Ok(Template {
-                src: src.into(),
-                src_bytes: Vec::from(src.as_bytes()).into(),
-                has_ts: is_dynamic,
-                has_fields: RE.is_match(src),
-            })
-        }
+        Template::try_from(src.to_owned())
     }
 }
 
@@ -66,15 +53,27 @@ impl TryFrom<PathBuf> for Template {
     type Error = TemplateError;
 
     fn try_from(p: PathBuf) -> Result<Self, Self::Error> {
-        Template::try_from(&*p.to_string_lossy())
+        Template::try_from(p.to_string_lossy().into_owned())
     }
 }
 
 impl TryFrom<String> for Template {
     type Error = TemplateError;
 
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        Template::try_from(s.as_str())
+    fn try_from(src: String) -> Result<Self, Self::Error> {
+        let (has_error, is_dynamic) = StrftimeItems::new(&src)
+            .fold((false, false), |pair, item| {
+                (pair.0 || is_error(&item), pair.1 || is_dynamic(&item))
+            });
+        if has_error {
+            Err(TemplateError::StrftimeError)
+        } else {
+            Ok(Template {
+                has_fields: RE.is_match(&src),
+                src,
+                has_ts: is_dynamic,
+            })
+        }
     }
 }
 
@@ -94,20 +93,19 @@ fn is_dynamic(item: &Item) -> bool {
 
 impl Template {
     pub fn render(&self, event: &Event) -> Result<Bytes, Vec<String>> {
-        match (self.has_fields, self.has_ts) {
-            (false, false) => Ok(self.src_bytes.clone()),
-            (true, false) => render_fields(&self.src, event).map(Bytes::from),
-            (false, true) => Ok(render_timestamp(&self.src, event).into()),
-            (true, true) => {
-                let tmp = render_fields(&self.src, event)?;
-                Ok(render_timestamp(&tmp, event).into())
-            }
-        }
+        self.render_string(event).map(Into::into)
     }
 
     pub fn render_string(&self, event: &Event) -> Result<String, Vec<String>> {
-        self.render(event)
-            .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
+        match (self.has_fields, self.has_ts) {
+            (false, false) => Ok(self.src.clone()),
+            (true, false) => render_fields(&self.src, event),
+            (false, true) => Ok(render_timestamp(&self.src, event)),
+            (true, true) => {
+                let tmp = render_fields(&self.src, event)?;
+                Ok(render_timestamp(&tmp, event))
+            }
+        }
     }
 
     pub fn get_fields(&self) -> Option<Vec<String>> {
@@ -129,8 +127,8 @@ impl Template {
         self.has_fields || self.has_ts
     }
 
-    pub fn get_ref(&self) -> &Bytes {
-        &self.src_bytes
+    pub fn get_ref(&self) -> &str {
+        &self.src
     }
 }
 
