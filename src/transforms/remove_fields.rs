@@ -24,7 +24,15 @@ inventory::submit! {
     TransformDescription::new::<RemoveFieldsConfig>("remove_fields")
 }
 
-impl GenerateConfig for RemoveFieldsConfig {}
+impl GenerateConfig for RemoveFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            fields: Vec::new(),
+            drop_empty: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
@@ -84,8 +92,13 @@ impl Transform for RemoveFields {
 
 #[cfg(test)]
 mod tests {
-    use super::RemoveFields;
+    use super::{RemoveFields, RemoveFieldsConfig};
     use crate::{event::Event, transforms::Transform};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoveFieldsConfig>();
+    }
 
     #[test]
     fn remove_fields() {

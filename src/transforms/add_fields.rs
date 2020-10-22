@@ -51,7 +51,11 @@ inventory::submit! {
     TransformDescription::new::<AddFieldsConfig>("add_fields")
 }
 
-impl GenerateConfig for AddFieldsConfig {}
+impl GenerateConfig for AddFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(r#"fields.name = "field_name""#).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
@@ -141,6 +145,11 @@ impl Transform for AddFields {
 mod tests {
     use super::*;
     use std::{iter::FromIterator, string::ToString};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AddFieldsConfig>();
+    }
 
     #[test]
     fn add_fields_event() {

@@ -40,7 +40,16 @@ inventory::submit! {
     SourceDescription::new::<VectorConfig>("vector")
 }
 
-impl GenerateConfig for VectorConfig {}
+impl GenerateConfig for VectorConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: SocketListenAddr::SocketAddr("0.0.0.0:9000".parse().unwrap()),
+            shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
@@ -111,6 +120,11 @@ mod test {
     use futures::{compat::Future01CompatExt, stream};
     use std::net::SocketAddr;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<VectorConfig>();
+    }
 
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
         let (tx, rx) = Pipeline::new_test();
