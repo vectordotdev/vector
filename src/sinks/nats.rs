@@ -80,7 +80,8 @@ impl NatsSinkConfig {
 
         let options = nats::Options::new()
             .with_name(&self.name)
-            .reconnect_buffer_size(0);
+            .reconnect_buffer_size(0)
+            .into();
 
         Ok(options)
     }
@@ -101,12 +102,16 @@ async fn healthcheck(config: NatsSinkConfig) -> crate::Result<()> {
  * Code dealing with the Sink struct.
  */
 
+#[derive(Clone)]
+struct NatsOptions {
+    name: String,
+}
+
 pub struct NatsSink {
     encoding: EncodingConfig<Encoding>,
-    options: nats::Options,
+    options: NatsOptions,
     subject: Template,
     url: String,
-
     acker: Acker,
 }
 
@@ -114,7 +119,7 @@ impl NatsSink {
     fn new(config: NatsSinkConfig, acker: Acker) -> crate::Result<Self> {
         Ok(NatsSink {
             acker,
-            options: config.to_nats_options()?,
+            options: (&config).into(),
             subject: Template::try_from(config.subject).context(SubjectTemplate)?,
             url: config.url,
 
@@ -124,11 +129,28 @@ impl NatsSink {
     }
 }
 
+impl From<NatsOptions> for nats::Options {
+    fn from(options: NatsOptions) -> Self {
+        nats::Options::new()
+            .with_name(&options.name)
+            .reconnect_buffer_size(0)
+    }
+}
+
+impl From<&NatsSinkConfig> for NatsOptions {
+    fn from(options: &NatsSinkConfig) -> Self {
+        Self {
+            name: options.name.clone(),
+        }
+    }
+}
+
 #[async_trait]
 impl StreamSink for NatsSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        // E0507: nats::Options does not implement Clone or Copy.
-        let nc = std::mem::replace(&mut self.options, nats::Options::new())
+        let nats_options: nats::Options = self.options.clone().into();
+
+        let nc = nats_options
             .connect_async(&self.url)
             .await
             .map_err(|_| ())?;
