@@ -528,7 +528,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hex",
- "http 0.2.1",
+ "http",
  "hyper",
  "hyper-rustls",
  "hyper-unix-connector",
@@ -1383,17 +1383,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
 
 [[package]]
-name = "elastic_responses"
-version = "0.21.0-pre.4"
+name = "encode_unicode"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb0edd76d9dcdffc1b2e65178df45a4b8d805581571839d3bca9fa188043eb66"
-dependencies = [
- "http 0.1.21",
- "quick-error",
- "serde",
- "serde_derive",
- "serde_json",
-]
+checksum = "a357d28ed41a50f9c765dbfe56cbc04a64e53e5fc58ba79fbc34c10ef3df831f"
 
 [[package]]
 name = "encoding_rs"
@@ -2003,7 +1996,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "futures-util",
- "http 0.2.1",
+ "http",
  "indexmap",
  "slab",
  "tokio",
@@ -2053,7 +2046,7 @@ dependencies = [
  "bitflags",
  "bytes 0.5.6",
  "headers-core",
- "http 0.2.1",
+ "http",
  "mime",
  "sha-1 0.8.2",
  "time 0.1.43",
@@ -2065,7 +2058,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7f66481bfee273957b1f20485a4ff3362987f85b2c236580d81b4eb7a326429"
 dependencies = [
- "http 0.2.1",
+ "http",
 ]
 
 [[package]]
@@ -2317,17 +2310,6 @@ dependencies = [
 
 [[package]]
 name = "http"
-version = "0.1.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6ccf5ede3a895d8856620237b2f02972c1bbc78d2965ad7fe8838d4a0ed41f0"
-dependencies = [
- "bytes 0.4.12",
- "fnv",
- "itoa",
-]
-
-[[package]]
-name = "http"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d569972648b2c512421b5f2a405ad6ac9666547189d0c5477a3f200f3e02f9"
@@ -2344,7 +2326,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13d5ff830006f7646652e057693569bfe0d51760c0085a071769d142a205111b"
 dependencies = [
  "bytes 0.5.6",
- "http 0.2.1",
+ "http",
 ]
 
 [[package]]
@@ -2385,7 +2367,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "h2",
- "http 0.2.1",
+ "http",
  "http-body",
  "httparse",
  "itoa",
@@ -2406,7 +2388,7 @@ checksum = "ed123fc8c1833f305468df3c3a6a837c34a7ae616567d40a5e3c2bf3cac2e31d"
 dependencies = [
  "antidote",
  "bytes 0.5.6",
- "http 0.2.1",
+ "http",
  "hyper",
  "linked_hash_set",
  "once_cell",
@@ -2650,7 +2632,7 @@ dependencies = [
  "base64 0.12.3",
  "bytes 0.5.6",
  "chrono",
- "http 0.2.1",
+ "http",
  "percent-encoding",
  "serde",
  "serde-value",
@@ -3373,7 +3355,7 @@ dependencies = [
  "derive_more",
  "encoding_rs",
  "futures 0.3.5",
- "http 0.2.1",
+ "http",
  "httparse",
  "lazy_static",
  "log",
@@ -4554,7 +4536,7 @@ dependencies = [
  "encoding_rs",
  "futures-core",
  "futures-util",
- "http 0.2.1",
+ "http",
  "http-body",
  "hyper",
  "hyper-rustls",
@@ -4656,7 +4638,7 @@ dependencies = [
  "crc32fast",
  "flate2",
  "futures 0.3.5",
- "http 0.2.1",
+ "http",
  "hyper",
  "hyper-tls",
  "lazy_static",
@@ -4691,6 +4673,21 @@ dependencies = [
  "shlex",
  "tokio",
  "zeroize",
+]
+
+[[package]]
+name = "rusoto_es"
+version = "0.45.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "12a49c8259ada24cb2c64d2a2aee0ca150eed3aef91d102063d8efca747ccaa3"
+dependencies = [
+ "async-trait",
+ "bytes 0.5.6",
+ "futures 0.3.5",
+ "rusoto_core",
+ "serde",
+ "serde_derive",
+ "serde_json",
 ]
 
 [[package]]
@@ -4759,7 +4756,7 @@ dependencies = [
  "futures 0.3.5",
  "hex",
  "hmac 0.8.1",
- "http 0.2.1",
+ "http",
  "hyper",
  "log",
  "md5",
@@ -6125,7 +6122,7 @@ version = "0.1.0"
 source = "git+https://github.com/tokio-rs/tracing?rev=f470db1b0354b368f62f9ee4d763595d16373231#f470db1b0354b368f62f9ee4d763595d16373231"
 dependencies = [
  "futures 0.3.5",
- "http 0.2.1",
+ "http",
  "pin-project",
  "tower-layer",
  "tower-make",
@@ -6208,7 +6205,7 @@ dependencies = [
  "base64 0.12.3",
  "byteorder",
  "bytes 0.5.6",
- "http 0.2.1",
+ "http",
  "httparse",
  "input_buffer",
  "log",
@@ -6489,7 +6486,6 @@ dependencies = [
  "derivative 1.0.4",
  "derive_is_enum_variant",
  "dirs 3.0.1",
- "elastic_responses",
  "evmap",
  "exitcode",
  "file-source",
@@ -6504,7 +6500,7 @@ dependencies = [
  "heim",
  "hex",
  "hostname",
- "http 0.2.1",
+ "http",
  "human_format",
  "hyper",
  "hyper-openssl",
@@ -6555,6 +6551,7 @@ dependencies = [
  "rusoto_cloudwatch",
  "rusoto_core",
  "rusoto_credential",
+ "rusoto_es",
  "rusoto_firehose",
  "rusoto_kinesis",
  "rusoto_logs",
@@ -6748,7 +6745,7 @@ dependencies = [
  "bytes 0.5.6",
  "futures 0.3.5",
  "headers",
- "http 0.2.1",
+ "http",
  "hyper",
  "log",
  "mime",

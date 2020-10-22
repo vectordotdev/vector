@@ -13,13 +13,13 @@ impl Md5Fn {
 }
 
 impl Function for Md5Fn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         use md5::{Digest, Md5};
 
         match self.query.execute(ctx)? {
-            Value::Bytes(bytes) => {
+            QueryValue::Value(Value::Bytes(bytes)) => {
                 let md5 = hex::encode(Md5::digest(&bytes));
-                Ok(Value::Bytes(md5.into()))
+                Ok(Value::Bytes(md5.into()).into())
             }
             v => unexpected_type!(v),
         }
@@ -28,7 +28,7 @@ impl Function for Md5Fn {
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }
@@ -63,7 +63,7 @@ mod tests {
                     event.as_mut_log().insert("foo", Value::from("foo"));
                     event
                 },
-                Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
+                Ok(QueryValue::from_value("acbd18db4cc2f85cedef654fccc4a4d8")),
                 Md5Fn::new(Box::new(Path::from(vec![vec!["foo"]]))),
             ),
         ];

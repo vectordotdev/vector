@@ -7,7 +7,10 @@ pub(in crate::mapping) use not::NotFn;
 
 use super::Function;
 use crate::Event;
-use crate::{event::Value, mapping::Result};
+use crate::{
+    event::Value,
+    mapping::{query::query_value::QueryValue, Result},
+};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -16,6 +19,7 @@ use std::str::FromStr;
 mod prelude {
     pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
     pub(super) use crate::event::{Event, Value};
+    pub(super) use crate::mapping::query::query_value::QueryValue;
     pub(super) use crate::mapping::query::Function;
     #[cfg(test)]
     pub(super) use crate::mapping::query::Literal;
@@ -33,23 +37,43 @@ macro_rules! unexpected_type {
 }
 
 macro_rules! required {
-    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+ $(,)?) => {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
         match $fn.execute($ctx)? {
-            $($pattern => $then,)+
+            $($pattern $(if $if)? => $then,)+
             v => unexpected_type!(v),
         }
     }
 }
 
+macro_rules! required_value {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
+        required!($ctx, $fn,
+            QueryValue::Value(value) => match value {
+                $($pattern $(if $if)? => $then,)+
+                v => unexpected_type!(v),
+            })
+    }
+}
+
 macro_rules! optional {
-    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+ $(,)?) => {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
         $fn.as_ref()
             .map(|v| v.execute($ctx))
             .transpose()?
             .map(|v| match v {
-                $($pattern => $then,)+
+                $($pattern $(if $if)? => $then,)+
                 v => unexpected_type!(v),
             })
+    }
+}
+
+macro_rules! optional_value {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
+        optional!($ctx, $fn,
+                  QueryValue::Value(value) => match value {
+                      $($pattern $(if $if)? => $then,)+
+                          v => unexpected_type!(v),
+                  })
     }
 }
 
@@ -134,6 +158,7 @@ build_signatures! {
     floor => FloorFn,
     ceil => CeilFn,
     parse_syslog => ParseSyslogFn,
+    split => SplitFn,
 }
 
 /// A parameter definition accepted by a function.
@@ -147,7 +172,7 @@ pub(in crate::mapping) struct Parameter {
 
     /// The parser calls this method to determine if a given argument value is
     /// accepted by the parameter.
-    pub accepts: fn(&Value) -> bool,
+    pub accepts: fn(&QueryValue) -> bool,
 
     /// Whether or not this is a required parameter.
     ///
@@ -237,7 +262,7 @@ impl Argument {
 }
 
 impl Function for Argument {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = self.resolver.execute(ctx)?;
 
         // Ask the parameter if it accepts the given value.
@@ -253,13 +278,16 @@ impl Function for Argument {
     }
 }
 
-fn is_scalar_value(value: &Value) -> bool {
+fn is_scalar_value(value: &QueryValue) -> bool {
     match value {
-        Value::Integer(_)
-        | Value::Float(_)
-        | Value::Bytes(_)
-        | Value::Boolean(_)
-        | Value::Timestamp(_) => true,
-        Value::Map(_) | Value::Array(_) | Value::Null => false,
+        QueryValue::Value(value) => match value {
+            Value::Integer(_)
+            | Value::Float(_)
+            | Value::Bytes(_)
+            | Value::Boolean(_)
+            | Value::Timestamp(_) => true,
+            Value::Map(_) | Value::Array(_) | Value::Null => false,
+        },
+        _ => false,
     }
 }

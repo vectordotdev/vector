@@ -43,7 +43,15 @@ inventory::submit! {
     SinkDescription::new::<SematextMetricsConfig>("sematext_metrics")
 }
 
-impl GenerateConfig for SematextMetricsConfig {}
+impl GenerateConfig for SematextMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"region = "us"
+            token = "${SEMATEXT_TOKEN}""#,
+        )
+        .unwrap()
+    }
+}
 
 async fn healthcheck(endpoint: String, mut client: HttpClient) -> Result<()> {
     let uri = format!("{}/health", endpoint);
@@ -248,6 +256,11 @@ mod tests {
     use crate::test_util;
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SematextMetricsConfig>();
+    }
 
     #[test]
     fn test_encode_counter_event() {

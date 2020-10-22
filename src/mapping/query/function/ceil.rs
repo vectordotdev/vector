@@ -18,28 +18,28 @@ impl CeilFn {
 }
 
 impl Function for CeilFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let precision = optional!(ctx, self.precision, Value::Integer(v) => v).unwrap_or(0);
-        let res = required!(ctx, self.query,
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let precision = optional_value!(ctx, self.precision, Value::Integer(v) => v).unwrap_or(0);
+        let res = required_value!(ctx, self.query,
                             Value::Float(f) => {
                                 Value::Float(round_to_precision(f, precision, f64::ceil))
                             },
                             v@Value::Integer(_) => v
         );
 
-        Ok(res)
+        Ok(res.into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Float(_) | Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Float(_)) | QueryValue::Value(Value::Integer(_))),
                 required: true,
             },
             Parameter {
                 keyword: "precision",
-                accepts: |v| matches!(v, Value::Integer(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Integer(_))),
                 required: false,
             },
         ]
@@ -120,7 +120,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

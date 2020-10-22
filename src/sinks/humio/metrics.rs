@@ -23,7 +23,16 @@ inventory::submit! {
     SinkDescription::new::<HumioMetricsConfig>("humio_metrics")
 }
 
-impl GenerateConfig for HumioMetricsConfig {}
+impl GenerateConfig for HumioMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"host_key = "hostname"
+            token = "${HUMIO_TOKEN}"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_metrics")]
@@ -64,6 +73,11 @@ mod tests {
     use crate::test_util;
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HumioMetricsConfig>();
+    }
 
     #[tokio::test]
     async fn smoke_json() {

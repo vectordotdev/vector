@@ -85,9 +85,12 @@ inventory::submit! {
     SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
 }
 
-impl GenerateConfig for CloudwatchLogsSinkConfig {}
+impl GenerateConfig for CloudwatchLogsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(default_config(Encoding::Json)).unwrap()
+    }
+}
 
-#[cfg(test)]
 fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
         group_name: Default::default(),
@@ -676,6 +679,11 @@ mod tests {
     };
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
+    }
 
     #[test]
     fn partition_static() {

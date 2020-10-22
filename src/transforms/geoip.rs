@@ -29,7 +29,16 @@ inventory::submit! {
     TransformDescription::new::<GeoipConfig>("geoip")
 }
 
-impl GenerateConfig for GeoipConfig {}
+impl GenerateConfig for GeoipConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            database: "/path/to/GeoLite2-City.mmdb".to_string(),
+            source: "ip address".to_owned(),
+            target: default_geoip_target_field(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
@@ -182,13 +191,18 @@ impl Transform for Geoip {
 #[cfg(feature = "transforms-json_parser")]
 #[cfg(test)]
 mod tests {
-    use super::Geoip;
+    use super::{Geoip, GeoipConfig};
     use crate::{
         event::Event,
         transforms::json_parser::{JsonParser, JsonParserConfig},
         transforms::Transform,
     };
     use std::collections::HashMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GeoipConfig>();
+    }
 
     #[test]
     fn geoip_city_lookup_success() {

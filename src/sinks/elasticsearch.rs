@@ -654,25 +654,33 @@ mod integration_tests {
             .send()
             .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
             .await
             .unwrap();
 
-        assert_eq!(1, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
+        assert_eq!(1, total);
 
-        let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
+        let hits = response["hits"]["hits"]
+            .as_array()
+            .expect("Elasticsearch response does not include hits->hits");
 
-        let doc = hit.document().unwrap();
-        assert_eq!(None, doc["my_id"].as_str());
+        let hit = hits.iter().next().unwrap();
+        assert_eq!("42", hit["_id"]);
 
-        let value = hit.into_document().unwrap();
+        let value = hit
+            .get("_source")
+            .expect("Elasticsearch hit missing _source");
+        assert_eq!(None, value["my_id"].as_str());
+
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
             "timestamp": input_event.as_log()[crate::config::log_schema().timestamp_key()],
         });
-        assert_eq!(expected, value);
+        assert_eq!(&expected, value);
     }
 
     #[tokio::test]
@@ -798,22 +806,31 @@ mod integration_tests {
             .send()
             .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
             .await
             .unwrap();
 
-        if break_events {
-            assert_ne!(input.len() as u64, response.total());
-        } else {
-            assert_eq!(input.len() as u64, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
 
+        if break_events {
+            assert_ne!(input.len() as u64, total);
+        } else {
+            assert_eq!(input.len() as u64, total);
+
+            let hits = response["hits"]["hits"]
+                .as_array()
+                .expect("Elasticsearch response does not include hits->hits");
             let input = input
                 .into_iter()
                 .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
                 .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
+            for hit in hits {
+                let hit = hit
+                    .get("_source")
+                    .expect("Elasticsearch hit missing _source");
+                assert!(input.contains(&hit));
             }
         }
     }
