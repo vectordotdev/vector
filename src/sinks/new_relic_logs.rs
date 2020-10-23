@@ -13,12 +13,20 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 
+// New Relic Logs API accepts payloads up to 1MB (10^6 bytes)
+const MAX_PAYLOAD_SIZE: usize = 1_000_000 as usize;
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display(
         "Missing authentication key, must provide either 'license_key' or 'insert_key'"
     ))]
     MissingAuthParam,
+    #[snafu(display(
+        "Too high batch max size. The value must be {} bytes or less",
+        MAX_PAYLOAD_SIZE
+    ))]
+    BatchMaxSize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -114,10 +122,12 @@ impl NewRelicLogsConfig {
         };
 
         let batch = self.batch.use_size_as_bytes()?;
+        let max_payload_size = batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE);
+        if max_payload_size > MAX_PAYLOAD_SIZE {
+            return Err(Box::new(BuildError::BatchMaxSize));
+        }
         let batch = BatchConfig {
-            // The max request size is 10MiB, so in order to be comfortably
-            // within this we batch up to 5MiB.
-            max_bytes: Some(batch.max_bytes.unwrap_or(bytesize::mib(5u64) as usize)),
+            max_bytes: Some(batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE)),
             max_events: None,
             ..batch
         };
@@ -191,10 +201,7 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
-        assert_eq!(
-            http_config.batch.max_bytes,
-            Some(bytesize::mib(5u64) as usize)
-        );
+        assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(
             http_config.request.in_flight_limit,
             InFlightLimit::Fixed(100)
@@ -213,7 +220,7 @@ mod tests {
         let mut nr_config = NewRelicLogsConfig::default();
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
-        nr_config.batch.max_size = Some(bytesize::mib(8u64) as usize);
+        nr_config.batch.max_size = Some(MAX_PAYLOAD_SIZE);
         nr_config.request.in_flight_limit = InFlightLimit::Fixed(12);
         nr_config.request.rate_limit_num = Some(24);
 
@@ -225,10 +232,7 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
-        assert_eq!(
-            http_config.batch.max_bytes,
-            Some(bytesize::mib(8u64) as usize)
-        );
+        assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(
             http_config.request.in_flight_limit,
             InFlightLimit::Fixed(12)
@@ -249,7 +253,7 @@ mod tests {
         region = "eu"
 
         [batch]
-        max_size = 8388608
+        max_size = 838860
 
         [request]
         in_flight_limit = 12
@@ -265,10 +269,7 @@ mod tests {
         );
         assert_eq!(http_config.method, Some(HttpMethod::Post));
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
-        assert_eq!(
-            http_config.batch.max_bytes,
-            Some(bytesize::mib(8u64) as usize)
-        );
+        assert_eq!(http_config.batch.max_bytes, Some(838860));
         assert_eq!(
             http_config.request.in_flight_limit,
             InFlightLimit::Fixed(12)
@@ -280,6 +281,25 @@ mod tests {
         );
         assert!(http_config.tls.is_none());
         assert!(http_config.auth.is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn new_relic_logs_check_config_custom_from_toml_batch_max_size_too_high() {
+        let config = r#"
+        insert_key = "foo"
+        region = "eu"
+
+        [batch]
+        max_size = 8388600
+
+        [request]
+        in_flight_limit = 12
+        rate_limit_num = 24
+    "#;
+        let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
+
+        nr_config.create_config().unwrap();
     }
 
     #[tokio::test]
