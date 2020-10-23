@@ -1,13 +1,13 @@
 remap: functions: to_int: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The string that is to be converted to an int. Must be the string representation of an `int`, otherwise, an `ArgumentError` will be raised." 
-			required: true
-			type:     "string"
+			name:        "value"
+			description: "The string that is to be converted to an int. Must be the string representation of an `int`, otherwise, an `ArgumentError` will be raised."
+			required:    true
+			type:        "string"
 		},
 	]
-        return: "integer"
+	return:   "integer"
 	category: "coerce"
 	description: #"""
 		Returns an `integer` whose text representation is `string`.
@@ -30,7 +30,7 @@ remap: functions: to_int: {
 			}
 			source: ".integer = to_int(.integer)"
 			output: {
-				error: errors.ArgumentError
+				error: remap.errors.ArgumentError
 			}
 		},
 	]

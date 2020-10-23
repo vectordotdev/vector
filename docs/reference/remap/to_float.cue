@@ -1,13 +1,13 @@
 remap: functions: to_float: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The string that is to be converted to a float. Must be the string representation of a `float`, otherwise an `ArgumentError` will be raised." 
-			required: true
-			type:     "string"
+			name:        "value"
+			description: "The string that is to be converted to a float. Must be the string representation of a `float`, otherwise an `ArgumentError` will be raised."
+			required:    true
+			type:        "string"
 		},
 	]
-        return: "float"
+	return:   "float"
 	category: "coerce"
 	description: #"""
 		Returns a `float` whose text representation is `string`.
@@ -30,7 +30,7 @@ remap: functions: to_float: {
 			}
 			source: ".float = to_float(.float)"
 			output: {
-				error: errors.ArgumentError
+				error: remap.errors.ArgumentError
 			}
 		},
 	]

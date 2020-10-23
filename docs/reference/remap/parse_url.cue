@@ -3,38 +3,37 @@ package metadata
 remap: functions: parse_url: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The text of the url."
-			required: true
-			type:     "string"
-		}
+			name:        "value"
+			description: "The text of the url."
+			required:    true
+			type:        "string"
+		},
 	]
-        return: "map"
+	return:   "map"
 	category: "parse"
 	description: #"""
-            Parses a url into it's constituent components.
+			Parses a url into it's constituent components.
 		"""#
 	examples: [
 		{
 			title: "Success"
 			input: {
 				url: #"ftp://foo:bar@vector.dev:4343/foobar?hello=world#123"#
-                                
 			}
 			source: #"""
 				.parsed = parse_url(.url)
 				"""#
 			output: {
 				parsed: {
-                                    "scheme": "ftp",
-                                    "username": "foo",
-                                    "password": "bar",
-                                    "host": "vector.dev",
-                                    "port": 4343,
-                                    "path": "/foobar",
-                                    "query": { "hello": "world" },
-                                    "fragment": "123",
-                                }
+					"scheme":   "ftp"
+					"username": "foo"
+					"password": "bar"
+					"host":     "vector.dev"
+					"port":     4343
+					"path":     "/foobar"
+					"query": {"hello": "world"}
+					"fragment": "123"
+				}
 			}
 		},
 		{
@@ -44,7 +43,7 @@ remap: functions: parse_url: {
 			}
 			source: #"""
 				.parsed = parse_url(.url)
-                                """#
+				"""#
 			output: {
 				error: remap.errors.ParseError
 			}

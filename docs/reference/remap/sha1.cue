@@ -3,23 +3,22 @@ package metadata
 remap: functions: sha1: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The text to calculate the hash for."
-			required: true
-			type:     "string"
-		}
+			name:        "value"
+			description: "The text to calculate the hash for."
+			required:    true
+			type:        "string"
+		},
 	]
-        return: "string"
+	return:   "string"
 	category: "hash"
 	description: #"""
-            Calculates a sha1 hash of a given string.
+			Calculates a sha1 hash of a given string.
 		"""#
 	examples: [
 		{
 			title: "Success"
 			input: {
 				text: #"foo"#
-                                
 			}
 			source: #"""
 				.hash = sha1(.text)
@@ -35,7 +34,7 @@ remap: functions: sha1: {
 			}
 			source: #"""
 				.hash = sha1(.text)
-                                """#
+			"""#
 			output: {
 				error: remap.errors.ArgumentError
 			}

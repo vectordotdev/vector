@@ -3,13 +3,13 @@ package metadata
 remap: functions: parse_json: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The text representation of the JSON to parse."
-			required: true
-			type:     "string"
+			name:        "value"
+			description: "The text representation of the JSON to parse."
+			required:    true
+			type:        "string"
 		},
 	]
-        return: ["boolean", "integer", "float", "string", "map", "array", "null"]
+	return: ["boolean", "integer", "float", "string", "map", "array", "null"]
 	category: "parse"
 	description: #"""
 		Returns an `object` whose text representation is a JSON

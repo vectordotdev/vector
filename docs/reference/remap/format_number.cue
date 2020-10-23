@@ -3,37 +3,36 @@ package metadata
 remap: functions: format_number: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The number to convert to text."
-			required: true
-			type:     ["integer", "float"]
+			name:        "value"
+			description: "The number to convert to text."
+			required:    true
+			type: ["integer", "float"]
 		},
-                {
-                    name: "scale",
-                    description: "The number of decimal places to display."
-                    required: false
-                    type: "integer"
-                },
-                {
-                    name: "decimal_separator"
-                    description: "The character to use between the whole and decimal parts of the number."
-                    required: false
-                    type: "string"
-                    default: true
-                }
-                {
-                    name: "grouping_separator"
-                    description: "The character to use between each thousands part of the number."
-                    required: false
-                    type: "string"
-                    default: true
-                }
+		{
+			name:        "scale"
+			description: "The number of decimal places to display."
+			required:    false
+			type:        "integer"
+		},
+		{
+			name:        "decimal_separator"
+			description: "The character to use between the whole and decimal parts of the number."
+			required:    false
+			type:        "string"
+			default:     true
+		},
+		{
+			name:        "grouping_separator"
+			description: "The character to use between each thousands part of the number."
+			required:    false
+			type:        "string"
+			default:     true
+		},
 	]
-        return: "string"
+	return:   "string"
 	category: "coerce"
 	description: #"""
-                 Returns a string representation of the given number.
-                 
+		Returns a string representation of the given number.
 		"""#
 	examples: [
 		{

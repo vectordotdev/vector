@@ -3,24 +3,24 @@ package metadata
 remap: functions: format_timestamp: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The timestamp to format as text."
-			required: true
-			type:     ["timestamp"]
+			name:        "value"
+			description: "The timestamp to format as text."
+			required:    true
+			type: ["timestamp"]
 		},
-                {
-                    name: "format",
-                    description: "The format string"
-                    required: true
-                    type: "string"
-                }
+		{
+			name:        "format"
+			description: "The format string"
+			required:    true
+			type:        "string"
+		},
 	]
-        return: "string"
+	return:   "string"
 	category: "text"
-        // TODO: Is it ok to just reference the chrono docs here?
+	// TODO: Is it ok to just reference the chrono docs here?
 	description: #"""
-                 Formats a `timestamp` as a given string.
-                 The format string used is specified by the [Chrono library](https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html).
+			Formats a `timestamp` as a given string.
+			The format string used is specified by the [Chrono library](https://docs.rs/chrono/0.4.19/chrono/format/strftime/index.html).
 		"""#
 	examples: [
 		{
@@ -29,7 +29,7 @@ remap: functions: format_timestamp: {
 				date: "2020-10-21T16:00:00Z"
 			}
 			source: #"""
-                                .timestamp = to_timestamp(.date)
+				.timestamp = to_timestamp(.date)
 				.formatted = format_timestamp(.timestamp, format = "%v %R")
 				"""#
 			output: {
@@ -42,7 +42,7 @@ remap: functions: format_timestamp: {
 				date: "2020-10-21T16:00:00Z"
 			}
 			source: #"""
-                                .timestamp = to_timestamp(.date)
+				.timestamp = to_timestamp(.date)
 				.formatted = format_timestamp(.timestamp, format = "NOTAFORMAT")
 				"""#
 			output: {

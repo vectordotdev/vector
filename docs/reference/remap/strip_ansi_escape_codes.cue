@@ -3,16 +3,16 @@ package metadata
 remap: functions: strip_ansi_escape_codes: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The text to strip."
-			required: true
-			type:     "string"
-		}
+			name:        "value"
+			description: "The text to strip."
+			required:    true
+			type:        "string"
+		},
 	]
-        return: "string"
+	return:   "string"
 	category: "text"
 	description: #"""
-                     Removes the any ansi escape codes from the provided string.
+			Removes the any ansi escape codes from the provided string.
 		"""#
 	examples: [
 		{
@@ -34,7 +34,7 @@ remap: functions: strip_ansi_escape_codes: {
 			}
 			source: #"""
 				.text = strip_ansi_escape_codes(.text)
-                                """#
+			"""#
 			output: {
 				error: remap.errors.ArgumentError
 			}

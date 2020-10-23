@@ -3,10 +3,10 @@ package metadata
 remap: functions: upcase: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The string to convert to uppercase."
-			required: true
-			type:     "string"
+			name:        "value"
+			description: "The string to convert to uppercase."
+			required:    true
+			type:        "string"
 		},
 	]
 	category: "text"

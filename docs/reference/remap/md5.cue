@@ -3,23 +3,22 @@ package metadata
 remap: functions: md5: {
 	arguments: [
 		{
-                        name: "value"
-                        description: "The text to calculate the hash for."
-			required: true
-			type:     "string"
-		}
+			name:        "value"
+			description: "The text to calculate the hash for."
+			required:    true
+			type:        "string"
+		},
 	]
-        return: "string"
+	return:   "string"
 	category: "hash"
 	description: #"""
-            Calculates an md5 hash of a given string.
+			Calculates an md5 hash of a given string.
 		"""#
 	examples: [
 		{
 			title: "Success"
 			input: {
 				text: #"foo"#
-                                
 			}
 			source: #"""
 				.hash = md5(.text)
@@ -35,7 +34,7 @@ remap: functions: md5: {
 			}
 			source: #"""
 				.hash = sha1(.text)
-                                """#
+				"""#
 			output: {
 				error: remap.errors.ArgumentError
 			}
