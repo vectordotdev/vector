@@ -3,6 +3,11 @@ use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     event::Event,
+    internal_events::aws_s3::source::{
+        SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
+        SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,
+        SqsS3EventRecordIgnoredInvalidEvent,
+    },
     line_agg::{self, LineAgg},
     rusoto,
     shutdown::ShutdownSignal,
@@ -33,13 +38,12 @@ use tokio_util::codec::FramedRead;
 //   * At the least, support setting a differente queue owner
 // * Revisit configuration of SQS strategy (intrnal vs. external tagging)
 // * Make sure we are handling shutdown well
-// * Consider having helper methods stream data and have top-level forward to pipeline
 // * Consider / decide on custom endpoint support
-//   * How would we handle this for multi-region S3 support?
-// * Internal events
 //
 // Future work:
 // * Additional codecs. Just treating like `file` source with newlines for now
+// * Additional compression formats
+// * (potentially) multi region support
 
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -211,7 +215,7 @@ enum SqsIngestorNewError {
 }
 
 #[derive(Debug, Snafu)]
-enum ProcessingError {
+pub enum ProcessingError {
     #[snafu(display(
         "Could not parse SQS message with id {} as S3 notification: {}",
         message_id,
@@ -323,7 +327,18 @@ impl SqsIngestor {
                 else => break Ok(()),
             };
 
-            let messages = self.receive_messages().await.unwrap_or_default(); // TODO emit event for errors
+            let messages = self
+                .receive_messages()
+                .inspect_ok(|messages| {
+                    emit!(SqsMessageReceiveSucceeded {
+                        count: messages.len(),
+                    });
+                })
+                .inspect_err(|err| {
+                    emit!(SqsMessageReceiveFailed { error: err });
+                })
+                .await
+                .unwrap_or_default();
 
             for message in messages {
                 let receipt_handle = match message.receipt_handle {
@@ -337,13 +352,35 @@ impl SqsIngestor {
                     Some(ref handle) => handle.to_owned(),
                 };
 
+                let message_id = message.message_id.clone().unwrap_or("<unknown>".to_owned());
+
                 match self.handle_sqs_message(message, out.clone()).await {
                     Ok(()) => {
+                        emit!(SqsMessageProcessingSucceeded {
+                            message_id: &message_id
+                        });
                         if self.delete_message {
-                            self.delete_message(receipt_handle).await.unwrap(); // TODO emit event
+                            match self.delete_message(receipt_handle).await {
+                                Ok(_) => {
+                                    emit!(SqsMessageDeleteSucceeded {
+                                        message_id: &message_id
+                                    });
+                                }
+                                Err(err) => {
+                                    emit!(SqsMessageDeleteFailed {
+                                        error: &err,
+                                        message_id: &message_id,
+                                    });
+                                }
+                            }
                         }
                     }
-                    Err(_err) => {} // TODO emit event
+                    Err(err) => {
+                        emit!(SqsMessageProcessingFailed {
+                            message_id: &message_id,
+                            error: &err,
+                        });
+                    }
                 }
             }
         }
@@ -379,7 +416,12 @@ impl SqsIngestor {
         out: Pipeline,
     ) -> Result<(), ProcessingError> {
         if s3_event.event_name.kind != "ObjectCreated" {
-            // TODO emit event
+            emit!(SqsS3EventRecordIgnoredInvalidEvent {
+                bucket: &s3_event.s3.bucket.name,
+                key: &s3_event.s3.object.key,
+                kind: &s3_event.event_name.kind,
+                name: &s3_event.event_name.name,
+            });
             return Ok(());
         }
 
