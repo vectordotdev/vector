@@ -78,13 +78,32 @@ mod tests {
     }
 
     impl Object for Event {
-        fn insert(&mut self, path: &str, value: Value) -> std::result::Result<(), String> {
+        fn insert(
+            &mut self,
+            path: &[Vec<String>],
+            value: Value,
+        ) -> std::result::Result<(), String> {
+            let path = path
+                .iter()
+                .map(|c| c.join("."))
+                .collect::<Vec<_>>()
+                .join(".");
+
             self.paths.insert(path.to_owned(), value);
             Ok(())
         }
 
-        fn find(&self, path: &str) -> std::result::Result<Option<Value>, String> {
-            Ok(self.paths.get(path).cloned())
+        fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
+            Ok(self
+                .paths
+                .get(
+                    &path
+                        .iter()
+                        .map(|c| c.join("."))
+                        .collect::<Vec<_>>()
+                        .join("."),
+                )
+                .cloned())
         }
     }
 
@@ -96,7 +115,7 @@ mod tests {
             (
                 r#".foo == .bar"#,
                 Err(
-                    expression::Error::Path(expression::path::Error::Missing(".foo".to_owned()))
+                    expression::Error::Path(expression::path::Error::Missing("foo".to_owned()))
                         .into(),
                 ),
             ),
