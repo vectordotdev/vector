@@ -34,8 +34,6 @@ use tokio_util::codec::FramedRead;
 // * Revisit configuration of SQS strategy (intrnal vs. external tagging)
 // * Make sure we are handling shutdown well
 // * Consider having helper methods stream data and have top-level forward to pipeline
-// * Consider / decide on multi-region S3 support (handling messages referring to buckets in
-//   multiple regions)
 // * Consider / decide on custom endpoint support
 //   * How would we handle this for multi-region S3 support?
 // * Internal events
@@ -169,6 +167,7 @@ impl AwsS3Config {
                     S3Client::new_with(client.clone(), creds.clone(), sqs.region.clone());
 
                 SqsIngestor::new(
+                    sqs.region.clone(),
                     sqs_client,
                     s3_client,
                     sqs.clone(),
@@ -225,9 +224,22 @@ enum ProcessingError {
         bucket: String,
         key: String,
     },
+    #[snafu(display(
+        "Object notification for s3://{}/{} is a bucket in another region: {}",
+        bucket,
+        key,
+        region
+    ))]
+    WrongRegion {
+        region: String,
+        bucket: String,
+        key: String,
+    },
 }
 
 struct SqsIngestor {
+    region: Region,
+
     s3_client: S3Client,
     sqs_client: SqsClient,
 
@@ -242,6 +254,7 @@ struct SqsIngestor {
 
 impl SqsIngestor {
     async fn new(
+        region: Region,
         sqs_client: SqsClient,
         s3_client: S3Client,
         config: SqsConfig,
@@ -276,6 +289,8 @@ impl SqsIngestor {
                 })?;
 
         Ok(SqsIngestor {
+            region,
+
             s3_client,
             sqs_client,
 
@@ -346,6 +361,16 @@ impl SqsIngestor {
         if s3_event.event_name.kind != "ObjectCreated" {
             // TODO emit event
             return Ok(());
+        }
+
+        // S3 has to send notifications to a queue in the same region so I don't think this will
+        // actually ever be it unless messages are being forwarded from one queue to another
+        if self.region.name() != s3_event.aws_region {
+            return Err(ProcessingError::WrongRegion {
+                bucket: s3_event.s3.bucket.name.clone(),
+                key: s3_event.s3.object.key.clone(),
+                region: s3_event.aws_region,
+            });
         }
 
         let object = self
@@ -562,7 +587,7 @@ struct S3Event {
 struct S3EventRecord {
     event_version: String, // TODO compare >=
     event_source: String,
-    aws_region: String, // TODO validate?
+    aws_region: String,
     event_name: S3EventName,
 
     s3: S3Message,
