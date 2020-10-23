@@ -359,7 +359,7 @@ impl SqsIngestor {
                 message_id: message.message_id.unwrap_or("<empty>".to_owned()),
             })?;
 
-        self.handle_s3_event(s3_event, out).map_ok(|_| ()).await
+        self.handle_s3_event(s3_event, out).await
     }
 
     async fn handle_s3_event(
@@ -443,7 +443,7 @@ impl SqsIngestor {
                                 }
                             })
                         })
-                        .map(|r| r.unwrap()),
+                        .map(|r| r.unwrap()), // validated by take_while
                 );
                 if let Some(config) = &self.multiline {
                     lines = Box::new(
