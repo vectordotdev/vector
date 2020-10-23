@@ -12,13 +12,10 @@ pub fn capture_key_press() -> (mpsc::Receiver<KeyCode>, oneshot::Sender<()>) {
     tokio::spawn(async move {
         loop {
             if poll(std::time::Duration::from_millis(50)).unwrap_or(false) {
-                match read().expect(INPUT_INVARIANT) {
-                    Event::Key(k) => {
-                        let _ = tx.clone().send(k.code).await;
-                    }
-                    _ => {}
+                if let Event::Key(k) = read().expect(INPUT_INVARIANT) {
+                    let _ = tx.clone().send(k.code).await;
                 };
-            } else if let Ok(_) = kill_rx.try_recv() {
+            } else if kill_rx.try_recv().is_ok() {
                 return;
             }
         }

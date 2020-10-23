@@ -122,7 +122,7 @@ impl Widgets {
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
 pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
-    let (mut key_press_rx, key_press_kill) = capture_key_press();
+    let (mut key_press_rx, key_press_kill_tx) = capture_key_press();
 
     // Write to stdout, and enter an alternate screen, to avoid overwriting existing
     // terminal output
@@ -146,13 +146,10 @@ pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error:
                 terminal.draw(|f| widgets.draw(f))?;
             },
             k = key_press_rx.recv() => {
-                match k.unwrap() {
-                    KeyCode::Esc | KeyCode::Char('q') => {
-                        let _ = key_press_kill.send(());
-                        break
-                    },
-                    _ => {},
-                };
+                if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
+                    let _ = key_press_kill_tx.send(());
+                    break
+                }
             }
         }
     }
