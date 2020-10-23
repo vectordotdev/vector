@@ -848,3 +848,21 @@
     "foo[1].equals" = "bat"
     "foo[2].equals" = "fizz buzz"
 
+[transforms.remap_function_log]
+  inputs=[]
+  type = "remap"
+  mapping = """
+    log(.foo, level=info)
+  """
+[[tests]]
+  name = "remap_function_log"
+  [tests.input]
+    insert_at = "remap_function_log"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "this should be unchanged"
+  [[tests.outputs]]
+    extract_from = "remap_function_log"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "this should be unchanged"
+

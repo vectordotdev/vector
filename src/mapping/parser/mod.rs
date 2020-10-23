@@ -13,7 +13,8 @@ use crate::{
             regex::Regex,
             Literal,
         },
-        Assignment, Deletion, Function, IfStatement, Mapping, MergeFn, Noop, OnlyFields, Result,
+        Assignment, Deletion, Function, IfStatement, LogFn, LogLevel, Mapping, MergeFn, Noop,
+        OnlyFields, Result,
     },
 };
 use pest::{
@@ -21,6 +22,7 @@ use pest::{
     iterators::{Pair, Pairs},
     Parser,
 };
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 // If this macro triggers, it means the parser syntax file (grammar.pest) was
@@ -453,11 +455,23 @@ fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     Ok(Box::new(MergeFn::new(to_path, query2, deep)))
 }
 
+fn log_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
+    let mut inner = pair.into_inner();
+    let msg = query_arithmetic_from_pair(inner.next().ok_or(TOKEN_ERR)?)?;
+    let level = inner
+        .next()
+        .map(|level| LogLevel::try_from(level.as_str()))
+        .transpose()?;
+
+    Ok(Box::new(LogFn::new(msg, level)))
+}
+
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
         Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
         Rule::merge => merge_function_from_pair(pair),
+        Rule::log => log_function_from_pair(pair),
         _ => unexpected_parser_sytax!(pair),
     }
 }
@@ -651,6 +665,10 @@ mod tests {
                 // We cannot assign to a regular expression.
                 r#"/ab/ = .foo"#,
                 vec![" 1:1\n", "= expected if_statement, target_path, or function"],
+            ),
+            (
+                r#"log(.foo, level=notthere)"#,
+                vec![" 1:17\n", "= expected loglevel"],
             ),
         ];
 
@@ -1218,6 +1236,20 @@ mod tests {
                     "bar".into(),
                     Box::new(QueryPath::from("baz")),
                     Some(Box::new(Literal::from(Value::Boolean(true)))),
+                ))]),
+            ),
+            (
+                "log(.bar)",
+                Mapping::new(vec![Box::new(LogFn::new(
+                    Box::new(QueryPath::from("bar")),
+                    None,
+                ))]),
+            ),
+            (
+                "log(.bar, level=debug)",
+                Mapping::new(vec![Box::new(LogFn::new(
+                    Box::new(QueryPath::from("bar")),
+                    Some(LogLevel::Debug),
                 ))]),
             ),
             (
