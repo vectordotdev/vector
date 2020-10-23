@@ -33,7 +33,7 @@ not            = { operator_not* ~ (call | primary) }
 
 operator_boolean_expr   = { "||" | "&&" }
 operator_equality       = { "!=" | "==" }
-operator_comparison     = { ">" | ">=" | "<" | "<=" }
+operator_comparison     = { ">=" | ">" | "<=" | "<" }
 operator_addition       = { "-" | "+" }
 operator_multiplication = { "/" | "*" | "%" }
 operator_not            = { "!" }
