@@ -12,7 +12,7 @@ use expression::Expr;
 use operator::Operator;
 
 pub use error::Error;
-pub use expression::Expression;
+pub use expression::{Error as ExpressionError, Expression};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;

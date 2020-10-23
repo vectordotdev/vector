@@ -1,6 +1,5 @@
 use super::Error as E;
-use crate::function::Split;
-use crate::{Argument, ArgumentList, Expression, Function as _, Object, Result, State, Value};
+use crate::{Argument, ArgumentList, Expression, Function as Fn, Object, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -23,17 +22,17 @@ pub(crate) struct Function {
 }
 
 impl Function {
-    pub(crate) fn new(ident: String, arguments: Vec<(Option<String>, Argument)>) -> Result<Self> {
-        // TODO: move to `Runtime` so that we can eventually expose
-        // `register_function`.
-        let functions = vec![Split];
-
-        let function = functions
+    pub(crate) fn new(
+        ident: String,
+        arguments: Vec<(Option<String>, Argument)>,
+        definitions: &[Box<dyn Fn>],
+    ) -> Result<Self> {
+        let definition = definitions
             .iter()
             .find(|b| b.identifier() == ident)
             .ok_or_else(|| E::Function(ident.clone(), Error::Undefined))?;
 
-        let parameters = function.parameters();
+        let parameters = definition.parameters();
 
         // check function arity
         if arguments.len() > parameters.len() {
@@ -84,7 +83,7 @@ impl Function {
             })
             .collect::<Result<_>>()?;
 
-        let function = function.compile(list)?;
+        let function = definition.compile(list)?;
         Ok(Self { function })
     }
 }

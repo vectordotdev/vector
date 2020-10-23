@@ -6,7 +6,6 @@ use crate::{
 };
 use remap::{Program, Runtime};
 use serde::{Deserialize, Serialize};
-use std::str::FromStr;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -50,8 +49,11 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
+        // TODO: move this into a constant?
+        let definitions: Vec<Box<dyn remap::Function>> = vec![];
+
         Ok(Remap {
-            program: Program::from_str(&config.source)?,
+            program: Program::new(&config.source, definitions)?,
             drop_on_err: config.drop_on_err,
         })
     }
