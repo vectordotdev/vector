@@ -1,12 +1,13 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::HttpClient,
     sinks::{
         util::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
             TowerRequestConfig, VecBuffer,
         },
