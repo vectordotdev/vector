@@ -344,9 +344,7 @@ impl SqsIngestor {
                 key: s3_event.s3.object.key.clone(),
             })?;
 
-        // TODO assert event type
-
-        let metadata = object.metadata.unwrap_or_default().clone(); // TODO can we avoid cloning the hashmap?
+        let metadata = object.metadata;
 
         match object.body {
             Some(body) => {
@@ -389,25 +387,20 @@ impl SqsIngestor {
                 }
 
                 let stream = lines.filter_map(|line| {
-                    let bucket_name = s3_event.s3.bucket.name.clone();
-                    let object_key = s3_event.s3.object.key.clone();
-                    let aws_region = s3_event.aws_region.clone();
-                    let metadata = metadata.clone();
+                    let mut event = Event::from(line);
 
-                    async move {
-                        let mut event = Event::from(line);
+                    let log = event.as_mut_log();
+                    log.insert("bucket", s3_event.s3.bucket.name.clone());
+                    log.insert("object", s3_event.s3.object.key.clone());
+                    log.insert("region", s3_event.aws_region.clone());
 
-                        let log = event.as_mut_log();
-                        log.insert("bucket", bucket_name);
-                        log.insert("object", object_key);
-                        log.insert("region", aws_region);
-
-                        for (key, value) in &metadata {
+                    if let Some(metadata) = &metadata {
+                        for (key, value) in metadata {
                             log.insert(key, value.clone());
                         }
-
-                        Some(Ok(event))
                     }
+
+                    futures::future::ready(Some(Ok(event)))
                 });
 
                 out.send_all(Compat::new(Box::pin(stream)))
