@@ -73,7 +73,7 @@ Before we explore how to improve `LogEvent`, we must make sure we're familiar wi
 The `LogEvent` currently meets our needs from several ergonomics angles (notably the flattening code), but we often must twist it in painful ways to work with it (notably buffers to flatmaps to `BTree` style APIs).
 
 ```rust
-//! src/event/top
+//! src/event/mod.rs
 #[derive(PartialEq, Debug, Clone)]
 pub struct LogEvent {
     fields: BTreeMap<String, Value>,
