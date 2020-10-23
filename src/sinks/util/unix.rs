@@ -16,7 +16,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{future::BoxFuture, stream::BoxStream, SinkExt, StreamExt};
+use futures::{stream::BoxStream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
@@ -24,7 +24,7 @@ use tokio::{net::UnixStream, time::delay_for};
 use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Debug, Snafu)]
-pub enum HealthcheckError {
+pub enum UnixError {
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: tokio::io::Error },
 }
@@ -45,40 +45,23 @@ impl UnixSinkConfig {
         cx: SinkContext,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
-        let sink = UnixSink::new(self.path.clone(), cx.acker(), encode_event);
-        Ok((VectorSink::Stream(Box::new(sink)), self.healthcheck()))
-    }
-
-    fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
-        let path = self.path.clone();
-
-        Box::pin(async move {
-            UnixStream::connect(&path)
-                .await
-                .context(ConnectError)
-                .map(|_| ())
-                .map_err(Into::into)
-        })
+        let connector = UnixConnector::new(self.path.clone());
+        let sink = UnixSink::new(connector.clone(), cx.acker(), encode_event);
+        Ok((
+            VectorSink::Stream(Box::new(sink)),
+            Box::pin(async move { connector.healthcheck().await }),
+        ))
     }
 }
 
-struct UnixSink {
-    path: PathBuf,
-    acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+#[derive(Debug, Clone)]
+struct UnixConnector {
+    pub path: PathBuf,
 }
 
-impl UnixSink {
-    pub fn new(
-        path: PathBuf,
-        acker: Acker,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
-    ) -> Self {
-        Self {
-            path,
-            acker,
-            encode_event: Arc::new(encode_event),
-        }
+impl UnixConnector {
+    fn new(path: PathBuf) -> Self {
+        Self { path }
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -88,22 +71,21 @@ impl UnixSink {
             .max_delay(Duration::from_secs(60))
     }
 
-    async fn connect(&mut self) -> AckerBytesSink<UnixStream> {
+    async fn connect(&self) -> Result<UnixStream, UnixError> {
+        debug!(
+            message = "Connecting",
+            path = %self.path.to_str().unwrap()
+        );
+        UnixStream::connect(&self.path).await.context(ConnectError)
+    }
+
+    async fn connect_backoff(&self) -> UnixStream {
         let mut backoff = Self::fresh_backoff();
         loop {
-            debug!(
-                message = "Connecting",
-                path = %self.path.to_str().unwrap()
-            );
-            match UnixStream::connect(self.path.clone()).await {
+            match self.connect().await {
                 Ok(stream) => {
                     emit!(UnixSocketConnectionEstablished { path: &self.path });
-                    return AckerBytesSink::new(
-                        stream,
-                        self.acker.clone(),
-                        Box::new(|byte_size| emit!(UnixSocketEventSent { byte_size })),
-                        Box::new(|_| ShutdownCheck::Alive),
-                    );
+                    return stream;
                 }
                 Err(error) => {
                     emit!(UnixSocketConnectionFailure {
@@ -114,6 +96,40 @@ impl UnixSink {
                 }
             }
         }
+    }
+
+    async fn healthcheck(&self) -> crate::Result<()> {
+        self.connect().await.map(|_| ()).map_err(Into::into)
+    }
+}
+
+struct UnixSink {
+    connector: UnixConnector,
+    acker: Acker,
+    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+}
+
+impl UnixSink {
+    pub fn new(
+        connector: UnixConnector,
+        acker: Acker,
+        encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            connector,
+            acker,
+            encode_event: Arc::new(encode_event),
+        }
+    }
+
+    async fn connect(&mut self) -> AckerBytesSink<UnixStream> {
+        let stream = self.connector.connect_backoff().await;
+        AckerBytesSink::new(
+            stream,
+            self.acker.clone(),
+            Box::new(|byte_size| emit!(UnixSocketEventSent { byte_size })),
+            Box::new(|_| ShutdownCheck::Alive),
+        )
     }
 }
 
@@ -135,7 +151,7 @@ impl StreamSink for UnixSink {
             if let Err(error) = sink.send_all(&mut input).await {
                 emit!(UnixSocketError {
                     error,
-                    path: &self.path
+                    path: &self.connector.path
                 });
             }
             // TODO: we can lost ack for buffered item
@@ -162,10 +178,20 @@ mod tests {
     async fn unix_sink_healthcheck() {
         let good_path = temp_uds_path("valid_uds");
         let _listener = UnixListener::bind(&good_path).unwrap();
-        assert!(UnixSinkConfig::new(good_path).healthcheck().await.is_ok());
+        assert!(UnixSinkConfig::new(good_path)
+            .build(SinkContext::new_test(), |_| None)
+            .unwrap()
+            .1
+            .await
+            .is_ok());
 
         let bad_path = temp_uds_path("no_one_listening");
-        assert!(UnixSinkConfig::new(bad_path).healthcheck().await.is_err());
+        assert!(UnixSinkConfig::new(bad_path)
+            .build(SinkContext::new_test(), |_| None)
+            .unwrap()
+            .1
+            .await
+            .is_err());
     }
 
     #[tokio::test]
