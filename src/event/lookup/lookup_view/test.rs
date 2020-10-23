@@ -1,17 +1,17 @@
 use crate::event::lookup::*;
-use std::{fs, io::Read, path::Path, str::FromStr};
+use std::{fs, io::Read, path::Path};
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;
 lazy_static::lazy_static! {
     static ref SUFFICIENTLY_DECOMPOSED: [Segment<'static>; 9] = [
-        Segment::field(r#"regular"#.to_string()),
-        Segment::field(r#""quoted""#.to_string()),
-        Segment::field(r#""quoted but spaces""#.to_string()),
-        Segment::field(r#""quoted.but.periods""#.to_string()),
-        Segment::field(r#"lookup"#.to_string()),
+        Segment::field(r#"regular"#),
+        Segment::field(r#""quoted""#),
+        Segment::field(r#""quoted but spaces""#),
+        Segment::field(r#""quoted.but.periods""#),
+        Segment::field(r#"lookup"#),
         Segment::index(0),
-        Segment::field(r#"nested_lookup"#.to_string()),
+        Segment::field(r#"nested_lookup"#),
         Segment::index(0),
         Segment::index(0),
     ];
@@ -67,16 +67,6 @@ fn array() {
     crate::test_util::trace_init();
     let input = "foo[0]";
     let lookup = Lookup::from_str(input).unwrap();
-    assert_eq!(lookup[0], Segment::field("foo"));
-    assert_eq!(lookup[1], Segment::index(0));
-    assert_eq!(lookup.to_string(), input);
-}
-
-#[test]
-fn via_parse() {
-    crate::test_util::trace_init();
-    let input = "foo[0]";
-    let lookup = input.parse::<Lookup>().unwrap();
     assert_eq!(lookup[0], Segment::field("foo"));
     assert_eq!(lookup[1], Segment::index(0));
     assert_eq!(lookup.to_string(), input);

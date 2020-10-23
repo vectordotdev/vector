@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod test;
+
 use crate::{
     mapping::parser::{MappingParser, Rule},
 };
@@ -16,6 +19,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 use crate::event::lookup::Segment;
+use nom::lib::std::vec::IntoIter;
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///
@@ -93,6 +97,11 @@ impl<'a> Lookup<'a> {
     #[instrument]
     pub fn iter(&self) -> Iter<'_, Segment<'a>> {
         self.segments.iter()
+    }
+
+    #[instrument]
+    pub fn into_iter(self) -> IntoIter<Segment<'a>> {
+        self.segments.into_iter()
     }
 
     /// Raise any errors that might stem from the lookup being invalid.

@@ -1,4 +1,4 @@
-use crate::event::{lookup::SegmentBuf, util, LookupBuf, PathComponent, Value};
+use crate::event::{lookup::SegmentBuf, util, LookupBuf, Lookup, PathComponent, Value};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -6,6 +6,7 @@ use std::{
     fmt::{Debug, Display},
     iter::FromIterator,
 };
+use crate::event::lookup::Segment;
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
@@ -15,7 +16,51 @@ pub struct LogEvent {
 impl LogEvent {
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        util::log::get(&self.fields, key.as_ref())
+        let lookup = Lookup::from(key.as_ref());
+
+        let mut lookup_iter = lookup.iter();
+        // The first step should always be a field.
+        let first_step = lookup_iter.next()?;
+        // This is good, since the first step into a LogEvent will also be a field.
+
+        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
+        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
+        let mut cursor = match first_step {
+            Segment::Field(f) => self.fields.get(*f),
+            // In this case, the user has passed us an invariant.
+            Segment::Index(_) => {
+                error!("Lookups into LogEvents should never start with indexes.\
+                        Please report your config.");
+                return None
+            },
+        };
+
+        for segment in lookup_iter {
+            // Don't do extra work.
+            if cursor.is_none() {
+                break;
+            }
+            cursor = match (segment, cursor) {
+                // Fields access maps.
+                (Segment::Field(f), Some(Value::Map(map))) => {
+                    trace!("Matched field into map.");
+                    map.get(*f)
+                }
+                // Indexes access arrays.
+                (Segment::Index(i), Some(Value::Array(array))) => {
+                    trace!("Matched index into array");
+                    array.get(*i)
+                }
+                // The rest, it's not good.
+                (Segment::Index(_), _) | (Segment::Field(_), _) => {
+                    trace!("Unmatched lookup.");
+                    None
+                }
+            }
+        };
+
+        // By the time we get here we either have the item, or nothing. Either case, we're correct.
+        cursor
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
@@ -25,12 +70,56 @@ impl LogEvent {
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        util::log::get_mut(&mut self.fields, key.as_ref())
+        let lookup = Lookup::from(key.as_ref());
+
+        let mut lookup_iter = lookup.iter();
+        // The first step should always be a field.
+        let first_step = lookup_iter.next()?;
+        // This is good, since the first step into a LogEvent will also be a field.
+
+        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
+        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
+        let mut cursor = match first_step {
+            Segment::Field(f) => self.fields.get_mut(*f),
+            // In this case, the user has passed us an invariant.
+            Segment::Index(_) => {
+                error!("Lookups into LogEvents should never start with indexes.\
+                        Please report your config..");
+                return None
+            },
+        };
+
+        for segment in lookup_iter {
+            // Don't do extra work.
+            if cursor.is_none() {
+                break;
+            }
+            cursor = match (segment, cursor) {
+                // Fields access maps.
+                (Segment::Field(f), Some(Value::Map(map))) => {
+                    trace!("Matched field into map.");
+                    map.get_mut(*f)
+                }
+                // Indexes access arrays.
+                (Segment::Index(i), Some(Value::Array(array))) => {
+                    trace!("Matched index into array");
+                    array.get_mut(*i)
+                }
+                // The rest, it's not good.
+                (Segment::Index(_), _) | (Segment::Field(_), _) => {
+                    trace!("Unmatched lookup.");
+                    None
+                }
+            }
+        };
+
+        // By the time we get here we either have the item, or nothing. Either case, we're correct.
+        cursor
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        util::log::contains(&self.fields, key.as_ref())
+        self.get(key).is_some()
     }
 
     #[instrument(skip(self, key), fields(key = %key.as_ref()))]
