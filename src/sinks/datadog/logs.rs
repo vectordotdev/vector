@@ -319,6 +319,7 @@ mod tests {
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {
+            assert_eq!(val.0.headers.get("Content-Type").unwrap(), "text/plain");
             assert_eq!(val.1, format!("{}\n", expected[i]));
         }
     }
@@ -353,6 +354,11 @@ mod tests {
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {
+            assert_eq!(
+                val.0.headers.get("Content-Type").unwrap(),
+                "application/json"
+            );
+
             let mut json = serde_json::Deserializer::from_slice(&val.1[..])
                 .into_iter::<serde_json::Value>()
                 .map(|v| v.expect("decoding json"));
