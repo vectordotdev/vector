@@ -6,7 +6,10 @@ use crate::{
         UnixSocketEventSent,
     },
     sinks::{
-        util::{AckerBytesSink, StreamSink},
+        util::{
+            acker_bytes_sink::{AckerBytesSink, ShutdownCheck},
+            StreamSink,
+        },
         Healthcheck, VectorSink,
     },
     Event,
@@ -99,6 +102,7 @@ impl UnixSink {
                         stream,
                         self.acker.clone(),
                         Box::new(|byte_size| emit!(UnixSocketEventSent { byte_size })),
+                        Box::new(|_| ShutdownCheck::Alive),
                     );
                 }
                 Err(error) => {
@@ -134,6 +138,8 @@ impl StreamSink for UnixSink {
                     path: &self.path
                 });
             }
+            // TODO: we can lost ack for buffered item
+            // https://docs.rs/futures-util/0.3.6/src/futures_util/sink/send_all.rs.html#78-112
             sink.ack();
         }
 
