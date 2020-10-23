@@ -1,5 +1,6 @@
 use crate::event::{Event, Value};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 
 pub mod parser;
 pub mod query;
@@ -242,6 +243,67 @@ impl Function for MergeFn {
 
             _ => Err("parameters passed to merge are non-map values".into()),
         }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+/// Represents the different log levels that can be used by LogFn
+#[derive(Debug, Clone, Copy)]
+pub(in crate::mapping) enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl TryFrom<&str> for LogLevel {
+    type Error = String;
+
+    fn try_from(level: &str) -> Result<Self> {
+        match level {
+            "trace" => Ok(Self::Trace),
+            "debug" => Ok(Self::Debug),
+            "info" => Ok(Self::Info),
+            "warn" => Ok(Self::Warn),
+            "error" => Ok(Self::Error),
+            _ => Err("invalid log level".to_string()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(in crate::mapping) struct LogFn {
+    msg: Box<dyn query::Function>,
+    level: Option<LogLevel>,
+}
+
+impl LogFn {
+    pub(in crate::mapping) fn new(msg: Box<dyn query::Function>, level: Option<LogLevel>) -> Self {
+        Self { msg, level }
+    }
+}
+
+impl Function for LogFn {
+    fn apply(&self, target: &mut Event) -> Result<()> {
+        let msg = match self.msg.execute(target)? {
+            QueryValue::Value(value) => value,
+            _ => return Err("can only log Value parameters".to_string()),
+        };
+        let msg = msg.into_bytes();
+        let string = String::from_utf8_lossy(&msg);
+        let level = self.level.unwrap_or(LogLevel::Info);
+
+        match level {
+            LogLevel::Trace => trace!("{}", string),
+            LogLevel::Debug => debug!("{}", string),
+            LogLevel::Info => info!("{}", string),
+            LogLevel::Warn => warn!("{}", string),
+            LogLevel::Error => error!("{}", string),
+        }
+
+        Ok(())
     }
 }
 
