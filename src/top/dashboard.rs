@@ -1,15 +1,19 @@
 use super::{
-    events::{Event, Events},
+    events::capture_key_press,
     state::{WidgetsState, TOPOLOGY_HEADERS},
 };
-use std::io::Stdout;
-use termion::{
-    event::Key,
-    raw::{IntoRawMode, RawTerminal},
-    screen::AlternateScreen,
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
+};
+use std::{
+    io::{stdout, Write},
+    sync::Arc,
 };
 use tui::{
-    backend::{Backend, TermionBackend},
+    backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans},
@@ -17,16 +21,13 @@ use tui::{
     Frame, Terminal,
 };
 
-const INVARIANT: &str =
-    "Unable to create terminal session for the Vector top dashboard. Please report this.";
-
 pub struct Widgets {
     constraints: Vec<Constraint>,
-    state: WidgetsState,
+    state: Arc<WidgetsState>,
 }
 
 impl Widgets {
-    pub fn new(state: WidgetsState) -> Self {
+    pub fn new(state: Arc<WidgetsState>) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
@@ -108,41 +109,59 @@ impl Widgets {
         self.topology_table(f, rects[1]);
         self.quit_box(f, rects[2]);
     }
-}
 
-pub struct Dashboard {
-    terminal: Terminal<TermionBackend<AlternateScreen<RawTerminal<Stdout>>>>,
-}
-
-impl Dashboard {
-    /// Create/return a new dashboard. This initializes a new terminal using `AlternateScreen`,
-    /// which has the effect of 'overlaying' the existing terminal window to avoid messing with
-    /// an existing console session. Exiting from the dashboard removed the window overlay so
-    /// the user can return to their previous session
-    pub fn new() -> Self {
-        let stdout = AlternateScreen::from(std::io::stdout().into_raw_mode().expect(INVARIANT));
-        let backend = TermionBackend::new(stdout);
-        let terminal = Terminal::new(backend).expect(INVARIANT);
-
-        Self { terminal }
+    /// Listen for state updates. Used to determine when to redraw
+    async fn listen(&self) {
+        self.state.listen().await;
     }
+}
 
-    /// Run the current dashboard by rendering out to the terminal. This will block until the
-    /// user exists by pressing `q`
-    pub fn run(&mut self, widgets: &Widgets) {
-        let events = Events::new();
+/// Initialize the dashboard. A new terminal drawing session will be created, targeting
+/// stdout. We're using 'direct' drawing mode to control the full output of the dashboard,
+/// as well as entering an 'alternate screen' to overlay the console. This ensures that when
+/// the dashboard is exited, the user's previous terminal session can commence, unaffected.
+pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error::Error>> {
+    // Capture key presses, to determine when to quit
+    let (mut key_press_rx, key_press_kill) = capture_key_press();
 
-        loop {
-            self.terminal.draw(|f| widgets.draw(f)).expect(INVARIANT);
+    // Write to stdout, and enter an alternate screen, to avoid overwriting existing
+    // terminal output
+    let mut stdout = stdout();
 
-            if let Event::Input(key) = events.next().unwrap() {
-                match key {
-                    Key::Char('q') | Key::Esc => {
-                        break;
-                    }
-                    _ => {}
-                }
-            };
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+
+    // Drop into 'raw' mode, to enable direct drawing to the terminal
+    enable_raw_mode()?;
+
+    // Build terminal. We're using crossterm for *nix + Windows support
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Clear the screen, readying it for output
+    terminal.clear()?;
+
+    loop {
+        tokio::select! {
+            _ = widgets.listen() => {
+                terminal.draw(|f| widgets.draw(f))?;
+            },
+            k = key_press_rx.recv() => {
+                match k.unwrap() {
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        let _ = key_press_kill.send(());
+                        break
+                    },
+                    _ => {},
+                };
+            }
         }
     }
+
+    // Clean-up terminal
+    terminal.backend_mut().execute(DisableMouseCapture)?;
+    terminal.backend_mut().execute(LeaveAlternateScreen)?;
+
+    disable_raw_mode()?;
+
+    Ok(())
 }

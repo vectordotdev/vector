@@ -1,5 +1,5 @@
 use super::{
-    dashboard::{Dashboard, Widgets},
+    dashboard::{init_dashboard, Widgets},
     state::{TopologyRow, TopologyState, WidgetsState},
 };
 use crate::config;
@@ -16,7 +16,7 @@ use vector_api_client::{
 async fn update_topology(
     interval: u64,
     client: Client,
-    topology_state: Arc<TopologyState>,
+    state: Arc<WidgetsState>,
 ) -> Result<(), ()> {
     // Loop every `interval` ms to update topology
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(interval));
@@ -46,7 +46,7 @@ async fn update_topology(
             })
             .collect::<Vec<_>>();
 
-        topology_state.update_rows(rows);
+        state.update_topology_rows(rows);
     }
 }
 
@@ -75,20 +75,23 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Create initial topology, to be shared by the API client and dashboard renderer
-    let topology_state = Arc::new(TopologyState::new());
+    let state = Arc::new(WidgetsState::new(url, TopologyState::new()));
 
     // Update dashboard based on the provided refresh interval
     tokio::spawn(update_topology(
         opts.refresh_interval,
         client,
-        Arc::clone(&topology_state),
+        Arc::clone(&state),
     ));
 
     // Render a dashboard with the configured widgets
-    let state = WidgetsState::new(url, Arc::clone(&topology_state));
-    let widgets = Widgets::new(state);
+    let widgets = Widgets::new(Arc::clone(&state));
 
-    Dashboard::new().run(&widgets);
-
-    exitcode::OK
+    match init_dashboard(&widgets).await {
+        Ok(_) => exitcode::OK,
+        _ => {
+            eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
+            exitcode::IOERR
+        }
+    }
 }

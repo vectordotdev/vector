@@ -3,6 +3,7 @@ use std::{
     collections::btree_map::BTreeMap,
     sync::{Arc, Mutex},
 };
+use tokio::sync::watch;
 
 pub static TOPOLOGY_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
 pub static ACQUIRE_LOCK_INVARIANT: &str = "Unable to acquire topology lock. Please report this.";
@@ -100,12 +101,21 @@ impl TopologyState {
 pub struct WidgetsState {
     url: url::Url,
     topology: Arc<TopologyState>,
+    tx: watch::Sender<()>,
+    rx: watch::Receiver<()>,
 }
 
 impl WidgetsState {
     /// Returns new widgets state
-    pub fn new(url: url::Url, topology: Arc<TopologyState>) -> Self {
-        Self { url, topology }
+    pub fn new(url: url::Url, topology: TopologyState) -> Self {
+        let (tx, rx) = watch::channel(());
+
+        Self {
+            url,
+            topology: Arc::new(topology),
+            tx,
+            rx,
+        }
     }
 
     /// Returns a thread-safe clone of current topology state
@@ -116,5 +126,21 @@ impl WidgetsState {
     /// Returns a string representation of the URL
     pub fn url(&self) -> String {
         self.url.to_string()
+    }
+
+    /// Signal an update of state to a listener
+    fn notify(&self) {
+        let _ = self.tx.broadcast(());
+    }
+
+    /// Listen for an update signal. Used to determine whether the dashboard should redraw
+    pub async fn listen(&self) -> watch::Receiver<()> {
+        self.rx.clone()
+    }
+
+    /// Update topology rows
+    pub fn update_topology_rows(&self, rows: Vec<TopologyRow>) {
+        self.topology.update_rows(rows);
+        self.notify();
     }
 }
