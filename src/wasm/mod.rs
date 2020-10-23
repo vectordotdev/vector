@@ -211,7 +211,7 @@ fn protobuf() -> Result<()> {
 
     // Refresh the test json.
     let event_string = serde_json::to_string(&event.as_log())?;
-    let mut json_fixture = fs::File::create("tests/data/wasm/protobuf/top.json")?;
+    let mut json_fixture = fs::File::create("tests/data/wasm/protobuf/demo.json")?;
     json_fixture.write(event_string.as_bytes())?;
 
     // Run the test.
