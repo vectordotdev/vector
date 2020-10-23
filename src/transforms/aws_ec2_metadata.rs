@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    sinks::util::http::HttpClient,
+    http::HttpClient,
 };
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};

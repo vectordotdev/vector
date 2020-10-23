@@ -1,9 +1,10 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
