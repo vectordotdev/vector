@@ -49,7 +49,7 @@ pub trait Expression: std::fmt::Debug {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
 }
 
-macro_rules! enum_dispatch {
+macro_rules! expression_dispatch {
     ($($expr:tt),+ $(,)?) => (
         /// The list of implemented expressions.
         ///
@@ -84,7 +84,7 @@ macro_rules! enum_dispatch {
     );
 }
 
-enum_dispatch![
+expression_dispatch![
     Arithmetic,
     Assignment,
     Block,
