@@ -22,7 +22,7 @@ use rusoto_sqs::{
     DeleteMessageError, DeleteMessageRequest, GetQueueUrlError, GetQueueUrlRequest, Message,
     ReceiveMessageError, ReceiveMessageRequest, Sqs, SqsClient,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use std::{convert::TryInto, time::Duration};
 use tokio::{select, time};
@@ -326,6 +326,11 @@ impl SqsIngestor {
         s3_event: S3EventRecord,
         out: Pipeline,
     ) -> Result<(), ProcessingError> {
+        if s3_event.event_name.kind != "ObjectCreated" {
+            // TODO emit event
+            return Ok(());
+        }
+
         let object = self
             .s3_client
             .get_object(GetObjectRequest {
@@ -542,9 +547,55 @@ struct S3EventRecord {
     event_version: String, // TODO compare >=
     event_source: String,
     aws_region: String, // TODO validate?
-    event_name: String, // TODO break up?
+    event_name: S3EventName,
 
     s3: S3Message,
+}
+
+#[derive(Clone, Debug)]
+struct S3EventName {
+    kind: String,
+    name: String,
+}
+
+// https://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html#supported-notification-event-types
+//
+// we could enums here, but that seems overly brittle as deserialization would  break if they add
+// new event types or names
+impl<'de> Deserialize<'de> for S3EventName {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let s = String::deserialize(deserializer)?;
+
+        let mut parts = s.splitn(2, ":");
+
+        let kind = parts
+            .next()
+            .ok_or(D::Error::custom("Missing event type"))?
+            .parse::<String>()
+            .map_err(D::Error::custom)?;
+
+        let name = parts
+            .next()
+            .ok_or(D::Error::custom("Missing event name"))?
+            .parse::<String>()
+            .map_err(D::Error::custom)?;
+
+        Ok(S3EventName { kind, name })
+    }
+}
+
+impl Serialize for S3EventName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&format!("{}:{}", self.name, self.kind))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
