@@ -89,7 +89,7 @@ mod tests {
                 .collect::<Vec<_>>()
                 .join(".");
 
-            self.paths.insert(path.to_owned(), value);
+            self.paths.insert(path, value);
             Ok(())
         }
 
