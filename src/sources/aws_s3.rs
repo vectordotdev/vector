@@ -438,8 +438,12 @@ impl SqsIngestor {
             .receive_message(ReceiveMessageRequest {
                 queue_url: self.queue_url.clone(),
                 max_number_of_messages: Some(10),
-                // TODO handle timeouts > i64
-                visibility_timeout: Some(self.visibility_timeout.as_secs().try_into().unwrap()),
+                visibility_timeout: Some(
+                    self.visibility_timeout
+                        .as_secs()
+                        .try_into()
+                        .unwrap_or(std::i64::MAX), // A failure would indicate overflow
+                ),
                 ..Default::default()
             })
             .map_ok(|res| res.messages.unwrap_or_default()) // TODO
