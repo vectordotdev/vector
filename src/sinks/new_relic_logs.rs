@@ -24,9 +24,9 @@ enum BuildError {
     MissingAuthParam,
     #[snafu(display(
         "Too high batch max size. The value must be {} bytes or less",
-        max_size
+        MAX_PAYLOAD_SIZE
     ))]
-    BatchMaxSize { max_size: usize },
+    BatchMaxSize,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -124,9 +124,7 @@ impl NewRelicLogsConfig {
         let batch = self.batch.use_size_as_bytes()?;
         let max_payload_size = batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE);
         if max_payload_size > MAX_PAYLOAD_SIZE {
-            return Err(Box::new(BuildError::BatchMaxSize {
-                max_size: MAX_PAYLOAD_SIZE,
-            }));
+            return Err(Box::new(BuildError::BatchMaxSize));
         }
         let batch = BatchConfig {
             max_bytes: Some(batch.max_bytes.unwrap_or(MAX_PAYLOAD_SIZE)),
