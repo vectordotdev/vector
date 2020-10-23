@@ -1,11 +1,11 @@
-use crate::{
-    expression::Error, Argument, ArgumentList, Expression, Function, Object, Parameter, Result,
-    State, Value,
+use remap::{
+    Argument, ArgumentList, Expression, ExpressionError as Error, Function, Object, Parameter,
+    Result, State, Value,
 };
 use std::convert::{TryFrom, TryInto};
 
 #[derive(Debug)]
-pub(crate) struct Split;
+pub struct Split;
 
 impl Function for Split {
     fn identifier(&self) -> &'static str {
@@ -25,7 +25,7 @@ impl Function for Split {
                 required: true,
             },
             Parameter {
-                keyword: "case_sensitive",
+                keyword: "limit",
                 accepts: |v| matches!(v, Value::Boolean(_)),
                 required: false,
             },

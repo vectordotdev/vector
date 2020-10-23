@@ -2,10 +2,6 @@ use crate::{Expression, Result, Value};
 use core::convert::TryInto;
 use std::collections::HashMap;
 
-mod split;
-
-pub(crate) use split::Split;
-
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
     #[error(r#"expected expression argument, got regex"#)]

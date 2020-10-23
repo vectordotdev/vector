@@ -52,6 +52,7 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
+pub mod remap;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod serde;

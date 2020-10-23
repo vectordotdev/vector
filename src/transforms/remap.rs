@@ -50,7 +50,8 @@ pub struct Remap {
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
         // TODO: move this into a constant?
-        let definitions: Vec<Box<dyn remap::Function>> = vec![];
+        use crate::remap::*;
+        let definitions: Vec<Box<dyn remap::Function>> = vec![Box::new(Split)];
 
         Ok(Remap {
             program: Program::new(&config.source, definitions)?,
