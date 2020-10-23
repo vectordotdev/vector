@@ -32,9 +32,7 @@ use tokio_util::codec::FramedRead;
 // * Revisit configuration of queue. Should we take the URL instead?
 //   * At the least, support setting a differente queue owner
 // * Revisit configuration of SQS strategy (intrnal vs. external tagging)
-// * Move AWS utils from sink to general
 // * Make sure we are handling shutdown well
-// * Consider any special handling of FIFO SQS queues
 // * Consider having helper methods stream data and have top-level forward to pipeline
 // * Consider / decide on multi-region S3 support (handling messages referring to buckets in
 //   multiple regions)
@@ -158,19 +156,16 @@ impl AwsS3Config {
     ) -> Result<SqsIngestor, CreateSqsIngestorError> {
         match self.sqs {
             Some(ref sqs) => {
-                // TODO:
-                // * move resolver?
-                // * try cloning credentials provider again?
                 let resolver = Resolver;
                 let client = rusoto::client(resolver).with_context(|| Client {})?;
-                let creds =
+                let creds: std::sync::Arc<rusoto::AwsCredentialsProvider> =
                     rusoto::AwsCredentialsProvider::new(&sqs.region, self.assume_role.clone())
-                        .with_context(|| Credentials {})?;
-                let sqs_client = SqsClient::new_with(client.clone(), creds, sqs.region.clone());
-                let creds =
-                    rusoto::AwsCredentialsProvider::new(&sqs.region, self.assume_role.clone())
-                        .with_context(|| Credentials {})?;
-                let s3_client = S3Client::new_with(client.clone(), creds, sqs.region.clone());
+                        .with_context(|| Credentials {})?
+                        .into();
+                let sqs_client =
+                    SqsClient::new_with(client.clone(), creds.clone(), sqs.region.clone());
+                let s3_client =
+                    S3Client::new_with(client.clone(), creds.clone(), sqs.region.clone());
 
                 SqsIngestor::new(
                     sqs_client,
