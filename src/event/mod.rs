@@ -423,9 +423,9 @@ impl From<Metric> for Event {
     }
 }
 
-impl remap_lang::Object for Event {
+impl remap::Object for Event {
     // TODO: replace this with `Lookup`, once that lands.
-    fn insert(&mut self, path: &[Vec<String>], value: remap_lang::Value) -> Result<(), String> {
+    fn insert(&mut self, path: &[Vec<String>], value: remap::Value) -> Result<(), String> {
         let path_str = path
             .iter()
             .map(|c| {
@@ -442,7 +442,7 @@ impl remap_lang::Object for Event {
     }
 
     // TODO: replace this with `Lookup`, once that lands.
-    fn find(&self, path: &[Vec<String>]) -> Result<Option<remap_lang::Value>, String> {
+    fn find(&self, path: &[Vec<String>]) -> Result<Option<remap::Value>, String> {
         let path = path
             .iter()
             .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect::<Vec<_>>())

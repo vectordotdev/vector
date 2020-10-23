@@ -202,9 +202,9 @@ impl TryInto<serde_json::Value> for Value {
     }
 }
 
-impl From<remap_lang::Value> for Value {
-    fn from(v: remap_lang::Value) -> Self {
-        use remap_lang::Value::*;
+impl From<remap::Value> for Value {
+    fn from(v: remap::Value) -> Self {
+        use remap::Value::*;
 
         match v {
             String(v) => Value::Bytes(v),
@@ -218,9 +218,9 @@ impl From<remap_lang::Value> for Value {
     }
 }
 
-impl From<Value> for remap_lang::Value {
+impl From<Value> for remap::Value {
     fn from(v: Value) -> Self {
-        use remap_lang::Value::*;
+        use remap::Value::*;
 
         match v {
             Value::Bytes(v) => String(v),

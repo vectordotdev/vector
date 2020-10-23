@@ -4,7 +4,7 @@ use crate::{
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
 };
-use remap_lang::{Program, Runtime};
+use remap::{Program, Runtime};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
