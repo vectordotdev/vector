@@ -84,7 +84,6 @@ impl fmt::Display for Rule {
             regex_char,
             regex_flags,
             regex_inner,
-            statement,
             string,
             string_inner,
             target,
