@@ -353,4 +353,19 @@ impl Value {
             _ => self == rhs,
         }
     }
+
+    /// Returns [`Value::String`], lossy converting any other variant.
+    pub fn as_string_lossy(&self) -> Self {
+        use Value::*;
+
+        match self {
+            s @ String(_) => s.clone(), // cloning a Bytes is cheap
+            Integer(v) => Value::from(format!("{}", v)),
+            Float(v) => Value::from(format!("{}", v)),
+            Boolean(v) => Value::from(format!("{}", v)),
+            Map(_) => Value::from(""),
+            Array(_) => Value::from(""),
+            Null => Value::from(""),
+        }
+    }
 }

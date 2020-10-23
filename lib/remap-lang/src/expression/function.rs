@@ -60,7 +60,17 @@ impl Function {
                 }
 
                 // keyword argument
-                Some(k) => parameters.iter().find(|p| p.keyword == k),
+                Some(k) => parameters
+                    .iter()
+                    .enumerate()
+                    .find(|(_, param)| param.keyword == k)
+                    .map(|(pos, param)| {
+                        if pos == index {
+                            index += 1;
+                        }
+
+                        param
+                    }),
             }
             .ok_or_else(|| {
                 E::Function(

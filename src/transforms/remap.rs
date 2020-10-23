@@ -51,8 +51,12 @@ impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
         // TODO: move this into a constant?
         use crate::remap::*;
-        let definitions: Vec<Box<dyn remap::Function>> =
-            vec![Box::new(Split), Box::new(Del), Box::new(OnlyFields)];
+        let definitions: Vec<Box<dyn remap::Function>> = vec![
+            Box::new(Split),
+            Box::new(Del),
+            Box::new(OnlyFields),
+            Box::new(ToString),
+        ];
 
         Ok(Remap {
             program: Program::new(&config.source, definitions)?,

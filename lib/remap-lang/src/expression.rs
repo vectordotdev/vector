@@ -16,7 +16,7 @@ pub(super) use assignment::{Assignment, Target};
 pub(super) use block::Block;
 pub(super) use function::Function;
 pub(super) use if_statement::IfStatement;
-pub(super) use literal::Literal;
+pub use literal::Literal;
 pub(super) use noop::Noop;
 pub(super) use not::Not;
 pub(super) use path::Path;
