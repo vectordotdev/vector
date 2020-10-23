@@ -65,6 +65,12 @@ pub trait Object: std::fmt::Debug {
     ///
     /// See [`Object::insert`] for more details.
     fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String>;
+
+    /// Remove the given path from the object.
+    ///
+    /// If `compact` is true, after deletion, if an empty object or array is
+    /// left behind, it should be removed as well.
+    fn remove(&mut self, path: &str, compact: bool);
 }
 
 #[cfg(test)]

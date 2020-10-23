@@ -492,6 +492,10 @@ impl remap::Object for Event {
 
         Ok(Some(value.clone().into()))
     }
+
+    fn remove(&mut self, path: &str, compact: bool) {
+        self.as_mut_log().remove_prune(path, compact);
+    }
 }
 
 #[cfg(test)]
