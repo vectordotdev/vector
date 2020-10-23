@@ -4,8 +4,8 @@ use crate::{
     dns::Resolver,
     event::Event,
     line_agg::{self, LineAgg},
+    rusoto,
     shutdown::ShutdownSignal,
-    sinks::util::rusoto,
     Pipeline,
 };
 use bytes::Bytes;
