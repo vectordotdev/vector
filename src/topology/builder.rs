@@ -132,12 +132,12 @@ pub async fn build_pieces(
                     })
                     .flatten()
                     .boxed();
-                Box::new(transformed).forward(output)
+                transformed.forward(output)
             }
             Transform::Task(t) => {
                 let filtered = filter_event_type(input_rx, input_type);
-                let transformed = t.transform(filtered);
-                Box::new(transformed).forward(output)
+                let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> = t.transform(filtered);
+                transformed.forward(output)
             }
         }
         .map(|_| debug!("Finished"))
