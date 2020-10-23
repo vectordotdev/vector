@@ -65,10 +65,10 @@ where
         self,
         mut chans: C,
         mut shutdown: impl Future + Unpin,
-    ) -> Result<Shutdown, <C as Sink<(Bytes, String)>>::Error>
+    ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
     where
-        C: Sink<(Bytes, String)> + Unpin,
-        <C as Sink<(Bytes, String)>>::Error: std::error::Error,
+        C: Sink<Vec<(Bytes, String)>> + Unpin,
+        <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
     {
         let mut fingerprint_buffer = Vec::new();
 
@@ -284,7 +284,8 @@ where
             });
 
             let start = time::Instant::now();
-            let mut stream = stream::iter(lines.drain(..).map(Ok));
+            let to_send = std::mem::take(&mut lines);
+            let mut stream = stream::once(futures::future::ok(to_send));
             let result = block_on(chans.send_all(&mut stream));
             match result {
                 Ok(()) => {}
