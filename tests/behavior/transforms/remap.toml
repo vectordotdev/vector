@@ -814,25 +814,25 @@
     "foo[1].equals" = "bat"
     "foo[2].equals" = "fizzaxbbuzz"
 
-# [transforms.remap_function_split_string]
-#   inputs=[]
-#   type = "remap"
-#   source = """
-#     .foo = split(.foo, " ", 3)
-#   """
-# [[tests]]
-#   name = "remap_function_split_string"
-#   [tests.input]
-#     insert_at = "remap_function_split_string"
-#     type = "log"
-#     [tests.input.log_fields]
-#       foo = "bar bat fizz buzz"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_split_string"
-#     [[tests.outputs.conditions]]
-#     "foo[0].equals" = "bar"
-#     "foo[1].equals" = "bat"
-#     "foo[2].equals" = "fizz buzz"
+[transforms.remap_function_split_string]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = split(.foo, " ", 3)
+  """
+[[tests]]
+  name = "remap_function_split_string"
+  [tests.input]
+    insert_at = "remap_function_split_string"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "bar bat fizz buzz"
+  [[tests.outputs]]
+    extract_from = "remap_function_split_string"
+    [[tests.outputs.conditions]]
+    "foo[0].equals" = "bar"
+    "foo[1].equals" = "bat"
+    "foo[2].equals" = "fizz buzz"
 
 # [transforms.remap_function_log]
 #   inputs=[]
