@@ -135,7 +135,11 @@ impl<K, C> Logic<K, C> {
     }
 }
 
-impl<T, K, C> LineAgg<T, K, C> {
+impl<T, K, C> LineAgg<T, K, C>
+where
+    T: Stream<Item = (K, Bytes, C)> + Unpin,
+    K: Hash + Eq + Clone,
+{
     /// Create a new `LineAgg` using the specified `inner` stream and
     /// preconfigured `logic`.
     pub fn new(inner: T, logic: Logic<K, C>) -> Self {
