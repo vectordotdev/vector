@@ -127,7 +127,6 @@ macro_rules! build_signatures {
 
 // List of built-in functions.
 build_signatures! {
-    to_int => ToIntegerFn,
     to_float => ToFloatFn,
     to_bool => ToBooleanFn,
     to_timestamp => ToTimestampFn,

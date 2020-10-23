@@ -56,6 +56,7 @@ impl Remap {
             Box::new(Del),
             Box::new(OnlyFields),
             Box::new(ToString),
+            Box::new(ToInt),
         ];
 
         Ok(Remap {

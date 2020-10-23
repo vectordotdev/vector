@@ -134,6 +134,7 @@
   type = "remap"
   source = """
     .foo = to_string(.foo)
+    .bar = to_int(.bar)
   """
 [[tests]]
   name = "remap_coercion"
@@ -151,6 +152,7 @@
     extract_from = "remap_coercion"
     [[tests.outputs.conditions]]
       "foo.equals" = "10"
+      "bar.equals" = 20
 
 [transforms.remap_quoted_path]
   inputs = []
