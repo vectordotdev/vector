@@ -1,4 +1,4 @@
-use crate::{Expr, Expression, Result, Value};
+use crate::{Expression, Result, Value};
 use core::convert::TryInto;
 use std::collections::HashMap;
 
@@ -16,7 +16,7 @@ pub enum Error {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) struct Parameter {
+pub struct Parameter {
     /// The keyword of the parameter.
     ///
     /// Arguments can be passed in both using the keyword, or as a positional
@@ -45,16 +45,16 @@ impl std::fmt::Debug for Parameter {
 }
 
 #[derive(Debug, Default)]
-pub(crate) struct ArgumentList(HashMap<&'static str, Argument>);
+pub struct ArgumentList(HashMap<&'static str, Argument>);
 
 impl ArgumentList {
     pub fn optional(&mut self, keyword: &str) -> Option<Argument> {
         self.0.remove(keyword)
     }
 
-    pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Box<Expr>>> {
+    pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Box<dyn Expression>>> {
         self.optional(keyword)
-            .map(|v| v.try_into().map(Box::new).map_err(Into::into))
+            .map(|v| v.try_into().map_err(Into::into))
             .transpose()
     }
 
@@ -64,10 +64,9 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
-    pub fn required_expr(&mut self, keyword: &str) -> Result<Box<Expr>> {
+    pub fn required_expr(&mut self, keyword: &str) -> Result<Box<dyn Expression>> {
         self.required(keyword)
             .and_then(|v| v.try_into().map_err(Into::into))
-            .map(Box::new)
     }
 
     pub fn keywords(&self) -> Vec<&'static str> {
@@ -80,15 +79,15 @@ impl ArgumentList {
 }
 
 #[derive(Debug)]
-pub(crate) enum Argument {
-    Expression(Expr),
+pub enum Argument {
+    Expression(Box<dyn Expression>),
     Regex(regex::Regex),
 }
 
-impl TryInto<Expr> for Argument {
+impl TryInto<Box<dyn Expression>> for Argument {
     type Error = Error;
 
-    fn try_into(self) -> std::result::Result<Expr, Self::Error> {
+    fn try_into(self) -> std::result::Result<Box<dyn Expression>, Self::Error> {
         match self {
             Argument::Expression(expr) => Ok(expr),
             Argument::Regex(_) => Err(Error::ArgumentExprRegex),
@@ -96,7 +95,7 @@ impl TryInto<Expr> for Argument {
     }
 }
 
-pub(crate) trait Function: std::fmt::Debug {
+pub trait Function: std::fmt::Debug {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 

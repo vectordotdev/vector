@@ -167,7 +167,12 @@ fn argument_from_pair(pair: Pair<R>) -> Result<(Option<String>, Argument)> {
             // This matches first, if a keyword is provided.
             R::ident => ident = Some(pair.as_str().to_owned()),
             R::regex => return Ok((ident, Argument::Regex(regex_from_pair(pair)?))),
-            _ => return Ok((ident, Argument::Expression(expression_from_pair(pair)?))),
+            _ => {
+                return Ok((
+                    ident,
+                    Argument::Expression(Box::new(expression_from_pair(pair)?)),
+                ))
+            }
         }
     }
 

@@ -8,17 +8,18 @@ mod runtime;
 mod state;
 mod value;
 
-use expression::{Expr, Expression};
-use function::{Argument, ArgumentList, Function, Parameter};
+use expression::Expr;
 use operator::Operator;
-use state::State;
 
 pub use error::Error;
+pub use expression::Expression;
+pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
+pub use state::State;
 pub use value::Value;
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Any object you want to map through the remap language has to implement this
 /// trait.

@@ -1,6 +1,6 @@
 use crate::{
-    expression::Error, Argument, ArgumentList, Expr, Expression, Function, Object, Parameter,
-    Result, State, Value,
+    expression::Error, Argument, ArgumentList, Expression, Function, Object, Parameter, Result,
+    State, Value,
 };
 use std::convert::{TryFrom, TryInto};
 
@@ -47,9 +47,9 @@ impl Function for Split {
 
 #[derive(Debug)]
 pub(crate) struct SplitFn {
-    value: Box<Expr>,
+    value: Box<dyn Expression>,
     pattern: Argument,
-    limit: Option<Box<Expr>>,
+    limit: Option<Box<dyn Expression>>,
 }
 
 impl Expression for SplitFn {
