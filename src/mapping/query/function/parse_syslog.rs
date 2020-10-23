@@ -178,6 +178,7 @@ mod tests {
                         .ymd(Utc::now().year(), 6, 13)
                         .and_hms_milli(16, 33, 35, 0)
                         .into();
+
                     map.insert(
                         "message".to_string(),
                         Value::from("Proxy sticky-servers started."),
