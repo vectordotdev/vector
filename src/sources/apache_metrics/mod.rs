@@ -183,6 +183,7 @@ fn apache_metrics(
                             let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
                                 .chain(vec![Ok(Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -216,6 +217,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -233,6 +235,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,

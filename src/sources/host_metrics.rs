@@ -671,6 +671,7 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric {
             name: self.namespace.encode(name),
+            namespace: None,
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Counter { value },
@@ -687,6 +688,7 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric {
             name: self.namespace.encode(name),
+            namespace: None,
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value },

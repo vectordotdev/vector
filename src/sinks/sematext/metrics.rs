@@ -267,6 +267,7 @@ mod tests {
     fn test_encode_counter_event() {
         let events = vec![Metric {
             name: "jvm.pool.used".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
             tags: None,
             kind: MetricKind::Incremental,
@@ -283,6 +284,7 @@ mod tests {
     fn test_encode_counter_event_no_namespace() {
         let events = vec![Metric {
             name: "used".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
             tags: None,
             kind: MetricKind::Incremental,
@@ -300,6 +302,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "jvm.pool.used".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -307,6 +310,7 @@ mod tests {
             },
             Metric {
                 name: "jvm.pool.committed".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -361,6 +365,7 @@ mod tests {
         for (i, (metric, val)) in metrics.iter().enumerate() {
             let event = Event::from(Metric {
                 name: metric.to_string(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32)),
                 tags: Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]

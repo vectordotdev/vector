@@ -83,6 +83,7 @@ mod test {
     fn to_lua_metric() {
         let event = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -133,6 +134,7 @@ mod test {
         }"#;
         let expected = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,

@@ -317,6 +317,7 @@ impl MongoDBMetrics {
     ) -> Metric {
         Metric {
             name: self.encode_namespace(name),
+            namespace: None,
             timestamp: Some(Utc::now()),
             tags: Some(tags),
             kind: MetricKind::Absolute,
