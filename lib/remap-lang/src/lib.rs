@@ -122,6 +122,14 @@ mod tests {
                 }"#,
                 Ok(Some("foobar".into())),
             ),
+            (
+                r#"
+                    .foo = false
+                    false || (.foo = true) && true
+                    .foo
+                "#,
+                Ok(Some(true.into())),
+            ),
         ];
 
         for (script, result) in cases {
