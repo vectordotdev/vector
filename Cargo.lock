@@ -6472,7 +6472,7 @@ dependencies = [
  "colored",
  "criterion",
  "db-key",
- "derivative 1.0.4",
+ "derivative 2.1.1",
  "derive_is_enum_variant",
  "dirs 3.0.1",
  "evmap",
