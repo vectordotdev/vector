@@ -48,8 +48,8 @@ pub struct TcpSinkConfig {
 }
 
 impl TcpSinkConfig {
-    pub fn new(address: String) -> Self {
-        Self { address, tls: None }
+    pub fn new(address: String, tls: Option<TlsConfig>) -> Self {
+        Self { address, tls }
     }
 
     pub fn build(
@@ -137,7 +137,7 @@ impl TcpConnector {
     }
 }
 
-pub struct TcpSink {
+struct TcpSink {
     connector: TcpConnector,
     acker: Acker,
     encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
