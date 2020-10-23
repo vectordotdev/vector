@@ -69,7 +69,12 @@ impl BlackholeSink {
 impl StreamSink for BlackholeSink {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         while let Some(event) = input.next().await {
-            let message_len = std::mem::size_of_val(&event);
+            let message_len = match event {
+                Event::Log(log) => serde_json::to_string(&log),
+                Event::Metric(metric) => serde_json::to_string(&metric),
+            }
+            .map(|v| v.len())
+            .unwrap_or(0);
 
             self.total_events += 1;
             self.total_raw_bytes += message_len;
