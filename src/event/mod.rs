@@ -423,6 +423,16 @@ impl From<Metric> for Event {
     }
 }
 
+impl remap_lang::Object for Event {
+    fn insert(&mut self, path: &str, value: remap_lang::Value) -> Result<(), String> {
+        todo!()
+    }
+
+    fn find(&self, path: &str) -> Result<Option<remap_lang::Value>, String> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

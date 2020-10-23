@@ -140,9 +140,9 @@ mod tests {
                 })
                 .unwrap();
             let mut runtime = Runtime::new(State::default());
-            let event = Event::default();
+            let mut event = Event::default();
 
-            assert_eq!(runtime.execute(event, program), result);
+            assert_eq!(runtime.execute(&mut event, &program), result);
         }
     }
 }

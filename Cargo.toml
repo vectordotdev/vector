@@ -113,6 +113,9 @@ prettytable-rs = { version = "0.8.0", optional = true }
 human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
 
+# Remap Lang
+remap-lang = { path = "lib/remap-lang" }
+
 # External libs
 derivative = "2.1.1"
 chrono = { version = "0.4.19", features = ["serde"] }

@@ -202,6 +202,39 @@ impl TryInto<serde_json::Value> for Value {
     }
 }
 
+impl From<remap_lang::Value> for Value {
+    fn from(v: remap_lang::Value) -> Self {
+        use remap_lang::Value::*;
+
+        match v {
+            String(v) => Value::Bytes(v),
+            Integer(v) => Value::Integer(v),
+            Float(v) => Value::Float(v),
+            Boolean(v) => Value::Boolean(v),
+            Map(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
+            Null => Value::Null,
+        }
+    }
+}
+
+impl From<Value> for remap_lang::Value {
+    fn from(v: Value) -> Self {
+        use remap_lang::Value::*;
+
+        match v {
+            Value::Bytes(v) => String(v),
+            Value::Integer(v) => Integer(v),
+            Value::Float(v) => Float(v),
+            Value::Boolean(v) => Boolean(v),
+            Value::Map(v) => Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
+            Value::Null => Null,
+            _ => todo!("Value::Timestamp"),
+        }
+    }
+}
+
 impl Value {
     // TODO: return Cow
     pub fn to_string_lossy(&self) -> String {

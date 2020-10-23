@@ -45,7 +45,7 @@ pub enum Error {
     Variable(#[from] variable::Error),
 }
 
-pub trait Expression: std::fmt::Debug {
+pub trait Expression: Send + std::fmt::Debug {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
 }
 

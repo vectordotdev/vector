@@ -6606,6 +6606,7 @@ dependencies = [
  "rand_distr",
  "rdkafka",
  "regex",
+ "remap-lang",
  "reqwest",
  "rlua",
  "rusoto_cloudwatch",
