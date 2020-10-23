@@ -49,11 +49,11 @@ path_index_inner =  { "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
 
 // Literals --------------------------------------------------------------------
 
-null    = { "null" }
-boolean = { "true" | "false" }
-string  = { "\"" ~ string_inner ~ "\"" }
-integer = { "-"? ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
-float   = {
+null    =  { "null" }
+boolean =  { "true" | "false" }
+string  = ${ "\"" ~ string_inner ~ "\"" }
+integer = ${ "-"? ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+float   = ${
     "-"?
     ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
     ~ ("." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?)
