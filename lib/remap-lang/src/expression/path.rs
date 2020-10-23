@@ -12,21 +12,35 @@ pub enum Error {
 
 #[derive(Debug)]
 pub(crate) struct Path {
-    path: String,
+    // TODO: Switch to String once Event API is cleaned up.
+    segments: Vec<Vec<String>>,
 }
 
 impl Path {
-    pub(crate) fn new(path: String) -> Self {
-        Self { path }
+    pub(crate) fn new(segments: Vec<Vec<String>>) -> Self {
+        Self { segments }
     }
 }
 
 impl Expression for Path {
     fn execute(&self, _: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
         object
-            .find(&self.path)
+            .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?
-            .ok_or_else(|| E::from(Error::Missing(self.path.to_owned())).into())
+            .ok_or_else(|| E::from(Error::Missing(segments_to_path(&self.segments))).into())
             .map(Some)
     }
+}
+
+fn segments_to_path(segments: &[Vec<String>]) -> String {
+    segments
+        .iter()
+        .map(|c| {
+            c.iter()
+                .map(|p| p.replace(".", "\\."))
+                .collect::<Vec<_>>()
+                .join(".")
+        })
+        .collect::<Vec<_>>()
+        .join(".")
 }

@@ -56,7 +56,7 @@ fn expression_from_pair(pair: Pair<R>) -> Result<Expr> {
 /// This returns a `target_path` target.
 fn target_from_pair(pair: Pair<R>) -> Result<Target> {
     match pair.as_rule() {
-        R::path => Ok(Target::Path(pair.as_str().to_owned())),
+        R::path => Ok(Target::Path(path_segments_from_pairs(pair.into_inner())?)),
         _ => Err(e(R::target)),
     }
 }
@@ -204,7 +204,49 @@ fn regex_from_pair(pair: Pair<R>) -> Result<Regex> {
 
 /// Parse a [`Path`] value, e.g. ".foo.bar"
 fn path_from_pair(pair: Pair<R>) -> Result<Expr> {
-    Ok(Expr::from(Path::new(pair.as_str().to_owned())))
+    let segments = path_segments_from_pairs(pair.into_inner())?;
+
+    Ok(Expr::from(Path::new(segments)))
+}
+
+fn path_segments_from_pairs(pairs: Pairs<R>) -> Result<Vec<Vec<String>>> {
+    pairs.map(path_segment_from_pair).collect::<Result<_>>()
+}
+
+fn path_segment_from_pair(pair: Pair<R>) -> Result<Vec<String>> {
+    let mut segments = vec![];
+    for segment in pair.into_inner() {
+        match segment.as_rule() {
+            R::path_field => segments.push(path_field_from_pair(segment)?),
+            R::path_coalesce => segments.append(&mut path_coalesce_from_pair(segment)?),
+            R::path_index => segments
+                .last_mut()
+                .get_or_insert(&mut "".to_owned())
+                .push_str(segment.as_str()),
+            _ => todo!(),
+        }
+    }
+
+    Ok(segments)
+}
+
+fn path_field_from_pair(pair: Pair<R>) -> Result<String> {
+    let field = pair.into_inner().next().ok_or(e(Rule::path_field))?;
+
+    match field.as_rule() {
+        R::string => {
+            let string = field.into_inner().next().ok_or(e(R::string))?;
+            escaped_string_from_pair(string)
+        }
+        R::ident => Ok(field.as_str().to_owned()),
+        _ => Err(e(Rule::path_field)),
+    }
+}
+
+fn path_coalesce_from_pair(pair: Pair<R>) -> Result<Vec<String>> {
+    pair.into_inner()
+        .map(path_field_from_pair)
+        .collect::<Result<_>>()
 }
 
 fn escaped_string_from_pair(pair: Pair<R>) -> Result<String> {

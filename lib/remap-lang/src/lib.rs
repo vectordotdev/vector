@@ -58,12 +58,12 @@ pub trait Object: std::fmt::Debug {
     /// When inserting into a coalesced path, the implementor is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
-    fn insert(&mut self, path: &str, value: Value) -> std::result::Result<(), String>;
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String>;
 
     /// Find a value for a given path.
     ///
     /// See [`Object::insert`] for more details.
-    fn find(&self, path: &str) -> std::result::Result<Option<Value>, String>;
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String>;
 }
 
 #[cfg(test)]
