@@ -204,6 +204,11 @@ enum SqsIngestorNewError {
     },
     #[snafu(display("Got an empty queue URL for {}", name))]
     MissingQueueUrl { name: String },
+    #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
+    InvalidVisibilityTimeout {
+        source: std::num::TryFromIntError,
+        timeout: u64,
+    },
 }
 
 #[derive(Debug, Snafu)]
@@ -231,7 +236,7 @@ struct SqsIngestor {
 
     queue_url: String,
     poll_interval: Duration,
-    visibility_timeout: Duration,
+    visibility_timeout_secs: i64,
     delete_message: bool,
 }
 
@@ -259,6 +264,17 @@ impl SqsIngestor {
                 name: config.queue_name.clone(),
             })?;
 
+        // This is a bit odd as AWS wants an i64 for this value, but also doesn't want negative
+        // values so I used u64 for the config deserialization and validate that there is no
+        // overflow here
+        let visibility_timeout_secs: i64 =
+            config
+                .visibility_timeout_secs
+                .try_into()
+                .context(InvalidVisibilityTimeout {
+                    timeout: config.visibility_timeout_secs,
+                })?;
+
         Ok(SqsIngestor {
             s3_client,
             sqs_client,
@@ -268,7 +284,7 @@ impl SqsIngestor {
 
             queue_url,
             poll_interval: Duration::from_secs(config.poll_secs),
-            visibility_timeout: Duration::from_secs(config.visibility_timeout_secs),
+            visibility_timeout_secs,
             delete_message: config.delete_message,
         })
     }
@@ -438,12 +454,7 @@ impl SqsIngestor {
             .receive_message(ReceiveMessageRequest {
                 queue_url: self.queue_url.clone(),
                 max_number_of_messages: Some(10),
-                visibility_timeout: Some(
-                    self.visibility_timeout
-                        .as_secs()
-                        .try_into()
-                        .unwrap_or(std::i64::MAX), // A failure would indicate overflow
-                ),
+                visibility_timeout: Some(self.visibility_timeout_secs),
                 ..Default::default()
             })
             .map_ok(|res| res.messages.unwrap_or_default()) // TODO
