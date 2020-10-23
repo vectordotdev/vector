@@ -203,7 +203,7 @@ fn protobuf() -> Result<()> {
     crate::test_util::trace_init();
 
     // Load in fixtures.
-    let mut test_file = fs::File::open("tests/data/wasm/protobuf/top.pb")?;
+    let mut test_file = fs::File::open("tests/data/wasm/protobuf/demo.pb")?;
     let mut buf = String::new();
     test_file.read_to_string(&mut buf)?;
     let mut event = Event::new_empty_log();

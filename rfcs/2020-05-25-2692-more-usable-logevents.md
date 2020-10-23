@@ -124,7 +124,7 @@ The `Atom` type is deprecated, please use `String` and adapt any `Atom` usages t
 The current `LogEvent` API is as follows *(documentation, if it exists, is included)*:
 
 ```rust
-//! Summarized from src/event/top
+//! Summarized from src/event/mod.rs
 impl LogEvent {
     pub fn new() -> Self;
     pub fn get(&self, key: &Atom) -> Option<&Value>;
