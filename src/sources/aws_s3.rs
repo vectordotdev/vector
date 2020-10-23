@@ -362,6 +362,14 @@ impl SqsIngestor {
                 //
                 // String is used as we cannot take clone std::io::Error to take ownership in
                 // closure
+                //
+                // FramedRead likely stops when it gets an i/o error but I found it more clear to
+                // show that we `take_while` there hasn't been an error
+                //
+                // This can result in objects being partially processed before an error, but we
+                // prefer duplicate lines over message loss. Future work could include recording
+                // the offset of the object that has been read, but this would only be relevant in
+                // the case that the same vector instance processes the same message.
                 let mut read_error: Option<String> = None;
                 let mut lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
                     FramedRead::new(r, BytesDelimitedCodec::new(b'\n'))
@@ -370,7 +378,6 @@ impl SqsIngestor {
                                 Ok(_) => true,
                                 Err(err) => {
                                     read_error = Some(err.to_string());
-                                    //TODO
                                     false
                                 }
                             })
