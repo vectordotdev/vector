@@ -93,7 +93,7 @@ mod tests {
 
     /// If this failes at any run, then the algorithm in `gauge_add` is faulty.
     #[test]
-    fn eventualy_consistent() {
+    fn eventually_consistent() {
         let n = 8;
         let m = 1000;
         let gauge = OpenGauge::new();
