@@ -63,9 +63,8 @@ impl TopologyState {
         }
     }
 
-    /// Immutable method that returns a new Arc<Self> containing updated rows. Rows that
-    /// don't exist in `rows` will be deleted; new rows will be added, and existing
-    /// rows will be updated
+    /// Updates the existing topology rows. Rows that don't exist in `rows` will be deleted;
+    /// new rows will be added, and existing rows will be updated
     pub fn update_rows(&self, rows: Vec<TopologyRow>) {
         let rows = rows
             .into_iter()
@@ -74,7 +73,8 @@ impl TopologyState {
                     r.name.clone(),
                     match self.rows.lock().expect(ACQUIRE_LOCK_INVARIANT).get(&r.name) {
                         Some(existing) if existing.topology_type == r.topology_type => {
-                            // TODO - update values > 0. For now, just return row
+                            // TODO - update values > 0 when throughput and other metrics gleaned
+                            // are independently updated. For now, just return the new row.
                             r
                         }
                         _ => r,
@@ -86,7 +86,9 @@ impl TopologyState {
         *self.rows.lock().expect(ACQUIRE_LOCK_INVARIANT) = rows;
     }
 
-    /// Returns a cloned copy of topology rows
+    /// Returns a cloned copy of topology rows, typically used inside of frame re-renders
+    /// where the row data may be updated during its use in a current render cycle. Borrowing
+    /// would prevent the lock from releasing; this keeps contention lower.
     pub fn rows(&self) -> Vec<TopologyRow> {
         self.rows
             .lock()
@@ -97,7 +99,7 @@ impl TopologyState {
     }
 }
 
-/// Contains the aggregate state required to render each widget in a dashboard
+/// Contains the aggregate state required to render each widget in a dashboard.
 pub struct WidgetsState {
     url: url::Url,
     topology: Arc<TopologyState>,
@@ -106,7 +108,7 @@ pub struct WidgetsState {
 }
 
 impl WidgetsState {
-    /// Returns new widgets state
+    /// Returns new widgets state.
     pub fn new(url: url::Url, topology: TopologyState) -> Self {
         let (tx, rx) = watch::channel(());
 
@@ -118,27 +120,27 @@ impl WidgetsState {
         }
     }
 
-    /// Returns a thread-safe clone of current topology state
+    /// Returns a thread-safe clone of current topology state.
     pub fn topology(&self) -> Arc<TopologyState> {
         Arc::clone(&self.topology)
     }
 
-    /// Returns a string representation of the URL
+    /// Returns a string representation of the URL.
     pub fn url(&self) -> String {
         self.url.to_string()
     }
 
-    /// Signal an update of state to a listener
+    /// Signal an update of state to a listener.
     fn notify(&self) {
         let _ = self.tx.broadcast(());
     }
 
-    /// Listen for an update signal. Used to determine whether the dashboard should redraw
+    /// Listen for an update signal. Used to determine whether the dashboard should redraw.
     pub async fn listen(&self) -> watch::Receiver<()> {
         self.rx.clone()
     }
 
-    /// Update topology rows
+    /// Update topology rows.
     pub fn update_topology_rows(&self, rows: Vec<TopologyRow>) {
         self.topology.update_rows(rows);
         self.notify();
