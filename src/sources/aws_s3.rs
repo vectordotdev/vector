@@ -212,6 +212,15 @@ enum SqsIngestorNewError {
 
 #[derive(Debug, Snafu)]
 enum ProcessingError {
+    #[snafu(display(
+        "Could not parse SQS message with id {} as S3 notification: {}",
+        message_id,
+        source
+    ))]
+    InvalidSqsMessage {
+        source: serde_json::Error,
+        message_id: String,
+    },
     #[snafu(display("Failed to fetch s3://{}/{}: {}", bucket, key, source))]
     GetObject {
         source: RusotoError<GetObjectError>,
@@ -345,8 +354,10 @@ impl SqsIngestor {
         message: Message,
         out: Pipeline,
     ) -> Result<(), ProcessingError> {
-        let s3_event: S3Event =
-            serde_json::from_str(message.body.unwrap_or_default().as_ref()).unwrap(); // TODO return processing error
+        let s3_event: S3Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
+            .context(InvalidSqsMessage {
+                message_id: message.message_id.unwrap_or("<empty>".to_owned()),
+            })?;
 
         self.handle_s3_event(s3_event, out).map_ok(|_| ()).await
     }
