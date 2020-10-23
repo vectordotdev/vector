@@ -72,6 +72,7 @@ impl DatadogLogsConfig {
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
         BatchSettings::default()
             .bytes(bytesize::kib(100u64))
+            .events(20)
             .timeout(1)
             .parse_config(self.batch)
     }
