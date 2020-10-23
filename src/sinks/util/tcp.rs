@@ -108,8 +108,7 @@ impl TcpConnector {
 
         let addr = SocketAddr::new(ip, self.port);
         self.tls
-            .clone()
-            .connect(self.host.clone(), addr)
+            .connect(&self.host, &addr)
             .await
             .context(ConnectError)
     }
