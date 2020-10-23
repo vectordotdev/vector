@@ -27,6 +27,7 @@ pub struct Widgets {
 }
 
 impl Widgets {
+    /// Creates a new Widgets, containing constraints to re-use across renders.
     pub fn new(state: Arc<WidgetsState>) -> Self {
         let constraints = vec![
             Constraint::Length(3),
@@ -37,7 +38,7 @@ impl Widgets {
         Self { constraints, state }
     }
 
-    /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to
+    /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
     fn title<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
         let text = vec![Spans::from(self.state.url())];
 
@@ -53,7 +54,7 @@ impl Widgets {
     }
 
     /// Renders a topology table, showing sources, transforms and sinks in tabular form, with
-    /// statistics pulled from `topology_state`
+    /// statistics pulled from `TopologyState`,
     fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
         let topology = self.state.topology();
         let items = topology.rows().into_iter().map(|r| {
@@ -85,7 +86,7 @@ impl Widgets {
         f.render_widget(w, area);
     }
 
-    /// Renders a box showing instructions on how to exit from `vector top`
+    /// Renders a box showing instructions on how to exit from `vector top`.
     fn quit_box<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
         let text = vec![Spans::from("To quit, press ESC or 'q'")];
 
@@ -100,6 +101,7 @@ impl Widgets {
         f.render_widget(w, area);
     }
 
+    /// Draw a single frame. Creates a layout and renders widgets into it.
     fn draw<B: Backend>(&self, f: &mut Frame<B>) {
         let rects = Layout::default()
             .constraints(self.constraints.as_ref())
@@ -110,7 +112,7 @@ impl Widgets {
         self.quit_box(f, rects[2]);
     }
 
-    /// Listen for state updates. Used to determine when to redraw
+    /// Listen for state updates. Used to determine when to redraw.
     async fn listen(&self) {
         self.state.listen().await;
     }
