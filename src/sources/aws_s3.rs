@@ -314,15 +314,24 @@ impl SqsIngestor {
                 else => break Ok(()),
             };
 
-            let messages = self.receive_messages().await.unwrap_or_default(); //TODO emit event for errors
+            let messages = self.receive_messages().await.unwrap_or_default(); // TODO emit event for errors
 
             for message in messages {
-                let receipt_handle = message.receipt_handle.clone();
+                let receipt_handle = match message.receipt_handle {
+                    None => {
+                        // I don't think this will ever actually happen, but is just an artifact of the
+                        // AWS's API prediliction for returning nullable values for all response
+                        // attributes
+                        warn!(message = "Refusing to process message with no receipt_handle.", ?message.message_id);
+                        continue;
+                    }
+                    Some(ref handle) => handle.to_owned(),
+                };
 
                 match self.handle_sqs_message(message, out.clone()).await {
                     Ok(()) => {
                         if self.delete_message {
-                            self.delete_message(receipt_handle).await.unwrap();
+                            self.delete_message(receipt_handle).await.unwrap(); // TODO emit event
                         }
                     }
                     Err(_err) => {} // TODO emit event
@@ -337,7 +346,7 @@ impl SqsIngestor {
         out: Pipeline,
     ) -> Result<(), ProcessingError> {
         let s3_event: S3Event =
-            serde_json::from_str(message.body.unwrap_or_default().as_ref()).unwrap();
+            serde_json::from_str(message.body.unwrap_or_default().as_ref()).unwrap(); // TODO return processing error
 
         self.handle_s3_event(s3_event, out).map_ok(|_| ()).await
     }
@@ -482,15 +491,14 @@ impl SqsIngestor {
                 visibility_timeout: Some(self.visibility_timeout_secs),
                 ..Default::default()
             })
-            .map_ok(|res| res.messages.unwrap_or_default()) // TODO
+            .map_ok(|res| res.messages.unwrap_or_default())
             .await
     }
 
     async fn delete_message(
         &self,
-        receipt_handle: Option<String>,
+        receipt_handle: String,
     ) -> Result<(), RusotoError<DeleteMessageError>> {
-        let receipt_handle = receipt_handle.unwrap_or_default(); // TODO
         self.sqs_client
             .delete_message(DeleteMessageRequest {
                 queue_url: self.queue_url.clone(),
