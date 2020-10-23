@@ -20,7 +20,6 @@ pub(super) use literal::Literal;
 pub(super) use noop::Noop;
 pub(super) use not::Not;
 pub(super) use path::Path;
-pub(super) use variable::Variable;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -95,5 +94,4 @@ enum_dispatch![
     Noop,
     Not,
     Path,
-    Variable,
 ];

@@ -11,9 +11,8 @@ if_statement = { "if" ~ (boolean_expr | group) ~ block ~ ("else" ~ block)? }
 
 // Primary ---------------------------------------------------------------------
 
-primary  =  { value | variable | path | group }
+primary  =  { value | path | group }
 value    =  { string | float | integer | boolean | null }
-variable = ${ "$" ~ ident }
 group    =  { "(" ~ expression ~ ")" }
 
 // Function Calls --------------------------------------------------------------
@@ -68,7 +67,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 // Other ----------------------------------------------------------------------
 
 ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
-target = _{ variable | path }
+target = _{ path }
 block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ "}" }
 
 string_inner = @{ char* }

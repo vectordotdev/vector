@@ -3,7 +3,6 @@
 use crate::{
     expression::{
         Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
-        Variable,
     },
     Argument, Error, Expr, Operator, Result, Value,
 };
@@ -54,17 +53,9 @@ fn expression_from_pair(pair: Pair<R>) -> Result<Expr> {
 
 /// Return the target type to which a value is being assigned.
 ///
-/// This can either return a `variable` or a `target_path` target, depending on
-/// the parser rule being processed.
+/// This returns a `target_path` target.
 fn target_from_pair(pair: Pair<R>) -> Result<Target> {
     match pair.as_rule() {
-        R::variable => Ok(Target::Variable(
-            pair.into_inner()
-                .next()
-                .ok_or(e(R::variable))?
-                .as_str()
-                .to_owned(),
-        )),
         R::path => Ok(Target::Path(pair.as_str().to_owned())),
         _ => Err(e(R::target)),
     }
@@ -125,7 +116,6 @@ fn primary_from_pair(pair: Pair<R>) -> Result<Expr> {
 
     match pair.as_rule() {
         R::value => value_from_pair(pair.into_inner().next().ok_or(e(R::value))?),
-        R::variable => variable_from_pair(pair),
         R::path => path_from_pair(pair),
         R::group => expression_from_pair(pair.into_inner().next().ok_or(e(R::group))?),
         _ => Err(e(R::primary)),
@@ -215,13 +205,6 @@ fn regex_from_pair(pair: Pair<R>) -> Result<Regex> {
 /// Parse a [`Path`] value, e.g. ".foo.bar"
 fn path_from_pair(pair: Pair<R>) -> Result<Expr> {
     Ok(Expr::from(Path::new(pair.as_str().to_owned())))
-}
-
-/// Parse a [`Variable`] value, e.g. "$foo"
-fn variable_from_pair(pair: Pair<R>) -> Result<Expr> {
-    let ident = pair.into_inner().next().ok_or(e(R::variable))?;
-
-    Ok(Expr::from(Variable::new(ident.as_str().to_owned())))
 }
 
 fn escaped_string_from_pair(pair: Pair<R>) -> Result<String> {
