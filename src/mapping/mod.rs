@@ -296,11 +296,11 @@ impl Function for LogFn {
         let level = self.level.unwrap_or(LogLevel::Info);
 
         match level {
-            LogLevel::Trace => trace!("{:?}", string),
-            LogLevel::Debug => debug!("{:?}", string),
-            LogLevel::Info => info!("{:?}", string),
-            LogLevel::Warn => warn!("{:?}", string),
-            LogLevel::Error => error!("{:?}", string),
+            LogLevel::Trace => trace!("{}", string),
+            LogLevel::Debug => debug!("{}", string),
+            LogLevel::Info => info!("{}", string),
+            LogLevel::Warn => warn!("{}", string),
+            LogLevel::Error => error!("{}", string),
         }
 
         Ok(())
