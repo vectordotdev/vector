@@ -256,6 +256,7 @@ mod tests {
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
         Event::Metric(Metric {
             name: "event".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags),
             kind: metric::MetricKind::Incremental,

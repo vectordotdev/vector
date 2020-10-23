@@ -283,6 +283,7 @@ mod test {
     fn test_encode_counter() {
         let metric1 = Metric {
             name: "counter".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -299,6 +300,7 @@ mod test {
     fn test_encode_absolute_counter() {
         let metric1 = Metric {
             name: "counter".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -316,6 +318,7 @@ mod test {
     fn test_encode_gauge() {
         let metric1 = Metric {
             name: "gauge".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -332,6 +335,7 @@ mod test {
     fn test_encode_absolute_gauge() {
         let metric1 = Metric {
             name: "gauge".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -348,6 +352,7 @@ mod test {
     fn test_encode_distribution() {
         let metric1 = Metric {
             name: "distribution".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -368,6 +373,7 @@ mod test {
     fn test_encode_set() {
         let metric1 = Metric {
             name: "set".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -407,6 +413,7 @@ mod test {
         let events = vec![
             Event::Metric(Metric {
                 name: "counter".to_owned(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
@@ -414,6 +421,7 @@ mod test {
             }),
             Event::Metric(Metric {
                 name: "histogram".to_owned(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,

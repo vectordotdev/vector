@@ -296,6 +296,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -303,6 +304,7 @@ mod tests {
             },
             Metric {
                 name: "bytes_out".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -310,6 +312,7 @@ mod tests {
             },
             Metric {
                 name: "healthcheck".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: Some(
                     vec![("region".to_owned(), "local".to_owned())]
@@ -356,6 +359,7 @@ mod tests {
     fn encode_events_absolute_gauge() {
         let events = vec![Metric {
             name: "temperature".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -379,6 +383,7 @@ mod tests {
     fn encode_events_distribution() {
         let events = vec![Metric {
             name: "latency".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -407,6 +412,7 @@ mod tests {
     fn encode_events_set() {
         let events = vec![Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -469,6 +475,7 @@ mod integration_tests {
         for i in 0..100 {
             let event = Event::Metric(Metric {
                 name: format!("counter-{}", 0),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -489,6 +496,7 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", gauge_name),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -501,6 +509,7 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric {
                 name: format!("distribution-{}", distribution_name),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
                 kind: MetricKind::Incremental,

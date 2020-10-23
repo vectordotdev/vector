@@ -104,6 +104,7 @@ mod tests {
         let metrics = vec![
             Event::from(Metric {
                 name: "metric1".to_string(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1)),
                 tags: Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
@@ -115,6 +116,7 @@ mod tests {
             }),
             Event::from(Metric {
                 name: "metric2".to_string(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2)),
                 tags: Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
