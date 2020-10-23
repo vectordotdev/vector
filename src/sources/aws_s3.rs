@@ -38,6 +38,7 @@ use tokio_util::codec::FramedRead;
 //   multiple regions)
 // * Consider / decide on custom endpoint support
 //   * How would we handle this for multi-region S3 support?
+// * Internal events
 //
 // Future work:
 // * Additional codecs. Just treating like `file` source with newlines for now
@@ -282,7 +283,7 @@ impl SqsIngestor {
                 else => break Ok(()),
             };
 
-            let messages = self.receive_messages().await.unwrap_or_default();
+            let messages = self.receive_messages().await.unwrap_or_default(); //TODO emit event for errors
 
             for message in messages {
                 let receipt_handle = message.receipt_handle.clone();
@@ -293,7 +294,7 @@ impl SqsIngestor {
                             self.delete_message(receipt_handle).await.unwrap();
                         }
                     }
-                    Err(_err) => {} // TODO emit error
+                    Err(_err) => {} // TODO emit event
                 }
             }
         }
