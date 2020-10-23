@@ -6,7 +6,7 @@ remap: functions: parse_json: {
 			name:        "value"
 			description: "The text representation of the JSON to parse."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return: ["boolean", "integer", "float", "string", "map", "array", "null"]

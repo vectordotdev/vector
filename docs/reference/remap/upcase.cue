@@ -6,7 +6,7 @@ remap: functions: upcase: {
 			name:        "value"
 			description: "The string to convert to uppercase."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	category: "text"

@@ -6,7 +6,7 @@ remap: functions: strip_ansi_escape_codes: {
 			name:        "value"
 			description: "The text to strip."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"
@@ -33,8 +33,8 @@ remap: functions: strip_ansi_escape_codes: {
 				text: 37
 			}
 			source: #"""
-				.text = strip_ansi_escape_codes(.text)
-			"""#
+					.text = strip_ansi_escape_codes(.text)
+				"""#
 			output: {
 				error: remap.errors.ArgumentError
 			}

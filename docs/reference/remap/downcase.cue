@@ -6,7 +6,7 @@ remap: functions: downcase: {
 			name:        "value"
 			description: "The string to convert to lowercase."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"

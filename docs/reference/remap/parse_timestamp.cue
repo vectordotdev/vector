@@ -6,13 +6,13 @@ remap: functions: parse_timestamp: {
 			name:        "value"
 			description: "The text of the timestamp."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "format"
 			description: "The format string the timestamp text is expected to be in."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "default"

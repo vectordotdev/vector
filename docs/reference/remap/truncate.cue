@@ -6,7 +6,7 @@ remap: functions: truncate: {
 			name:        "value"
 			description: "The string to truncate."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "limit"
@@ -18,7 +18,7 @@ remap: functions: truncate: {
 			name:        "ellipsis"
 			description: "If true, an ellipsis (...) is appended should the string be truncated."
 			required:    true
-			type:        "boolean"
+			type: ["boolean"]
 		},
 	]
 	return:   "string"

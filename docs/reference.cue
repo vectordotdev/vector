@@ -863,6 +863,8 @@ data_model: close({
 
 releases: #Releases
 
+#RemapTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "any"
+
 remap: {
 	errors: [Name=string]: {
 		description: string
@@ -878,10 +880,10 @@ remap: {
 					name: string
 				}
 
-				type: "float" | "int" | "string"
+				type: [#RemapTypes, ...]
 			},
 		]
-		category:    "coerce" | "parse"
+		category:    "coerce" | "parse" | "text" | "hash"
 		description: string
 		examples: [
 			{

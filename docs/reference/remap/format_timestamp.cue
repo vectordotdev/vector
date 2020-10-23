@@ -12,7 +12,7 @@ remap: functions: format_timestamp: {
 			name:        "format"
 			description: "The format string"
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"

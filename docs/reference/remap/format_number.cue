@@ -12,21 +12,21 @@ remap: functions: format_number: {
 			name:        "scale"
 			description: "The number of decimal places to display."
 			required:    false
-			type:        "integer"
+			type: ["integer"]
 		},
 		{
 			name:        "decimal_separator"
 			description: "The character to use between the whole and decimal parts of the number."
 			required:    false
-			type:        "string"
-			default:     true
+			type: ["string"]
+			default: true
 		},
 		{
 			name:        "grouping_separator"
 			description: "The character to use between each thousands part of the number."
 			required:    false
-			type:        "string"
-			default:     true
+			type: ["string"]
+			default: true
 		},
 	]
 	return:   "string"

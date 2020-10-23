@@ -6,7 +6,7 @@ remap: functions: tokenize: {
 			name:        "value"
 			description: "The string to tokenize."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "array"

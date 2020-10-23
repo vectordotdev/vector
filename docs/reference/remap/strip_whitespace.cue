@@ -6,7 +6,7 @@ remap: functions: strip_whitespace: {
 			name:        "value"
 			description: "The string to trim."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"

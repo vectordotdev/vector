@@ -6,13 +6,13 @@ remap: functions: parse_duration: {
 			name:        "value"
 			description: "The text of the duration."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "output"
 			description: "The text of the duration unit the number should be output as."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "float"

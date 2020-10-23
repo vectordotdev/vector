@@ -6,7 +6,7 @@ remap: functions: sha1: {
 			name:        "value"
 			description: "The text to calculate the hash for."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"
@@ -33,8 +33,8 @@ remap: functions: sha1: {
 				text: 42
 			}
 			source: #"""
-				.hash = sha1(.text)
-			"""#
+					.hash = sha1(.text)
+				"""#
 			output: {
 				error: remap.errors.ArgumentError
 			}

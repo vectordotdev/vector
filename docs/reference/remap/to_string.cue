@@ -6,13 +6,13 @@ remap: functions: to_string: {
 			name:        "value"
 			description: "The value to return a string representation of."
 			required:    true
-			type:        "any"
+			type: ["any"]
 		},
 		{
 			name:        "default"
 			description: "If the value parameter errors, return this parameter instead."
 			required:    false
-			type:        "any"
+			type: ["any"]
 		},
 	]
 	return: ["boolean", "integer", "float", "string", "map", "array", "null"]

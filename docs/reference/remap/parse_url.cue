@@ -6,7 +6,7 @@ remap: functions: parse_url: {
 			name:        "value"
 			description: "The text of the url."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "map"

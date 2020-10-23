@@ -6,25 +6,25 @@ remap: functions: sha3: {
 			name:        "value"
 			description: "The text to calculate the hash for."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "variant"
 			description: "The variant of the algorithm to use."
 			required:    false
 			default:     "SHA3-512"
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"
 	category: "hash"
 	description: #"""
-			Calculates a sha3 hash of a given string. The allowed variants are:
-			- SHA3-224
-			- SHA3-256
-			- SHA3-384
-			- SHA3-512
-			"""#
+		Calculates a sha3 hash of a given string. The allowed variants are:
+		- SHA3-224
+		- SHA3-256
+		- SHA3-384
+		- SHA3-512
+		"""#
 	examples: [
 		{
 			title: "Success"
@@ -44,8 +44,8 @@ remap: functions: sha3: {
 				text: #"foo"#
 			}
 			source: #"""
-				.hash = sha3(.text, variant = "SHA-NONE")
-			"""#
+					.hash = sha3(.text, variant = "SHA-NONE")
+				"""#
 			output: {
 				error: remap.errors.ArgumentError
 			}

@@ -6,20 +6,20 @@ remap: functions: starts_with: {
 			name:        "value"
 			description: "The text to search."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "substring"
 			description: "The substring to search for in `value`."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "case_sensitive"
 			description: "Should the match be case sensitive?"
 			required:    false
-			type:        "boolean"
-			default:     true
+			type: ["boolean"]
+			default: true
 		},
 	]
 	return:   "boolean"

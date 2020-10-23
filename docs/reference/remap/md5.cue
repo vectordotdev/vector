@@ -6,7 +6,7 @@ remap: functions: md5: {
 			name:        "value"
 			description: "The text to calculate the hash for."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"

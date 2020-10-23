@@ -6,14 +6,14 @@ remap: functions: sha2: {
 			name:        "value"
 			description: "The text to calculate the hash for."
 			required:    true
-			type:        "string"
+			type: ["string"]
 		},
 		{
 			name:        "variant"
 			description: "The variant of the algorithm to use."
 			required:    false
 			default:     "SHA-512/256"
-			type:        "string"
+			type: ["string"]
 		},
 	]
 	return:   "string"
@@ -46,8 +46,8 @@ remap: functions: sha2: {
 				text: #"foo"#
 			}
 			source: #"""
-				.hash = sha2(.text, variant = "SHA-NONE")
-			"""#
+					.hash = sha2(.text, variant = "SHA-NONE")
+				"""#
 			output: {
 				error: remap.errors.ArgumentError
 			}
