@@ -229,8 +229,8 @@ impl Value {
         let err = || Error::Sub(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv - i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv - f64::try_from(&rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 
