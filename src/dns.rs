@@ -1,4 +1,4 @@
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::Future;
 use hyper::client::connect::dns::Name as Name13;
 use snafu::ResultExt;
@@ -17,11 +17,6 @@ pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
 pub struct Resolver;
 
 impl Resolver {
-    pub fn lookup_ip_01(self, name: String) -> ResolverFuture {
-        let fut = self.lookup_ip(name).boxed().compat();
-        Box::new(fut)
-    }
-
     pub async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
         // We need to add port with the name so that `to_socket_addrs`
         // resolves it properly. We will be discarding the port afterwards.
