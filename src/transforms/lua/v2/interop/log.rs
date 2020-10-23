@@ -1,4 +1,4 @@
-use crate::event::{LogEvent, Value};
+use crate::event::{LogEvent, Value, LookupBuf};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {
@@ -15,7 +15,8 @@ impl<'a> FromLua<'a> for LogEvent {
                 let mut log = LogEvent::default();
                 for pair in t.pairs() {
                     let (key, value): (String, Value) = pair?;
-                    log.insert_flat(key, value);
+                    let key = LookupBuf::from(key);
+                    log.insert(key, value);
                 }
                 Ok(log)
             }

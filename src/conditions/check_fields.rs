@@ -1,6 +1,6 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
-    event::Value,
+    event::{LookupBuf, Value},
     Event,
 };
 use cidr_utils::cidr::IpCidr;
@@ -34,13 +34,13 @@ pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync {
 
 #[derive(Debug, Clone)]
 struct EqualsPredicate {
-    target: String,
+    target: LookupBuf,
     arg: CheckFieldsPredicateArg,
 }
 
 impl EqualsPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         Ok(Box::new(Self {
@@ -76,7 +76,7 @@ impl CheckFieldsPredicate for EqualsPredicate {
             Event::Metric(m) => {
                 m.tags
                     .as_ref()
-                    .and_then(|t| t.get(&self.target))
+                    .and_then(|t| t.get(&self.target.to_string()))
                     .map_or(false, |v| match &self.arg {
                         CheckFieldsPredicateArg::String(s) => s.as_bytes() == v.as_bytes(),
                         _ => false,
@@ -90,13 +90,13 @@ impl CheckFieldsPredicate for EqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct ContainsPredicate {
-    target: String,
+    target: LookupBuf,
     arg: Vec<String>,
 }
 
 impl ContainsPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
@@ -129,13 +129,13 @@ impl CheckFieldsPredicate for ContainsPredicate {
 
 #[derive(Debug, Clone)]
 struct StartsWithPredicate {
-    target: String,
+    target: LookupBuf,
     arg: Vec<String>,
 }
 
 impl StartsWithPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
@@ -170,13 +170,13 @@ impl CheckFieldsPredicate for StartsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct EndsWithPredicate {
-    target: String,
+    target: LookupBuf,
     arg: Vec<String>,
 }
 
 impl EndsWithPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
@@ -209,13 +209,13 @@ impl CheckFieldsPredicate for EndsWithPredicate {
 
 #[derive(Debug, Clone)]
 struct NotEqualsPredicate {
-    target: String,
+    target: LookupBuf,
     arg: Vec<String>,
 }
 
 impl NotEqualsPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         Ok(Box::new(Self {
@@ -244,7 +244,7 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
             Event::Metric(m) => m
                 .tags
                 .as_ref()
-                .and_then(|t| t.get(&self.target))
+                .and_then(|t| t.get(&self.target.to_string()))
                 .map_or(false, |v| {
                     !self.arg.iter().any(|s| v.as_bytes() == s.as_bytes())
                 }),
@@ -256,13 +256,13 @@ impl CheckFieldsPredicate for NotEqualsPredicate {
 
 #[derive(Debug, Clone)]
 struct RegexPredicate {
-    target: String,
+    target: LookupBuf,
     regex: Regex,
 }
 
 impl RegexPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         let pattern = match arg {
@@ -285,7 +285,7 @@ impl CheckFieldsPredicate for RegexPredicate {
             Event::Metric(metric) => metric
                 .tags
                 .as_ref()
-                .and_then(|tags| tags.get(&self.target))
+                .and_then(|tags| tags.get(&self.target.to_string()))
                 .map_or(false, |field| self.regex.is_match(field)),
         }
     }
@@ -295,13 +295,13 @@ impl CheckFieldsPredicate for RegexPredicate {
 
 #[derive(Debug, Clone)]
 struct ExistsPredicate {
-    target: String,
+    target: LookupBuf,
     arg: bool,
 }
 
 impl ExistsPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
@@ -327,13 +327,13 @@ impl CheckFieldsPredicate for ExistsPredicate {
 
 #[derive(Debug, Clone)]
 struct IpCidrPredicate {
-    target: String,
+    target: LookupBuf,
     cidrs: Vec<IpCidr>,
 }
 
 impl IpCidrPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         let cidr_strings = match arg {
@@ -378,7 +378,7 @@ struct NegatePredicate {
 impl NegatePredicate {
     pub fn new(
         predicate: &str,
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         let subpred = build_predicate(predicate, target, arg)?;
@@ -396,13 +396,13 @@ impl CheckFieldsPredicate for NegatePredicate {
 
 #[derive(Debug, Clone)]
 struct LengthEqualsPredicate {
-    target: String,
+    target: LookupBuf,
     arg: i64,
 }
 
 impl LengthEqualsPredicate {
     pub fn new(
-        target: String,
+        target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
         match arg {
@@ -441,7 +441,7 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
 
 fn build_predicate(
     predicate: &str,
-    target: String,
+    target: LookupBuf,
     arg: &CheckFieldsPredicateArg,
 ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
     match predicate {
@@ -468,7 +468,7 @@ fn build_predicate(
 
 fn build_predicates(
     map: &IndexMap<String, CheckFieldsPredicateArg>,
-) -> Result<IndexMap<String, Box<dyn CheckFieldsPredicate>>, Vec<String>> {
+) -> Result<IndexMap<LookupBuf, Box<dyn CheckFieldsPredicate>>, Vec<String>> {
     let mut predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>> = IndexMap::new();
     let mut errors = Vec::new();
 
@@ -511,7 +511,7 @@ fn build_predicates(
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct CheckFieldsConfig {
     #[serde(flatten, default)]
-    predicates: IndexMap<String, CheckFieldsPredicateArg>,
+    predicates: IndexMap<LookupBuf, CheckFieldsPredicateArg>,
 }
 
 inventory::submit! {
@@ -541,7 +541,7 @@ impl ConditionConfig for CheckFieldsConfig {
 //------------------------------------------------------------------------------
 
 pub struct CheckFields {
-    predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
+    predicates: IndexMap<LookupBuf, Box<dyn CheckFieldsPredicate>>,
 }
 
 impl Condition for CheckFields {

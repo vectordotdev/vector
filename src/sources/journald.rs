@@ -209,10 +209,10 @@ impl JournaldConfig {
 fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
-    if let Some(message) = log.remove(MESSAGE) {
+    if let Some(message) = log.remove(MESSAGE, false) {
         log.insert(log_schema().message_key(), message);
     }
-    if let Some(host) = log.remove(HOSTNAME) {
+    if let Some(host) = log.remove(HOSTNAME, false) {
         log.insert(log_schema().host_key(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
@@ -231,7 +231,7 @@ fn create_event(record: Record) -> Event {
         }
     }
     // Add source type
-    log.try_insert(log_schema().source_type_key(), Bytes::from("journald"));
+    log.insert(log_schema().source_type_key().into(), Bytes::from("journald"));
 
     log.into()
 }

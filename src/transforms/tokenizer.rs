@@ -2,7 +2,7 @@ use super::util::tokenize::parse;
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, PathComponent, PathIter, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -13,10 +13,10 @@ use std::str;
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct TokenizerConfig {
-    pub field_names: Vec<String>,
-    pub field: Option<String>,
+    pub field_names: Vec<LookupBuf>,
+    pub field: Option<LookupBuf>,
     pub drop_field: bool,
-    pub types: HashMap<String, String>,
+    pub types: HashMap<LookupBuf, String>,
 }
 
 inventory::submit! {
@@ -31,13 +31,12 @@ impl TransformConfig for TokenizerConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
-            .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
+        let drop_field = self.drop_field && !self.field_names.iter().any(|f| *f == field);
 
         Ok(Box::new(Tokenizer::new(
             self.field_names.clone(),
@@ -61,24 +60,23 @@ impl TransformConfig for TokenizerConfig {
 }
 
 pub struct Tokenizer {
-    field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
-    field: String,
+    field_names: Vec<(LookupBuf, Conversion)>,
+    field: LookupBuf,
     drop_field: bool,
 }
 
 impl Tokenizer {
     pub fn new(
-        field_names: Vec<String>,
-        field: String,
+        field_names: Vec<LookupBuf>,
+        field: LookupBuf,
         drop_field: bool,
-        types: HashMap<String, Conversion>,
+        types: HashMap<LookupBuf, Conversion>,
     ) -> Self {
         let field_names = field_names
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
-                let path: Vec<PathComponent> = PathIter::new(&name).collect();
-                (name, path, conversion)
+                (name, conversion)
             })
             .collect();
 
@@ -95,23 +93,27 @@ impl Transform for Tokenizer {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            for ((name, path, conversion), value) in
-                self.field_names.iter().zip(parse(value).into_iter())
+            for ((name, conversion), value) in self.field_names.iter().zip(parse(value).into_iter())
             {
                 match conversion.convert(Value::from(value.to_owned())) {
                     Ok(value) => {
-                        event.as_mut_log().insert_path(path.clone(), value);
+                        event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        emit!(TokenizerConvertFailed { field: name, error });
+                        emit!(TokenizerConvertFailed {
+                            field: name.as_lookup(),
+                            error
+                        });
                     }
                 }
             }
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            emit!(TokenizerFieldMissing { field: &self.field });
+            emit!(TokenizerFieldMissing {
+                field: self.field.as_lookup()
+            });
         };
 
         emit!(TokenizerEventProcessed);
@@ -145,7 +147,6 @@ mod tests {
         let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<String>>();
         let field = field.map(|f| f.into());
         let mut parser = TokenizerConfig {
-            field_names,
             field,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),

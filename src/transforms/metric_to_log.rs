@@ -4,7 +4,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::{self, Event, LogEvent},
+    event::{self, Event, LogEvent, LookupBuf},
     internal_events::{MetricToLogEventProcessed, MetricToLogFailedSerialize},
     types::Conversion,
 };
@@ -15,7 +15,7 @@ use serde_json::Value;
 #[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
-    pub host_tag: Option<String>,
+    pub host_tag: Option<LookupBuf>,
 }
 
 inventory::submit! {
@@ -52,17 +52,17 @@ impl TransformConfig for MetricToLogConfig {
 }
 
 pub struct MetricToLog {
-    timestamp_key: String,
-    host_tag: String,
+    timestamp_key: LookupBuf,
+    host_tag: LookupBuf,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<String>) -> Self {
+    pub fn new(host_tag: Option<LookupBuf>) -> Self {
         Self {
             timestamp_key: "timestamp".into(),
             host_tag: format!(
                 "tags.{}",
-                host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
+                host_tag.unwrap_or_else(|| log_schema().host_key().into_buf())
             ),
         }
     }
@@ -81,16 +81,16 @@ impl Transform for MetricToLog {
                     let mut log = LogEvent::default();
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(LookupBuf::from(key), value);
                     }
 
                     let timestamp = log
-                        .remove(&self.timestamp_key)
+                        .remove(&self.timestamp_key, false)
                         .and_then(|value| Conversion::Timestamp.convert(value).ok())
                         .unwrap_or_else(|| event::Value::Timestamp(Utc::now()));
-                    log.insert(&log_schema().timestamp_key(), timestamp);
+                    log.insert(log_schema().timestamp_key().into_buf(), timestamp);
 
-                    if let Some(host) = log.remove_prune(&self.host_tag, true) {
+                    if let Some(host) = log.remove(&self.host_tag, true) {
                         log.insert(&log_schema().host_key(), host);
                     }
 

@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use crate::event::Lookup;
 
 #[derive(Debug)]
 pub struct ANSIStripperEventProcessed;
@@ -12,7 +13,7 @@ impl InternalEvent for ANSIStripperEventProcessed {
 
 #[derive(Debug)]
 pub struct ANSIStripperFieldMissing<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl InternalEvent for ANSIStripperFieldMissing<'_> {
@@ -31,7 +32,7 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
 
 #[derive(Debug)]
 pub struct ANSIStripperFieldInvalid<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl InternalEvent for ANSIStripperFieldInvalid<'_> {
@@ -50,7 +51,7 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
 
 #[derive(Debug)]
 pub struct ANSIStripperFailed<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
     pub error: std::io::Error,
 }
 

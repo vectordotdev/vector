@@ -91,7 +91,7 @@ impl Transform for Merge {
         let mut event = event.into_log();
 
         // Prepare an event's discriminant.
-        let discriminant = Discriminant::from_log_event(&event, &self.stream_discriminant_fields);
+        let discriminant = Discriminant::from_log_event(&event, self.stream_discriminant_fields.as_slice());
 
         // TODO: `lua` transform doesn't support assigning non-string values.
         // Normally we'd check for the field value to be `true`, and only then

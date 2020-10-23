@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{CoercerConversionFailed, CoercerEventProcessed},
     types::{parse_conversion_map, Conversion},
 };
@@ -13,7 +13,7 @@ use std::str;
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct CoercerConfig {
-    types: HashMap<String, String>,
+    types: HashMap<LookupBuf, String>,
     drop_unspecified: bool,
 }
 
@@ -48,7 +48,7 @@ impl TransformConfig for CoercerConfig {
 }
 
 pub struct Coercer {
-    types: HashMap<String, Conversion>,
+    types: HashMap<LookupBuf, Conversion>,
     drop_unspecified: bool,
 }
 

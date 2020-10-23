@@ -1,8 +1,5 @@
-use crate::{
-    event::Value,
-    mapping::parser::{Rule},
-};
-use pest::{iterators::Pair};
+use crate::{event::Value, mapping::parser::Rule};
+use pest::iterators::Pair;
 use std::{
     convert::TryFrom,
     ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
@@ -11,15 +8,15 @@ use std::{
 };
 use toml::Value as TomlValue;
 
+use super::{segmentbuf::SegmentBuf, Lookup};
+use crate::event::lookup::Segment;
 use core::fmt;
 use indexmap::map::IndexMap;
-use super::{Lookup, segmentbuf::SegmentBuf};
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 use std::str::FromStr;
-use crate::event::lookup::Segment;
 
 #[cfg(test)]
 mod test;
@@ -62,8 +59,10 @@ impl<'a> TryFrom<Pair<'a, Rule>> for LookupBuf {
 
     fn try_from(pair: Pair<'a, Rule>) -> Result<Self, Self::Error> {
         let retval = LookupBuf {
-            segments: Segment::from_lookup(pair)?.into_iter()
-                .map(Into::into).collect(),
+            segments: Segment::from_lookup(pair)?
+                .into_iter()
+                .map(Into::into)
+                .collect(),
         };
         retval.is_valid()?;
         Ok(retval)
@@ -74,14 +73,11 @@ impl<'a> TryFrom<Vec<SegmentBuf>> for LookupBuf {
     type Error = crate::Error;
 
     fn try_from(segments: Vec<SegmentBuf>) -> Result<Self, Self::Error> {
-        let retval = LookupBuf {
-            segments,
-        };
+        let retval = LookupBuf { segments };
         retval.is_valid()?;
         Ok(retval)
     }
 }
-
 
 impl Display for LookupBuf {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -150,7 +146,7 @@ impl LookupBuf {
                 "A TOML table must be passed to the `from_toml_table` function. Passed: {:?}",
                 value
             )
-                .into()),
+            .into()),
         }
     }
 
@@ -189,7 +185,7 @@ impl LookupBuf {
 
     /// Raise any errors that might stem from the lookup being invalid.
     #[instrument]
-    fn is_valid(&self) -> crate::Result<()> {
+    pub fn is_valid(&self) -> crate::Result<()> {
         if self.segments.is_empty() {
             return Err("Lookups must have at least 1 segment to be valid.".into());
         }
@@ -198,8 +194,13 @@ impl LookupBuf {
     }
 
     #[instrument]
-    fn as_lookup(&self) -> Lookup<'_> {
+    pub fn as_lookup(&self) -> Lookup<'_> {
         Lookup::from(self)
+    }
+
+    #[instrument]
+    pub fn from_str(value: &str) -> LookupBuf {
+        Lookup::from(value).into_buf()
     }
 }
 
@@ -288,8 +289,8 @@ impl IndexMut<usize> for LookupBuf {
 
 impl Serialize for LookupBuf {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(&*self.to_string())
     }
@@ -297,8 +298,8 @@ impl Serialize for LookupBuf {
 
 impl<'de> Deserialize<'de> for LookupBuf {
     fn deserialize<D>(deserializer: D) -> Result<LookupBuf, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_string(LookupVisitor)
     }
@@ -314,15 +315,15 @@ impl<'de> Visitor<'de> for LookupVisitor {
     }
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
+    where
+        E: de::Error,
     {
         LookupBuf::from_str(value).map_err(de::Error::custom)
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-        where
-            E: de::Error,
+    where
+        E: de::Error,
     {
         LookupBuf::from_str(&value).map_err(de::Error::custom)
     }
@@ -330,11 +331,27 @@ impl<'de> Visitor<'de> for LookupVisitor {
 
 impl<'a> From<Lookup<'a>> for LookupBuf {
     fn from(v: Lookup<'a>) -> Self {
-        let segments = v.segments.into_iter().map(|f| f.as_segment_buf()).collect::<Vec<_>>();
+        let segments = v
+            .segments
+            .into_iter()
+            .map(|f| f.as_segment_buf())
+            .collect::<Vec<_>>();
         let retval: Result<LookupBuf, crate::Error> = LookupBuf::try_from(segments);
         retval.expect(
             "A LookupBuf with 0 length was turned into a Lookup. Since a LookupBuf with 0 \
-                  length is an invariant, any action on it is too."
+                  length is an invariant, any action on it is too.",
         )
+    }
+}
+
+impl<'buf: 'view, 'view> AsRef<Lookup<'view>> for &'buf LookupBuf {
+    fn as_ref(&self) -> &Lookup<'view> {
+        &self.as_lookup()
+    }
+}
+
+impl<'buf: 'view, 'view> std::borrow::Borrow<Lookup<'view>> for &'buf LookupBuf {
+    fn borrow(&self) -> &Lookup<'view> {
+        self.as_lookup()
     }
 }

@@ -1,5 +1,5 @@
-use std::fmt::{Display, Formatter};
 use crate::event::lookup::Segment;
+use std::fmt::{Display, Formatter};
 
 /// `SegmentBuf`s are chunks of a `LookupBuf`.
 ///
@@ -28,7 +28,6 @@ impl SegmentBuf {
     pub fn is_index(&self) -> bool {
         matches!(self, SegmentBuf::Index(_))
     }
-
 
     #[instrument]
     pub(crate) fn as_segment(&self) -> Segment<'_> {

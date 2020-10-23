@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, PathComponent, PathIter},
+    event::{Event, LookupBuf},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
@@ -25,10 +25,10 @@ enum BuildError {
 #[derivative(Default)]
 pub struct GrokParserConfig {
     pub pattern: String,
-    pub field: Option<String>,
+    pub field: Option<LookupBuf>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
-    pub types: HashMap<String, String>,
+    pub types: HashMap<LookupBuf, String>,
 }
 
 inventory::submit! {
@@ -44,7 +44,7 @@ impl TransformConfig for GrokParserConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| log_schema().message_key().into());
+            .unwrap_or_else(|| log_schema().message_key().into_buf());
 
         let mut grok = grok::Grok::with_patterns();
 
@@ -79,10 +79,10 @@ impl TransformConfig for GrokParserConfig {
 
 pub struct GrokParser {
     pattern: Pattern,
-    field: String,
+    field: LookupBuf,
     drop_field: bool,
-    types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent>>,
+    types: HashMap<LookupBuf, Conversion>,
+    paths: HashMap<String, LookupBuf>,
 }
 
 impl Transform for GrokParser {
@@ -99,11 +99,9 @@ impl Transform for GrokParser {
                     match conv.convert(value.to_string().into()) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert_path(path.to_vec(), value.clone());
+                                event.insert(path, value.clone());
                             } else {
-                                let path = PathIter::new(name).collect::<Vec<_>>();
-                                self.paths.insert(name.to_string(), path.clone());
-                                event.insert_path(path, value);
+                                event.insert(LookupBuf::from(name), value);
                             }
                         }
                         Err(error) => emit!(GrokParserConversionFailed { name, error }),

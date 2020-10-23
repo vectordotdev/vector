@@ -9,7 +9,6 @@ use crate::{
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
-use chrono::Utc;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -155,49 +154,14 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
             .map(|j| {
                 let parsed_json = serde_json::from_slice(&j?)
                     .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))?;
-                json_parse_object(parsed_json)
+                serde_json::from_value(parsed_json)
             })
             .collect::<Result<_, _>>(),
         Encoding::Json => {
             let parsed_json = serde_json::from_slice(&body)
                 .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))?;
-            json_parse_array_of_object(parsed_json)
+            serde_json::from_value(parsed_json)
         }
-    }
-}
-
-fn json_parse_object(value: JsonValue) -> Result<Event, ErrorMessage> {
-    let mut event = Event::new_empty_log();
-    let log = event.as_mut_log();
-    log.insert(log_schema().timestamp_key(), Utc::now()); // Add timestamp
-    match value {
-        JsonValue::Object(map) => {
-            for (k, v) in map {
-                log.insert_flat(k, v);
-            }
-            Ok(event)
-        }
-        _ => Err(json_error(format!(
-            "Expected Object, got {}",
-            json_value_to_type_string(&value)
-        ))),
-    }
-}
-
-fn json_parse_array_of_object(value: JsonValue) -> Result<Vec<Event>, ErrorMessage> {
-    match value {
-        JsonValue::Array(v) => v
-            .into_iter()
-            .map(json_parse_object)
-            .collect::<Result<_, _>>(),
-        JsonValue::Object(map) => {
-            //treat like an array of one object
-            Ok(vec![json_parse_object(JsonValue::Object(map))?])
-        }
-        _ => Err(json_error(format!(
-            "Expected Array or Object, got {}.",
-            json_value_to_type_string(&value)
-        ))),
     }
 }
 

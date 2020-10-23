@@ -1,25 +1,23 @@
 #[cfg(test)]
 mod test;
 
-use crate::{
-    mapping::parser::{MappingParser, Rule},
-};
-use pest::{iterators::Pair};
+use super::{segmentbuf::SegmentBuf, LookupBuf};
+use crate::event::lookup::Segment;
+use crate::mapping::parser::{MappingParser, Rule};
+use core::fmt;
+use nom::lib::std::vec::IntoIter;
+use pest::iterators::Pair;
+use pest::Parser;
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt::{Display, Formatter};
+use std::ops::{Index, IndexMut};
 use std::{
     convert::TryFrom,
     ops::{RangeFrom, RangeFull, RangeTo, RangeToInclusive},
     slice::Iter,
     str,
 };
-use pest::Parser;
-use core::fmt;
-use super::{LookupBuf, segmentbuf::SegmentBuf};
-use serde::de::{self, Visitor};
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fmt::{Display, Formatter};
-use std::ops::{Index, IndexMut};
-use crate::event::lookup::Segment;
-use nom::lib::std::vec::IntoIter;
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///
@@ -106,7 +104,7 @@ impl<'a> Lookup<'a> {
 
     /// Raise any errors that might stem from the lookup being invalid.
     #[instrument]
-    fn is_valid(&self) -> crate::Result<()> {
+    pub fn is_valid(&self) -> crate::Result<()> {
         if self.segments.is_empty() {
             return Err("Lookups must have at least 1 segment to be valid.".into());
         }
@@ -116,10 +114,16 @@ impl<'a> Lookup<'a> {
 
     /// Parse the lookup from a str.
     #[instrument]
-    pub(crate) fn from_str(input: &'a str) -> Result<Self, crate::Error> {
+    pub fn from_str(input: &'a str) -> Result<Self, crate::Error> {
         let mut pairs = MappingParser::parse(Rule::lookup, input)?;
         let pair = pairs.next().ok_or("No tokens found.")?;
         Self::try_from(pair)
+    }
+
+    /// Become a `LookupBuf` (by allocating).
+    #[instrument]
+    pub fn into_buf(&self) -> LookupBuf {
+        LookupBuf::from(self.segments)
     }
 }
 
@@ -145,14 +149,11 @@ impl<'a> TryFrom<Vec<Segment<'a>>> for Lookup<'a> {
     type Error = crate::Error;
 
     fn try_from(segments: Vec<Segment<'a>>) -> Result<Self, Self::Error> {
-        let retval = Self {
-            segments,
-        };
+        let retval = Self { segments };
         retval.is_valid()?;
         Ok(retval)
     }
 }
-
 
 impl<'collection: 'item, 'item> TryFrom<&'collection [SegmentBuf]> for Lookup<'item> {
     type Error = crate::Error;
@@ -168,9 +169,10 @@ impl<'collection: 'item, 'item> TryFrom<&'collection [SegmentBuf]> for Lookup<'i
 
 impl<'a> From<&'a LookupBuf> for Lookup<'a> {
     fn from(lookup_buf: &'a LookupBuf) -> Self {
-        Self::try_from(lookup_buf.segments.as_slice())
-            .expect("It is an invariant to have a 0 segment LookupBuf, so it is also an \
-                     invariant to have a 0 segment Lookup.")
+        Self::try_from(lookup_buf.segments.as_slice()).expect(
+            "It is an invariant to have a 0 segment LookupBuf, so it is also an \
+                     invariant to have a 0 segment Lookup.",
+        )
     }
 }
 
@@ -222,8 +224,8 @@ impl<'a> IndexMut<usize> for Lookup<'a> {
 
 impl<'a> Serialize for Lookup<'a> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         serializer.serialize_str(&*self.to_string())
     }
@@ -231,10 +233,12 @@ impl<'a> Serialize for Lookup<'a> {
 
 impl<'de> Deserialize<'de> for Lookup<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Lookup<'de>, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
-        deserializer.deserialize_str(LookupVisitor { _marker: Default::default() })
+        deserializer.deserialize_str(LookupVisitor {
+            _marker: Default::default(),
+        })
     }
 }
 
@@ -251,9 +255,15 @@ impl<'de> Visitor<'de> for LookupVisitor<'de> {
     }
 
     fn visit_borrowed_str<E>(self, value: &'de str) -> Result<Self::Value, E>
-        where
-            E: de::Error,
+    where
+        E: de::Error,
     {
         Lookup::from_str(value).map_err(de::Error::custom)
+    }
+}
+
+impl<'a> AsRef<Lookup<'a>> for Lookup<'a> {
+    fn as_ref(&self) -> &Lookup<'a> {
+        &self
     }
 }

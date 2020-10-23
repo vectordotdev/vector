@@ -1,6 +1,6 @@
 use super::errors::{ParseRecords, RequestError};
 use super::models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse};
-use crate::{config::log_schema, event::Event, Pipeline};
+use crate::{config::log_schema, event::{Event, LookupBuf}, Pipeline};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::GzDecoder;
@@ -61,10 +61,10 @@ fn parse_records(
                 let mut event = Event::new_empty_log();
                 let log = event.as_mut_log();
 
-                log.insert(log_schema().message_key(), record);
-                log.insert(log_schema().timestamp_key(), request.timestamp);
-                log.insert("request_id", request_id.to_string());
-                log.insert("source_arn", source_arn.to_string());
+                log.insert(&log_schema().message_key().into_buf(), record);
+                log.insert(&log_schema().timestamp_key().into_buf(), request.timestamp);
+                log.insert(LookupBuf::from("request_id"), request_id.to_string());
+                log.insert(LookupBuf::from("source_arn"), source_arn.to_string());
 
                 event
             })

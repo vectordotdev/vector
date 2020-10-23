@@ -161,7 +161,7 @@ impl HttpSink for AzureMonitorLogsSink {
         let mut log = event.into_log();
         let timestamp_key = log_schema().timestamp_key();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key) {
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key, false) {
             ts
         } else {
             chrono::Utc::now()

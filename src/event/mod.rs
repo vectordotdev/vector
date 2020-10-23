@@ -15,7 +15,7 @@ mod lookup;
 mod value;
 
 pub use log_event::LogEvent;
-pub use lookup::{LookupBuf, Lookup};
+pub use lookup::{Lookup, LookupBuf};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;

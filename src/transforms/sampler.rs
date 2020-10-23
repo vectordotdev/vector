@@ -4,7 +4,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::Event,
+    event::{Event, Lookup, LookupBuf},
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
 use regex::RegexSet; // TODO: use regex::bytes
@@ -15,7 +15,7 @@ use snafu::ResultExt;
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     pub rate: u64,
-    pub key_field: Option<String>,
+    pub key_field: Option<LookupBuf>,
     #[serde(default)]
     pub pass_list: Vec<String>,
 }
@@ -61,13 +61,13 @@ impl TransformConfig for SamplerConfig {
 
 pub struct Sampler {
     rate: u64,
-    key_field: String,
+    key_field: LookupBuf,
     pass_list: RegexSet,
 }
 
 impl Sampler {
-    pub fn new(rate: u64, key_field: Option<String>, pass_list: RegexSet) -> Self {
-        let key_field = key_field.unwrap_or_else(|| log_schema().message_key().to_string());
+    pub fn new(rate: u64, key_field: Option<LookupBuf>, pass_list: RegexSet) -> Self {
+        let key_field = key_field.unwrap_or_else(|| log_schema().message_key().into_buf());
         Self {
             rate,
             key_field,
@@ -93,7 +93,7 @@ impl Transform for Sampler {
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
             event
                 .as_mut_log()
-                .insert("sample_rate", self.rate.to_string());
+                .insert(Lookup::from("sample_rate"), self.rate.to_string());
 
             Some(event)
         } else {

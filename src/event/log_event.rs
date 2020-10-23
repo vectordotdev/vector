@@ -1,12 +1,15 @@
-use crate::event::{lookup::SegmentBuf, util, LookupBuf, Lookup, PathComponent, Value};
+use crate::event::{
+    lookup::{Segment, SegmentBuf},
+    util, Lookup, LookupBuf, Value,
+};
 use serde::{Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
-    fmt::{Debug, Display},
+    fmt::Debug,
     iter::FromIterator,
+    borrow::Borrow,
 };
-use crate::event::lookup::Segment;
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
@@ -14,10 +17,9 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
-        let lookup = Lookup::from(key.as_ref());
-
+    #[instrument(skip(self))]
+    pub fn get<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&Value> {
+        let lookup = lookup.into();
         let mut lookup_iter = lookup.iter();
         // The first step should always be a field.
         let first_step = lookup_iter.next()?;
@@ -29,10 +31,12 @@ impl LogEvent {
             Segment::Field(f) => self.fields.get(*f),
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
-                error!("Lookups into LogEvents should never start with indexes.\
-                        Please report your config.");
-                return None
-            },
+                error!(
+                    "Lookups into LogEvents should never start with indexes.\
+                        Please report your config."
+                );
+                return None;
+            }
         };
 
         for segment in lookup_iter {
@@ -57,21 +61,15 @@ impl LogEvent {
                     None
                 }
             }
-        };
+        }
 
         // By the time we get here we either have the item, or nothing. Either case, we're correct.
         cursor
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
-        self.fields.get(key.as_ref())
-    }
-
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
-        let lookup = Lookup::from(key.as_ref());
-
+    #[instrument(skip(self))]
+    pub fn get_mut<'a>(&mut self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&mut Value> {
+        let lookup = Lookup::from(lookup);
         let mut lookup_iter = lookup.iter();
         // The first step should always be a field.
         let first_step = lookup_iter.next()?;
@@ -83,10 +81,12 @@ impl LogEvent {
             Segment::Field(f) => self.fields.get_mut(*f),
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
-                error!("Lookups into LogEvents should never start with indexes.\
-                        Please report your config..");
-                return None
-            },
+                error!(
+                    "Lookups into LogEvents should never start with indexes.\
+                        Please report your config.."
+                );
+                return None;
+            }
         };
 
         for segment in lookup_iter {
@@ -111,59 +111,29 @@ impl LogEvent {
                     None
                 }
             }
-        };
+        }
 
         // By the time we get here we either have the item, or nothing. Either case, we're correct.
         cursor
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn contains(&self, key: impl AsRef<str>) -> bool {
-        self.get(key).is_some()
+    #[instrument(skip(self))]
+    pub fn contains<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> bool {
+        self.get(lookup).is_some()
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(skip(self))]
     pub fn insert(
         &mut self,
-        key: impl AsRef<str>,
+        lookup: LookupBuf,
         value: impl Into<Value> + Debug,
     ) -> Option<Value> {
-        util::log::insert(&mut self.fields, key.as_ref(), value.into())
+        unimplemented!();
     }
 
-    #[instrument(skip(self, key), fields(key = ?key))]
-    pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
-    where
-        V: Into<Value> + Debug,
-    {
-        util::log::insert_path(&mut self.fields, key, value.into())
-    }
-
-    #[instrument(skip(self, key), fields(key = %key))]
-    pub fn insert_flat<K, V>(&mut self, key: K, value: V)
-    where
-        K: Into<String> + Display,
-        V: Into<Value> + Debug,
-    {
-        self.fields.insert(key.into(), value.into());
-    }
-
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
-        let key = key.as_ref();
-        if !self.contains(key) {
-            self.insert(key, value);
-        }
-    }
-
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
-        util::log::remove(&mut self.fields, key.as_ref(), false)
-    }
-
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
-    pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
-        util::log::remove(&mut self.fields, key.as_ref(), prune)
+    #[instrument(skip(self))]
+    pub fn remove<'a>(&mut self, lookup: impl Borrow<Lookup<'a>> + Debug, prune: bool) -> Option<Value> {
+        unimplemented!();
     }
 
     #[instrument(skip(self))]
@@ -275,14 +245,26 @@ impl TryInto<serde_json::Value> for LogEvent {
     }
 }
 
-impl<T> std::ops::Index<T> for LogEvent
+impl<'a, T> std::ops::Index<T> for LogEvent
 where
-    T: AsRef<str>,
+    T: Borrow<Lookup<'a>>,
 {
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
         self.get(key.as_ref())
+            .expect(&*format!("Key is not found: {:?}", key.as_ref()))
+    }
+}
+
+impl<'a, T> std::ops::IndexMut<T> for LogEvent
+where
+    T: Borrow<Lookup<'a>>,
+{
+    type Output = Value;
+
+    fn index_mut(&self, key: T) -> &mut Value {
+        self.get_mut(key.as_ref())
             .expect(&*format!("Key is not found: {:?}", key.as_ref()))
     }
 }

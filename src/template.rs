@@ -1,4 +1,4 @@
-use crate::{config::log_schema, event::Value, Event};
+use crate::{config::log_schema, event::{Value, Lookup}, Event};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},
@@ -115,7 +115,7 @@ impl Template {
             RE.captures_iter(&self.src)
                 .map(|c| {
                     c.get(1)
-                        .map(|s| s.as_str().trim().to_string())
+                        .map(|s| Lookup::from(s.as_str().trim().to_string()))
                         .expect("src should match regex")
                 })
                 .collect::<Vec<_>>()

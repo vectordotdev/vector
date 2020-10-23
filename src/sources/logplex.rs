@@ -172,7 +172,7 @@ fn line_to_event(line: String) -> Event {
     // Add source type
     event
         .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("logplex"));
+        .insert(log_schema().source_type_key(), Bytes::from("logplex"));
 
     event
 }

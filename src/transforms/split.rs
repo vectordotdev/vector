@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -12,11 +12,11 @@ use std::str;
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct SplitConfig {
-    pub field_names: Vec<String>,
+    pub field_names: Vec<LookupBuf>,
     pub separator: Option<String>,
-    pub field: Option<String>,
+    pub field: Option<LookupBuf>,
     pub drop_field: bool,
-    pub types: HashMap<String, String>,
+    pub types: HashMap<LookupBuf, String>,
 }
 
 inventory::submit! {
@@ -32,7 +32,7 @@ impl TransformConfig for SplitConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
             .map_err(|err| format!("{}", err))?;
@@ -63,19 +63,19 @@ impl TransformConfig for SplitConfig {
 }
 
 pub struct Split {
-    field_names: Vec<(String, Conversion)>,
+    field_names: Vec<(LookupBuf, Conversion)>,
     separator: Option<String>,
-    field: String,
+    field: LookupBuf,
     drop_field: bool,
 }
 
 impl Split {
     pub fn new(
-        field_names: Vec<String>,
+        field_names: Vec<LookupBuf>,
         separator: Option<String>,
-        field: String,
+        field: LookupBuf,
         drop_field: bool,
-        types: HashMap<String, Conversion>,
+        types: HashMap<LookupBuf, Conversion>,
     ) -> Self {
         let field_names = field_names
             .into_iter()
@@ -114,10 +114,10 @@ impl Transform for Split {
                 }
             }
             if self.drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            emit!(SplitFieldMissing { field: &self.field });
+            emit!(SplitFieldMissing { field: self.field.as_lookup() });
         };
 
         emit!(SplitEventProcessed);

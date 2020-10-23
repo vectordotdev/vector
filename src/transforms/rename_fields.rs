@@ -74,21 +74,15 @@ impl Transform for RenameFields {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
-            let old_key_string = old_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
-            let new_key_string = new_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let log = event.as_mut_log();
-            match log.remove_prune(&old_key_string, self.drop_empty) {
+            match log.remove(&old_key, self.drop_empty) {
                 Some(v) => {
-                    if event.as_mut_log().insert(&new_key_string, v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten {
-                            field: &old_key_string
-                        });
+                    if event.as_mut_log().insert(new_key.clone(), v).is_some() {
+                        emit!(RenameFieldsFieldOverwritten { field: old_key.as_lookup() });
                     }
                 }
                 None => {
-                    emit!(RenameFieldsFieldDoesNotExist {
-                        field: &old_key_string
-                    });
+                    emit!(RenameFieldsFieldDoesNotExist { field: old_key.as_lookup() });
                 }
             }
         }

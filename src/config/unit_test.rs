@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     conditions::{Condition, ConditionConfig},
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf},
     transforms::Transform,
 };
 use indexmap::IndexMap;
@@ -299,7 +299,7 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
                         TestInputValue::Integer(i) => Value::from(*i),
                         TestInputValue::Float(f) => Value::from(*f),
                     };
-                    event.as_mut_log().insert(path.to_owned(), value);
+                    event.as_mut_log().insert(LookupBuf::from_str(path), value);
                 }
                 Ok((target, event))
             } else {

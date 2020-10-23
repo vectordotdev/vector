@@ -142,7 +142,7 @@ impl HttpSink for LokiConfig {
             if self.remove_label_fields {
                 if let Some(fields) = template.get_fields() {
                     for field in fields {
-                        event.as_mut_log().remove(&field);
+                        event.as_mut_log().remove(&field, false);
                     }
                 }
             }
@@ -154,7 +154,7 @@ impl HttpSink for LokiConfig {
         };
 
         if self.remove_timestamp {
-            event.as_mut_log().remove(log_schema().timestamp_key());
+            event.as_mut_log().remove(log_schema().timestamp_key(), false);
         }
 
         self.encoding.apply_rules(&mut event);

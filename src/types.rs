@@ -1,4 +1,4 @@
-use crate::event::Value;
+use crate::event::{LookupBuf, Value};
 use chrono::{DateTime, Local, ParseError as ChronoParseError, TimeZone, Utc};
 use lazy_static::lazy_static;
 use snafu::{ResultExt, Snafu};
@@ -70,16 +70,16 @@ impl FromStr for Conversion {
 
 /// Helper function to parse a conversion map and check against a list of names
 pub fn parse_check_conversion_map(
-    types: &HashMap<String, String>,
-    names: &[impl AsRef<str>],
-) -> Result<HashMap<String, Conversion>, ConversionError> {
+    types: &HashMap<LookupBuf, String>,
+    names: &[LookupBuf],
+) -> Result<HashMap<LookupBuf, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
     let names = names.iter().map(|s| s.as_ref()).collect::<HashSet<_>>();
     for name in types.keys() {
-        if !names.contains(name.as_str()) {
+        if !names.contains(&name.as_lookup()) {
             warn!(
                 message = "Field was specified in the types but is not a valid field name.",
-                field = &name[..]
+                field = %name
             );
         }
     }
@@ -89,8 +89,8 @@ pub fn parse_check_conversion_map(
 
 /// Helper function to parse a mapping of conversion descriptions into actual Conversion values.
 pub fn parse_conversion_map(
-    types: &HashMap<String, String>,
-) -> Result<HashMap<String, Conversion>, ConversionError> {
+    types: &HashMap<LookupBuf, String>,
+) -> Result<HashMap<LookupBuf, Conversion>, ConversionError> {
     types
         .iter()
         .map(|(field, typename)| {

@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Value,
+    event::{LookupBuf, Value},
     internal_events::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
         ANSIStripperFieldMissing,
@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AnsiStripperConfig {
-    field: Option<String>,
+    field: Option<LookupBuf>,
 }
 
 inventory::submit! {
@@ -33,7 +33,7 @@ impl TransformConfig for AnsiStripperConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
 
         Ok(Box::new(AnsiStripper { field }))
     }
@@ -52,7 +52,7 @@ impl TransformConfig for AnsiStripperConfig {
 }
 
 pub struct AnsiStripper {
-    field: String,
+    field: LookupBuf,
 }
 
 impl Transform for AnsiStripper {
@@ -60,12 +60,12 @@ impl Transform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(ANSIStripperFieldMissing { field: &self.field }),
+            None => emit!(ANSIStripperFieldMissing { field: self.field.as_lookup() }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
                     Err(error) => emit!(ANSIStripperFailed {
-                        field: &self.field,
+                        field: self.field.as_lookup(),
                         error
                     }),
                 };

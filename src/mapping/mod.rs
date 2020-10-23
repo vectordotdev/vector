@@ -474,7 +474,7 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("timestamp", false);
                     event
                 },
                 {
@@ -483,7 +483,7 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("timestamp", false);
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(
@@ -505,8 +505,8 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove("timestamp");
-                    event.as_mut_log().remove("message");
+                    event.as_mut_log().remove("timestamp", false);
+                    event.as_mut_log().remove("message", false);
                     event
                 },
                 {
@@ -517,8 +517,8 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove("timestamp");
-                    event.as_mut_log().remove("message");
+                    event.as_mut_log().remove("timestamp", false);
+                    event.as_mut_log().remove("message", false);
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(
@@ -549,8 +549,8 @@ mod tests {
                                }
                         }),
                     );
-                    event.as_mut_log().remove("timestamp");
-                    event.as_mut_log().remove("message");
+                    event.as_mut_log().remove("timestamp", false);
+                    event.as_mut_log().remove("message", false);
                     event
                 },
                 {
@@ -574,8 +574,8 @@ mod tests {
                               }
                         }),
                     );
-                    event.as_mut_log().remove("timestamp");
-                    event.as_mut_log().remove("message");
+                    event.as_mut_log().remove("timestamp", false);
+                    event.as_mut_log().remove("message", false);
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(
@@ -606,8 +606,8 @@ mod tests {
                                }
                         }),
                     );
-                    event.as_mut_log().remove("timestamp");
-                    event.as_mut_log().remove("message");
+                    event.as_mut_log().remove("timestamp", false);
+                    event.as_mut_log().remove("message", false);
                     event
                 },
                 {
@@ -632,8 +632,8 @@ mod tests {
                               }
                         }),
                     );
-                    event.as_mut_log().remove("timestamp");
-                    event.as_mut_log().remove("message");
+                    event.as_mut_log().remove("timestamp", false);
+                    event.as_mut_log().remove("message", false);
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(

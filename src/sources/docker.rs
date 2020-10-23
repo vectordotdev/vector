@@ -2,7 +2,7 @@ use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     event::merge_state::LogEventMergeState,
-    event::{self, Event, LogEvent, Value},
+    event::{self, Event, LogEvent, LookupBuf, Value},
     internal_events::{
         DockerCommunicationError, DockerContainerEventReceived, DockerContainerMetadataFetchFailed,
         DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
@@ -33,17 +33,16 @@ use std::{collections::HashMap, convert::TryFrom, env};
 
 use tokio::sync::mpsc;
 
-/// The beginning of image names of vector docker images packaged by vector.
-const VECTOR_IMAGE_NAME: &str = "timberio/vector";
-const IMAGE: &str = "image";
-const CREATED_AT: &str = "container_created_at";
-const NAME: &str = "container_name";
-const STREAM: &str = "stream";
-const CONTAINER: &str = "container_id";
-
+// The beginning of image names of vector docker images packaged by vector.
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
+    static ref VECTOR_IMAGE_NAME: LookupBuf = LookupBuf::from("timberio/vector");
+    static ref IMAGE: LookupBuf = LookupBuf::from("image");
+    static ref CREATED_AT: LookupBuf = LookupBuf::from("container_created_at");
+    static ref NAME: LookupBuf = LookupBuf::from("container_name");
+    static ref STREAM: LookupBuf = LookupBuf::from("stream");
+    static ref CONTAINER: LookupBuf = LookupBuf::from("container_id");
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -815,13 +814,13 @@ impl ContainerLogInfo {
             let mut log_event = LogEvent::default();
 
             // Source type
-            log_event.insert(log_schema().source_type_key(), Bytes::from("docker"));
+            log_event.insert(log_schema().source_type_key().into_buf(), Bytes::from("docker"));
 
             // The log message.
-            log_event.insert(log_schema().message_key(), bytes_message);
+            log_event.insert(log_schema().message_key().into_buf(), bytes_message);
 
             // Stream we got the message from.
-            log_event.insert(STREAM, stream);
+            log_event.insert(STREAM.into_buf(), stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
@@ -964,7 +963,7 @@ fn line_agg_adapter(
         let mut log_event = event.into_log();
 
         let message_value = log_event
-            .remove(log_schema().message_key())
+            .remove(log_schema().message_key(), false)
             .expect("message must exist in the event");
         let stream_value = log_event
             .get(&*STREAM)
@@ -976,7 +975,7 @@ fn line_agg_adapter(
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(|(_, message, mut log_event)| {
-        log_event.insert(log_schema().message_key(), message);
+        log_event.insert(log_schema().message_key().into_buf(), message);
         Event::Log(log_event)
     })
 }

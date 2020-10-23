@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, LogEvent, Value},
+    event::{Event, LogEvent, LookupBuf, Value},
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
         SplunkSourceTypeMissingKeys,
@@ -37,10 +37,10 @@ pub struct HecSinkConfig {
     #[serde(alias = "host")]
     pub endpoint: String,
     #[serde(default = "default_host_key")]
-    pub host_key: String,
+    pub host_key: LookupBuf,
     #[serde(default)]
-    pub indexed_fields: Vec<String>,
-    pub index: Option<String>,
+    pub indexed_fields: Vec<LookupBuf>,
+    pub index: Option<LookupBuf>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
     #[serde(
@@ -158,9 +158,9 @@ impl HttpSink for HecSinkConfig {
 
         let mut event = event.into_log();
 
-        let host = event.get(self.host_key.to_owned()).cloned();
+        let host = event.get(&self.host_key).cloned();
 
-        let timestamp = match event.remove(log_schema().timestamp_key()) {
+        let timestamp = match event.remove(log_schema().timestamp_key(), false) {
             Some(Value::Timestamp(ts)) => ts,
             _ => chrono::Utc::now(),
         };
@@ -169,7 +169,7 @@ impl HttpSink for HecSinkConfig {
         let fields = self
             .indexed_fields
             .iter()
-            .filter_map(|field| event.get(field).map(|value| (field, value.clone())))
+            .filter_map(|field| event.get(field).map(|value| (field.as_lookup(), value.clone())))
             .collect::<LogEvent>();
 
         let mut event = Event::Log(event);

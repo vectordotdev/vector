@@ -1,9 +1,8 @@
 use super::Transform;
-use crate::event::LookupBuf;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    event::{Event, LookupBuf},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
-    Event,
 };
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
@@ -58,7 +57,7 @@ impl TransformConfig for RemoveFieldsConfig {
 }
 
 impl RemoveFields {
-    pub fn new(fields: Vec<String>, drop_empty: bool) -> crate::Result<Self> {
+    pub fn new(fields: Vec<LookupBuf>, drop_empty: bool) -> crate::Result<Self> {
         let mut lookups = Vec::with_capacity(fields.len());
         for field in fields {
             let string = field.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
@@ -77,11 +76,10 @@ impl Transform for RemoveFields {
 
         let log = event.as_mut_log();
         for field in &self.fields {
-            let field_string = field.to_string();
-            let old_val = log.remove_prune(&field_string, self.drop_empty);
+            let old_val = log.remove(&field, self.drop_empty);
             if old_val.is_none() {
                 emit!(RemoveFieldsFieldMissing {
-                    field: &field_string
+                    field: field.as_lookup()
                 });
             }
         }

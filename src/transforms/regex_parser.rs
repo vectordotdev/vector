@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
         RegexParserMissingField, RegexParserTargetExists,
@@ -24,14 +24,14 @@ pub struct RegexParserConfig {
     /// TODO: Remove at a future point in time.
     pub regex: Option<String>,
     pub patterns: Vec<String>,
-    pub field: Option<String>,
+    pub field: Option<LookupBuf>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub drop_failed: bool,
-    pub target_field: Option<String>,
+    pub target_field: Option<LookupBuf>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
-    pub types: HashMap<String, String>,
+    pub types: HashMap<LookupBuf, String>,
 }
 
 inventory::submit! {
@@ -63,16 +63,16 @@ impl TransformConfig for RegexParserConfig {
 pub struct RegexParser {
     regexset: RegexSet,
     patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
-    field: String,
+    field: LookupBuf,
     drop_field: bool,
     drop_failed: bool,
-    target_field: Option<String>,
+    target_field: Option<LookupBuf>,
     overwrite_target: bool,
 }
 
 struct CompiledRegex {
     regex: Regex,
-    capture_names: Vec<(usize, String, Conversion)>,
+    capture_names: Vec<(usize, LookupBuf, Conversion)>,
     capture_locs: CaptureLocations,
 }
 
@@ -104,7 +104,7 @@ impl CompiledRegex {
     fn captures<'a>(
         &'a mut self,
         value: &'a [u8],
-    ) -> Option<impl Iterator<Item = (String, Value)> + 'a> {
+    ) -> Option<impl Iterator<Item = (LookupBuf, Value)> + 'a> {
         match self.regex.captures_read(&mut self.capture_locs, value) {
             Some(_) => {
                 let capture_locs = &self.capture_locs;
@@ -119,7 +119,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(RegexParserConversionFailed { name, error });
+                                        emit!(RegexParserConversionFailed { name: name.as_lookup(), error });
                                         None
                                     }
                                 }
@@ -200,12 +200,12 @@ impl RegexParser {
     pub fn new(
         regexset: RegexSet,
         patterns: Vec<Regex>,
-        field: String,
+        field: LookupBuf,
         mut drop_field: bool,
         drop_failed: bool,
-        target_field: Option<String>,
+        target_field: Option<LookupBuf>,
         overwrite_target: bool,
-        types: HashMap<String, Conversion>,
+        types: HashMap<LookupBuf, Conversion>,
     ) -> Self {
         // Build a buffer of the regex capture locations and names to avoid
         // repeated allocations.
@@ -250,8 +250,6 @@ impl Transform for RegexParser {
                 }
             };
 
-            let target_field = self.target_field.as_ref();
-
             let pattern = self
                 .patterns
                 .get_mut(id)
@@ -259,10 +257,12 @@ impl Transform for RegexParser {
 
             if let Some(captures) = pattern.captures(&value) {
                 // Handle optional overwriting of the target field
-                if let Some(target_field) = target_field {
+                if let Some(target_field) = self.target_field {
+                    // We can reuse this since we borrow it.
+                    let target_field = target_field.as_lookup();
                     if log.contains(target_field) {
                         if self.overwrite_target {
-                            log.remove(target_field);
+                            log.remove(target_field, false);
                         } else {
                             emit!(RegexParserTargetExists { target_field });
                             return Some(event);
@@ -271,18 +271,18 @@ impl Transform for RegexParser {
                 }
 
                 log.extend(captures.map(|(name, value)| {
-                    let name = target_field
+                    let name = self.target_field
                         .map(|target| format!("{}.{}", target, name))
                         .unwrap_or_else(|| name.clone());
                     (name, value)
                 }));
                 if self.drop_field {
-                    log.remove(&self.field);
+                    log.remove(&self.field, false);
                 }
                 return Some(event);
             }
         } else {
-            emit!(RegexParserMissingField { field: &self.field });
+            emit!(RegexParserMissingField { field: self.field.as_lookup() });
         }
 
         if self.drop_failed {

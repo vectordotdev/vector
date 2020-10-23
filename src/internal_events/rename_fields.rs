@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::event::Lookup;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -12,7 +13,7 @@ impl InternalEvent for RenameFieldsEventProcessed {
 
 #[derive(Debug)]
 pub struct RenameFieldsFieldOverwritten<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for RenameFieldsFieldOverwritten<'a> {
@@ -23,7 +24,7 @@ impl<'a> InternalEvent for RenameFieldsFieldOverwritten<'a> {
 
 #[derive(Debug)]
 pub struct RenameFieldsFieldDoesNotExist<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for RenameFieldsFieldDoesNotExist<'a> {

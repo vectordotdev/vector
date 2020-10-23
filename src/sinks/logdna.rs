@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
@@ -111,6 +111,15 @@ impl SinkConfig for LogdnaConfig {
     }
 }
 
+lazy_static::lazy_static! {
+    static ref line_lookup: LookupBuf = LookupBuf::from("line");
+    static ref timestamp_lookup: LookupBuf = LookupBuf::from("timestamp");
+    static ref env_lookup: LookupBuf = LookupBuf::from("env");
+    static ref app_lookup: LookupBuf = LookupBuf::from("app");
+    static ref file_lookup: LookupBuf = LookupBuf::from("file");
+    static ref meta_lookup: LookupBuf = LookupBuf::from("meta");
+}
+
 #[async_trait::async_trait]
 impl HttpSink for LogdnaConfig {
     type Input = serde_json::Value;
@@ -121,46 +130,46 @@ impl HttpSink for LogdnaConfig {
         let mut log = event.into_log();
 
         let line = log
-            .remove(crate::config::log_schema().message_key())
+            .remove(crate::config::log_schema().message_key(), false)
             .unwrap_or_else(|| String::from("").into());
         let timestamp = log
-            .remove(crate::config::log_schema().timestamp_key())
+            .remove(crate::config::log_schema().timestamp_key(), false)
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
 
-        map.insert("line".to_string(), json!(line));
-        map.insert("timestamp".to_string(), json!(timestamp));
+        map.insert(line_lookup.clone(), json!(line));
+        map.insert(timestamp_lookup, json!(timestamp));
 
-        if let Some(env) = log.remove("env") {
-            map.insert("env".to_string(), json!(env));
+        if let Some(env) = log.remove(&env_lookup, false) {
+            map.insert(env_lookup.clone(), json!(env));
         }
 
-        if let Some(app) = log.remove("app") {
-            map.insert("app".to_string(), json!(app));
+        if let Some(app) = log.remove(&app_lookup, false) {
+            map.insert(app_lookup.clone(), json!(app));
         }
 
-        if let Some(file) = log.remove("file") {
+        if let Some(file) = log.remove(file_lookup, false) {
             map.insert("file".to_string(), json!(file));
         }
 
         if !map.contains_key("env") {
             map.insert(
-                "env".to_string(),
+                env_lookup.clone(),
                 json!(self.default_env.as_deref().unwrap_or("production")),
             );
         }
 
-        if !map.contains_key("app") && !map.contains_key("file") {
+        if !map.contains_key(app_lookup) && !map.contains_key(file_lookup) {
             if let Some(default_app) = &self.default_app {
-                map.insert("app".to_string(), json!(default_app.as_str()));
+                map.insert(app_lookup.clone(), json!(default_app.as_str()));
             } else {
-                map.insert("app".to_string(), json!("vector"));
+                map.insert(app_lookup.clone(), json!("vector"));
             }
         }
 
         if !log.is_empty() {
-            map.insert("meta".into(), json!(&log));
+            map.insert(meta_lookup.clone(), json!(&log));
         }
 
         Some(map.into())

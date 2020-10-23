@@ -770,7 +770,7 @@ mod integration_tests {
             let mut doit = false;
             sink.run(events.map(move |mut event| {
                 if doit {
-                    event.as_mut_log().insert("_type", 1);
+                    event.as_mut_log().insert(LookupBuf::from("_type"), 1);
                 }
                 doit = true;
                 event

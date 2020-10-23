@@ -420,7 +420,7 @@ fn encode_log(
     mut log: LogEvent,
     encoding: &EncodingConfig<Encoding>,
 ) -> Result<InputLogEvent, CloudwatchLogsError> {
-    let timestamp = match log.remove(log_schema().timestamp_key()) {
+    let timestamp = match log.remove(log_schema().timestamp_key(), false) {
         Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
         _ => Utc::now().timestamp_millis(),
     };

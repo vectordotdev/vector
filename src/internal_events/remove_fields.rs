@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use crate::event::Lookup;
 
 #[derive(Debug)]
 pub struct RemoveFieldsEventProcessed;
@@ -12,7 +13,7 @@ impl InternalEvent for RemoveFieldsEventProcessed {
 
 #[derive(Debug)]
 pub struct RemoveFieldsFieldMissing<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for RemoveFieldsFieldMissing<'a> {

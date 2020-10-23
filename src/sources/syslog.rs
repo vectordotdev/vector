@@ -476,20 +476,20 @@ mod test {
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert(log_schema().source_type_key(), "syslog");
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
+            expected.insert(LookupBuf::from("host"), "74794bfb6795");
+            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
 
-            expected.insert("meta.sequenceId", "1");
-            expected.insert("meta.sysUpTime", "37");
-            expected.insert("meta.language", "EN");
-            expected.insert("origin.software", "test");
-            expected.insert("origin.ip", "192.168.0.1");
+            expected.insert(LookupBuf::from("meta.sequenceId"), "1");
+            expected.insert(LookupBuf::from("meta.sysUpTime"), "37");
+            expected.insert(LookupBuf::from("meta.language"), "EN");
+            expected.insert(LookupBuf::from("origin.software"), "test");
+            expected.insert(LookupBuf::from("origin.ip"), "192.168.0.1");
 
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("version", 1);
-            expected.insert("appname", "root");
-            expected.insert("procid", 8449);
+            expected.insert(LookupBuf::from("severity"), "notice");
+            expected.insert(LookupBuf::from("facility"), "user");
+            expected.insert(LookupBuf::from("version"), 1);
+            expected.insert(LookupBuf::from("appname"), "root");
+            expected.insert(LookupBuf::from("procid"), 8449);
         }
 
         assert_eq!(
@@ -510,17 +510,17 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                log_schema().timestamp_key().into_buf(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(log_schema().host_key(), "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert(log_schema().source_type_key(), "syslog");
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("version", 1);
-            expected.insert("appname", "root");
-            expected.insert("procid", 8449);
+            expected.insert(log_schema().host_key().into_buf(), "74794bfb6795");
+            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
+            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(LookupBuf::from("severity"), "notice");
+            expected.insert(LookupBuf::from("facility"), "user");
+            expected.insert(LookupBuf::from("version"), 1);
+            expected.insert(LookupBuf::from("appname"), "root");
+            expected.insert(LookupBuf::from("procid"), 8449);
         }
 
         let event = event_from_str(&"host".to_string(), None, &raw);
@@ -602,14 +602,14 @@ mod test {
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
                 chrono::Local.ymd(2020, 2, 13).and_hms(20, 7, 26).into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
-            expected.insert(log_schema().host_key(), "74794bfb6795");
-            expected.insert(log_schema().source_type_key(), "syslog");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "notice");
-            expected.insert("facility", "user");
-            expected.insert("appname", "root");
-            expected.insert("procid", 8539);
+            expected.insert(log_schema().timestamp_key().into_buf(), expected_date);
+            expected.insert(log_schema().host_key().into_buf(), "74794bfb6795");
+            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
+            expected.insert(LookupBuf::from("severity"), "notice");
+            expected.insert(LookupBuf::from("facility"), "user");
+            expected.insert(LookupBuf::from("appname"), "root");
+            expected.insert(LookupBuf::from("procid"), 8539);
         }
 
         assert_eq!(
@@ -631,17 +631,17 @@ mod test {
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
                 chrono::Local.ymd(2020, 2, 13).and_hms(21, 31, 56).into();
-            expected.insert(log_schema().timestamp_key(), expected_date);
-            expected.insert(log_schema().source_type_key(), "syslog");
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "info");
-            expected.insert("facility", "local7");
-            expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "8979");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(log_schema().timestamp_key().into_buf(), expected_date);
+            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(LookupBuf::from("host"), "74794bfb6795");
+            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
+            expected.insert(LookupBuf::from("severity"), "info");
+            expected.insert(LookupBuf::from("facility"), "local7");
+            expected.insert(LookupBuf::from("appname"), "liblogging-stdlog");
+            expected.insert(LookupBuf::from("origin.software"), "rsyslogd");
+            expected.insert(LookupBuf::from("origin.swVersion"), "8.24.0");
+            expected.insert(LookupBuf::from("origin.x-pid"), "8979");
+            expected.insert(LookupBuf::from("origin.x-info"), "http://www.rsyslog.com");
         }
 
         assert_eq!(
@@ -667,16 +667,16 @@ mod test {
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
-            expected.insert("host", "74794bfb6795");
-            expected.insert("hostname", "74794bfb6795");
-            expected.insert("severity", "info");
-            expected.insert("facility", "local7");
-            expected.insert("appname", "liblogging-stdlog");
-            expected.insert("origin.software", "rsyslogd");
-            expected.insert("origin.swVersion", "8.24.0");
-            expected.insert("origin.x-pid", "9043");
-            expected.insert("origin.x-info", "http://www.rsyslog.com");
+            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(LookupBuf::from("host"), "74794bfb6795");
+            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
+            expected.insert(LookupBuf::from("severity"), "info");
+            expected.insert(LookupBuf::from("facility"), "local7");
+            expected.insert(LookupBuf::from("appname"), "liblogging-stdlog");
+            expected.insert(LookupBuf::from("origin.software"), "rsyslogd");
+            expected.insert(LookupBuf::from("origin.swVersion"), "8.24.0");
+            expected.insert(LookupBuf::from("origin.x-pid"), "9043");
+            expected.insert(LookupBuf::from("origin.x-info"), "http://www.rsyslog.com");
         }
 
         assert_eq!(

@@ -7,4 +7,3 @@ mod lookup_buf;
 pub use lookup_buf::LookupBuf;
 mod segment;
 pub use segment::Segment;
-

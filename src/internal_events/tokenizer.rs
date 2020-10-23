@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::event::Lookup;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -12,7 +13,7 @@ impl InternalEvent for TokenizerEventProcessed {
 
 #[derive(Debug)]
 pub(crate) struct TokenizerFieldMissing<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
@@ -31,7 +32,7 @@ impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
 
 #[derive(Debug)]
 pub(crate) struct TokenizerConvertFailed<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
     pub error: crate::types::Error,
 }
 

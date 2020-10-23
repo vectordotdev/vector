@@ -6,7 +6,7 @@ use crate::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
-    Event,
+    event::{Event, LookupBuf},
 };
 use futures01::{Future, Sink};
 use serde::{Deserialize, Serialize};
@@ -87,16 +87,21 @@ impl SinkConfig for SematextLogsConfig {
     }
 }
 
+lazy_static::lazy_static! {
+    static ref timestamp_lookup: LookupBuf = LookupBuf::from("@timestamp");
+    static ref host_lookup: LookupBuf = LookupBuf::from("os.host");
+}
+
 /// Used to map `timestamp` to `@timestamp`.
 fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
     let log = event.as_mut_log();
 
-    if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
-        log.insert("@timestamp", ts);
+    if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key(), false) {
+        log.insert(timestamp_lookup.clone(), ts);
     }
 
-    if let Some(host) = log.remove(crate::config::log_schema().host_key()) {
-        log.insert("os.host", host);
+    if let Some(host) = log.remove(crate::config::log_schema().host_key(), false) {
+        log.insert(host_lookup.clone(), host);
     }
 
     futures01::future::ok(event)

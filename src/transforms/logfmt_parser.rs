@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, Value},
+    event::{Event, LookupBuf, Value},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -11,9 +11,9 @@ use std::str;
 #[derive(Deserialize, Serialize, Debug, Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct LogfmtConfig {
-    pub field: Option<String>,
+    pub field: Option<LookupBuf>,
     pub drop_field: bool,
-    pub types: HashMap<String, String>,
+    pub types: HashMap<LookupBuf, String>,
 }
 
 inventory::submit! {
@@ -29,7 +29,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Box::new(Logfmt {
@@ -53,9 +53,9 @@ impl TransformConfig for LogfmtConfig {
 }
 
 pub struct Logfmt {
-    field: String,
+    field: LookupBuf,
     drop_field: bool,
-    conversions: HashMap<String, Conversion>,
+    conversions: HashMap<LookupBuf, Conversion>,
 }
 
 impl Transform for Logfmt {

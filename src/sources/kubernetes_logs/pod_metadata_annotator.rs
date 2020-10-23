@@ -4,7 +4,7 @@
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::{
-    event::{LogEvent, PathComponent, PathIter},
+    event::{LogEvent, LookupBuf, Lookup},
     kubernetes as k8s, Event,
 };
 use evmap::ReadHandle;
@@ -17,25 +17,25 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct FieldsSpec {
-    pub pod_name: String,
-    pub pod_namespace: String,
-    pub pod_uid: String,
-    pub pod_labels: String,
-    pub pod_node_name: String,
-    pub container_name: String,
-    pub container_image: String,
+    pub pod_name: LookupBuf,
+    pub pod_namespace: LookupBuf,
+    pub pod_uid: LookupBuf,
+    pub pod_labels: LookupBuf,
+    pub pod_node_name: LookupBuf,
+    pub container_name: LookupBuf,
+    pub container_image: LookupBuf,
 }
 
 impl Default for FieldsSpec {
     fn default() -> Self {
         Self {
-            pod_name: "kubernetes.pod_name".to_owned(),
-            pod_namespace: "kubernetes.pod_namespace".to_owned(),
-            pod_uid: "kubernetes.pod_uid".to_owned(),
-            pod_labels: "kubernetes.pod_labels".to_owned(),
-            pod_node_name: "kubernetes.pod_node_name".to_owned(),
-            container_name: "kubernetes.container_name".to_owned(),
-            container_image: "kubernetes.container_image".to_owned(),
+            pod_name: LookupBuf::from("kubernetes.pod_name"),
+            pod_namespace: LookupBuf::from("kubernetes.pod_namespace"),
+            pod_uid: LookupBuf::from("kubernetes.pod_uid"),
+            pod_labels: LookupBuf::from("kubernetes.pod_labels"),
+            pod_node_name: LookupBuf::from("kubernetes.pod_node_name"),
+            container_name: LookupBuf::from("kubernetes.container_name"),
+            container_image: LookupBuf::from("kubernetes.container_image"),
         }
     }
 }
@@ -107,17 +107,17 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
     .iter()
     {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.clone(), val.to_owned());
         }
     }
 
     if let Some(labels) = &metadata.labels {
         // Calculate and cache the prefix path.
-        let prefix_path = PathIter::new(fields_spec.pod_labels.as_ref()).collect::<Vec<_>>();
+        let prefix_path = Lookup::from(fields_spec.pod_labels.as_ref());
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
-            path.push(PathComponent::Key(key.clone()));
-            log.insert_path(path, val.to_owned());
+            path.push(key);
+            log.insert(path, val.to_owned());
         }
     }
 }

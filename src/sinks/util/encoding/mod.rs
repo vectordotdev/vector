@@ -66,7 +66,7 @@ pub trait EncodingConfiguration<E> {
                         })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(removal);
+                        log_event.remove(removal, false);
                     }
                 }
                 Event::Metric(_) => {
@@ -80,7 +80,7 @@ pub trait EncodingConfiguration<E> {
             match event {
                 Event::Log(log_event) => {
                     for field in except_fields {
-                        log_event.remove(field);
+                        log_event.remove(field, false);
                     }
                 }
                 Event::Metric(_) => (), // Metrics don't get affected by this one!

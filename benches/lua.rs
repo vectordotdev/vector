@@ -27,7 +27,10 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut map = IndexMap::new();
-                    map.insert(LookupBuf::from_str(key).unwrap(), String::from(value).into());
+                    map.insert(
+                        LookupBuf::from_str(key).unwrap(),
+                        String::from(value).into(),
+                    );
                     transforms::add_fields::AddFields::new(map, true).unwrap()
                 },
                 |mut transform| {

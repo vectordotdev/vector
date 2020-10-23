@@ -1,7 +1,7 @@
+use crate::event::lookup::SegmentBuf;
 use crate::mapping::parser::Rule;
 use pest::iterators::Pair;
 use std::fmt::{Display, Formatter};
-use crate::event::lookup::SegmentBuf;
 
 /// Segments are chunks of a lookup. They represent either a field or an index.
 /// A sequence of Segments can become a lookup.
@@ -118,9 +118,7 @@ impl<'a> Segment<'a> {
         let retval = match segment.as_rule() {
             Rule::inner_quoted_string => {
                 tracing::trace!(segment = %segment.as_str(), rule = ?segment.as_rule(), action = %"push");
-                Ok(Segment::field(
-                    full_segment,
-                ))
+                Ok(Segment::field(full_segment))
             }
             _ => {
                 return Err(format!(
