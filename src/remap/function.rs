@@ -5,6 +5,7 @@ mod to_bool;
 mod to_float;
 mod to_int;
 mod to_string;
+mod to_timestamp;
 
 pub use del::Del;
 pub use only_fields::OnlyFields;
@@ -13,6 +14,7 @@ pub use to_bool::ToBool;
 pub use to_float::ToFloat;
 pub use to_int::ToInt;
 pub use to_string::ToString;
+pub use to_timestamp::ToTimestamp;
 
 use remap::{Result, Value};
 
@@ -35,6 +37,6 @@ fn is_scalar_value(value: &Value) -> bool {
 
     match value {
         Integer(_) | Float(_) | String(_) | Boolean(_) => true,
-        Map(_) | Array(_) | Null => false,
+        Timestamp(_) | Map(_) | Array(_) | Null => false,
     }
 }

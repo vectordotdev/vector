@@ -561,7 +561,7 @@ mod tests {
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
         ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
-        StripWhitespaceFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
+        StripWhitespaceFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
     #[test]
@@ -993,33 +993,6 @@ mod tests {
                     "foo.bar".to_string(),
                     "baz".to_string(),
                 ]))]),
-            ),
-            (
-                ".foo = to_timestamp(.foo, 10)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToTimestampFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some(Value::Integer(10)),
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = to_timestamp(.foo, \"2020-09-14T12:51:12+00:00\")",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToTimestampFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some(Value::from("2020-09-14T12:51:12+00:00")),
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = to_timestamp(.bar)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToTimestampFn::new(Box::new(QueryPath::from("bar")), None)),
-                ))]),
             ),
             (
                 ".foo = parse_timestamp(.foo, \"%d %m %Y\")",

@@ -137,6 +137,9 @@
     .bar = to_int(.bar)
     .baz = to_float(.baz)
     .bev = to_bool(.bev)
+    .a = to_timestamp(.a)
+    .b = to_timestamp(.nope, 10)
+    .c = to_timestamp(.nope, "2020-09-14T12:51:12+02:00")
   """
 [[tests]]
   name = "remap_coercion"
@@ -157,6 +160,9 @@
       "bar.equals" = 20
       "baz.equals" = 30.3
       "bev.equals" = true
+      "a.equals" = "2020-09-14T09:53:44Z"
+      "b.equals" = "1970-01-01T00:00:10Z"
+      "c.equals" = "2020-09-14T10:51:12Z"
 
 [transforms.remap_quoted_path]
   inputs = []

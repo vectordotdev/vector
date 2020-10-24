@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::string::String as StdString;
@@ -11,6 +12,7 @@ pub enum Value {
     Boolean(bool),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
+    Timestamp(DateTime<Utc>),
     Null,
 }
 
@@ -104,6 +106,12 @@ impl From<&str> for Value {
     }
 }
 
+impl From<DateTime<Utc>> for Value {
+    fn from(v: DateTime<Utc>) -> Self {
+        Value::Timestamp(v)
+    }
+}
+
 impl TryFrom<&Value> for f64 {
     type Error = Error;
 
@@ -172,6 +180,7 @@ impl Value {
             Boolean(_) => "boolean",
             Map(_) => "map",
             Array(_) => "array",
+            Timestamp(_) => "timestamp",
             Null => "null",
         }
     }
@@ -365,6 +374,7 @@ impl Value {
             Boolean(v) => Value::from(format!("{}", v)),
             Map(_) => Value::from(""),
             Array(_) => Value::from(""),
+            Timestamp(v) => Value::from(v.to_string()),
             Null => Value::from(""),
         }
     }

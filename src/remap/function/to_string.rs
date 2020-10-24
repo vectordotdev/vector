@@ -64,11 +64,10 @@ impl Expression for ToStringFn {
 mod tests {
     use super::*;
     use crate::map;
-    use std::collections::BTreeMap;
 
     #[test]
     fn to_string() {
-        let cases: Vec<(BTreeMap<String, Value>, _, _)> = vec![
+        let cases = vec![
             (
                 map![],
                 Err("path error: missing path: foo".into()),

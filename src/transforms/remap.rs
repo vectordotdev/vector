@@ -59,6 +59,7 @@ impl Remap {
             Box::new(ToInt),
             Box::new(ToFloat),
             Box::new(ToBool),
+            Box::new(ToTimestamp),
         ];
 
         Ok(Remap {

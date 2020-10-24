@@ -213,6 +213,7 @@ impl From<remap::Value> for Value {
             Boolean(v) => Value::Boolean(v),
             Map(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
             Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
+            Timestamp(v) => Value::Timestamp(v),
             Null => Value::Null,
         }
     }
@@ -229,8 +230,8 @@ impl From<Value> for remap::Value {
             Value::Boolean(v) => Boolean(v),
             Value::Map(v) => Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
             Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
+            Value::Timestamp(v) => Timestamp(v),
             Value::Null => Null,
-            _ => todo!("Value::Timestamp"),
         }
     }
 }
