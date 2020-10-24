@@ -127,7 +127,6 @@ build_signatures! {
     parse_timestamp => ParseTimestampFn,
     strip_whitespace => StripWhitespaceFn,
     md5 => Md5Fn,
-    sha1 => Sha1Fn,
     sha2 => Sha2Fn,
     sha3 => Sha3Fn,
     now => NowFn,

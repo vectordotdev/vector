@@ -1,6 +1,7 @@
 mod del;
 mod downcase;
 mod only_fields;
+mod sha1;
 mod split;
 mod to_bool;
 mod to_float;
@@ -10,6 +11,7 @@ mod to_timestamp;
 mod upcase;
 mod uuid_v4;
 
+pub use self::sha1::Sha1;
 pub use del::Del;
 pub use downcase::Downcase;
 pub use only_fields::OnlyFields;

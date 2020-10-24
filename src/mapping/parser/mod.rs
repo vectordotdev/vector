@@ -560,7 +560,7 @@ mod tests {
     use super::*;
     use crate::mapping::query::function::{
         ContainsFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
-        ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
+        ParseTimestampFn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
         StripWhitespaceFn, TokenizeFn, TruncateFn,
     };
 
@@ -1046,13 +1046,6 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(Md5Fn::new(Box::new(QueryPath::from("foo")))),
-                ))]),
-            ),
-            (
-                ".foo = sha1(.foo)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(Sha1Fn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
             (
