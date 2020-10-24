@@ -86,46 +86,42 @@ fn is_scalar_value(value: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::path::Path;
+    use crate::map;
+    use std::collections::BTreeMap;
 
     #[test]
     fn to_int() {
-        let cases = vec![
+        let cases: Vec<(BTreeMap<String, Value>, _, _)> = vec![
             (
-                Event::from(""),
-                Err("path .foo not found in event".to_string()),
-                ToIntegerFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+                map![],
+                Err("path error: missing path: foo".into()),
+                ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
             (
-                Event::from(""),
-                Ok(Value::Integer(10)),
-                ToIntegerFn::new(
-                    Box::new(Path::from(vec![vec!["foo"]])),
-                    Some(Value::Integer(10)),
-                ),
+                map![],
+                Ok(Some(Value::Integer(10))),
+                ToIntFn::new(Box::new(Path::from("foo")), Some(10.into())),
             ),
             (
-                {
-                    let mut event = Event::from("");
-                    event.as_mut_log().insert("foo", Value::from("20"));
-                    event
-                },
-                Ok(Value::Integer(20)),
-                ToIntegerFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+                map!["foo": "20"],
+                Ok(Some(Value::Integer(20))),
+                ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
             (
-                {
-                    let mut event = Event::from("");
-                    event.as_mut_log().insert("foo", Value::Float(20.5));
-                    event
-                },
-                Ok(Value::Integer(20)),
-                ToIntegerFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+                map!["foo": 20.5],
+                Ok(Some(Value::Integer(20))),
+                ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
         ];
 
-        for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
+        let mut state = remap::State::default();
+
+        for (mut object, exp, func) in cases {
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
         }
     }
 }

@@ -64,46 +64,42 @@ impl Expression for ToStringFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::path::Path;
+    use crate::map;
+    use std::collections::BTreeMap;
 
     #[test]
     fn to_string() {
-        let cases = vec![
+        let cases: Vec<(BTreeMap<String, Value>, _, _)> = vec![
             (
-                Event::from(""),
-                Err("path .foo not found in event".to_string()),
-                ToStringFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+                map![],
+                Err("path error: missing path: foo".into()),
+                ToStringFn::new(Box::new(Path::from("foo")), None),
             ),
             (
-                Event::from(""),
-                Ok(Value::from("default")),
-                ToStringFn::new(
-                    Box::new(Path::from(vec![vec!["foo"]])),
-                    Some(Value::from("default")),
-                ),
+                map![],
+                Ok(Some(Value::from("default"))),
+                ToStringFn::new(Box::new(Path::from("foo")), Some(Value::from("default"))),
             ),
             (
-                {
-                    let mut event = Event::from("");
-                    event.as_mut_log().insert("foo", Value::Integer(20));
-                    event
-                },
-                Ok(Value::from("20")),
-                ToStringFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+                map!["foo": 20],
+                Ok(Some(Value::from("20"))),
+                ToStringFn::new(Box::new(Path::from("foo")), None),
             ),
             (
-                {
-                    let mut event = Event::from("");
-                    event.as_mut_log().insert("foo", Value::Float(20.5));
-                    event
-                },
-                Ok(Value::from("20.5")),
-                ToStringFn::new(Box::new(Path::from(vec![vec!["foo"]])), None),
+                map!["foo": 20.5],
+                Ok(Some(Value::from("20.5"))),
+                ToStringFn::new(Box::new(Path::from("foo")), None),
             ),
         ];
 
-        for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
+        let mut state = remap::State::default();
+
+        for (mut object, exp, func) in cases {
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
         }
     }
 }
