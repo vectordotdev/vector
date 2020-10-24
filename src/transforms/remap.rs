@@ -69,6 +69,7 @@ impl Remap {
             Box::new(FormatTimestamp),
             Box::new(Contains),
             Box::new(StartsWith),
+            Box::new(EndsWith),
         ];
 
         Ok(Remap {

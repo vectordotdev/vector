@@ -31,6 +31,7 @@ macro_rules! optional {
 mod contains;
 mod del;
 mod downcase;
+mod ends_with;
 mod format_timestamp;
 mod md5;
 mod now;
@@ -51,6 +52,7 @@ pub use self::sha1::Sha1;
 pub use contains::Contains;
 pub use del::Del;
 pub use downcase::Downcase;
+pub use ends_with::EndsWith;
 pub use format_timestamp::FormatTimestamp;
 pub use now::Now;
 pub use only_fields::OnlyFields;

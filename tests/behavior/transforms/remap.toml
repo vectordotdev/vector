@@ -522,32 +522,32 @@
       "d.equals" = false
       "e.equals" = true
 
-# [transforms.remap_function_ends_with]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = ends_with(.foobar, substring = .bar)
-#     .b = ends_with(.foobar, substring = "bar")
-#     .c = ends_with(.foobar, substring = "foo")
-#     .d = ends_with(.foobar, substring = "BAR", case_sensitive = true)
-#     .e = ends_with(.foobar, substring = "BAR", case_sensitive = false)
-#   """
-# [[tests]]
-#   name = "remap_function_ends_with"
-#   [tests.input]
-#     insert_at = "remap_function_ends_with"
-#     type = "log"
-#     [tests.input.log_fields]
-#       bar = "bar"
-#       foobar = "foobar"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_ends_with"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = true
-#       "b.equals" = true
-#       "c.equals" = false
-#       "d.equals" = false
-#       "e.equals" = true
+[transforms.remap_function_ends_with]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ends_with(.foobar, substring = .bar)
+    .b = ends_with(.foobar, substring = "bar")
+    .c = ends_with(.foobar, substring = "foo")
+    .d = ends_with(.foobar, substring = "BAR", case_sensitive = true)
+    .e = ends_with(.foobar, substring = "BAR", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_ends_with"
+  [tests.input]
+    insert_at = "remap_function_ends_with"
+    type = "log"
+    [tests.input.log_fields]
+      bar = "bar"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_ends_with"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = false
+      "e.equals" = true
 
 # [transforms.remap_function_slice]
 #   inputs = []
