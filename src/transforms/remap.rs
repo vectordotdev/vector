@@ -65,6 +65,7 @@ impl Remap {
             Box::new(UuidV4),
             Box::new(Sha1),
             Box::new(Md5),
+            Box::new(Now),
         ];
 
         Ok(Remap {

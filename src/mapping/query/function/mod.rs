@@ -128,7 +128,6 @@ build_signatures! {
     strip_whitespace => StripWhitespaceFn,
     sha2 => Sha2Fn,
     sha3 => Sha3Fn,
-    now => NowFn,
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
     format_timestamp => FormatTimestampFn,

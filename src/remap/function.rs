@@ -1,6 +1,7 @@
 mod del;
 mod downcase;
 mod md5;
+mod now;
 mod only_fields;
 mod sha1;
 mod split;
@@ -16,6 +17,7 @@ pub use self::md5::Md5;
 pub use self::sha1::Sha1;
 pub use del::Del;
 pub use downcase::Downcase;
+pub use now::Now;
 pub use only_fields::OnlyFields;
 pub use split::Split;
 pub use to_bool::ToBool;
