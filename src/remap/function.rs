@@ -1,5 +1,6 @@
 mod del;
 mod downcase;
+mod md5;
 mod only_fields;
 mod sha1;
 mod split;
@@ -11,6 +12,7 @@ mod to_timestamp;
 mod upcase;
 mod uuid_v4;
 
+pub use self::md5::Md5;
 pub use self::sha1::Sha1;
 pub use del::Del;
 pub use downcase::Downcase;

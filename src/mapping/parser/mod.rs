@@ -559,9 +559,9 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ContainsFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
-        ParseTimestampFn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
-        StripWhitespaceFn, TokenizeFn, TruncateFn,
+        ContainsFn, FormatTimestampFn, NowFn, ParseDurationFn, ParseJsonFn, ParseTimestampFn,
+        Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, TokenizeFn,
+        TruncateFn,
     };
 
     #[test]
@@ -1039,13 +1039,6 @@ mod tests {
                         Box::new(Literal::from(Value::Integer(5))),
                         Some(Value::Boolean(true)),
                     )),
-                ))]),
-            ),
-            (
-                ".foo = md5(.foo)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(Md5Fn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
             (

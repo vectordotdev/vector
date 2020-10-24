@@ -386,47 +386,47 @@
       a = "foo"
       b = true
 
-# [transforms.remap_function_md5]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = md5(.a)
+[transforms.remap_function_md5]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = md5(.a)
 
-#     if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
-#         .b = md5(.a + .b + "baz")
-#     }
-#   """
-# [[tests]]
-#   name = "remap_function_md5"
-#   [tests.input]
-#     insert_at = "remap_function_md5"
-#     type = "log"
-#     [tests.input.log_fields]
-#       a = "foo"
-#       b = "bar"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_md5"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
-#       "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
+    if md5(.b) == "37b51d194a7513e45b56f6524f2d51f2" {
+        .b = md5(.a + .b + "baz")
+    }
+  """
+[[tests]]
+  name = "remap_function_md5"
+  [tests.input]
+    insert_at = "remap_function_md5"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_md5"
+    [[tests.outputs.conditions]]
+      "a.equals" = "acbd18db4cc2f85cedef654fccc4a4d8"
+      "b.equals" = "223cfa6567e4c0599c9a23628bf7a234"
 
-# [transforms.remap_function_md5_error]
-#   inputs = []
-#   type = "remap"
-#   drop_on_err = true
-#   source = """
-#     .a = md5(.a)
-#     .b = md5(.b)
-#   """
-# [[tests]]
-#   name = "remap_function_md5_error"
-#   no_outputs_from = ["remap_function_md5_error"]
-#   [tests.input]
-#     insert_at = "remap_function_md5_error"
-#     type = "log"
-#     [tests.input.log_fields]
-#       a = "foo"
-#       b = true
+[transforms.remap_function_md5_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = md5(.a)
+    .b = md5(.b)
+  """
+[[tests]]
+  name = "remap_function_md5_error"
+  no_outputs_from = ["remap_function_md5_error"]
+  [tests.input]
+    insert_at = "remap_function_md5_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "foo"
+      b = true
 
 # [transforms.remap_function_now]
 #   inputs = []

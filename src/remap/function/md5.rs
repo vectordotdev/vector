@@ -1,12 +1,11 @@
 use remap::prelude::*;
-use std::convert::TryFrom;
 
 #[derive(Debug)]
-pub struct Downcase;
+pub struct Md5;
 
-impl Function for Downcase {
+impl Function for Md5 {
     fn identifier(&self) -> &'static str {
-        "downcase"
+        "md5"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -20,32 +19,32 @@ impl Function for Downcase {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
 
-        Ok(Box::new(DowncaseFn { value }))
+        Ok(Box::new(Md5Fn { value }))
     }
 }
 
 #[derive(Debug)]
-struct DowncaseFn {
+struct Md5Fn {
     value: Box<dyn Expression>,
 }
 
-impl DowncaseFn {
+impl Md5Fn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>) -> Self {
         Self { value }
     }
 }
 
-impl Expression for DowncaseFn {
+impl Expression for Md5Fn {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        self.value
-            .execute(state, object)?
-            .map(String::try_from)
-            .transpose()?
-            .map(|v| v.to_lowercase())
-            .map(Into::into)
-            .map(Ok)
-            .transpose()
+        use md5::{Digest, Md5};
+
+        self.value.execute(state, object).map(|r| {
+            r.map(|v| match v.as_string_lossy() {
+                Value::String(bytes) => Value::String(hex::encode(Md5::digest(&bytes)).into()),
+                _ => unreachable!(),
+            })
+        })
     }
 }
 
@@ -55,17 +54,17 @@ mod tests {
     use crate::map;
 
     #[test]
-    fn downcase() {
+    fn md5() {
         let cases = vec![
             (
                 map![],
                 Err("path error: missing path: foo".into()),
-                DowncaseFn::new(Box::new(Path::from("foo"))),
+                Md5Fn::new(Box::new(Path::from("foo"))),
             ),
             (
-                map!["foo": "FOO 2 bar"],
-                Ok(Some(Value::from("foo 2 bar"))),
-                DowncaseFn::new(Box::new(Path::from("foo"))),
+                map!["foo": "foo"],
+                Ok(Some(Value::from("acbd18db4cc2f85cedef654fccc4a4d8"))),
+                Md5Fn::new(Box::new(Path::from("foo"))),
             ),
         ];
 

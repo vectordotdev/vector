@@ -64,6 +64,7 @@ impl Remap {
             Box::new(Downcase),
             Box::new(UuidV4),
             Box::new(Sha1),
+            Box::new(Md5),
         ];
 
         Ok(Remap {
