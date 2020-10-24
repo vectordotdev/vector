@@ -13,12 +13,12 @@ impl Function for ToInt {
         &[
             Parameter {
                 keyword: "value",
-                accepts: is_scalar_value,
+                accepts: super::is_scalar_value,
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: is_scalar_value,
+                accepts: super::is_scalar_value,
                 required: false,
             },
         ]
@@ -61,25 +61,11 @@ impl Expression for ToIntFn {
             _ => Err("unable to convert value to integer".into()),
         };
 
-        self.value
-            .execute(state, object)
-            .and_then(|opt| opt.map(to_int).transpose())
-            .or_else(|err| {
-                self.default
-                    .as_ref()
-                    .ok_or(err)
-                    .and_then(|value| value.execute(state, object))
-                    .and_then(|opt| opt.map(to_int).transpose())
-            })
-    }
-}
-
-fn is_scalar_value(value: &Value) -> bool {
-    use Value::*;
-
-    match value {
-        Integer(_) | Float(_) | String(_) | Boolean(_) => true,
-        Map(_) | Array(_) | Null => false,
+        super::convert_value_or_default(
+            self.value.execute(state, object),
+            self.default.as_ref().map(|v| v.execute(state, object)),
+            to_int,
+        )
     }
 }
 

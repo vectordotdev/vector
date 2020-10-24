@@ -32,7 +32,7 @@ impl Function for ToString {
 }
 
 #[derive(Debug)]
-pub struct ToStringFn {
+struct ToStringFn {
     value: Box<dyn Expression>,
     default: Option<Box<dyn Expression>>,
 }
@@ -47,17 +47,16 @@ impl ToStringFn {
 
 impl Expression for ToStringFn {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        self.value
-            .execute(state, object)
-            .map(|value| match value {
-                Some(v @ Value::String(_)) => Some(v),
-                Some(value) => Some(value.as_string_lossy()),
-                None => Some(Value::String("".into())),
-            })
-            .or_else(|err| match &self.default {
-                Some(default) => default.execute(state, object),
-                None => Err(err),
-            })
+        let to_string = |value| match value {
+            Value::String(_) => Ok(value),
+            _ => Ok(value.as_string_lossy()),
+        };
+
+        super::convert_value_or_default(
+            self.value.execute(state, object),
+            self.default.as_ref().map(|v| v.execute(state, object)),
+            to_string,
+        )
     }
 }
 
