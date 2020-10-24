@@ -463,37 +463,37 @@
     [[tests.outputs.conditions]]
       "a.equals" = "1970-01-01T00:00:10+00:00"
 
-# [transforms.remap_function_contains]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = contains(.foo, substring = .bar)
-#     .b = contains(.bar, substring = "bar")
-#     .c = contains(.bar, substring = "BAR", case_sensitive = true)
-#     .d = contains(.bar, substring = "BAR", case_sensitive = false)
-#     .e = contains(.foobar, substring = "oba")
-#     .f = contains(.foobar, substring = "OBA", case_sensitive = true)
-#     .g = contains(.foobar, substring = "OBA", case_sensitive = false)
-#   """
-# [[tests]]
-#   name = "remap_function_contains"
-#   [tests.input]
-#     insert_at = "remap_function_contains"
-#     type = "log"
-#     [tests.input.log_fields]
-#       foo = "foo"
-#       bar = "bar"
-#       foobar = "foobar"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_contains"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = false
-#       "b.equals" = true
-#       "c.equals" = false
-#       "d.equals" = true
-#       "e.equals" = true
-#       "f.equals" = false
-#       "g.equals" = true
+[transforms.remap_function_contains]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = contains(.foo, substring = .bar)
+    .b = contains(.bar, substring = "bar")
+    .c = contains(.bar, substring = "BAR", case_sensitive = true)
+    .d = contains(.bar, substring = "BAR", case_sensitive = false)
+    .e = contains(.foobar, substring = "oba")
+    .f = contains(.foobar, substring = "OBA", case_sensitive = true)
+    .g = contains(.foobar, substring = "OBA", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_contains"
+  [tests.input]
+    insert_at = "remap_function_contains"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      bar = "bar"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_contains"
+    [[tests.outputs.conditions]]
+      "a.equals" = false
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = true
+      "e.equals" = true
+      "f.equals" = false
+      "g.equals" = true
 
 # [transforms.remap_function_starts_with]
 #   inputs = []

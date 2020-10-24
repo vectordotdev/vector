@@ -12,6 +12,23 @@ macro_rules! required {
     }
 }
 
+macro_rules! optional {
+    ($state:expr, $object:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
+        $fn.as_ref()
+            .map(|v| v.execute($state, $object))
+            .transpose()?
+            .map(|v| match v {
+                Some(value) => match value {
+                    $($pattern $(if $if)? => Some($then),)+
+                    v => panic!(v),
+                }
+                None => None,
+            })
+            .flatten()
+    }
+}
+
+mod contains;
 mod del;
 mod downcase;
 mod format_timestamp;
@@ -30,6 +47,7 @@ mod uuid_v4;
 
 pub use self::md5::Md5;
 pub use self::sha1::Sha1;
+pub use contains::Contains;
 pub use del::Del;
 pub use downcase::Downcase;
 pub use format_timestamp::FormatTimestamp;

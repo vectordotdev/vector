@@ -559,8 +559,8 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ContainsFn, ParseDurationFn, ParseJsonFn, ParseTimestampFn, Sha2Fn, Sha3Fn, SliceFn,
-        SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, TokenizeFn, TruncateFn,
+        ParseDurationFn, ParseJsonFn, ParseTimestampFn, Sha2Fn, Sha3Fn, SliceFn, SplitFn,
+        StripAnsiEscapeCodesFn, StripWhitespaceFn, TokenizeFn, TruncateFn,
     };
 
     #[test]
@@ -1103,17 +1103,6 @@ mod tests {
                 Mapping::new(vec![Box::new(LogFn::new(
                     Box::new(QueryPath::from("bar")),
                     Some(LogLevel::Debug),
-                ))]),
-            ),
-            (
-                r#".foo = contains(.foo, substring = "BAR", case_sensitive = true)"#,
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ContainsFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        "BAR",
-                        true,
-                    )),
                 ))]),
             ),
             (
