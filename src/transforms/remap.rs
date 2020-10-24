@@ -62,6 +62,7 @@ impl Remap {
             Box::new(ToTimestamp),
             Box::new(Upcase),
             Box::new(Downcase),
+            Box::new(UuidV4),
         ];
 
         Ok(Remap {

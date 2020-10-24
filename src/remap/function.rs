@@ -8,6 +8,7 @@ mod to_int;
 mod to_string;
 mod to_timestamp;
 mod upcase;
+mod uuid_v4;
 
 pub use del::Del;
 pub use downcase::Downcase;
@@ -19,6 +20,7 @@ pub use to_int::ToInt;
 pub use to_string::ToString;
 pub use to_timestamp::ToTimestamp;
 pub use upcase::Upcase;
+pub use uuid_v4::UuidV4;
 
 use remap::{Result, Value};
 
