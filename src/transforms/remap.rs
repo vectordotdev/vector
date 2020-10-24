@@ -60,6 +60,7 @@ impl Remap {
             Box::new(ToFloat),
             Box::new(ToBool),
             Box::new(ToTimestamp),
+            Box::new(Upcase),
         ];
 
         Ok(Remap {

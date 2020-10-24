@@ -561,7 +561,7 @@ mod tests {
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
         ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
-        StripWhitespaceFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
+        StripWhitespaceFn, TokenizeFn, TruncateFn, UuidV4Fn,
     };
 
     #[test]
@@ -1003,13 +1003,6 @@ mod tests {
                         Box::new(QueryPath::from("foo")),
                         None,
                     )),
-                ))]),
-            ),
-            (
-                ".foo = upcase(.foo)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(UpcaseFn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
             (

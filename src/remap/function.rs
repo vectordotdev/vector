@@ -6,6 +6,7 @@ mod to_float;
 mod to_int;
 mod to_string;
 mod to_timestamp;
+mod upcase;
 
 pub use del::Del;
 pub use only_fields::OnlyFields;
@@ -15,6 +16,7 @@ pub use to_float::ToFloat;
 pub use to_int::ToInt;
 pub use to_string::ToString;
 pub use to_timestamp::ToTimestamp;
+pub use upcase::Upcase;
 
 use remap::{Result, Value};
 

@@ -224,53 +224,53 @@
       "k.equals" = "20"
       "l.equals" = "30"
 
-# [transforms.remap_function_upcase]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = upcase(.a)
-#     .b = upcase(.b)
-#     .c.c = upcase(.c.c)
+[transforms.remap_function_upcase]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+    .c.c = upcase(.c.c)
 
-#     if upcase(.f) == "F" {
-#         .f = "ff"
-#     }
-#   """
-# [[tests]]
-#   name = "remap_function_upcase"
-#   [tests.input]
-#     insert_at = "remap_function_upcase"
-#     type = "log"
-#     [tests.input.log_fields]
-#       a = "a"
-#       b = "bbb bb"
-#       "c.c" = "c.c"
-#       f = "f"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_upcase"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = "A"
-#       "b.equals" = "BBB BB"
-#       "c.c.equals" = "C.C"
-#       "f.equals" = "ff"
+    if upcase(.f) == "F" {
+        .f = "ff"
+    }
+  """
+[[tests]]
+  name = "remap_function_upcase"
+  [tests.input]
+    insert_at = "remap_function_upcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = "bbb bb"
+      "c.c" = "c.c"
+      f = "f"
+  [[tests.outputs]]
+    extract_from = "remap_function_upcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "A"
+      "b.equals" = "BBB BB"
+      "c.c.equals" = "C.C"
+      "f.equals" = "ff"
 
-# [transforms.remap_function_upcase_error]
-#   inputs = []
-#   type = "remap"
-#   drop_on_err = true
-#   source = """
-#     .a = upcase(.a)
-#     .b = upcase(.b)
-#   """
-# [[tests]]
-#   name = "remap_function_upcase_error"
-#   no_outputs_from = ["remap_function_upcase_error"]
-#   [tests.input]
-#     insert_at = "remap_function_upcase_error"
-#     type = "log"
-#     [tests.input.log_fields]
-#       a = "a"
-#       b = true
+[transforms.remap_function_upcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = upcase(.a)
+    .b = upcase(.b)
+  """
+[[tests]]
+  name = "remap_function_upcase_error"
+  no_outputs_from = ["remap_function_upcase_error"]
+  [tests.input]
+    insert_at = "remap_function_upcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "a"
+      b = true
 
 # [transforms.remap_function_downcase]
 #   inputs = []
