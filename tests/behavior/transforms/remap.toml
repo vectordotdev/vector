@@ -495,32 +495,32 @@
       "f.equals" = false
       "g.equals" = true
 
-# [transforms.remap_function_starts_with]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = starts_with(.foobar, substring = .foo)
-#     .b = starts_with(.foobar, substring = "foo")
-#     .c = starts_with(.foobar, substring = "bar")
-#     .d = starts_with(.foobar, substring = "FOO", case_sensitive = true)
-#     .e = starts_with(.foobar, substring = "FOO", case_sensitive = false)
-#   """
-# [[tests]]
-#   name = "remap_function_starts_with"
-#   [tests.input]
-#     insert_at = "remap_function_starts_with"
-#     type = "log"
-#     [tests.input.log_fields]
-#       foo = "foo"
-#       foobar = "foobar"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_starts_with"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = true
-#       "b.equals" = true
-#       "c.equals" = false
-#       "d.equals" = false
-#       "e.equals" = true
+[transforms.remap_function_starts_with]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = starts_with(.foobar, substring = .foo)
+    .b = starts_with(.foobar, substring = "foo")
+    .c = starts_with(.foobar, substring = "bar")
+    .d = starts_with(.foobar, substring = "FOO", case_sensitive = true)
+    .e = starts_with(.foobar, substring = "FOO", case_sensitive = false)
+  """
+[[tests]]
+  name = "remap_function_starts_with"
+  [tests.input]
+    insert_at = "remap_function_starts_with"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      foobar = "foobar"
+  [[tests.outputs]]
+    extract_from = "remap_function_starts_with"
+    [[tests.outputs.conditions]]
+      "a.equals" = true
+      "b.equals" = true
+      "c.equals" = false
+      "d.equals" = false
+      "e.equals" = true
 
 # [transforms.remap_function_ends_with]
 #   inputs = []

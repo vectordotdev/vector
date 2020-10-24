@@ -136,7 +136,6 @@ build_signatures! {
     parse_duration => ParseDurationFn,
     format_number => FormatNumberFn,
     parse_url => ParseUrlFn,
-    starts_with => StartsWithFn,
     ends_with => EndsWithFn,
     round => RoundFn,
     floor => FloorFn,
