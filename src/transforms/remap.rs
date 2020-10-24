@@ -66,6 +66,7 @@ impl Remap {
             Box::new(Sha1),
             Box::new(Md5),
             Box::new(Now),
+            Box::new(FormatTimestamp),
         ];
 
         Ok(Remap {

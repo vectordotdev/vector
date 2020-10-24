@@ -1,5 +1,20 @@
+#![macro_use]
+
+macro_rules! required {
+    ($state:expr, $object:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
+        match $fn.execute($state, $object)? {
+            Some(value) => match value {
+                $($pattern $(if $if)? => $then,)+
+                v => panic!(v),
+            }
+            None => return Ok(None)
+        }
+    }
+}
+
 mod del;
 mod downcase;
+mod format_timestamp;
 mod md5;
 mod now;
 mod only_fields;
@@ -17,6 +32,7 @@ pub use self::md5::Md5;
 pub use self::sha1::Sha1;
 pub use del::Del;
 pub use downcase::Downcase;
+pub use format_timestamp::FormatTimestamp;
 pub use now::Now;
 pub use only_fields::OnlyFields;
 pub use split::Split;
