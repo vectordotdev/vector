@@ -11,9 +11,17 @@ pub enum Error {
 }
 
 #[derive(Debug)]
-pub(crate) struct Path {
+pub struct Path {
     // TODO: Switch to String once Event API is cleaned up.
     segments: Vec<Vec<String>>,
+}
+
+impl<T: AsRef<str>> From<T> for Path {
+    fn from(v: T) -> Self {
+        Self {
+            segments: vec![vec![v.as_ref().to_owned()]],
+        }
+    }
 }
 
 impl Path {

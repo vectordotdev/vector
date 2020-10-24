@@ -13,7 +13,7 @@ use operator::Operator;
 
 pub mod prelude;
 pub use error::Error;
-pub use expression::{Expression, Literal};
+pub use expression::{Expression, Literal, Path};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
@@ -77,6 +77,53 @@ pub trait Object: std::fmt::Debug {
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well.
     fn remove(&mut self, path: &str, compact: bool);
+}
+
+impl Object for std::collections::HashMap<String, Value> {
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
+        self.insert(vec_path_to_string(path), value);
+
+        Ok(())
+    }
+
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
+        Ok(self.get(&vec_path_to_string(path)).cloned())
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.keys().cloned().collect::<Vec<_>>()
+    }
+
+    fn remove(&mut self, path: &str, _: bool) {
+        self.remove(path);
+    }
+}
+
+impl Object for std::collections::BTreeMap<String, Value> {
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
+        self.insert(vec_path_to_string(path), value);
+
+        Ok(())
+    }
+
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
+        Ok(self.get(&vec_path_to_string(path)).cloned())
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.keys().cloned().collect::<Vec<_>>()
+    }
+
+    fn remove(&mut self, path: &str, _: bool) {
+        self.remove(path);
+    }
+}
+
+fn vec_path_to_string(path: &[Vec<String>]) -> String {
+    path.iter()
+        .map(|v| v.join("."))
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 #[cfg(test)]

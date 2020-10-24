@@ -16,10 +16,11 @@ pub(super) use assignment::{Assignment, Target};
 pub(super) use block::Block;
 pub(super) use function::Function;
 pub(super) use if_statement::IfStatement;
-pub use literal::Literal;
 pub(super) use noop::Noop;
 pub(super) use not::Not;
-pub(super) use path::Path;
+
+pub use literal::Literal;
+pub use path::Path;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
