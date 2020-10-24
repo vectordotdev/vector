@@ -561,8 +561,8 @@ mod tests {
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
         ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
-        StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToIntegerFn, ToStringFn, ToTimestampFn,
-        TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
+        StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn,
+        UuidV4Fn,
     };
 
     #[test]
@@ -998,51 +998,6 @@ mod tests {
                     "foo.bar".to_string(),
                     "baz".to_string(),
                 ]))]),
-            ),
-            // function: to_string
-            (
-                ".foo = to_string(.foo, \"bar\")",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToStringFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some(Value::from("bar")),
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = to_string(.bar)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToStringFn::new(Box::new(QueryPath::from("bar")), None)),
-                ))]),
-            ),
-            (
-                ".foo = to_int(.foo, 5)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToIntegerFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some(Value::Integer(5)),
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = to_int(.foo, 5.0)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToIntegerFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some(Value::Float(5.0)),
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = to_int(.bar)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToIntegerFn::new(Box::new(QueryPath::from("bar")), None)),
-                ))]),
             ),
             (
                 ".foo = to_float(.foo, 5.5)",
