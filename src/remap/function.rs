@@ -1,4 +1,5 @@
 mod del;
+mod downcase;
 mod only_fields;
 mod split;
 mod to_bool;
@@ -9,6 +10,7 @@ mod to_timestamp;
 mod upcase;
 
 pub use del::Del;
+pub use downcase::Downcase;
 pub use only_fields::OnlyFields;
 pub use split::Split;
 pub use to_bool::ToBool;

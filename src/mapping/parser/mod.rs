@@ -559,7 +559,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
+        ContainsFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
         ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
         StripWhitespaceFn, TokenizeFn, TruncateFn, UuidV4Fn,
     };
@@ -1003,13 +1003,6 @@ mod tests {
                         Box::new(QueryPath::from("foo")),
                         None,
                     )),
-                ))]),
-            ),
-            (
-                ".foo = downcase(.foo)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(DowncaseFn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
             (

@@ -126,7 +126,6 @@ macro_rules! build_signatures {
 build_signatures! {
     parse_timestamp => ParseTimestampFn,
     strip_whitespace => StripWhitespaceFn,
-    downcase => DowncaseFn,
     uuid_v4 => UuidV4Fn,
     md5 => Md5Fn,
     sha1 => Sha1Fn,

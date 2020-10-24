@@ -272,54 +272,54 @@
       a = "a"
       b = true
 
-# [transforms.remap_function_downcase]
-#   inputs = []
-#   type = "remap"
-#   drop_on_err = true
-#   source = """
-#     .a = downcase(.a)
-#     .b = downcase(.b)
-#     .c.c = downcase(.c.c)
+[transforms.remap_function_downcase]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+    .c.c = downcase(.c.c)
 
-#     if downcase(.f) == "f" {
-#         .f = "FF"
-#     }
-#   """
-# [[tests]]
-#   name = "remap_function_downcase"
-#   [tests.input]
-#     insert_at = "remap_function_downcase"
-#     type = "log"
-#     [tests.input.log_fields]
-#       a = "A"
-#       b = "BBB BB"
-#       "c.c" = "C.C"
-#       f = "F"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_downcase"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = "a"
-#       "b.equals" = "bbb bb"
-#       "c.c.equals" = "c.c"
-#       "f.equals" = "FF"
+    if downcase(.f) == "f" {
+        .f = "FF"
+    }
+  """
+[[tests]]
+  name = "remap_function_downcase"
+  [tests.input]
+    insert_at = "remap_function_downcase"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = "BBB BB"
+      "c.c" = "C.C"
+      f = "F"
+  [[tests.outputs]]
+    extract_from = "remap_function_downcase"
+    [[tests.outputs.conditions]]
+      "a.equals" = "a"
+      "b.equals" = "bbb bb"
+      "c.c.equals" = "c.c"
+      "f.equals" = "FF"
 
-# [transforms.remap_function_downcase_error]
-#   inputs = []
-#   type = "remap"
-#   drop_on_err = true
-#   source = """
-#     .a = downcase(.a)
-#     .b = downcase(.b)
-#   """
-# [[tests]]
-#   name = "remap_function_downcase_error"
-#   no_outputs_from = ["remap_function_downcase_error"]
-#   [tests.input]
-#     insert_at = "remap_function_downcase_error"
-#     type = "log"
-#     [tests.input.log_fields]
-#       a = "A"
-#       b = 10
+[transforms.remap_function_downcase_error]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    .a = downcase(.a)
+    .b = downcase(.b)
+  """
+[[tests]]
+  name = "remap_function_downcase_error"
+  no_outputs_from = ["remap_function_downcase_error"]
+  [tests.input]
+    insert_at = "remap_function_downcase_error"
+    type = "log"
+    [tests.input.log_fields]
+      a = "A"
+      b = 10
 
 # [transforms.remap_function_uuid_v4]
 #   inputs = []
