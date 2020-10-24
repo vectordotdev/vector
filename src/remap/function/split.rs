@@ -23,7 +23,7 @@ impl Function for Split {
             },
             Parameter {
                 keyword: "limit",
-                accepts: |v| matches!(v, Value::Boolean(_)),
+                accepts: |v| matches!(v, Value::Integer(_)),
                 required: false,
             },
         ]

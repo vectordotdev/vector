@@ -14,6 +14,12 @@ pub enum Error {
 
     #[error(r#"missing required argument "{0}" (position {1})"#)]
     Required(String, usize),
+
+    #[error(r#"unexpected non-value argument "{0}""#)]
+    Expression(&'static str),
+
+    #[error(r#"incorrect value type for argument "{0}" (got "{0}")"#)]
+    Value(&'static str, &'static str),
 }
 
 #[derive(Debug)]
@@ -32,12 +38,13 @@ impl Function {
             .find(|b| b.identifier() == ident)
             .ok_or_else(|| E::Function(ident.clone(), Error::Undefined))?;
 
+        let ident = definition.identifier();
         let parameters = definition.parameters();
 
         // check function arity
         if arguments.len() > parameters.len() {
             return Err(E::Function(
-                ident.clone(),
+                ident.to_owned(),
                 Error::Arity(parameters.len(), arguments.len()),
             )
             .into());
@@ -74,10 +81,24 @@ impl Function {
             }
             .ok_or_else(|| {
                 E::Function(
-                    ident.clone(),
+                    ident.to_owned(),
                     Error::Keyword(keyword.expect("arity checked")),
                 )
             })?;
+
+            let argument = match argument {
+                // Wrap expression argument to validate its value type at
+                // runtime.
+                Argument::Expression(expr) => {
+                    Argument::Expression(Box::new(ArgumentValidator::new(
+                        expr,
+                        definition.identifier(),
+                        param.keyword,
+                        param.accepts,
+                    )))
+                }
+                Argument::Regex(_) => argument,
+            };
 
             list.insert(param.keyword, argument);
         }
@@ -89,7 +110,7 @@ impl Function {
             .filter(|(_, p)| p.required)
             .filter(|(_, p)| !list.keywords().contains(&p.keyword))
             .map(|(i, p)| {
-                Err(E::Function(ident.clone(), Error::Required(p.keyword.to_owned(), i)).into())
+                Err(E::Function(ident.to_owned(), Error::Required(p.keyword.to_owned(), i)).into())
             })
             .collect::<Result<_>>()?;
 
@@ -101,5 +122,58 @@ impl Function {
 impl Expression for Function {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
         self.function.execute(state, object)
+    }
+}
+
+struct ArgumentValidator {
+    expression: Box<dyn Expression>,
+    ident: &'static str,
+    keyword: &'static str,
+    validator: fn(&Value) -> bool,
+}
+
+impl std::fmt::Debug for ArgumentValidator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ArgumentValidator")
+            .field("expression", &self.expression)
+            .field("ident", &self.ident)
+            .field("keyword", &self.keyword)
+            .field("validator", &"fn(&Value) -> bool".to_owned())
+            .finish()
+    }
+}
+
+impl ArgumentValidator {
+    pub fn new(
+        expression: Box<dyn Expression>,
+        ident: &'static str,
+        keyword: &'static str,
+        validator: fn(&Value) -> bool,
+    ) -> Self {
+        Self {
+            expression,
+            ident,
+            keyword,
+            validator,
+        }
+    }
+}
+
+impl Expression for ArgumentValidator {
+    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+        let value = self.expression.execute(state, object)?.ok_or(E::Function(
+            self.ident.to_owned(),
+            Error::Expression(self.keyword),
+        ))?;
+
+        if !(self.validator)(&value) {
+            return Err(E::Function(
+                self.ident.to_owned(),
+                Error::Value(self.keyword, value.kind()),
+            )
+            .into());
+        }
+
+        Ok(Some(value))
     }
 }
