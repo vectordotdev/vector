@@ -13,7 +13,7 @@ use operator::Operator;
 
 pub mod prelude;
 pub use error::Error;
-pub use expression::{Error as ExpressionError, Expression, Literal};
+pub use expression::{Expression, Literal};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;

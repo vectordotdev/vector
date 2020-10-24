@@ -54,7 +54,7 @@ impl Expression for SplitFn {
         let string: String = self
             .value
             .execute(state, object)?
-            .ok_or(Error::Missing)?
+            .ok_or(Error::from("argument missing"))?
             .try_into()?;
 
         let limit: usize = self
@@ -75,7 +75,7 @@ impl Expression for SplitFn {
             Argument::Expression(expr) => {
                 let pattern: String = expr
                     .execute(state, object)?
-                    .ok_or(Error::Missing)?
+                    .ok_or(Error::from("argument missing"))?
                     .try_into()?;
 
                 string.splitn(limit, &pattern).collect::<Vec<_>>().into()

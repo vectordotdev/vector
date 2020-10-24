@@ -1,4 +1,4 @@
 pub use crate::{
-    Argument, ArgumentList, Expression, ExpressionError as Error, Function, Literal, Object,
-    Parameter, Result, State, Value,
+    Argument, ArgumentList, Error, Expression, Function, Literal, Object, Parameter, Result, State,
+    Value,
 };
