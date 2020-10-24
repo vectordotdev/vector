@@ -561,7 +561,7 @@ mod tests {
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
         ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
-        StripWhitespaceFn, ToBooleanFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
+        StripWhitespaceFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
     #[test]
@@ -993,23 +993,6 @@ mod tests {
                     "foo.bar".to_string(),
                     "baz".to_string(),
                 ]))]),
-            ),
-            (
-                ".foo = to_bool(.foo, true)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToBooleanFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some(Value::Boolean(true)),
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = to_bool(.bar)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToBooleanFn::new(Box::new(QueryPath::from("bar")), None)),
-                ))]),
             ),
             (
                 ".foo = to_timestamp(.foo, 10)",

@@ -58,6 +58,7 @@ impl Remap {
             Box::new(ToString),
             Box::new(ToInt),
             Box::new(ToFloat),
+            Box::new(ToBool),
         ];
 
         Ok(Remap {

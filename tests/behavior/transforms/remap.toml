@@ -136,6 +136,7 @@
     .foo = to_string(.foo)
     .bar = to_int(.bar)
     .baz = to_float(.baz)
+    .bev = to_bool(.bev)
   """
 [[tests]]
   name = "remap_coercion"
@@ -155,6 +156,7 @@
       "foo.equals" = "10"
       "bar.equals" = 20
       "baz.equals" = 30.3
+      "bev.equals" = true
 
 [transforms.remap_quoted_path]
   inputs = []
