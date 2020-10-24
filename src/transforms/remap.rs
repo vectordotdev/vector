@@ -57,6 +57,7 @@ impl Remap {
             Box::new(OnlyFields),
             Box::new(ToString),
             Box::new(ToInt),
+            Box::new(ToFloat),
         ];
 
         Ok(Remap {

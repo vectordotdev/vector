@@ -561,8 +561,7 @@ mod tests {
     use crate::mapping::query::function::{
         ContainsFn, DowncaseFn, FormatTimestampFn, Md5Fn, NowFn, ParseDurationFn, ParseJsonFn,
         ParseTimestampFn, Sha1Fn, Sha2Fn, Sha3Fn, SliceFn, SplitFn, StripAnsiEscapeCodesFn,
-        StripWhitespaceFn, ToBooleanFn, ToFloatFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn,
-        UuidV4Fn,
+        StripWhitespaceFn, ToBooleanFn, ToTimestampFn, TokenizeFn, TruncateFn, UpcaseFn, UuidV4Fn,
     };
 
     #[test]
@@ -628,10 +627,6 @@ mod tests {
             (
                 r#"only_fields(,)"#,
                 vec![" 1:13\n", "= expected target_path"],
-            ),
-            (
-                ".foo = to_string(\"bar\",)",
-                vec![" 1:24\n", "= expected argument"],
             ),
             (
                 // Due to the explicit list of allowed escape chars our grammar
@@ -998,23 +993,6 @@ mod tests {
                     "foo.bar".to_string(),
                     "baz".to_string(),
                 ]))]),
-            ),
-            (
-                ".foo = to_float(.foo, 5.5)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToFloatFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some(Value::Float(5.5)),
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = to_float(.bar)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ToFloatFn::new(Box::new(QueryPath::from("bar")), None)),
-                ))]),
             ),
             (
                 ".foo = to_bool(.foo, true)",
