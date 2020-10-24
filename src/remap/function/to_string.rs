@@ -41,7 +41,7 @@ impl ToStringFn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, default: Option<Value>) -> Self {
         let default = default.map(|v| Box::new(Literal::from(v)) as _);
-        Self { query, default }
+        Self { value, default }
     }
 }
 
