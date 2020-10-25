@@ -31,7 +31,6 @@ remap: functions: replace: {
 			- *i* perform a case insensitive match.
 			- *g* global. If specified all occurrences of the pattern are replaced. 
 			- *m* multiline. When enabled `^` and `$` match the beginning and end of multiline strings.
-		
 		"""#
 	examples: [
 		{

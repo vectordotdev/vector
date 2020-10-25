@@ -25,7 +25,7 @@ remap: functions: truncate: {
 	category: "text"
 	description: #"""
 		Truncates a string after a given number of characters. If `limit` is larger than the length of the string,
-		the string is returned unchanged. 
+		the string is returned unchanged.
 
 		Optionally, an ellipsis (...) is appended if the string does get appended.
 		Note: this does increase the string length by 3, so if you need the result to fit in a certain length, specify
