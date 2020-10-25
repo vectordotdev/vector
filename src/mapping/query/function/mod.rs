@@ -124,7 +124,6 @@ macro_rules! build_signatures {
 build_signatures! {
     strip_whitespace => StripWhitespaceFn,
     truncate => TruncateFn,
-    parse_json => ParseJsonFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
     split => SplitFn,
     replace => ReplaceFn,

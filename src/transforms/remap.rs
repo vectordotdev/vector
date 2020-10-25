@@ -82,6 +82,7 @@ impl Remap {
             Box::new(Round),
             Box::new(ParseSyslog),
             Box::new(ParseTimestamp),
+            Box::new(ParseJson),
         ];
 
         Ok(Remap {

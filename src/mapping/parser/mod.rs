@@ -559,7 +559,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ParseJsonFn, SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, TruncateFn,
+        SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, TruncateFn,
     };
 
     #[test]
@@ -1026,13 +1026,6 @@ mod tests {
                         Box::new(Literal::from(Value::Integer(5))),
                         Some(Value::Boolean(true)),
                     )),
-                ))]),
-            ),
-            (
-                ".foo = parse_json(.foo)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ParseJsonFn::new(Box::new(QueryPath::from("foo")))),
                 ))]),
             ),
             (
