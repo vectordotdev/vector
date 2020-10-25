@@ -130,42 +130,6 @@ fn vec_path_to_string(path: &[Vec<String>]) -> String {
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use std::str::FromStr;
-
-    #[derive(Debug, Default)]
-    struct Event {
-        paths: HashMap<String, Value>,
-    }
-
-    impl Object for Event {
-        fn insert(
-            &mut self,
-            path: &[Vec<String>],
-            value: Value,
-        ) -> std::result::Result<(), String> {
-            let path = path
-                .iter()
-                .map(|c| c.join("."))
-                .collect::<Vec<_>>()
-                .join(".");
-
-            self.paths.insert(path, value);
-            Ok(())
-        }
-
-        fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
-            Ok(self
-                .paths
-                .get(
-                    &path
-                        .iter()
-                        .map(|c| c.join("."))
-                        .collect::<Vec<_>>()
-                        .join("."),
-                )
-                .cloned())
-        }
-    }
 
     #[test]
     fn it_works() {
@@ -190,10 +154,6 @@ mod tests {
             // ),
             (".bar = true\n.foo = .bar", Ok(Some(Value::Boolean(true)))),
             (
-                r#"split("bar", pattern = /a/)"#,
-                Ok(Some(vec!["b", "r"].into())),
-            ),
-            (
                 r#"{
                     .foo = "foo"
                     .foo = .foo + "bar"
@@ -212,14 +172,14 @@ mod tests {
         ];
 
         for (script, result) in cases {
-            let program = Program::from_str(script)
+            let program = Program::new(script, vec![])
                 .map_err(|e| {
                     println!("{}", &e);
                     e
                 })
                 .unwrap();
             let mut runtime = Runtime::new(State::default());
-            let mut event = Event::default();
+            let mut event = HashMap::default();
 
             assert_eq!(runtime.execute(&mut event, &program), result);
         }
