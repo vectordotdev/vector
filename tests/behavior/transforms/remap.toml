@@ -846,6 +846,23 @@
     "foo[1].equals" = "bat"
     "foo[2].equals" = "fizz buzz"
 
+[transforms.remap_function_parse_timestamp]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = parse_timestamp("10", "%s")
+  """
+[[tests]]
+  name = "remap_function_parse_timestamp"
+  [tests.input]
+    insert_at = "remap_function_parse_timestamp"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_timestamp"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "1970-01-01T00:00:10Z"
+
 # [transforms.remap_function_log]
 #   inputs=[]
 #   type = "remap"

@@ -92,7 +92,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::from("10"))),
+                Ok(Some("10".into())),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
                     "%s",
@@ -100,7 +100,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::from("1970-01-01T00:00:10+00:00"))),
+                Ok(Some("1970-01-01T00:00:10+00:00".into())),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
                     "%+",

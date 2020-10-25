@@ -41,6 +41,7 @@ mod now;
 mod only_fields;
 mod parse_duration;
 mod parse_syslog;
+mod parse_timestamp;
 mod parse_url;
 mod round;
 mod sha1;
@@ -74,6 +75,7 @@ pub use now::Now;
 pub use only_fields::OnlyFields;
 pub use parse_duration::ParseDuration;
 pub use parse_syslog::ParseSyslog;
+pub use parse_timestamp::ParseTimestamp;
 pub use parse_url::ParseUrl;
 pub use round::Round;
 pub use slice::Slice;
@@ -93,10 +95,10 @@ use remap::{Result, Value};
 fn convert_value_or_default(
     value: Result<Option<Value>>,
     default: Option<Result<Option<Value>>>,
-    convert: fn(Value) -> Result<Value>,
+    convert: impl Fn(Value) -> Result<Value> + Clone,
 ) -> Result<Option<Value>> {
     value
-        .and_then(|opt| opt.map(convert).transpose())
+        .and_then(|opt| opt.map(convert.clone()).transpose())
         .or_else(|err| {
             default
                 .ok_or(err)?

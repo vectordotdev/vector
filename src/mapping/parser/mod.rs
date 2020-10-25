@@ -559,8 +559,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ParseJsonFn, ParseTimestampFn, SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn,
-        TruncateFn,
+        ParseJsonFn, SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, TruncateFn,
     };
 
     #[test]
@@ -992,17 +991,6 @@ mod tests {
                     "foo.bar".to_string(),
                     "baz".to_string(),
                 ]))]),
-            ),
-            (
-                ".foo = parse_timestamp(.foo, \"%d %m %Y\")",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(ParseTimestampFn::new(
-                        "%d %m %Y",
-                        Box::new(QueryPath::from("foo")),
-                        None,
-                    )),
-                ))]),
             ),
             (
                 ".foo = strip_whitespace(.foo)",

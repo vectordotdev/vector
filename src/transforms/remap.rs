@@ -81,6 +81,7 @@ impl Remap {
             Box::new(Floor),
             Box::new(Round),
             Box::new(ParseSyslog),
+            Box::new(ParseTimestamp),
         ];
 
         Ok(Remap {

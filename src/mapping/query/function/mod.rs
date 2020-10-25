@@ -20,7 +20,6 @@ mod prelude {
     #[cfg(test)]
     pub(super) use crate::mapping::query::Literal;
     pub(super) use crate::mapping::Result;
-    pub(super) use crate::types::Conversion;
     pub(super) use std::convert::TryFrom;
 }
 
@@ -123,7 +122,6 @@ macro_rules! build_signatures {
 
 // List of built-in functions.
 build_signatures! {
-    parse_timestamp => ParseTimestampFn,
     strip_whitespace => StripWhitespaceFn,
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
