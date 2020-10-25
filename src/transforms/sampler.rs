@@ -217,8 +217,8 @@ mod tests {
     }
 
     fn random_events(n: usize) -> Vec<Event> {
-        use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
+        use rand_distr::Alphanumeric;
 
         (0..n)
             .map(|_| {
