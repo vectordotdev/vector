@@ -17,11 +17,6 @@ remap: functions: to_timestamp: {
 	category: "coerce"
 	description: #"""
 		Returns a `timestamp` from the parameters. If parameter is `string`, the timestamp is parsed in these formats.
-
-		----- TODO -------
-		Is there already some existing documentation of timestamp formats?
-
-
 		If parameter is `integer`, the timestamp is takes as that number of seconds after January 1st 1970.
 		"""#
 	examples: [
@@ -32,7 +27,6 @@ remap: functions: to_timestamp: {
 			}
 			source: ".date = to_timestamp(.date)"
 			output: {
-				// TODO : Not sure how to indicate that this is now a date.
 				date: "2020-10-21T16:00:00Z"
 			}
 		},
@@ -43,7 +37,6 @@ remap: functions: to_timestamp: {
 			}
 			source: ".date = to_timestamp(.date, 10)"
 			output: {
-				// TODO : Not sure how to indicate that this is now a date.
 				date: "1970-01-01T00:00:10Z"
 			}
 		},

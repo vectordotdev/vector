@@ -18,7 +18,6 @@ remap: functions: to_string: {
 	return: ["boolean", "integer", "float", "string", "map", "array", "null"]
 	category: "coerce"
 
-	// TODO : This function seems a bit wierd. Is this really how it should work!!!
 	description: #"""
 		Returns the string representation of the first parameter. If this parameter is an error, then
 		the second parameter is returned.
