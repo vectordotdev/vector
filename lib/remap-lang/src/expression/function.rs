@@ -161,10 +161,10 @@ impl ArgumentValidator {
 
 impl Expression for ArgumentValidator {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let value = self.expression.execute(state, object)?.ok_or(E::Function(
-            self.ident.to_owned(),
-            Error::Expression(self.keyword),
-        ))?;
+        let value = self
+            .expression
+            .execute(state, object)?
+            .ok_or_else(|| E::Function(self.ident.to_owned(), Error::Expression(self.keyword)))?;
 
         if !(self.validator)(&value) {
             return Err(E::Function(
