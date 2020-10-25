@@ -7,6 +7,7 @@ use std::{
     pin::Pin,
     sync::{Arc, Mutex},
     task::{Context, Poll},
+    io::{Error as IoError, ErrorKind}
 };
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
@@ -90,7 +91,7 @@ impl<S> Stream for EncodeEventStream<'_, S>
 where
     S: Stream<Item = Event> + Unpin,
 {
-    type Item = Result<Bytes, std::io::Error>;
+    type Item = Result<Bytes, IoError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
@@ -111,7 +112,7 @@ where
 }
 
 pub enum ShutdownCheck {
-    Error(std::io::Error),
+    Error(IoError),
     Close,
     Alive,
 }
@@ -154,15 +155,15 @@ where
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let pinned = self.as_mut().project();
         match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
-            ShutdownCheck::Error(error) => return Poll::Ready(Err(error)), // TODO: add custom?
+            ShutdownCheck::Error(error) => return Poll::Ready(Err(error)),
             ShutdownCheck::Close => {
-                if let Err(error) = ready!(self.as_mut().poll_flush(cx)) {
+                if let Err(error) = ready!(self.as_mut().poll_close(cx)) {
                     return Poll::Ready(Err(error));
                 }
 
-                return Poll::Ready(Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "custom close",
+                return Poll::Ready(Err(IoError::new(
+                    ErrorKind::Other,
+                    "ShutdownCheck::Close",
                 )));
             }
             ShutdownCheck::Alive => {}
