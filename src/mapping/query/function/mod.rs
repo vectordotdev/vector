@@ -131,7 +131,6 @@ build_signatures! {
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
     round => RoundFn,
     floor => FloorFn,
-    ceil => CeilFn,
     parse_syslog => ParseSyslogFn,
     split => SplitFn,
     replace => ReplaceFn,

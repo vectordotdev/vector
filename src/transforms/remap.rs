@@ -77,6 +77,7 @@ impl Remap {
             Box::new(ParseDuration),
             Box::new(FormatNumber),
             Box::new(ParseUrl),
+            Box::new(Ceil),
         ];
 
         Ok(Remap {

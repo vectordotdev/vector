@@ -28,6 +28,7 @@ macro_rules! optional {
     }
 }
 
+mod ceil;
 mod contains;
 mod del;
 mod downcase;
@@ -58,6 +59,7 @@ pub use self::md5::Md5;
 pub use self::sha1::Sha1;
 pub use self::sha2::Sha2;
 pub use self::sha3::Sha3;
+pub use ceil::Ceil;
 pub use contains::Contains;
 pub use del::Del;
 pub use downcase::Downcase;
@@ -103,4 +105,15 @@ fn is_scalar_value(value: &Value) -> bool {
         Integer(_) | Float(_) | String(_) | Boolean(_) => true,
         Timestamp(_) | Map(_) | Array(_) | Null => false,
     }
+}
+
+/// Rounds the given number to the given precision.
+/// Takes a function parameter so the exact rounding function (ceil, floor or round)
+/// can be specified.
+fn round_to_precision<F>(num: f64, precision: i64, fun: F) -> f64
+where
+    F: Fn(f64) -> f64,
+{
+    let multiplier = 10_f64.powf(precision as f64);
+    fun(num * multiplier as f64) / multiplier
 }

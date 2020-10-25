@@ -716,27 +716,27 @@
       "parts.query.hello.equals" = "world"
       "parts.fragment.equals" = "configuration"
 
-# [transforms.remap_function_ceil]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = ceil(.num)
-#     .b = ceil(.num, precision = 1)
-#     .c = ceil(.num, precision = 2)
-#   """
-# [[tests]]
-#   name = "remap_function_ceil"
-#   [tests.input]
-#     insert_at = "remap_function_ceil"
-#     type = "log"
-#     [tests.input.log_fields]
-#       num = 92.489
-#   [[tests.outputs]]
-#     extract_from = "remap_function_ceil"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = 93
-#       "b.equals" = 92.5
-#       "c.equals" = 92.49
+[transforms.remap_function_ceil]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ceil(.num)
+    .b = ceil(.num, precision = 1)
+    .c = ceil(.num, precision = 2)
+  """
+[[tests]]
+  name = "remap_function_ceil"
+  [tests.input]
+    insert_at = "remap_function_ceil"
+    type = "log"
+    [tests.input.log_fields]
+      num = 92.489
+  [[tests.outputs]]
+    extract_from = "remap_function_ceil"
+    [[tests.outputs.conditions]]
+      "a.equals" = 93
+      "b.equals" = 92.5
+      "c.equals" = 92.49
 
 # [transforms.remap_function_floor]
 #   inputs = []
