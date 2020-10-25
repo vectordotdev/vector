@@ -72,6 +72,7 @@ impl Remap {
             Box::new(EndsWith),
             Box::new(Slice),
             Box::new(Tokenize),
+            Box::new(Sha2),
         ];
 
         Ok(Remap {

@@ -559,8 +559,8 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ParseDurationFn, ParseJsonFn, ParseTimestampFn, Sha2Fn, Sha3Fn, SplitFn,
-        StripAnsiEscapeCodesFn, StripWhitespaceFn, TruncateFn,
+        ParseDurationFn, ParseJsonFn, ParseTimestampFn, Sha3Fn, SplitFn, StripAnsiEscapeCodesFn,
+        StripWhitespaceFn, TruncateFn,
     };
 
     #[test]
@@ -1037,16 +1037,6 @@ mod tests {
                         Box::new(QueryPath::from("foo")),
                         Box::new(Literal::from(Value::Integer(5))),
                         Some(Value::Boolean(true)),
-                    )),
-                ))]),
-            ),
-            (
-                r#".foo = sha2(.foo, variant = "SHA-224")"#,
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(Sha2Fn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Some("SHA-224"),
                     )),
                 ))]),
             ),

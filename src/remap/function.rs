@@ -37,6 +37,7 @@ mod md5;
 mod now;
 mod only_fields;
 mod sha1;
+mod sha2;
 mod slice;
 mod split;
 mod starts_with;
@@ -51,6 +52,7 @@ mod uuid_v4;
 
 pub use self::md5::Md5;
 pub use self::sha1::Sha1;
+pub use self::sha2::Sha2;
 pub use contains::Contains;
 pub use del::Del;
 pub use downcase::Downcase;
