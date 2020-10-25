@@ -129,7 +129,6 @@ build_signatures! {
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
-    parse_duration => ParseDurationFn,
     format_number => FormatNumberFn,
     parse_url => ParseUrlFn,
     round => RoundFn,

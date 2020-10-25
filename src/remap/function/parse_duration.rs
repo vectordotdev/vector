@@ -1,6 +1,6 @@
-use super::prelude::*;
 use lazy_static::lazy_static;
 use regex::Regex;
+use remap::prelude::*;
 use rust_decimal::{prelude::ToPrimitive, Decimal};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -33,29 +33,60 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub(in crate::mapping) struct ParseDurationFn {
-    query: Box<dyn Function>,
-    output: Box<dyn Function>,
+pub struct ParseDuration;
+
+impl Function for ParseDuration {
+    fn identifier(&self) -> &'static str {
+        "parse_duration"
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &[
+            Parameter {
+                keyword: "value",
+                accepts: |v| matches!(v, Value::String(_)),
+                required: true,
+            },
+            Parameter {
+                keyword: "output",
+                accepts: |v| matches!(v, Value::String(_)),
+                required: true,
+            },
+        ]
+    }
+
+    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+        let value = arguments.required_expr("value")?;
+        let output = arguments.required_expr("output")?;
+
+        Ok(Box::new(ParseDurationFn { value, output }))
+    }
+}
+
+#[derive(Debug)]
+struct ParseDurationFn {
+    value: Box<dyn Expression>,
+    output: Box<dyn Expression>,
 }
 
 impl ParseDurationFn {
     #[cfg(test)]
-    pub(in crate::mapping) fn new(query: Box<dyn Function>, output: &str) -> Self {
-        let output = Box::new(Literal::from(Value::from(output)));
+    fn new(value: Box<dyn Expression>, output: &str) -> Self {
+        let output = Box::new(Literal::from(output));
 
-        Self { query, output }
+        Self { value, output }
     }
 }
 
-impl Function for ParseDurationFn {
-    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+impl Expression for ParseDurationFn {
+    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
         let value = {
-            let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
+            let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
         let conversion_factor = {
-            let bytes = required_value!(ctx, self.output, Value::Bytes(v) => v);
+            let bytes = required!(state, object, self.output, Value::String(v) => v);
             let output = String::from_utf8_lossy(&bytes).into_owned();
 
             UNITS
@@ -79,108 +110,88 @@ impl Function for ParseDurationFn {
             .to_f64()
             .ok_or(format!("unable to format duration: '{}'", number))?;
 
-        Ok(Value::from(number).into())
-    }
-
-    fn parameters() -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "value",
-                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
-                required: true,
-            },
-            Parameter {
-                keyword: "output",
-                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
-                required: true,
-            },
-        ]
-    }
-}
-
-impl TryFrom<ArgumentList> for ParseDurationFn {
-    type Error = String;
-
-    fn try_from(mut arguments: ArgumentList) -> Result<Self> {
-        let query = arguments.required("value")?;
-        let output = arguments.required("output")?;
-
-        Ok(Self { query, output })
+        Ok(Some(number.into()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::path::Path;
+    use crate::map;
 
     #[test]
     fn parse_duration() {
         let cases = vec![
             (
-                Event::from(""),
-                Ok(Value::from(0.5)),
+                map![],
+                Ok(Some(0.5.into())),
                 ParseDurationFn::new(Box::new(Literal::from("30s")), "m"),
             ),
             (
-                Event::from(""),
-                Ok(Value::from(1.2)),
+                map![],
+                Ok(Some(1.2.into())),
                 ParseDurationFn::new(Box::new(Literal::from("1200ms")), "s"),
             ),
             (
-                Event::from(""),
-                Ok(Value::from(100.0)),
+                map![],
+                Ok(Some(100.0.into())),
                 ParseDurationFn::new(Box::new(Literal::from("100ms")), "ms"),
             ),
             (
-                Event::from(""),
-                Ok(Value::from(1.005)),
+                map![],
+                Ok(Some(1.005.into())),
                 ParseDurationFn::new(Box::new(Literal::from("1005ms")), "s"),
             ),
             (
-                Event::from(""),
-                Ok(Value::from(0.0001)),
+                map![],
+                Ok(Some(0.0001.into())),
                 ParseDurationFn::new(Box::new(Literal::from("100ns")), "ms"),
             ),
             (
-                Event::from(""),
-                Ok(Value::from(86400.0)),
+                map![],
+                Ok(Some(86400.0.into())),
                 ParseDurationFn::new(Box::new(Literal::from("1d")), "s"),
             ),
             (
-                Event::from(""),
-                Ok(Value::from(1000000000.0)),
+                map![],
+                Ok(Some(1000000000.0.into())),
                 ParseDurationFn::new(Box::new(Literal::from("1 s")), "ns"),
             ),
             (
-                Event::from(""),
-                Err("path .foo not found in event".to_owned()),
-                ParseDurationFn::new(Box::new(Path::from(vec![vec!["foo"]])), "s"),
+                map![],
+                Err("path error: missing path: foo".into()),
+                ParseDurationFn::new(Box::new(Path::from("foo")), "s"),
             ),
             (
-                Event::from(""),
-                Err("unable to parse duration: 'foo'".to_owned()),
+                map![],
+                Err("function call error: unable to parse duration: 'foo'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("foo")), "µs"),
             ),
             (
-                Event::from(""),
-                Err("unable to parse duration: '1'".to_owned()),
+                map![],
+                Err("function call error: unable to parse duration: '1'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("1")), "ns"),
             ),
             (
-                Event::from(""),
-                Err("unknown duration unit: 'w'".to_owned()),
+                map![],
+                Err("function call error: unknown duration unit: 'w'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("1w")), "ns"),
             ),
             (
-                Event::from(""),
-                Err("unknown output format: 'w'".to_owned()),
+                map![],
+                Err("function call error: unknown output format: 'w'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("1s")), "w"),
             ),
         ];
 
-        for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
+        let mut state = remap::State::default();
+
+        for (mut object, exp, func) in cases {
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
         }
     }
 }

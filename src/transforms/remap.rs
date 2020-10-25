@@ -74,6 +74,7 @@ impl Remap {
             Box::new(Tokenize),
             Box::new(Sha2),
             Box::new(Sha3),
+            Box::new(ParseDuration),
         ];
 
         Ok(Remap {
