@@ -519,12 +519,8 @@ macro_rules! map {
         ::std::collections::BTreeMap::new()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
-        {
-            let mut m = ::std::collections::BTreeMap::new();
-            $(
-                m.insert($k.into(), $v.into());
-            ),+
-            m
-        }
+        vec![$(($k.into(), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>()
     };
 }

@@ -112,6 +112,12 @@ impl From<&str> for Value {
     }
 }
 
+impl From<BTreeMap<String, Value>> for Value {
+    fn from(value: BTreeMap<String, Value>) -> Self {
+        Value::Map(value)
+    }
+}
+
 impl From<DateTime<Utc>> for Value {
     fn from(v: DateTime<Utc>) -> Self {
         Value::Timestamp(v)

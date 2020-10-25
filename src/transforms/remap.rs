@@ -76,6 +76,7 @@ impl Remap {
             Box::new(Sha3),
             Box::new(ParseDuration),
             Box::new(FormatNumber),
+            Box::new(ParseUrl),
         ];
 
         Ok(Remap {
