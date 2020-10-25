@@ -259,6 +259,7 @@ components: transforms: lua: {
 					"""
 			}
 			input: metric: {
+				kind: "incremental"
 				name: "logins"
 				counter: {
 					value: 2.0
@@ -269,6 +270,7 @@ components: transforms: lua: {
 				}
 			}
 			output: metric: {
+				kind: "incremental"
 				name: "logins"
 				counter: {
 					value: 2.0
@@ -402,6 +404,7 @@ components: transforms: lua: {
 			}
 			input: log: {}
 			output: metric: {
+				kind: "incremental"
 				name: "event_counter"
 				counter: {
 					value: 1.0

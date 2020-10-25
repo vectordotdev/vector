@@ -497,6 +497,7 @@ _values: {
 }
 
 #MetricEvent: {
+	kind: "incremental" | "absolute"
 	name: string
 	tags: [Name=string]: string
 	timestamp?: string
@@ -555,7 +556,7 @@ _values: {
 	name:     Name
 })
 
-#MetricType: "counter" | "gauge" | "histogram" | "summary"
+#MetricType: "counter" | "distribution" | "gauge" | "histogram" | "summary"
 
 #Object: {[_=string]: #Any}
 
