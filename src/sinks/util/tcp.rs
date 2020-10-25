@@ -3,8 +3,9 @@ use crate::{
     dns::Resolver,
     emit,
     internal_events::{
-        TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
-        TcpConnectionShutdown, TcpEventSent, TcpFlushError,
+        ConnectionOpen, OpenGauge, OpenTokenDyn, TcpConnectionDisconnected,
+        TcpConnectionEstablished, TcpConnectionFailed, TcpConnectionShutdown, TcpEventSent,
+        TcpFlushError,
     },
     sinks::util::{SinkBuildError, StreamSinkOld},
     sinks::{Healthcheck, VectorSink},
@@ -149,7 +150,7 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     Connecting(Box<dyn Future<Item = TcpOrTlsStream, Error = TcpError> + Send>),
-    Connected(TcpOrTlsStream01),
+    Connected(TcpOrTlsStream01, OpenTokenDyn),
     Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
@@ -206,14 +207,20 @@ impl TcpSink {
                             peer_addr: connection.get_mut().peer_addr().ok(),
                         });
                         self.backoff = Self::fresh_backoff();
-                        TcpSinkState::Connected(CompatSink::new(connection))
+                        TcpSinkState::Connected(
+                            CompatSink::new(connection),
+                            OpenGauge::new()
+                                .open(Box::new(|count| emit!(ConnectionOpen { count }))),
+                        )
                     }
                     Err(error) => {
                         emit!(TcpConnectionFailed { error });
                         TcpSinkState::Backoff(self.next_delay01())
                     }
                 },
-                TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
+                TcpSinkState::Connected(ref mut connection, _) => {
+                    return Ok(Async::Ready(connection))
+                }
                 TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(())) => TcpSinkState::Disconnected,
