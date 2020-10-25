@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{
         encode_namespace,
@@ -114,6 +114,10 @@ impl SinkConfig for PrometheusSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "prometheus"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![Resource::Port(self.address.port())]
     }
 }
 
