@@ -78,6 +78,7 @@ impl Remap {
             Box::new(FormatNumber),
             Box::new(ParseUrl),
             Box::new(Ceil),
+            Box::new(Floor),
         ];
 
         Ok(Remap {

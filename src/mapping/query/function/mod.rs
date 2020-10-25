@@ -130,7 +130,6 @@ build_signatures! {
     parse_json => ParseJsonFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
     round => RoundFn,
-    floor => FloorFn,
     parse_syslog => ParseSyslogFn,
     split => SplitFn,
     replace => ReplaceFn,
