@@ -73,6 +73,7 @@ impl Remap {
             Box::new(Slice),
             Box::new(Tokenize),
             Box::new(Sha2),
+            Box::new(Sha3),
         ];
 
         Ok(Remap {
