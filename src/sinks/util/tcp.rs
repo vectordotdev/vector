@@ -5,7 +5,7 @@ use crate::{
     internal_events::{TcpConnectionEstablished, TcpConnectionFailed, TcpEventSent},
     sinks::{
         util::{
-            events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
+            socket_events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
             SinkBuildError, StreamSink,
         },
         Healthcheck, VectorSink,

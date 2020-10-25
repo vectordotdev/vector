@@ -2,13 +2,13 @@ pub mod auto_concurrency;
 pub mod batch;
 pub mod buffer;
 pub mod encoding;
-pub mod events_counter;
 pub mod http;
 pub mod retries;
 #[cfg(feature = "rusoto_core")]
 pub mod rusoto;
 pub mod service;
 pub mod sink;
+pub mod socket_events_counter;
 pub mod statistic;
 pub mod tcp;
 #[cfg(test)]

@@ -7,7 +7,7 @@ use crate::{
     },
     sinks::{
         util::{
-            events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
+            socket_events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
             StreamSink,
         },
         Healthcheck, VectorSink,

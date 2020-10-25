@@ -3,11 +3,11 @@ use bytes::Bytes;
 use futures::{ready, Sink, Stream};
 use pin_project::pin_project;
 use std::{
+    io::{Error as IoError, ErrorKind},
     marker::Unpin,
     pin::Pin,
     sync::{Arc, Mutex},
     task::{Context, Poll},
-    io::{Error as IoError, ErrorKind}
 };
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
@@ -161,10 +161,7 @@ where
                     return Poll::Ready(Err(error));
                 }
 
-                return Poll::Ready(Err(IoError::new(
-                    ErrorKind::Other,
-                    "ShutdownCheck::Close",
-                )));
+                return Poll::Ready(Err(IoError::new(ErrorKind::Other, "ShutdownCheck::Close")));
             }
             ShutdownCheck::Alive => {}
         }
