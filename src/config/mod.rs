@@ -278,7 +278,7 @@ impl Resource {
     /// From given components returns all that have a resource conflict with any other componenet.
     pub fn conflicts<K: Eq + Hash + Clone>(
         components: impl IntoIterator<Item = (K, Vec<Resource>)>,
-    ) -> impl IntoIterator<Item = K> {
+    ) -> impl Iterator<Item = K> {
         let mut resource_map = HashMap::<Resource, HashSet<K>>::new();
         for (key, resources) in components {
             for resource in resources {
