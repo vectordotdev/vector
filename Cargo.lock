@@ -6070,7 +6070,7 @@ dependencies = [
 name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
- "ansi_term 0.11.0",
+ "ansi_term 0.12.1",
  "criterion",
  "tracing 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "tracing-core 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
