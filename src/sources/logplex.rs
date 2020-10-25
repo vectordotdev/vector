@@ -2,7 +2,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::Event,
+    event::{Event, Value},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -13,6 +13,7 @@ use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     io::{BufRead, BufReader},
     net::SocketAddr,
     str::FromStr,
@@ -23,6 +24,7 @@ use warp::http::{HeaderMap, StatusCode};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
+    query_params: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
 }
@@ -35,6 +37,7 @@ impl GenerateConfig for LogplexConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:80".parse().unwrap(),
+            query_params: Vec::new(),
             tls: None,
             auth: None,
         })
@@ -43,11 +46,19 @@ impl GenerateConfig for LogplexConfig {
 }
 
 #[derive(Clone, Default)]
-struct LogplexSource;
+struct LogplexSource {
+    query_params: Vec<String>,
+}
 
 impl HttpSource for LogplexSource {
-    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+    fn build_event(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_params: HashMap<String, String>,
+    ) -> Result<Vec<Event>, ErrorMessage> {
         decode_message(body, header_map)
+            .map(|events| add_query_params(events, &self.query_params, query_params))
     }
 }
 
@@ -61,7 +72,9 @@ impl SourceConfig for LogplexConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let source = LogplexSource::default();
+        let source = LogplexSource {
+            query_params: self.query_params.clone(),
+        };
         source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
     }
 
@@ -106,6 +119,27 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
     }
 
     Ok(events)
+}
+
+fn add_query_params(
+    mut events: Vec<Event>,
+    query_params_config: &[String],
+    query_params: HashMap<String, String>,
+) -> Vec<Event> {
+    for query_param_name in query_params_config {
+        let value = query_params
+            .get(query_param_name)
+            .map(String::as_bytes)
+            .unwrap_or_default();
+        for event in events.iter_mut() {
+            event.as_mut_log().insert(
+                query_param_name as &str,
+                Value::from(Bytes::from(value.to_owned())),
+            );
+        }
+    }
+
+    events
 }
 
 fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, ErrorMessage> {
@@ -198,12 +232,16 @@ mod tests {
         crate::test_util::test_generate_config::<LogplexConfig>();
     }
 
-    async fn source(auth: Option<HttpSourceAuthConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(
+        auth: Option<HttpSourceAuthConfig>,
+        query_params: Vec<String>,
+    ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
             LogplexConfig {
                 address,
+                query_params,
                 tls: None,
                 auth,
             }
@@ -223,9 +261,14 @@ mod tests {
         (recv, address)
     }
 
-    async fn send(address: SocketAddr, body: &str, auth: Option<HttpSourceAuthConfig>) -> u16 {
+    async fn send(
+        address: SocketAddr,
+        body: &str,
+        auth: Option<HttpSourceAuthConfig>,
+        query: &str,
+    ) -> u16 {
         let len = body.lines().count();
-        let mut req = reqwest::Client::new().post(&format!("http://{}/events", address));
+        let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
             req = req.basic_auth(auth.username, Some(auth.password));
         }
@@ -251,9 +294,16 @@ mod tests {
             password: "vector_pass".to_owned(),
         };
 
-        let (rx, addr) = source(Some(auth.clone())).await;
+        let (rx, addr) = source(
+            Some(auth.clone()),
+            vec!["appname".to_string(), "absent".to_string()],
+        )
+        .await;
 
-        assert_eq!(200, send(addr, body, Some(auth)).await);
+        assert_eq!(
+            200,
+            send(addr, body, Some(auth), "appname=lumberjack-store").await
+        );
 
         let mut events = collect_n(rx, body.lines().count()).await.unwrap();
         let event = events.remove(0);
@@ -272,6 +322,8 @@ mod tests {
         );
         assert_eq!(log[&log_schema().host_key()], "host".into());
         assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log["appname"], "lumberjack-store".into());
+        assert_eq!(log["absent"], "".into());
     }
 
     #[test]
