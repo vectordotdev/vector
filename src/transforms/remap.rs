@@ -85,6 +85,7 @@ impl Remap {
             Box::new(ParseJson),
             Box::new(Truncate),
             Box::new(StripWhitespace),
+            Box::new(StripAnsiEscapeCodes),
         ];
 
         Ok(Remap {
