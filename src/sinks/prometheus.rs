@@ -70,20 +70,25 @@ pub fn default_flush_period_secs() -> u64 {
     60
 }
 
+impl Default for PrometheusSinkConfig {
+    fn default() -> Self {
+        Self {
+            namespace: None,
+            address: default_address(),
+            buckets: default_histogram_buckets(),
+            quantiles: default_summary_quantiles(),
+            flush_period_secs: default_flush_period_secs(),
+        }
+    }
+}
+
 inventory::submit! {
     SinkDescription::new::<PrometheusSinkConfig>("prometheus")
 }
 
 impl GenerateConfig for PrometheusSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
-            namespace: None,
-            address: default_address(),
-            buckets: default_histogram_buckets(),
-            quantiles: default_summary_quantiles(),
-            flush_period_secs: default_flush_period_secs(),
-        })
-        .unwrap()
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 

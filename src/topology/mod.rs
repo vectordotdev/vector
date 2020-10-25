@@ -710,12 +710,25 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "sinks-console", feature = "sources-splunk_hec"))]
+#[cfg(all(
+    test,
+    feature = "sinks-console",
+    feature = "sources-splunk_hec",
+    feature = "sources-generator",
+    feature = "sinks-prometheus",
+    feature = "transforms-log_to_metric"
+))]
 mod reload_tests {
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
+    use crate::sinks::prometheus::PrometheusSinkConfig;
+    use crate::sources::generator::GeneratorConfig;
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, start_topology};
+    use crate::test_util::{next_addr, start_topology, wait_for_tcp};
+    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use futures::{compat::Stream01CompatExt, StreamExt};
+    use std::time::Duration;
+    use tokio::time::delay_for;
 
     #[tokio::test]
     async fn topology_reuse_old_port() {
@@ -805,6 +818,66 @@ mod reload_tests {
             .reload_config_and_respawn(old_config.build().unwrap(), false)
             .await
             .unwrap());
+    }
+
+    #[tokio::test]
+    async fn topology_reuse_old_port_sink() {
+        let address = next_addr();
+
+        let source =
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001));
+        let transform = LogToMetricConfig {
+            metrics: vec![MetricConfig::Gauge(GaugeConfig {
+                field: "message".to_string(),
+                name: None,
+                tags: None,
+            })],
+        };
+
+        let mut old_config = Config::builder();
+        old_config.add_source("in", source.clone());
+        old_config.add_transform("trans", &[&"in"], transform.clone());
+        old_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusSinkConfig {
+                address,
+                flush_period_secs: 1,
+                ..PrometheusSinkConfig::default()
+            },
+        );
+
+        let mut new_config = Config::builder();
+        new_config.add_source("in", source.clone());
+        new_config.add_transform("trans", &[&"in"], transform.clone());
+        new_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusSinkConfig {
+                address,
+                flush_period_secs: 2,
+                ..PrometheusSinkConfig::default()
+            },
+        );
+
+        let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+        let mut crash = crash.compat();
+
+        // Wait for sink to come online
+        wait_for_tcp(address).await;
+
+        assert!(topology
+            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .await
+            .unwrap());
+
+        // Give old time to shutdown if it didn't, and new one to come online.
+        delay_for(Duration::from_secs(2)).await;
+
+        tokio::select! {
+            _ = wait_for_tcp(address) => {}//Success
+            _ = crash.next() => panic!(),
+        }
     }
 }
 
