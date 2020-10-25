@@ -21,7 +21,7 @@ remap: functions: truncate: {
 			type: ["boolean"]
 		},
 	]
-	return:   "string"
+	return:   ["string"]
 	category: "text"
 	description: #"""
 		Truncates a string after a given number of characters. If `limit` is larger than the length of the string,

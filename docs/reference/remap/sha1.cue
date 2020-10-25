@@ -9,7 +9,7 @@ remap: functions: sha1: {
 			type: ["string"]
 		},
 	]
-	return:   "string"
+	return:   ["string"]
 	category: "hash"
 	description: #"""
 			Calculates a sha1 hash of a given string.

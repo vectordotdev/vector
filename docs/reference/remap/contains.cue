@@ -22,7 +22,7 @@ remap: functions: contains: {
 			default: true
 		},
 	]
-	return:   "boolean"
+	return:   ["boolean"]
 	category: "text"
 	description: #"""
 			Searches a string, `value` to determine if it contains a given `substring`.

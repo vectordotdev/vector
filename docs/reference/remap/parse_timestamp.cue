@@ -22,7 +22,7 @@ remap: functions: parse_timestamp: {
 		},
 
 	]
-	return:   "timestamp"
+	return:   ["timestamp"]
 	category: "coerce"
 	description: #"""
 		Parses a string representing a timestamp using a provided format string. If the string is unable to be parsed, and a `default` is specified,

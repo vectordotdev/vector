@@ -9,7 +9,7 @@ remap: functions: tokenize: {
 			type: ["string"]
 		},
 	]
-	return:   "array"
+	return:   ["array"]
 	category: "text"
 	description: #"""
 		Splits the string up into an array of tokens. A token is considered to be:

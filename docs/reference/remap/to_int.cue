@@ -7,7 +7,7 @@ remap: functions: to_int: {
 			type: ["string"]
 		},
 	]
-	return:   "integer"
+	return:   ["integer"]
 	category: "coerce"
 	description: #"""
 		Returns an `integer` whose text representation is `string`.

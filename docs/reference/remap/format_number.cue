@@ -29,7 +29,7 @@ remap: functions: format_number: {
 			default: true
 		},
 	]
-	return:   "string"
+	return:   ["string"]
 	category: "coerce"
 	description: #"""
 		Returns a string representation of the given number.

@@ -863,13 +863,16 @@ data_model: close({
 
 releases: #Releases
 
-#RemapTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "any"
+#RemapParameterTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
+
+#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
 remap: {
 	errors: [Name=string]: {
 		description: string
 		name:        Name
 	}
+
 
 	functions: [Name=string]: {
 		arguments: [
@@ -880,10 +883,16 @@ remap: {
 					name: string
 				}
 
-				type: [#RemapTypes, ...]
+				multiple: bool
+				if !multiple {
+					multiple: false
+				}
+
+				type: [#RemapParameterTypes, ...]
 			},
 		]
-		category:    "coerce" | "parse" | "text" | "hash"
+		return: [#RemapReturnTypes, ...]
+		category:    "coerce" | "parse" | "text" | "hash" | "event"
 		description: string
 		examples: [
 			{

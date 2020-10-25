@@ -13,6 +13,7 @@ remap: functions: to_timestamp: {
 			type: ["string", "integer", "timestamp"]
 		},
 	]
+	return: ["timestamp"]
 	category: "coerce"
 	description: #"""
 		Returns a `timestamp` from the parameters. If parameter is `string`, the timestamp is parsed in these formats.

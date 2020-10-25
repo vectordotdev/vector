@@ -9,6 +9,7 @@ remap: functions: upcase: {
 			type: ["string"]
 		},
 	]
+	return: ["string"]
 	category: "text"
 	description: #"""
 		Returns a copy of `string` that has been converted into uppercase.

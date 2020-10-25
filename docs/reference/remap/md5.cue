@@ -9,7 +9,7 @@ remap: functions: md5: {
 			type: ["string"]
 		},
 	]
-	return:   "string"
+	return:   ["string"]
 	category: "hash"
 	description: #"""
 			Calculates an md5 hash of a given string.

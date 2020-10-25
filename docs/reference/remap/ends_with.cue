@@ -22,7 +22,7 @@ remap: functions: ends_with: {
 			default: true
 		},
 	]
-	return:   "boolean"
+	return:   ["boolean"]
 	category: "text"
 	description: #"""
 			Determines if a given string ends with a given `substring`.

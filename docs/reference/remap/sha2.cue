@@ -16,7 +16,7 @@ remap: functions: sha2: {
 			type: ["string"]
 		},
 	]
-	return:   "string"
+	return:   ["string"]
 	category: "hash"
 	description: #"""
 			Calculates a sha2 hash of a given string. The allowed variants are:

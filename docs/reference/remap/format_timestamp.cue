@@ -15,7 +15,7 @@ remap: functions: format_timestamp: {
 			type: ["string"]
 		},
 	]
-	return:   "string"
+	return:   ["string"]
 	category: "text"
 	// TODO: Is it ok to just reference the chrono docs here?
 	description: #"""
