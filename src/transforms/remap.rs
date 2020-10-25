@@ -84,6 +84,7 @@ impl Remap {
             Box::new(ParseTimestamp),
             Box::new(ParseJson),
             Box::new(Truncate),
+            Box::new(StripWhitespace),
         ];
 
         Ok(Remap {

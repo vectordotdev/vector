@@ -558,7 +558,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::function::{SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn};
+    use crate::mapping::query::function::{SplitFn, StripAnsiEscapeCodesFn};
 
     #[test]
     fn check_parser_errors() {
@@ -989,20 +989,6 @@ mod tests {
                     "foo.bar".to_string(),
                     "baz".to_string(),
                 ]))]),
-            ),
-            (
-                ".foo = strip_whitespace(.foo)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
-                ))]),
-            ),
-            (
-                ".foo = strip_whitespace(.foo)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
-                ))]),
             ),
             (
                 "merge(.bar, .baz)",

@@ -122,7 +122,6 @@ macro_rules! build_signatures {
 
 // List of built-in functions.
 build_signatures! {
-    strip_whitespace => StripWhitespaceFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
     split => SplitFn,
     replace => ReplaceFn,

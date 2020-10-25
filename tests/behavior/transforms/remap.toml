@@ -882,6 +882,23 @@
     "foo.equals" = "foo"
     "bar.equals" = "foob..."
 
+[transforms.remap_function_strip_whitespace]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = strip_whitespace("  foobar  ")
+  """
+[[tests]]
+  name = "remap_function_strip_whitespace"
+  [tests.input]
+    insert_at = "remap_function_strip_whitespace"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_strip_whitespace"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "foobar"
+
 # [transforms.remap_function_log]
 #   inputs=[]
 #   type = "remap"
