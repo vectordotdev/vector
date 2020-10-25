@@ -1,8 +1,9 @@
 use crate::{
     config::SinkContext,
     internal_events::{
-        UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketEventSent,
-        UnixSocketFlushFailed, UnixSocketSendFailed,
+        ConnectionOpen, OpenGauge, OpenTokenDyn, UnixSocketConnectionEstablished,
+        UnixSocketConnectionFailure, UnixSocketEventSent, UnixSocketFlushFailed,
+        UnixSocketSendFailed,
     },
     sinks::util::StreamSinkOld,
     sinks::{Healthcheck, VectorSink},
@@ -107,7 +108,7 @@ type UnixSocket01 = CompatSink<UnixSocket, Bytes>;
 enum UnixSinkState {
     Disconnected,
     Creating(Box<dyn Future<Item = UnixSocket, Error = UnixSocketError> + Send>),
-    Open(UnixSocket01),
+    Open(UnixSocket01, OpenTokenDyn),
     Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
@@ -143,7 +144,7 @@ impl UnixSink {
     fn poll_connection(&mut self) -> Poll01<&mut UnixSocket01, ()> {
         loop {
             self.state = match self.state {
-                UnixSinkState::Open(ref mut stream) => return Ok(Async::Ready(stream)),
+                UnixSinkState::Open(ref mut stream, _) => return Ok(Async::Ready(stream)),
                 UnixSinkState::Creating(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
@@ -158,7 +159,11 @@ impl UnixSink {
                             path: &self.connector.path,
                         });
                         self.backoff = Self::fresh_backoff();
-                        UnixSinkState::Open(CompatSink::new(socket))
+                        UnixSinkState::Open(
+                            CompatSink::new(socket),
+                            OpenGauge::new()
+                                .open(Box::new(|count| emit!(ConnectionOpen { count }))),
+                        )
                     }
                 },
                 UnixSinkState::Backoff(ref mut delay) => match delay.poll() {

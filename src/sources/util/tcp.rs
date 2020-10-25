@@ -1,5 +1,5 @@
 use crate::{
-    internal_events::TcpConnectionError,
+    internal_events::{ConnectionOpen, OpenGauge, TcpConnectionError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event, Pipeline,
@@ -13,7 +13,7 @@ use futures::{
 use futures01::Sink;
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, io, net::SocketAddr, task::Poll, time::Duration};
+use std::{fmt, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
     net::{TcpListener, TcpStream},
     time::delay_for,
@@ -97,6 +97,8 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
             }
             .shared();
 
+            let connection_gauge = OpenGauge::new();
+
             listener
                 .accept_stream()
                 .take_until(shutdown.clone())
@@ -105,6 +107,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                     let tripwire = tripwire.clone();
                     let source = self.clone();
                     let out = out.clone();
+                    let connection_gauge = connection_gauge.clone();
 
                     async move {
                         let socket = match connection {
@@ -135,8 +138,13 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                             let peer_addr = socket.peer_addr();
                             debug!(message = "accepted a new connection", %peer_addr);
 
+                            let open_token =
+                                connection_gauge.open(|count| emit!(ConnectionOpen { count }));
+
                             let fut = handle_stream(shutdown, socket, source, tripwire, host, out);
-                            tokio::spawn(fut.instrument(span.clone()));
+                            tokio::spawn(
+                                fut.map(move |()| drop(open_token)).instrument(span.clone()),
+                            );
                         });
                     }
                 })
