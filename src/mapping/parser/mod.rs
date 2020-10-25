@@ -559,7 +559,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 mod tests {
     use super::*;
     use crate::mapping::query::function::{
-        ParseDurationFn, ParseJsonFn, ParseTimestampFn, Sha2Fn, Sha3Fn, SliceFn, SplitFn,
+        ParseDurationFn, ParseJsonFn, ParseTimestampFn, Sha2Fn, Sha3Fn, SplitFn,
         StripAnsiEscapeCodesFn, StripWhitespaceFn, TokenizeFn, TruncateFn,
     };
 
@@ -1103,13 +1103,6 @@ mod tests {
                 Mapping::new(vec![Box::new(LogFn::new(
                     Box::new(QueryPath::from("bar")),
                     Some(LogLevel::Debug),
-                ))]),
-            ),
-            (
-                r#".foo = slice(.foo, 0, 1)"#,
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(SliceFn::new(Box::new(QueryPath::from("foo")), 0, Some(1))),
                 ))]),
             ),
             (

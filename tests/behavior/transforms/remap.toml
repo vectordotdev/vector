@@ -549,30 +549,30 @@
       "d.equals" = false
       "e.equals" = true
 
-# [transforms.remap_function_slice]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = slice(.foo + .bar, 1)
-#     .b = slice(.foo + .bar, 0, 1)
-#     .c = slice(.foo + .bar, start = -2)
-#     .d = slice(.foo + .bar, start = 1, end = -1)
-#   """
-# [[tests]]
-#   name = "remap_function_slice"
-#   [tests.input]
-#     insert_at = "remap_function_slice"
-#     type = "log"
-#     [tests.input.log_fields]
-#       foo = "foo"
-#       bar = "bar"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_slice"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = "oobar"
-#       "b.equals" = "f"
-#       "c.equals" = "ar"
-#       "d.equals" = "ooba"
+[transforms.remap_function_slice]
+  inputs = []
+  type = "remap"
+  sourcsource = """
+    .a = slice(.foo + .bar, 1)
+    .b = slice(.foo + .bar, 0, 1)
+    .c = slice(.foo + .bar, start = -2)
+    .d = slice(.foo + .bar, start = 1, end = -1)
+  """
+[[tests]]
+  name = "remap_function_slice"
+  [tests.input]
+    insert_at = "remap_function_slice"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "foo"
+      bar = "bar"
+  [[tests.outputs]]
+    extract_from = "remap_function_slice"
+    [[tests.outputs.conditions]]
+      "a.equals" = "oobar"
+      "b.equals" = "f"
+      "c.equals" = "ar"
+      "d.equals" = "ooba"
 
 # [transforms.remap_function_tokenize]
 #   inputs = []

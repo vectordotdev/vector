@@ -70,6 +70,7 @@ impl Remap {
             Box::new(Contains),
             Box::new(StartsWith),
             Box::new(EndsWith),
+            Box::new(Slice),
         ];
 
         Ok(Remap {

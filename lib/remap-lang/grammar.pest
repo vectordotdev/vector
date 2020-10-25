@@ -45,17 +45,17 @@ path_segment     = ${ (path_field | path_coalesce) ~ path_index* }
 path_field       = ${ ident | string }
 path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
 path_index       =  { "[" ~ path_index_inner ~ "]" }
-path_index_inner =  { "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+path_index_inner =  { ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
 
 // Literals --------------------------------------------------------------------
 
 null    =  { "null" }
 boolean =  { "true" | "false" }
 string  = ${ "\"" ~ string_inner ~ "\"" }
-integer = ${ "-"? ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+integer = ${ "-"? ~ ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
 float   = ${
     "-"?
-    ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
+    ~ ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT*
     ~ ("." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?)
         | (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)
 }
