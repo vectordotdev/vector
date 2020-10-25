@@ -80,6 +80,7 @@ impl Remap {
             Box::new(Ceil),
             Box::new(Floor),
             Box::new(Round),
+            Box::new(ParseSyslog),
         ];
 
         Ok(Remap {

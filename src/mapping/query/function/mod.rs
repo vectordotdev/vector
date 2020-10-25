@@ -128,7 +128,6 @@ build_signatures! {
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
-    parse_syslog => ParseSyslogFn,
     split => SplitFn,
     replace => ReplaceFn,
     flatten => FlattenFn,
