@@ -1,7 +1,6 @@
 #![macro_use]
 
 mod not;
-mod util;
 
 pub(in crate::mapping) use not::NotFn;
 
@@ -129,7 +128,6 @@ build_signatures! {
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
-    round => RoundFn,
     parse_syslog => ParseSyslogFn,
     split => SplitFn,
     replace => ReplaceFn,

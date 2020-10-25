@@ -760,27 +760,27 @@
       "b.equals" = 92.4
       "c.equals" = 92.48
 
-# [transforms.remap_function_round]
-#   inputs = []
-#   type = "remap"
-#   source = """
-#     .a = round(.num)
-#     .b = round(.num, precision = 1)
-#     .c = round(.num, precision = 2)
-#   """
-# [[tests]]
-#   name = "remap_function_round"
-#   [tests.input]
-#     insert_at = "remap_function_round"
-#     type = "log"
-#     [tests.input.log_fields]
-#       num = 92.489
-#   [[tests.outputs]]
-#     extract_from = "remap_function_round"
-#     [[tests.outputs.conditions]]
-#       "a.equals" = 92
-#       "b.equals" = 92.5
-#       "c.equals" = 92.49
+[transforms.remap_function_round]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = round(.num)
+    .b = round(.num, precision = 1)
+    .c = round(.num, precision = 2)
+  """
+[[tests]]
+  name = "remap_function_round"
+  [tests.input]
+    insert_at = "remap_function_round"
+    type = "log"
+    [tests.input.log_fields]
+      num = 92.489
+  [[tests.outputs]]
+    extract_from = "remap_function_round"
+    [[tests.outputs.conditions]]
+      "a.equals" = 92
+      "b.equals" = 92.5
+      "c.equals" = 92.49
 
 # [transforms.remap_function_parse_syslog]
 #   inputs = []

@@ -79,6 +79,7 @@ impl Remap {
             Box::new(ParseUrl),
             Box::new(Ceil),
             Box::new(Floor),
+            Box::new(Round),
         ];
 
         Ok(Remap {
