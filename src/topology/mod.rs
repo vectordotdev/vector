@@ -12,7 +12,7 @@ mod task;
 
 use crate::{
     buffers,
-    config::{Config, ConfigDiff},
+    config::{Config, ConfigDiff, Resource},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
@@ -63,7 +63,9 @@ pub async fn start_validated(
     {
         return None;
     }
-    running_topology.connect_diff(&diff, &mut pieces);
+    running_topology
+        .connect_diff(&diff, &mut pieces, &HashSet::new())
+        .await;
     running_topology.spawn_diff(&diff, pieces);
 
     Some((running_topology, abort_rx))
@@ -214,8 +216,27 @@ impl RunningTopology {
 
         let diff = ConfigDiff::new(&self.config, &new_config);
 
+        // At this point both the old and the new config don't have
+        // conflicts in their resource usage. So if we combine their
+        // resources, all found conflicts are between
+        // to be removed and to be added components.
+        let remove = diff.sinks.removed_and_changed().map(|name| {
+            let value = self.config.sinks[name].inner.resources();
+            ((true, name.clone()), value)
+        });
+        let add = diff.sinks.changed_and_added().map(|name| {
+            let value = new_config.sinks[name].inner.resources();
+            ((false, name.clone()), value)
+        });
+        let conflicts = Resource::conflicts(remove.chain(add));
+        let wait_for_sinks = conflicts
+            .into_iter()
+            .filter(|&(exist, _)| exist)
+            .map(|(_, name)| name)
+            .collect();
+
         // Checks passed so let's shutdown the difference.
-        self.shutdown_diff(&diff).await;
+        self.shutdown_diff(&diff, &wait_for_sinks).await;
 
         // Gives windows some time to make available any port
         // released by shutdown componenets.
@@ -231,7 +252,8 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces);
+                self.connect_diff(&diff, &mut new_pieces, &wait_for_sinks)
+                    .await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
                 // We have successfully changed to new config.
@@ -247,7 +269,8 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces);
+                self.connect_diff(&diff, &mut new_pieces, &wait_for_sinks)
+                    .await;
                 self.spawn_diff(&diff, new_pieces);
                 // We have successfully returned to old config.
                 return Ok(false);
@@ -289,7 +312,7 @@ impl RunningTopology {
     }
 
     /// Shutdowns removed and replaced pieces of topology.
-    async fn shutdown_diff(&mut self, diff: &ConfigDiff) {
+    async fn shutdown_diff(&mut self, diff: &ConfigDiff, wait_for_sinks: &HashSet<String>) {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -337,12 +360,7 @@ impl RunningTopology {
             .unwrap();
 
         // Second pass now that all sources have shut down for final cleanup.
-        for name in &diff.sources.to_remove {
-            if let Some(task) = self.source_tasks.remove(name) {
-                task.await.unwrap().unwrap();
-            }
-        }
-        for name in &diff.sources.to_change {
+        for name in diff.sources.removed_and_changed() {
             if let Some(task) = self.source_tasks.remove(name) {
                 task.await.unwrap().unwrap();
             }
@@ -360,18 +378,30 @@ impl RunningTopology {
         }
 
         // Sinks
+        // First pass to detach sinks
         for name in &diff.sinks.to_remove {
             info!(message = "Removing sink.", name = ?name);
-
-            let previous = self.tasks.remove(name).unwrap();
-            drop(previous); // detach and forget
-
             self.remove_inputs(&name);
+        }
+
+        // Second pass for final cleanup
+        for name in &diff.sinks.to_remove {
+            let previous = self.tasks.remove(name).unwrap();
+            if wait_for_sinks.contains(name) {
+                previous.await.unwrap().unwrap();
+            } else {
+                drop(previous); // detach and forget
+            }
         }
     }
 
     /// Rewires topology
-    fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
+    async fn connect_diff(
+        &mut self,
+        diff: &ConfigDiff,
+        new_pieces: &mut Pieces,
+        wait_for_sinks: &HashSet<String>,
+    ) {
         // Sources
         for name in diff.sources.changed_and_added() {
             self.setup_outputs(&name, new_pieces);
@@ -399,6 +429,17 @@ impl RunningTopology {
 
         for name in &diff.sinks.to_add {
             self.setup_inputs(&name, new_pieces);
+        }
+
+        // Since inputs of diff.sinks.to_change need to be replaced to avoid loosing events
+        // that requires for new pieces to be built, so waiting on changed sinks is done here
+        // instead of in fn shutdown_diff. A consequence of that is a strict requirement on
+        // the sinks with resources to not use their resources in the build method, but only
+        // once they have been run. Otherwise build will fail.
+        for name in wait_for_sinks {
+            if let Some(previous) = self.tasks.remove(name) {
+                previous.await.unwrap().unwrap();
+            }
         }
     }
 

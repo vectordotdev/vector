@@ -190,6 +190,9 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
     fn sink_type(&self) -> &'static str;
 
+    /// Resources that the sink is using.
+    /// These resources shouldn't be used in the build method as that can result
+    /// in a build error. Only the sinks are contrained by this.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
