@@ -83,6 +83,7 @@ impl Remap {
             Box::new(ParseSyslog),
             Box::new(ParseTimestamp),
             Box::new(ParseJson),
+            Box::new(Truncate),
         ];
 
         Ok(Remap {

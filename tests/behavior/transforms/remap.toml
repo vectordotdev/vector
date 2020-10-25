@@ -863,6 +863,25 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "1970-01-01T00:00:10Z"
 
+[transforms.remap_function_truncate]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = truncate("foobar", limit = 3)
+    .bar = truncate("foobar", limit = 4, ellipsis = true)
+  """
+[[tests]]
+  name = "remap_function_truncate"
+  [tests.input]
+    insert_at = "remap_function_truncate"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_truncate"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "foo"
+    "bar.equals" = "foob..."
+
 # [transforms.remap_function_log]
 #   inputs=[]
 #   type = "remap"

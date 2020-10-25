@@ -57,6 +57,7 @@ mod to_int;
 mod to_string;
 mod to_timestamp;
 mod tokenize;
+mod truncate;
 mod upcase;
 mod uuid_v4;
 
@@ -89,6 +90,7 @@ pub use to_int::ToInt;
 pub use to_string::ToString;
 pub use to_timestamp::ToTimestamp;
 pub use tokenize::Tokenize;
+pub use truncate::Truncate;
 pub use upcase::Upcase;
 pub use uuid_v4::UuidV4;
 

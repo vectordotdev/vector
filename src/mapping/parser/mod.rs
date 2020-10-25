@@ -558,9 +558,7 @@ pub fn parse(input: &str) -> Result<Mapping> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::function::{
-        SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn, TruncateFn,
-    };
+    use crate::mapping::query::function::{SplitFn, StripAnsiEscapeCodesFn, StripWhitespaceFn};
 
     #[test]
     fn check_parser_errors() {
@@ -1004,28 +1002,6 @@ mod tests {
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
                     Box::new(StripWhitespaceFn::new(Box::new(QueryPath::from("foo")))),
-                ))]),
-            ),
-            (
-                ".foo = truncate(.foo, .limit)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(TruncateFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Box::new(QueryPath::from("limit")),
-                        None,
-                    )),
-                ))]),
-            ),
-            (
-                ".foo = truncate(.foo, 5, true)",
-                Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
-                    Box::new(TruncateFn::new(
-                        Box::new(QueryPath::from("foo")),
-                        Box::new(Literal::from(Value::Integer(5))),
-                        Some(Value::Boolean(true)),
-                    )),
                 ))]),
             ),
             (
