@@ -18,32 +18,23 @@ impl FormatTimestampFn {
 }
 
 impl Function for FormatTimestampFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let format = match self.format.execute(ctx)? {
-            Value::Bytes(b) => String::from_utf8_lossy(&b).into_owned(),
-            v => unexpected_type!(v),
-        };
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let format = required_value!(ctx, self.format, Value::Bytes(b) => String::from_utf8_lossy(&b).into_owned());
+        let ts = required_value!(ctx, self.query, Value::Timestamp(ts) => ts);
 
-        self.query
-            .execute(ctx)
-            .map(|v| match v {
-                Value::Timestamp(ts) => ts,
-                _ => unexpected_type!(v),
-            })
-            .and_then(|ts| try_format(&ts, &format))
-            .map(Value::from)
+        try_format(&ts, &format).map(QueryValue::from_value)
     }
 
     fn parameters() -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Timestamp(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Timestamp(_))),
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
                 required: true,
             },
         ]
@@ -113,7 +104,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

@@ -21,6 +21,7 @@ on:
       - "Makefile"
       - "rust-toolchain"
       - "distribution/**"
+  pull_request:
 
 env:
   AUTOINSTALL: true
@@ -48,6 +49,10 @@ jobs:
   build-x86_64-unknown-linux-gnu:
     name: Build - x86_64-unknown-linux-gnu
     runs-on: ubuntu-20.04
+    if: |
+      !github.event.pull_request
+        || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
+        || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -78,6 +83,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+    if: |
+      !github.event.pull_request
+        || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e tests enable')
+        || contains(github.event.pull_request.labels.*.name, 'ci-condition: k8s e2e all targets')
     steps:
       - uses: actions/github-script@v2
         id: set-matrix

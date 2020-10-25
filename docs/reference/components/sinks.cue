@@ -285,6 +285,46 @@ components: sinks: [Name=string]: {
 	}
 
 	how_it_works: {
+		if sinks[Name].features.buffer.enabled {
+			if sinks[Name].features.send != _|_ {
+				if sinks[Name].features.send.batch != _|_ {
+					if sinks[Name].features.send.batch.enabled {
+						buffers_batches: {
+							title: "Buffers & Batches"
+							body: #"""
+									<SVG src="/img/buffers-and-batches-serial.svg" />
+
+									This component buffers & batches data as shown in the diagram above. You'll notice that Vector treats these concepts
+									differently, instead of treating them as global concepts, Vector treats them
+									as sink specific concepts. This isolates sinks, ensuring services disruptions
+									are contained and delivery guarantees are honored.
+
+									*Batches* are flushed when 1 of 2 conditions are met:
+
+									1. The batch age meets or exceeds the configured `timeout_secs`.
+									2. The batch size meets or exceeds the configured <% if component.options.batch.children.respond_to?(:max_size) %>`max_size`<% else %>`max_events`<% end %>.
+
+									*Buffers* are controlled via the [`buffer.*`](#buffer) options.
+									"""#
+						}
+					}
+				}
+			}
+
+			if sinks[Name].features.send == _|_ {
+				buffers: {
+					title: "Buffers"
+					body: """
+						<SVG src="/img/buffers.svg" />
+
+						This component buffers events as shown in
+						the diagram above. This helps to smooth out data processing if the downstream
+						service applies backpressure. Buffers are controlled via the
+						[`buffer.*`](#buffer) options.
+						"""
+				}
+			}
+		}
 		if sinks[Name].features.healthcheck.enabled {
 			healthchecks: {
 				title: "Health Checks"

@@ -15,8 +15,9 @@ use crate::{
     sources::generator::GeneratorConfig,
     test_util::{
         start_topology,
-        stats::{HistogramStats, LevelTimeHistogram, WeightedSumStats},
+        stats::{HistogramStats, LevelTimeHistogram, TimeHistogram, WeightedSumStats},
     },
+    BoolAndSome,
 };
 use core::task::Context;
 use futures::{
@@ -29,15 +30,70 @@ use rand::{distributions::Exp1, prelude::*};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
+    fmt,
     fs::{read_dir, File},
     io::Read,
     path::PathBuf,
     sync::{Arc, Mutex},
     task::Poll,
 };
-use tokio::time::{self, delay_until, Duration, Instant};
+use tokio::time::{self, delay_for, Duration, Instant};
 use tower::Service;
+
+#[derive(Copy, Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+enum Action {
+    #[derivative(Default)]
+    // Above the given limit, additional requests will return with an
+    // error.
+    Defer,
+    // Above the given limit, additional requests will be silently
+    // dropped.
+    Drop,
+}
+
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
+struct LimitParams {
+    // The scale is the amount a request's delay increases at higher
+    // levels of the variable.
+    #[serde(default)]
+    scale: f64,
+
+    // The knee is the point above which a request's delay increases at
+    // an exponential scale rather than a linear scale.
+    knee_start: Option<usize>,
+
+    knee_exp: Option<f64>,
+
+    // The limit is the level above which more requests will be denied.
+    limit: Option<usize>,
+
+    // The action specifies how over-limit requests will be denied.
+    #[serde(default)]
+    action: Action,
+}
+
+impl LimitParams {
+    fn action_at_level(&self, level: usize) -> Option<Action> {
+        self.limit
+            .and_then(|limit| (level > limit).and_some(self.action))
+    }
+
+    fn scale(&self, level: usize) -> f64 {
+        (level - 1) as f64 * self.scale
+            + self
+                .knee_start
+                .map(|knee| {
+                    self.knee_exp
+                        .unwrap_or_else(|| self.scale + 1.0)
+                        .powf(level.saturating_sub(knee) as f64)
+                        - 1.0
+                })
+                .unwrap_or(0.0)
+    }
+}
 
 #[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
 struct TestParams {
@@ -57,19 +113,11 @@ struct TestParams {
     #[serde(default)]
     jitter: f64,
 
-    // The concurrency scale is the rate at which requests' delay
-    // increases at higher concurrency levels.
     #[serde(default)]
-    concurrency_scale: f64,
+    concurrency: LimitParams,
 
-    // The number of outstanding requests at which requests will return
-    // with an error.
     #[serde(default)]
-    concurrency_defer: usize,
-
-    // The number of outstanding requests at which requests will be dropped.
-    #[serde(default)]
-    concurrency_drop: usize,
+    rate: LimitParams,
 
     #[serde(default = "default_in_flight_limit")]
     in_flight_limit: InFlightLimit,
@@ -152,6 +200,14 @@ impl TestSink {
             params: config.params,
         }
     }
+
+    fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
+        self.params.delay
+            * (1.0
+                + self.params.concurrency.scale(in_flight)
+                + self.params.rate.scale(rate)
+                + thread_rng().sample(Exp1) * self.params.jitter)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -176,36 +232,43 @@ impl Service<Vec<Event>> for TestSink {
     fn call(&mut self, _request: Vec<Event>) -> Self::Future {
         let now = Instant::now();
         let mut stats = self.stats.lock().expect("Poisoned stats lock");
-        stats.in_flight.adjust(1, now.into());
+        stats.start_request(now);
         let in_flight = stats.in_flight.level();
+        let rate = stats.requests.len();
 
-        let params = self.params;
-        let delay = Duration::from_secs_f64(
-            params.delay
-                * (1.0
-                    + (in_flight - 1) as f64 * params.concurrency_scale
-                    + thread_rng().sample(Exp1) * params.jitter),
-        );
-
-        if params.concurrency_drop > 0 && in_flight >= params.concurrency_drop {
-            stats.in_flight.adjust(-1, now.into());
-            Box::pin(pending())
-        } else {
-            let stats2 = Arc::clone(&self.stats);
-            Box::pin(async move {
-                delay_until(now + delay).await;
-                let mut stats = stats2.lock().expect("Poisoned stats lock");
-                let in_flight = stats.in_flight.level();
-                stats.in_flight.adjust(-1, Instant::now().into());
-
-                if params.concurrency_defer > 0 && in_flight >= params.concurrency_defer {
-                    Err(Error::Deferred)
-                } else {
-                    Ok(Response::Ok)
-                }
-            })
+        let action = self
+            .params
+            .concurrency
+            .action_at_level(in_flight)
+            .or_else(|| self.params.rate.action_at_level(rate));
+        match action {
+            None => {
+                let delay = self.delay_at(in_flight, rate);
+                respond_after(Ok(Response::Ok), delay, Arc::clone(&self.stats))
+            }
+            Some(Action::Defer) => {
+                let delay = self.delay_at(1, 1);
+                respond_after(Err(Error::Deferred), delay, Arc::clone(&self.stats))
+            }
+            Some(Action::Drop) => {
+                stats.end_request(now, false);
+                Box::pin(pending())
+            }
         }
     }
+}
+
+fn respond_after(
+    response: Result<Response, Error>,
+    delay: f64,
+    stats: Arc<Mutex<Statistics>>,
+) -> BoxFuture<'static, Result<Response, Error>> {
+    Box::pin(async move {
+        delay_for(Duration::from_secs_f64(delay)).await;
+        let mut stats = stats.lock().expect("Poisoned stats lock");
+        stats.end_request(Instant::now(), matches!(response, Ok(Response::Ok)));
+        response
+    })
 }
 
 impl EncodedLength for Event {
@@ -231,9 +294,57 @@ impl RetryLogic for TestRetryLogic {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct Statistics {
+    completed: usize,
     in_flight: LevelTimeHistogram,
+    rate: TimeHistogram,
+    requests: VecDeque<Instant>,
+}
+
+impl fmt::Debug for Statistics {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        fmt.debug_struct("Statistics")
+            .field("completed", &self.completed)
+            .field("in_flight", &self.in_flight)
+            .field("rate", &self.rate.stats())
+            .field("requests", &self.requests.len())
+            .finish()
+    }
+}
+
+impl Statistics {
+    fn start_request(&mut self, now: Instant) {
+        self.prune_old_requests(now);
+        self.requests.push_back(now);
+        self.rate.add(self.requests.len(), now.into());
+        self.in_flight.adjust(1, now.into());
+    }
+
+    fn end_request(&mut self, now: Instant, completed: bool) {
+        self.prune_old_requests(now);
+        self.rate.add(self.requests.len(), now.into());
+        self.in_flight.adjust(-1, now.into());
+        self.completed += completed as usize;
+    }
+
+    /// Prune any requests that are more than one second old. The
+    /// `requests` deque is used to track the rate at which requests are
+    /// being issued. As such, it needs to be pruned of old requests any
+    /// time a request status changes. Since all requests are inserted
+    /// in chronological order, this function simply looks at the head
+    /// of the deque and pops off all entries that are more than one
+    /// second old. In this way, the length is always equal to the
+    /// number of requests per second.
+    fn prune_old_requests(&mut self, now: Instant) {
+        let then = now - Duration::from_secs(1);
+        while let Some(&first) = self.requests.get(0) {
+            if first > then {
+                break;
+            }
+            self.requests.pop_front();
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -269,13 +380,9 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let controller = get_controller().unwrap();
 
-    // Give time for the generator to start and queue all its data, and
-    // all the requests to resolve to a response.
-    let delay = params.interval.unwrap_or(0.0) * (params.requests as f64) + 1.0;
     // This is crude and dumb, but it works, and the tests run fast and
     // the results are highly repeatable.
-    let msecs = (delay * 1000.0) as usize;
-    for _ in 0..msecs {
+    while stats.lock().expect("Poisoned stats lock").completed < params.requests {
         time::advance(Duration::from_millis(1)).await;
     }
     topology.stop().compat().await.unwrap();
@@ -431,6 +538,7 @@ struct ControllerResults {
 #[derive(Debug, Deserialize)]
 struct StatsResults {
     in_flight: Option<ResultTest>,
+    rate: Option<ResultTest>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -450,6 +558,11 @@ async fn run_compare(file_path: PathBuf, input: TestInput) {
     if let Some(test) = input.stats.in_flight {
         let in_flight = results.stats.in_flight.stats().unwrap();
         failures.extend(test.compare_histogram(in_flight, "stats in_flight"));
+    }
+
+    if let Some(test) = input.stats.rate {
+        let rate = results.stats.rate.stats().unwrap();
+        failures.extend(test.compare_histogram(rate, "stats rate"));
     }
 
     if let Some(test) = input.controller.in_flight {
@@ -512,6 +625,12 @@ async fn all_tests() {
     entries.sort_unstable_by_key(|entry| entry.0.to_string_lossy().to_string());
 
     time::pause();
+
+    // The first delay takes just slightly longer than all the rest,
+    // which causes the first test to run differently than all the
+    // others. Throw in a dummy delay to take up this delay "slack".
+    let _ = tokio::spawn(async move { delay_for(Duration::from_millis(1)) }).await;
+    time::advance(Duration::from_millis(1)).await;
 
     // Then run all the tests
     for (file_path, input) in entries {

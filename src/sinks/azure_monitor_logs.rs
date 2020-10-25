@@ -1,10 +1,11 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -268,8 +269,9 @@ impl AzureMonitorLogsSink {
             len, CONTENT_TYPE, X_MS_DATE, rfc1123date, RESOURCE
         );
         let mut signer = sign::Signer::new(hash::MessageDigest::sha256(), &self.shared_key)?;
+        signer.update(string_to_hash.as_bytes())?;
 
-        let signature = signer.sign_oneshot_to_vec(string_to_hash.as_bytes())?;
+        let signature = signer.sign_to_vec()?;
         let signature_base64 = base64::encode_block(&signature);
 
         Ok(format!(

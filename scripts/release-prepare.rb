@@ -12,13 +12,20 @@
 # Setup
 #
 
+require "json"
 require "time"
-require_relative "setup"
+require_relative "util/commit"
+require_relative "util/git_log_commit"
+require_relative "util/printer"
+require_relative "util/release"
+require_relative "util/version"
 
 #
 # Constants
 #
 
+ROOT = ".."
+RELEASE_REFERENCE_DIR = File.join(ROOT, "docs", "reference", "releases")
 TYPES = ["chore", "docs", "feat", "fix", "enhancement", "perf"]
 TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 
@@ -28,23 +35,15 @@ TYPES_THAT_REQUIRE_SCOPES = ["feat", "enhancement", "fix"]
 # Sorted alphabetically.
 #
 
-# Determines if a commit message is a breaking change as defined by the
-# Conventional Commits specification:
+# Creates and updates the new release log file located at
 #
-# https://www.conventionalcommits.org
-def breaking_change?(commit)
-  !commit.fetch("message").match(/^[a-z]*!/).nil?
-end
-
-# Creates and updates the new release meta file located at
-#
-#   /.meta/releases/X.X.X.toml
+#   /.meta/releases/X.X.X.log
 #
 # This file is created from outstanding commits since the last release.
 # It's meant to be a starting point. The resulting file should be reviewed
-# and edited by a human.
-def create_release_meta_file!(current_commits, new_version)
-  release_meta_path = "#{RELEASE_META_DIR}/#{new_version}.toml"
+# and edited by a human before being turned into a cue file.
+def create_log_file!(current_commits, new_version)
+  release_log_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.log"
 
   # Grab all existing commits
   existing_commits = get_existing_commits!
@@ -59,165 +58,219 @@ def create_release_meta_file!(current_commits, new_version)
   new_commits =
     current_commits.select do |current_commit|
       !existing_commits.any? do |existing_commit|
-        existing_commit.fetch("sha") == current_commit.fetch("sha") ||
-          existing_commit.fetch("pr_number") == current_commit.fetch("pr_number")
+        existing_commit.eql?(current_commit)
       end
     end
 
+  new_commit_lines = new_commits.collect { |c| c.to_git_log_commit.to_raw }.join("\n")
+
   if new_commits.any?
-    if File.exists?(release_meta_path)
+    if File.exists?(release_log_path)
       words =
         <<~EOF
-        I found #{new_commits.length} new commits since you last generated:
+        I found #{new_commits.length} new commits since you last ran this
+        command. So that I don't erase any other work in that file, please
+        manually add the following commit lines:
 
-            #{release_meta_path}
+            #{new_commit_lines.split("\n").collect { |line| "    #{line}" }.join("\n")}
 
-        So I don't erase any other work in that file, please manually add the
-        following commit lines:
+        To:
 
-        #{new_commits.to_toml.indent(4)}
+            #{release_log_path}
 
-        Done? Ready to proceed?
+        All done? Ready to proceed?
         EOF
 
-      if Printer.get(words, ["y", "n"]) == "n"
-        Printer.error!("Ok, re-run this command when you're ready.")
+      if Util::Printer.get(words, ["y", "n"]) == "n"
+        Util::Printer.error!("Ok, re-run this command when you're ready.")
       end
     else
-      File.open(release_meta_path, 'w+') do |file|
+      File.open(release_log_path, 'w+') do |file|
+        file.write(new_commit_lines)
+      end
+
+      words =
+        <<~EOF
+        I've created a release log file here:
+
+            #{release_log_path}
+
+        Please review the commits and *adjust the commit messages as necessary*.
+
+        All done? Ready to proceed?
+        EOF
+
+      if Util::Printer.get(words, ["y", "n"]) == "n"
+        Util::Printer.error!("Ok, re-run this command when you're ready.")
+      end
+    end
+  end
+
+  release_log_path
+end
+
+def create_release_file!(new_version)
+  release_log_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.log"
+  git_log = Vector::GitLogCommit.from_file!(release_log_path)
+  commits = Vector::Commit.from_git_log!(git_log)
+
+  release_reference_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.cue"
+
+  if commits.any?
+    if File.exists?(release_reference_path)
+      words =
+        <<~EOF
+        It looks like you already have a release file:
+
+            #{release_reference_path}
+
+        So that I don't overwrite your work, please copy these commits into
+        the release file:
+
+            test
+
+        All done? Ready to proceed?
+        EOF
+
+      if Util::Printer.get(words, ["y", "n"]) == "n"
+        Util::Printer.error!("Ok, re-run this command when you're ready.")
+      end
+    else
+      cue_commits =
+        commits.collect do |commit|
+          "{" +
+            "sha: #{commit.sha.to_json}, " +
+            "date: #{commit.date.to_json}, " +
+            "description: #{commit.description.to_json}, " +
+            "pr_number: #{commit.pr_number.to_json}, " +
+            "scopes: #{commit.scopes.to_json}, " +
+            "type: #{commit.type.to_json}, " +
+            "breaking_change: #{commit.breaking_change.to_json}, " +
+            "author: #{commit.author.to_json}, " +
+            "files_count: #{commit.files_count.to_json}, " +
+            "insertions_count: #{commit.insertions_count.to_json}, " +
+            "deletions_count: #{commit.deletions_count.to_json}},"
+        end
+
+      File.open(release_reference_path, 'w+') do |file|
         file.write(
           <<~EOF
-          [releases."#{new_version}"]
-          date = #{Time.now.utc.to_date.to_toml}
-          commits = #{new_commits.to_toml}
+          package metadata
+
+          releases: #{new_version.to_json}: {
+            date:     #{Date.today.to_json}
+            codename: ""
+
+            whats_next: []
+
+            commits: [
+              #{cue_commits.join("\n    ")}
+            ]
+          }
           EOF
         )
       end
 
+      `cue fmt #{release_reference_path}`
+
       words =
         <<~EOF
-        I've created a release meta file here:
+        All done! I've create a release file at:
 
-          #{release_meta_path}
+            #{release_reference_path}
 
-        I recommend reviewing the commits and fixing any mistakes.
-
-        Ready to proceed?
+        I recommend previewing the website changes with this release.
         EOF
 
-      if Printer.get(words, ["y", "n"]) == "n"
-        Printer.error!("Ok, re-run this command when you're ready.")
-      end
+      Util::Printer.success(words)
     end
   end
-
-  true
-end
-
-# Gets the commit log from the last version. This is used to determine
-# the outstanding commits that should be included in this release.
-# Notice the specified format, this allow us to parse the lines into
-# structured data.
-def get_commit_log(last_version)
-  range = "v#{last_version}..."
-  `git log #{range} --no-merges --pretty=format:'%H\t%s\t%aN\t%ad'`.chomp
 end
 
 def get_commits_since(last_version)
-  commit_log = get_commit_log(last_version)
-  commit_lines = commit_log.split("\n").reverse
-
-  commit_lines.collect do |commit_line|
-    parse_commit_line!(commit_line)
-  end
-end
-
-# This is used for the `files_count`, `insertions_count`, and `deletions_count`
-# attributes. It helps to communicate stats and the depth of changes in our
-# release notes.
-def get_commit_stats(sha)
-  `git show --shortstat --oneline #{sha}`.split("\n").last
+  Vector::Commit.fetch_since!(last_version).select do |commit|
+      commit.type != "chore" &&
+        commit.type != "docs" &&
+        !commit.scopes.include?("external docs") &&
+        !commit.scopes.include?("docs")
+    end
 end
 
 # Grabs all existing commits that are included in the `.meta/releases/*.toml`
 # files. We grab _all_ commits to ensure we do not include duplicate commits
 # in the new release.
 def get_existing_commits!
-  release_meta_paths = Dir.glob("#{RELEASE_META_DIR}/*.toml").to_a
+  releases = Vector::Release.all!(RELEASE_REFERENCE_DIR)
+  release_commits = releases.collect(&:commits).flatten
 
-  release_meta_paths.collect do |release_meta_path|
-    contents = File.read(release_meta_path)
-    parsed_contents = TomlRB.parse(contents)
-    release_hash = parsed_contents.fetch("releases").values.fetch(0)
-    release_hash.fetch("commits").collect do |c|
-      message_data = parse_commit_message!(c.fetch("message"))
+  release_log_paths = Dir.glob("#{RELEASE_REFERENCE_DIR}/*.log").to_a
 
-      {
-        "sha" => c.fetch("sha"),
-        "message" => c.fetch("message"),
-        "author" => c.fetch("author"),
-        "date" => c.fetch("date"),
-        "pr_number" => message_data.fetch("pr_number"),
-        "files_count" => c["files_count"],
-        "insertions_count" => c["insertions_count"],
-        "deletions_count" => c["deletions_count"]
-      }
-    end
-  end.flatten
+  log_commits =
+    release_log_paths.collect do |release_log_path|
+      git_log = Vector::GitLogCommit.from_file!(release_log_path)
+      Vector::Commit.from_git_log!(git_log)
+    end.flatten
+
+  release_commits + log_commits
 end
 
-def get_new_version(last_version, commits)
+def get_new_version(last_version, current_commits)
   next_version =
-    if commits.any? { |c| breaking_change?(c) }
-      next_version = "#{last_version.major + 1}.0.0"
+    if current_commits.any? { |c| c.breaking_change? }
+      next_version =
+        if last_version.major == 0
+          "0.#{last_version.minor + 1}.0"
+        else
+          "#{last_version.major + 1}.0.0"
+        end
 
       words = "It looks like the new commits contain breaking changes. " +
         "Would you like to use the recommended version #{next_version} for " +
         "this release?"
 
-      if Printer.get(words, ["y", "n"]) == "y"
+      if Util::Printer.get(words, ["y", "n"]) == "y"
         next_version
       else
         nil
       end
-    elsif commits.any? { |c| new_feature?(c) }
+    elsif current_commits.any? { |c| c.new_feature? }
       next_version = "#{last_version.major}.#{last_version.minor + 1}.0"
 
       words = "It looks like this release contains commits with new features. " +
         "Would you like to use the recommended version #{next_version} for " +
         "this release?"
 
-      if Printer.get(words, ["y", "n"]) == "y"
+      if Util::Printer.get(words, ["y", "n"]) == "y"
         next_version
       else
         nil
       end
-    elsif commits.any? { |c| fix?(c) }
+    elsif current_commits.any? { |c| c.fix? }
       next_version = "#{last_version.major}.#{last_version.minor}.#{last_version.patch + 1}"
 
       words = "It looks like this release contains commits with bug fixes. " +
         "Would you like to use the recommended version #{next_version} for " +
         "this release?"
 
-      if Printer.get(words, ["y", "n"]) == "y"
+      if Util::Printer.get(words, ["y", "n"]) == "y"
         next_version
       else
         nil
       end
     end
 
-  version_string = next_version || Printer.get("What is the next version you are releasing? (current version is #{last_version})")
+  version_string = next_version || Util::Printer.get("What is the next version you are releasing? (current version is #{last_version})")
 
   version =
     begin
-      Version.new(version_string)
+      Util::Version.new(version_string)
     rescue ArgumentError => e
-      Printer.invalid("It looks like the version you entered is invalid: #{e.message}")
+      Util::Printer.invalid("It looks like the version you entered is invalid: #{e.message}")
       get_new_version(last_version, commits)
     end
 
   if last_version.bump_type(version).nil?
-    Printer.invalid("The version you entered must be a single patch, minor, or major bump")
+    Util::Printer.invalid("The version you entered must be a single patch, minor, or major bump")
     get_new_version(last_version, commits)
   else
     version
@@ -239,91 +292,20 @@ def migrate_highlights(new_version)
   end
 end
 
-def new_feature?(commit)
-  !commit.fetch("message").match(/^feat/).nil?
-end
-
-def fix?(commit)
-  !commit.fetch("message").match(/^fix/).nil?
-end
-
-# Parses the commit line from `#get_commit_log`.
-def parse_commit_line!(commit_line)
-  # Parse the full commit line
-  line_parts = commit_line.split("\t")
-  sha = line_parts.fetch(0)
-  message = line_parts.fetch(1)
-  author = line_parts.fetch(2)
-  date = Time.parse(line_parts.fetch(3))
-  message_data = parse_commit_message!(message)
-  pr_number = message_data.fetch("pr_number")
-
-  attributes =
-    {
-      "sha" =>  sha,
-      "message" => message,
-      "author" => author,
-      "date" => date,
-      "pr_number" => pr_number
-    }
-
-  # Parse the stats
-  stats = get_commit_stats(attributes.fetch("sha"))
-  if /^\W*\p{Digit}+ files? changed,/.match(stats)
-    stats_attributes = parse_commit_stats!(stats)
-    attributes.merge!(stats_attributes)
-  end
-
-  attributes
-end
-
-# Parses the commit message. This is used to extra other information that is
-# helpful in de-duping commits across releases.
-def parse_commit_message!(message)
-  match = message.match(/ \(#(?<pr_number>[0-9]*)\)?$/)
-  {
-    "pr_number" => match && match[:pr_number] ? match[:pr_number].to_i : nil
-  }
-end
-
-# Parses the data from `#get_commit_stats`.
-def parse_commit_stats!(stats)
-  attributes = {}
-
-  stats.split(", ").each do |stats_part|
-    stats_part.strip!
-
-    key =
-      case stats_part
-      when /insertions?/
-        "insertions_count"
-      when /deletions?/
-        "deletions_count"
-      when /files? changed/
-        "files_count"
-      else
-        raise "Invalid commit stat: #{stats_part}"
-      end
-
-    count = stats_part.match(/^(?<count>[0-9]*) /)[:count].to_i
-    attributes[key] = count
-  end
-
-  attributes
-end
-
 #
 # Execute
 #
 
-Printer.title("Creating release meta file...")
+Util::Printer.title("Creating release meta file...")
 
 last_tag = `git describe --tags --abbrev=0`.chomp
-last_version = Version.new(last_tag.gsub(/^v/, ''))
-commits = get_commits_since(last_version)
-new_version = get_new_version(last_version, commits)
-create_release_meta_file!(commits, new_version)
+last_version = Util::Version.new(last_tag.gsub(/^v/, ''))
+current_commits = get_commits_since(last_version)
+new_version = get_new_version(last_version, current_commits)
+log_file_path = create_log_file!(current_commits, new_version)
+create_release_file!(new_version)
+File.delete(log_file_path)
 
-Printer.title("Migrating all nightly associated highlights to #{new_version}...")
+#Util::Printer.title("Migrating all nightly associated highlights to #{new_version}...")
 
-migrate_highlights(new_version)
+#migrate_highlights(new_version)

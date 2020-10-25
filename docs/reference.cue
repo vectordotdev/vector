@@ -53,6 +53,22 @@ _values: {
 	}
 }
 
+#Commit: {
+	author:           string
+	breaking_change:  bool
+	date:             #Date
+	description:      string
+	deletions_count:  uint
+	files_count:      uint
+	insertions_count: uint
+	pr_number:        uint | null
+	scopes:           [string, ...] | []
+	sha:              #CommitSha
+	type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status"
+}
+
+#CommitSha: =~"^[a-z0-9]{40}$"
+
 // `#ComponentKind` represent the kind of component.
 #ComponentKind: "sink" | "source" | "transform"
 
@@ -68,10 +84,7 @@ _values: {
 	// It is used for SEO purposes and should be full of relevant keywords.
 	description?: =~"[.]$"
 
-	// `title` is the human friendly title for the component.
-	//
-	// For example, the `http` sink has a `HTTP` title.
-	title: string
+	env_vars: #EnvVars
 
 	// `type` is the component identifier. This is set automatically.
 	type: Type
@@ -136,6 +149,11 @@ _values: {
 
 	// `support` communicates the varying levels of support of the component.
 	support: #Support & {_args: kind: Kind}
+
+	// `title` is the human friendly title for the component.
+	//
+	// For example, the `http` sink has a `HTTP` title.
+	title: string
 }
 
 // `#CompressionAlgorithm` specified data compression algorithm.
@@ -145,6 +163,8 @@ _values: {
 #CompressionAlgorithm: "none" | "gzip"
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
+
+#Date: =~"^\\d{4}-\\d{2}-\\d{2}"
 
 // `#DeliveryStatus` documents the delivery guarantee.
 //
@@ -189,6 +209,12 @@ _values: {
 //                }
 #Enum: [Name=_]: string
 
+#EnvVars: #Schema & {[Type=string]: {
+	common:   true
+	required: false
+	type: string: default: null
+}}
+
 #Event: {
 	close({log: #LogEvent}) |
 	close({metric: #MetricEvent})
@@ -199,6 +225,8 @@ _values: {
 // * `log` - log event
 // * `metric` - metric event
 #EventType: "log" | "metric"
+
+#Fields: [Name=string]: #Fields | _
 
 #Interface: {
 	close({binary: #InterfaceBinary}) |
@@ -248,26 +276,21 @@ _values: {
 
 	if Args.kind == "source" {
 		collect?:  #FeaturesCollect
+		generate?: #FeaturesGenerate
+		multiline: #FeaturesMultiline
 		receive?:  #FeaturesReceive
-		generate?: close({})
-
-		// `multiline` should be enabled for sources that offer the ability
-		// to merge multiple lines together.
-		multiline: close({
-			enabled: bool
-		})
 	}
 
 	if Args.kind == "transform" {
-		convert?:  close({})
+		convert?:  #FeaturesConvert
 		enrich?:   #FeaturesEnrich
-		filter?:   close({})
+		filter?:   #FeaturesFilter
 		parse?:    #FeaturesParse
 		program?:  #FeaturesProgram
-		reduce?:   close({})
-		route?:    close({})
-		sanitize?: close({})
-		shape?:    close({})
+		reduce?:   #FeaturesReduce
+		route?:    #FeaturesRoute
+		sanitize?: #FeaturesSanitize
+		shape?:    #FeaturesShape
 	}
 
 	if Args.kind == "sink" {
@@ -284,17 +307,20 @@ _values: {
 		exposes?: #FeaturesExpose
 		send?:    #FeaturesSend & {_args: Args}
 	}
+
+	descriptions: [Name=string]: string
 }
 
 #FeaturesCollect: {
-	// `checkpoint` describes how the component checkpoints its read
-	// position.
 	checkpoint: close({
 		enabled: bool
 	})
 
 	from?: #Service
 	tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
+}
+
+#FeaturesConvert: {
 }
 
 #FeaturesEnrich: {
@@ -307,6 +333,16 @@ _values: {
 
 #FeaturesExpose: {
 	for: #Service
+}
+
+#FeaturesFilter: {
+}
+
+#FeaturesGenerate: {
+}
+
+#FeaturesMultiline: {
+	enabled: bool
 }
 
 #FeaturesParse: {
@@ -324,6 +360,18 @@ _values: {
 #FeaturesReceive: {
 	from?: #Service
 	tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+}
+
+#FeaturesReduce: {
+}
+
+#FeaturesRoute: {
+}
+
+#FeaturesSanitize: {
+}
+
+#FeaturesShape: {
 }
 
 #FeaturesSend: {
@@ -534,6 +582,14 @@ _values: {
 
 #Protocol: "http" | "tcp" | "udp" | "unix"
 
+#Releases: [Name=string]: {
+	codename: string
+	date:     string
+
+	commits: [#Commit, ...]
+	whats_next: #Any
+}
+
 #Runtime: {
 	name:    string
 	url:     string
@@ -558,10 +614,6 @@ _values: {
 	// "Context" category to make generated configuration examples easier to
 	// read.
 	category?: string
-
-	if strings.HasSuffix(name, "_key") {
-		category: "Mapping"
-	}
 
 	if type.object != _|_ {
 		category: strings.ToTitle(name)
@@ -810,7 +862,7 @@ data_model: close({
 	schema: #Schema
 })
 
-#Fields: [Name=string]: #Fields | _
+releases: #Releases
 
 remap: {
 	errors: [Name=string]: {

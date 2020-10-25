@@ -1,12 +1,13 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::HttpClient,
     sinks::{
         util::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
             TowerRequestConfig, VecBuffer,
         },
@@ -57,7 +58,15 @@ inventory::submit! {
     SinkDescription::new::<DatadogLogsConfig>("datadog_logs")
 }
 
-impl GenerateConfig for DatadogLogsConfig {}
+impl GenerateConfig for DatadogLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"api_key = "${DATADOG_API_KEY_ENV_VAR}"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 impl DatadogLogsConfig {
     fn get_endpoint(&self) -> &str {
@@ -72,6 +81,7 @@ impl DatadogLogsConfig {
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
         BatchSettings::default()
             .bytes(bytesize::kib(100u64))
+            .events(20)
             .timeout(1)
             .parse_config(self.batch)
     }
@@ -116,10 +126,14 @@ impl DatadogLogsConfig {
     }
 
     /// Build the request, GZipping the contents if the config specifies.
-    fn build_request(&self, body: Vec<u8>) -> crate::Result<http::Request<Vec<u8>>> {
+    fn build_request(
+        &self,
+        content_type: &str,
+        body: Vec<u8>,
+    ) -> crate::Result<http::Request<Vec<u8>>> {
         let uri = format!("{}/v1/input", self.get_endpoint());
         let request = Request::post(uri)
-            .header("Content-Type", "text/plain")
+            .header("Content-Type", content_type)
             .header("DD-API-KEY", self.api_key.clone());
 
         let compression = self.compression.unwrap_or(Compression::Gzip(None));
@@ -217,7 +231,7 @@ impl HttpSink for DatadogLogsJsonService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body = serde_json::to_vec(&events)?;
-        self.config.build_request(body)
+        self.config.build_request("application/json", body)
     }
 }
 
@@ -232,7 +246,7 @@ impl HttpSink for DatadogLogsTextService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body: Vec<u8> = events.into_iter().flat_map(Bytes::into_iter).collect();
-        self.config.build_request(body)
+        self.config.build_request("text/plain", body)
     }
 }
 
@@ -284,6 +298,11 @@ mod tests {
     };
     use futures::StreamExt;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
+
     #[tokio::test]
     async fn smoke_text() {
         let (mut config, cx) = load_sink::<DatadogLogsConfig>(
@@ -314,6 +333,7 @@ mod tests {
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {
+            assert_eq!(val.0.headers.get("Content-Type").unwrap(), "text/plain");
             assert_eq!(val.1, format!("{}\n", expected[i]));
         }
     }
@@ -348,6 +368,11 @@ mod tests {
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {
+            assert_eq!(
+                val.0.headers.get("Content-Type").unwrap(),
+                "application/json"
+            );
+
             let mut json = serde_json::Deserializer::from_slice(&val.1[..])
                 .into_iter::<serde_json::Value>()
                 .map(|v| v.expect("decoding json"));

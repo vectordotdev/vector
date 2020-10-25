@@ -12,6 +12,7 @@ mod auto_concurrency;
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
@@ -43,11 +44,15 @@ mod kafka;
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
+#[cfg(feature = "transforms-logfmt_parser")]
+mod logfmt_parser;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 mod metric_to_log;
+#[cfg(feature = "sources-mongodb_metrics")]
+mod mongodb_metrics;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
@@ -107,6 +112,7 @@ pub use self::auto_concurrency::*;
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
+#[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
@@ -140,6 +146,8 @@ pub use self::kafka::*;
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
+#[cfg(feature = "transforms-logfmt_parser")]
+pub use self::logfmt_parser::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
@@ -162,7 +170,7 @@ pub use self::rename_fields::*;
 pub use self::sampler::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
-#[cfg(any(feature = "sources-socket", feature = "sources-syslog"))]
+#[cfg(feature = "sources-socket")]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -187,6 +195,8 @@ pub use self::vector::*;
 pub use self::wasm::*;
 #[cfg(windows)]
 pub use self::windows::*;
+#[cfg(feature = "sources-mongodb_metrics")]
+pub use mongodb_metrics::*;
 
 pub trait InternalEvent {
     fn emit_logs(&self) {}

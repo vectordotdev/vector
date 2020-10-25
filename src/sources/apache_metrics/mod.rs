@@ -44,7 +44,16 @@ inventory::submit! {
     SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
 }
 
-impl GenerateConfig for ApacheMetricsConfig {}
+impl GenerateConfig for ApacheMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoints: vec!["http://localhost:8080/server-status/?auto".to_owned()],
+            scrape_interval_secs: default_scrape_interval_secs(),
+            namespace: default_namespace(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "apache_metrics")]
@@ -174,6 +183,7 @@ fn apache_metrics(
                             let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
                                 .chain(vec![Ok(Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -207,6 +217,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -224,6 +235,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -259,6 +271,11 @@ mod test {
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ApacheMetricsConfig>();
+    }
 
     #[tokio::test]
     async fn test_apache_up() {

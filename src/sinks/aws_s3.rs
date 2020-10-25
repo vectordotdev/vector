@@ -2,12 +2,11 @@ use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
-    region::RegionOrEndpoint,
+    rusoto::{self, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto,
         sink::Response,
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -300,7 +299,12 @@ impl Service<Request> for S3Sink {
             ..Default::default()
         };
 
-        Box::pin(async move { client.put_object(request).await }.instrument(info_span!("request")))
+        Box::pin(async move {
+            client
+                .put_object(request)
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
@@ -539,7 +543,7 @@ mod integration_tests {
         config::SinkContext,
         dns::Resolver,
         event::Event,
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};
@@ -571,7 +575,7 @@ mod integration_tests {
         assert!(key.ends_with(".log"));
 
         let obj = get_object(key).await;
-        assert_eq!(obj.content_encoding, None);
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
 
         let response_lines = get_lines(obj).await;
         assert_eq!(lines, response_lines);
@@ -683,7 +687,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4572".to_owned(),
+            endpoint: "http://localhost:4566".to_owned(),
         };
 
         use rusoto_core::HttpClient;
@@ -707,7 +711,7 @@ mod integration_tests {
                 timeout_secs: Some(5),
                 ..Default::default()
             },
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4572".to_owned()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             ..Default::default()
         }
     }

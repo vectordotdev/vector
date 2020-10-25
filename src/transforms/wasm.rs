@@ -49,7 +49,17 @@ inventory::submit! {
     TransformDescription::new::<WasmConfig>("wasm")
 }
 
-impl GenerateConfig for WasmConfig {}
+impl GenerateConfig for WasmConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            module: PathBuf::new(),
+            artifact_cache: PathBuf::new(),
+            heap_memory_size: defaults::HEAP_MEMORY_SIZE,
+            options: HashMap::new(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
@@ -95,10 +105,15 @@ impl Transform for Wasm {
 
 #[cfg(test)]
 mod tests {
-    use super::Wasm;
+    use super::{Wasm, WasmConfig};
     use crate::{event::Event, transforms::Transform};
     use serde_json::Value;
     use std::{collections::HashMap, fs, io::Read, path::Path};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<WasmConfig>();
+    }
 
     fn parse_config(s: &str) -> crate::Result<Wasm> {
         Wasm::new(toml::from_str(s).unwrap())

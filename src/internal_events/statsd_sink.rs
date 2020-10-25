@@ -19,6 +19,6 @@ impl<'a> InternalEvent for StatsdInvalidMetricReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "invalid_metric");
+        counter!("processing_errors_total", 1, "error_type" => "invalid_metric");
     }
 }

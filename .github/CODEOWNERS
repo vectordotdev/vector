@@ -25,11 +25,12 @@
 /docs/reference/components/sinks/statsd.cue @lukesteensen
 /docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
 
-/docs/reference/components/sources/apache_metrics/ @jszwedko
+/docs/reference/components/sources/apache_metrics.cue @jszwedko
 /docs/reference/components/sources/docker.cue @fanatid
 /docs/reference/components/sources/generator.cue @bruceg
 /docs/reference/components/sources/host_metrics.cue @bruceg
 /docs/reference/components/sources/journald.cue @bruceg
+/docs/reference/components/sources/mongodb_metrics.cue @fanatid
 /docs/reference/components/sources/stdin.cue @bruceg
 /docs/reference/components/sources/syslog.cue @lukesteensen
 /docs/reference/components/sources/tcp.cue @bruceg
@@ -132,6 +133,7 @@
 /src/sources/generator.rs @bruceg
 /src/sources/host_metrics.rs @bruceg
 /src/sources/journald.rs @bruceg
+/src/sources/mongodb_metrics/ @fanatid
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen
 /src/sources/tcp.rs @bruceg

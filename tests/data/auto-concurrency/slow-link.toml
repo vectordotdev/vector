@@ -1,7 +1,7 @@
 [params]
 requests = 200
 delay = 0.100
-concurrency_scale = 1.0
+concurrency.scale = 1.0
 
 # With a link that slows down heavily as concurrency increases, the
 # limiter will keep the concurrency low (timing skews occasionally

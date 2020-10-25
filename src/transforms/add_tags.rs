@@ -25,7 +25,15 @@ inventory::submit! {
     TransformDescription::new::<AddTagsConfig>("add_tags")
 }
 
-impl GenerateConfig for AddTagsConfig {}
+impl GenerateConfig for AddTagsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            tags: std::iter::once(("name".to_owned(), "value".to_owned())).collect(),
+            overwrite: true,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
@@ -89,7 +97,7 @@ impl Transform for AddTags {
 
 #[cfg(test)]
 mod tests {
-    use super::AddTags;
+    use super::{AddTags, AddTagsConfig};
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
@@ -99,9 +107,15 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AddTagsConfig>();
+    }
+
+    #[test]
     fn add_tags() {
         let event = Event::Metric(Metric {
             name: "bar".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -130,6 +144,7 @@ mod tests {
         tags.insert("region".to_string(), "us-east-1".to_string());
         let event = Event::Metric(Metric {
             name: "bar".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags),
             kind: MetricKind::Absolute,

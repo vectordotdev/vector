@@ -31,7 +31,16 @@ inventory::submit! {
     SourceDescription::new::<LogplexConfig>("logplex")
 }
 
-impl GenerateConfig for LogplexConfig {}
+impl GenerateConfig for LogplexConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "0.0.0.0:80".parse().unwrap(),
+            tls: None,
+            auth: None,
+        })
+        .unwrap()
+    }
+}
 
 #[derive(Clone, Default)]
 struct LogplexSource;
@@ -183,6 +192,11 @@ mod tests {
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogplexConfig>();
+    }
 
     async fn source(auth: Option<HttpSourceAuthConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();

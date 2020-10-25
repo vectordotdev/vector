@@ -101,6 +101,7 @@ components: sinks: aws_cloudwatch_logs: {
 			required:    true
 			type: string: {
 				examples: ["group-name", "{{ file }}"]
+				templateable: true
 			}
 		}
 		stream_name: {
@@ -108,6 +109,7 @@ components: sinks: aws_cloudwatch_logs: {
 			required:    true
 			type: string: {
 				examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]
+				templateable: true
 			}
 		}
 	}

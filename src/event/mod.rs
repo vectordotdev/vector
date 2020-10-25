@@ -192,6 +192,12 @@ impl From<proto::EventWrapper> for Event {
 
                 let name = proto.name;
 
+                let namespace = if proto.namespace.is_empty() {
+                    None
+                } else {
+                    Some(proto.namespace)
+                };
+
                 let timestamp = proto
                     .timestamp
                     .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
@@ -236,6 +242,7 @@ impl From<proto::EventWrapper> for Event {
 
                 Event::Metric(Metric {
                     name,
+                    namespace,
                     timestamp,
                     tags,
                     kind,
@@ -294,11 +301,14 @@ impl From<Event> for proto::EventWrapper {
             }
             Event::Metric(Metric {
                 name,
+                namespace,
                 timestamp,
                 tags,
                 kind,
                 value,
             }) => {
+                let namespace = namespace.unwrap_or_default();
+
                 let timestamp = timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
                     nanos: ts.timestamp_subsec_nanos() as i32,
@@ -361,6 +371,7 @@ impl From<Event> for proto::EventWrapper {
 
                 let event = EventProto::Metric(proto::Metric {
                     name,
+                    namespace,
                     timestamp,
                     tags,
                     kind,

@@ -1,8 +1,11 @@
 use crate::event::{Event, Value};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 
 pub mod parser;
 pub mod query;
+
+use query::query_value::QueryValue;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -26,9 +29,13 @@ impl Assignment {
 
 impl Function for Assignment {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        let v = self.function.execute(&target)?;
-        target.as_mut_log().insert(&self.path, v);
-        Ok(())
+        match self.function.execute(&target)? {
+            QueryValue::Value(v) => {
+                target.as_mut_log().insert(&self.path, v);
+                Ok(())
+            }
+            _ => Err("assignment must be from a value".to_string()),
+        }
     }
 }
 
@@ -117,8 +124,8 @@ impl IfStatement {
 impl Function for IfStatement {
     fn apply(&self, target: &mut Event) -> Result<()> {
         match self.query.execute(target)? {
-            Value::Boolean(true) => self.true_statement.apply(target),
-            Value::Boolean(false) => self.false_statement.apply(target),
+            QueryValue::Value(Value::Boolean(true)) => self.true_statement.apply(target),
+            QueryValue::Value(Value::Boolean(false)) => self.false_statement.apply(target),
             _ => Err("query returned non-boolean value".to_string()),
         }
     }
@@ -218,7 +225,7 @@ impl Function for MergeFn {
         let deep = match &self.deep {
             None => false,
             Some(deep) => match deep.execute(target)? {
-                Value::Boolean(value) => value,
+                QueryValue::Value(Value::Boolean(value)) => value,
                 _ => return Err("deep parameter passed to merge is a non-boolean value".into()),
             },
         };
@@ -229,13 +236,74 @@ impl Function for MergeFn {
         ))?;
 
         match (to_value, from_value) {
-            (Value::Map(ref mut map1), Value::Map(ref map2)) => {
+            (Value::Map(ref mut map1), QueryValue::Value(Value::Map(ref map2))) => {
                 merge_maps(map1, &map2, deep);
                 Ok(())
             }
 
             _ => Err("parameters passed to merge are non-map values".into()),
         }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+/// Represents the different log levels that can be used by LogFn
+#[derive(Debug, Clone, Copy)]
+pub(in crate::mapping) enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl TryFrom<&str> for LogLevel {
+    type Error = String;
+
+    fn try_from(level: &str) -> Result<Self> {
+        match level {
+            "trace" => Ok(Self::Trace),
+            "debug" => Ok(Self::Debug),
+            "info" => Ok(Self::Info),
+            "warn" => Ok(Self::Warn),
+            "error" => Ok(Self::Error),
+            _ => Err("invalid log level".to_string()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(in crate::mapping) struct LogFn {
+    msg: Box<dyn query::Function>,
+    level: Option<LogLevel>,
+}
+
+impl LogFn {
+    pub(in crate::mapping) fn new(msg: Box<dyn query::Function>, level: Option<LogLevel>) -> Self {
+        Self { msg, level }
+    }
+}
+
+impl Function for LogFn {
+    fn apply(&self, target: &mut Event) -> Result<()> {
+        let msg = match self.msg.execute(target)? {
+            QueryValue::Value(value) => value,
+            _ => return Err("can only log Value parameters".to_string()),
+        };
+        let msg = msg.into_bytes();
+        let string = String::from_utf8_lossy(&msg);
+        let level = self.level.unwrap_or(LogLevel::Info);
+
+        match level {
+            LogLevel::Trace => trace!("{}", string),
+            LogLevel::Debug => debug!("{}", string),
+            LogLevel::Info => info!("{}", string),
+            LogLevel::Warn => warn!("{}", string),
+            LogLevel::Error => error!("{}", string),
+        }
+
+        Ok(())
     }
 }
 
