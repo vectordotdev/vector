@@ -74,7 +74,7 @@ components: sinks: datadog_metrics: {
 			distribution: true
 			gauge:        true
 			histogram:    false
-			set:          true
+			set:          false
 			summary:      false
 		}
 	}
