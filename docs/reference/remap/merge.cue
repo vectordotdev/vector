@@ -22,7 +22,7 @@ remap: functions: merge: {
 			type: ["boolean"]
 		},
 	]
-	return:   ["string"]
+	return: ["string"]
 	category: "text"
 	description: #"""
 		Merges the `from` map provided into the `to_path` path specified, which must specify an existing map.

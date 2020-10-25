@@ -9,7 +9,7 @@ remap: functions: parse_url: {
 			type: ["string"]
 		},
 	]
-	return:   ["map"]
+	return: ["map"]
 	category: "parse"
 	description: #"""
 			Parses a url into it's constituent components.

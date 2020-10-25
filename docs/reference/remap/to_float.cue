@@ -7,7 +7,7 @@ remap: functions: to_float: {
 			type: ["string"]
 		},
 	]
-	return:   ["float"]
+	return: ["float"]
 	category: "coerce"
 	description: #"""
 		Returns a `float` whose text representation is `string`.

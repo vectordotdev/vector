@@ -21,7 +21,7 @@ remap: functions: replace: {
 			type: ["string"]
 		},
 	]
-	return:   ["string"]
+	return: ["string"]
 	category: "text"
 	description: #"""
 			Replaces any matches of pattern with the provided string. Pattern can be either a fixed string or a regular expression.

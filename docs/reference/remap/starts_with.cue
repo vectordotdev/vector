@@ -22,7 +22,7 @@ remap: functions: starts_with: {
 			default: true
 		},
 	]
-	return:   ["boolean"]
+	return: ["boolean"]
 	category: "text"
 	description: #"""
 			Determines if a given string begins with a given `substring`.

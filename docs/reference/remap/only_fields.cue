@@ -10,7 +10,7 @@ remap: functions: only_fields: {
 			type: ["string"]
 		},
 	]
-	return:   ["null"]
+	return: ["null"]
 	category: "event"
 	description: #"""
 			Remove any fields that are *not* specified by the given paths from the root `event` object. Multiple fields can be specified.

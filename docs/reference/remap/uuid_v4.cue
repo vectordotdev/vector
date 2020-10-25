@@ -2,7 +2,7 @@ package metadata
 
 remap: functions: uuid_v4: {
 	arguments: []
-	return:   ["string"]
+	return: ["string"]
 	category: "text"
 	description: #"""
 			Returns a random Uuid (Universally Unique Identifier).

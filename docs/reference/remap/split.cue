@@ -21,7 +21,7 @@ remap: functions: split: {
 			type: ["integer"]
 		},
 	]
-	return:   ["string"]
+	return: ["string"]
 	category: "text"
 	description: #"""
 		Splits the given string whenever a given pattern is matched. If `limit` is specified, after `limit` has been reached

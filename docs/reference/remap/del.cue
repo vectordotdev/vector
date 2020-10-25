@@ -10,7 +10,7 @@ remap: functions: del: {
 			type: ["string"]
 		},
 	]
-	return:   ["null"]
+	return: ["null"]
 	category: "event"
 	description: #"""
 			Removed the fields specified by the given paths from the root `event` object. Multiple fields can be specified.
