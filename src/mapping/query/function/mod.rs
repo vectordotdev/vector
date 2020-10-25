@@ -130,7 +130,6 @@ build_signatures! {
     sha3 => Sha3Fn,
     truncate => TruncateFn,
     parse_json => ParseJsonFn,
-    tokenize => TokenizeFn,
     strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
     parse_duration => ParseDurationFn,
     format_number => FormatNumberFn,
