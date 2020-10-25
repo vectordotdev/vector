@@ -134,6 +134,7 @@ components: sinks: prometheus: {
 			title:  "Counter"
 			configuration: {}
 			input: metric: {
+				kind: "incremental"
 				name: _name
 				counter: {
 					value: _value
@@ -155,6 +156,7 @@ components: sinks: prometheus: {
 			title:  "Gauge"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				gauge: {
 					value: _value
@@ -175,6 +177,7 @@ components: sinks: prometheus: {
 			title: "Histogram"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				histogram: {
 					buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
@@ -212,6 +215,7 @@ components: sinks: prometheus: {
 			}
 			input: metric: {
 				name: _name
+				kind: "incremental"
 				distribution: {
 					values: [0.0, 1.0, 4.0]
 					sample_rates: [4, 2, 1]
@@ -242,6 +246,7 @@ components: sinks: prometheus: {
 			}
 			input: metric: {
 				name: _name
+				kind: "incremental"
 				distribution: {
 					values: [0.0, 1.0, 4.0]
 					sample_rates: [3, 2, 1]
@@ -268,6 +273,7 @@ components: sinks: prometheus: {
 			configuration: {}
 			input: metric: {
 				name: _name
+				kind: "absolute"
 				summary: {
 					quantiles: [0.01, 0.5, 0.99]
 					values: [1.5, 2.0, 3.0]

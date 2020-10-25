@@ -102,9 +102,9 @@ components: transforms: log_to_metric: {
 							enum: {
 								counter:   "A [counter metric type][docs.data-model.metric#counter]."
 								gauge:     "A [gauge metric type][docs.data-model.metric#gauge]."
-								histogram: "A [distribution metric type with histogram statistic][docs.data-model.metric#distribution]."
+								histogram: "A [distribution metric type][docs.data-model.metric#distribution] with histogram statistic."
 								set:       "A [set metric type][docs.data-model.metric#set]."
-								summary:   "A [distribution metric type with summary statistic][docs.data-model.metric#distribution]."
+								summary:   "A [distribution metric type][docs.data-model.metric#distribution] with summary statistic."
 							}
 						}
 					}
@@ -148,6 +148,7 @@ components: transforms: log_to_metric: {
 				status:  200
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "response_total"
 				tags: {
 					status: "200"
@@ -180,6 +181,7 @@ components: transforms: log_to_metric: {
 				total:   122.2
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "order_total"
 				tags: {
 					host: "10.22.11.222"
@@ -220,6 +222,7 @@ components: transforms: log_to_metric: {
 			}
 			output: [
 				{metric: {
+					kind: "absolute"
 					name: "1m_load_avg"
 					tags: {
 						host: "10.22.11.222"
@@ -229,6 +232,7 @@ components: transforms: log_to_metric: {
 					}
 				}},
 				{metric: {
+					kind: "absolute"
 					name: "5m_load_avg"
 					tags: {
 						host: "10.22.11.222"
@@ -238,6 +242,7 @@ components: transforms: log_to_metric: {
 					}
 				}},
 				{metric: {
+					kind: "absolute"
 					name: "15m_load_avg"
 					tags: {
 						host: "10.22.11.222"
@@ -249,8 +254,8 @@ components: transforms: log_to_metric: {
 			]
 		},
 		{
-			title: "Histogram"
-			notes: "This example demonstrates capturing timings in your logs."
+			title: "Histogram distribution"
+			notes: "This example demonstrates capturing timings in your logs to compute histogram."
 			configuration: {
 				metrics: [
 					{
@@ -271,6 +276,7 @@ components: transforms: log_to_metric: {
 				time:    54.2
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "time_ms"
 				tags: {
 					status: "200"
@@ -284,7 +290,7 @@ components: transforms: log_to_metric: {
 			}}]
 		},
 		{
-			title: "Summary"
+			title: "Summary distribution"
 			notes: "This example demonstrates capturing timings in your logs to compute summary."
 			configuration: {
 				metrics: [
@@ -306,6 +312,7 @@ components: transforms: log_to_metric: {
 				time:    54.2
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "time_ms"
 				tags: {
 					status: "200"
@@ -343,6 +350,7 @@ components: transforms: log_to_metric: {
 				remote_addr: "233.221.232.22"
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "remote_addr"
 				tags: {
 					host: "10.22.11.222"

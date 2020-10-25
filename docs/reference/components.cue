@@ -390,7 +390,7 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type: "distribution"
 				}
 
 				_passthrough_gauge: {
