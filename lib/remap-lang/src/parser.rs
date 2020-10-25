@@ -368,3 +368,111 @@ impl Parser {
 fn e(rule: R) -> Error {
     Error::Rule(rule)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pest::Parser as _;
+
+    #[test]
+    fn check_parser_errors() {
+        let cases = vec![
+            (r#". = "bar""#, vec![" 1:2\n", "= expected path_segment"]),
+            (
+                ".foo = !",
+                vec![" 1:9\n", "= expected primary, operator_not, or ident"],
+            ),
+            (
+                ".foo = to_string",
+                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+            ),
+            (
+                r#"foo = "bar""#,
+                vec![
+                    " 1:1\n",
+                    "= expected EOI, if_statement, not, path, or block",
+                ],
+            ),
+            (
+                r#".foo.bar = "baz" and this"#,
+                vec![" 1:18\n", "= expected EOI, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, path, or block"],
+            ),
+            (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected not"]),
+            (
+                ".foo.bar = .foo.(bar |)",
+                vec![" 1:23\n", "= expected path_field"],
+            ),
+            (
+                r#"if .foo > 0 { .foo = "bar" } else"#,
+                vec![" 1:34\n", "= expected block"],
+            ),
+            (
+                "if .foo { }",
+                vec![
+                    " 1:11\n",
+                    "= expected if_statement, not, path, or block",
+                ],
+            ),
+            (
+                "if { del(.foo) } else { del(.bar) }",
+                vec![" 1:4\n", "= expected not"],
+            ),
+            (
+                "if .foo > .bar { del(.foo) } else { .bar = .baz",
+                // This message isn't great, ideally I'd like "expected closing bracket"
+                vec![" 1:48\n", "= expected operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or path_index"],
+            ),
+            (
+                "only_fields(.foo,)",
+                vec![" 1:18\n", "= expected argument"],
+            ),
+            (
+                "only_fields(,)",
+                vec![" 1:13\n", "= expected argument"],
+            ),
+            (
+                // Due to the explicit list of allowed escape chars our grammar
+                // doesn't actually recognize this as a string literal.
+                r#".foo = "invalid escape \k sequence""#,
+                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+            ),
+            (
+                // Same here as above.
+                r#".foo."invalid \k escape".sequence = "foo""#,
+                vec![" 1:6\n", "= expected path_segment"],
+            ),
+            (
+                // Regexes can't be parsed as part of a path
+                r#".foo = split(.foo, ./[aa]/)"#,
+                vec![" 1:21\n", "= expected path_segment"],
+            ),
+            (
+                // We cannot assign a regular expression to a field.
+                r#".foo = /ab/i"#,
+                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+            ),
+            (
+                // We cannot assign to a regular expression.
+                r#"/ab/ = .foo"#,
+                vec![" 1:1\n", "= expected EOI, if_statement, not, path, or block"],
+            ),
+        ];
+
+        for (source, exp_expressions) in cases {
+            let err = Parser::parse(Rule::program, source)
+                .err()
+                .unwrap()
+                .to_string();
+
+            for exp in exp_expressions {
+                assert!(
+                    err.contains(exp),
+                    "expected: {}\nwith source: {}\nfull error message: {}",
+                    exp,
+                    source,
+                    err
+                );
+            }
+        }
+    }
+}

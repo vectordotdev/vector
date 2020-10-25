@@ -67,7 +67,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 
 ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 target = _{ path }
-block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ "}" }
+block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*) ~ NEWLINE* ~ "}" }
 
 string_inner = @{ char* }
 char         =  { !("\"" | "\\") ~ ANY | "\\" ~ ("\"" | "\\" | "n" | "t") }
