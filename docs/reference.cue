@@ -882,10 +882,7 @@ remap: {
 					name: string
 				}
 
-				multiple: bool
-				if !multiple {
-					multiple: false
-				}
+				multiple: bool | *false
 
 				type: [#RemapParameterTypes, ...]
 			},
