@@ -7,7 +7,7 @@ use crate::{
     },
     sinks::{
         util::{
-            acker_bytes_sink::{AckerBytesSink, ShutdownCheck},
+            events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
             StreamSink,
         },
         Healthcheck, VectorSink,
@@ -105,8 +105,7 @@ impl UnixConnector {
 
 struct UnixSink {
     connector: UnixConnector,
-    acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    events_counter: Arc<EventsCounter>,
 }
 
 impl UnixSink {
@@ -115,20 +114,19 @@ impl UnixSink {
         acker: Acker,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> Self {
+        let on_success = |byte_size| emit!(UnixSocketEventSent { byte_size });
         Self {
             connector,
-            acker,
-            encode_event: Arc::new(encode_event),
+            events_counter: Arc::new(EventsCounter::new(acker, encode_event, on_success)),
         }
     }
 
-    async fn connect(&mut self) -> AckerBytesSink<UnixStream> {
+    async fn connect(&mut self) -> BytesSink<UnixStream> {
         let stream = self.connector.connect_backoff().await;
-        AckerBytesSink::new(
+        BytesSink::new(
             stream,
-            self.acker.clone(),
-            Box::new(|byte_size| emit!(UnixSocketEventSent { byte_size })),
             Box::new(|_| ShutdownCheck::Alive),
+            Arc::clone(&self.events_counter),
         )
     }
 }
@@ -136,27 +134,21 @@ impl UnixSink {
 #[async_trait]
 impl StreamSink for UnixSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let encode_event = Arc::clone(&self.encode_event);
-        let mut input = input
-            // We send event empty events because `AckerBytesSink` `ack` and `emit!` for us.
-            .map(|event| match encode_event(event) {
-                Some(bytes) => bytes,
-                None => Bytes::new(),
-            })
-            .map(Ok)
-            .peekable();
-
+        let mut input = input.peekable();
         while Pin::new(&mut input).peek().await.is_some() {
+            let events_counter = Arc::clone(&self.events_counter);
+            let encode_event = move |event| events_counter.encode_event(event);
+            let mut stream = EncodeEventStream::new(&mut input, encode_event);
+
             let mut sink = self.connect().await;
-            if let Err(error) = sink.send_all(&mut input).await {
+            if let Err(error) = sink.send_all(&mut stream).await {
                 emit!(UnixSocketError {
                     error,
                     path: &self.connector.path
                 });
             }
-            // TODO: we can lost ack for buffered item
-            // https://docs.rs/futures-util/0.3.6/src/futures_util/sink/send_all.rs.html#78-112
-            sink.ack();
+
+            self.events_counter.ack_rest();
         }
 
         Ok(())

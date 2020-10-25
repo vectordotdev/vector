@@ -5,7 +5,7 @@ use crate::{
     internal_events::{TcpConnectionEstablished, TcpConnectionFailed, TcpEventSent},
     sinks::{
         util::{
-            acker_bytes_sink::{AckerBytesSink, ShutdownCheck},
+            events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
             SinkBuildError, StreamSink,
         },
         Healthcheck, VectorSink,
@@ -138,8 +138,7 @@ impl TcpConnector {
 
 struct TcpSink {
     connector: TcpConnector,
-    acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    events_counter: Arc<EventsCounter>,
 }
 
 impl TcpSink {
@@ -148,20 +147,19 @@ impl TcpSink {
         acker: Acker,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> Self {
+        let on_success = |byte_size| emit!(TcpEventSent { byte_size });
         Self {
             connector,
-            acker,
-            encode_event: Arc::new(encode_event),
+            events_counter: Arc::new(EventsCounter::new(acker, encode_event, on_success)),
         }
     }
 
-    async fn connect(&self) -> AckerBytesSink<MaybeTlsStream<TcpStream>> {
+    async fn connect(&self) -> BytesSink<MaybeTlsStream<TcpStream>> {
         let stream = self.connector.connect_backoff().await;
-        AckerBytesSink::new(
+        BytesSink::new(
             stream,
-            self.acker.clone(),
-            Box::new(|byte_size| emit!(TcpEventSent { byte_size })),
             Box::new(Self::shutdown_check),
+            Arc::clone(&self.events_counter),
         )
     }
 
@@ -196,22 +194,18 @@ impl TcpSink {
 #[async_trait]
 impl StreamSink for TcpSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let encode_event = Arc::clone(&self.encode_event);
-        let mut input = input
-            // We send event empty events because `AckerBytesSink` `ack` and `emit!` for us.
-            .map(|event| match encode_event(event) {
-                Some(bytes) => bytes,
-                None => Bytes::new(),
-            })
-            .map(Ok)
-            .peekable();
-
+        let mut input = input.peekable();
         while Pin::new(&mut input).peek().await.is_some() {
+            let events_counter = Arc::clone(&self.events_counter);
+            let encode_event = move |event| events_counter.encode_event(event);
+            let mut stream = EncodeEventStream::new(&mut input, encode_event);
+
             let mut sink = self.connect().await;
-            if let Err(error) = sink.send_all(&mut input).await {
+            if let Err(error) = sink.send_all(&mut stream).await {
                 error!(message = "connection disconnected.", %error);
             }
-            sink.ack();
+
+            self.events_counter.ack_rest();
         }
 
         Ok(())

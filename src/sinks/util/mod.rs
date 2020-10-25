@@ -1,8 +1,8 @@
-pub mod acker_bytes_sink;
 pub mod auto_concurrency;
 pub mod batch;
 pub mod buffer;
 pub mod encoding;
+pub mod events_counter;
 pub mod http;
 pub mod retries;
 #[cfg(feature = "rusoto_core")]
