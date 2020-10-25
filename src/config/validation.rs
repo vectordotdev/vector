@@ -1,5 +1,5 @@
 use super::{Config, DataType, Resource};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
     let mut errors = vec![];
@@ -52,8 +52,7 @@ pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
             .sinks
             .iter()
             .map(|(name, config)| (name, config.inner.resources())),
-    )
-    .collect::<HashSet<_>>();
+    );
     if conflicting_componenets.is_empty() {
         Ok(())
     } else {

@@ -275,10 +275,10 @@ pub enum Resource {
 }
 
 impl Resource {
-    /// From given components returns all that have a resource conflict with any other componenet.
+    /// From given components returns all that have a resource conflict with any other component.
     pub fn conflicts<K: Eq + Hash + Clone>(
         components: impl IntoIterator<Item = (K, Vec<Resource>)>,
-    ) -> impl Iterator<Item = K> {
+    ) -> HashSet<K> {
         let mut resource_map = HashMap::<Resource, HashSet<K>>::new();
         for (key, resources) in components {
             for resource in resources {
@@ -291,7 +291,9 @@ impl Resource {
 
         resource_map
             .into_iter()
+            .filter(|(_, componenets)| componenets.len() > 1)
             .flat_map(|(_, componenets)| componenets)
+            .collect()
     }
 }
 
@@ -543,6 +545,48 @@ mod test {
                 "duplicate source name found: in".into(),
                 "duplicate sink name found: out".into(),
             ])
+        );
+    }
+}
+
+#[cfg(test)]
+mod resource_tests {
+    use super::Resource;
+    use std::collections::HashSet;
+
+    #[test]
+    fn valid() {
+        let componenets = vec![
+            ("sink_0", vec![Resource::Port(0)]),
+            ("sink_1", vec![Resource::Port(1)]),
+            ("sink_2", vec![Resource::Port(2)]),
+        ];
+        let conflicting = Resource::conflicts(componenets);
+        assert_eq!(conflicting, HashSet::new());
+    }
+
+    #[test]
+    fn conflicting_pair() {
+        let componenets = vec![
+            ("sink_0", vec![Resource::Port(0)]),
+            ("sink_1", vec![Resource::Port(2)]),
+            ("sink_2", vec![Resource::Port(2)]),
+        ];
+        let conflicting = Resource::conflicts(componenets);
+        assert_eq!(conflicting, vec!["sink_1", "sink_2"].into_iter().collect());
+    }
+
+    #[test]
+    fn conflicting_multi() {
+        let componenets = vec![
+            ("sink_0", vec![Resource::Port(0)]),
+            ("sink_1", vec![Resource::Port(2), Resource::Port(0)]),
+            ("sink_2", vec![Resource::Port(2)]),
+        ];
+        let conflicting = Resource::conflicts(componenets);
+        assert_eq!(
+            conflicting,
+            vec!["sink_0", "sink_1", "sink_2"].into_iter().collect()
         );
     }
 }
