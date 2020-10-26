@@ -24,6 +24,7 @@ use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -73,6 +74,21 @@ pub struct Config {
 
     /// A list of glob patterns to exclude from reading the files.
     exclude_paths_glob_patterns: Vec<PathBuf>,
+
+    /// Max amount of bytes to read from a single file before switching over
+    /// to the next file.
+    /// This allows distributing the reads more or less evenly accross
+    /// the files.
+    #[serde(default = "default_max_read_bytes")]
+    max_read_bytes: usize,
+
+    // This value specifies not exactly the globbing, but interval
+    // between the polling the files to watch from the `paths_provider`.
+    // This is quite efficient, yet might still create some load of the
+    // file system, so this call is 10 times larger than the default for
+    // the files.
+    #[serde(default = "default_glob_minimum_cooldown_ms")]
+    glob_minimum_cooldown_ms: usize,
 }
 
 inventory::submit! {
@@ -138,6 +154,8 @@ struct Source {
     field_selector: String,
     label_selector: String,
     exclude_paths: Vec<glob::Pattern>,
+    max_read_bytes: usize,
+    glob_minimum_cooldown: Duration,
 }
 
 impl Source {
@@ -166,6 +184,11 @@ impl Source {
             })
             .collect::<crate::Result<Vec<_>>>()?;
 
+        let glob_minimum_cooldown =
+            Duration::from_millis(config.glob_minimum_cooldown_ms.try_into().expect(
+                "unable to convert glob_minimum_cooldown_ms from usize to u64 without data loss",
+            ));
+
         Ok(Self {
             client,
             data_dir,
@@ -174,6 +197,8 @@ impl Source {
             field_selector,
             label_selector,
             exclude_paths,
+            max_read_bytes: config.max_read_bytes,
+            glob_minimum_cooldown,
         })
     }
 
@@ -190,6 +215,8 @@ impl Source {
             field_selector,
             label_selector,
             exclude_paths,
+            max_read_bytes,
+            glob_minimum_cooldown,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -213,7 +240,7 @@ impl Source {
         let paths_provider = K8sPathsProvider::new(state_reader.clone(), exclude_paths);
         let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
 
-        // TODO: maybe some of the parameters have to be configurable.
+        // TODO: maybe more of the parameters have to be configurable.
 
         // The 16KB is the maximum size of the payload at single line for both
         // docker and CRI log formats.
@@ -224,8 +251,10 @@ impl Source {
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
-            // This is the default value for the read buffer size.
-            max_read_bytes: 2048,
+            /// Max amount of bytes to read from a single file before switching over
+            /// to the next file.
+            /// This allows ditributing the reads more or less evenly accross the files.
+            max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
             start_at_beginning: false,
@@ -245,7 +274,7 @@ impl Source {
             // This is quite efficient, yet might still create some load of the
             // file system, so this call is 10 times larger than the default for
             // the files.
-            glob_minimum_cooldown: Duration::from_secs(10),
+            glob_minimum_cooldown,
             // The shape of the log files is well-known in the Kubernetes
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
@@ -366,6 +395,14 @@ fn create_event(line: Bytes, file: &str) -> Event {
 /// as it should be at the generated config file.
 fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
+}
+
+fn default_max_read_bytes() -> usize {
+    2048
+}
+
+fn default_glob_minimum_cooldown_ms() -> usize {
+    10000
 }
 
 /// This function construct the effective field selector to use, based on
