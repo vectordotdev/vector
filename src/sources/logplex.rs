@@ -2,10 +2,10 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event},
+    event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig, add_query_parameters},
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };

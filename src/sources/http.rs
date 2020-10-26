@@ -4,7 +4,7 @@ use crate::{
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig, add_query_parameters},
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };
@@ -126,10 +126,9 @@ fn add_headers(
             .map(Bytes::from);
 
         for event in events.iter_mut() {
-            event.as_mut_log().insert(
-                header_name as &str,
-                Value::from(value.to_owned()),
-            );
+            event
+                .as_mut_log()
+                .insert(header_name as &str, Value::from(value.to_owned()));
         }
     }
 
