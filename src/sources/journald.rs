@@ -7,8 +7,10 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
-use futures::{compat::Future01CompatExt, ready, FutureExt, Stream, StreamExt, TryFutureExt};
-use futures01::{future, Future, Sink};
+use futures::{
+    compat::Sink01CompatExt, ready, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
+};
+use futures01::Future;
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -157,10 +159,6 @@ impl JournaldConfig {
         batch_size: usize,
         remap_priority: bool,
     ) -> crate::Result<super::Source> {
-        let out = out
-            .sink_map_err(|_| ())
-            .with(|record: Record| future::ok(create_event(record)));
-
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
         let cursor = match checkpointer.get().await {
             Ok(cursor) => cursor,
@@ -178,7 +176,7 @@ impl JournaldConfig {
             journal: Box::pin(journal),
             include_units,
             exclude_units,
-            channel: out,
+            out,
             checkpointer,
             batch_size,
             remap_priority,
@@ -312,23 +310,19 @@ impl Stream for Journalctl {
     }
 }
 
-struct JournaldServer<J, T> {
+struct JournaldServer<J> {
     journal: Pin<Box<J>>,
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
-    channel: T,
+    out: Pipeline,
     checkpointer: Checkpointer,
     batch_size: usize,
     remap_priority: bool,
 }
 
-impl<J, T> JournaldServer<J, T>
-where
-    J: JournalStream,
-    T: Sink<SinkItem = Record, SinkError = ()>,
-{
+impl<J: JournalStream> JournaldServer<J> {
     pub async fn run(mut self) {
-        let channel = &mut self.channel;
+        let mut out = self.out.sink_compat();
 
         loop {
             let mut saw_record = false;
@@ -372,9 +366,12 @@ where
                     byte_size: text.len()
                 });
 
-                match channel.send(record).compat().await {
+                match out.send(create_event(record)).await {
                     Ok(_) => {}
-                    Err(()) => error!(message = "Could not send journald log"),
+                    Err(error) => {
+                        error!(message = "Could not send journald log", %error);
+                        return;
+                    }
                 }
             }
 
@@ -546,7 +543,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Pipeline;
+    use futures::compat::Future01CompatExt;
     use futures01::stream::Stream as _;
     use std::{
         io::{BufRead, BufReader, Cursor},
