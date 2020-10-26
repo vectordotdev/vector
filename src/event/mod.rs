@@ -123,7 +123,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         Some(proto::value::Kind::Array(array)) => decode_array(array.items),
         Some(proto::value::Kind::Null(_)) => Some(Value::Null),
         None => {
-            error!("encoded event contains unknown value kind");
+            error!("Encoded event contains unknown value kind.");
             None
         }
     }

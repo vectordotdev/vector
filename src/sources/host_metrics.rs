@@ -227,7 +227,7 @@ impl HostMetricsConfig {
         match heim::cpu::times().await {
             Ok(times) => {
                 times
-                    .filter_map(|result| filter_result(result, "Failed to load/parse CPU time"))
+                    .filter_map(|result| filter_result(result, "Failed to load/parse CPU time."))
                     .enumerate()
                     .map(|(index, times)| {
                         let timestamp = Utc::now();
@@ -432,7 +432,7 @@ impl HostMetricsConfig {
         match heim::net::io_counters().await {
             Ok(counters) => {
                 counters
-                    .filter_map(|result| filter_result(result, "Failed to load/parse network data"))
+                    .filter_map(|result| filter_result(result, "Failed to load/parse network data."))
                     // The following pair should be possible to do in one
                     // .filter_map, but it results in a strange "one type is
                     // more general than the other" error.
@@ -512,7 +512,7 @@ impl HostMetricsConfig {
             Ok(partitions) => {
                 partitions
                     .filter_map(|result| {
-                        filter_result(result, "Failed to load/parse partition data")
+                        filter_result(result, "Failed to load/parse partition data.")
                     })
                     // Filter on configured mountpoints
                     .map(|partition| {
@@ -548,7 +548,7 @@ impl HostMetricsConfig {
                             .await
                             .map_err(|error| {
                                 error!(
-                                    message = "Failed to load partition usage data",
+                                    message = "Failed to load partition usage data.",
                                     mount_point = ?partition.mount_point(),
                                     %error,
                                     rate_limit_secs = 60,
@@ -607,7 +607,7 @@ impl HostMetricsConfig {
             Ok(counters) => {
                 counters
                     .filter_map(|result| {
-                        filter_result(result, "Failed to load/parse disk I/O data")
+                        filter_result(result, "Failed to load/parse disk I/O data.")
                     })
                     .map(|counter| {
                         self.disk

@@ -113,7 +113,7 @@ impl fmt::Debug for AwsCredentialsProvider {
 impl AwsCredentialsProvider {
     pub fn new(region: &Region, assume_role: Option<String>) -> crate::Result<Self> {
         if let Some(role) = assume_role {
-            debug!("using sts assume role credentials for AWS.");
+            debug!("Using STS assume role credentials for AWS.");
 
             let dispatcher = rusoto_core::request::HttpClient::new()
                 .map_err(|_| RusotoError::DispatcherError)?;
@@ -136,7 +136,7 @@ impl AwsCredentialsProvider {
             let creds = AutoRefreshingProvider::new(provider).context(InvalidAWSCredentials)?;
             Ok(Self::Role(creds))
         } else {
-            debug!("using default credentials provider for AWS.");
+            debug!("Using default credentials provider for AWS.");
             let mut chain = CustomChainProvider::new();
             // 8 seconds because our default healthcheck timeout
             // is 10 seconds.

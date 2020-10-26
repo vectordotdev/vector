@@ -100,7 +100,7 @@ impl SourceConfig for JournaldConfig {
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
             (true, false) => {
-                warn!("The `units` setting is deprecated, use `include_units` instead");
+                warn!("The `units` setting is deprecated, use `include_units` instead.");
                 &self.units
             }
             (false, _) => &self.include_units,

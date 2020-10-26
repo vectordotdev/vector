@@ -1149,7 +1149,7 @@ mod integration_tests {
 
     /// Returns once container is done running
     async fn container_wait(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting container.");
+        trace!("Waiting for container.");
 
         docker
             .wait_container(id, None::<WaitContainerOptions<&str>>)
@@ -1162,7 +1162,7 @@ mod integration_tests {
 
     /// Returns once container is killed
     async fn container_kill(id: &str, docker: &Docker) -> Result<(), bollard::errors::Error> {
-        trace!("Waiting container.");
+        trace!("Waiting for container to be killed.");
 
         docker
             .kill_container(id, None::<KillContainerOptions<&str>>)

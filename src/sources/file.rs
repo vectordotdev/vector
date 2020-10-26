@@ -280,7 +280,7 @@ pub fn file_source(
         })
         .boxed()
         .compat()
-        .map_err(|error| error!(message="file server unexpectedly stopped.",%error))
+        .map_err(|error| error!(message="File server unexpectedly stopped.",%error))
     }))
 }
 

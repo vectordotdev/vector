@@ -136,7 +136,7 @@ impl SourceConfig for MongoDBMetricsConfig {
         .await?;
 
         let mut out = out
-            .sink_map_err(|e| error!("error sending metric: {:?}", e))
+            .sink_map_err(|e| error!("Error sending metric: {:?}.", e))
             .sink_compat();
 
         Ok(Box::new(

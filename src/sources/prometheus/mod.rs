@@ -78,7 +78,7 @@ fn prometheus(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_map_err(|e| error!("Error sending metric: {:?}.", e))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
@@ -164,7 +164,7 @@ fn prometheus(
         })
         .flatten()
         .forward(out)
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending."));
 
     Box::new(task.boxed().compat())
 }
@@ -234,7 +234,7 @@ mod test {
 
         tokio::spawn(async move {
             if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+                error!("Server error: {:?}.", e);
             }
         });
 

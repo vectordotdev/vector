@@ -139,7 +139,7 @@ impl CloudWatchMetricsSvc {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));
+            .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}.", e));
 
         Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }

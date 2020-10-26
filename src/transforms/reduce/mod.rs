@@ -87,7 +87,7 @@ impl ReduceState {
                         match get_value_merger(v, strat) {
                             Ok(m) => Some((k, m)),
                             Err(err) => {
-                                warn!("failed to create merger for field '{}': {}", k, err);
+                                warn!("Failed to create merger for field '{}': {}.", k, err);
                                 None
                             }
                         }
@@ -110,7 +110,7 @@ impl ReduceState {
                                 entry.insert(m);
                             }
                             Err(err) => {
-                                warn!("failed to merge value: {}", err);
+                                warn!("Failed to merge value: {}.", err);
                             }
                         }
                     } else {
@@ -119,7 +119,7 @@ impl ReduceState {
                 }
                 hash_map::Entry::Occupied(mut entry) => {
                     if let Err(err) = entry.get_mut().add(v.clone()) {
-                        warn!("failed to merge value: {}", err);
+                        warn!("Failed to merge value: {}.", err);
                     }
                 }
             }
@@ -131,7 +131,7 @@ impl ReduceState {
         let mut event = Event::new_empty_log().into_log();
         for (k, v) in self.fields.drain() {
             if let Err(err) = v.insert_into(k, &mut event) {
-                warn!("failed to merge values for field: {}", err);
+                warn!("Failed to merge values for field: {}.", err);
             }
         }
         event

@@ -60,7 +60,7 @@ impl BufferInputCloner {
     pub fn get(&self) -> Box<dyn Sink<SinkItem = Event, SinkError = ()> + Send> {
         match self {
             BufferInputCloner::Memory(tx, when_full) => {
-                let inner = tx.clone().sink_map_err(|e| error!("sender error: {:?}", e));
+                let inner = tx.clone().sink_map_err(|e| error!("Sender error: {:?}.", e));
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull { inner })
                 } else {

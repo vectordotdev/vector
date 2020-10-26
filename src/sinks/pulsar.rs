@@ -179,7 +179,7 @@ impl Sink for PulsarSink {
                 }
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     trace!(
-                        "Pulsar sink produced message {:?} from {} at sequence id {}",
+                        "Pulsar sink produced message {:?} from {} at sequence id {}.",
                         result.message_id,
                         result.producer_id,
                         result.sequence_id
@@ -192,7 +192,7 @@ impl Sink for PulsarSink {
                     }
                     self.acker.ack(num_to_ack);
                 }
-                Err(e) => error!("Pulsar sink generated an error: {}", e),
+                Err(e) => error!("Pulsar sink generated an error: {}.", e),
             }
         }
     }

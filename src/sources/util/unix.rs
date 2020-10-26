@@ -33,7 +33,7 @@ where
     D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
     E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
-    let out = out.sink_map_err(|e| error!("Error sending line: {:?}", e));
+    let out = out.sink_map_err(|e| error!("Error sending line: {:?}.", e));
 
     let fut = async move {
         let mut listener =
@@ -45,7 +45,7 @@ where
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(error) => {
-                    error!("Failed to accept socket; error = {:?}", error);
+                    error!("Failed to accept socket; error = {:?}.", error);
                     continue;
                 }
                 Ok(socket) => socket,
@@ -90,7 +90,7 @@ where
                 async move {
                     let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
                     let _ = out.send_all(&mut stream).await;
-                    info!("Finished sending");
+                    info!("Finished sending.");
 
                     let socket: &UnixStream = stream.get_ref().get_ref().get_ref();
                     let _ = socket.shutdown(std::net::Shutdown::Both);

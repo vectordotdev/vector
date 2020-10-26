@@ -715,7 +715,7 @@ where
         self.next_request_id = request_id.wrapping_add(1);
 
         trace!(
-            message = "submitting service request.",
+            message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
         let response = Compat::new(Box::pin(self.service.call(req)))

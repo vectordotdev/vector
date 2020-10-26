@@ -30,7 +30,7 @@ async fn make_listener(
         SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
             Ok(listener) => Some(listener),
             Err(err) => {
-                error!("Failed to bind to listener socket: {}", err);
+                error!("Failed to bind to listener socket: {}.", err);
                 None
             }
         },
@@ -38,16 +38,16 @@ async fn make_listener(
             Ok(Some(listener)) => match TcpListener::from_std(listener) {
                 Ok(listener) => Some(listener.into()),
                 Err(err) => {
-                    error!("Failed to bind to listener socket: {}", err);
+                    error!("Failed to bind to listener socket: {}.", err);
                     None
                 }
             },
             Ok(None) => {
-                error!("Failed to take listen FD, not open or already taken");
+                error!("Failed to take listen FD, not open or already taken.");
                 None
             }
             Err(err) => {
-                error!("Failed to take listen FD: {}", err);
+                error!("Failed to take listen FD: {}.", err);
                 None
             }
         },
@@ -72,7 +72,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|e| error!("Error sending event: {:?}", e));
+        let out = out.sink_map_err(|e| error!("Error sending event: {:?}.", e));
 
         let listenfd = ListenFd::from_env();
 
@@ -183,7 +183,7 @@ async fn handle_stream(
         if let Some(fut) = shutdown.as_mut() {
             match fut.poll_unpin(cx) {
                 Poll::Ready(token) => {
-                    debug!("Start graceful shutdown");
+                    debug!("Start graceful shutdown.");
                     // Close our write part of TCP socket to signal the other side
                     // that it should stop writing and close the channel.
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();
@@ -219,7 +219,7 @@ async fn handle_stream(
     }))
     .forward(out.sink_compat())
     .map_err(|_| warn!(message = "Error received while processing TCP source."))
-    .map(|_| debug!("connection closed."))
+    .map(|_| debug!("Connection closed."))
     .await
 }
 
