@@ -61,7 +61,7 @@ jobs:
           path: "./target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-arm65.deb"
+          name: "vector-arm64.deb"
           path: "./target/artifacts/vector-arm64.deb"
       - uses: actions/upload-artifact@v1
         with:
