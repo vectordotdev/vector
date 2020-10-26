@@ -1,5 +1,5 @@
 use crate::{
-    event::{PathComponent, PathIter},
+    event::{PathComponent, PathIter, Lookup, LookupBuf},
     sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat},
 };
 use serde::{
@@ -29,14 +29,13 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
+    pub(crate) only_fields: Option<Vec<LookupBuf>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
     #[serde(
         default,
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
-    pub(crate) except_fields: Option<Vec<String>>,
+    pub(crate) except_fields: Option<Vec<LookupBuf>>,
     /// Format for outgoing timestamps.
     #[serde(
         default,
@@ -49,11 +48,10 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
+    fn only_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
         &self.only_fields
     }
-    fn except_fields(&self) -> &Option<Vec<String>> {
+    fn except_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
         &self.except_fields
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {

@@ -43,7 +43,10 @@ async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<S
         match build_unit_test(test, &config).await {
             Ok(t) => tests.push(t),
             Err(errs) => {
-                let mut test_err = errs.join("\n");
+                let mut test_err = errs
+                  .iter()
+                  .map(|v| format!("{:?}", v))
+                  .collect::<Vec<String>>().join("\n");
                 // Indent all line breaks
                 test_err = test_err.replace("\n", "\n  ");
                 test_err.insert_str(0, &format!("Failed to build test '{}':\n  ", test.name));
@@ -281,7 +284,7 @@ fn reduce_transforms(
     });
 }
 
-fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event), String> {
+fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event), crate::Error> {
     let target = config.get_inputs(&input.insert_at);
 
     match input.type_str.as_ref() {
@@ -299,31 +302,31 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
                         TestInputValue::Integer(i) => Value::from(*i),
                         TestInputValue::Float(f) => Value::from(*f),
                     };
-                    event.as_mut_log().insert(LookupBuf::from_str(path), value);
+                    event.as_mut_log().insert(LookupBuf::from_str(path)?, value);
                 }
                 Ok((target, event))
             } else {
-                Err("input type 'log' requires the field 'log_fields'".to_string())
+                Err("input type 'log' requires the field 'log_fields'".into())
             }
         }
         "metric" => {
             if let Some(metric) = &input.metric {
                 Ok((target, Event::Metric(metric.clone())))
             } else {
-                Err("input type 'metric' requires the field 'metric'".to_string())
+                Err("input type 'metric' requires the field 'metric'".into())
             }
         }
         _ => Err(format!(
             "unrecognized input type '{}', expected one of: 'raw', 'log' or 'metric'",
             input.type_str
-        )),
+        ).into()),
     }
 }
 
 fn build_inputs(
     config: &Config,
     definition: &TestDefinition,
-) -> Result<Vec<(Vec<String>, Event)>, Vec<String>> {
+) -> Result<Vec<(Vec<String>, Event)>, Vec<crate::Error>> {
     let mut inputs = Vec::new();
     let mut errors = vec![];
 
@@ -333,7 +336,7 @@ fn build_inputs(
             Err(err) => errors.push(err),
         }
     } else if definition.inputs.is_empty() {
-        errors.push("must specify at least one input.".to_owned());
+        errors.push("must specify at least one input.".into());
     }
     for input_def in &definition.inputs {
         match build_input(config, input_def) {
@@ -352,7 +355,7 @@ fn build_inputs(
 async fn build_unit_test(
     definition: &TestDefinition,
     config: &Config,
-) -> Result<UnitTest, Vec<String>> {
+) -> Result<UnitTest, Vec<crate::Error>> {
     let mut errors = vec![];
 
     let inputs = match build_inputs(config, definition) {
@@ -385,7 +388,7 @@ async fn build_unit_test(
                 errors.push(format!(
                     "inputs[{}]: unable to locate target transform '{}'",
                     i, target
-                ));
+                ).into());
             }
         }
     }
@@ -433,7 +436,7 @@ async fn build_unit_test(
                     );
                 }
                 Err(err) => {
-                    errors.push(format!("failed to build transform '{}': {}", name, err));
+                    errors.push(format!("failed to build transform '{}': {}", name, err).into());
                 }
             }
         }
@@ -450,12 +453,12 @@ async fn build_unit_test(
                 errors.push(format!(
                     "unable to complete topology between target transform '{}' and output target '{}'",
                     targets.first().unwrap(), o.extract_from
-                ));
+                ).into());
             } else {
                 errors.push(format!(
                     "unable to complete topology between target transforms {:?} and output target '{}'",
                     targets, o.extract_from
-                ));
+                ).into());
             }
         }
     });
@@ -482,7 +485,7 @@ async fn build_unit_test(
                             errors.push(format!(
                                 "failed to create test condition '{}': {}",
                                 index, e,
-                            ));
+                            ).into());
                         }
                     },
                     TestCondition::NoTypeEmbedded(n) => match n.build() {
@@ -493,14 +496,14 @@ async fn build_unit_test(
                             errors.push(format!(
                                 "failed to create test condition '{}': {}",
                                 index, e,
-                            ));
+                            ).into());
                         }
                     },
                     TestCondition::String(_s) => {
                         errors.push(format!(
                             "failed to create test condition '{}': condition references are not yet supported",
                             index
-                        ));
+                        ).into());
                     }
                 }
             }
@@ -513,7 +516,7 @@ async fn build_unit_test(
 
     if definition.outputs.is_empty() && definition.no_outputs_from.is_empty() {
         errors.push(
-            "unit test must contain at least one of `outputs` or `no_outputs_from`.".to_owned(),
+            "unit test must contain at least one of `outputs` or `no_outputs_from`.".into(),
         );
     }
 

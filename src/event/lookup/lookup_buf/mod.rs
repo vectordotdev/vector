@@ -199,8 +199,8 @@ impl LookupBuf {
     }
 
     #[instrument]
-    pub fn from_str(value: &str) -> LookupBuf {
-        Lookup::from(value).into_buf()
+    pub fn from_str(value: &str) -> Result<LookupBuf, crate::Error> {
+        Lookup::from_str(value).map(Lookup::into_buf)
     }
 }
 
@@ -352,6 +352,6 @@ impl<'buf: 'view, 'view> AsRef<Lookup<'view>> for &'buf LookupBuf {
 
 impl<'buf: 'view, 'view> std::borrow::Borrow<Lookup<'view>> for &'buf LookupBuf {
     fn borrow(&self) -> &Lookup<'view> {
-        self.as_lookup()
+        &self.as_lookup()
     }
 }

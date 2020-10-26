@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::Event,
+    event::{Event, Lookup, LookupBuf},
     internal_events::AwsKinesisStreamsEventSent,
     region::RegionOrEndpoint,
     sinks::util::{
@@ -271,7 +271,7 @@ enum HealthcheckError {
 
 fn encode_event(
     mut event: Event,
-    partition_key_field: &Option<String>,
+    partition_key_field: &Option<Lookup<'_>>,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {

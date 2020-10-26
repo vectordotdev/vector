@@ -8,7 +8,7 @@ pub fn merge_log_event<'a>(current: &mut LogEvent, mut incoming: LogEvent, field
             None => continue,
             Some(val) => val,
         };
-        match current.get_mut(&field) {
+        match current.get_mut(field) {
             None => {
                 current.insert(field.into_buf(), incoming_val);
             }

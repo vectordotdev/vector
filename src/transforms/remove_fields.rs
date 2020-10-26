@@ -76,7 +76,7 @@ impl Transform for RemoveFields {
 
         let log = event.as_mut_log();
         for field in &self.fields {
-            let old_val = log.remove(&field, self.drop_empty);
+            let old_val = log.remove(field, self.drop_empty);
             if old_val.is_none() {
                 emit!(RemoveFieldsFieldMissing {
                     field: field.as_lookup()

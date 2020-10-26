@@ -77,7 +77,7 @@ struct CompiledRegex {
 }
 
 impl CompiledRegex {
-    fn new(regex: Regex, types: &HashMap<String, Conversion>) -> CompiledRegex {
+    fn new(regex: Regex, types: &HashMap<LookupBuf, Conversion>) -> CompiledRegex {
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
         let capture_names = regex
@@ -140,7 +140,7 @@ impl RegexParser {
         let field = config
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().to_buf());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {

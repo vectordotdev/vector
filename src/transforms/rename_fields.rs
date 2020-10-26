@@ -75,7 +75,7 @@ impl Transform for RenameFields {
 
         for (old_key, new_key) in &self.fields {
             let log = event.as_mut_log();
-            match log.remove(&old_key, self.drop_empty) {
+            match log.remove(old_key, self.drop_empty) {
                 Some(v) => {
                     if event.as_mut_log().insert(new_key.clone(), v).is_some() {
                         emit!(RenameFieldsFieldOverwritten { field: old_key.as_lookup() });

@@ -123,7 +123,7 @@ impl<'a> Lookup<'a> {
     /// Become a `LookupBuf` (by allocating).
     #[instrument]
     pub fn into_buf(&self) -> LookupBuf {
-        LookupBuf::from(self.segments)
+        LookupBuf::from(self)
     }
 }
 

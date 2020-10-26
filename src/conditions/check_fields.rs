@@ -511,7 +511,7 @@ fn build_predicates(
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct CheckFieldsConfig {
     #[serde(flatten, default)]
-    predicates: IndexMap<LookupBuf, CheckFieldsPredicateArg>,
+    predicates: IndexMap<String, CheckFieldsPredicateArg>,
 }
 
 inventory::submit! {
@@ -560,8 +560,8 @@ impl Condition for CheckFields {
             Ok(())
         } else {
             Err(format!(
-                "predicates failed: [ {} ]",
-                failed_preds.join(", ")
+                "predicates failed: {:?}",
+                failed_preds
             ))
         }
     }

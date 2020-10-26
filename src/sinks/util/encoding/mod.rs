@@ -35,7 +35,7 @@ mod with_default;
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
-    event::{PathComponent, PathIter, Value},
+    event::{PathComponent, PathIter, Value, Lookup, LookupBuf},
     Event, Result,
 };
 use serde::{Deserialize, Serialize};
@@ -46,9 +46,8 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
-    fn except_fields(&self) -> &Option<Vec<String>>;
+    fn only_fields<'a>(&self) -> &'a Option<Vec<Lookup<'a>>>;
+    fn except_fields<'a>(&self) -> &'a Option<Vec<Lookup<'a>>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
     fn apply_only_fields(&self, event: &mut Event) {
@@ -101,7 +100,13 @@ pub trait EncodingConfiguration<E> {
                                 }
                             }
                             for (k, v) in unix_timestamps {
-                                log_event.insert(k, v);
+                                // TODO: Fixed in https://github.com/timberio/vector/issues/2845
+                                log_event.insert(
+                                    LookupBuf::from_str(k).expect(
+                                        "While iterating over fields in an event, found one which was not a valid lookup. This is an invariant, please report this."
+                                    ),
+                                    v
+                                );
                             }
                         }
                         // RFC3339 is the default serialization of a timestamp.

@@ -379,10 +379,10 @@ impl From<Bytes> for Event {
 
         event
             .as_mut_log()
-            .insert(log_schema().message_key(), message);
+            .insert(log_schema().message_key().into_buf(), message);
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
+            .insert(log_schema().timestamp_key().into_buf(), Utc::now());
 
         event
     }

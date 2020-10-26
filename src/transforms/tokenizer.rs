@@ -31,6 +31,7 @@ impl TransformConfig for TokenizerConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
+            .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;

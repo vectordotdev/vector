@@ -23,9 +23,9 @@ pub struct EncodingConfig<E> {
     pub(crate) codec: E,
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default)]
-    pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
+    pub(crate) only_fields: Option<LookupBuf>,
     #[serde(default)]
-    pub(crate) except_fields: Option<Vec<String>>,
+    pub(crate) except_fields: Option<LookupBuf>,
     #[serde(default)]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
@@ -35,10 +35,10 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
         &self.codec
     }
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
+    fn only_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
         &self.only_fields
     }
-    fn except_fields(&self) -> &Option<Vec<String>> {
+    fn except_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
         &self.except_fields
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {

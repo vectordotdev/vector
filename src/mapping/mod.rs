@@ -1,4 +1,4 @@
-use crate::event::{Event, Value};
+use crate::event::{Event, Value, Lookup, LookupBuf};
 use std::collections::BTreeMap;
 
 pub mod parser;
@@ -16,7 +16,7 @@ pub(self) trait Function: Send + core::fmt::Debug {
 
 #[derive(Debug)]
 pub(self) struct Assignment {
-    path: String,
+    path: LookupBuf,
     function: Box<dyn query::Function>,
 }
 
@@ -42,11 +42,11 @@ impl Function for Assignment {
 
 #[derive(Debug)]
 pub(self) struct Deletion {
-    paths: Vec<String>,
+    paths: Vec<LookupBuf>,
 }
 
 impl Deletion {
-    pub(self) fn new(mut paths: Vec<String>) -> Self {
+    pub(self) fn new(mut paths: Vec<LookupBuf>) -> Self {
         Self {
             paths: paths.drain(..).collect(),
         }
@@ -56,7 +56,7 @@ impl Deletion {
 impl Function for Deletion {
     fn apply(&self, target: &mut Event) -> Result<()> {
         for path in &self.paths {
-            target.as_mut_log().remove(&path);
+            target.as_mut_log().remove(&path, false);
         }
         Ok(())
     }
@@ -66,11 +66,11 @@ impl Function for Deletion {
 
 #[derive(Debug)]
 pub(self) struct OnlyFields {
-    paths: Vec<String>,
+    paths: Vec<LookupBuf>,
 }
 
 impl OnlyFields {
-    pub(self) fn new(paths: Vec<String>) -> Self {
+    pub(self) fn new(paths: Vec<LookupBuf>) -> Self {
         Self { paths }
     }
 }
@@ -79,7 +79,7 @@ impl Function for OnlyFields {
     fn apply(&self, target: &mut Event) -> Result<()> {
         let target_log = target.as_mut_log();
 
-        let keys: Vec<String> = target_log
+        let keys: Vec<LookupBuf> = target_log
             .keys()
             .filter(|k| {
                 self.paths
@@ -90,7 +90,7 @@ impl Function for OnlyFields {
             .collect();
 
         for key in keys {
-            target_log.remove_prune(key, true);
+            target_log.remove(key, true);
         }
 
         Ok(())

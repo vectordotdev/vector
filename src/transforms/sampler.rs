@@ -93,7 +93,7 @@ impl Transform for Sampler {
         if seahash::hash(message.as_bytes()) % self.rate == 0 {
             event
                 .as_mut_log()
-                .insert(Lookup::from("sample_rate"), self.rate.to_string());
+                .insert(LookupBuf::from("sample_rate"), self.rate.to_string());
 
             Some(event)
         } else {

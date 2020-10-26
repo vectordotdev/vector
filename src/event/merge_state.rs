@@ -1,5 +1,5 @@
 use crate::event::merge::merge_log_event;
-use crate::event::LogEvent;
+use crate::event::{LogEvent, Lookup};
 
 /// Encapsulates the inductive events merging algorithm.
 ///
@@ -21,16 +21,16 @@ impl LogEventMergeState {
     }
 
     /// Merge the incoming (partial) event in.
-    pub fn merge_in_next_event(&mut self, incoming: LogEvent, fields: &[impl AsRef<str>]) {
+    pub fn merge_in_next_event<'a>(&mut self, incoming: LogEvent, fields: &[impl AsRef<Lookup<'a>>]) {
         merge_log_event(&mut self.intermediate_merged_event, incoming, fields);
     }
 
     /// Merge the final (non-partial) event in and return the resulting (merged)
     /// event.
-    pub fn merge_in_final_event(
+    pub fn merge_in_final_event<'a>(
         mut self,
         incoming: LogEvent,
-        fields: &[impl AsRef<str>],
+        fields: &[impl AsRef<Lookup<'a>>],
     ) -> LogEvent {
         self.merge_in_next_event(incoming, fields);
         self.intermediate_merged_event
