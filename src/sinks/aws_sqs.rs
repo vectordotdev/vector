@@ -29,6 +29,8 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 
+const MESSAGE_GROUP_ID: &'static str = "vector-sinks-aws-sqs------------------------------------------------------------------------------------------------------------";
+
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
     #[snafu(display("GetQueueAttributes failed: {}", source))]
@@ -263,7 +265,11 @@ fn encode_event(
     Some(SendMessageBatchRequestEntry {
         id: gen_id(30),
         message_body,
-        message_group_id: if fifo { Some(gen_id(128)) } else { None },
+        message_group_id: if fifo {
+            Some(MESSAGE_GROUP_ID.to_string())
+        } else {
+            None
+        },
         ..Default::default()
     })
 }
