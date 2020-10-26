@@ -33,18 +33,6 @@ use std::{convert::TryInto, time::Duration};
 use tokio::{select, time};
 use tokio_util::codec::FramedRead;
 
-// TODO:
-// * Revisit configuration of queue. Should we take the URL instead?
-//   * At the least, support setting a differente queue owner
-// * Revisit configuration of SQS strategy (intrnal vs. external tagging)
-// * Make sure we are handling shutdown well
-// * Consider / decide on custom endpoint support
-//
-// Future work:
-// * Additional codecs. Just treating like `file` source with newlines for now
-// * Additional compression formats
-// * (potentially) multi region support
-
 #[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 enum Compression {
@@ -91,6 +79,7 @@ struct AwsS3Config {
 struct SqsConfig {
     region: Region,
     queue_name: String,
+    queue_owner: Option<String>,
     #[serde(default = "default_poll_interval_secs")]
     poll_secs: u64,
     #[serde(default = "default_visibility_timeout_secs")]
@@ -204,9 +193,10 @@ enum SqsIngestorNewError {
     FetchQueueUrl {
         source: RusotoError<GetQueueUrlError>,
         name: String,
+        owner: Option<String>,
     },
     #[snafu(display("Got an empty queue URL for {}", name))]
-    MissingQueueUrl { name: String },
+    MissingQueueUrl { name: String, owner: Option<String> },
     #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
     InvalidVisibilityTimeout {
         source: std::num::TryFromIntError,
@@ -277,17 +267,20 @@ impl SqsIngestor {
         let queue_url_result = sqs_client
             .get_queue_url(GetQueueUrlRequest {
                 queue_name: config.queue_name.clone(),
+                queue_owner_aws_account_id: config.queue_owner.clone(),
                 ..Default::default()
             })
             .await
             .with_context(|| FetchQueueUrl {
                 name: config.queue_name.clone(),
+                owner: config.queue_owner.clone(),
             })?;
 
         let queue_url = queue_url_result
             .queue_url
             .ok_or(SqsIngestorNewError::MissingQueueUrl {
                 name: config.queue_name.clone(),
+                owner: config.queue_owner.clone(),
             })?;
 
         // This is a bit odd as AWS wants an i64 for this value, but also doesn't want negative
