@@ -105,7 +105,7 @@ impl Expression for ParseSyslogFn {
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
 
-        Ok(Some(message_to_value(parsed).into()))
+        Ok(Some(message_to_value(parsed)))
     }
 }
 

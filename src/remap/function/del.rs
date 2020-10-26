@@ -57,7 +57,7 @@ impl Expression for DelFn {
             .paths
             .iter()
             .filter_map(|expr| expr.execute(state, object).transpose())
-            .map(|r| r.and_then(|v| Ok(String::try_from(v)?.trim_start_matches(".").to_owned())))
+            .map(|r| r.and_then(|v| Ok(String::try_from(v)?.trim_start_matches('.').to_owned())))
             .collect::<Result<Vec<String>>>()?;
 
         for path in paths {

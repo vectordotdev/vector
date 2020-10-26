@@ -19,6 +19,6 @@ struct NowFn;
 
 impl Expression for NowFn {
     fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
-        Ok(Some(Value::Timestamp(Utc::now()).into()))
+        Ok(Some(Utc::now().into()))
     }
 }
