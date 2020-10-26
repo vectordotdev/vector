@@ -14,6 +14,7 @@ use tokio_util::codec::{BytesCodec, FramedWrite};
 
 const MAX_PENDING_ITEMS: usize = 10_000;
 
+/// Count number of encoded events and ack on request.
 pub struct EventsCounter {
     sizes: Mutex<Vec<usize>>,
     acker: Acker,
@@ -71,6 +72,13 @@ pub enum ShutdownCheck {
     Alive,
 }
 
+/// [FramedWrite](https://docs.rs/tokio-util/0.3.1/tokio_util/codec/struct.FramedWrite.html) wrapper.
+/// Wrapper acts like [Sink](https://docs.rs/futures/0.3.7/futures/sink/trait.Sink.html) forwarding all
+/// calls to `FramedWrite`, but in addition:
+/// - Call `shutdown_check` on each `poll_ready`, so we able stop data sending if other side disconnected.
+/// - Flush all data on each `poll_ready` if total number of events in queue more than some limit.
+/// - Add event size to queue on each `start_send`.
+/// - Ack all events from queue on successful `poll_flush` and `poll_close`.
 #[pin_project]
 pub struct BytesSink<T> {
     #[pin]

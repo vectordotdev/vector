@@ -198,6 +198,11 @@ impl TcpSink {
 #[async_trait]
 impl StreamSink for TcpSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
+        // connection only when we have something to send.
+        // It would be cool encode events before `peekable()` but [SendAll](https://docs.rs/futures-util/0.3.6/src/futures_util/sink/send_all.rs.html)
+        // have buffered item, so if our connection fail we will completely lost one item.
+        // As result `EventsCounter` was added for calculating encoded events and ack only consumed items on failed send.
         let mut input = Some(input.peekable());
         while Pin::new(input.as_mut().unwrap()).peek().await.is_some() {
             let events_counter = Arc::clone(&self.events_counter);

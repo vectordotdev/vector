@@ -134,6 +134,7 @@ impl UnixSink {
 
 #[async_trait]
 impl StreamSink for UnixSink {
+    // Same as TcpSink, more details there.
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = Some(input.peekable());
         while Pin::new(input.as_mut().unwrap()).peek().await.is_some() {
