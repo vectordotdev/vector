@@ -2,10 +2,10 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, Value},
+    event::{Event},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig, add_query_parameters},
     tls::TlsConfig,
     Pipeline,
 };
@@ -119,27 +119,6 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
     }
 
     Ok(events)
-}
-
-fn add_query_parameters(
-    mut events: Vec<Event>,
-    query_parameters_config: &[String],
-    query_parameters: HashMap<String, String>,
-) -> Vec<Event> {
-    for query_parameter_name in query_parameters_config {
-        let value = query_parameters
-            .get(query_parameter_name)
-            .map(String::as_bytes)
-            .unwrap_or_default();
-        for event in events.iter_mut() {
-            event.as_mut_log().insert(
-                query_parameter_name as &str,
-                Value::from(Bytes::from(value.to_owned())),
-            );
-        }
-    }
-
-    events
 }
 
 fn get_header<'a>(header_map: &'a HeaderMap, name: &str) -> Result<&'a str, ErrorMessage> {

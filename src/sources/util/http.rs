@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{Event, Value},
     internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -18,6 +18,27 @@ use warp::{
     reject::Rejection,
     Filter,
 };
+
+pub fn add_query_parameters(
+    mut events: Vec<Event>,
+    query_parameters_config: &[String],
+    query_parameters: HashMap<String, String>,
+) -> Vec<Event> {
+    for query_parameter_name in query_parameters_config {
+        let value = query_parameters
+            .get(query_parameter_name)
+            .map(String::as_bytes)
+            .unwrap_or_default();
+        for event in events.iter_mut() {
+            event.as_mut_log().insert(
+                query_parameter_name as &str,
+                Value::from(Bytes::from(value.to_owned())),
+            );
+        }
+    }
+
+    events
+}
 
 #[derive(Serialize, Debug)]
 pub struct ErrorMessage {

@@ -7,7 +7,7 @@ mod tcp;
 mod unix;
 
 #[cfg(feature = "sources-utils-http")]
-pub use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
+pub use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig, add_query_parameters};
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
