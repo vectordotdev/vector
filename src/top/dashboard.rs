@@ -6,6 +6,7 @@ use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    tty::IsTty,
     ExecutableCommand,
 };
 use std::{
@@ -116,6 +117,11 @@ impl Widgets {
     async fn listen(&self) {
         self.state.listen().await;
     }
+}
+
+/// Determine if the terminal is a TTY
+pub fn is_tty() -> bool {
+    stdout().is_tty()
 }
 
 /// Initialize the dashboard. A new terminal drawing session will be created, targeting

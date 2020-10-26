@@ -1,5 +1,5 @@
 use super::{
-    dashboard::{init_dashboard, Widgets},
+    dashboard::{init_dashboard, is_tty, Widgets},
     state::{TopologyRow, TopologyState, WidgetsState},
 };
 use crate::config;
@@ -53,6 +53,12 @@ async fn update_topology(
 /// CLI command func for displaying Vector topology, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
 pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
+    // Exit early if the terminal is not a teletype
+    if !is_tty() {
+        eprintln!("Terminal must be a teletype (TTY) to display a Vector dashboard.");
+        return exitcode::IOERR;
+    }
+
     // Use the provided URL as the Vector GraphQL API server, or default to the local port
     // provided by the API config. This will work despite `api` and `api-client` being distinct
     // features; the config is available even if `api` is disabled
