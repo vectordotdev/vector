@@ -412,7 +412,7 @@ mod tests {
         let mut template = directory.to_string_lossy().to_string();
         template.push_str("/{{level}}s-{{date}}.log");
 
-        trace!(message = "Template", %template);
+        trace!(message = "Template.", %template);
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),

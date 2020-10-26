@@ -185,7 +185,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             }
         });
 
-        info!(message = "Building HTTP server", addr = %address);
+        info!(message = "Building HTTP server.", addr = %address);
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {

@@ -176,7 +176,7 @@ impl HostMetricsConfig {
                 .send_all(futures01::stream::iter_ok(metrics))
                 .compat()
                 .await
-                .map_err(|error| error!(message = "Error sending host metrics", %error))?;
+                .map_err(|error| error!(message = "Error sending host metrics.", %error))?;
             out = sink;
         }
 
@@ -268,7 +268,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load CPU times", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load CPU times.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -349,7 +349,7 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load memory info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load memory info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -395,7 +395,7 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load swap info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load swap info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -418,7 +418,7 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load load average info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load load average info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         };
@@ -503,7 +503,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load network I/O counters", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load network I/O counters.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -658,7 +658,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load disk I/O info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load disk I/O info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }

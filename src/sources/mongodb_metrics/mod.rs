@@ -196,7 +196,7 @@ impl MongoDBMetrics {
         let node_type = Self::get_node_type(&client).await?;
         let build_info = Self::get_build_info(&client).await?;
         debug!(
-            "Connected to: {:?} (node type: {:?}, server version: {})",
+            "Connected to: {:?} (node type: {:?}, server version: {}).",
             endpoint,
             node_type,
             serde_json::to_string(&build_info).unwrap()
