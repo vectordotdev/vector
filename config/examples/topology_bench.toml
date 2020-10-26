@@ -1,0 +1,17 @@
+data_dir = "/var/lib/vector"
+
+[sources.src]
+  type = "generator"
+  lines = ["test1", "test2"]
+[sinks.dst]
+  inputs = ["src"]
+  type = "blackhole"
+  print_amount = 1_000_000
+
+[sources.internal_metrics]
+  type = "internal_metrics"
+[sinks.metrics]
+  type = "prometheus"
+  inputs = ["internal_metrics"]
+  address = "0.0.0.0:9090"
+  namespace = "vector"
