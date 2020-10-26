@@ -172,7 +172,7 @@ mod tests {
         ];
 
         for (script, result) in cases {
-            let program = Program::new(script, vec![])
+            let program = Program::new(script, &[])
                 .map_err(|e| {
                     println!("{}", &e);
                     e
