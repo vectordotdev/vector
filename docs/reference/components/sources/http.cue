@@ -114,9 +114,8 @@ components: sources: http: {
 		query_parameters: {
 			common:      false
 			description: "A list of URL query parameters to include in the log event. These will override any values included in the body with conflicting names."
-			required: false
-			warnings: []
-			type: array {
+			required:    false
+			type: array: {
 				default: null
 				items: type: string: examples: ["application", "source"]
 			}
