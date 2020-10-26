@@ -63,6 +63,8 @@ impl Default for Strategy {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 struct AwsS3Config {
+    region: Region,
+
     compression: Compression,
 
     strategy: Strategy,
@@ -77,7 +79,6 @@ struct AwsS3Config {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SqsConfig {
-    region: Region,
     queue_name: String,
     queue_owner: Option<String>,
     #[serde(default = "default_poll_interval_secs")]
@@ -151,16 +152,16 @@ impl AwsS3Config {
                 let resolver = Resolver;
                 let client = rusoto::client(resolver).with_context(|| Client {})?;
                 let creds: std::sync::Arc<rusoto::AwsCredentialsProvider> =
-                    rusoto::AwsCredentialsProvider::new(&sqs.region, self.assume_role.clone())
+                    rusoto::AwsCredentialsProvider::new(&self.region, self.assume_role.clone())
                         .with_context(|| Credentials {})?
                         .into();
                 let sqs_client =
-                    SqsClient::new_with(client.clone(), creds.clone(), sqs.region.clone());
+                    SqsClient::new_with(client.clone(), creds.clone(), self.region.clone());
                 let s3_client =
-                    S3Client::new_with(client.clone(), creds.clone(), sqs.region.clone());
+                    S3Client::new_with(client.clone(), creds.clone(), self.region.clone());
 
                 SqsIngestor::new(
-                    sqs.region.clone(),
+                    self.region.clone(),
                     sqs_client,
                     s3_client,
                     sqs.clone(),
@@ -498,6 +499,8 @@ impl SqsIngestor {
                     log.insert("object", s3_event.s3.object.key.clone());
                     log.insert("region", s3_event.aws_region.clone());
 
+                    //TODO timestamp
+
                     if let Some(metadata) = &metadata {
                         for (key, value) in metadata {
                             log.insert(key, value.clone());
@@ -806,15 +809,15 @@ mod integration_tests {
 
     async fn config(queue_name: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
+            region: Region::Custom {
+                name: "minio".to_owned(),
+                endpoint: "http://localhost:4566".to_owned(),
+            },
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
             multiline,
             sqs: Some(SqsConfig {
                 queue_name: queue_name.to_string(),
-                region: Region::Custom {
-                    name: "minio".to_owned(),
-                    endpoint: "http://localhost:4566".to_owned(),
-                },
                 poll_secs: 1,
                 ..Default::default()
             }),
