@@ -126,14 +126,20 @@ where
                         warn!(message = "Retrying after error.", %expected);
                         Some(self.build_retry())
                     } else {
-                        error!(message = "Non-retriable error; dropping the request.", ?error);
+                        error!(
+                            message = "Non-retriable error; dropping the request.",
+                            ?error
+                        );
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!("Request timed out.");
                     Some(self.build_retry())
                 } else {
-                    error!(message = "Unexpected error type; dropping the request.", ?error);
+                    error!(
+                        message = "Unexpected error type; dropping the request.",
+                        ?error
+                    );
                     None
                 }
             }

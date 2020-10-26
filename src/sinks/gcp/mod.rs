@@ -142,7 +142,10 @@ impl GcpCredentials {
             async move {
                 debug!("Renewing GCP authentication token.");
                 if let Err(error) = this.regenerate_token().await {
-                    error!(message = "Failed to update GCP authentication token.", ?error);
+                    error!(
+                        message = "Failed to update GCP authentication token.",
+                        ?error
+                    );
                 }
             }
         });
