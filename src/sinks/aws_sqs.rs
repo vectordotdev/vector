@@ -181,7 +181,7 @@ impl Service<Vec<SendMessageBatchRequestEntry>> for SqsSink {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, entries: Vec<SendMessageBatchRequestEntry>) -> Self::Future {
+    fn call(&mut self, mut entries: Vec<SendMessageBatchRequestEntry>) -> Self::Future {
         debug!(
             message = "sending records.",
             events = %entries.len(),
@@ -191,6 +191,12 @@ impl Service<Vec<SendMessageBatchRequestEntry>> for SqsSink {
             .iter()
             .map(|entry| entry.message_body.len())
             .collect();
+
+        // Make sure that `id` in batch is uniq
+        for (i, entry) in entries.iter_mut().enumerate() {
+            // `unwrap` is safe because batch can sent only maximum 10 events
+            entry.id.push(std::char::from_digit(i as u32, 10).unwrap());
+        }
 
         let client = self.client.clone();
         let request = SendMessageBatchRequest {
