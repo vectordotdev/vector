@@ -192,7 +192,7 @@ impl Sink for PulsarSink {
                     }
                     self.acker.ack(num_to_ack);
                 }
-                Err(e) => error!("Pulsar sink generated an error: {}.", e),
+                Err(e) => error!(message = "Pulsar sink generated an error.", ?e),
             }
         }
     }

@@ -131,7 +131,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
             .and_then(move |auth_header, headers: HeaderMap, body: Bytes| {
-                info!("Handling HTTP request: {:?}.", headers);
+                info!(message = "Handling HTTP request.", ?headers);
 
                 let out = out.clone();
 
@@ -154,7 +154,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     // can only fail if receiving end disconnected, so we are shutting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed.");
-                                    error!("Tried to send the following event: {:?}.", e);
+                                    error!(message = "Tried to send the following event.", ?e);
                                     warp::reject::custom(RejectShuttingDown)
                                 })
                                 .map_ok(|_| warp::reply())

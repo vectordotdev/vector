@@ -33,7 +33,7 @@ where
     D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
     E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
-    let out = out.sink_map_err(|e| error!("Error sending line: {:?}.", e));
+    let out = out.sink_map_err(|e| error!(message = "Error sending line.", ?e));
 
     let fut = async move {
         let mut listener =
@@ -45,7 +45,7 @@ where
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(error) => {
-                    error!("Failed to accept socket; error = {:?}.", error);
+                    error!(message = "Failed to accept socket.", ?error);
                     continue;
                 }
                 Ok(socket) => socket,

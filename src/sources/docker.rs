@@ -132,7 +132,7 @@ impl SourceConfig for DockerConfig {
             match source.handle_running_containers().await {
                 Ok(source) => source.run().await,
                 Err(error) => {
-                    error!(message = "Listing currently running containers failed.", %error);
+                    error!(message = "Listing currently running containers failed.", ?error);
                 }
             }
         };

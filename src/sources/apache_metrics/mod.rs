@@ -140,7 +140,7 @@ fn apache_metrics(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("Error sending metric: {:?}.", e))
+        .sink_map_err(|e| error!(message = "Error sending metric.", ?e))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
@@ -329,7 +329,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         tokio::spawn(async move {
             if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("Server error: {:?}.", e);
+                error!(message = "Server error.", ?e);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -373,10 +373,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                         );
                         assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
                     }
-                    None => error!("No tags for metric {:?}.", m),
+                    None => error!(message = "No tags for metric.", ?m),
                 }
             }
-            None => error!("Could not find apache_up metric in {:?}.", metrics),
+            None => error!(message = "Could not find apache_up metric in.", ?metrics),
         }
     }
 
@@ -397,7 +397,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         tokio::spawn(async move {
             if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("Server error: {:?}.", e);
+                error!(message = "Server error.", ?e);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -434,7 +434,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
         match metrics.iter().find(|m| m.name == "apache_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
-            None => error!("Could not find apache_up metric in {:?}.", metrics),
+            None => error!(message = "Could not find apache_up metric in.", ?metrics),
         }
     }
 
@@ -472,7 +472,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         match metrics.iter().find(|m| m.name == "custom_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 0.0 }),
-            None => error!("Could not find apache_up metric in {:?}.", metrics),
+            None => error!(message = "Could not find apache_up metric in.", ?metrics),
         }
     }
 }

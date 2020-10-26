@@ -546,12 +546,12 @@ impl RetryLogic for CloudwatchRetryLogic {
         match error {
             CloudwatchError::Put(err) => match err {
                 RusotoError::Service(PutLogEventsError::ServiceUnavailable(error)) => {
-                    error!(message = "Put logs service unavailable.", %error);
+                    error!(message = "Put logs service unavailable.", ?error);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Put logs HTTP dispatch.", %error);
+                    error!(message = "Put logs HTTP dispatch.", ?error);
                     true
                 }
 
@@ -580,7 +580,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::Describe(err) => match err {
                 RusotoError::Service(DescribeLogStreamsError::ServiceUnavailable(error)) => {
-                    error!(message = "Describe streams service unavailable.", %error);
+                    error!(message = "Describe streams service unavailable.", ?error);
                     true
                 }
 
@@ -597,7 +597,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Describe streams HTTP dispatch.", %error);
+                    error!(message = "Describe streams HTTP dispatch.", ?error);
                     true
                 }
 
@@ -606,7 +606,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::CreateStream(err) => match err {
                 RusotoError::Service(CreateLogStreamError::ServiceUnavailable(error)) => {
-                    error!(message = "Create stream service unavailable.", %error);
+                    error!(message = "Create stream service unavailable.", ?error);
                     true
                 }
 
@@ -623,7 +623,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Create stream HTTP dispatch.", %error);
+                    error!(message = "Create stream HTTP dispatch.", ?error);
                     true
                 }
 
