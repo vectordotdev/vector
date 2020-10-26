@@ -52,7 +52,11 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
                 }
             }
             Err(errs) => {
-                error!("Failed to execute {} tests:\n{}.", path_str, errs.join("\n"));
+                error!(
+                    "Failed to execute {} tests:\n{}.",
+                    path_str,
+                    errs.join("\n")
+                );
                 return exitcode::CONFIG;
             }
         }
