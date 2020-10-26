@@ -18,8 +18,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let functions: Vec<Box<dyn remap::Function>> = crate::remap::FUNCTIONS.clone();
-        let program = remap::Program::new(&self.source, functions)?;
+        let program = remap::Program::new(&self.source, &crate::remap::FUNCTIONS)?;
 
         Ok(Box::new(Remap { program }))
     }

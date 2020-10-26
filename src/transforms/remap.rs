@@ -49,10 +49,8 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
-        let functions: Vec<Box<dyn remap::Function>> = crate::remap::FUNCTIONS_MUT.clone();
-
         Ok(Remap {
-            program: Program::new(&config.source, functions)?,
+            program: Program::new(&config.source, &crate::remap::FUNCTIONS_MUT)?,
             drop_on_err: config.drop_on_err,
         })
     }
