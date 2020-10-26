@@ -25,7 +25,7 @@ pub struct SimpleHttpConfig {
     encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
-    query_params: Vec<String>,
+    query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
 }
@@ -40,7 +40,7 @@ impl GenerateConfig for SimpleHttpConfig {
             address: "0.0.0.0:80".parse().unwrap(),
             encoding: Default::default(),
             headers: Vec::new(),
-            query_params: Vec::new(),
+            query_parameters: Vec::new(),
             tls: None,
             auth: None,
         })
@@ -52,7 +52,7 @@ impl GenerateConfig for SimpleHttpConfig {
 struct SimpleHttpSource {
     encoding: Encoding,
     headers: Vec<String>,
-    query_params: Vec<String>,
+    query_parameters: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
@@ -70,11 +70,11 @@ impl HttpSource for SimpleHttpSource {
         &self,
         body: Bytes,
         header_map: HeaderMap,
-        query_params: HashMap<String, String>,
+        query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
-            .map(|events| add_query_params(events, &self.query_params, query_params))
+            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
             .map(|mut events| {
                 // Add source type
                 let key = log_schema().source_type_key();
@@ -99,7 +99,7 @@ impl SourceConfig for SimpleHttpConfig {
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
-            query_params: self.query_params.clone(),
+            query_parameters: self.query_parameters.clone(),
         };
         source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
     }
@@ -134,19 +134,19 @@ fn add_headers(
     events
 }
 
-fn add_query_params(
+fn add_query_parameters(
     mut events: Vec<Event>,
-    query_params_config: &[String],
-    query_params: HashMap<String, String>,
+    query_parameters_config: &[String],
+    query_parameters: HashMap<String, String>,
 ) -> Vec<Event> {
-    for query_param_name in query_params_config {
-        let value = query_params
-            .get(query_param_name)
+    for query_parameter_name in query_parameters_config {
+        let value = query_parameters
+            .get(query_parameter_name)
             .map(String::as_bytes)
             .unwrap_or_default();
         for event in events.iter_mut() {
             event.as_mut_log().insert(
-                query_param_name as &str,
+                query_parameter_name as &str,
                 Value::from(Bytes::from(value.to_owned())),
             );
         }
@@ -273,7 +273,7 @@ mod tests {
     async fn source(
         encoding: Encoding,
         headers: Vec<String>,
-        query_params: Vec<String>,
+        query_parameters: Vec<String>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
@@ -282,7 +282,7 @@ mod tests {
                 address,
                 encoding,
                 headers,
-                query_params,
+                query_parameters,
                 tls: None,
                 auth: None,
             }

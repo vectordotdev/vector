@@ -24,7 +24,7 @@ use warp::http::{HeaderMap, StatusCode};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
-    query_params: Vec<String>,
+    query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
 }
@@ -37,7 +37,7 @@ impl GenerateConfig for LogplexConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:80".parse().unwrap(),
-            query_params: Vec::new(),
+            query_parameters: Vec::new(),
             tls: None,
             auth: None,
         })
@@ -47,7 +47,7 @@ impl GenerateConfig for LogplexConfig {
 
 #[derive(Clone, Default)]
 struct LogplexSource {
-    query_params: Vec<String>,
+    query_parameters: Vec<String>,
 }
 
 impl HttpSource for LogplexSource {
@@ -55,10 +55,10 @@ impl HttpSource for LogplexSource {
         &self,
         body: Bytes,
         header_map: HeaderMap,
-        query_params: HashMap<String, String>,
+        query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_message(body, header_map)
-            .map(|events| add_query_params(events, &self.query_params, query_params))
+            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
     }
 }
 
@@ -73,7 +73,7 @@ impl SourceConfig for LogplexConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = LogplexSource {
-            query_params: self.query_params.clone(),
+            query_parameters: self.query_parameters.clone(),
         };
         source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
     }
@@ -121,19 +121,19 @@ fn decode_message(body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, Erro
     Ok(events)
 }
 
-fn add_query_params(
+fn add_query_parameters(
     mut events: Vec<Event>,
-    query_params_config: &[String],
-    query_params: HashMap<String, String>,
+    query_parameters_config: &[String],
+    query_parameters: HashMap<String, String>,
 ) -> Vec<Event> {
-    for query_param_name in query_params_config {
-        let value = query_params
-            .get(query_param_name)
+    for query_parameter_name in query_parameters_config {
+        let value = query_parameters
+            .get(query_parameter_name)
             .map(String::as_bytes)
             .unwrap_or_default();
         for event in events.iter_mut() {
             event.as_mut_log().insert(
-                query_param_name as &str,
+                query_parameter_name as &str,
                 Value::from(Bytes::from(value.to_owned())),
             );
         }
@@ -234,14 +234,14 @@ mod tests {
 
     async fn source(
         auth: Option<HttpSourceAuthConfig>,
-        query_params: Vec<String>,
+        query_parameters: Vec<String>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
             LogplexConfig {
                 address,
-                query_params,
+                query_parameters,
                 tls: None,
                 auth,
             }

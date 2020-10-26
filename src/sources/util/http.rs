@@ -111,7 +111,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         &self,
         body: Bytes,
         header_map: HeaderMap,
-        query_params: HashMap<String, String>,
+        query_parameters: HashMap<String, String>,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
@@ -140,14 +140,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 move |auth_header,
                       headers: HeaderMap,
                       body: Bytes,
-                      query_params: HashMap<String, String>| {
+                      query_parameters: HashMap<String, String>| {
                     info!("Handling HTTP request: {:?}", headers);
 
                     let out = out.clone();
 
                     let body_size = body.len();
                     let events = match auth.is_valid(&auth_header) {
-                        Ok(()) => self.build_event(body, headers, query_params),
+                        Ok(()) => self.build_event(body, headers, query_parameters),
                         Err(err) => Err(err),
                     };
 
