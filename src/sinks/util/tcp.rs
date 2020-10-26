@@ -3,14 +3,14 @@ use crate::{
     dns::Resolver,
     emit,
     internal_events::{
-        TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
-        TcpConnectionShutdown, TcpEventSent, TcpFlushError,
+        ConnectionOpen, OpenGauge, OpenTokenDyn, TcpConnectionDisconnected,
+        TcpConnectionEstablished, TcpConnectionFailed, TcpConnectionShutdown, TcpEventSent,
+        TcpFlushError,
     },
-    sinks::util::{
-        encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld,
-    },
+    sinks::util::{SinkBuildError, StreamSinkOld},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
+    Event,
 };
 use bytes::Bytes;
 use futures::{
@@ -80,22 +80,19 @@ impl TcpSinkConfig {
         Ok(connector)
     }
 
-    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(TcpService, Healthcheck)> {
-        let connector = self.build_connector(cx)?;
-        let healthcheck = connector.healthcheck();
-        Ok((connector.into(), healthcheck))
-    }
-
-    pub fn build(
+    pub fn build<F>(
         &self,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        encode_event: F,
+    ) -> crate::Result<(VectorSink, Healthcheck)>
+    where
+        F: Fn(Event) -> Option<Bytes> + Send + 'static,
+    {
         let connector = self.build_connector(cx.clone())?;
         let healthcheck = connector.healthcheck();
         let sink: TcpSink = connector.into();
         let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+            .with_flat_map(move |event| iter_ok(encode_event(event)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
@@ -143,37 +140,6 @@ impl Into<TcpSink> for TcpConnector {
     }
 }
 
-impl Into<TcpService> for TcpConnector {
-    fn into(self) -> TcpService {
-        TcpService { connector: self }
-    }
-}
-
-pub struct TcpService {
-    connector: TcpConnector,
-}
-
-impl tower::Service<Bytes> for TcpService {
-    type Response = ();
-    type Error = TcpError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, msg: Bytes) -> Self::Future {
-        use futures::SinkExt;
-        let connector = self.connector.clone();
-        async move {
-            let mut connection = connector.connect().await?;
-            connection.send(msg).await.context(SendError)?;
-            Ok(())
-        }
-        .boxed()
-    }
-}
-
 pub struct TcpSink {
     connector: TcpConnector,
     state: TcpSinkState,
@@ -184,7 +150,7 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     Connecting(Box<dyn Future<Item = TcpOrTlsStream, Error = TcpError> + Send>),
-    Connected(TcpOrTlsStream01),
+    Connected(TcpOrTlsStream01, OpenTokenDyn),
     Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
@@ -241,14 +207,20 @@ impl TcpSink {
                             peer_addr: connection.get_mut().peer_addr().ok(),
                         });
                         self.backoff = Self::fresh_backoff();
-                        TcpSinkState::Connected(CompatSink::new(connection))
+                        TcpSinkState::Connected(
+                            CompatSink::new(connection),
+                            OpenGauge::new()
+                                .open(Box::new(|count| emit!(ConnectionOpen { count }))),
+                        )
                     }
                     Err(error) => {
                         emit!(TcpConnectionFailed { error });
                         TcpSinkState::Backoff(self.next_delay01())
                     }
                 },
-                TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
+                TcpSinkState::Connected(ref mut connection, _) => {
+                    return Ok(Async::Ready(connection))
+                }
                 TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(())) => TcpSinkState::Disconnected,

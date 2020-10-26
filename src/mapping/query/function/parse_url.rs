@@ -16,18 +16,18 @@ impl ParseUrlFn {
 }
 
 impl Function for ParseUrlFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let bytes = required!(ctx, self.query, Value::Bytes(v) => v);
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
 
         Url::parse(&String::from_utf8_lossy(&bytes))
             .map_err(|e| format!("unable to parse url: {}", e))
-            .map(Into::into)
+            .map(QueryValue::from_value)
     }
 
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }
@@ -129,7 +129,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

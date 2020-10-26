@@ -71,7 +71,14 @@ inventory::submit! {
     TransformDescription::new::<SwimlanesConfig>("swimlanes")
 }
 
-impl GenerateConfig for SwimlanesConfig {}
+impl GenerateConfig for SwimlanesConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            lanes: IndexMap::new(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
@@ -108,3 +115,11 @@ impl TransformConfig for SwimlanesConfig {
 }
 
 //------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::SwimlanesConfig>();
+    }
+}

@@ -2,12 +2,11 @@ use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::Event,
-    region::RegionOrEndpoint,
+    rusoto::{self, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto,
         sink::Response,
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -300,7 +299,12 @@ impl Service<Request> for S3Sink {
             ..Default::default()
         };
 
-        Box::pin(async move { client.put_object(request).await }.instrument(info_span!("request")))
+        Box::pin(async move {
+            client
+                .put_object(request)
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
@@ -539,7 +543,7 @@ mod integration_tests {
         config::SinkContext,
         dns::Resolver,
         event::Event,
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};

@@ -83,7 +83,17 @@ inventory::submit! {
     SinkDescription::new::<KafkaSinkConfig>("kafka")
 }
 
-impl GenerateConfig for KafkaSinkConfig {}
+impl GenerateConfig for KafkaSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+            key_field = "user_id"
+            topic = "topic-1234"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
@@ -284,6 +294,11 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KafkaSinkConfig>();
+    }
 
     #[test]
     fn kafka_encode_event_text() {

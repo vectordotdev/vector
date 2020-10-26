@@ -16,7 +16,7 @@ impl ToTimestampFn {
 }
 
 impl Function for ToTimestampFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         self.query
             .execute(ctx)
             .and_then(to_timestamp)
@@ -33,12 +33,20 @@ impl Function for ToTimestampFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                                      | QueryValue::Value(Value::Bytes(_))
+                                      | QueryValue::Value(Value::Timestamp(_)))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Bytes(_) | Value::Timestamp(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                                      | QueryValue::Value(Value::Bytes(_))
+                                      | QueryValue::Value(Value::Timestamp(_)))
+                },
                 required: false,
             },
         ]
@@ -56,13 +64,14 @@ impl TryFrom<ArgumentList> for ToTimestampFn {
     }
 }
 
-fn to_timestamp(value: Value) -> Result<Value> {
+fn to_timestamp(value: QueryValue) -> Result<QueryValue> {
     match value {
-        Value::Bytes(_) => Conversion::Timestamp
+        QueryValue::Value(value @ Value::Bytes(_)) => Conversion::Timestamp
             .convert(value)
+            .map(Into::into)
             .map_err(|e| e.to_string()),
-        Value::Integer(i) => Ok(Value::Timestamp(Utc.timestamp(i, 0))),
-        Value::Timestamp(_) => Ok(value),
+        QueryValue::Value(Value::Integer(i)) => Ok(Value::Timestamp(Utc.timestamp(i, 0)).into()),
+        QueryValue::Value(Value::Timestamp(_)) => Ok(value),
         _ => Err("unable to parse non-string or integer type to timestamp".to_string()),
     }
 }
@@ -140,7 +149,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

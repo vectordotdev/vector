@@ -85,19 +85,18 @@ fn message_to_value(message: Message<&str>) -> Value {
 }
 
 impl Function for ParseSyslogFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let message =
-            required!(ctx, self.query, Value::Bytes(v) => String::from_utf8_lossy(&v).into_owned());
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let message = required_value!(ctx, self.query, Value::Bytes(v) => String::from_utf8_lossy(&v).into_owned());
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
 
-        Ok(message_to_value(parsed))
+        Ok(message_to_value(parsed).into())
     }
 
     fn parameters() -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::Bytes(_)),
+            accepts: |v| matches!(v, QueryValue::Value(Value::Bytes(_))),
             required: true,
         }]
     }
@@ -171,42 +170,42 @@ mod tests {
             (
                 Event::from(""),
                 Ok(Value::from({
-                    // Syslog message which doesn't include the hostname or the current year.
+                    // Syslog message which doesn't include the hostname, current year or timezone.
                     let mut map = BTreeMap::new();
+
+                    // The timezone is assumed to be the local time.
+                    let ts: DateTime<Utc> = chrono::Local
+                        .ymd(Utc::now().year(), 6, 13)
+                        .and_hms_milli(16, 33, 35, 0)
+                        .into();
+
                     map.insert(
                         "message".to_string(),
                         Value::from("Proxy sticky-servers started."),
                     );
                     map.insert("facility".to_string(), Value::from("local0"));
                     map.insert("severity".to_string(), Value::from("notice"));
-                    map.insert(
-                        "timestamp".to_string(),
-                        Value::from(
-                            chrono::Utc
-                                .ymd(Utc::now().year(), 1, 13)
-                                .and_hms_milli(16, 33, 35, 0),
-                        ),
-                    );
+                    map.insert("timestamp".to_string(), Value::from(ts));
                     map.insert("appname".to_string(), Value::from("haproxy"));
                     map.insert("procid".to_string(), Value::from(73411));
                     map
                 })),
                 ParseSyslogFn::new(Box::new(Literal::from(Value::from(
-                    r#"<133>Jan 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
+                    r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
                 )))),
             ),
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 
     #[test]
     fn handles_empty_sd_element() {
-        fn there_is_map_called_empty(value: Value) -> Result<bool> {
+        fn there_is_map_called_empty(value: QueryValue) -> Result<bool> {
             match value {
-                Value::Map(map) => {
+                QueryValue::Value(Value::Map(map)) => {
                     Ok(map.iter().find(|(key, _)| (&key[..]).starts_with("empty")) == None)
                 }
                 _ => Err("Result was not a map".to_string()),

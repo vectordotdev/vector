@@ -15,15 +15,19 @@ impl ToBooleanFn {
 }
 
 impl Function for ToBooleanFn {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         match self.query.execute(ctx) {
-            Ok(v) => match v {
-                Value::Boolean(_) => Ok(v),
-                Value::Float(f) => Ok(Value::Boolean(f != 0.0)),
-                Value::Integer(i) => Ok(Value::Boolean(i != 0)),
-                Value::Bytes(_) => Conversion::Boolean.convert(v).map_err(|e| e.to_string()),
-                _ => unexpected_type!(v),
+            Ok(QueryValue::Value(value)) => match value {
+                Value::Boolean(_) => Ok(value.into()),
+                Value::Float(f) => Ok(Value::Boolean(f != 0.0).into()),
+                Value::Integer(i) => Ok(Value::Boolean(i != 0).into()),
+                Value::Bytes(_) => Conversion::Boolean
+                    .convert(value)
+                    .map(Into::into)
+                    .map_err(|e| e.to_string()),
+                _ => unexpected_type!(value),
             },
+            Ok(query) => unexpected_type!(query),
             Err(err) => Err(err),
         }
         .or_else(|err| match &self.default {
@@ -36,12 +40,22 @@ impl Function for ToBooleanFn {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                             | QueryValue::Value(Value::Float(_))
+                             | QueryValue::Value(Value::Bytes(_))
+                             | QueryValue::Value(Value::Boolean(_)))
+                },
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::Integer(_) | Value::Float(_) | Value::Bytes(_) | Value::Boolean(_)),
+                accepts: |v| {
+                    matches!(v, QueryValue::Value(Value::Integer(_))
+                             | QueryValue::Value(Value::Float(_))
+                             | QueryValue::Value(Value::Bytes(_))
+                             | QueryValue::Value(Value::Boolean(_)))
+                },
                 required: false,
             },
         ]
@@ -101,7 +115,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

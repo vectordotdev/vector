@@ -14,11 +14,11 @@ use file_source::{
     FileServer, Fingerprinter,
 };
 use futures::{
-    compat::{Compat, Compat01As03, Compat01As03Sink, Future01CompatExt},
+    compat::{Compat, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
+    stream::{Stream, StreamExt},
 };
-use futures01::{future, Future, Sink, Stream};
+use futures01::{Future, Sink};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -225,25 +225,15 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
-    Box::new(future::lazy(move || {
+
+    Box::new(futures01::future::lazy(move || {
         info!(message = "Starting file server.", ?include, ?exclude);
 
         // sizing here is just a guess
-        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let rx = rx.map(futures::stream::iter).flatten();
 
-        // This closure is overcomplicated because of the compatibility layer.
-        let wrap_with_line_agg = |rx, config| {
-            let rx = StreamExt::filter_map(Compat01As03::new(rx), |val| {
-                futures::future::ready(val.ok())
-            });
-            let logic = line_agg::Logic::new(config);
-            Box::new(Compat::new(
-                LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
-                    .map(|(src, line, _context)| (line, src))
-                    .map(Ok),
-            ))
-        };
-        let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
+        let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
                 wrap_with_line_agg(
                     rx,
@@ -265,13 +255,15 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
+        let messages01 = Compat::new(StreamExt::map(
+            messages,
+            move |(msg, file): (Bytes, String)| {
+                let _enter = span2.enter();
+                Ok::<_, ()>(create_event(msg, file, &host_key, &hostname, &file_key))
+            },
+        ));
         tokio::spawn(
-            messages
-                .map(move |(msg, file): (Bytes, String)| {
-                    let _enter = span2.enter();
-                    create_event(msg, file, &host_key, &hostname, &file_key)
-                })
-                .forward(out.sink_map_err(|e| error!(%e)))
+            futures01::Stream::forward(messages01, out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())
                 .compat()
                 .instrument(span),
@@ -280,7 +272,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(Compat01As03Sink::new(tx), shutdown);
+            let result = file_server.run(tx, shutdown);
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -290,6 +282,17 @@ pub fn file_source(
         .compat()
         .map_err(|error| error!(message="file server unexpectedly stopped.",%error))
     }))
+}
+
+fn wrap_with_line_agg(
+    rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
+    config: line_agg::Config,
+) -> Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static> {
+    let logic = line_agg::Logic::new(config);
+    Box::new(
+        LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
+            .map(|(src, line, _context)| (line, src)),
+    )
 }
 
 fn create_event(

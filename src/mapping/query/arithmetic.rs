@@ -1,3 +1,4 @@
+use super::query_value::QueryValue;
 use super::Function;
 use crate::{
     event::{Event, Value},
@@ -71,9 +72,25 @@ fn compare_number_types(
 }
 
 impl Function for Arithmetic {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
-        let left = self.left.execute(ctx);
-        let right = self.right.execute(ctx);
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
+        let left = match self.left.execute(ctx)? {
+            QueryValue::Value(value) => value,
+            query => {
+                return Err(format!(
+                    "arithmetic can not be performed with {}",
+                    query.kind()
+                ))
+            }
+        };
+        let right = match self.right.execute(ctx)? {
+            QueryValue::Value(value) => value,
+            query => {
+                return Err(format!(
+                    "arithmetic can not be performed with {}",
+                    query.kind()
+                ))
+            }
+        };
 
         // TODO: A lot of these comparisons could potentially be baked into the
         // Value type. However, we would need to agree on general rules as to
@@ -81,7 +98,7 @@ impl Function for Arithmetic {
 
         Ok(match self.op {
             Operator::Multiply => {
-                let (left, right) = coerce_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left, right);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl * fr),
@@ -106,7 +123,7 @@ impl Function for Arithmetic {
             }
 
             Operator::Divide => {
-                let (left, right) = coerce_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left, right);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl / fr),
@@ -124,8 +141,8 @@ impl Function for Arithmetic {
                 }
             }
 
-            Operator::Modulo => match left? {
-                Value::Integer(il) => match right? {
+            Operator::Modulo => match left {
+                Value::Integer(il) => match right {
                     Value::Integer(ir) => Value::Integer(il % ir),
                     vr => return Err(format!("unable to modulo right-hand field type {:?}", vr)),
                 },
@@ -133,7 +150,7 @@ impl Function for Arithmetic {
             },
 
             Operator::Add => {
-                let (left, right) = coerce_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left, right);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl + fr),
@@ -157,7 +174,7 @@ impl Function for Arithmetic {
             }
 
             Operator::Subtract => {
-                let (left, right) = coerce_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left, right);
                 match left {
                     Value::Float(fl) => match right {
                         Value::Float(fr) => Value::Float(fl - fr),
@@ -182,34 +199,35 @@ impl Function for Arithmetic {
             }
 
             Operator::Equal => {
-                let (left, right) = coerce_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left, right);
                 Value::Boolean(left == right)
             }
             Operator::NotEqual => {
-                let (left, right) = coerce_number_types(left?, right?);
+                let (left, right) = coerce_number_types(left, right);
                 Value::Boolean(left != right)
             }
-            Operator::Greater => compare_number_types(left?, right?, &|lf, rf| lf > rf)?,
-            Operator::GreaterOrEqual => compare_number_types(left?, right?, &|lf, rf| lf >= rf)?,
-            Operator::Less => compare_number_types(left?, right?, &|lf, rf| lf < rf)?,
-            Operator::LessOrEqual => compare_number_types(left?, right?, &|lf, rf| lf <= rf)?,
+            Operator::Greater => compare_number_types(left, right, &|lf, rf| lf > rf)?,
+            Operator::GreaterOrEqual => compare_number_types(left, right, &|lf, rf| lf >= rf)?,
+            Operator::Less => compare_number_types(left, right, &|lf, rf| lf < rf)?,
+            Operator::LessOrEqual => compare_number_types(left, right, &|lf, rf| lf <= rf)?,
 
-            Operator::And => match left? {
-                Value::Boolean(bl) => match right? {
+            Operator::And => match left {
+                Value::Boolean(bl) => match right {
                     Value::Boolean(br) => Value::Boolean(bl && br),
                     vr => return Err(format!("unable to AND right-hand field type {:?}", vr)),
                 },
                 vl => return Err(format!("unable to AND left-hand field type {:?}", vl)),
             },
 
-            Operator::Or => match left? {
-                Value::Boolean(bl) => match right? {
+            Operator::Or => match left {
+                Value::Boolean(bl) => match right {
                     Value::Boolean(br) => Value::Boolean(bl || br),
                     vr => return Err(format!("unable to OR right-hand field type {:?}", vr)),
                 },
                 vl => return Err(format!("unable to OR left-hand field type {:?}", vl)),
             },
-        })
+        }
+        .into())
     }
 }
 
@@ -218,7 +236,7 @@ impl Function for Arithmetic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::{path::Path, Literal};
+    use crate::mapping::query::{path::Path, regex::Regex, Literal};
 
     #[test]
     fn check_compare_query() {
@@ -262,6 +280,19 @@ mod tests {
                     Box::new(Literal::from(Value::Integer(3))),
                     Box::new(Literal::from(Value::Boolean(true))),
                     Operator::Divide,
+                ),
+            ),
+            (
+                Event::from(""),
+                Err("arithmetic can not be performed with regex".to_string()),
+                Arithmetic::new(
+                    Box::new(Literal::from(QueryValue::Regex(
+                        Regex::new("a".to_string(), false, false, false).unwrap(),
+                    ))),
+                    Box::new(Literal::from(QueryValue::Regex(
+                        Regex::new("a".to_string(), false, false, false).unwrap(),
+                    ))),
+                    Operator::And,
                 ),
             ),
             (
@@ -393,7 +424,7 @@ mod tests {
         ];
 
         for (input_event, exp, query) in cases {
-            assert_eq!(query.execute(&input_event), exp);
+            assert_eq!(query.execute(&input_event), exp.map(QueryValue::Value));
         }
     }
 }

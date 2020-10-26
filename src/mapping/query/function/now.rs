@@ -12,8 +12,8 @@ impl NowFn {
 }
 
 impl Function for NowFn {
-    fn execute(&self, _: &Event) -> Result<Value> {
-        Ok(Value::Timestamp(Utc::now()))
+    fn execute(&self, _: &Event) -> Result<QueryValue> {
+        Ok(Value::Timestamp(Utc::now()).into())
     }
 }
 

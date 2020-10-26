@@ -43,6 +43,7 @@ pub mod api;
 pub mod app;
 pub mod async_read;
 pub mod heartbeat;
+pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kubernetes;
@@ -51,7 +52,8 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-pub mod region;
+#[cfg(feature = "rusoto_core")]
+pub mod rusoto;
 pub mod serde;
 pub mod service;
 pub mod shutdown;

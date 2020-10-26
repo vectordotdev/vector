@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::ConsoleFieldNotFound,
+    internal_events::{ConsoleEventProcessed, ConsoleFieldNotFound},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -46,7 +46,15 @@ inventory::submit! {
     SinkDescription::new::<ConsoleSinkConfig>("console")
 }
 
-impl GenerateConfig for ConsoleSinkConfig {}
+impl GenerateConfig for ConsoleSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            target: Target::Stdout,
+            encoding: Encoding::Json.into(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
@@ -135,6 +143,10 @@ impl StreamSink for WriterSink {
                     error!("Error writing to output: {}. Stopping sink.", error);
                     return Err(());
                 }
+
+                emit!(ConsoleEventProcessed {
+                    byte_size: buf.len(),
+                });
             }
         }
         Ok(())
@@ -143,10 +155,15 @@ impl StreamSink for WriterSink {
 
 #[cfg(test)]
 mod test {
-    use super::{encode_event, Encoding, EncodingConfig};
+    use super::{encode_event, ConsoleSinkConfig, Encoding, EncodingConfig};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ConsoleSinkConfig>();
+    }
 
     #[test]
     fn encodes_raw_logs() {
@@ -174,6 +191,7 @@ mod test {
     fn encodes_counter() {
         let event = Event::Metric(Metric {
             name: "foos".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
                 vec![
@@ -197,6 +215,7 @@ mod test {
     fn encodes_set() {
         let event = Event::Metric(Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -214,6 +233,7 @@ mod test {
     fn encodes_histogram_without_timestamp() {
         let event = Event::Metric(Metric {
             name: "glork".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -233,6 +253,7 @@ mod test {
     fn encodes_metric_text() {
         let event = Event::Metric(Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,

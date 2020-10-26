@@ -34,7 +34,15 @@ inventory::submit! {
     SourceDescription::new::<PrometheusConfig>("prometheus")
 }
 
-impl GenerateConfig for PrometheusConfig {}
+impl GenerateConfig for PrometheusConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoints: vec!["http://localhost:9090/metrics".to_string()],
+            scrape_interval_secs: default_scrape_interval_secs(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
@@ -178,6 +186,11 @@ mod test {
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn genreate_config() {
+        crate::test_util::test_generate_config::<PrometheusConfig>();
+    }
 
     #[tokio::test]
     async fn test_prometheus_routing() {

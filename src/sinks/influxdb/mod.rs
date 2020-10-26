@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::sinks::util::{encode_namespace, http::HttpClient};
+use crate::{http::HttpClient, sinks::util::encode_namespace};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
@@ -756,12 +756,12 @@ mod tests {
 mod integration_tests {
     use crate::{
         config::SinkContext,
+        http::HttpClient,
         sinks::influxdb::{
             healthcheck,
             test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN},
             InfluxDB1Settings, InfluxDB2Settings,
         },
-        sinks::util::http::HttpClient,
     };
 
     #[tokio::test]

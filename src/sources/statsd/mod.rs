@@ -184,7 +184,7 @@ mod test {
     use tokio::time::{delay_for, Duration};
 
     #[test]
-    fn test_generate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<StatsdConfig>();
     }
 

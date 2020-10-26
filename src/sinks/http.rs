@@ -1,9 +1,10 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
         UriSerde,
     },
@@ -99,7 +100,15 @@ inventory::submit! {
     SinkDescription::new::<HttpSinkConfig>("http")
 }
 
-impl GenerateConfig for HttpSinkConfig {}
+impl GenerateConfig for HttpSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"uri = "https://10.22.212.22:9000/endpoint"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "http")]
@@ -308,6 +317,11 @@ mod tests {
     use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HttpSinkConfig>();
+    }
 
     #[test]
     fn http_encode_event_text() {

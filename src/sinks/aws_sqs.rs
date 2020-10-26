@@ -2,11 +2,10 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     internal_events::AwsSqsEventSent,
-    region::RegionOrEndpoint,
+    rusoto,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto,
         sink::Response,
         BatchConfig, BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
@@ -49,7 +48,7 @@ pub struct SqsSink {
 pub struct SqsSinkConfig {
     pub queue_url: String,
     #[serde(flatten)]
-    pub region: RegionOrEndpoint,
+    pub region: rusoto::RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -76,7 +75,16 @@ inventory::submit! {
     SinkDescription::new::<SqsSinkConfig>("aws_sqs")
 }
 
-impl GenerateConfig for SqsSinkConfig {}
+impl GenerateConfig for SqsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"queue_url = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+            region = "us-east-2"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_sqs")]
@@ -313,7 +321,7 @@ mod integration_tests {
 
         let config = SqsSinkConfig {
             queue_url: queue_url.clone(),
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
+            region: rusoto::RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             batch: BatchConfig {
                 max_events: Some(2),

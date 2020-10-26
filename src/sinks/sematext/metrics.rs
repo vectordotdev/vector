@@ -2,10 +2,11 @@ use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricValue},
+    http::HttpClient,
     internal_events::SematextMetricsInvalidMetricReceived,
     sinks::influxdb::{encode_timestamp, encode_uri, influx_line_protocol, Field, ProtocolVersion},
     sinks::util::{
-        http::{HttpBatchService, HttpClient, HttpRetryLogic},
+        http::{HttpBatchService, HttpRetryLogic},
         BatchConfig, BatchSettings, MetricBuffer, TowerRequestConfig,
     },
     sinks::{Healthcheck, HealthcheckError, VectorSink},
@@ -43,7 +44,15 @@ inventory::submit! {
     SinkDescription::new::<SematextMetricsConfig>("sematext_metrics")
 }
 
-impl GenerateConfig for SematextMetricsConfig {}
+impl GenerateConfig for SematextMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"region = "us"
+            token = "${SEMATEXT_TOKEN}""#,
+        )
+        .unwrap()
+    }
+}
 
 async fn healthcheck(endpoint: String, mut client: HttpClient) -> Result<()> {
     let uri = format!("{}/health", endpoint);
@@ -250,9 +259,15 @@ mod tests {
     use futures::{stream, StreamExt};
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SematextMetricsConfig>();
+    }
+
+    #[test]
     fn test_encode_counter_event() {
         let events = vec![Metric {
             name: "jvm.pool.used".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
             tags: None,
             kind: MetricKind::Incremental,
@@ -269,6 +284,7 @@ mod tests {
     fn test_encode_counter_event_no_namespace() {
         let events = vec![Metric {
             name: "used".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
             tags: None,
             kind: MetricKind::Incremental,
@@ -286,6 +302,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "jvm.pool.used".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -293,6 +310,7 @@ mod tests {
             },
             Metric {
                 name: "jvm.pool.committed".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -347,6 +365,7 @@ mod tests {
         for (i, (metric, val)) in metrics.iter().enumerate() {
             let event = Event::from(Metric {
                 name: metric.to_string(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32)),
                 tags: Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]

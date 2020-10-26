@@ -167,7 +167,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
             } else {
                 vec![transform_names
                     .get(i - 1)
-                    .unwrap_or(&"TODO".to_owned())
+                    .unwrap_or(&"component-name".to_owned())
                     .to_owned()]
             };
 
@@ -250,7 +250,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
                                 None
                             }
                         })
-                        .unwrap_or_else(|| vec!["TODO".to_owned()]),
+                        .unwrap_or_else(|| vec!["component-name".to_owned()]),
                     buffer: crate::buffers::BufferConfig::default(),
                     healthcheck: true,
                     inner: example,
@@ -329,10 +329,45 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
-#[cfg(all(test, feature = "transforms-json_parser", feature = "sinks-console"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn generate_all() {
+        let mut errors = Vec::new();
+
+        for name in SourceDescription::types() {
+            let param = format!("{}//", name);
+            let cfg = generate_example(true, &param).unwrap();
+            if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
+                errors.push((param, error));
+            }
+        }
+
+        for name in TransformDescription::types() {
+            let param = format!("/{}/", name);
+            let cfg = generate_example(true, &param).unwrap();
+            if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
+                errors.push((param, error));
+            }
+        }
+
+        for name in SinkDescription::types() {
+            let param = format!("//{}", name);
+            let cfg = generate_example(true, &param).unwrap();
+            if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
+                errors.push((param, error));
+            }
+        }
+
+        for (component, error) in &errors {
+            println!("{:?} : {}", component, error);
+        }
+        assert!(errors.is_empty());
+    }
+
+    #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
     #[test]
     fn generate_basic() {
         assert_eq!(
@@ -352,7 +387,11 @@ type = "json_parser"
 [sinks.sink0]
 healthcheck = true
 inputs = ["transform0"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -379,7 +418,11 @@ type = "json_parser"
 [sinks.sink0]
 healthcheck = true
 inputs = ["transform0"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -400,7 +443,11 @@ type = "stdin"
 [sinks.sink0]
 healthcheck = true
 inputs = ["source0"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -416,8 +463,12 @@ when_full = "block"
 
 [sinks.sink0]
 healthcheck = true
-inputs = ["TODO"]
+inputs = ["component-name"]
+target = "stdout"
 type = "console"
+
+[sinks.sink0.encoding]
+codec = "json"
 
 [sinks.sink0.buffer]
 type = "memory"
@@ -435,6 +486,9 @@ when_full = "block"
 inputs = []
 type = "add_fields"
 
+[transforms.transform0.fields]
+name = "field_name"
+
 [transforms.transform1]
 inputs = ["transform0"]
 drop_field = true
@@ -443,6 +497,7 @@ type = "json_parser"
 
 [transforms.transform2]
 inputs = ["transform1"]
+fields = []
 type = "remove_fields"
 "#
             .to_string())
@@ -455,6 +510,9 @@ type = "remove_fields"
 inputs = []
 type = "add_fields"
 
+[transforms.transform0.fields]
+name = "field_name"
+
 [transforms.transform1]
 inputs = ["transform0"]
 drop_field = true
@@ -463,6 +521,7 @@ type = "json_parser"
 
 [transforms.transform2]
 inputs = ["transform1"]
+fields = []
 type = "remove_fields"
 "#
             .to_string())

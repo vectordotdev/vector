@@ -2,14 +2,14 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
-    region::RegionOrEndpoint,
+    rusoto::{self, RegionOrEndpoint},
     sinks::util::{
-        retries::RetryLogic, rusoto, BatchConfig, BatchSettings, Compression, MetricBuffer,
+        retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
         TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future::BoxFuture, FutureExt};
+use futures::{future, future::BoxFuture, FutureExt};
 use futures01::Sink;
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
@@ -214,17 +214,14 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let client = self.client.clone();
         let input = self.encode_events(items);
+        if input.metric_data.is_empty() {
+            return future::ready(Ok(())).boxed();
+        }
 
-        Box::pin(async move {
-            if input.metric_data.is_empty() {
-                Ok(())
-            } else {
-                debug!(message = "Sending data.", ?input);
-                client.put_metric_data(input).await
-            }
-        })
+        debug!(message = "Sending data.", ?input);
+        let client = self.client.clone();
+        Box::pin(async move { client.put_metric_data(input).await })
     }
 }
 
@@ -299,6 +296,7 @@ mod tests {
         let events = vec![
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -306,6 +304,7 @@ mod tests {
             },
             Metric {
                 name: "bytes_out".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -313,6 +312,7 @@ mod tests {
             },
             Metric {
                 name: "healthcheck".into(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: Some(
                     vec![("region".to_owned(), "local".to_owned())]
@@ -359,6 +359,7 @@ mod tests {
     fn encode_events_absolute_gauge() {
         let events = vec![Metric {
             name: "temperature".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -382,6 +383,7 @@ mod tests {
     fn encode_events_distribution() {
         let events = vec![Metric {
             name: "latency".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -410,6 +412,7 @@ mod tests {
     fn encode_events_set() {
         let events = vec![Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -439,7 +442,7 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         event::{metric::StatisticKind, Event},
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::random_string,
     };
     use chrono::offset::TimeZone;
@@ -472,6 +475,7 @@ mod integration_tests {
         for i in 0..100 {
             let event = Event::Metric(Metric {
                 name: format!("counter-{}", 0),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -492,6 +496,7 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", gauge_name),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -504,6 +509,7 @@ mod integration_tests {
         for i in 0..10 {
             let event = Event::Metric(Metric {
                 name: format!("distribution-{}", distribution_name),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 123456789)),
                 tags: None,
                 kind: MetricKind::Incremental,

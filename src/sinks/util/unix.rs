@@ -1,18 +1,19 @@
 use crate::{
     config::SinkContext,
     internal_events::{
-        UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketEventSent,
-        UnixSocketFlushFailed, UnixSocketSendFailed,
+        ConnectionOpen, OpenGauge, OpenTokenDyn, UnixSocketConnectionEstablished,
+        UnixSocketConnectionFailure, UnixSocketEventSent, UnixSocketFlushFailed,
+        UnixSocketSendFailed,
     },
-    sinks::util::{encode_event, encoding::EncodingConfig, Encoding, StreamSinkOld},
+    sinks::util::StreamSinkOld,
     sinks::{Healthcheck, VectorSink},
+    Event,
 };
 use bytes::Bytes;
 use futures::{compat::CompatSink, future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream, try_ready, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::task::{Context, Poll};
 use std::{path::PathBuf, time::Duration};
 use tokio::{
     net::UnixStream,
@@ -39,20 +40,18 @@ impl UnixSinkConfig {
         Ok((connector, healthcheck))
     }
 
-    pub fn build_service(&self) -> crate::Result<(UnixService, Healthcheck)> {
-        let (connector, healthcheck) = self.build_connector()?;
-        Ok((connector.into(), healthcheck))
-    }
-
-    pub fn build(
+    pub fn build<F>(
         &self,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        encode_event: F,
+    ) -> crate::Result<(VectorSink, Healthcheck)>
+    where
+        F: Fn(Event) -> Option<Bytes> + Send + 'static,
+    {
         let (connector, healthcheck) = self.build_connector()?;
         let sink: UnixSink = connector.into();
         let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| stream::iter_ok(encode_event(event, &encoding)));
+            .with_flat_map(move |event| stream::iter_ok(encode_event(event)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
@@ -89,12 +88,6 @@ impl Into<UnixSink> for UnixConnector {
     }
 }
 
-impl Into<UnixService> for UnixConnector {
-    fn into(self) -> UnixService {
-        UnixService { connector: self }
-    }
-}
-
 #[derive(Debug, Snafu)]
 pub enum UnixSocketError {
     #[snafu(display("Connect error: {}", source))]
@@ -115,7 +108,7 @@ type UnixSocket01 = CompatSink<UnixSocket, Bytes>;
 enum UnixSinkState {
     Disconnected,
     Creating(Box<dyn Future<Item = UnixSocket, Error = UnixSocketError> + Send>),
-    Open(UnixSocket01),
+    Open(UnixSocket01, OpenTokenDyn),
     Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
@@ -151,7 +144,7 @@ impl UnixSink {
     fn poll_connection(&mut self) -> Poll01<&mut UnixSocket01, ()> {
         loop {
             self.state = match self.state {
-                UnixSinkState::Open(ref mut stream) => return Ok(Async::Ready(stream)),
+                UnixSinkState::Open(ref mut stream, _) => return Ok(Async::Ready(stream)),
                 UnixSinkState::Creating(ref mut connect_future) => match connect_future.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Err(error) => {
@@ -166,7 +159,11 @@ impl UnixSink {
                             path: &self.connector.path,
                         });
                         self.backoff = Self::fresh_backoff();
-                        UnixSinkState::Open(CompatSink::new(socket))
+                        UnixSinkState::Open(
+                            CompatSink::new(socket),
+                            OpenGauge::new()
+                                .open(Box::new(|count| emit!(ConnectionOpen { count }))),
+                        )
                     }
                 },
                 UnixSinkState::Backoff(ref mut delay) => match delay.poll() {
@@ -236,37 +233,10 @@ impl Sink for UnixSink {
     }
 }
 
-pub struct UnixService {
-    connector: UnixConnector,
-}
-
-impl tower::Service<Bytes> for UnixService {
-    type Response = ();
-    type Error = UnixSocketError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, msg: Bytes) -> Self::Future {
-        use futures::SinkExt;
-        let connector = self.connector.clone();
-        async move {
-            connector
-                .connect()
-                .await?
-                .send(msg)
-                .await
-                .context(SendError)
-        }
-        .boxed()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sinks::util::{encode_event, Encoding};
     use crate::test_util::{random_lines_with_stream, CountReceiver};
     use tokio::net::UnixListener;
 
@@ -295,7 +265,10 @@ mod tests {
         // Set up Sink
         let config = UnixSinkConfig::new(out_path);
         let cx = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(cx, Encoding::Text.into()).unwrap();
+        let encoding = Encoding::Text.into();
+        let (sink, _healthcheck) = config
+            .build(cx, move |event| encode_event(event, &encoding))
+            .unwrap();
 
         // Send the test data
         let (input_lines, events) = random_lines_with_stream(100, num_lines);

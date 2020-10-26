@@ -26,7 +26,15 @@ inventory::submit! {
     SinkDescription::new::<PapertrailConfig>("papertrail")
 }
 
-impl GenerateConfig for PapertrailConfig {}
+impl GenerateConfig for PapertrailConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "logs.papertrailapp.com:12345"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]
@@ -114,6 +122,11 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PapertrailConfig>();
+    }
 
     #[test]
     fn encode_event_apply_rules() {

@@ -15,7 +15,7 @@ impl InternalEvent for MongoDBMetricsCollectCompleted {
     }
 
     fn emit_metrics(&self) {
-        counter!("collect_completed", 1);
+        counter!("collect_completed_total", 1);
         histogram!("collect_duration_nanoseconds", self.end - self.start);
     }
 }
@@ -31,10 +31,7 @@ impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("request_error", 1,
-            "component_kind" => "source",
-            "component_type" => "mongodb_metrics",
-        );
+        counter!("request_error_total", 1);
     }
 }
 
@@ -49,9 +46,6 @@ impl<'a> InternalEvent for MongoDBMetricsBsonParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("bson_parse_error", 1,
-            "component_kind" => "source",
-            "component_type" => "mongodb_metrics",
-        )
+        counter!("bson_parse_error_total", 1);
     }
 }

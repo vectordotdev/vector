@@ -27,7 +27,11 @@ inventory::submit! {
     TransformDescription::new::<RenameFieldsConfig>("rename_fields")
 }
 
-impl GenerateConfig for RenameFieldsConfig {}
+impl GenerateConfig for RenameFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(r#"fields.old_field_name = "new_field_name""#).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
@@ -97,6 +101,11 @@ impl Transform for RenameFields {
 mod tests {
     use super::*;
     use std::convert::TryFrom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RenameFieldsConfig>();
+    }
 
     #[test]
     fn rename_fields() {
