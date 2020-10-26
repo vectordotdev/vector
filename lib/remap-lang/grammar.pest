@@ -1,0 +1,78 @@
+// Root ------------------------------------------------------------------------
+
+program    = _{ SOI ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ EOI }
+expression = _{ assignment | if_statement | boolean_expr | block }
+
+// Statements ------------------------------------------------------------------
+
+assignment   = { target ~ "=" ~ expression }
+if_statement = { "if" ~ boolean_expr ~ block ~ ("else" ~ block)? }
+
+// Primary ---------------------------------------------------------------------
+
+primary  =  { value | path | group }
+value    =  { string | float | integer | boolean | null }
+group    =  { "(" ~ expression ~ ")" }
+
+// Function Calls --------------------------------------------------------------
+
+call      = ${ ident ~ "(" ~ arguments? ~ ")"  }
+arguments = !{ argument ~ ("," ~ argument)* }
+argument  =  { (ident ~ "=")? ~ (expression | regex) }
+
+// Operations ------------------------------------------------------------------
+
+boolean_expr   = { equality ~ (operator_boolean_expr ~ equality)* }
+equality       = { comparison ~ (operator_equality ~ comparison)* }
+comparison     = { addition ~ (operator_comparison ~ addition)* }
+addition       = { multiplication ~ (operator_addition ~ multiplication)* }
+multiplication = { not ~ (operator_multiplication ~ not)* }
+not            = { operator_not* ~ (call | primary) }
+
+// Operators -------------------------------------------------------------------
+
+operator_boolean_expr   = { "||" | "&&" }
+operator_equality       = { "!=" | "==" }
+operator_comparison     = { ">" | ">=" | "<" | "<=" }
+operator_addition       = { "-" | "+" }
+operator_multiplication = { "/" | "*" | "%" }
+operator_not            = { "!" }
+
+// Paths -----------------------------------------------------------------------
+
+path             = ${ ("." ~ path_segment)+ }
+path_segment     = ${ (path_field | path_coalesce) ~ path_index* }
+path_field       = ${ ident | string }
+path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
+path_index       =  { "[" ~ path_index_inner ~ "]" }
+path_index_inner =  { "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+
+// Literals --------------------------------------------------------------------
+
+null    = { "null" }
+boolean = { "true" | "false" }
+string  = { "\"" ~ string_inner ~ "\"" }
+integer = { "-"? ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+float   = {
+    "-"?
+    ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
+    ~ ("." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?)
+        | (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)
+}
+
+regex       = ${ "/" ~ regex_inner ~ "/" ~ regex_flags }
+regex_flags =  { ("i" | "x" | "m")* }
+
+// Other ----------------------------------------------------------------------
+
+ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
+target = _{ path }
+block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ "}" }
+
+string_inner = @{ char* }
+char         =  { !("\"" | "\\") ~ ANY | "\\" ~ ("\"" | "\\" | "n" | "t") }
+
+regex_inner = @{ regex_char* }
+regex_char  =  { !("/" | "\\") ~ ANY | "\\" ~ ANY }
+
+WHITESPACE  = _{ " " | "\t" }
