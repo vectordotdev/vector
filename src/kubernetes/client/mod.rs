@@ -19,7 +19,7 @@
 //!   The reference implementation on preparing the in-cluster config.
 //!
 
-use crate::{dns::Resolver, sinks::util::http::HttpClient, tls::TlsSettings};
+use crate::{dns::Resolver, http::HttpClient, tls::TlsSettings};
 use http::{
     header::{self, HeaderValue},
     uri, Request, Response, Uri,

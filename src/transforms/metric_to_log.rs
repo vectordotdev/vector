@@ -140,6 +140,7 @@ mod tests {
     fn transform_counter() {
         let counter = Metric {
             name: "counter".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -166,6 +167,7 @@ mod tests {
     fn transform_gauge() {
         let gauge = Metric {
             name: "gauge".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -190,6 +192,7 @@ mod tests {
     fn transform_set() {
         let set = Metric {
             name: "set".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -217,6 +220,7 @@ mod tests {
     fn transform_distribution() {
         let distro = Metric {
             name: "distro".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -258,6 +262,7 @@ mod tests {
     fn transform_histogram() {
         let histo = Metric {
             name: "histo".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -304,6 +309,7 @@ mod tests {
     fn transform_summary() {
         let summary = Metric {
             name: "summary".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,

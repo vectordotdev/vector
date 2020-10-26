@@ -29,12 +29,16 @@ target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
 function = {
     deletion |
     only_fields |
-    merge
+    merge |
+    log
 }
 
 deletion = { "del(" ~ target_paths ~ ")" }
 only_fields = { "only_fields(" ~ target_paths ~ ")" }
 merge = { "merge(" ~ target_path ~ "," ~ query_arithmetic ~ ("," ~ query_arithmetic)? ~ ")" }
+log = { "log(" ~ query_arithmetic ~ ("," ~ "level" ~ "=" ~ loglevel)? ~ ")" }
+
+loglevel = { "trace" | "debug" | "info" | "warn" | "error" }
 
 // One or more path arguments for a given function.
 //

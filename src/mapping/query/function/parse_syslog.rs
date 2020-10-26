@@ -170,28 +170,28 @@ mod tests {
             (
                 Event::from(""),
                 Ok(Value::from({
-                    // Syslog message which doesn't include the hostname or the current year.
+                    // Syslog message which doesn't include the hostname, current year or timezone.
                     let mut map = BTreeMap::new();
+
+                    // The timezone is assumed to be the local time.
+                    let ts: DateTime<Utc> = chrono::Local
+                        .ymd(Utc::now().year(), 6, 13)
+                        .and_hms_milli(16, 33, 35, 0)
+                        .into();
+
                     map.insert(
                         "message".to_string(),
                         Value::from("Proxy sticky-servers started."),
                     );
                     map.insert("facility".to_string(), Value::from("local0"));
                     map.insert("severity".to_string(), Value::from("notice"));
-                    map.insert(
-                        "timestamp".to_string(),
-                        Value::from(
-                            chrono::Utc
-                                .ymd(Utc::now().year(), 1, 13)
-                                .and_hms_milli(16, 33, 35, 0),
-                        ),
-                    );
+                    map.insert("timestamp".to_string(), Value::from(ts));
                     map.insert("appname".to_string(), Value::from("haproxy"));
                     map.insert("procid".to_string(), Value::from(73411));
                     map
                 })),
                 ParseSyslogFn::new(Box::new(Literal::from(Value::from(
-                    r#"<133>Jan 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
+                    r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
                 )))),
             ),
         ];

@@ -47,7 +47,7 @@ pub struct UnixSocketError<'a, E> {
 
 impl<E> InternalEvent for UnixSocketError<'_, E>
 where
-    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display
+    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
     fn emit_logs(&self) {
         debug!(

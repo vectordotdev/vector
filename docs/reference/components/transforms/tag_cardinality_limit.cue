@@ -105,6 +105,7 @@ components: transforms: tag_cardinality_limit: {
 			}
 			input: [
 				{metric: {
+					kind: "incremental"
 					name: "logins"
 					counter: {
 						value: 2.0
@@ -114,6 +115,7 @@ components: transforms: tag_cardinality_limit: {
 					}
 				}},
 				{metric: {
+					kind: "incremental"
 					name: "logins"
 					counter: {
 						value: 2.0
@@ -125,6 +127,7 @@ components: transforms: tag_cardinality_limit: {
 			]
 			output: [
 				{metric: {
+					kind: "incremental"
 					name: "logins"
 					counter: {
 						value: 2.0
@@ -134,6 +137,7 @@ components: transforms: tag_cardinality_limit: {
 					}
 				}},
 				{metric: {
+					kind: "incremental"
 					name: "logins"
 					counter: {
 						value: 2.0

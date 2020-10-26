@@ -4,16 +4,15 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
     event::{Event, LogEvent, Value},
-    region::RegionOrEndpoint,
+    rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
+        BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
 };
-use bytes::Bytes;
 use chrono::{Duration, Utc};
 use futures::{
     future::{BoxFuture, FutureExt, TryFutureExt},
@@ -286,8 +285,8 @@ impl CloudwatchLogsSvc {
         key: &CloudwatchKey,
         client: CloudWatchLogsClient,
     ) -> Self {
-        let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
-        let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
+        let group_name = key.group.clone();
+        let stream_name = key.stream.clone();
 
         let create_missing_group = config.create_missing_group.unwrap_or(true);
         let create_missing_stream = config.create_missing_stream.unwrap_or(true);
@@ -412,8 +411,8 @@ impl EncodedLength for InputLogEvent {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct CloudwatchKey {
-    group: Bytes,
-    stream: Bytes,
+    group: String,
+    stream: String,
 }
 
 fn encode_log(
@@ -445,7 +444,7 @@ fn partition_encode(
     group: &Template,
     stream: &Template,
 ) -> Option<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>> {
-    let group = match group.render(&event) {
+    let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
@@ -457,7 +456,7 @@ fn partition_encode(
         }
     };
 
-    let stream = match stream.render(&event) {
+    let stream = match stream.render_string(&event) {
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
@@ -502,7 +501,7 @@ async fn healthcheck(
         return Ok(());
     }
 
-    let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
+    let group_name = config.group_name.get_ref().to_owned();
     let expected_group_name = group_name.clone();
 
     let request = DescribeLogGroupsRequest {
@@ -675,7 +674,7 @@ mod tests {
     use crate::{
         dns::Resolver,
         event::{Event, Value},
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
     };
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
@@ -859,7 +858,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
     use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};

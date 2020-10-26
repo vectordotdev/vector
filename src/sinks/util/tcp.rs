@@ -3,8 +3,8 @@ use crate::{
     config::SinkContext,
     dns::Resolver,
     internal_events::{
-        SocketEventSent, SocketMode, TcpSocketConnectionEstablished, TcpSocketConnectionFailed,
-        TcpSocketConnectionShutdown, TcpSocketError,
+        ConnectionOpen, OpenGauge, SocketEventSent, SocketMode, TcpSocketConnectionEstablished,
+        TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
     },
     sinks::{
         util::{
@@ -205,6 +205,8 @@ impl StreamSink for TcpSink {
             let mut stream = EncodeEventStream::new(&mut input, encode_event);
 
             let mut sink = self.connect().await;
+            let _open_token =
+                OpenGauge::new().open(Box::new(|count| emit!(ConnectionOpen { count })));
             if let Err(error) = sink.send_all(&mut stream).await {
                 let peer_addr = sink.get_ref().get_ref().peer_addr().ok();
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {

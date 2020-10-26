@@ -11,6 +11,7 @@ components: sinks: [Name=string]: {
 				description:   "The filename for a Google Cloud service account credentials JSON file used for authentication."
 				relevant_when: "endpoint = null"
 				type: string: {
+					default: null
 					examples: ["/path/to/credentials.json"]
 				}
 			}

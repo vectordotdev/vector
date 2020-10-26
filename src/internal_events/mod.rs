@@ -44,6 +44,8 @@ mod kafka;
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
+#[cfg(feature = "transforms-logfmt_parser")]
+mod logfmt_parser;
 mod logplex;
 #[cfg(feature = "transforms-lua")]
 mod lua;
@@ -51,6 +53,7 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+mod open;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
@@ -139,11 +142,14 @@ pub use self::kafka::*;
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
 pub(crate) use self::log_to_metric::*;
+#[cfg(feature = "transforms-logfmt_parser")]
+pub use self::logfmt_parser::*;
 pub use self::logplex::*;
 #[cfg(feature = "transforms-lua")]
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+pub use self::open::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]
 pub use self::prometheus::*;

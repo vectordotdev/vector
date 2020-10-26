@@ -11,7 +11,8 @@ use futures::{
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{thread_rng, Rng};
+use rand_distr::Alphanumeric;
 use std::{
     collections::HashMap,
     convert::Infallible,

@@ -2,8 +2,8 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     internal_events::{
-        SocketEventSent, SocketMode, UnixSocketConnectionEstablished, UnixSocketConnectionFailed,
-        UnixSocketError,
+        ConnectionOpen, OpenGauge, SocketEventSent, SocketMode, UnixSocketConnectionEstablished,
+        UnixSocketConnectionFailed, UnixSocketError,
     },
     sinks::{
         util::{
@@ -142,6 +142,8 @@ impl StreamSink for UnixSink {
             let mut stream = EncodeEventStream::new(&mut input, encode_event);
 
             let mut sink = self.connect().await;
+            let _open_token =
+                OpenGauge::new().open(Box::new(|count| emit!(ConnectionOpen { count })));
             if let Err(error) = sink.send_all(&mut stream).await {
                 emit!(UnixSocketError {
                     error,

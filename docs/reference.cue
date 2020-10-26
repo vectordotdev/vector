@@ -212,7 +212,6 @@ _values: {
 #EnvVars: #Schema & {[Type=string]: {
 	common:   true
 	required: false
-	type: string: default: null
 }}
 
 #Event: {
@@ -497,6 +496,7 @@ _values: {
 }
 
 #MetricEvent: {
+	kind: "incremental" | "absolute"
 	name: string
 	tags: [Name=string]: string
 	timestamp?: string
@@ -514,7 +514,7 @@ _values: {
 
 #MetricEventDistribution: {
 	values: [float, ...]
-	sample_rates: [float, ...]
+	sample_rates: [uint, ...]
 	statistic: "histogram" | "summary"
 }
 
@@ -555,7 +555,7 @@ _values: {
 	name:     Name
 })
 
-#MetricType: "counter" | "gauge" | "histogram" | "summary"
+#MetricType: "counter" | "distribution" | "gauge" | "histogram" | "summary"
 
 #Object: {[_=string]: #Any}
 
