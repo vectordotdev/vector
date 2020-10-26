@@ -337,7 +337,7 @@ impl SqsIngestor {
                 let receipt_handle = match message.receipt_handle {
                     None => {
                         // I don't think this will ever actually happen, but is just an artifact of the
-                        // AWS's API prediliction for returning nullable values for all response
+                        // AWS's API predilection for returning nullable values for all response
                         // attributes
                         warn!(message = "Refusing to process message with no receipt_handle.", ?message.message_id);
                         continue;

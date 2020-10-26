@@ -6,7 +6,6 @@ pub mod source {
     use metrics::counter;
     use rusoto_core::RusotoError;
     use rusoto_sqs::{DeleteMessageError, ReceiveMessageError};
-    use std::convert::TryInto;
 
     #[derive(Debug)]
     pub(crate) struct SqsMessageReceiveFailed<'a> {
@@ -34,11 +33,8 @@ pub mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("sqs_message_receive_successful_total", 1);
-            counter!(
-                "sqs_message_received_messages",
-                self.count.try_into().unwrap()
-            ); // TODO
+            counter!("sqs_message_receive_succeeded_total", 1);
+            counter!("sqs_message_received_messages", self.count as u64,);
         }
     }
 
@@ -49,7 +45,7 @@ pub mod source {
 
     impl<'a> InternalEvent for SqsMessageProcessingSucceeded<'a> {
         fn emit_logs(&self) {
-            trace!(message = "Processed SQS message successfully.", %self.message_id);
+            trace!(message = "Processed SQS message succeededly.", %self.message_id);
         }
 
         fn emit_metrics(&self) {
@@ -84,7 +80,7 @@ pub mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("sqs_message_delete_successful_total", 1);
+            counter!("sqs_message_delete_succeeded_total", 1);
         }
     }
 
