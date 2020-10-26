@@ -1,6 +1,6 @@
 use crate::{buffers::Acker, Event};
 use bytes::Bytes;
-use futures::{ready, Sink, Stream};
+use futures::{ready, Sink};
 use pin_project::pin_project;
 use std::{
     io::{Error as IoError, ErrorKind},
@@ -35,11 +35,11 @@ impl EventsCounter {
         }
     }
 
-    pub fn encode_event(&self, event: Event) -> Option<Bytes> {
+    pub fn encode_event(&self, event: Event) -> Option<Result<Bytes, std::io::Error>> {
         let mut sizes = self.sizes.lock().unwrap();
         let bytes = (self.encode_event_inner)(event);
         sizes.push(bytes.as_ref().map_or(0, |bytes| bytes.len()));
-        bytes
+        bytes.map(Ok)
     }
 
     fn is_full(&self) -> bool {
@@ -62,52 +62,6 @@ impl EventsCounter {
     pub fn ack_rest(&self) {
         let count = self.sizes.lock().unwrap().len();
         self.ack(count);
-    }
-}
-
-#[pin_project]
-pub struct EncodeEventStream<'a, S> {
-    #[pin]
-    inner: &'a mut S,
-    encode_event: Box<dyn Fn(Event) -> Option<Bytes> + Send>,
-}
-
-impl<'a, S> EncodeEventStream<'a, S>
-where
-    S: Stream<Item = Event>,
-{
-    pub fn new(
-        inner: &'a mut S,
-        encode_event: impl Fn(Event) -> Option<Bytes> + Send + 'static,
-    ) -> Self {
-        Self {
-            inner,
-            encode_event: Box::new(encode_event),
-        }
-    }
-}
-
-impl<S> Stream for EncodeEventStream<'_, S>
-where
-    S: Stream<Item = Event> + Unpin,
-{
-    type Item = Result<Bytes, IoError>;
-
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        loop {
-            match ready!(self.as_mut().project().inner.poll_next(cx)) {
-                Some(event) => {
-                    if let Some(bytes) = (self.encode_event)(event) {
-                        return Poll::Ready(Some(Ok(bytes)));
-                    }
-                }
-                None => return Poll::Ready(None),
-            }
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
     }
 }
 

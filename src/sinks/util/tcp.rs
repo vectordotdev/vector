@@ -8,7 +8,7 @@ use crate::{
     },
     sinks::{
         util::{
-            socket_events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
+            socket_events_counter::{BytesSink, EventsCounter, ShutdownCheck},
             SinkBuildError, StreamSink,
         },
         Healthcheck, VectorSink,
@@ -18,7 +18,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use futures::{future, stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -198,11 +198,11 @@ impl TcpSink {
 #[async_trait]
 impl StreamSink for TcpSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mut input = input.peekable();
-        while Pin::new(&mut input).peek().await.is_some() {
+        let mut input = Some(input.peekable());
+        while Pin::new(input.as_mut().unwrap()).peek().await.is_some() {
             let events_counter = Arc::clone(&self.events_counter);
-            let encode_event = move |event| events_counter.encode_event(event);
-            let mut stream = EncodeEventStream::new(&mut input, encode_event);
+            let encode_event = move |event| future::ready(events_counter.encode_event(event));
+            let mut stream = input.take().unwrap().filter_map(encode_event);
 
             let mut sink = self.connect().await;
             let _open_token =
@@ -217,6 +217,7 @@ impl StreamSink for TcpSink {
             }
 
             self.events_counter.ack_rest();
+            input.replace(stream.into_inner());
         }
 
         Ok(())
