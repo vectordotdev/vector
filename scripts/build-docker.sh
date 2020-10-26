@@ -35,11 +35,11 @@ build() {
     docker buildx create --use --name vector-builder
     docker buildx install
 
-    docker buildx build \
+    eval docker buildx build \
       --platform="$PLATFORM" \
       --tag "$TAG" \
       target/artifacts \
-      -f "$DOCKERFILE" "${PUSH:+--push}"
+      -f "$DOCKERFILE" "${PUSH:+'--push'}"
   else
     docker build \
       --tag "$TAG" \
