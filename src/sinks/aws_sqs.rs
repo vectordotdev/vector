@@ -36,8 +36,6 @@ enum HealthcheckError {
     GetQueueAttributes {
         source: RusotoError<GetQueueAttributesError>,
     },
-    #[snafu(display("Queue is not FIFO"))]
-    IsNotFifo,
 }
 
 #[derive(Clone)]
@@ -109,23 +107,12 @@ impl SqsSinkConfig {
     pub async fn healthcheck(self, client: SqsClient) -> crate::Result<()> {
         client
             .get_queue_attributes(GetQueueAttributesRequest {
-                attribute_names: Some(vec!["FifoQueue".to_owned()]),
+                attribute_names: None,
                 queue_url: self.queue_url.clone(),
             })
             .await
+            .map(|_| ())
             .context(GetQueueAttributes)
-            .and_then(|result| {
-                if self.queue_url.ends_with(".fifo") {
-                    let fifo = result
-                        .attributes
-                        .and_then(|attrs| attrs.get("FifoQueue").map(|fifo| fifo == "true"))
-                        .unwrap_or(false);
-                    if !fifo {
-                        return Err(HealthcheckError::IsNotFifo);
-                    }
-                }
-                Ok(())
-            })
             .map_err(Into::into)
     }
 
