@@ -13,27 +13,27 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get(&self, key: impl AsRef<str>) -> Option<&Value> {
         util::log::get(&self.fields, key.as_ref())
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_flat(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.fields.get(key.as_ref())
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn get_mut(&mut self, key: impl AsRef<str>) -> Option<&mut Value> {
         util::log::get_mut(&mut self.fields, key.as_ref())
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn contains(&self, key: impl AsRef<str>) -> bool {
         util::log::contains(&self.fields, key.as_ref())
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn insert(
         &mut self,
         key: impl AsRef<str>,
@@ -42,7 +42,7 @@ impl LogEvent {
         util::log::insert(&mut self.fields, key.as_ref(), value.into())
     }
 
-    #[instrument(skip(self, key), fields(key = ?key))]
+    #[instrument(level = "trace", skip(self, key), fields(key = ?key))]
     pub fn insert_path<V>(&mut self, key: Vec<PathComponent>, value: V) -> Option<Value>
     where
         V: Into<Value> + Debug,
@@ -50,7 +50,7 @@ impl LogEvent {
         util::log::insert_path(&mut self.fields, key, value.into())
     }
 
-    #[instrument(skip(self, key), fields(key = %key))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key))]
     pub fn insert_flat<K, V>(&mut self, key: K, value: V)
     where
         K: Into<String> + Display,
@@ -59,7 +59,7 @@ impl LogEvent {
         self.fields.insert(key.into(), value.into());
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn try_insert(&mut self, key: impl AsRef<str>, value: impl Into<Value> + Debug) {
         let key = key.as_ref();
         if !self.contains(key) {
@@ -67,32 +67,32 @@ impl LogEvent {
         }
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove(&mut self, key: impl AsRef<str>) -> Option<Value> {
         util::log::remove(&mut self.fields, key.as_ref(), false)
     }
 
-    #[instrument(skip(self, key), fields(key = %key.as_ref()))]
+    #[instrument(level = "trace", skip(self, key), fields(key = %key.as_ref()))]
     pub fn remove_prune(&mut self, key: impl AsRef<str>, prune: bool) -> Option<Value> {
         util::log::remove(&mut self.fields, key.as_ref(), prune)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         util::log::keys(&self.fields)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
         util::log::all_fields(&self.fields)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
     }
 
-    #[instrument(skip(self, lookup), fields(lookup = %lookup), err)]
+    #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
     fn entry(&mut self, lookup: Lookup) -> crate::Result<Entry<String, Value>> {
         trace!("Seeking to entry.");
         let mut walker = lookup.into_iter().enumerate();
