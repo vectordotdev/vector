@@ -1,5 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    dns,
     event::{Event, Value},
     http::HttpClient,
     sinks::util::{
@@ -59,7 +60,7 @@ impl SinkConfig for HoneycombConfig {
             .timeout(1)
             .parse_config(self.batch)?;
 
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(dns::Resolver, None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

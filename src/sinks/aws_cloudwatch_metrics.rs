@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
+    dns,
     event::metric::{Metric, MetricKind, MetricValue},
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
@@ -64,7 +64,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client(dns::Resolver)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
         Ok((sink, healthcheck))
@@ -94,7 +94,7 @@ impl CloudWatchMetricsSinkConfig {
         client.put_metric_data(request).await.map_err(Into::into)
     }
 
-    fn create_client(&self, resolver: Resolver) -> crate::Result<CloudWatchClient> {
+    fn create_client(&self, resolver: dns::Resolver) -> crate::Result<CloudWatchClient> {
         let region = (&self.region).try_into()?;
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
@@ -459,7 +459,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_metrics_healthchecks() {
         let config = config();
-        let client = config.create_client(Resolver).unwrap();
+        let client = config.create_client(dns::Resolver).unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
@@ -467,7 +467,7 @@ mod integration_tests {
     async fn cloudwatch_metrics_put_data() {
         let cx = SinkContext::new_test();
         let config = config();
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client(dns::Resolver).unwrap();
         let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
 
         let mut events = Vec::new();

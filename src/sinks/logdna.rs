@@ -1,5 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    dns,
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -83,7 +84,7 @@ impl SinkConfig for LogdnaConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(dns::Resolver, None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

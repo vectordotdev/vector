@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
+    dns,
     event::Event,
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
@@ -88,7 +88,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client(dns::Resolver)?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
         Ok((
@@ -129,7 +129,7 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    fn create_client(&self, resolver: Resolver) -> crate::Result<KinesisFirehoseClient> {
+    fn create_client(&self, resolver: dns::Resolver) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
 
         let client = rusoto::client(resolver)?;
@@ -354,7 +354,7 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client(dns::Resolver).unwrap();
         let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
         let (input, events) = random_events_with_stream(100, 100);

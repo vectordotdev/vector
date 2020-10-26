@@ -1,5 +1,6 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    dns,
     event::{Event, LogEvent, Value},
     http::HttpClient,
     internal_events::{
@@ -100,7 +101,7 @@ impl SinkConfig for HecSinkConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(dns::Resolver, tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

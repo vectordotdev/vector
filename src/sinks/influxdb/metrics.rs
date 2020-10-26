@@ -1,5 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    dns,
     event::metric::{Metric, MetricValue, StatisticKind},
     http::HttpClient,
     sinks::{
@@ -80,7 +81,7 @@ impl_generate_config_from_default!(InfluxDBConfig);
 impl SinkConfig for InfluxDBConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(dns::Resolver, tls_settings)?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -872,6 +873,7 @@ mod tests {
 mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
+        dns,
         event::metric::{Metric, MetricKind, MetricValue},
         http::HttpClient,
         sinks::influxdb::{
@@ -997,7 +999,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(dns::Resolver, None).unwrap();
         let sink = InfluxDBSvc::new(config, cx, client).unwrap();
         sink.run(stream::iter(events)).await.unwrap();
 

@@ -192,24 +192,16 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 #[derive(Debug, Clone)]
 pub struct SinkContext {
     pub(super) acker: Acker,
-    pub(super) resolver: Resolver,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
-        Self {
-            acker: Acker::Null,
-            resolver: Resolver,
-        }
+        Self { acker: Acker::Null }
     }
 
     pub fn acker(&self) -> Acker {
         self.acker.clone()
-    }
-
-    pub fn resolver(&self) -> Resolver {
-        self.resolver
     }
 }
 

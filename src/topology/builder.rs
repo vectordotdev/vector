@@ -6,7 +6,7 @@ use super::{
 use crate::{
     buffers,
     config::{DataType, SinkContext, TransformContext},
-    dns::Resolver,
+    dns,
     event::Event,
     shutdown::SourceShutdownCoordinator,
     Pipeline,
@@ -43,7 +43,7 @@ pub async fn build_pieces(
     let mut errors = vec![];
 
     // TODO: remove the unimplemented
-    let resolver = Resolver;
+    let resolver = dns::Resolver;
 
     // Build sources
     for (name, source) in config
@@ -151,7 +151,7 @@ pub async fn build_pieces(
             Ok(buffer) => buffer,
         };
 
-        let cx = SinkContext { resolver, acker };
+        let cx = SinkContext { acker };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {

@@ -1,6 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    dns,
     event::Event,
     http::{HttpClient, HttpClientFuture},
     serde::to_string,
@@ -190,14 +191,14 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    async fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    async fn new(config: &GcsSinkConfig, _cx: &SinkContext) -> crate::Result<Self> {
         let creds = config
             .auth
             .make_credentials(Scope::DevStorageReadWrite)
             .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls)?;
+        let client = HttpClient::new(dns::Resolver, tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {

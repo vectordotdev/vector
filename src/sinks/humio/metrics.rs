@@ -4,6 +4,7 @@ use crate::{
         DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
         TransformContext,
     },
+    dns,
     sinks::{Healthcheck, VectorSink},
     transforms::metric_to_log::MetricToLogConfig,
 };
@@ -39,7 +40,7 @@ impl GenerateConfig for HumioMetricsConfig {
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tcx = TransformContext {
-            resolver: cx.resolver(),
+            resolver: dns::Resolver,
         };
 
         let mut transform = self.transform.clone().build(tcx).await?;

@@ -1,5 +1,6 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    dns,
     event::{Event, Value},
     http::HttpClient,
     sinks::{
@@ -111,7 +112,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         }
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), Some(tls_settings))?;
+        let client = HttpClient::new(dns::Resolver, Some(tls_settings))?;
 
         let sink = AzureMonitorLogsSink::new(self)?;
         let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);

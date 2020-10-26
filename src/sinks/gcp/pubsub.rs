@@ -1,6 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    dns,
     event::Event,
     http::HttpClient,
     sinks::{
@@ -82,7 +83,7 @@ impl SinkConfig for PubsubConfig {
             .parse_config(self.batch)?;
         let request_settings = self.request.unwrap_with(&Default::default());
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(dns::Resolver {}, tls_settings)?;
 
         let healthcheck = healthcheck(client.clone(), sink.uri("")?, sink.creds.clone()).boxed();
 

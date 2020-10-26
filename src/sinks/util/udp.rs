@@ -1,7 +1,7 @@
 use super::{SinkBuildError, StreamSinkOld};
 use crate::{
     config::SinkContext,
-    dns::Resolver,
+    dns,
     internal_events::UdpSendIncomplete,
     sinks::{Healthcheck, VectorSink},
     Event,
@@ -42,13 +42,13 @@ impl UdpSinkConfig {
         Self { address }
     }
 
-    fn build_connector(&self, cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
+    fn build_connector(&self, _cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
 
-        let connector = UdpConnector::new(host, port, cx.resolver());
+        let connector = UdpConnector::new(host, port, dns::Resolver);
         let healthcheck = connector.healthcheck();
 
         Ok((connector, healthcheck))
@@ -80,11 +80,11 @@ impl UdpSinkConfig {
 struct UdpConnector {
     host: String,
     port: u16,
-    resolver: Resolver,
+    resolver: dns::Resolver,
 }
 
 impl UdpConnector {
-    fn new(host: String, port: u16, resolver: Resolver) -> Self {
+    fn new(host: String, port: u16, resolver: dns::Resolver) -> Self {
         Self {
             host,
             port,
@@ -210,7 +210,7 @@ enum State {
 }
 
 impl UdpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver) -> Self {
+    pub fn new(host: String, port: u16, resolver: dns::Resolver) -> Self {
         let span = info_span!("connection", %host, %port);
         let connector = UdpConnector {
             host,

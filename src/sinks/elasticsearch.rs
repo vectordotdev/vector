@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    emit,
+    dns, emit,
     event::Event,
     http::HttpClient,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
@@ -109,7 +109,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
+        let client = HttpClient::new(dns::Resolver, common.tls_settings.clone())?;
 
         let healthcheck = healthcheck(client.clone(), common).boxed();
 
@@ -645,7 +645,7 @@ mod integration_tests {
             .unwrap();
 
         // make sure writes all all visible
-        flush(cx.resolver(), common).await.unwrap();
+        flush(dns::Resolver, common).await.unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", base_url, index))
@@ -783,7 +783,7 @@ mod integration_tests {
         }
 
         // make sure writes all all visible
-        flush(cx.resolver(), common)
+        flush(dns::Resolver, common)
             .await
             .expect("Flushing writes failed");
 

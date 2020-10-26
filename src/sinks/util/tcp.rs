@@ -1,7 +1,6 @@
 use crate::{
     config::SinkContext,
-    dns::Resolver,
-    emit,
+    dns, emit,
     internal_events::{
         ConnectionOpen, OpenGauge, OpenTokenDyn, TcpConnectionDisconnected,
         TcpConnectionEstablished, TcpConnectionFailed, TcpConnectionShutdown, TcpEventSent,
@@ -46,7 +45,7 @@ pub struct TcpSinkConfig {
 struct TcpConnector {
     host: String,
     port: u16,
-    resolver: Resolver,
+    resolver: dns::Resolver,
     tls: MaybeTlsSettings,
 }
 
@@ -67,7 +66,7 @@ impl TcpSinkConfig {
         Self { address, tls: None }
     }
 
-    fn build_connector(&self, cx: SinkContext) -> crate::Result<TcpConnector> {
+    fn build_connector(&self, _cx: SinkContext) -> crate::Result<TcpConnector> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -75,7 +74,7 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let connector = TcpConnector::new(host, port, cx.resolver(), tls);
+        let connector = TcpConnector::new(host, port, dns::Resolver, tls);
 
         Ok(connector)
     }
@@ -99,7 +98,7 @@ impl TcpSinkConfig {
 }
 
 impl TcpConnector {
-    fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
+    fn new(host: String, port: u16, resolver: dns::Resolver, tls: MaybeTlsSettings) -> Self {
         Self {
             host,
             port,
@@ -158,7 +157,7 @@ type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
 type TcpOrTlsStream01 = CompatSink<TcpOrTlsStream, Bytes>;
 
 impl TcpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
+    pub fn new(host: String, port: u16, resolver: dns::Resolver, tls: MaybeTlsSettings) -> Self {
         let span = info_span!("connection", %host, %port);
         let connector = TcpConnector {
             host,
