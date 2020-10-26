@@ -1,7 +1,7 @@
 use crate::transforms::util::tokenize;
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Tokenize;
 
 impl Function for Tokenize {

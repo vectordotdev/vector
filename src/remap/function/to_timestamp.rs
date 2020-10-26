@@ -2,7 +2,7 @@ use crate::types::Conversion;
 use chrono::{TimeZone, Utc};
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ToTimestamp;
 
 impl Function for ToTimestamp {

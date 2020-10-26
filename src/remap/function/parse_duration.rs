@@ -32,7 +32,7 @@ lazy_static! {
     .collect();
 }
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ParseDuration;
 
 impl Function for ParseDuration {

@@ -1,7 +1,7 @@
 use remap::prelude::*;
 use std::convert::TryFrom;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Upcase;
 
 impl Function for Upcase {

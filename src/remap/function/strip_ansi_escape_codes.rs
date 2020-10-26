@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct StripAnsiEscapeCodes;
 
 impl Function for StripAnsiEscapeCodes {

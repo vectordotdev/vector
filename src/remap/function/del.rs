@@ -1,7 +1,7 @@
 use remap::prelude::*;
 use std::convert::TryFrom;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Del;
 
 impl Function for Del {

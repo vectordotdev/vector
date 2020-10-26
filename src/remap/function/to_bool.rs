@@ -1,7 +1,7 @@
 use crate::types::Conversion;
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ToBool;
 
 impl Function for ToBool {

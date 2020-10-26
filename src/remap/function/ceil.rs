@@ -1,7 +1,7 @@
 use super::round_to_precision;
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Ceil;
 
 impl Function for Ceil {
