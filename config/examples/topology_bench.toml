@@ -2,7 +2,11 @@ data_dir = "/var/lib/vector"
 
 [sources.src]
   type = "generator"
-  lines = ["test1", "test2"]
+  lines = [
+    '{"log":"{\"host\":\"144.193.246.231\", \"user-identifier\":\"mante3044\", \"datetime\":\"26/Oct/2020:18:55:43 +0000\", \"method\": \"HEAD\", \"request\": \"/applications/bleeding-edge/e-business/intuitive\", \"protocol\":\"HTTP/1.0\", \"status\":205, \"bytes\":6855, \"referer\": \"https://www.internalturn-key.name/extend/sticky\"}\n","stream":"stdout","time":"2020-10-26T19:14:18.1231174Z"}',
+    '{"log":"{\"host\":\"93.133.36.169\", \"user-identifier\":\"cartwright8872\", \"datetime\":\"26/Oct/2020:18:55:43 +0000\", \"method\": \"HEAD\", \"request\": \"/matrix/bleeding-edge/mesh\", \"protocol\":\"HTTP/1.1\", \"status\":406, \"bytes\":26467, \"referer\": \"http://www.principalseize.org/utilize/portals\"}\n","stream":"stdout","time":"2020-10-26T19:14:18.127509549Z"}',
+    '{"log":"{\"host\":\"176.66.162.48\", \"user-identifier\":\"bernhard7607\", \"datetime\":\"26/Oct/2020:18:55:43 +0000\", \"method\": \"PATCH\", \"request\": \"/unleash/architect\", \"protocol\":\"HTTP/1.1\", \"status\":502, \"bytes\":19538, \"referer\": \"https://www.seniorscalable.org/networks/brand/granular\"}\n","stream":"stdout","time":"2020-10-26T19:14:18.138198261Z"}',
+  ]
 [sinks.dst]
   inputs = ["src"]
   type = "blackhole"
