@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
@@ -43,7 +43,7 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         RegexParser::build(&self)
     }
 
@@ -297,10 +297,7 @@ impl Transform for RegexParser {
 mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        Event,
-    };
+    use crate::{config::TransformConfig, Event};
 
     #[test]
     fn generate_config() {
@@ -317,7 +314,7 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
 

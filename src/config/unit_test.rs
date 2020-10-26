@@ -1,7 +1,4 @@
-use super::{
-    Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue,
-    TransformContext,
-};
+use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
@@ -418,11 +415,7 @@ async fn build_unit_test(
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config
-                .inner
-                .build(TransformContext::new_test())
-                .await
-            {
+            match transform_config.inner.build().await {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),

@@ -4,7 +4,7 @@ use indexmap::IndexMap;
 use std::str::FromStr;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
+    config::TransformConfig,
     event::Lookup,
     test_util::runtime,
     transforms::{self, Transform},
@@ -97,7 +97,7 @@ fn field_filter(c: &mut Criterion) {
                             field: "the_field".to_string(),
                             value: "0".to_string(),
                         }
-                        .build(TransformContext::new_test())
+                        .build()
                         .await
                         .unwrap()
                     })

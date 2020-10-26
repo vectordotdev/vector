@@ -1,8 +1,8 @@
 mod interop;
 
 use crate::{
+    config::DataType,
     config::CONFIG_PATHS,
-    config::{DataType, TransformContext},
     event::Event,
     internal_events::{LuaBuildError, LuaEventProcessed, LuaGcTriggered},
     transforms::{
@@ -88,7 +88,7 @@ struct TimerConfig {
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
-    pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    pub fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self).map(|lua| Box::new(lua) as Box<dyn Transform>)
     }
 

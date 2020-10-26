@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
 };
@@ -38,7 +38,7 @@ impl GenerateConfig for AddTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
     }
 

@@ -1,9 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{
         AwsCloudwatchLogsSubscriptionParserEventProcessed,
@@ -28,7 +25,7 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs_subscription_parser")]
 impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(AwsCloudwatchLogsSubscriptionParser::from(
             self.clone(),
         )))
