@@ -121,7 +121,7 @@ where
     let mut lines_till_we_give_up = 10000;
     while let Some(line) = log_reader.read_line().await {
         println!("Got line: {:?}", line);
-      
+
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
             println!("Giving up");
