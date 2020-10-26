@@ -18,43 +18,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        // TODO(jean): move this to into a global "immutable functions" array.
-        use crate::remap::*;
-        let functions: Vec<Box<dyn remap::Function>> = vec![
-            Box::new(Split),
-            Box::new(ToString),
-            Box::new(ToInt),
-            Box::new(ToFloat),
-            Box::new(ToBool),
-            Box::new(ToTimestamp),
-            Box::new(Upcase),
-            Box::new(Downcase),
-            Box::new(UuidV4),
-            Box::new(Sha1),
-            Box::new(Md5),
-            Box::new(Now),
-            Box::new(FormatTimestamp),
-            Box::new(Contains),
-            Box::new(StartsWith),
-            Box::new(EndsWith),
-            Box::new(Slice),
-            Box::new(Tokenize),
-            Box::new(Sha2),
-            Box::new(Sha3),
-            Box::new(ParseDuration),
-            Box::new(FormatNumber),
-            Box::new(ParseUrl),
-            Box::new(Ceil),
-            Box::new(Floor),
-            Box::new(Round),
-            Box::new(ParseSyslog),
-            Box::new(ParseTimestamp),
-            Box::new(ParseJson),
-            Box::new(Truncate),
-            Box::new(StripWhitespace),
-            Box::new(StripAnsiEscapeCodes),
-        ];
-
+        let functions: Vec<Box<dyn remap::Function>> = crate::remap::FUNCTIONS.clone();
         let program = remap::Program::new(&self.source, functions)?;
 
         Ok(Box::new(Remap { program }))
