@@ -1,7 +1,7 @@
 use crate::{buffers::Acker, Event};
 use bytes::Bytes;
 use futures::{ready, Sink};
-use pin_project::pin_project;
+use pin_project::{pin_project, pinned_drop};
 use std::{
     io::{Error as IoError, ErrorKind},
     marker::Unpin,
@@ -60,7 +60,7 @@ impl EventsCounter {
         }
     }
 
-    pub fn ack_rest(&self) {
+    fn ack_rest(&self) {
         let count = self.sizes.lock().unwrap().len();
         self.ack(count);
     }
@@ -78,8 +78,9 @@ pub enum ShutdownCheck {
 /// - Call `shutdown_check` on each `poll_ready`, so we able stop data sending if other side disconnected.
 /// - Flush all data on each `poll_ready` if total number of events in queue more than some limit.
 /// - Add event size to queue on each `start_send`.
-/// - Ack all events from queue on successful `poll_flush` and `poll_close`.
-#[pin_project]
+/// - Ack all sent events on successful `poll_flush` and `poll_close`.
+/// - Ack rest of encoded events on `Drop`.
+#[pin_project(PinnedDrop)]
 pub struct BytesSink<T> {
     #[pin]
     inner: FramedWrite<T, BytesCodec>,
@@ -109,6 +110,13 @@ impl<T: AsyncWrite> BytesSink<T> {
     fn ack(&mut self) {
         self.events_counter.ack(self.events_count);
         self.events_count = 0;
+    }
+}
+
+#[pinned_drop]
+impl<T> PinnedDrop for BytesSink<T> {
+    fn drop(self: Pin<&mut Self>) {
+        self.project().events_counter.ack_rest()
     }
 }
 

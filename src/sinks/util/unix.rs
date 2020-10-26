@@ -152,7 +152,6 @@ impl StreamSink for UnixSink {
                 });
             }
 
-            self.events_counter.ack_rest();
             input.replace(stream.into_inner());
         }
 
