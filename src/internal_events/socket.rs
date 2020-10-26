@@ -36,6 +36,23 @@ impl InternalEvent for SocketEventReceived {
 }
 
 #[derive(Debug)]
+pub(crate) struct SocketEventSent {
+    pub mode: SocketMode,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for SocketEventSent {
+    fn emit_logs(&self) {
+        trace!(message = "One event sent.", byte_size = %self.byte_size);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("events_processed_total", 1, "mode" => self.mode.as_str());
+        counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct SocketReceiveError {
     pub mode: SocketMode,
     pub error: std::io::Error,

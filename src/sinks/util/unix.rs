@@ -2,8 +2,8 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     internal_events::{
-        UnixSocketConnectionEstablished, UnixSocketConnectionFailure, UnixSocketError,
-        UnixSocketEventSent,
+        SocketEventSent, SocketMode, UnixSocketConnectionEstablished, UnixSocketConnectionFailed,
+        UnixSocketError,
     },
     sinks::{
         util::{
@@ -72,10 +72,6 @@ impl UnixConnector {
     }
 
     async fn connect(&self) -> Result<UnixStream, UnixError> {
-        debug!(
-            message = "Connecting",
-            path = %self.path.to_str().unwrap()
-        );
         UnixStream::connect(&self.path).await.context(ConnectError)
     }
 
@@ -88,7 +84,7 @@ impl UnixConnector {
                     return stream;
                 }
                 Err(error) => {
-                    emit!(UnixSocketConnectionFailure {
+                    emit!(UnixSocketConnectionFailed {
                         error,
                         path: &self.path
                     });
@@ -114,7 +110,12 @@ impl UnixSink {
         acker: Acker,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> Self {
-        let on_success = |byte_size| emit!(UnixSocketEventSent { byte_size });
+        let on_success = |byte_size| {
+            emit!(SocketEventSent {
+                byte_size,
+                mode: SocketMode::Unix,
+            })
+        };
         Self {
             connector,
             events_counter: Arc::new(EventsCounter::new(acker, encode_event, on_success)),

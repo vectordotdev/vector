@@ -3,7 +3,10 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     dns::Resolver,
-    internal_events::UdpSendIncomplete,
+    internal_events::{
+        SocketEventSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
+        UdpSocketConnectionFailed, UdpSocketError,
+    },
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     Event,
 };
@@ -124,9 +127,12 @@ impl UdpConnector {
         let mut backoff = Self::fresh_backoff();
         loop {
             match self.connect().await {
-                Ok(socket) => return socket,
+                Ok(socket) => {
+                    emit!(UdpSocketConnectionEstablished {});
+                    return socket;
+                }
                 Err(error) => {
-                    error!(message = "unable to connect UDP socket.", %error);
+                    emit!(UdpSocketConnectionFailed { error });
                     delay_for(backoff.next().unwrap()).await;
                 }
             }
@@ -199,7 +205,7 @@ impl tower::Service<Bytes> for UdpService {
         };
 
         Box::pin(async move {
-            // TODO: Add reconnect support as TCP?
+            // TODO: Add reconnect support as TCP/Unix?
             let result = udp_send(&mut socket, &msg).await.context(SendError);
             let _ = sender.send(socket);
             result
@@ -242,18 +248,19 @@ impl StreamSink for UdpSink {
         while Pin::new(&mut input).peek().await.is_some() {
             let mut socket = self.connector.connect_backoff().await;
             while let Some(bytes) = input.next().await {
-                debug!(
-                    message = "sending event.",
-                    bytes = %bytes.len()
-                );
-
                 let result = udp_send(&mut socket, &bytes).await;
                 self.acker.ack(1);
 
-                if let Err(error) = result {
-                    error!(message = "send failed.", %error);
-                    break;
-                }
+                match result {
+                    Ok(()) => emit!(SocketEventSent {
+                        byte_size: bytes.len(),
+                        mode: SocketMode::Udp,
+                    }),
+                    Err(error) => {
+                        emit!(UdpSocketError { error });
+                        break;
+                    }
+                };
             }
         }
 

@@ -2,7 +2,10 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     dns::Resolver,
-    internal_events::{TcpConnectionEstablished, TcpConnectionFailed, TcpEventSent},
+    internal_events::{
+        SocketEventSent, SocketMode, TcpSocketConnectionEstablished, TcpSocketConnectionFailed,
+        TcpSocketConnectionShutdown, TcpSocketError,
+    },
     sinks::{
         util::{
             socket_events_counter::{BytesSink, EncodeEventStream, EventsCounter, ShutdownCheck},
@@ -19,6 +22,7 @@ use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
+    io::ErrorKind,
     net::SocketAddr,
     pin::Pin,
     sync::Arc,
@@ -118,13 +122,13 @@ impl TcpConnector {
         loop {
             match self.connect().await {
                 Ok(socket) => {
-                    emit!(TcpConnectionEstablished {
+                    emit!(TcpSocketConnectionEstablished {
                         peer_addr: socket.peer_addr().ok(),
                     });
                     return socket;
                 }
                 Err(error) => {
-                    emit!(TcpConnectionFailed { error });
+                    emit!(TcpSocketConnectionFailed { error });
                     delay_for(backoff.next().unwrap()).await;
                 }
             }
@@ -147,7 +151,12 @@ impl TcpSink {
         acker: Acker,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> Self {
-        let on_success = |byte_size| emit!(TcpEventSent { byte_size });
+        let on_success = |byte_size| {
+            emit!(SocketEventSent {
+                byte_size,
+                mode: SocketMode::Tcp,
+            })
+        };
         Self {
             connector,
             events_counter: Arc::new(EventsCounter::new(acker, encode_event, on_success)),
@@ -174,14 +183,12 @@ impl TcpSink {
         // valid and the write will most likely succeed.
         let mut cx = Context::from_waker(noop_waker_ref());
         match Pin::new(stream).poll_read(&mut cx, &mut [0u8; 1]) {
-            Poll::Ready(Err(error)) => {
-                ShutdownCheck::Error(error)
-            }
+            Poll::Ready(Err(error)) => ShutdownCheck::Error(error),
             Poll::Ready(Ok(0)) => {
                 // Maybe this is only a sign to close the channel,
                 // in which case we should try to flush our buffers
                 // before disconnecting.
-                ShutdownCheck::Close
+                ShutdownCheck::Close("ShutdownCheck::Close")
             }
             _ => ShutdownCheck::Alive,
         }
@@ -199,7 +206,12 @@ impl StreamSink for TcpSink {
 
             let mut sink = self.connect().await;
             if let Err(error) = sink.send_all(&mut stream).await {
-                error!(message = "Connection disconnected.", %error);
+                let peer_addr = sink.get_ref().get_ref().peer_addr().ok();
+                if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
+                    emit!(TcpSocketConnectionShutdown { peer_addr });
+                } else {
+                    emit!(TcpSocketError { peer_addr, error });
+                }
             }
 
             self.events_counter.ack_rest();

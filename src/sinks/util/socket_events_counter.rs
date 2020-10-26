@@ -113,7 +113,7 @@ where
 
 pub enum ShutdownCheck {
     Error(IoError),
-    Close,
+    Close(&'static str),
     Alive,
 }
 
@@ -140,6 +140,10 @@ impl<T: AsyncWrite> BytesSink<T> {
         }
     }
 
+    pub fn get_ref(&self) -> &FramedWrite<T, BytesCodec> {
+        &self.inner
+    }
+
     fn ack(&mut self) {
         self.events_counter.ack(self.events_count);
         self.events_count = 0;
@@ -156,12 +160,12 @@ where
         let pinned = self.as_mut().project();
         match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
             ShutdownCheck::Error(error) => return Poll::Ready(Err(error)),
-            ShutdownCheck::Close => {
+            ShutdownCheck::Close(reason) => {
                 if let Err(error) = ready!(self.as_mut().poll_close(cx)) {
                     return Poll::Ready(Err(error));
                 }
 
-                return Poll::Ready(Err(IoError::new(ErrorKind::Other, "ShutdownCheck::Close")));
+                return Poll::Ready(Err(IoError::new(ErrorKind::Other, reason)));
             }
             ShutdownCheck::Alive => {}
         }
