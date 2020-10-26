@@ -119,16 +119,13 @@ fn add_headers(
     headers: HeaderMap,
 ) -> Vec<Event> {
     for header_name in headers_config {
-        let value = headers
-            .get(header_name)
-            .map(HeaderValue::as_bytes)
-            .map(<&[u8]>::to_owned)
-            .map(Bytes::from);
+        let value = headers.get(header_name).map(HeaderValue::as_bytes);
 
         for event in events.iter_mut() {
-            event
-                .as_mut_log()
-                .insert(header_name as &str, Value::from(value.to_owned()));
+            event.as_mut_log().insert(
+                header_name as &str,
+                Value::from(value.map(Bytes::copy_from_slice)),
+            );
         }
     }
 
