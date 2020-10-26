@@ -147,7 +147,7 @@ impl SourceConfig for JournaldConfig {
 }
 
 impl JournaldConfig {
-    async fn source<J>(
+    async fn source<J: JournalStream>(
         &self,
         out: Pipeline,
         shutdown: ShutdownSignal,
@@ -156,10 +156,7 @@ impl JournaldConfig {
         exclude_units: HashSet<String>,
         batch_size: usize,
         remap_priority: bool,
-    ) -> crate::Result<super::Source>
-    where
-        J: JournalSource + Send + 'static,
-    {
+    ) -> crate::Result<super::Source> {
         let out = out
             .sink_map_err(|_| ())
             .with(|record: Record| future::ok(create_event(record)));
@@ -245,11 +242,8 @@ fn fixup_unit(unit: &str) -> String {
     }
 }
 
-/// A `JournalSource` is a data source that works as a `Stream`
-/// producing lines that resemble journald JSON format records. These
-/// trait functions is an addition to the standard stream methods for
-/// initializing the source.
-trait JournalSource: Stream<Item = io::Result<String>> + Sized {
+/// `JournalStream` is a stream of lines from output of `journalctl` process.
+trait JournalStream: Stream<Item = io::Result<String>> + Sized + Send + 'static {
     /// (source, close_underlying_stream)
     fn new(
         config: &JournaldConfig,
@@ -263,7 +257,7 @@ struct Journalctl {
     inner: io::Split<BufReader<ChildStdout>>,
 }
 
-impl JournalSource for Journalctl {
+impl JournalStream for Journalctl {
     fn new(
         config: &JournaldConfig,
         cursor: Option<String>,
@@ -330,7 +324,7 @@ struct JournaldServer<J, T> {
 
 impl<J, T> JournaldServer<J, T>
 where
-    J: JournalSource,
+    J: JournalStream,
     T: Sink<SinkItem = Record, SinkError = ()>,
 {
     pub async fn run(mut self) {
@@ -344,12 +338,12 @@ where
                 let text = match self.journal.next().await {
                     None => {
                         info!("Journald process stopped.");
-                        break;
+                        return;
                     }
                     Some(Ok(text)) => text,
                     Some(Err(err)) => {
                         error!(
-                            message = "Could not read from journald source",
+                            message = "Could not read from journald source.",
                             error = %err,
                         );
                         break;
@@ -598,7 +592,7 @@ mod tests {
         }
     }
 
-    impl JournalSource for FakeJournal {
+    impl JournalStream for FakeJournal {
         fn new(
             _: &JournaldConfig,
             checkpoint: Option<String>,
