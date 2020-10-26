@@ -302,7 +302,7 @@ mod tests {
         assert_eq!(log[&log_schema().host_key()], "host".into());
         assert_eq!(log[log_schema().source_type_key()], "logplex".into());
         assert_eq!(log["appname"], "lumberjack-store".into());
-        assert_eq!(log["absent"], Value::Null.into());
+        assert_eq!(log["absent"], Value::Null);
     }
 
     #[test]
