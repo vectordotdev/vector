@@ -1,6 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
     event::Event,
     internal_events::aws_s3::source::{
@@ -14,6 +14,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use chrono::{DateTime, TimeZone, Utc};
 use codec::BytesDelimitedCodec;
 use futures::{
     compat::{Compat, Future01CompatExt},
@@ -443,6 +444,14 @@ impl SqsIngestor {
             })?;
 
         let metadata = object.metadata;
+        let timestamp = object
+            .last_modified
+            .and_then(|t| {
+                DateTime::parse_from_rfc2822(&t)
+                    .map(|ts| Utc.timestamp(ts.timestamp(), ts.timestamp_subsec_nanos()))
+                    .ok()
+            })
+            .unwrap_or_else(Utc::now);
 
         match object.body {
             Some(body) => {
@@ -498,8 +507,7 @@ impl SqsIngestor {
                     log.insert("bucket", s3_event.s3.bucket.name.clone());
                     log.insert("object", s3_event.s3.object.key.clone());
                     log.insert("region", s3_event.aws_region.clone());
-
-                    //TODO timestamp
+                    log.insert(log_schema().timestamp_key(), timestamp);
 
                     if let Some(metadata) = &metadata {
                         for (key, value) in metadata {
