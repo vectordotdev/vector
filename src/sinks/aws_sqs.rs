@@ -146,7 +146,7 @@ impl SqsSink {
         // Up to 10 events, not more than 256KB as total size.
         let batch = BatchSettings::default()
             .events(10)
-            .bytes(250_000)
+            .bytes(262_144)
             .timeout(1)
             .parse_config(config.batch)?;
 

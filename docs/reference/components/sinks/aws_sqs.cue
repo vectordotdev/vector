@@ -19,7 +19,7 @@ components: sinks: aws_sqs: {
 			batch: {
 				enabled:      true
 				common:       false
-				max_bytes:    250000
+				max_bytes:    262144
 				max_events:   10
 				timeout_secs: 1
 			}
@@ -52,7 +52,7 @@ components: sinks: aws_sqs: {
 					socket: {
 						api: {
 							title: "Amazon Simple Queue Service API"
-							url:   urls.aws_kinesis_streams_api
+							url:   urls.aws_sqs_api
 						}
 						direction: "outgoing"
 						protocols: ["http"]
@@ -92,5 +92,16 @@ components: sinks: aws_sqs: {
 	input: {
 		logs:    true
 		metrics: null
+	}
+
+	how_it_works: {
+		batching: {
+			title: "Batch Limitations"
+			body:  """
+				Amazon SQS batch allow upload up to 10 messages in one batch
+				with maximum total payload size 256KB (262,144 bytes).
+				[SQS Developer Guide](\(urls.aws_sqs_batch_actions)).
+				"""
+		}
 	}
 }
