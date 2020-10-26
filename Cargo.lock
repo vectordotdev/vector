@@ -3779,6 +3779,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "paste"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba7ae1a2180ed02ddfdb5ab70c70d596a26dd642e097bb6fe78b1bde8588ed97"
+
+[[package]]
 name = "pbkdf2"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4533,6 +4539,18 @@ name = "regex-syntax"
 version = "0.6.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
+
+[[package]]
+name = "remap-lang"
+version = "0.1.0"
+dependencies = [
+ "bytes 0.5.6",
+ "paste",
+ "pest",
+ "pest_derive",
+ "regex",
+ "thiserror",
+]
 
 [[package]]
 name = "remove_dir_all"
