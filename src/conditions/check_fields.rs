@@ -450,7 +450,7 @@ fn build_predicate(
         "contains" => ContainsPredicate::new(target, arg),
         "prefix" => {
             warn!(
-                message = "The \"prefix\" comparison predicate is deprecated, use \"starts_with\" instead",
+                message = "The \"prefix\" comparison predicate is deprecated, use \"starts_with\" instead.",
                 %target,
             );
             StartsWithPredicate::new(target, arg)

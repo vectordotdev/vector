@@ -369,7 +369,7 @@ fn handle(
     }
 
     info!(
-        message = "Request complete",
+        message = "Request complete.",
         response_code = ?response.status()
     );
 

@@ -169,7 +169,7 @@ impl JournaldConfig {
             Ok(cursor) => cursor,
             Err(err) => {
                 error!(
-                    message = "Could not retrieve saved journald checkpoint",
+                    message = "Could not retrieve saved journald checkpoint.",
                     error = %err
                 );
                 None
@@ -351,7 +351,7 @@ where
                     Some(Ok(text)) => text,
                     Some(Err(err)) => {
                         error!(
-                            message = "Could not read from journald source",
+                            message = "Could not read from journald source.",
                             error = %err,
                         );
                         break;
@@ -382,7 +382,7 @@ where
 
                 match channel.send(record).compat().await {
                     Ok(_) => {}
-                    Err(()) => error!(message = "Could not send journald log"),
+                    Err(()) => error!(message = "Could not send journald log."),
                 }
             }
 

@@ -182,7 +182,7 @@ impl Service<Vec<Record>> for KinesisFirehoseService {
 
     fn call(&mut self, records: Vec<Record>) -> Self::Future {
         debug!(
-            message = "sending records.",
+            message = "Sending records.",
             events = %records.len(),
         );
 

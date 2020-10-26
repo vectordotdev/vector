@@ -186,7 +186,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
 
     fn call(&mut self, records: Vec<PutRecordsRequestEntry>) -> Self::Future {
         debug!(
-            message = "sending records.",
+            message = "Sending records.",
             events = %records.len(),
         );
 

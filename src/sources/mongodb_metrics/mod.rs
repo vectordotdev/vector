@@ -157,7 +157,7 @@ impl SourceConfig for MongoDBMetricsConfig {
 
                     let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
                     if let Err(()) = out.send_all(&mut stream).await {
-                        error!(message = "Error sending mongodb metrics");
+                        error!(message = "Error sending mongodb metrics.");
                     }
                 }
             }

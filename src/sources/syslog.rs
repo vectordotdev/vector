@@ -363,7 +363,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
     });
 
     trace!(
-        message = "processing one event.",
+        message = "Processing one event.",
         event = ?event
     );
 

@@ -508,7 +508,7 @@ where
         // is apply back pressure.
         if self.sending.len() > 5 {
             trace!(
-                message = "too many sending batches.",
+                message = "Too many sending batches.",
                 amount = self.sending.len()
             );
             self.poll_complete()?;
@@ -761,10 +761,10 @@ where
                         num_to_ack += ack_size;
                         self.seq_tail += 1
                     }
-                    trace!(message = "acking events.", acking_num = num_to_ack);
+                    trace!(message = "Acking events.", acking_num = num_to_ack);
                     self.acker.ack(num_to_ack);
                 }
-                Err(_) => panic!("ServiceSink service sender dropped"),
+                Err(_) => panic!("ServiceSink service sender dropped."),
             }
         }
     }

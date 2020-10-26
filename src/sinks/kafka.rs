@@ -160,7 +160,7 @@ impl Sink for KafkaSink {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
-            error!(message = "Missing keys for topic", ?missing_keys);
+            error!(message = "Missing keys for topic.", ?missing_keys);
         })?;
 
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
@@ -171,7 +171,7 @@ impl Sink for KafkaSink {
             record = record.timestamp(timestamp.timestamp_millis());
         }
 
-        debug!(message = "sending event.", count = 1);
+        debug!(message = "Sending event.", count = 1);
         let future = match self.producer.send_result(record) {
             Ok(f) => f,
             Err((e, record)) => {
@@ -244,7 +244,7 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
         Ok(topic) => Some(topic),
         Err(missing_keys) => {
             warn!(
-                message = "Could not generate topic for healthcheck",
+                message = "Could not generate topic for healthcheck.",
                 ?missing_keys
             );
             None

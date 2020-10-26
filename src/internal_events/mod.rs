@@ -240,7 +240,7 @@ pub fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
 mod test {
     #[test]
     fn truncate_utf8() {
-        let message = "hello 😁 this is test";
-        assert_eq!("hello [...]", super::truncate_string_at(&message, 13));
+        let message = "Hello 😁 this is test.";
+        assert_eq!("Hello [...]", super::truncate_string_at(&message, 13));
     }
 }

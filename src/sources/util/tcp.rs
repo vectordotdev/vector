@@ -114,7 +114,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                             Ok(socket) => socket,
                             Err(error) => {
                                 error!(
-                                    message = "failed to accept socket",
+                                    message = "Failed to accept socket.",
                                     %error
                                 );
                                 return;
@@ -136,7 +136,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 
                         span.in_scope(|| {
                             let peer_addr = socket.peer_addr();
-                            debug!(message = "accepted a new connection", %peer_addr);
+                            debug!(message = "Accepted a new connection.", %peer_addr);
 
                             let open_token =
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));

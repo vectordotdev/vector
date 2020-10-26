@@ -68,15 +68,15 @@ impl<'bound> Lifecycle<'bound> {
 
         let token = match select(first_task_fut, &mut global_shutdown).await {
             Either::Left((None, _)) => {
-                trace!(message = "Lifecycle had no tasks upon run, we're done");
+                trace!(message = "Lifecycle had no tasks upon run, we're done.");
                 GlobalShutdownToken::Unused(global_shutdown)
             }
             Either::Left((Some(()), _)) => {
-                trace!(message = "Lifecycle had the first task completed");
+                trace!(message = "Lifecycle had the first task completed.");
                 GlobalShutdownToken::Unused(global_shutdown)
             }
             Either::Right((shutdown_signal_token, _)) => {
-                trace!(message = "Lifecycle got a global shutdown request");
+                trace!(message = "Lifecycle got a global shutdown request.");
                 GlobalShutdownToken::Token(shutdown_signal_token)
             }
         };
@@ -87,14 +87,14 @@ impl<'bound> Lifecycle<'bound> {
                 trace!(
                     message = "Error while sending a future shutdown, \
                         the receiver is already dropped; \
-                        this is not a problem"
+                        this is not a problem."
                 );
             }
         }
 
         // Wait for all the futures to complete.
         while let Some(()) = self.futs.next().await {
-            trace!(message = "A lifecycle-managed future completed after shutdown was requested");
+            trace!(message = "A lifecycle-managed future completed after shutdown was requested.");
         }
 
         // Return the global shutdown token so that caller can perform it's

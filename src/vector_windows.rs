@@ -291,10 +291,10 @@ pub mod service_control {
 
         match exit_code {
             ServiceExitCode::Win32(ec) if ec != NO_ERROR => {
-                warn!(message = "Service stopped with error", exit_code = ec);
+                warn!(message = "Service stopped with error.", exit_code = ec);
             }
             ServiceExitCode::ServiceSpecific(ec) => {
-                warn!(message = "Service stopped with error", exit_code = ec);
+                warn!(message = "Service stopped with error.", exit_code = ec);
             }
             _ => {}
         };

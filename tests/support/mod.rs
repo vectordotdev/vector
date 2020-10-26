@@ -315,7 +315,7 @@ where
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
         let sink = sink.sink_map_err(|error| {
-            error!(message = "Ingesting an event failed at mock sink", ?error)
+            error!(message = "Ingesting an event failed at mock sink.", ?error)
         });
         let sink = StreamSinkOld::new(sink, cx.acker());
         let healthcheck = if self.healthy {

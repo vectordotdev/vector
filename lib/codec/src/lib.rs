@@ -93,7 +93,7 @@ impl Decoder for BytesDelimitedCodec {
                     // reach the next delimiter
                     self.is_discarding = true;
                     warn!(
-                        message = "Discarding frame larger than max_length",
+                        message = "Discarding frame larger than max_length.",
                         buf_len = buf.len(),
                         max_length = self.max_length,
                         rate_limit_secs = 30

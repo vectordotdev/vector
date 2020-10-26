@@ -343,7 +343,7 @@ fn encode_events(
     interval: i64,
     namespace: Option<&str>,
 ) -> DatadogRequest<DatadogMetric> {
-    debug!(message = "series", count = events.len());
+    debug!(message = "Series", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
@@ -453,7 +453,7 @@ fn encode_distribution_events(
     interval: i64,
     namespace: Option<&str>,
 ) -> DatadogRequest<DatadogDistributionMetric> {
-    debug!(message = "distribution", count = events.len());
+    debug!(message = "Distribution", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {

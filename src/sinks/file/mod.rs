@@ -211,12 +211,12 @@ impl FileSink {
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
 
                             // Close all the open files.
-                            debug!(message = "Closing all the open files");
+                            debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
                                 if let Err(error) = file.close().await {
                                     error!(message = "Failed to close file.", ?path, %error);
                                 } else{
-                                    trace!(message = "Successfully closed file", ?path);
+                                    trace!(message = "Successfully closed file.", ?path);
                                 }
                             }
 
