@@ -196,7 +196,7 @@ mod tests {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        event::Event,
+        event::{Event, Value},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -302,7 +302,7 @@ mod tests {
         assert_eq!(log[&log_schema().host_key()], "host".into());
         assert_eq!(log[log_schema().source_type_key()], "logplex".into());
         assert_eq!(log["appname"], "lumberjack-store".into());
-        assert_eq!(log["absent"], "".into());
+        assert_eq!(log["absent"], Value::Null.into());
     }
 
     #[test]
