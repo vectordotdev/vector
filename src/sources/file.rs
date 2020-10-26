@@ -1,7 +1,7 @@
 use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::Event,
+    event::{Event, Lookup},
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -292,12 +292,12 @@ pub fn file_source(
     }))
 }
 
-fn create_event(
+fn create_event<'a>(
     line: Bytes,
     file: String,
-    host_key: &str,
+    host_key: &'a Lookup<'a>,
     hostname: &Option<String>,
-    file_key: &Option<String>,
+    file_key: &'a Option<Lookup<'a>>,
 ) -> Event {
     emit!(FileEventReceived {
         file: &file,
@@ -309,14 +309,14 @@ fn create_event(
     // Add source type
     event
         .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("file"));
+        .insert(log_schema().source_type_key().into_buf(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);
     }
 
     if let Some(hostname) = &hostname {
-        event.as_mut_log().insert(host_key, hostname.clone());
+        event.as_mut_log().insert(host_key.clone(), hostname.clone());
     }
 
     event

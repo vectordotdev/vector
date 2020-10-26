@@ -200,7 +200,7 @@ impl LookupBuf {
 
     #[instrument]
     pub fn from_str(value: &str) -> Result<LookupBuf, crate::Error> {
-        Lookup::from_str(value).map(Lookup::into_buf)
+        Lookup::from_str(value).map(|l| l.into_buf())
     }
 }
 

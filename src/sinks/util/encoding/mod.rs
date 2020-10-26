@@ -46,8 +46,8 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
-    fn only_fields<'a>(&self) -> &'a Option<Vec<Lookup<'a>>>;
-    fn except_fields<'a>(&self) -> &'a Option<Vec<Lookup<'a>>>;
+    fn only_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>>;
+    fn except_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
     fn apply_only_fields(&self, event: &mut Event) {
@@ -102,7 +102,7 @@ pub trait EncodingConfiguration<E> {
                             for (k, v) in unix_timestamps {
                                 // TODO: Fixed in https://github.com/timberio/vector/issues/2845
                                 log_event.insert(
-                                    LookupBuf::from_str(k).expect(
+                                    LookupBuf::from_str(&k).expect(
                                         "While iterating over fields in an event, found one which was not a valid lookup. This is an invariant, please report this."
                                     ),
                                     v

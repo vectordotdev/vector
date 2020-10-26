@@ -1,7 +1,7 @@
 extern crate pest;
 
 use crate::{
-    event::Value,
+    event::{Value, LookupBuf},
     mapping::{
         query::{
             self,
@@ -455,8 +455,8 @@ fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
-        Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair)?))),
-        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair)?))),
+        Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair).iter().map(LookupBuf::from).collect()?))),
+        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair).iter().map(LookupBuf::from).collect()?))),
         Rule::merge => merge_function_from_pair(pair),
         _ => unexpected_parser_sytax!(pair),
     }

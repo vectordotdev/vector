@@ -122,7 +122,7 @@ impl<'a> Lookup<'a> {
 
     /// Become a `LookupBuf` (by allocating).
     #[instrument]
-    pub fn into_buf(&self) -> LookupBuf {
+    pub fn into_buf(self) -> LookupBuf {
         LookupBuf::from(self)
     }
 }

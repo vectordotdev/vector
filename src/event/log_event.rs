@@ -48,7 +48,7 @@ impl LogEvent {
                 // Fields access maps.
                 (Segment::Field(f), Some(Value::Map(map))) => {
                     trace!("Matched field into map.");
-                    map.get(&f)
+                    map.get(f)
                 }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {

@@ -290,7 +290,7 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
     match input.type_str.as_ref() {
         "raw" => match input.value.as_ref() {
             Some(v) => Ok((target, Event::from(v.clone()))),
-            None => Err("input type 'raw' requires the field 'value'".to_string()),
+            None => Err("input type 'raw' requires the field 'value'".into()),
         },
         "log" => {
             if let Some(log_fields) = &input.log_fields {

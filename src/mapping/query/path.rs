@@ -52,7 +52,7 @@ impl Function for Path {
         // the path walker.
         let mut value = self.path[0]
             .iter()
-            .find_map(|p| ctx.as_log().get(Lookup::from(p)))
+            .find_map(|p| ctx.as_log().get(Lookup::from(*p)))
             .ok_or_else(|| format!("path .{} not found in event", self.path[0].first().unwrap()))?;
 
         // Walk remaining (if any) path segments. Our parse is already capable

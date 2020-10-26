@@ -1,5 +1,5 @@
 use crate::{
-    event::{PathComponent, PathIter},
+    event::{PathComponent, PathIter, LookupBuf},
     sinks::util::encoding::{
         with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
     },
@@ -23,9 +23,9 @@ pub struct EncodingConfig<E> {
     pub(crate) codec: E,
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default)]
-    pub(crate) only_fields: Option<LookupBuf>,
+    pub(crate) only_fields: Option<Vec<LookupBuf>>,
     #[serde(default)]
-    pub(crate) except_fields: Option<LookupBuf>,
+    pub(crate) except_fields: Option<Vec<LookupBuf>>,
     #[serde(default)]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }

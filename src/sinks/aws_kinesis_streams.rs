@@ -43,7 +43,7 @@ pub struct KinesisService {
 #[serde(deny_unknown_fields)]
 pub struct KinesisSinkConfig {
     pub stream_name: String,
-    pub partition_key_field: Option<String>,
+    pub partition_key_field: Option<LookupBuf>,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
@@ -170,7 +170,7 @@ impl KinesisService {
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
+            .with_flat_map(move |e| iter_ok(encode_event(e, partition_key_field.as_ref(), &encoding)));
 
         Ok(sink)
     }
@@ -271,7 +271,7 @@ enum HealthcheckError {
 
 fn encode_event(
     mut event: Event,
-    partition_key_field: &Option<Lookup<'_>>,
+    partition_key_field: &Option<LookupBuf>,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
