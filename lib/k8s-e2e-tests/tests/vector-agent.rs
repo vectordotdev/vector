@@ -549,7 +549,7 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!(message = "Got line.", ?line);
+        println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
@@ -729,7 +729,7 @@ kubernetesLogsSource:
             Some(line) => line,
             None => break,
         };
-        println!(message = "Got line.", ?line);
+        println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
@@ -870,7 +870,7 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
             Some(line) => line,
             None => break,
         };
-        println!(message = "Got line.", ?line);
+        println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
@@ -1020,7 +1020,7 @@ kubernetesLogsSource:
             Some(line) => line,
             None => break,
         };
-        println!(message = "Got line.", ?line);
+        println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
         if lines_till_we_give_up <= 0 {
