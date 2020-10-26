@@ -2,11 +2,11 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::{HttpClient, HttpClientFuture},
     serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,

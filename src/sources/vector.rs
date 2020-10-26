@@ -156,6 +156,7 @@ mod test {
             Event::from("source"),
             Event::Metric(Metric {
                 name: String::from("also test a metric"),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,

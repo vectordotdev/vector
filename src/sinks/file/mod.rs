@@ -52,7 +52,7 @@ inventory::submit! {
 impl GenerateConfig for FileSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            path: Template::try_from("TODO").unwrap(),
+            path: Template::try_from("/tmp/vector-%Y-%m-%d.log").unwrap(),
             idle_timeout_secs: None,
             encoding: Default::default(),
             compression: Default::default(),

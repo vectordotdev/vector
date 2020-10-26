@@ -24,6 +24,7 @@ components: sources: docker: {
 		DOCKER_HOST: {
 			description: "The Docker host to connect to."
 			type: string: {
+				default: null
 				examples: ["unix:///var/run/docker.sock"]
 			}
 		}
@@ -31,6 +32,7 @@ components: sources: docker: {
 		DOCKER_VERIFY_TLS: {
 			description: "If `true` (the default), Vector will validate the TLS certificate of the remote host. Do NOT set this to `false` unless you understand the risks of not verifying the remote certificate."
 			type: string: {
+				default: "true"
 				enum: {
 					"true":  "true"
 					"false": "false"

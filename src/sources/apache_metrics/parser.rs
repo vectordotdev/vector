@@ -161,6 +161,7 @@ fn line_to_metrics<'a>(
         result.map(move |statistic| match statistic {
             StatusFieldStatistic::ServerUptimeSeconds(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "uptime_seconds_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -170,6 +171,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::TotalAccesses(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "access_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -179,6 +181,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::TotalKBytes(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "sent_bytes_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -188,6 +191,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::TotalDuration(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "duration_seconds_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -197,6 +201,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::CPUUser(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -209,6 +214,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPUSystem(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -221,6 +227,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPUChildrenUser(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -233,6 +240,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPUChildrenSystem(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_seconds_total"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -245,6 +253,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPULoad(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "cpu_load"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -253,6 +262,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::IdleWorkers(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "workers"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -267,6 +277,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::BusyWorkers(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "workers"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -280,6 +291,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsTotal(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -293,6 +305,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsAsyncWriting(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -306,6 +319,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsAsyncClosing(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -319,6 +333,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsAsyncKeepAlive(value) => Box::new(iter::once(Metric {
                 name: encode_namespace(namespace, "connections"),
+                namespace: None,
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -369,6 +384,7 @@ fn score_to_metric(
 ) -> Metric {
     Metric {
         name: encode_namespace(namespace, "scoreboard"),
+        namespace: None,
         timestamp: Some(now),
         tags: {
             let mut tags = tags.cloned().unwrap_or_default();
@@ -506,6 +522,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             vec![
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "closing"}),
                     kind: MetricKind::Absolute,
@@ -513,6 +530,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "keepalive"}),
                     kind: MetricKind::Absolute,
@@ -520,6 +538,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "total"}),
                     kind: MetricKind::Absolute,
@@ -527,6 +546,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "writing"}),
                     kind: MetricKind::Absolute,
@@ -534,6 +554,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "closing"}),
                     kind: MetricKind::Absolute,
@@ -541,6 +562,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "dnslookup"}),
                     kind: MetricKind::Absolute,
@@ -548,6 +570,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "finishing"}),
                     kind: MetricKind::Absolute,
@@ -555,6 +578,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "idle_cleanup"}),
                     kind: MetricKind::Absolute,
@@ -562,6 +586,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "keepalive"}),
                     kind: MetricKind::Absolute,
@@ -569,6 +594,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "logging"}),
                     kind: MetricKind::Absolute,
@@ -576,6 +602,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "open"}),
                     kind: MetricKind::Absolute,
@@ -583,6 +610,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "reading"}),
                     kind: MetricKind::Absolute,
@@ -590,6 +618,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "sending"}),
                     kind: MetricKind::Absolute,
@@ -597,6 +626,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "starting"}),
                     kind: MetricKind::Absolute,
@@ -604,6 +634,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "waiting"}),
                     kind: MetricKind::Absolute,
@@ -611,6 +642,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_uptime_seconds_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -618,6 +650,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_workers".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "busy"}),
                     kind: MetricKind::Absolute,
@@ -625,6 +658,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_workers".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "idle"}),
                     kind: MetricKind::Absolute,
@@ -698,6 +732,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             vec![
                 Metric {
                     name: "apache_access_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -705,6 +740,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "closing"}),
                     kind: MetricKind::Absolute,
@@ -712,6 +748,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "keepalive"}),
                     kind: MetricKind::Absolute,
@@ -719,6 +756,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "total"}),
                     kind: MetricKind::Absolute,
@@ -726,6 +764,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_connections".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "writing"}),
                     kind: MetricKind::Absolute,
@@ -733,6 +772,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_cpu_load".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -740,6 +780,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_cpu_seconds_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"type" => "children_system"}),
                     kind: MetricKind::Absolute,
@@ -747,6 +788,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_cpu_seconds_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"type" => "children_user"}),
                     kind: MetricKind::Absolute,
@@ -754,6 +796,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_cpu_seconds_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"type" => "system"}),
                     kind: MetricKind::Absolute,
@@ -761,6 +804,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_cpu_seconds_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"type" => "user"}),
                     kind: MetricKind::Absolute,
@@ -768,6 +812,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_duration_seconds_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -775,6 +820,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "closing"}),
                     kind: MetricKind::Absolute,
@@ -782,6 +828,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "dnslookup"}),
                     kind: MetricKind::Absolute,
@@ -789,6 +836,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "finishing"}),
                     kind: MetricKind::Absolute,
@@ -796,6 +844,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "idle_cleanup"}),
                     kind: MetricKind::Absolute,
@@ -803,6 +852,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "keepalive"}),
                     kind: MetricKind::Absolute,
@@ -810,6 +860,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "logging"}),
                     kind: MetricKind::Absolute,
@@ -817,6 +868,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "open"}),
                     kind: MetricKind::Absolute,
@@ -824,6 +876,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "reading"}),
                     kind: MetricKind::Absolute,
@@ -831,6 +884,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "sending"}),
                     kind: MetricKind::Absolute,
@@ -838,6 +892,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "starting"}),
                     kind: MetricKind::Absolute,
@@ -845,6 +900,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_scoreboard".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "waiting"}),
                     kind: MetricKind::Absolute,
@@ -852,6 +908,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_sent_bytes_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -859,6 +916,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_uptime_seconds_total".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -866,6 +924,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_workers".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "busy"}),
                     kind: MetricKind::Absolute,
@@ -873,6 +932,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                 },
                 Metric {
                     name: "apache_workers".into(),
+                    namespace: None,
                     timestamp: Some(now),
                     tags: Some(map! {"state" => "idle"}),
                     kind: MetricKind::Absolute,
@@ -908,6 +968,7 @@ ConnsTotal: 1
             metrics,
             vec![Metric {
                 name: "apache_connections".into(),
+                namespace: None,
                 timestamp: Some(now),
                 tags: Some(map! {"state" => "total"}),
                 kind: MetricKind::Absolute,
