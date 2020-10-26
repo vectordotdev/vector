@@ -136,7 +136,7 @@ impl WidgetsState {
     }
 
     /// Listen for an update signal. Used to determine whether the dashboard should redraw.
-    pub async fn listen(&self) -> watch::Receiver<()> {
+    pub fn listen(&self) -> watch::Receiver<()> {
         self.rx.clone()
     }
 

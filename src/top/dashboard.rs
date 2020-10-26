@@ -13,6 +13,7 @@ use std::{
     io::{stdout, Write},
     sync::Arc,
 };
+use tokio::stream::StreamExt;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
@@ -114,8 +115,8 @@ impl Widgets {
     }
 
     /// Listen for state updates. Used to determine when to redraw.
-    async fn listen(&self) {
-        self.state.listen().await;
+    fn listen(&self) -> tokio::sync::watch::Receiver<()> {
+        self.state.listen()
     }
 }
 
@@ -148,9 +149,15 @@ pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error:
     // Clear the screen, readying it for output
     terminal.clear()?;
 
+    // Throttle widgets changes to 250ms, to space out re-draws
+    let widget_listener =
+        tokio::time::throttle(tokio::time::Duration::from_millis(250), widgets.listen());
+
+    tokio::pin!(widget_listener);
+
     loop {
         tokio::select! {
-            _ = widgets.listen() => {
+            _ = widget_listener.next() => {
                 terminal.draw(|f| widgets.draw(f))?;
             },
             k = key_press_rx.recv() => {
