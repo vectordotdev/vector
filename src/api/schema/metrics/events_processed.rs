@@ -31,3 +31,30 @@ impl From<Metric> for EventsProcessedTotal {
         Self(m)
     }
 }
+
+pub struct ComponentEventsProcessedTotal {
+    name: String,
+    metric: Metric,
+}
+
+impl ComponentEventsProcessedTotal {
+    pub fn new(metric: Metric) -> Self {
+        Self {
+            name: metric.tag_value("component_name").unwrap().clone(),
+            metric,
+        }
+    }
+}
+
+#[Object]
+impl ComponentEventsProcessedTotal {
+    /// Component name
+    async fn name(&self) -> String {
+        self.name.clone()
+    }
+
+    /// Events processed total metric
+    async fn metric(&self) -> EventsProcessedTotal {
+        EventsProcessedTotal::new(self.metric.clone())
+    }
+}

@@ -3,7 +3,7 @@ mod events_processed;
 mod host;
 mod uptime;
 
-use crate::event::{Event, Metric};
+use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{capture_metrics, get_controller, Controller};
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
@@ -14,8 +14,9 @@ use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
 pub use bytes_processed::ProcessedBytesTotal;
-pub use events_processed::EventsProcessedTotal;
+pub use events_processed::{ComponentEventsProcessedTotal, EventsProcessedTotal};
 pub use host::HostMetrics;
+use nom::lib::std::collections::BTreeMap;
 pub use uptime::Uptime;
 
 lazy_static! {
@@ -69,6 +70,15 @@ impl MetricsSubscription {
         })
     }
 
+    /// Component events processed metrics. Streams new data as the metric changes
+    async fn component_events_processed_total(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ComponentEventsProcessedTotal> {
+        component_counter_metrics("events_processed_total", interval)
+            .map(|m| ComponentEventsProcessedTotal::new(m))
+    }
+
     /// Bytes processed metrics
     async fn processed_bytes_total(
         &self,
@@ -109,6 +119,20 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
             }
         }
     }
+}
+
+pub fn component_counter_metrics(metric_name: &str, interval: i32) -> impl Stream<Item = Metric> {
+    let mut cache = BTreeMap::new();
+
+    cache
+        .get_metrics(interval)
+        .filter(|m| m.name == metric_name)
+        .filter_map(|m| match m.tag_value("component_name") {
+            Ok(name) => match m.value {
+                MetricValue::Counter { value } if *cache.entry(name).or_insert(value) >= value => m,
+            },
+            _ => None,
+        })
 }
 
 /// Get the events processed by component name
