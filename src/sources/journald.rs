@@ -127,7 +127,8 @@ impl SourceConfig for JournaldConfig {
                 format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
             })?;
 
-        self.source::<Journalctl>(
+        journald_source::<Journalctl>(
+            self,
             out,
             shutdown,
             checkpointer,
@@ -148,56 +149,54 @@ impl SourceConfig for JournaldConfig {
     }
 }
 
-impl JournaldConfig {
-    async fn source<J: JournalStream>(
-        &self,
-        out: Pipeline,
-        shutdown: ShutdownSignal,
-        mut checkpointer: Checkpointer,
-        include_units: HashSet<String>,
-        exclude_units: HashSet<String>,
-        batch_size: usize,
-        remap_priority: bool,
-    ) -> crate::Result<super::Source> {
-        // Retrieve the saved checkpoint, and use it to seek forward in the journald log
-        let cursor = match checkpointer.get().await {
-            Ok(cursor) => cursor,
-            Err(err) => {
-                error!(
-                    message = "Could not retrieve saved journald checkpoint",
-                    error = %err
-                );
-                None
-            }
-        };
+async fn journald_source<J: JournalStream>(
+    config: &JournaldConfig,
+    out: Pipeline,
+    shutdown: ShutdownSignal,
+    mut checkpointer: Checkpointer,
+    include_units: HashSet<String>,
+    exclude_units: HashSet<String>,
+    batch_size: usize,
+    remap_priority: bool,
+) -> crate::Result<super::Source> {
+    // Retrieve the saved checkpoint, and use it to seek forward in the journald log
+    let cursor = match checkpointer.get().await {
+        Ok(cursor) => cursor,
+        Err(err) => {
+            error!(
+                message = "Could not retrieve saved journald checkpoint",
+                error = %err
+            );
+            None
+        }
+    };
 
-        let (journal, close) = J::new(self, cursor)?;
-        let journald_server = JournaldServer {
-            journal: Box::pin(journal),
-            include_units,
-            exclude_units,
-            out,
-            checkpointer,
-            batch_size,
-            remap_priority,
-        };
+    let (journal, close) = J::new(config, cursor)?;
+    let journald_server = JournaldServer {
+        journal: Box::pin(journal),
+        include_units,
+        exclude_units,
+        out,
+        checkpointer,
+        batch_size,
+        remap_priority,
+    };
 
-        Ok(Box::new(
-            async move {
-                info!(message = "Starting journald server.",);
-                journald_server.run().await;
-                Ok(())
-            }
-            .instrument(info_span!("journald-server"))
-            .boxed()
-            .compat()
-            .select(Box::new(
-                shutdown.map(move |_| close()).unit_error().boxed().compat(),
-            ))
-            .map(|_| ())
-            .map_err(|_| ()),
+    Ok(Box::new(
+        async move {
+            info!(message = "Starting journald server.",);
+            journald_server.run().await;
+            Ok(())
+        }
+        .instrument(info_span!("journald-server"))
+        .boxed()
+        .compat()
+        .select(Box::new(
+            shutdown.map(move |_| close()).unit_error().boxed().compat(),
         ))
-    }
+        .map(|_| ())
+        .map_err(|_| ()),
+    ))
 }
 
 fn create_event(record: Record) -> Event {
@@ -630,18 +629,18 @@ mod tests {
         }
 
         let config = JournaldConfig::default();
-        let source = config
-            .source::<FakeJournal>(
-                tx,
-                shutdown,
-                checkpointer,
-                include_units,
-                exclude_units,
-                DEFAULT_BATCH_SIZE,
-                true,
-            )
-            .await
-            .expect("Creating journald source failed");
+        let source = journald_source::<FakeJournal>(
+            &config,
+            tx,
+            shutdown,
+            checkpointer,
+            include_units,
+            exclude_units,
+            DEFAULT_BATCH_SIZE,
+            true,
+        )
+        .await
+        .expect("Creating journald source failed");
         tokio::spawn(source.compat());
 
         delay_for(Duration::from_millis(100)).await;
