@@ -154,7 +154,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     // can only fail if receiving end disconnected, so we are shutting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed.");
-                                    error!(message = "Tried to send the following event.", ?e);
+                                    error!(message = "Error sending event.", error = ?e);
                                     warp::reject::custom(RejectShuttingDown)
                                 })
                                 .map_ok(|_| warp::reply())

@@ -46,7 +46,7 @@ pub fn udp(
     mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    let mut out = out.sink_map_err(|e| error!(message = "Error sending event.", ?e));
+    let mut out = out.sink_map_err(|e| error!(message = "Error sending event.", error = ?e));
 
     Box::new(
         async move {

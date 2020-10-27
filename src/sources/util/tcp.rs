@@ -30,7 +30,7 @@ async fn make_listener(
         SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
             Ok(listener) => Some(listener),
             Err(err) => {
-                error!(message = "Failed to bind to listener socket.", ?err);
+                error!(message = "Failed to bind to listener socket.", error = ?err);
                 None
             }
         },
@@ -38,7 +38,7 @@ async fn make_listener(
             Ok(Some(listener)) => match TcpListener::from_std(listener) {
                 Ok(listener) => Some(listener.into()),
                 Err(err) => {
-                    error!(message = "Failed to bind to listener socket.", ?err);
+                    error!(message = "Failed to bind to listener socket.", error = ?err);
                     None
                 }
             },
@@ -47,7 +47,7 @@ async fn make_listener(
                 None
             }
             Err(err) => {
-                error!(message = "Failed to take listen FD.", ?err);
+                error!(message = "Failed to take listen FD.", error = ?err);
                 None
             }
         },
@@ -72,7 +72,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|e| error!(message = "Error sending event.", ?e));
+        let out = out.sink_map_err(|e| error!(message = "Error sending event.", error = ?e));
 
         let listenfd = ListenFd::from_env();
 
