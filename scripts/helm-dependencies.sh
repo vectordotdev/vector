@@ -41,8 +41,7 @@ update() {
     rm -rf "$CHART_VENDORED_DEPENDENCIES_PATH"
     mkdir -p "$CHART_VENDORED_DEPENDENCIES_PATH"
 
-    mapfile -t DEPENDENCIES < <(list-chart-dependencies "$CHART_PATH")
-    for DEPENDENCY_PAIR in "${DEPENDENCIES[@]}"; do
+    while IFS= read -r DEPENDENCY_PAIR; do
       read -ra KV <<<"$DEPENDENCY_PAIR"
       DEPENDENCY_NAME="${KV[0]}"
       DEPENDENCY_PATH="${KV[1]}"
@@ -52,7 +51,7 @@ update() {
 
       echo "Symlinking \"$DEPENDENCY_NAME\" with name \"$LINK_NAME\" and target \"$LINK_TARGET\"..."
       ln -sfn -T "$LINK_TARGET" "$LINK_NAME"
-    done
+    done < <(list-chart-dependencies "$CHART_PATH")
   done
 }
 
@@ -63,8 +62,7 @@ validate() {
     CHART_PATH="distribution/helm/$CHART"
     CHART_VENDORED_DEPENDENCIES_PATH="$CHART_PATH/charts"
 
-    mapfile -t DEPENDENCIES < <(list-chart-dependencies "$CHART_PATH")
-    for DEPENDENCY_PAIR in "${DEPENDENCIES[@]}"; do
+    while IFS= read -r DEPENDENCY_PAIR; do
       read -ra KV <<<"$DEPENDENCY_PAIR"
       DEPENDENCY_NAME="${KV[0]}"
       DEPENDENCY_PATH="${KV[1]}"
@@ -74,7 +72,7 @@ validate() {
 
       echo "Validating \"$DEPENDENCY_NAME\" at \"$VENDORED_PATH\" against \"$UPSTREAM_PATH\"..."
       diff -qr "$VENDORED_PATH" "$UPSTREAM_PATH"
-    done
+    done < <(list-chart-dependencies "$CHART_PATH")
   done
 }
 
