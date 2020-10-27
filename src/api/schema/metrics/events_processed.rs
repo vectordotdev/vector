@@ -39,10 +39,11 @@ pub struct ComponentEventsProcessedTotal {
 
 impl ComponentEventsProcessedTotal {
     pub fn new(metric: Metric) -> Self {
-        Self {
-            name: metric.tag_value("component_name").unwrap().clone(),
-            metric,
-        }
+        let name = metric.tag_value("component_name").expect(
+            "Returned a metric without a `component_name`, which shouldn't happen. Please report.",
+        );
+
+        Self { name, metric }
     }
 }
 

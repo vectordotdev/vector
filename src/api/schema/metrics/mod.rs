@@ -76,7 +76,7 @@ impl MetricsSubscription {
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ComponentEventsProcessedTotal> {
         component_counter_metrics("events_processed_total", interval)
-            .map(|m| ComponentEventsProcessedTotal::new(m))
+            .map(ComponentEventsProcessedTotal::new)
     }
 
     /// Bytes processed metrics

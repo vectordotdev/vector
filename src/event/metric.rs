@@ -255,9 +255,7 @@ impl Metric {
 
     /// Returns the string value of a tag, if it exists
     pub fn tag_value(&self, name: &str) -> Option<String> {
-        self.tags
-            .as_ref()
-            .and_then(|t| t.get(name).map(|v| v.clone()))
+        self.tags.as_ref().and_then(|t| t.get(name).cloned())
     }
 }
 
