@@ -9,8 +9,16 @@
     ],
     "env": {
         "VECTOR_TOML_URL": {
-            "description": "The URL of the `vector.toml` you use to use. (Refreshed on restart! For static, provision a `vector.toml` with your app.)",
+            "description": "The URL of the `vector.toml` you use to use. (Refreshed on restart! For static, provision a `vector.toml` with your app.",
             "required": false
+        },
+        "LOGPLEX_AUTH_USERNAME": {
+            "description": "The unique, private `user` part of `heroku drains:add https://user:pass@mylogdrain.herokuapp.com/logs -a myapp`.",
+            "required": true
+        },
+        "LOGPLEX_AUTH_PASSWORD": {
+            "description": "The unique, private `pass` part of `heroku drains:add https://user:pass@mylogdrain.herokuapp.com/logs -a myapp`.",
+            "required": true
         }
     },
     "formation": {

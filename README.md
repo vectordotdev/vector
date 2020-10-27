@@ -190,10 +190,10 @@ Want to spin one up? Hit the button and fill in the boxes.
 
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/heroku-button&env[VECTOR_TOML_URL]=https://raw.githubusercontent.com/timberio/vector-heroku-buildpack/master/vector.toml)
 
-Then:
+Then, from your console, set up the log drain to sink to Vector:
 
 ```bash
-heroku drains:add https://${VECTOR_INSTANCE_NAME}.herokuapp.com/events -a ${YOUR_APP}
+heroku drains:add https://${LOGPLEX_AUTH_USERNAME}:${LOGPLEX_AUTH_PASSWORD}@${VECTOR_INSTANCE_NAME}.herokuapp.com/events -a ${YOUR_APP}
 ```
 
 ## Latest Highlights
