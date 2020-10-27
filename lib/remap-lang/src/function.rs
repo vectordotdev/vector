@@ -7,6 +7,9 @@ pub enum Error {
     #[error(r#"expected expression argument, got regex"#)]
     ArgumentExprRegex,
 
+    #[error(r#"expected regex argument, got expression"#)]
+    ArgumentRegexExpr,
+
     #[error(r#"missing required argument "{0}""#)]
     Required(String),
 }
@@ -65,6 +68,11 @@ impl ArgumentList {
             .and_then(|v| v.try_into().map_err(Into::into))
     }
 
+    pub fn required_regex(&mut self, keyword: &str) -> Result<regex::Regex> {
+        self.required(keyword)
+            .and_then(|v| v.try_into().map_err(Into::into))
+    }
+
     pub fn keywords(&self) -> Vec<&'static str> {
         self.0.keys().copied().collect::<Vec<_>>()
     }
@@ -87,6 +95,17 @@ impl TryInto<Box<dyn Expression>> for Argument {
         match self {
             Argument::Expression(expr) => Ok(expr),
             Argument::Regex(_) => Err(Error::ArgumentExprRegex),
+        }
+    }
+}
+
+impl TryInto<regex::Regex> for Argument {
+    type Error = Error;
+
+    fn try_into(self) -> std::result::Result<regex::Regex, Self::Error> {
+        match self {
+            Argument::Regex(regex) => Ok(regex),
+            Argument::Expression(_) => Err(Error::ArgumentRegexExpr),
         }
     }
 }
