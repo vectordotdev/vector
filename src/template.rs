@@ -1,4 +1,4 @@
-use crate::{config::log_schema, event::{Value, Lookup}, Event};
+use crate::{config::log_schema, event::{Value, Lookup, LookupBuf}, Event};
 use bytes::Bytes;
 use chrono::{
     format::{strftime::StrftimeItems, Item},

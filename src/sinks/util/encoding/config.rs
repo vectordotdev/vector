@@ -34,12 +34,12 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn codec(&self) -> &E {
         &self.codec
     }
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn only_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
-        &self.only_fields
+
+    fn only_fields(&self) -> &Option<Vec<LookupBuf>> {
+        self.only_fields.borrow()
     }
-    fn except_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
-        &self.except_fields
+    fn except_fields(&self) -> &Option<Vec<LookupBuf>> {
+        self.except_fields.borrow()
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
         &self.timestamp_format

@@ -81,6 +81,8 @@ impl Function for OnlyFields {
 
         let keys: Vec<LookupBuf> = target_log
             .keys()
+            .map(|v| LookupBuf::from_str(v)
+                .expect("Got an invalid Lookup while iterating internally over an EventLog. This is an invariant. Please report it."))
             .filter(|k| {
                 self.paths
                     .iter()

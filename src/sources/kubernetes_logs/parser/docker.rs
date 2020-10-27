@@ -31,12 +31,12 @@ impl Transform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent) -> Option<()> {
-    let to_parse = log.remove(log_schema().message_key())?.as_bytes();
+    let to_parse = log.remove(log_schema().message_key(), false)?.as_bytes();
 
     match serde_json::from_slice(to_parse.as_ref()) {
         Ok(JsonValue::Object(object)) => {
             for (key, value) in object {
-                log.insert_flat(key, value);
+                log.insert(LookupBuf::from(key), value);
             }
             Some(())
         }
@@ -51,17 +51,17 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
-    let time = log.remove(&*TIME).context(TimeFieldMissing)?;
+    let time = log.remove(&*TIME, false).context(TimeFieldMissing)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
     };
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsing)?;
-    log.insert(log_schema().timestamp_key(), time.with_timezone(&Utc));
+    log.insert(log_schema().timestamp_key().into_buf(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(&*LOG).context(LogFieldMissing)?;
+    let message = log.remove(&*LOG, false).context(LogFieldMissing)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),

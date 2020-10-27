@@ -6,6 +6,7 @@ use crate::{
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,
+    event::{Lookup, LookupBuf},
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +29,7 @@ pub struct HumioLogsConfig {
     event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
-    #[derivative(default = "default_host_key()")]
+    #[derivative(Default(value = "default_host_key()"))]
     host_key: LookupBuf,
 
     #[serde(default)]
@@ -41,8 +42,8 @@ pub struct HumioLogsConfig {
     batch: BatchConfig,
 }
 
-fn default_host_key() -> String {
-    crate::config::LogSchema::default().host_key().to_string()
+fn default_host_key() -> LookupBuf {
+    crate::config::LogSchema::default().host_key().into_buf()
 }
 
 inventory::submit! {

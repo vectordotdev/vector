@@ -149,6 +149,11 @@ impl<'a> Lookup<'a> {
     pub fn extend(&mut self, other: Self) {
         self.segments.extend(other.segments)
     }
+
+    /// Returns `true` if `needle` is a prefix of the lookup.
+    pub fn starts_with<'b>(&self, needle: Lookup<'b>) -> bool {
+        self.segments.starts_with(&needle.segments)
+    }
 }
 
 impl<'a> IntoIterator for Lookup<'a> {

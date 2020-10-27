@@ -85,7 +85,7 @@ impl CompiledRegex {
             .enumerate()
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
-                    let conv = types.get(cn).unwrap_or(&Conversion::Bytes);
+                    let conv = types.get(Lookup::from(cn)).unwrap_or(&Conversion::Bytes);
                     let name = cn.to_string();
                     (idx, name, conv.clone())
                 })
@@ -140,7 +140,7 @@ impl RegexParser {
         let field = config
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().to_buf());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {

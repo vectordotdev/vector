@@ -26,7 +26,9 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/event.proto.rs"));
 }
 
-pub const PARTIAL: &str = "_partial";
+lazy_static::lazy_static! {
+    static ref PARTIAL: LookupBuf = LookupBuf::from("_partial");
+}
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Event {

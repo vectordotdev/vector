@@ -41,7 +41,11 @@ use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
 
 /// The key we use for `file` field.
-const FILE_KEY: &str = "file";
+
+
+lazy_static::lazy_static! {
+    pub static ref FILE_KEY: LookupBuf = LookupBuf::from("file");
+}
 
 /// The `self_node_name` value env var key.
 const SELF_NODE_NAME_ENV_KEY: &str = "VECTOR_SELF_NODE_NAME";

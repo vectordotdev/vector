@@ -156,8 +156,8 @@ fn line_to_event(line: String) -> Event {
 
         log.insert(log_schema().host_key(), hostname.to_owned());
 
-        log.insert("app_name", app_name.to_owned());
-        log.insert("proc_id", proc_id.to_owned());
+        log.insert(LookupBuf::from("app_name"), app_name.to_owned());
+        log.insert(LookupBuf::from("proc_id"), proc_id.to_owned());
 
         event
     } else {

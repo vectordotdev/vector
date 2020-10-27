@@ -4,7 +4,7 @@
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::{
-    event::{LogEvent, LookupBuf, Lookup},
+    event::{LogEvent, LookupBuf, Lookup, Segment},
     kubernetes as k8s, Event,
 };
 use evmap::ReadHandle;
@@ -93,7 +93,7 @@ fn annotate_from_file_info(
     file_info: &LogFileInfo<'_>,
 ) {
     log.insert(
-        &fields_spec.container_name,
+        fields_spec.container_name.clone(),
         file_info.container_name.to_owned(),
     );
 }
@@ -113,10 +113,10 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
 
     if let Some(labels) = &metadata.labels {
         // Calculate and cache the prefix path.
-        let prefix_path = Lookup::from(fields_spec.pod_labels.as_ref());
+        let prefix_path = fields_spec.pod_labels;
         for (key, val) in labels.iter() {
             let mut path = prefix_path.clone();
-            path.push(key);
+            path.push(Segment::field(key));
             log.insert(path, val.to_owned());
         }
     }
@@ -125,7 +125,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
 fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
     for (ref key, ref val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.clone(), val.to_owned());
         }
     }
 }
@@ -133,7 +133,7 @@ fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec
 fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
     for (ref key, ref val) in [(&fields_spec.container_image, &container.image)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.clone(), val.to_owned());
         }
     }
 }

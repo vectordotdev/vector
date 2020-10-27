@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event, LogEvent, Value},
+    event::{self, Event, LookupBuf, LogEvent, Value},
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
         Transform,
@@ -7,7 +7,10 @@ use crate::{
 };
 use snafu::{OptionExt, Snafu};
 
-pub const MULTILINE_TAG: &str = "multiline_tag";
+lazy_static::lazy_static! {
+    pub static ref MULTILINE_TAG: LookupBuf = LookupBuf::from("multiline_tag");
+}
+
 
 /// Parser for the CRI log format.
 ///
@@ -67,7 +70,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(event::PARTIAL, true);
+        log.insert(event::PARTIAL.clone(), true);
     }
 
     Ok(())

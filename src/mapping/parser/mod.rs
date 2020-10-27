@@ -455,8 +455,8 @@ fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
-        Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair).into_iter().map(LookupBuf::from).collect()?))),
-        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair).into_iter().map(LookupBuf::from).collect()?))),
+        Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair).into_iter().map(LookupBuf::from_str).collect()?))),
+        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair).into_iter().map(LookupBuf::from_str).collect()?))),
         Rule::merge => merge_function_from_pair(pair),
         _ => unexpected_parser_sytax!(pair),
     }

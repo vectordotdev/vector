@@ -46,8 +46,8 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
-    fn only_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>>;
-    fn except_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>>;
+    fn only_fields(&self) -> &Option<Vec<LookupBuf>>;
+    fn except_fields(&self) -> &Option<Vec<LookupBuf>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;
 
     fn apply_only_fields(&self, event: &mut Event) {
@@ -57,10 +57,10 @@ pub trait EncodingConfiguration<E> {
                     let to_remove = log_event
                         .keys()
                         .filter(|field| {
-                            let field_path = PathIter::new(field).collect::<Vec<_>>();
+                            let field_path = LookupBuf::from_str(field)
+                                .expect("Got invalid Lookup from an EventLog iteration. This is an invariant. Please report it."); 
                             !only_fields.iter().any(|only| {
-                                // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-                                field_path.starts_with(&only[..])
+                                field_path.starts_with(only)
                             })
                         })
                         .collect::<VecDeque<_>>();

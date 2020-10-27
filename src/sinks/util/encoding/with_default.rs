@@ -48,10 +48,10 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
-    fn only_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
+    fn only_fields(&self) -> &Option<Vec<LookupBuf>> {
         &self.only_fields
     }
-    fn except_fields<'a>(&self) -> &'a Option<Vec<LookupBuf>> {
+    fn except_fields(&self) -> &Option<Vec<LookupBuf>> {
         &self.except_fields
     }
     fn timestamp_format(&self) -> &Option<TimestampFormat> {
