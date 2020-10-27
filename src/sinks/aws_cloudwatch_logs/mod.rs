@@ -199,7 +199,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let sink = {
             let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
             let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}.", e))
+                .sink_map_err(|error| error!("Fatal cloudwatchlogs sink error.", ?error))
                 .with_flat_map(move |event| {
                     iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
                 });

@@ -109,7 +109,7 @@ impl SinkConfig for StatsdSinkConfig {
                     batch.timeout,
                     cx.acker(),
                 )
-                .sink_map_err(|e| error!("Fatal statsd sink error: {}.", e))
+                .sink_map_err(|error| error!("Fatal statsd sink error.", ?error))
                 .with_flat_map(move |event| {
                     stream::iter_ok(encode_event(event, namespace.as_deref()))
                 });
