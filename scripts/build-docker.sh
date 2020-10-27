@@ -39,7 +39,7 @@ build() {
       --platform="$PLATFORM" \
       --tag "$TAG" \
       target/artifacts \
-      -f "$DOCKERFILE" ${PUSH:+--push}
+      -f "$DOCKERFILE" "${PUSH:+--push}"
   else
     docker build \
       --tag "$TAG" \

@@ -212,7 +212,6 @@ _values: {
 #EnvVars: #Schema & {[Type=string]: {
 	common:   true
 	required: false
-	type: string: default: null
 }}
 
 #Event: {

@@ -42,7 +42,6 @@ impl Regex {
         &self.compiled
     }
 
-    #[allow(dead_code)]
     pub fn is_global(&self) -> bool {
         self.global
     }
