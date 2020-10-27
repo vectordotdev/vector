@@ -189,7 +189,7 @@ build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vect
 
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- graphql-schema --no-default-features --features=default-no-api-client
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
 
 ##@ Cross Compiling
 .PHONY: cross-enable
