@@ -187,7 +187,23 @@ We taught [Vic](https://vector.dev/vic/) how to deploy Vector on Heroku! What a 
 
 Want to spin one up? Hit the button and fill in the boxes.
 
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/heroku-button&env[VECTOR_TOML_URL]=https://raw.githubusercontent.com/timberio/vector-heroku-buildpack/master/vector.toml)
+[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/heroku-button)
+
+Next, create a `./vector.toml` and start it with:
+
+```toml
+# ./vector.toml
+
+[sources.heroku]
+  type = "logplex"
+  address = "0.0.0.0:${PORT}"
+  # You can leave these as is!
+  # Heroku will set the environment variables that you filled while deploying.
+  auth.username = "${LOGPLEX_AUTH_USERNAME}"
+  auth.password = "${LOGPLEX_AUTH_PASSWORD}"
+
+# Now, feed the logplex elsewhere! https://vector.dev/guides/#/guides/integrate/sinks
+```
 
 Then, from your console, set up the log drain to sink to Vector:
 
