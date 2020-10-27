@@ -40,10 +40,9 @@ impl<'a> std::iter::Iterator for MapFlatten<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(ref mut inner) = self.inner {
             let next = inner.next();
-            if next.is_some() {
-                return next;
-            } else {
-                self.inner = None;
+            match next {
+                Some(_) => return next,
+                None => self.inner = None,
             }
         }
 
@@ -64,43 +63,45 @@ impl<'a> std::iter::Iterator for MapFlatten<'a> {
 
 /// Create an iterator that can walk a tree of Array values.
 /// This can be used to flatten the array.
-struct ValueFlatten<'a> {
+struct ArrayFlatten<'a> {
     values: std::slice::Iter<'a, Value>,
-    inner: Option<Box<ValueFlatten<'a>>>,
+    inner: Option<Box<ArrayFlatten<'a>>>,
 }
 
-impl<'a> ValueFlatten<'a> {
+impl<'a> ArrayFlatten<'a> {
     fn new(values: std::slice::Iter<'a, Value>) -> Self {
-        ValueFlatten {
+        ArrayFlatten {
             values,
             inner: None,
         }
     }
 }
 
-impl<'a> std::iter::Iterator for ValueFlatten<'a> {
+impl<'a> std::iter::Iterator for ArrayFlatten<'a> {
     type Item = &'a Value;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Iterate over our inner list first.
         if let Some(ref mut inner) = self.inner {
             let next = inner.next();
-            if next.is_some() {
-                return next;
-            } else {
-                // The inner list has been exhausted.
-                self.inner = None;
+            match next {
+                Some(_) => return next,
+                None => {
+                    // The inner list has been exhausted.
+                    self.inner = None;
+                }
             }
         }
 
         // Then iterate over our values.
         let next = self.values.next();
-        if let Some(Value::Array(next)) = next {
-            // Create a new iterator for this child list.
-            self.inner = Some(Box::new(ValueFlatten::new(next.iter())));
-            self.next()
-        } else {
-            next
+        match next {
+            Some(Value::Array(next)) => {
+                // Create a new iterator for this child list.
+                self.inner = Some(Box::new(ArrayFlatten::new(next.iter())));
+                self.next()
+            }
+            _ => next,
         }
     }
 }
@@ -121,7 +122,7 @@ impl Function for FlattenFn {
     fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = required_value!(ctx, self.value,
         Value::Array(arr) => Value::Array(
-            ValueFlatten::new(arr.iter()).cloned().collect()
+            ArrayFlatten::new(arr.iter()).cloned().collect()
         ),
         Value::Map(map) => Value::Map(
             MapFlatten::new(map.iter()).map(|(k, v)| (k, v.clone())).collect()
@@ -339,8 +340,8 @@ mod test {
                     let mut event = Event::from("");
                     let map = json!(
                         {"parent1": { "child1": { "grandchild1": 1 },
-                                       "child2": { "grandchild2": 2,
-                                                    "grandchild3": 3 }
+                                      "child2": { "grandchild2": 2,
+                                                  "grandchild3": 3 }
                         },
                          "parent2": 4}
                     );
