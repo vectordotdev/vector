@@ -12,12 +12,9 @@ titleOnly: true
 
 types:
   - chore               # An internal change this is not observable by users.
-  - docs                # Any user observable documentation change.
   - enhancement         # Any user observable enhancement to an existing feature.
   - feat                # Any user observable new feature, such as a new platform, source, transform, or sink.
   - fix                 # Any user observable bug fix.
-  - perf                # Any user observable performance improvement.
-  - status              # A status change to a Vector component.
 
 scopes:
   - new source
@@ -42,6 +39,7 @@ scopes:
   - extensions # Anything related to extending Vector (WASM, plugins, etc.)
   - external docs # Anything related to Vector's external, public documentation
   - filtering # Anything related to filtering within Vector
+  - graphql api # Anything related to Vector's GraphQL API
   - healthchecks # Anything related to Vector's healtchecks
   - internal docs # Anything related to Vector's internal documentation
   - logs # Anything related to Vector's log events
@@ -115,15 +113,17 @@ scopes:
 
   # sources
   - apache_metrics source # Anything `apache_metrics` source related
+  - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - docker source # Anything `docker` source related
   - file source # Anything `file` source related
   - generator source # Anything `generator` source related
+  - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
   - journald source # Anything `journald` source related
   - kafka source # Anything `kafka` source related
   - kubernetes_logs source # Anything `kubernetes_logs` source related
   - logplex source # Anything `logplex` source related
-  - mongodb_metrics # Anything `mongodb_metrics` source related
+  - mongodb_metrics source # Anything `mongodb_metrics` source related
   - prometheus source # Anything `prometheus` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related
@@ -181,6 +181,7 @@ scopes:
   - honeycomb sink # Anything `honeycomb` sink related
   - http sink # Anything `http` sink related
   - humio_logs sink # Anything `humio_logs` sink related
+  - humio_metrics sink # Anything `humio_metrics` sink related
   - influxdb_logs sink # Anything `influxdb_logs` sink related
   - influxdb_metrics sink # Anything `influxdb_metrics` sink related
   - kafka sink # Anything `kafka` sink related
@@ -191,6 +192,7 @@ scopes:
   - prometheus sink # Anything `prometheus` sink related
   - pulsar sink # Anything `pulsar` sink related
   - sematext_logs sink # Anything `sematext_logs` sink related
+  - sematext_metrics sink # Anything `sematext_metrics` sink related
   - socket sink # Anything `socket` sink related
   - splunk_hec sink # Anything `splunk_hec` sink related
   - statsd sink # Anything `statsd` sink related
