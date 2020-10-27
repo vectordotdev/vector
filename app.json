@@ -19,7 +19,7 @@
         "VECTOR_TOML_URL": {
             "description": "It is preferable for you to provision a `vector.toml` with your app. But, if you need, you can enter a URL here instead and Vector will pull it each deploy.",
             "required": false
-        },
+        }
     },
     "formation": {
         "web": {
