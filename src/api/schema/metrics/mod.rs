@@ -137,3 +137,29 @@ pub fn component_events_processed_total(component_name: String) -> Option<Events
         })
         .map(|ev| EventsProcessedTotal::new(ev.into_metric()))
 }
+
+/// Returns a stream of metrics, where `metric_name` matches the name of the metric
+/// (e.g. "events_processed"), and the value is derived from `MetricValue::Counter`. Uses a
+/// local cache to match against the `component_name` of a metric, to return results only when
+/// the value of a current iteration is greater than the previous. This is useful for the client
+/// to be notified as metrics increase without returning 'empty' or identical results.
+pub fn component_counter_metrics(
+    metric_name: &'static str,
+    interval: i32,
+) -> impl Stream<Item = Metric> {
+    let mut cache = BTreeMap::new();
+
+    get_metrics(interval)
+        .filter(move |m| m.name == metric_name)
+        .filter_map(move |m| match m.tag_value("component_name") {
+            Some(name) => match m.value {
+                MetricValue::Counter { value }
+                    if cache.insert(name, value).unwrap_or(0.00) < value =>
+                {
+                    Some(m)
+                }
+                _ => None,
+            },
+            _ => None,
+        })
+}
