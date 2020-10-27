@@ -1,7 +1,5 @@
-use super::util::MultilineConfig;
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    dns::Resolver,
+    config::log_schema,
     event::Event,
     internal_events::aws_s3::source::{
         SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
@@ -9,7 +7,6 @@ use crate::{
         SqsS3EventRecordIgnoredInvalidEvent,
     },
     line_agg::{self, LineAgg},
-    rusoto::{self, RegionOrEndpoint},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -18,7 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use codec::BytesDelimitedCodec;
 use futures::{
     compat::{Compat, Future01CompatExt},
-    future::{FutureExt, TryFutureExt},
+    future::TryFutureExt,
     stream::{Stream, StreamExt},
 };
 use futures01::Sink;
@@ -34,53 +31,9 @@ use std::{convert::TryInto, time::Duration};
 use tokio::{select, time};
 use tokio_util::codec::FramedRead;
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-enum Compression {
-    Auto,
-    None,
-    Gzip,
-    Zstd,
-}
-
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::Auto
-    }
-}
-
-#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum Strategy {
-    Sqs,
-}
-
-impl Default for Strategy {
-    fn default() -> Self {
-        Strategy::Sqs
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default, deny_unknown_fields)]
-struct AwsS3Config {
-    #[serde(flatten)]
-    region: RegionOrEndpoint,
-
-    compression: Compression,
-
-    strategy: Strategy,
-
-    sqs: Option<SqsConfig>,
-
-    assume_role: Option<String>,
-
-    multiline: Option<MultilineConfig>,
-}
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct SqsConfig {
+pub struct Config {
     queue_name: String,
     queue_owner: Option<String>,
     #[serde(default = "default_poll_interval_secs")]
@@ -102,98 +55,8 @@ const fn default_true() -> bool {
     true
 }
 
-inventory::submit! {
-    SourceDescription::new::<AwsS3Config>("aws_s3")
-}
-
-impl_generate_config_from_default!(AwsS3Config);
-
-#[async_trait::async_trait]
-#[typetag::serde(name = "aws_s3")]
-impl SourceConfig for AwsS3Config {
-    async fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        shutdown: ShutdownSignal,
-        out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        let multiline_config: Option<line_agg::Config> = self
-            .multiline
-            .as_ref()
-            .map(|config| config.try_into())
-            .map_or(Ok(None), |r| r.map(Some))?;
-
-        match self.strategy {
-            Strategy::Sqs => Ok(Box::new(
-                self.create_sqs_ingestor(multiline_config)
-                    .await?
-                    .run(out, shutdown)
-                    .boxed()
-                    .compat(),
-            )),
-        }
-    }
-
-    fn output_type(&self) -> DataType {
-        DataType::Log
-    }
-
-    fn source_type(&self) -> &'static str {
-        "aws_s3"
-    }
-}
-
-impl AwsS3Config {
-    async fn create_sqs_ingestor(
-        &self,
-        multiline: Option<line_agg::Config>,
-    ) -> Result<SqsIngestor, CreateSqsIngestorError> {
-        match self.sqs {
-            Some(ref sqs) => {
-                let region: Region = (&self.region).try_into().context(RegionParse {})?;
-                let resolver = Resolver;
-
-                let client = rusoto::client(resolver).with_context(|| Client {})?;
-                let creds: std::sync::Arc<rusoto::AwsCredentialsProvider> =
-                    rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())
-                        .context(Credentials {})?
-                        .into();
-                let sqs_client = SqsClient::new_with(client.clone(), creds.clone(), region.clone());
-                let s3_client = S3Client::new_with(client.clone(), creds.clone(), region.clone());
-
-                SqsIngestor::new(
-                    region.clone(),
-                    sqs_client,
-                    s3_client,
-                    sqs.clone(),
-                    self.compression,
-                    multiline,
-                )
-                .await
-                .context(Initialize {})
-            }
-            None => Err(CreateSqsIngestorError::ConfigMissing {}),
-        }
-    }
-}
-
 #[derive(Debug, Snafu)]
-enum CreateSqsIngestorError {
-    #[snafu(display("Unable to initialize: {}", source))]
-    Initialize { source: SqsIngestorNewError },
-    #[snafu(display("Unable to create AWS client: {}", source))]
-    Client { source: crate::Error },
-    #[snafu(display("Unable to create AWS credentials provider: {}", source))]
-    Credentials { source: crate::Error },
-    #[snafu(display("sqs configuration required when strategy=sqs"))]
-    ConfigMissing,
-    #[snafu(display("could not parse region configuration: {}", source))]
-    RegionParse { source: rusoto::region::ParseError },
-}
-
-#[derive(Debug, Snafu)]
-enum SqsIngestorNewError {
+pub enum IngestorNewError {
     #[snafu(display("Unable to fetch queue URL for {}: {}", name, source))]
     FetchQueueUrl {
         source: RusotoError<GetQueueUrlError>,
@@ -245,14 +108,14 @@ pub enum ProcessingError {
     },
 }
 
-struct SqsIngestor {
+pub struct Ingestor {
     region: Region,
 
     s3_client: S3Client,
     sqs_client: SqsClient,
 
     multiline: Option<line_agg::Config>,
-    compression: Compression,
+    compression: super::Compression,
 
     queue_url: String,
     poll_interval: Duration,
@@ -260,15 +123,15 @@ struct SqsIngestor {
     delete_message: bool,
 }
 
-impl SqsIngestor {
-    async fn new(
+impl Ingestor {
+    pub async fn new(
         region: Region,
         sqs_client: SqsClient,
         s3_client: S3Client,
-        config: SqsConfig,
-        compression: Compression,
+        config: Config,
+        compression: super::Compression,
         multiline: Option<line_agg::Config>,
-    ) -> Result<SqsIngestor, SqsIngestorNewError> {
+    ) -> Result<Ingestor, IngestorNewError> {
         let queue_url_result = sqs_client
             .get_queue_url(GetQueueUrlRequest {
                 queue_name: config.queue_name.clone(),
@@ -283,7 +146,7 @@ impl SqsIngestor {
 
         let queue_url = queue_url_result
             .queue_url
-            .ok_or(SqsIngestorNewError::MissingQueueUrl {
+            .ok_or(IngestorNewError::MissingQueueUrl {
                 name: config.queue_name.clone(),
                 owner: config.queue_owner.clone(),
             })?;
@@ -299,7 +162,7 @@ impl SqsIngestor {
                     timeout: config.visibility_timeout_secs,
                 })?;
 
-        Ok(SqsIngestor {
+        Ok(Ingestor {
             region,
 
             s3_client,
@@ -315,7 +178,7 @@ impl SqsIngestor {
         })
     }
 
-    async fn run(self, out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub async fn run(self, out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut interval = time::interval(self.poll_interval).map(|_| ());
 
         loop {
@@ -458,7 +321,7 @@ impl SqsIngestor {
 
         match object.body {
             Some(body) => {
-                let r = s3_object_decoder(
+                let r = super::s3_object_decoder(
                     self.compression,
                     &s3_event.s3.object.key,
                     object.content_encoding.as_deref(),
@@ -569,80 +432,6 @@ impl SqsIngestor {
     }
 }
 
-fn s3_object_decoder(
-    compression: Compression,
-    key: &str,
-    content_encoding: Option<&str>,
-    content_type: Option<&str>,
-    body: rusoto_s3::StreamingBody,
-) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    use async_compression::tokio_02::bufread;
-
-    let r = tokio::io::BufReader::new(body.into_async_read());
-
-    let mut compression = compression;
-    if let Auto = compression {
-        compression =
-            determine_compression(key, content_encoding, content_type).unwrap_or(Compression::None);
-    };
-
-    use Compression::*;
-    match compression {
-        Auto => unreachable!(), // is mapped above
-        None => Box::new(r),
-        Gzip => Box::new(bufread::GzipDecoder::new(r)),
-        Zstd => Box::new(bufread::ZstdDecoder::new(r)),
-    }
-}
-
-/// try to determine the compression given the:
-/// * content-encoding
-/// * content-type
-/// * key name (for file extension)
-///
-/// It will use this information in this order
-fn determine_compression(
-    key: &str,
-    content_encoding: Option<&str>,
-    content_type: Option<&str>,
-) -> Option<Compression> {
-    content_encoding
-        .and_then(|e| content_encoding_to_compression(e))
-        .or_else(|| content_type.and_then(|t| content_type_to_compression(t)))
-        .or_else(|| object_key_to_compression(key))
-}
-
-fn content_encoding_to_compression(content_encoding: &str) -> Option<Compression> {
-    use Compression::*;
-    match content_encoding {
-        "gzip" => Some(Gzip),
-        "zstd" => Some(Zstd),
-        _ => Option::None,
-    }
-}
-
-fn content_type_to_compression(content_type: &str) -> Option<Compression> {
-    use Compression::*;
-    match content_type {
-        "application/gzip" | "application/x-gzip" => Some(Gzip),
-        "application/zstd" => Some(Zstd),
-        _ => Option::None,
-    }
-}
-
-fn object_key_to_compression(key: &str) -> Option<Compression> {
-    let extension = std::path::Path::new(key)
-        .extension()
-        .and_then(std::ffi::OsStr::to_str);
-
-    use Compression::*;
-    extension.and_then(|extension| match extension {
-        "gz" => Some(Gzip),
-        "zst" => Some(Zstd),
-        _ => Option::None,
-    })
-}
-
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "PascalCase")]
@@ -726,35 +515,10 @@ struct S3Object {
     key: String,
 }
 
-mod test {
-    #[test]
-    fn determine_compression() {
-        use super::Compression;
-
-        let cases = vec![
-            ("out.log", Some("gzip"), None, Some(Compression::Gzip)),
-            (
-                "out.log",
-                None,
-                Some("application/gzip"),
-                Some(Compression::Gzip),
-            ),
-            ("out.log.gz", None, None, Some(Compression::Gzip)),
-            ("out.txt", None, None, None),
-        ];
-        for (key, content_encoding, content_type, expected) in cases {
-            assert_eq!(
-                super::determine_compression(key, content_encoding, content_type),
-                expected
-            );
-        }
-    }
-}
-
 #[cfg(feature = "aws-s3-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use super::{AwsS3Config, Compression, SqsConfig, Strategy};
+    use super::{AwsS3Config, Compression, Config, Strategy};
     use crate::{
         config::{GlobalOptions, SourceConfig},
         line_agg,
@@ -825,7 +589,7 @@ mod integration_tests {
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
             multiline,
-            sqs: Some(SqsConfig {
+            sqs: Some(Config {
                 queue_name: queue_name.to_string(),
                 poll_secs: 1,
                 ..Default::default()

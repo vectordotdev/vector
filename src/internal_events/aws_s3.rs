@@ -2,7 +2,7 @@ use super::InternalEvent;
 
 pub mod source {
     use super::InternalEvent;
-    use crate::sources::aws_s3::ProcessingError;
+    use crate::sources::aws_s3::sqs::ProcessingError;
     use metrics::counter;
     use rusoto_core::RusotoError;
     use rusoto_sqs::{DeleteMessageError, ReceiveMessageError};
