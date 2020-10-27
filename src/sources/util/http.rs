@@ -159,7 +159,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                       headers: HeaderMap,
                       body: Bytes,
                       query_parameters: HashMap<String, String>| {
-                    info!(message = "Handling HTTP request", headers = ?headers);
+                    info!(message = "Handling HTTP request.", headers = ?headers);
 
                     let out = out.clone();
 
