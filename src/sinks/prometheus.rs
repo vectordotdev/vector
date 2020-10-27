@@ -440,7 +440,7 @@ impl PrometheusSink {
         let server = Server::bind(&self.config.address)
             .serve(new_service)
             .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
-            .map_err(|e| eprintln!("server error: {}", e));
+            .map_err(|error| eprintln!("Server error: {}", error));
 
         tokio::spawn(server);
         self.server_shutdown_trigger = Some(trigger);

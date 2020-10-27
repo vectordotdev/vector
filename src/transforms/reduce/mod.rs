@@ -109,8 +109,8 @@ impl ReduceState {
                             Ok(m) => {
                                 entry.insert(m);
                             }
-                            Err(err) => {
-                                warn!(message = "Failed to merge value.", error = ?err);
+                            Err(error) => {
+                                warn!(message = "Failed to merge value.", error = ?error);
                             }
                         }
                     } else {
@@ -118,8 +118,8 @@ impl ReduceState {
                     }
                 }
                 hash_map::Entry::Occupied(mut entry) => {
-                    if let Err(err) = entry.get_mut().add(v.clone()) {
-                        warn!(message = "Failed to merge value.", error = ?err);
+                    if let Err(error) = entry.get_mut().add(v.clone()) {
+                        warn!(message = "Failed to merge value.", error = ?error);
                     }
                 }
             }
@@ -130,8 +130,8 @@ impl ReduceState {
     fn flush(mut self) -> LogEvent {
         let mut event = Event::new_empty_log().into_log();
         for (k, v) in self.fields.drain() {
-            if let Err(err) = v.insert_into(k, &mut event) {
-                warn!(message = "Failed to merge values for field.", error = ?err);
+            if let Err(error) = v.insert_into(k, &mut event) {
+                warn!(message = "Failed to merge values for field.", error = ?error);
             }
         }
         event

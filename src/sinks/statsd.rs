@@ -440,8 +440,9 @@ mod test {
                 .map_err(|error| error!(message = "Error reading line.", error = ?error))
                 .map_ok(|(bytes, _addr)| bytes.freeze())
                 .forward(
-                    tx.sink_compat()
-                        .sink_map_err(|error| error!(message = "Error sending event.", error = ?error)),
+                    tx.sink_compat().sink_map_err(
+                        |error| error!(message = "Error sending event.", error = ?error),
+                    ),
                 )
                 .await
                 .unwrap()

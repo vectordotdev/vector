@@ -167,10 +167,10 @@ impl JournaldConfig {
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
         let cursor = match checkpointer.get().await {
             Ok(cursor) => cursor,
-            Err(err) => {
+            Err(error) => {
                 error!(
                     message = "Could not retrieve saved journald checkpoint.",
-                    error = %err
+                    error = %error
                 );
                 None
             }
@@ -349,10 +349,10 @@ where
                         return;
                     }
                     Some(Ok(text)) => text,
-                    Some(Err(err)) => {
+                    Some(Err(error)) => {
                         error!(
                             message = "Could not read from journald source.",
-                            error = %err,
+                            error = %error,
                         );
                         break;
                     }

@@ -29,16 +29,16 @@ async fn make_listener(
     match addr {
         SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
             Ok(listener) => Some(listener),
-            Err(err) => {
-                error!(message = "Failed to bind to listener socket.", error = ?err);
+            Err(error) => {
+                error!(message = "Failed to bind to listener socket.", error = ?error);
                 None
             }
         },
         SocketListenAddr::SystemdFd(offset) => match listenfd.take_tcp_listener(offset) {
             Ok(Some(listener)) => match TcpListener::from_std(listener) {
                 Ok(listener) => Some(listener.into()),
-                Err(err) => {
-                    error!(message = "Failed to bind to listener socket.", error = ?err);
+                Err(error) => {
+                    error!(message = "Failed to bind to listener socket.", error = ?error);
                     None
                 }
             },
@@ -46,8 +46,8 @@ async fn make_listener(
                 error!("Failed to take listen FD, not open or already taken.");
                 None
             }
-            Err(err) => {
-                error!(message = "Failed to take listen FD.", error = ?err);
+            Err(error) => {
+                error!(message = "Failed to take listen FD.", error = ?error);
                 None
             }
         },
@@ -72,7 +72,8 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|error| error!(message = "Error sending event.", error = ?error));
+        let out =
+            out.sink_map_err(|error| error!(message = "Error sending event.", error = ?error));
 
         let listenfd = ListenFd::from_env();
 
@@ -115,7 +116,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                             Err(error) => {
                                 error!(
                                     message = "Failed to accept socket.",
-                                    %error
+                                    error = %error
                                 );
                                 return;
                             }

@@ -140,7 +140,7 @@ impl StreamSink for WriterSink {
                 if let Err(error) = self.output.write_all(buf.as_bytes()).await {
                     // Error when writing to stdout/stderr is likely irrecoverable,
                     // so stop the sink.
-                    error!("Error writing to output: {}. Stopping sink.", error);
+                    error!(message = "Error writing to output. Stopping sink.", error = ?error);
                     return Err(());
                 }
 

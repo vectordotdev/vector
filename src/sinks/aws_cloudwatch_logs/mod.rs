@@ -199,7 +199,9 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let sink = {
             let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
             let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", error = ?error))
+                .sink_map_err(
+                    |error| error!(message = "Fatal cloudwatchlogs sink error.", error = ?error),
+                )
                 .with_flat_map(move |event| {
                     iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
                 });
@@ -472,7 +474,7 @@ fn partition_encode(
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
-        .map_err(|error| error!(message = "Could not encode event.", %error, rate_limit_secs = 5))
+        .map_err(|error| error!(message = "Could not encode event.", error = %error, rate_limit_secs = 5))
         .ok()?;
 
     Some(PartitionInnerBuffer::new(event, key))
@@ -637,10 +639,14 @@ impl RetryLogic for CloudwatchRetryLogic {
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CloudwatchError::Put(e) => write!(f, "CloudwatchError::Put: {}", e),
-            CloudwatchError::Describe(e) => write!(f, "CloudwatchError::Describe: {}", e),
-            CloudwatchError::CreateStream(e) => write!(f, "CloudwatchError::CreateStream: {}", e),
-            CloudwatchError::CreateGroup(e) => write!(f, "CloudwatchError::CreateGroup: {}", e),
+            CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {}", error),
+            CloudwatchError::Describe(error) => write!(f, "CloudwatchError::Describe: {}", error),
+            CloudwatchError::CreateStream(error) => {
+                write!(f, "CloudwatchError::CreateStream: {}", error)
+            }
+            CloudwatchError::CreateGroup(error) => {
+                write!(f, "CloudwatchError::CreateGroup: {}", error)
+            }
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::ServiceDropped => write!(
                 f,
@@ -657,14 +663,14 @@ impl fmt::Display for CloudwatchError {
 impl std::error::Error for CloudwatchError {}
 
 impl From<RusotoError<PutLogEventsError>> for CloudwatchError {
-    fn from(e: RusotoError<PutLogEventsError>) -> Self {
-        CloudwatchError::Put(e)
+    fn from(error: RusotoError<PutLogEventsError>) -> Self {
+        CloudwatchError::Put(error)
     }
 }
 
 impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
-    fn from(e: RusotoError<DescribeLogStreamsError>) -> Self {
-        CloudwatchError::Describe(e)
+    fn from(error: RusotoError<DescribeLogStreamsError>) -> Self {
+        CloudwatchError::Describe(error)
     }
 }
 

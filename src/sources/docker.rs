@@ -536,7 +536,7 @@ impl EventStreamBuilder {
             }
             // In case of any error we have to notify the main thread that it should try again.
             if let Err(error) = this.main_send.send(Err(id)) {
-                error!(message = "Unable to send ContainerId to main.", %error);
+                error!(message = "Unable to send ContainerId to main.", error = %error);
             }
         });
 
@@ -629,7 +629,7 @@ impl EventStreamBuilder {
             Err(()) => Err(info.id),
         };
         if let Err(error) = self.main_send.send(result) {
-            error!(message = "Unable to return ContainerLogInfo to main.", %error);
+            error!(message = "Unable to return ContainerLogInfo to main.", error = %error);
         }
     }
 }
@@ -1157,7 +1157,7 @@ mod integration_tests {
         docker
             .wait_container(id, None::<WaitContainerOptions<&str>>)
             .try_for_each(|exit| async move {
-                info!("Container exited with status code: {}.", exit.status_code);
+                info!(message = "Container exited with status code.", status_code = ?exit.status_code);
                 Ok(())
             })
             .await

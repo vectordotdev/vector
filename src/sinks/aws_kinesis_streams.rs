@@ -168,7 +168,9 @@ impl KinesisService {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error", error = ?error))
+            .sink_map_err(
+                |error| error!(message = "Fatal kinesis streams sink error", error = ?error),
+            )
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
@@ -504,7 +506,7 @@ mod integration_tests {
 
         match client.create_stream(req).await {
             Ok(_) => (),
-            Err(e) => panic!("Unable to check the stream {:?}", e),
+            Err(error) => panic!("Unable to check the stream {:?}", error),
         };
 
         // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors

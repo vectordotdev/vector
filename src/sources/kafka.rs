@@ -300,8 +300,8 @@ mod integration_test {
             .key(key)
             .timestamp(timestamp);
 
-        if let Err(err) = producer.send(record, Timeout::Never).await {
-            panic!("Cannot send event to Kafka: {:?}", err);
+        if let Err(error) = producer.send(record, Timeout::Never).await {
+            panic!("Cannot send event to Kafka: {:?}", error);
         }
     }
 

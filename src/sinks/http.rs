@@ -187,7 +187,7 @@ impl HttpSink for HttpSinkConfig {
 
             Encoding::Ndjson => {
                 let mut b = serde_json::to_vec(&event)
-                    .map_err(|error| panic!(message = "Unable to encode into JSON.", error = ?error))
+                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 b.push(b'\n');
                 b
@@ -195,7 +195,7 @@ impl HttpSink for HttpSinkConfig {
 
             Encoding::Json => {
                 let mut b = serde_json::to_vec(&event)
-                    .map_err(|error| panic!(message = "Unable to encode into JSON.", error = ?error))
+                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 b.push(b',');
                 b

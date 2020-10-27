@@ -262,10 +262,9 @@ where
 
             *request.headers_mut() = headers;
 
-            let response = client
-                .oneshot(request)
-                .await
-                .map_err(|e| HttpDispatchError::new(format!("Error during dispatch: {}", e)))?;
+            let response = client.oneshot(request).await.map_err(|error| {
+                HttpDispatchError::new(format!("Error during dispatch: {}", error))
+            })?;
 
             let status = StatusCode::from_u16(response.status().as_u16()).unwrap();
             let headers = response

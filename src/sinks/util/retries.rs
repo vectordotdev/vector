@@ -108,7 +108,7 @@ where
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        error!(message = "Not retriable; dropping the request.", %reason);
+                        error!(message = "Not retriable; dropping the request.", reason = %reason);
                         None
                     }
 
@@ -123,12 +123,12 @@ where
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!(message = "Retrying after error.", %expected);
+                        warn!(message = "Retrying after error.", error = %expected);
                         Some(self.build_retry())
                     } else {
                         error!(
                             message = "Non-retriable error; dropping the request.",
-                            ?error
+                            error = ?error
                         );
                         None
                     }
@@ -138,7 +138,7 @@ where
                 } else {
                     error!(
                         message = "Unexpected error type; dropping the request.",
-                        ?error
+                        error = ?error
                     );
                     None
                 }

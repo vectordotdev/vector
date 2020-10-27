@@ -139,7 +139,9 @@ impl SinkConfig for StackdriverConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", error = ?error));
+        .sink_map_err(
+            |error| error!(message = "Fatal gcp_stackdriver_logs sink error.", error = ?error),
+        );
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

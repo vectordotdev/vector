@@ -310,7 +310,7 @@ mod integration_tests {
         for _ in 0..num_events {
             let msg = match consumer.next().await.unwrap() {
                 Ok(msg) => msg,
-                Err(err) => panic!("{:?}", err),
+                Err(error) => panic!("{:?}", error),
             };
             consumer.ack(&msg).await.unwrap();
         }
