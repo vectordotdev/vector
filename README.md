@@ -183,11 +183,24 @@ Or use your own [preferred method][docs.installation].
 
 ## Deploy
 
-We taught [Vic](https://vector.dev/vic/) how to deploy Vector on Heroku! What a good flying squirrel!
+> Want to deploy Vector on Heroku?
 
-Want to spin one up? Hit the button, then fill in the boxes:
+First, either hit the button and fill in the boxes, or run the commands below:
 
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy?template=https://github.com/timberio/vector/tree/heroku-button)
+
+```bash
+heroku apps:create ${APP_NAME} --buildpack https://github.com/timberio/vector-heroku-buildpack
+heroku config:set LOGPLEX_AUTH_USERNAME ${LOGPLEX_AUTH_USERNAME}
+heroku config:set LOGPLEX_AUTH_PASSWORD ${LOGPLEX_AUTH_PASSWORD}
+```
+
+Then you need to pull down the dyno repo and provision a configuration into it.
+
+```bash
+git clone https://git.heroku.com/${APP_NAME}.git
+cd ${APP_NAME}
+```
 
 Next, create a `./vector.toml` and start it with:
 
@@ -203,6 +216,14 @@ Next, create a `./vector.toml` and start it with:
   auth.password = "${LOGPLEX_AUTH_PASSWORD}"
 
 # Now, feed the logplex elsewhere! https://vector.dev/guides/#/guides/integrate/sinks
+```
+
+When that's all done, you'll need to push up the config:
+
+```bash
+git add vector.toml
+git commit -sm "Initialize Vector configuration"
+git push heroku
 ```
 
 Then, from your console, set up the log drain to sink to Vector:
