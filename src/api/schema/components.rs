@@ -9,7 +9,7 @@ use std::{
 use tokio::stream::{Stream, StreamExt};
 
 const INVARIANT: &str =
-    "It is an invariant for the API to be active but not have a TOPOLOGY. Please report this.";
+    "It is an invariant for the API to be active but not have COMPONENTS. Please report this.";
 
 #[derive(Enum, Eq, PartialEq, Copy, Clone)]
 pub enum SourceOutputType {
@@ -51,23 +51,23 @@ impl Source {
 
     /// Transform outputs
     async fn transforms(&self) -> Vec<Transform> {
-        filter_topology(|(_name, topology)| match topology {
-            Topology::Transform(t) if t.0.inputs.contains(&self.0.name) => Some(t.clone()),
+        filter_components(|(_name, components)| match components {
+            Component::Transform(t) if t.0.inputs.contains(&self.0.name) => Some(t.clone()),
             _ => None,
         })
     }
 
     /// Sink outputs
     async fn sinks(&self) -> Vec<Sink> {
-        filter_topology(|(_name, topology)| match topology {
-            Topology::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
+        filter_components(|(_name, components)| match components {
+            Component::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
             _ => None,
         })
     }
 
     /// Metric indicating events processed for the current source
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::topology_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(self.0.name.clone())
     }
 }
 
@@ -92,9 +92,9 @@ impl Transform {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match TOPOLOGY.read().expect(INVARIANT).get(name) {
+            .filter_map(|name| match COMPONENTS.read().expect(INVARIANT).get(name) {
                 Some(t) => match t {
-                    Topology::Source(s) => Some(s.clone()),
+                    Component::Source(s) => Some(s.clone()),
                     _ => None,
                 },
                 _ => None,
@@ -104,15 +104,15 @@ impl Transform {
 
     /// Sink outputs
     async fn sinks(&self) -> Vec<Sink> {
-        filter_topology(|(_name, topology)| match topology {
-            Topology::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
+        filter_components(|(_name, components)| match components {
+            Component::Sink(s) if s.0.inputs.contains(&self.0.name) => Some(s.clone()),
             _ => None,
         })
     }
 
     /// Metric indicating events processed for the current transform
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::topology_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(self.0.name.clone())
     }
 }
 
@@ -131,9 +131,9 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match TOPOLOGY.read().expect(INVARIANT).get(name) {
-                Some(topology) => match topology {
-                    Topology::Source(s) => Some(s.clone()),
+            .filter_map(|name| match COMPONENTS.read().expect(INVARIANT).get(name) {
+                Some(components) => match components {
+                    Component::Source(s) => Some(s.clone()),
                     _ => None,
                 },
                 _ => None,
@@ -146,9 +146,9 @@ impl Sink {
         self.0
             .inputs
             .iter()
-            .filter_map(|name| match TOPOLOGY.read().expect(INVARIANT).get(name) {
-                Some(topology) => match topology {
-                    Topology::Transform(t) => Some(t.clone()),
+            .filter_map(|name| match COMPONENTS.read().expect(INVARIANT).get(name) {
+                Some(components) => match components {
+                    Component::Transform(t) => Some(t.clone()),
                     _ => None,
                 },
                 _ => None,
@@ -158,7 +158,7 @@ impl Sink {
 
     /// Metric indicating events processed for the current sink
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::topology_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(self.0.name.clone())
     }
 }
 
@@ -170,31 +170,31 @@ impl Sink {
         type = "Option<metrics::EventsProcessedTotal>"
     )
 )]
-pub enum Topology {
+pub enum Component {
     Source(Source),
     Transform(Transform),
     Sink(Sink),
 }
 
 #[derive(Clone)]
-pub struct TopologyAdded(Topology);
+pub struct ComponentAdded(Component);
 
 #[derive(Clone)]
-pub struct TopologyRemoved(Topology);
+pub struct ComponentRemoved(Component);
 
 lazy_static! {
-    static ref TOPOLOGY: Arc<RwLock<HashMap<String, Topology>>> =
+    static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
 #[derive(Default)]
-pub struct TopologyQuery;
+pub struct ComponentsQuery;
 
 #[Object]
-impl TopologyQuery {
-    /// Configured Topology (source/transform/sink)
-    async fn topology(&self) -> Vec<Topology> {
-        filter_topology(|(_name, topology)| Some(topology.clone()))
+impl ComponentsQuery {
+    /// Configured components (sources/transforms/sinks)
+    async fn components(&self) -> Vec<Component> {
+        filter_components(|(_name, components)| Some(components.clone()))
     }
 
     /// Configured sources
@@ -214,23 +214,23 @@ impl TopologyQuery {
 }
 
 #[derive(Default)]
-pub struct TopologySubscription;
+pub struct ComponentsSubscription;
 
 #[Subscription]
-impl TopologySubscription {
-    /// Subscribes to all newly added topology
-    async fn topology_added(&self) -> impl Stream<Item = Topology> {
-        Broker::<TopologyAdded>::subscribe().map(|t| t.0)
+impl ComponentsSubscription {
+    /// Subscribes to all newly added components
+    async fn component_added(&self) -> impl Stream<Item = Component> {
+        Broker::<ComponentAdded>::subscribe().map(|t| t.0)
     }
 
-    /// Subscribes to all removed topology
-    async fn topology_removed(&self) -> impl Stream<Item = Topology> {
-        Broker::<TopologyRemoved>::subscribe().map(|t| t.0)
+    /// Subscribes to all removed components
+    async fn component_removed(&self) -> impl Stream<Item = Component> {
+        Broker::<ComponentRemoved>::subscribe().map(|t| t.0)
     }
 }
 
-fn filter_topology<T>(map_func: impl Fn((&String, &Topology)) -> Option<T>) -> Vec<T> {
-    TOPOLOGY
+fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T>) -> Vec<T> {
+    COMPONENTS
         .read()
         .expect(INVARIANT)
         .iter()
@@ -239,29 +239,29 @@ fn filter_topology<T>(map_func: impl Fn((&String, &Topology)) -> Option<T>) -> V
 }
 
 fn get_sources() -> Vec<Source> {
-    filter_topology(|(_, topology)| match topology {
-        Topology::Source(s) => Some(s.clone()),
+    filter_components(|(_, components)| match components {
+        Component::Source(s) => Some(s.clone()),
         _ => None,
     })
 }
 
 fn get_transforms() -> Vec<Transform> {
-    filter_topology(|(_, topology)| match topology {
-        Topology::Transform(t) => Some(t.clone()),
+    filter_components(|(_, components)| match components {
+        Component::Transform(t) => Some(t.clone()),
         _ => None,
     })
 }
 
 fn get_sinks() -> Vec<Sink> {
-    filter_topology(|(_, topology)| match topology {
-        Topology::Sink(s) => Some(s.clone()),
+    filter_components(|(_, components)| match components {
+        Component::Sink(s) => Some(s.clone()),
         _ => None,
     })
 }
 
-/// Returns the current topology names as a HashSet
-fn get_topology_names() -> HashSet<String> {
-    TOPOLOGY
+/// Returns the current component names as a HashSet
+fn get_component_names() -> HashSet<String> {
+    COMPONENTS
         .read()
         .expect(INVARIANT)
         .keys()
@@ -269,15 +269,15 @@ fn get_topology_names() -> HashSet<String> {
         .collect::<HashSet<String>>()
 }
 
-/// Update the 'global' configuration that will be consumed by topology queries
+/// Update the 'global' configuration that will be consumed by component queries
 pub fn update_config(config: &Config) {
-    let mut new_topology = HashMap::new();
+    let mut new_components = HashMap::new();
 
     // Sources
     for (name, source) in config.sources.iter() {
-        new_topology.insert(
+        new_components.insert(
             name.to_owned(),
-            Topology::Source(Source(SourceData {
+            Component::Source(Source(SourceData {
                 name: name.to_owned(),
                 output_type: source.output_type(),
             })),
@@ -286,9 +286,9 @@ pub fn update_config(config: &Config) {
 
     // Transforms
     for (name, transform) in config.transforms.iter() {
-        new_topology.insert(
+        new_components.insert(
             name.to_string(),
-            Topology::Transform(Transform(InputsData {
+            Component::Transform(Transform(InputsData {
                 name: name.to_owned(),
                 inputs: transform.inputs.clone(),
             })),
@@ -297,28 +297,28 @@ pub fn update_config(config: &Config) {
 
     // Sinks
     for (name, sink) in config.sinks.iter() {
-        new_topology.insert(
+        new_components.insert(
             name.to_string(),
-            Topology::Sink(Sink(InputsData {
+            Component::Sink(Sink(InputsData {
                 name: name.to_owned(),
                 inputs: sink.inputs.clone(),
             })),
         );
     }
 
-    // Get the names of existing topology
-    let existing_topology_names = get_topology_names();
-    let new_topology_names = new_topology
+    // Get the names of existing components
+    let existing_component_names = get_component_names();
+    let new_component_names = new_components
         .iter()
         .map(|(name, _)| name.clone())
         .collect::<HashSet<String>>();
 
-    // Publish all topology that has been removed
-    existing_topology_names
-        .difference(&new_topology_names)
+    // Publish all components that have been removed
+    existing_component_names
+        .difference(&new_component_names)
         .for_each(|name| {
-            Broker::publish(TopologyRemoved(
-                TOPOLOGY
+            Broker::publish(ComponentRemoved(
+                COMPONENTS
                     .read()
                     .expect(INVARIANT)
                     .get(name)
@@ -327,13 +327,13 @@ pub fn update_config(config: &Config) {
             ))
         });
 
-    // Publish all topology that has been added
-    new_topology_names
-        .difference(&existing_topology_names)
+    // Publish all components that have been added
+    new_component_names
+        .difference(&existing_component_names)
         .for_each(|name| {
-            Broker::publish(TopologyAdded(new_topology.get(name).unwrap().clone()));
+            Broker::publish(ComponentAdded(new_components.get(name).unwrap().clone()));
         });
 
     // override the old hashmap
-    *TOPOLOGY.write().expect(INVARIANT) = new_topology;
+    *COMPONENTS.write().expect(INVARIANT) = new_components;
 }
