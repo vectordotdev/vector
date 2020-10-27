@@ -110,16 +110,26 @@ impl AwsS3Config {
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
         match self.sqs {
             Some(ref sqs) => {
+                use std::sync::Arc;
+
                 let region: Region = (&self.region).try_into().context(RegionParse {})?;
                 let resolver = Resolver;
 
                 let client = rusoto::client(resolver).with_context(|| Client {})?;
-                let creds: std::sync::Arc<rusoto::AwsCredentialsProvider> =
+                let creds: Arc<rusoto::AwsCredentialsProvider> =
                     rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())
                         .context(Credentials {})?
                         .into();
-                let sqs_client = SqsClient::new_with(client.clone(), creds.clone(), region.clone());
-                let s3_client = S3Client::new_with(client.clone(), creds.clone(), region.clone());
+                let sqs_client = SqsClient::new_with(
+                    client.clone(),
+                    Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
+                    region.clone(),
+                );
+                let s3_client = S3Client::new_with(
+                    client.clone(),
+                    Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
+                    region.clone(),
+                );
 
                 sqs::Ingestor::new(
                     region.clone(),
@@ -274,7 +284,7 @@ mod integration_tests {
         let key = uuid::Uuid::new_v4().to_string();
         let logs: Vec<String> = random_lines(100).take(10).collect();
 
-        test_event(&key, None, None, None, logs.join("\n").into_bytes(), logs).await;
+        test_event(key, None, None, None, logs.join("\n").into_bytes(), logs).await;
     }
 
     #[tokio::test]
@@ -291,7 +301,7 @@ mod integration_tests {
         let mut buffer = Vec::new();
         gz.read_to_end(&mut buffer).unwrap();
 
-        test_event(&key, Some("gzip"), None, None, buffer, logs).await;
+        test_event(key, Some("gzip"), None, None, buffer, logs).await;
     }
 
     #[tokio::test]
@@ -303,7 +313,7 @@ mod integration_tests {
             .collect();
 
         test_event(
-            &key,
+            key,
             None,
             None,
             Some(MultilineConfig {
@@ -335,7 +345,7 @@ mod integration_tests {
 
     // puts an object and asserts that the logs it gets back match
     async fn test_event(
-        key: &str,
+        key: String,
         content_encoding: Option<&str>,
         content_type: Option<&str>,
         multiline: Option<MultilineConfig>,
@@ -440,7 +450,6 @@ mod integration_tests {
                     }]),
                     ..Default::default()
                 },
-                ..Default::default()
             })
             .await
             .expect("Could not create bucket notification");

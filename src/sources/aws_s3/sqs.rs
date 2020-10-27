@@ -136,7 +136,6 @@ impl Ingestor {
             .get_queue_url(GetQueueUrlRequest {
                 queue_name: config.queue_name.clone(),
                 queue_owner_aws_account_id: config.queue_owner.clone(),
-                ..Default::default()
             })
             .await
             .with_context(|| FetchQueueUrl {
@@ -213,7 +212,10 @@ impl Ingestor {
                     Some(ref handle) => handle.to_owned(),
                 };
 
-                let message_id = message.message_id.clone().unwrap_or("<unknown>".to_owned());
+                let message_id = message
+                    .message_id
+                    .clone()
+                    .unwrap_or_else(|| "<unknown>".to_owned());
 
                 match self.handle_sqs_message(message, out.clone()).await {
                     Ok(()) => {
@@ -254,7 +256,7 @@ impl Ingestor {
     ) -> Result<(), ProcessingError> {
         let s3_event: S3Event = serde_json::from_str(message.body.unwrap_or_default().as_ref())
             .context(InvalidSqsMessage {
-                message_id: message.message_id.unwrap_or("<empty>".to_owned()),
+                message_id: message.message_id.unwrap_or_else(|| "<empty>".to_owned()),
             })?;
 
         self.handle_s3_event(s3_event, out).await
@@ -426,7 +428,6 @@ impl Ingestor {
             .delete_message(DeleteMessageRequest {
                 queue_url: self.queue_url.clone(),
                 receipt_handle,
-                ..Default::default()
             })
             .await
     }
@@ -469,17 +470,17 @@ impl<'de> Deserialize<'de> for S3EventName {
 
         let s = String::deserialize(deserializer)?;
 
-        let mut parts = s.splitn(2, ":");
+        let mut parts = s.splitn(2, ':');
 
         let kind = parts
             .next()
-            .ok_or(D::Error::custom("Missing event type"))?
+            .ok_or_else(|| D::Error::custom("Missing event type"))?
             .parse::<String>()
             .map_err(D::Error::custom)?;
 
         let name = parts
             .next()
-            .ok_or(D::Error::custom("Missing event name"))?
+            .ok_or_else(|| D::Error::custom("Missing event name"))?
             .parse::<String>()
             .map_err(D::Error::custom)?;
 
