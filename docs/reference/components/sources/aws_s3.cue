@@ -6,8 +6,9 @@ components: sources: aws_s3: {
 
 	features: {
 		multiline: enabled: true
-		tls: enabled:       false
 		collect: {
+			tls: enabled:        false
+			checkpoint: enabled: false
 			from: {
 				name:     "AWS S3"
 				thing:    "a \(name) bucket"
@@ -56,7 +57,7 @@ components: sources: aws_s3: {
 		notices: []
 	}
 
-	configuration: components._aws.configuration & {
+	configuration: {
 		strategy: {
 			common:      true
 			description: "The strategy to use to consume objects from AWS S3."
@@ -85,7 +86,8 @@ components: sources: aws_s3: {
 		sqs: {
 			common:      true
 			description: "SQS strategy options. Required if strategy=`sqs`."
-			required:    true
+			required:    false
+			warnings: []
 			type: object: {
 				examples: []
 				options: {
@@ -94,14 +96,20 @@ components: sources: aws_s3: {
 						description: "How often to poll the queue for new messages in seconds."
 						required:    false
 						warnings: []
-						type: int: default: 15
+						type: uint: {
+							default: 15
+							unit:    "seconds"
+						}
 					}
 					visibility_timeout_secs: {
 						common:      false
 						description: "The visibility timeout to use for messages in secords. This controls how long a message is left unavailable when a Vector receives it. If Vector does not delete the message before the timeout expires, it will be made reavailable for another consumer; this can happen if, for example, the `vector` process crashes."
 						required:    false
 						warnings: ["Should be set higher than the length of time it takes to process an individual message to avoid that message being reprocessed."]
-						type: int: default: 300
+						type: uint: {
+							default: 300
+							unit:    "seconds"
+						}
 					}
 					delete_message: {
 						common:      true
@@ -111,12 +119,10 @@ components: sources: aws_s3: {
 						type: bool: default: true
 					}
 					queue_name: {
-						common:      true
 						description: "The name of the SQS queue to receieve bucket notifications from."
 						required:    true
 						warnings: []
 						type: string: {
-							default: null
 							examples: ["my-queue-name"]
 						}
 					}
