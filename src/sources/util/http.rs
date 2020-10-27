@@ -84,7 +84,7 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
                     Some(value) => {
                         let token = value
                             .to_str()
-                            .map_err(|error| format!("Failed stringify HeaderValue: {:?}", error))?
+                            .map_err(|err| format!("Failed stringify HeaderValue: {:?}", err))?
                             .to_owned();
                         Ok(HttpSourceAuth { token: Some(token) })
                     }
@@ -153,42 +153,48 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::header::optional::<String>("authorization"))
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
-            .and_then(move |auth_header, headers: HeaderMap, body: Bytes| {
-                info!(message = "Handling HTTP request.", headers = ?headers);
+            .and(warp::query::<HashMap<String, String>>())
+            .and_then(
+                move |auth_header,
+                      headers: HeaderMap,
+                      body: Bytes,
+                      query_parameters: HashMap<String, String>| {
+                    info!("Handling HTTP request: {:?}", headers);
 
-                let out = out.clone();
+                    let out = out.clone();
 
-                let body_size = body.len();
-                let events = match auth.is_valid(&auth_header) {
-                    Ok(()) => self.build_event(body, headers),
-                    Err(error) => Err(error),
-                };
+                    let body_size = body.len();
+                    let events = match auth.is_valid(&auth_header) {
+                        Ok(()) => self.build_event(body, headers, query_parameters),
+                        Err(err) => Err(err),
+                    };
 
-                async move {
-                    match events {
-                        Ok(events) => {
-                            emit!(HTTPEventsReceived {
-                                events_count: events.len(),
-                                byte_size: body_size,
-                            });
-                            out.send_all(futures01::stream::iter_ok(events))
-                                .compat()
-                                .map_err(move |error: futures01::sync::mpsc::SendError<Event>| {
-                                    // can only fail if receiving end disconnected, so we are shutting down,
-                                    // probably not gracefully.
-                                    error!("Failed to forward events, downstream is closed.");
-                                    error!(message = "Error sending event.", error = ?error);
-                                    warp::reject::custom(RejectShuttingDown)
-                                })
-                                .map_ok(|_| warp::reply())
-                                .await
-                        }
-                        Err(error) => {
-                            emit!(HTTPBadRequest {
-                                error_code: error.code,
-                                error_message: error.message.as_str(),
-                            });
-                            Err(warp::reject::custom(error))
+                    async move {
+                        match events {
+                            Ok(events) => {
+                                emit!(HTTPEventsReceived {
+                                    events_count: events.len(),
+                                    byte_size: body_size,
+                                });
+                                out.send_all(futures01::stream::iter_ok(events))
+                                    .compat()
+                                    .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
+                                        // can only fail if receiving end disconnected, so we are shutting down,
+                                        // probably not gracefully.
+                                        error!("Failed to forward events, downstream is closed");
+                                        error!("Tried to send the following event: {:?}", e);
+                                        warp::reject::custom(RejectShuttingDown)
+                                    })
+                                    .map_ok(|_| warp::reply())
+                                    .await
+                            }
+                            Err(err) => {
+                                emit!(HTTPBadRequest {
+                                    error_code: err.code,
+                                    error_message: err.message.as_str(),
+                                });
+                                Err(warp::reject::custom(err))
+                            }
                         }
                     }
                 },
@@ -208,7 +214,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             }
         });
 
-        info!(message = "Building HTTP server.", addr = %address);
+        info!(message = "Building HTTP server", addr = %address);
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {
