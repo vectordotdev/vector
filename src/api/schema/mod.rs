@@ -1,14 +1,14 @@
 mod broker;
+pub mod components;
 mod health;
 mod metrics;
-pub mod topology;
 
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
 
 #[derive(MergedObject, Default)]
 pub struct Query(
     health::HealthQuery,
-    topology::TopologyQuery,
+    components::ComponentsQuery,
     metrics::MetricsQuery,
 );
 
@@ -16,7 +16,7 @@ pub struct Query(
 pub struct Subscription(
     health::HealthSubscription,
     metrics::MetricsSubscription,
-    topology::TopologySubscription,
+    components::ComponentsSubscription,
 );
 
 /// Build a new GraphQL schema, comprised of Query, Mutation and Subscription types

@@ -1,5 +1,5 @@
-query TopologyQuery {
-  topology {
+query ComponentsQuery {
+  components {
     __typename
     name
     eventsProcessedTotal {
