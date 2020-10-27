@@ -26,7 +26,8 @@ assets = [
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
-  ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
+  ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"],
+  ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
