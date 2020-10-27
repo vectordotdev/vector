@@ -25,6 +25,7 @@ pub struct SimpleHttpConfig {
     encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
+    #[serde(default)]
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
