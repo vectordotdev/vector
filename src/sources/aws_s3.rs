@@ -151,7 +151,7 @@ impl AwsS3Config {
     ) -> Result<SqsIngestor, CreateSqsIngestorError> {
         match self.sqs {
             Some(ref sqs) => {
-                let region: Region = (&self.region).try_into().context(RegionParseError {})?;
+                let region: Region = (&self.region).try_into().context(RegionParse {})?;
                 let resolver = Resolver;
 
                 let client = rusoto::client(resolver).with_context(|| Client {})?;
@@ -189,7 +189,7 @@ enum CreateSqsIngestorError {
     #[snafu(display("sqs configuration required when strategy=sqs"))]
     ConfigMissing,
     #[snafu(display("could not parse region configuration: {}", source))]
-    RegionParseError { source: rusoto::region::ParseError },
+    RegionParse { source: rusoto::region::ParseError },
 }
 
 #[derive(Debug, Snafu)]
