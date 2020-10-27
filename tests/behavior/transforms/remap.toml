@@ -721,7 +721,7 @@
 [transforms.remap_function_ceil]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = ceil(.num)
     .b = ceil(.num, precision = 1)
     .c = ceil(.num, precision = 2)
@@ -743,7 +743,7 @@
 [transforms.remap_function_floor]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = floor(.num)
     .b = floor(.num, precision = 1)
     .c = floor(.num, precision = 2)
@@ -765,7 +765,7 @@
 [transforms.remap_function_round]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = round(.num)
     .b = round(.num, precision = 1)
     .c = round(.num, precision = 2)
@@ -787,7 +787,7 @@
 [transforms.remap_function_parse_syslog]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
    .a = parse_syslog(.a)
    """
 [[tests]]
@@ -811,7 +811,7 @@
 [transforms.remap_function_split_regex]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     .foo = split(.foo, /a.b/i, 3)
   """
 [[tests]]
@@ -831,7 +831,7 @@
 [transforms.remap_function_split_string]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     .foo = split(.foo, " ", 3)
   """
 [[tests]]
@@ -851,7 +851,7 @@
 [transforms.remap_function_log]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     log(.foo, level=info)
   """
 [[tests]]
@@ -866,3 +866,68 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "this should be unchanged"
 
+[transforms.remap_function_replace_regex]
+  inputs=[]
+  type = "remap"
+  source = """
+    .bip = replace(.foo, /Eggs/gi, "beans")
+    .bar = replace(.foo, /Eggs/i, "beans")
+    .zop = replace(.foo, /Eggs/, "beans")
+  """
+[[tests]]
+  name = "remap_function_replace_regex"
+  [tests.input]
+    insert_at = "remap_function_replace_regex"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "peas, eggs, chips and more eggs"
+  [[tests.outputs]]
+    extract_from = "remap_function_replace_regex"
+    [[tests.outputs.conditions]]
+    "bip.equals" = "peas, beans, chips and more beans"
+    "bar.equals" = "peas, beans, chips and more eggs"
+    "zop.equals" = "peas, eggs, chips and more eggs"
+
+[transforms.remap_function_replace_string]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = replace(.foo, "eggs", "beans")
+  """
+[[tests]]
+  name = "remap_function_replace_string"
+  [tests.input]
+    insert_at = "remap_function_replace_string"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "peas, eggs, chips and more eggs"
+  [[tests.outputs]]
+    extract_from = "remap_function_replace_string"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "peas, beans, chips and more beans"
+
+[transforms.remap_function_flatten_array]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = flatten(parse_json(.foo))
+  """
+[[tests]]
+  name = "remap_function_flatten_array"
+  [tests.input]
+    insert_at = "remap_function_flatten_array"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "[1, 2, [3, 4, [5, 6], 7], [8, 9]]"
+  [[tests.outputs]]
+    extract_from = "remap_function_flatten_array"
+    [[tests.outputs.conditions]]
+    "foo[0].equals" = 1
+    "foo[1].equals" = 2
+    "foo[2].equals" = 3
+    "foo[3].equals" = 4
+    "foo[4].equals" = 5
+    "foo[5].equals" = 6
+    "foo[6].equals" = 7
+    "foo[7].equals" = 8
+    "foo[8].equals" = 9
