@@ -239,7 +239,7 @@ impl FileSink {
                         }
                         Some(Err(error)) => error!(
                             message = "An error occurred while expiring a file.",
-                            %error,
+                            ?error,
                         ),
                     }
                 }

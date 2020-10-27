@@ -102,7 +102,7 @@ where
         })
         .forward(
             out.sink_map_err(
-                |error| error!(message = "Unable to send event to out.", error = %error),
+                |error| error!(message = "Unable to send event to out.", error = ?error),
             )
             .sink_compat(),
         )

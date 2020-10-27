@@ -170,7 +170,7 @@ impl SourceConfig for MockSourceConfig {
                     x
                 })
                 .forward(out.sink_map_err(
-                    |error| error!(message = "Error sending in sink..", error = %error),
+                    |error| error!(message = "Error sending in sink..", error = ?error),
                 ))
                 .map(|_| info!("Finished sending."))
             });

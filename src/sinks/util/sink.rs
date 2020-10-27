@@ -729,10 +729,7 @@ where
                         error!(message = "Response wasn't successful.", ?response);
                     }
                     Err(error) => {
-                        error!(
-                            message = "Request failed.",
-                            %error,
-                        );
+                        error!(message = "Request failed.", ?error,);
                     }
                 }
 

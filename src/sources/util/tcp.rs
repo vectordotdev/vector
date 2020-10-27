@@ -116,7 +116,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                             Err(error) => {
                                 error!(
                                     message = "Failed to accept socket.",
-                                    error = %error
+                                    error = ?error
                                 );
                                 return;
                             }
