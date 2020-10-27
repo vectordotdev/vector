@@ -1,9 +1,9 @@
 use crate::{
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::proto,
     internal_events::VectorEventSent,
-    sinks::util::{tcp::TcpSink, StreamSink},
+    sinks::util::{tcp::TcpSink, StreamSinkOld},
     tls::{MaybeTlsSettings, TlsConfig},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
     Event,
 };
 use bytes::{BufMut, Bytes, BytesMut};
@@ -34,12 +34,26 @@ enum BuildError {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<VectorSinkConfig>("vector")
+    SinkDescription::new::<VectorSinkConfig>("vector")
 }
 
+impl GenerateConfig for VectorSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "127.0.0.1:5000".to_string(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SinkConfig for VectorSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(BuildError::MissingHost)?.to_string();
@@ -47,12 +61,15 @@ impl SinkConfig for VectorSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let sink = TcpSink::new(host.clone(), port, cx.resolver(), tls);
-        let sink = StreamSink::new(sink, cx.acker())
+        let sink = TcpSink::new(host, port, cx.resolver(), tls);
+        let healthcheck = sink.healthcheck();
+        let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));
-        let healthcheck = super::util::tcp::tcp_healthcheck(host, port, cx.resolver());
 
-        Ok((Box::new(sink), healthcheck))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -80,7 +97,16 @@ fn encode_event(event: Event) -> Option<Bytes> {
     });
 
     let mut out = BytesMut::with_capacity(full_len);
-    out.put_u32_be(event_len as u32);
+    out.put_u32(event_len as u32);
     event.encode(&mut out).unwrap();
-    Some(out.freeze())
+
+    Some(out.into())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::VectorSinkConfig>();
+    }
 }

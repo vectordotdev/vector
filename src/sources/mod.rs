@@ -1,22 +1,32 @@
 use futures01::Future;
 use snafu::Snafu;
 
+#[cfg(feature = "sources-apache_metrics")]
+pub mod apache_metrics;
+#[cfg(feature = "sources-aws_kinesis_firehose")]
+pub mod aws_kinesis_firehose;
 #[cfg(feature = "sources-docker")]
 pub mod docker;
 #[cfg(feature = "sources-file")]
 pub mod file;
 #[cfg(feature = "sources-generator")]
 pub mod generator;
+#[cfg(feature = "sources-host_metrics")]
+pub mod host_metrics;
 #[cfg(feature = "sources-http")]
 pub mod http;
 #[cfg(feature = "sources-internal_metrics")]
 pub mod internal_metrics;
-#[cfg(all(feature = "sources-journald", feature = "unix"))]
+#[cfg(all(unix, feature = "sources-journald"))]
 pub mod journald;
 #[cfg(all(feature = "sources-kafka", feature = "rdkafka"))]
 pub mod kafka;
+#[cfg(feature = "sources-kubernetes-logs")]
+pub mod kubernetes_logs;
 #[cfg(feature = "sources-logplex")]
 pub mod logplex;
+#[cfg(feature = "sources-mongodb_metrics")]
+pub mod mongodb_metrics;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sources-socket")]

@@ -1,20 +1,17 @@
 pub mod logs;
 pub mod metrics;
 
-pub(self) use super::{Healthcheck, RouterSink};
-
-use crate::{dns::Resolver, sinks::util::http::HttpClient};
+use crate::{http::HttpClient, sinks::util::encode_namespace};
 use chrono::{DateTime, Utc};
-use futures::TryFutureExt;
-use futures01::Future;
+use futures::FutureExt;
 use http::{StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use snafu::Snafu;
 use std::collections::{BTreeMap, HashMap};
-use tower03::Service;
+use tower::Service;
 
-pub enum Field {
+pub(in crate::sinks) enum Field {
     /// string
     String(String),
     /// float
@@ -28,7 +25,7 @@ pub enum Field {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum ProtocolVersion {
+pub(in crate::sinks) enum ProtocolVersion {
     V1,
     V2,
 }
@@ -64,7 +61,7 @@ pub struct InfluxDB2Settings {
     token: String,
 }
 
-trait InfluxDBSettings {
+trait InfluxDBSettings: std::fmt::Debug {
     fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
     fn token(self: &Self) -> String;
@@ -130,22 +127,15 @@ fn influxdb_settings(
     influxdb1_settings: Option<InfluxDB1Settings>,
     influxdb2_settings: Option<InfluxDB2Settings>,
 ) -> Result<Box<dyn InfluxDBSettings>, crate::Error> {
-    if influxdb1_settings.is_some() & influxdb2_settings.is_some() {
-        return Err(ConfigError::BothConfiguration {
-            v1_settings: influxdb1_settings.unwrap(),
-            v2_settings: influxdb2_settings.unwrap(),
+    match (influxdb1_settings, influxdb2_settings) {
+        (Some(v1_settings), Some(v2_settings)) => Err(ConfigError::BothConfiguration {
+            v1_settings,
+            v2_settings,
         }
-        .into());
-    }
-
-    if influxdb1_settings.is_none() & influxdb2_settings.is_none() {
-        return Err(ConfigError::MissingConfiguration.into());
-    }
-
-    if let Some(settings) = influxdb1_settings {
-        Ok(Box::new(settings))
-    } else {
-        Ok(Box::new(influxdb2_settings.unwrap()))
+        .into()),
+        (None, None) => Err(ConfigError::MissingConfiguration.into()),
+        (Some(settings), _) => Ok(Box::new(settings)),
+        (_, Some(settings)) => Ok(Box::new(settings)),
     }
 }
 
@@ -155,33 +145,30 @@ fn healthcheck(
     endpoint: String,
     influxdb1_settings: Option<InfluxDB1Settings>,
     influxdb2_settings: Option<InfluxDB2Settings>,
-    resolver: Resolver,
+    mut client: HttpClient,
 ) -> crate::Result<super::Healthcheck> {
-    let settings = influxdb_settings(influxdb1_settings.clone(), influxdb2_settings.clone())?;
-
-    let endpoint = endpoint.clone();
+    let settings = influxdb_settings(influxdb1_settings, influxdb2_settings)?;
 
     let uri = settings.healthcheck_uri(endpoint)?;
 
     let request = hyper::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let mut client = HttpClient::new(resolver, None)?;
-
-    let healthcheck = client
-        .call(request)
-        .compat()
-        .map_err(|err| err.into())
-        .and_then(|response| match response.status() {
-            StatusCode::OK => Ok(()),
-            StatusCode::NO_CONTENT => Ok(()),
-            other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
-        });
-
-    Ok(Box::new(healthcheck))
+    Ok(async move {
+        client
+            .call(request)
+            .await
+            .map_err(|err| err.into())
+            .and_then(|response| match response.status() {
+                StatusCode::OK => Ok(()),
+                StatusCode::NO_CONTENT => Ok(()),
+                other => Err(super::HealthcheckError::UnexpectedStatus { status: other }.into()),
+            })
+    }
+    .boxed())
 }
 
 // https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/
-fn influx_line_protocol(
+pub(in crate::sinks) fn influx_line_protocol(
     protocol_version: ProtocolVersion,
     measurement: String,
     metric_type: &str,
@@ -191,7 +178,7 @@ fn influx_line_protocol(
     line_protocol: &mut String,
 ) {
     // Fields
-    let unwrapped_fields = fields.unwrap_or_else(|| HashMap::new());
+    let unwrapped_fields = fields.unwrap_or_else(HashMap::new);
     // LineProtocol should have a field
     if unwrapped_fields.is_empty() {
         return;
@@ -201,7 +188,7 @@ fn influx_line_protocol(
     line_protocol.push(',');
 
     // Tags
-    let mut unwrapped_tags = tags.unwrap_or_else(|| BTreeMap::new());
+    let mut unwrapped_tags = tags.unwrap_or_else(BTreeMap::new);
     unwrapped_tags.insert("metric_type".to_owned(), metric_type.to_owned());
     encode_tags(unwrapped_tags, line_protocol);
     line_protocol.push(' ');
@@ -287,7 +274,7 @@ fn encode_string(key: String, output: &mut String) {
     }
 }
 
-fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
+pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     if let Some(ts) = timestamp {
         ts.timestamp_nanos()
     } else {
@@ -295,15 +282,11 @@ fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
     }
 }
 
-fn encode_namespace(namespace: &str, name: &str) -> String {
-    if !namespace.is_empty() {
-        format!("{}.{}", namespace, name)
-    } else {
-        name.to_string()
-    }
-}
-
-fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> crate::Result<Uri> {
+pub(in crate::sinks) fn encode_uri(
+    endpoint: &str,
+    path: &str,
+    pairs: &[(&str, Option<String>)],
+) -> crate::Result<Uri> {
     let mut serializer = url::form_urlencoded::Serializer::new(String::new());
 
     for pair in pairs {
@@ -318,7 +301,7 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
         format!("{}/{}?{}", endpoint, path, serializer.finish())
     };
 
-    if url.ends_with("?") {
+    if url.ends_with('?') {
         url.pop();
     }
 
@@ -330,11 +313,13 @@ fn encode_uri(endpoint: &str, path: &str, pairs: &[(&str, Option<String>)]) -> c
 pub mod test_util {
     use super::*;
     use chrono::offset::TimeZone;
+    use std::fs::File;
+    use std::io::Read;
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
     pub(crate) const TOKEN: &str = "my-token";
-    pub(crate) const DATABASE: &str = "my-database";
+    pub(crate) const DATABASE: &str = "testdb";
 
     pub(crate) fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -378,10 +363,51 @@ pub mod test_util {
 
         split = split[1].splitn(3, ' ').collect::<Vec<&str>>();
 
-        return (measurement, split[0], split[1].to_string(), split[2]);
+        (measurement, split[0], split[1].to_string(), split[2])
     }
 
-    pub(crate) fn onboarding_v2() {
+    pub(crate) async fn query_v1(endpoint: &str, query: &str) -> reqwest::Response {
+        let mut test_ca = Vec::<u8>::new();
+        File::open("tests/data/Vector_CA.crt")
+            .unwrap()
+            .read_to_end(&mut test_ca)
+            .unwrap();
+        let test_ca = reqwest::Certificate::from_pem(&test_ca).unwrap();
+
+        let client = reqwest::Client::builder()
+            .add_root_certificate(test_ca)
+            .build()
+            .unwrap();
+
+        client
+            .get(&format!("{}/query", endpoint))
+            .query(&[("q", query)])
+            .send()
+            .await
+            .unwrap()
+    }
+
+    pub(crate) async fn onboarding_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("create database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
+    }
+
+    pub(crate) async fn cleanup_v1(endpoint: &str) {
+        let status = query_v1(endpoint, &format!("drop database {}", DATABASE))
+            .await
+            .status();
+        assert!(
+            status == http::StatusCode::OK,
+            format!("UnexpectedStatus: {}", status)
+        );
+    }
+
+    pub(crate) async fn onboarding_v2() {
         let mut body = std::collections::HashMap::new();
         body.insert("username", "my-user");
         body.insert("password", "my-password");
@@ -399,13 +425,13 @@ pub mod test_util {
             .json(&body)
             .header("accept", "application/json")
             .send()
+            .await
             .unwrap();
 
         let status = res.status();
 
         assert!(
-            status == http01::StatusCode::CREATED
-                || status == http01::StatusCode::UNPROCESSABLE_ENTITY,
+            status == StatusCode::CREATED || status == StatusCode::UNPROCESSABLE_ENTITY,
             format!("UnexpectedStatus: {}", status)
         );
     }
@@ -435,10 +461,10 @@ mod tests {
     "#;
         let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        match settings {
-            Ok(_) => assert!(false, "Expected error"),
-            Err(e) => assert_eq!(format!("{}",e), "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned())
-        }
+        assert_eq!(
+            format!("{}", settings.expect_err("expected error")),
+            "Unclear settings. Both version configured v1: InfluxDB1Settings { database: \"my-database\", consistency: None, retention_policy_name: None, username: None, password: None }, v2: InfluxDB2Settings { org: \"my-org\", bucket: \"my-bucket\", token: \"my-token\" }.".to_owned()
+        );
     }
 
     #[test]
@@ -447,13 +473,10 @@ mod tests {
     "#;
         let config: InfluxDBTestConfig = toml::from_str(&config).unwrap();
         let settings = influxdb_settings(config.influxdb1_settings, config.influxdb2_settings);
-        match settings {
-            Ok(_) => assert!(false, "Expected error"),
-            Err(e) => assert_eq!(
-                format!("{}", e),
-                "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
-            ),
-        }
+        assert_eq!(
+            format!("{}", settings.expect_err("expected error")),
+            "InfluxDB v1 or v2 should be configured as endpoint.".to_owned()
+        );
     }
 
     #[test]
@@ -668,12 +691,6 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_namespace() {
-        assert_eq!(encode_namespace("services", "status"), "services.status");
-        assert_eq!(encode_namespace("", "status"), "status")
-    }
-
-    #[test]
     fn test_encode_uri_valid() {
         let uri = encode_uri(
             "http://localhost:9999",
@@ -737,17 +754,21 @@ mod tests {
 #[cfg(feature = "influxdb-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
-    use crate::sinks::influxdb::test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN};
-    use crate::sinks::influxdb::{healthcheck, InfluxDB1Settings, InfluxDB2Settings};
-    use crate::test_util::runtime;
-    use crate::topology::SinkContext;
+    use crate::{
+        config::SinkContext,
+        http::HttpClient,
+        sinks::influxdb::{
+            healthcheck,
+            test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN},
+            InfluxDB1Settings, InfluxDB2Settings,
+        },
+    };
 
-    #[test]
-    fn influxdb2_healthchecks_ok() {
-        onboarding_v2();
+    #[tokio::test]
+    async fn influxdb2_healthchecks_ok() {
+        onboarding_v2().await;
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -755,23 +776,19 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap();
     }
 
-    #[test]
-    fn influxdb2_healthchecks_fail() {
-        onboarding_v2();
+    #[tokio::test]
+    async fn influxdb2_healthchecks_fail() {
+        onboarding_v2().await;
 
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -779,20 +796,17 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap_err();
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
+
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap_err();
     }
 
-    #[test]
-    fn influxdb1_healthchecks_ok() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+    #[tokio::test]
+    async fn influxdb1_healthchecks_ok() {
+        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -802,21 +816,17 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap();
     }
 
-    #[test]
-    fn influxdb1_healthchecks_fail() {
-        let mut rt = runtime();
-        let cx = SinkContext::new_test(rt.executor());
+    #[tokio::test]
+    async fn influxdb1_healthchecks_fail() {
+        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -826,14 +836,11 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
+        let client = HttpClient::new(cx.resolver(), None).unwrap();
 
-        let healthcheck = healthcheck(
-            endpoint,
-            influxdb1_settings,
-            influxdb2_settings,
-            cx.resolver(),
-        )
-        .unwrap();
-        rt.block_on(healthcheck).unwrap_err();
+        healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
+            .unwrap()
+            .await
+            .unwrap_err();
     }
 }

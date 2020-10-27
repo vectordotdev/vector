@@ -1,33 +1,41 @@
 use super::Transform;
 use crate::{
-    event::{self, Value},
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    event::Value,
+    internal_events::{
+        ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
+        ANSIStripperFieldMissing,
+    },
     Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AnsiStripperConfig {
-    field: Option<Atom>,
+    field: Option<String>,
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<AnsiStripperConfig>("ansi_stripper")
+    TransformDescription::new::<AnsiStripperConfig>("ansi_stripper")
 }
 
+impl GenerateConfig for AnsiStripperConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { field: None }).unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
-            .as_ref()
-            .unwrap_or(&event::log_schema().message_key());
+            .clone()
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
 
-        Ok(Box::new(AnsiStripper {
-            field: field.clone(),
-        }))
+        Ok(Box::new(AnsiStripper { field }))
     }
 
     fn input_type(&self) -> DataType {
@@ -44,7 +52,7 @@ impl TransformConfig for AnsiStripperConfig {
 }
 
 pub struct AnsiStripper {
-    field: Atom,
+    field: String,
 }
 
 impl Transform for AnsiStripper {
@@ -52,29 +60,20 @@ impl Transform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => debug!(
-                message = "Field does not exist.",
-                field = self.field.as_ref(),
-            ),
+            None => emit!(ANSIStripperFieldMissing { field: &self.field }),
             Some(Value::Bytes(ref mut bytes)) => {
-                *bytes = match strip_ansi_escapes::strip(bytes.clone()) {
-                    Ok(b) => b.into(),
-                    Err(error) => {
-                        debug!(
-                            message = "Could not strip ANSI escape sequences.",
-                            field = self.field.as_ref(),
-                            %error,
-                            rate_limit_secs = 30,
-                        );
-                        return Some(event);
-                    }
+                match strip_ansi_escapes::strip(&bytes) {
+                    Ok(b) => *bytes = b.into(),
+                    Err(error) => emit!(ANSIStripperFailed {
+                        field: &self.field,
+                        error
+                    }),
                 };
             }
-            _ => debug!(
-                message = "Field value must be a string.",
-                field = self.field.as_ref(),
-            ),
+            _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
         }
+
+        emit!(ANSIStripperEventProcessed);
 
         Some(event)
     }
@@ -82,11 +81,16 @@ impl Transform for AnsiStripper {
 
 #[cfg(test)]
 mod tests {
-    use super::AnsiStripper;
+    use super::{AnsiStripper, AnsiStripperConfig};
     use crate::{
-        event::{self, Event, Value},
+        event::{Event, Value},
         transforms::Transform,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AnsiStripperConfig>();
+    }
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {
@@ -99,7 +103,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(&event::log_schema().message_key()).unwrap(),
+                    event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),
                     Value::from("foo bar")
                 );
             )+

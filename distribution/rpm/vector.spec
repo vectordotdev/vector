@@ -7,6 +7,25 @@
 %define _sourceroot %{_name}-%{_arch}
 %define _buildname %{name}-%{version}-%{release}.%{_arch}
 %define _username %{_name}
+%define _sharedstatedir /var/lib
+
+%if %{undefined _unitdir}
+%global _unitdir %{_prefix}/lib/systemd/system
+%endif
+
+%if %{undefined _presetdir}
+%global _presetdir %{_prefix}/lib/systemd/system-preset
+%endif
+
+%if %{undefined _modulesloaddir}
+%global _modulesloaddir %{_prefix}/lib/modules-load.d
+%endif
+
+%if %{undefined _systemdgeneratordir}
+%global _systemdgeneratordir %{_prefix}/lib/systemd/system-generators
+%endif
+
+%define _build_id_links none
 
 Name: %{_name}
 Summary: A lightweight and ultra-fast tool for building observability pipelines
@@ -16,6 +35,7 @@ License: ASL 2.0
 Group: Applications/System
 Source: %{_source}
 URL: %{_url}
+AutoReqProv: no
 
 %description
 %{summary}
@@ -33,7 +53,7 @@ mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_sysconfdir}/%{_name}
 mkdir -p %{buildroot}%{_sharedstatedir}/%{_name}
 mkdir -p %{buildroot}%{_unitdir}
-cp -a %{_builddir}/bin/. %{buildroot}%{_bindir}
+cp -a %{_builddir}/bin/vector %{buildroot}%{_bindir}
 cp -a %{_builddir}/config/vector.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.toml
 cp -a %{_builddir}/config/vector.spec.toml %{buildroot}%{_sysconfdir}/%{_name}/vector.spec.toml
 cp -a %{_builddir}/config/examples/. %{buildroot}%{_sysconfdir}/%{_name}/examples
@@ -45,6 +65,7 @@ getent passwd %{_username} > /dev/null || \
   useradd -r -d %{_sharedstatedir}/%{_name} -g %{_username} -s /sbin/nologin \
   -c "Vector observability data router" %{_username}
 chown %{_username} %{_sharedstatedir}/%{_name}
+usermod -aG systemd-journal %{_username}  || true
 
 %clean
 rm -rf %{buildroot}

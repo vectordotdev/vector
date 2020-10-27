@@ -7,7 +7,9 @@
 checkpoints/*
 logs*/
 miniodat
+bench_output.txt
 sample.log
+scripts/package-lock.json
 target
 node_modules
 tests/data/wasm/*/target

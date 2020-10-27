@@ -29,11 +29,11 @@ for FILE in $(git ls-files); do
   case "$FILE" in
     *png) continue;;
     *svg) continue;;
+    *gif) continue;;
     *ico) continue;;
     *sig) continue;;
     tests/data*) continue;;
-    website/plugins/*) continue;;
-    website/sidebars.js) continue;;
+    distribution/kubernetes/vector.yaml) continue;;
   esac
 
   # check that the file contains trailing newline

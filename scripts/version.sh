@@ -11,7 +11,7 @@ set -euo pipefail
 #   is nightly.
 
 VERSION="${VERSION:-"$(sed -n 's/^version\s=\s"\(.*\)"/\1/p' Cargo.toml)"}"
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 if [ "$CHANNEL" == "nightly" ]; then
   VERSION="$VERSION-nightly"
 fi

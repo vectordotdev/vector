@@ -1,6 +1,3 @@
-#![allow(clippy::redundant_static_lifetimes)]
-#![allow(clippy::unreadable_literal)]
-
 #[macro_use]
 extern crate tracing;
 
@@ -16,7 +13,7 @@ use tracing::{field, span, Event, Id, Metadata};
 use tracing_limit::Limit;
 use tracing_subscriber::layer::SubscriberExt;
 
-const INPUTS: &'static [usize] = &[1, 100, 500, 1000];
+const INPUTS: &[usize] = &[1, 100, 500, 1000];
 
 fn bench(c: &mut Criterion) {
     c.bench_function_over_inputs(
@@ -32,7 +29,7 @@ fn bench(c: &mut Criterion) {
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = field::debug(0.99),
+                            quuux = ?0.99,
                         )
                     }
                 })
@@ -54,7 +51,7 @@ fn bench(c: &mut Criterion) {
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = field::debug(0.99),
+                            quuux = ?0.99,
                             rate_limit_secs = 5
                         )
                     }

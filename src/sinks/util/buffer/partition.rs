@@ -1,4 +1,4 @@
-use crate::sinks::util::{Batch, PushResult};
+use super::super::batch::{Batch, BatchConfig, BatchError, BatchSettings, PushResult};
 
 pub trait Partition<K> {
     fn partition(&self) -> K;
@@ -28,6 +28,13 @@ where
 {
     type Input = PartitionInnerBuffer<T::Input, K>;
     type Output = PartitionInnerBuffer<T::Output, K>;
+
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(T::get_settings_defaults(config, defaults.into())?.into())
+    }
 
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         let key = item.key;

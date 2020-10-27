@@ -1,28 +1,35 @@
 use super::Transform;
 use crate::{
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    internal_events::RemoveTagsEventProcessed,
     Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveTagsConfig {
-    pub tags: Vec<Atom>,
+    pub tags: Vec<String>,
 }
 
 pub struct RemoveTags {
-    tags: Vec<Atom>,
+    tags: Vec<String>,
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<RemoveTagsConfig>("remove_tags")
+    TransformDescription::new::<RemoveTagsConfig>("remove_tags")
 }
 
+impl GenerateConfig for RemoveTagsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { tags: Vec::new() }).unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveTags::new(self.tags.clone())))
     }
 
@@ -40,18 +47,20 @@ impl TransformConfig for RemoveTagsConfig {
 }
 
 impl RemoveTags {
-    pub fn new(tags: Vec<Atom>) -> Self {
+    pub fn new(tags: Vec<String>) -> Self {
         RemoveTags { tags }
     }
 }
 
 impl Transform for RemoveTags {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
-        let ref mut tags = event.as_mut_metric().tags;
+        emit!(RemoveTagsEventProcessed);
+
+        let tags = &mut event.as_mut_metric().tags;
 
         if let Some(map) = tags {
             for tag in &self.tags {
-                map.remove(tag.as_ref());
+                map.remove(tag);
 
                 if map.is_empty() {
                     *tags = None;
@@ -66,7 +75,7 @@ impl Transform for RemoveTags {
 
 #[cfg(test)]
 mod tests {
-    use super::RemoveTags;
+    use super::{RemoveTags, RemoveTagsConfig};
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
@@ -74,9 +83,15 @@ mod tests {
     };
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoveTagsConfig>();
+    }
+
+    #[test]
     fn remove_tags() {
         let event = Event::Metric(Metric {
             name: "foo".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(
                 vec![
@@ -105,6 +120,7 @@ mod tests {
     fn remove_all_tags() {
         let event = Event::Metric(Metric {
             name: "foo".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(
                 vec![("env".to_owned(), "production".to_owned())]
@@ -125,6 +141,7 @@ mod tests {
     fn remove_tags_from_none() {
         let event = Event::Metric(Metric {
             name: "foo".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,

@@ -1,0 +1,4 @@
+{
+  "foo": "bar",
+  "foo": "You're not allowed duplicate keys..."
+}

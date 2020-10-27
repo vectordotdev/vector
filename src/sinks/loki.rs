@@ -13,26 +13,23 @@
 //! does not match, we will add a default label `{agent="vector"}`.
 
 use crate::{
-    dns::Resolver,
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
-    runtime::FutureExt,
+    http::{Auth, HttpClient},
     sinks::util::{
+        buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
-        service2::TowerRequestConfig,
-        BatchConfig, BatchSettings, UriSerde, VecBuffer,
+        http::{BatchedHttpSink, HttpSink},
+        BatchConfig, BatchSettings, TowerRequestConfig, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use derivative::Derivative;
+use futures::FutureExt;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::collections::HashMap;
-
-type Labels = Vec<(String, String)>;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -70,37 +67,55 @@ enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<LokiConfig>("loki")
+    SinkDescription::new::<LokiConfig>("loki")
 }
 
+impl GenerateConfig for LokiConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "http://localhost:3100"
+            labels = {}"#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
 impl SinkConfig for LokiConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::RouterSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         if self.labels.is_empty() {
-            return Err(format!("`labels` must include at least one label.").into());
+            return Err("`labels` must include at least one label.".into());
         }
 
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
-        let batch_settings = self.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .timeout(1),
-        );
+        let batch_settings = BatchSettings::default()
+            .bytes(102_400)
+            .events(100_000)
+            .timeout(1)
+            .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(cx.resolver(), tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
-            VecBuffer::new(batch_settings.size),
+            LokiBuffer::new(batch_settings.size),
             request_settings,
             batch_settings.timeout,
-            Some(tls),
-            &cx,
+            client.clone(),
+            cx.acker(),
         )
         .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
 
-        let healthcheck = healthcheck(self.clone(), cx.resolver()).boxed_compat();
+        let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((Box::new(sink), Box::new(healthcheck)))
+        Ok((
+            super::VectorSink::Futures01Sink(Box::new(sink)),
+            healthcheck,
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -114,11 +129,10 @@ impl SinkConfig for LokiConfig {
 
 #[async_trait::async_trait]
 impl HttpSink for LokiConfig {
-    type Input = (Labels, (i64, String));
-    type Output = Vec<(Labels, (i64, String))>;
+    type Input = LokiRecord;
+    type Output = serde_json::Value;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
-        self.encoding.apply_rules(&mut event);
         let mut labels = Vec::new();
 
         for (key, template) in &self.labels {
@@ -135,27 +149,23 @@ impl HttpSink for LokiConfig {
             }
         }
 
-        let ts = if let Some(event::Value::Timestamp(ts)) =
-            event.as_log().get(&event::log_schema().timestamp_key())
-        {
-            ts.timestamp_nanos()
-        } else {
-            chrono::Utc::now().timestamp_nanos()
+        let timestamp = match event.as_log().get(log_schema().timestamp_key()) {
+            Some(event::Value::Timestamp(ts)) => ts.timestamp_nanos(),
+            _ => chrono::Utc::now().timestamp_nanos(),
         };
 
         if self.remove_timestamp {
-            event
-                .as_mut_log()
-                .remove(&event::log_schema().timestamp_key());
+            event.as_mut_log().remove(log_schema().timestamp_key());
         }
 
+        self.encoding.apply_rules(&mut event);
         let event = match &self.encoding.codec() {
             Encoding::Json => serde_json::to_string(&event.as_log().all_fields())
                 .expect("json encoding should never fail"),
 
             Encoding::Text => event
                 .as_log()
-                .get(&event::log_schema().message_key())
+                .get(log_schema().message_key())
                 .map(Value::to_string_lossy)
                 .unwrap_or_default(),
         };
@@ -167,48 +177,12 @@ impl HttpSink for LokiConfig {
             labels = vec![("agent".to_string(), "vector".to_string())]
         }
 
-        Some((labels, (ts, event)))
+        let event = LokiEvent { timestamp, event };
+        Some(LokiRecord { labels, event })
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
-        let mut streams: HashMap<Labels, Vec<(i64, String)>> = HashMap::new();
-
-        for (mut labels, event) in events {
-            // We must sort here to ensure it hashes to the same stream
-            // if the label set matches.
-            labels.sort();
-
-            if let Some(stream) = streams.get_mut(&labels) {
-                stream.push(event);
-            } else {
-                streams.insert(labels, vec![event]);
-            }
-        }
-
-        // Construct the json body
-        let mut streams_json: Vec<serde_json::Value> = Vec::new();
-
-        for (stream, mut events) in streams {
-            // Sort by timestamp
-            events.sort_by_key(|e| e.0);
-
-            let stream = stream.into_iter().collect::<HashMap<_, _>>();
-            let events = events
-                .into_iter()
-                // The final json output should be: `[ts, line]`
-                .map(|e| json!([format!("{}", e.0), e.1]))
-                .collect::<Vec<_>>();
-
-            streams_json.push(json!({
-                "stream": stream,
-                "values": events,
-            }));
-        }
-
-        let body = serde_json::to_vec(&json!({
-            "streams": streams_json,
-        }))
-        .unwrap();
+    async fn build_request(&self, json: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+        let body = serde_json::to_vec(&json).unwrap();
 
         let uri = format!("{}loki/api/v1/push", self.endpoint);
 
@@ -228,13 +202,14 @@ impl HttpSink for LokiConfig {
     }
 }
 
-async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()> {
+async fn healthcheck(config: LokiConfig, mut client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}ready", config.endpoint);
 
-    let tls = TlsSettings::from_options(&config.tls)?;
-    let mut client = HttpClient::new(resolver, tls)?;
+    let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
-    let req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
+    if let Some(auth) = &config.auth {
+        auth.apply(&mut req);
+    }
 
     let res = client.send(req).await?;
 
@@ -249,12 +224,19 @@ async fn healthcheck(config: LokiConfig, resolver: Resolver) -> crate::Result<()
 mod tests {
     use super::*;
     use crate::sinks::util::http::HttpSink;
-    use crate::sinks::util::test::load_sink;
+    use crate::sinks::util::test::{build_test_server, load_sink};
+    use crate::test_util;
     use crate::Event;
+    use futures::StreamExt;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LokiConfig>();
+    }
 
     #[test]
     fn interpolate_labels() {
-        let (config, _cx, _rt) = load_sink::<LokiConfig>(
+        let (config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {label1 = "{{ foo }}", label2 = "some-static-label"}
@@ -268,10 +250,10 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let (mut labels, (_, line)) = config.encode_event(e1).unwrap();
+        let mut record = config.encode_event(e1).unwrap();
 
         // HashMap -> Vec doesn't like keeping ordering
-        labels.sort();
+        record.labels.sort();
 
         // The final event should have timestamps and labels removed
         let expected_line = serde_json::to_string(&serde_json::json!({
@@ -279,33 +261,102 @@ mod tests {
         }))
         .unwrap();
 
-        assert_eq!(line, expected_line);
+        assert_eq!(record.event.event, expected_line);
 
-        assert_eq!(labels[0], ("label1".to_string(), "bar".to_string()));
+        assert_eq!(record.labels[0], ("label1".to_string(), "bar".to_string()));
         assert_eq!(
-            labels[1],
+            record.labels[1],
             ("label2".to_string(), "some-static-label".to_string())
+        );
+    }
+
+    #[test]
+    fn use_label_from_dropped_fields() {
+        let (config, _cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels.bar = "{{ foo }}"
+            encoding.codec = "json"
+            encoding.except_fields = ["foo"]
+        "#,
+        )
+        .unwrap();
+
+        let mut e1 = Event::from("hello world");
+
+        e1.as_mut_log().insert("foo", "bar");
+
+        let record = config.encode_event(e1).unwrap();
+
+        let expected_line = serde_json::to_string(&serde_json::json!({
+            "message": "hello world",
+        }))
+        .unwrap();
+
+        assert_eq!(record.event.event, expected_line);
+
+        assert_eq!(record.labels[0], ("bar".to_string(), "bar".to_string()));
+    }
+
+    #[tokio::test]
+    async fn healthcheck_includes_auth() {
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+			auth.strategy = "basic"
+			auth.user = "username"
+			auth.password = "some_password"
+        "#,
+        )
+        .unwrap();
+
+        let addr = test_util::next_addr();
+        let endpoint = format!("http://{}", addr);
+        config.endpoint = endpoint
+            .clone()
+            .parse::<http::Uri>()
+            .expect("could not create URI")
+            .into();
+
+        let (rx, _trigger, server) = build_test_server(addr);
+        tokio::spawn(server);
+
+        let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
+        let client = HttpClient::new(cx.resolver(), tls).expect("could not cerate HTTP client");
+
+        healthcheck(config.clone(), client)
+            .await
+            .expect("healthcheck failed");
+
+        let output = rx.take(1).collect::<Vec<_>>().await;
+        assert_eq!(
+            Some(&http::header::HeaderValue::from_static(
+                "Basic dXNlcm5hbWU6c29tZV9wYXNzd29yZA=="
+            )),
+            output[0].0.headers.get("authorization")
         );
     }
 }
 
-#[cfg(feature = "docker")]
+#[cfg(feature = "loki-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::sinks::util::test::load_sink;
-    use crate::template::Template;
-    use crate::topology::config::SinkConfig;
-    use crate::Event;
+    use crate::{
+        config::SinkConfig, sinks::util::test::load_sink, template::Template,
+        test_util::random_lines, Event,
+    };
     use bytes::Bytes;
+    use futures::compat::Future01CompatExt;
     use futures01::Sink;
     use std::convert::TryFrom;
 
-    #[test]
-    fn text() {
+    #[tokio::test]
+    async fn text() {
         let stream = uuid::Uuid::new_v4();
 
-        let (mut config, cx, mut rt) = load_sink::<LokiConfig>(
+        let (mut config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
@@ -319,29 +370,29 @@ mod integration_tests {
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let events = lines.clone().into_iter().map(Event::from);
-        let _ = rt
-            .block_on(sink.send_all(futures01::stream::iter_ok(events)))
+        let _ = sink
+            .into_futures01sink()
+            .send_all(futures01::stream::iter_ok(events))
+            .compat()
+            .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string());
-
+        let outputs = fetch_stream(stream.to_string()).await;
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
     }
 
-    #[test]
-    fn json() {
+    #[tokio::test]
+    async fn json() {
         let stream = uuid::Uuid::new_v4();
 
-        let (mut config, cx, mut rt) = load_sink::<LokiConfig>(
+        let (mut config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
@@ -356,31 +407,32 @@ mod integration_tests {
 
         *test_name = Template::try_from(stream.to_string()).unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-        let events = crate::test_util::random_lines(100)
+        let events = random_lines(100)
             .take(10)
             .map(Event::from)
             .collect::<Vec<_>>();
-
-        let _ = rt
-            .block_on(sink.send_all(futures01::stream::iter_ok(events.clone())))
+        let _ = sink
+            .into_futures01sink()
+            .send_all(futures01::stream::iter_ok(events.clone()))
+            .compat()
+            .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string());
-
+        let outputs = fetch_stream(stream.to_string()).await;
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
             assert_eq!(output, &expected_json);
         }
     }
 
-    #[test]
-    fn many_streams() {
+    #[tokio::test]
+    async fn many_streams() {
         let stream1 = uuid::Uuid::new_v4();
         let stream2 = uuid::Uuid::new_v4();
 
-        let (config, cx, mut rt) = load_sink::<LokiConfig>(
+        let (config, cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "{{ stream_id }}"}
@@ -389,11 +441,9 @@ mod integration_tests {
         )
         .unwrap();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
-        let lines = crate::test_util::random_lines(100)
-            .take(10)
-            .collect::<Vec<_>>();
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
 
         let mut events = lines
             .clone()
@@ -411,12 +461,15 @@ mod integration_tests {
             }
         }
 
-        let _ = rt
-            .block_on(sink.send_all(futures01::stream::iter_ok(events)))
+        let _ = sink
+            .into_futures01sink()
+            .send_all(futures01::stream::iter_ok(events))
+            .compat()
+            .await
             .unwrap();
 
-        let outputs1 = fetch_stream(stream1.to_string());
-        let outputs2 = fetch_stream(stream2.to_string());
+        let outputs1 = fetch_stream(stream1.to_string()).await;
+        let outputs2 = fetch_stream(stream2.to_string()).await;
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
@@ -429,19 +482,19 @@ mod integration_tests {
         }
     }
 
-    fn fetch_stream(stream: String) -> Vec<String> {
+    async fn fetch_stream(stream: String) -> Vec<String> {
         let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
         let query = format!(
             "http://localhost:3100/loki/api/v1/query_range?query={}&direction=forward",
             query
         );
-        let mut res = reqwest::get(&query).unwrap();
+        let res = reqwest::get(&query).await.unwrap();
 
         assert_eq!(res.status(), 200);
 
         // The response type follows this api https://github.com/grafana/loki/blob/master/docs/api.md#get-lokiapiv1query_range
         // where the result type is `streams`.
-        let data = res.json::<serde_json::Value>().unwrap();
+        let data = res.json::<serde_json::Value>().await.unwrap();
 
         // TODO: clean this up or explain it via docs
         let results = data

@@ -1,4 +1,4 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
+use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -58,6 +58,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             let val: f64 = parts[0].parse()?;
             Metric {
                 name,
+                namespace: None,
                 timestamp: None,
                 tags,
                 kind: MetricKind::Incremental,
@@ -66,16 +67,18 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 },
             }
         }
-        unit @ "h" | unit @ "ms" => {
+        unit @ "h" | unit @ "ms" | unit @ "d" => {
             let val: f64 = parts[0].parse()?;
             Metric {
                 name,
+                namespace: None,
                 timestamp: None,
                 tags,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
                     values: vec![convert_to_base_units(unit, val)],
                     sample_rates: vec![sample_rate as u32],
+                    statistic: convert_to_statistic(unit),
                 },
             }
         }
@@ -94,6 +97,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             match parse_direction(parts[0])? {
                 None => Metric {
                     name,
+                    namespace: None,
                     timestamp: None,
                     tags,
                     kind: MetricKind::Absolute,
@@ -101,6 +105,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 },
                 Some(sign) => Metric {
                     name,
+                    namespace: None,
                     timestamp: None,
                     tags,
                     kind: MetricKind::Incremental,
@@ -112,6 +117,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
         }
         "s" => Metric {
             name,
+            namespace: None,
             timestamp: None,
             tags,
             kind: MetricKind::Incremental,
@@ -197,6 +203,13 @@ fn convert_to_base_units(unit: &str, val: f64) -> f64 {
     }
 }
 
+fn convert_to_statistic(unit: &str) -> StatisticKind {
+    match unit {
+        "d" => StatisticKind::Summary,
+        _ => StatisticKind::Histogram,
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ParseError {
     Malformed(&'static str),
@@ -207,9 +220,7 @@ pub enum ParseError {
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            anything => write!(f, "Statsd parse error: {:?}", anything),
-        }
+        write!(f, "Statsd parse error: {:?}", self)
     }
 }
 
@@ -230,7 +241,7 @@ impl From<ParseFloatError> for ParseError {
 #[cfg(test)]
 mod test {
     use super::{parse, sanitize_key, sanitize_sampling};
-    use crate::event::metric::{Metric, MetricKind, MetricValue};
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[test]
     fn basic_counter() {
@@ -238,6 +249,7 @@ mod test {
             parse("foo:1|c"),
             Ok(Metric {
                 name: "foo".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -252,6 +264,7 @@ mod test {
             parse("foo:1|c|#tag1,tag2:value"),
             Ok(Metric {
                 name: "foo".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -273,6 +286,7 @@ mod test {
             parse("bar:2|c|@0.1"),
             Ok(Metric {
                 name: "bar".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -287,6 +301,7 @@ mod test {
             parse("bar:2|c|@0"),
             Ok(Metric {
                 name: "bar".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -301,12 +316,14 @@ mod test {
             parse("glork:320|ms|@0.1"),
             Ok(Metric {
                 name: "glork".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Distribution {
                     values: vec![0.320],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram
                 },
             }),
         );
@@ -318,6 +335,7 @@ mod test {
             parse("glork:320|h|@0.1|#region:us-west1,production,e:"),
             Ok(Metric {
                 name: "glork".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -332,6 +350,34 @@ mod test {
                 value: MetricValue::Distribution {
                     values: vec![320.0],
                     sample_rates: vec![10],
+                    statistic: StatisticKind::Histogram
+                },
+            }),
+        );
+    }
+
+    #[test]
+    fn sampled_distribution() {
+        assert_eq!(
+            parse("glork:320|d|@0.1|#region:us-west1,production,e:"),
+            Ok(Metric {
+                name: "glork".into(),
+                namespace: None,
+                timestamp: None,
+                tags: Some(
+                    vec![
+                        ("region".to_owned(), "us-west1".to_owned()),
+                        ("production".to_owned(), "true".to_owned()),
+                        ("e".to_owned(), "".to_owned()),
+                    ]
+                    .into_iter()
+                    .collect(),
+                ),
+                kind: MetricKind::Incremental,
+                value: MetricValue::Distribution {
+                    values: vec![320.0],
+                    sample_rates: vec![10],
+                    statistic: StatisticKind::Summary
                 },
             }),
         );
@@ -343,6 +389,7 @@ mod test {
             parse("gaugor:333|g"),
             Ok(Metric {
                 name: "gaugor".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -357,6 +404,7 @@ mod test {
             parse("gaugor:-4|g"),
             Ok(Metric {
                 name: "gaugor".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -367,6 +415,7 @@ mod test {
             parse("gaugor:+10|g"),
             Ok(Metric {
                 name: "gaugor".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -381,6 +430,7 @@ mod test {
             parse("uniques:765|s"),
             Ok(Metric {
                 name: "uniques".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,

@@ -1,51 +1,25 @@
-use super::batch::{err_event_too_large, Batch, BatchSize, PushResult};
+use super::batch::{
+    err_event_too_large, Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+};
 use flate2::write::GzEncoder;
-use serde::{Deserialize, Serialize};
 use std::io::Write;
 
+pub mod compression;
 pub mod json;
+pub mod loki;
 pub mod metrics;
 pub mod partition;
 pub mod vec;
 
+pub use compression::{Compression, GZIP_FAST};
 pub use partition::{Partition, PartitionBuffer, PartitionInnerBuffer};
-
-#[derive(Serialize, Deserialize, Debug, Derivative, Copy, Clone, Eq, PartialEq)]
-#[derivative(Default)]
-#[serde(rename_all = "lowercase")]
-pub enum Compression {
-    #[derivative(Default)]
-    None,
-    Gzip,
-}
-
-impl Compression {
-    pub fn default_gzip() -> Compression {
-        Compression::Gzip
-    }
-
-    pub fn content_encoding(&self) -> Option<&'static str> {
-        match self {
-            Self::None => None,
-            Self::Gzip => Some("gzip"),
-        }
-    }
-
-    pub fn extension(&self) -> &'static str {
-        match self {
-            Self::None => "log",
-            Self::Gzip => "log.gz",
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct Buffer {
     inner: InnerBuffer,
     num_items: usize,
     num_bytes: usize,
-    max_bytes: usize,
-    max_events: usize,
+    settings: BatchSize<Self>,
     compression: Compression,
 }
 
@@ -56,24 +30,23 @@ pub enum InnerBuffer {
 }
 
 impl Buffer {
-    pub fn new(settings: BatchSize, compression: Compression) -> Self {
-        Self::new_with_settings(settings.bytes, settings.events, compression)
-    }
-
-    fn new_with_settings(max_bytes: usize, max_events: usize, compression: Compression) -> Self {
-        let buffer = Vec::with_capacity(max_bytes);
+    pub fn new(settings: BatchSize<Self>, compression: Compression) -> Self {
+        let buffer = Vec::with_capacity(settings.bytes);
         let inner = match compression {
             Compression::None => InnerBuffer::Plain(buffer),
-            Compression::Gzip => {
-                InnerBuffer::Gzip(GzEncoder::new(buffer, flate2::Compression::fast()))
+            Compression::Gzip(level) => {
+                let level = level.unwrap_or(GZIP_FAST);
+                InnerBuffer::Gzip(GzEncoder::new(
+                    buffer,
+                    flate2::Compression::new(level as u32),
+                ))
             }
         };
         Self {
             inner,
             num_items: 0,
             num_bytes: 0,
-            max_bytes,
-            max_events,
+            settings,
             compression,
         }
     }
@@ -90,15 +63,6 @@ impl Buffer {
         }
     }
 
-    // This is not guaranteed to be completely accurate as the gzip library does
-    // some internal buffering.
-    pub fn size(&self) -> usize {
-        match &self.inner {
-            InnerBuffer::Plain(inner) => inner.len(),
-            InnerBuffer::Gzip(inner) => inner.get_ref().len(),
-        }
-    }
-
     pub fn is_empty(&self) -> bool {
         match &self.inner {
             InnerBuffer::Plain(inner) => inner.is_empty(),
@@ -111,19 +75,30 @@ impl Batch for Buffer {
     type Input = Vec<u8>;
     type Output = Vec<u8>;
 
+    fn get_settings_defaults(
+        config: BatchConfig,
+        defaults: BatchSettings<Self>,
+    ) -> Result<BatchSettings<Self>, BatchError> {
+        Ok(config
+            .use_size_as_bytes()?
+            .get_settings_or_default(defaults))
+    }
+
     fn push(&mut self, item: Self::Input) -> PushResult<Self::Input> {
         // The compressed encoders don't flush bytes immediately, so we
         // can't track compressed sizes. Keep a running count of the
         // number of bytes written instead.
         let new_bytes = self.num_bytes + item.len();
-        if self.is_empty() && item.len() > self.max_bytes {
+        if self.is_empty() && item.len() > self.settings.bytes {
             err_event_too_large(item.len())
-        } else if self.num_items >= self.max_events || new_bytes > self.max_bytes {
+        } else if self.num_items >= self.settings.events || new_bytes > self.settings.bytes {
             PushResult::Overflow(item)
         } else {
             self.push(&item);
             self.num_bytes = new_bytes;
-            PushResult::Ok(self.num_items >= self.max_events || new_bytes >= self.max_bytes)
+            PushResult::Ok(
+                self.num_items >= self.settings.events || new_bytes >= self.settings.bytes,
+            )
         }
     }
 
@@ -132,7 +107,7 @@ impl Batch for Buffer {
     }
 
     fn fresh(&self) -> Self {
-        Self::new_with_settings(self.max_bytes, self.max_events, self.compression)
+        Self::new(self.settings, self.compression)
     }
 
     fn finish(self) -> Self::Output {
@@ -153,43 +128,35 @@ impl Batch for Buffer {
 mod test {
     use super::{Buffer, Compression};
     use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSink, BatchSize};
-    use crate::test_util::runtime;
-    use futures01::{future, Future, Sink};
-    use std::io::Read;
-    use std::sync::{Arc, Mutex};
-    use std::time::Duration;
-    use tokio01_test::clock::MockClock;
+    use crate::sinks::util::{BatchSettings, BatchSink};
+    use futures::{compat::Future01CompatExt, future};
+    use futures01::Sink;
+    use std::{
+        io::Read,
+        sync::{Arc, Mutex},
+    };
+    use tokio::time::Duration;
 
-    #[test]
-    fn gzip() {
+    #[tokio::test]
+    async fn gzip() {
         use flate2::read::GzDecoder;
-
-        let rt = runtime();
-        let mut clock = MockClock::new();
 
         let (acker, _) = Acker::new_for_testing();
         let sent_requests = Arc::new(Mutex::new(Vec::new()));
 
         let svc = tower::service_fn(|req| {
-            let sent_requests = sent_requests.clone();
-
+            let sent_requests = Arc::clone(&sent_requests);
             sent_requests.lock().unwrap().push(req);
-
             future::ok::<_, std::io::Error>(())
         });
-        let batch_size = BatchSize {
-            bytes: 100_000,
-            events: 1_000,
-        };
+        let batch_size = BatchSettings::default().bytes(100_000).events(1_000).size;
         let timeout = Duration::from_secs(0);
 
-        let buffered = BatchSink::with_executor(
+        let buffered = BatchSink::new(
             svc,
-            Buffer::new(batch_size, Compression::Gzip),
+            Buffer::new(batch_size, Compression::gzip_default()),
             timeout,
             acker,
-            rt.executor(),
         );
 
         let input = std::iter::repeat(
@@ -197,15 +164,12 @@ mod test {
         )
         .take(100_000);
 
-        let (sink, _) = clock.enter(|_| {
-            buffered
-                .sink_map_err(drop)
-                .send_all(futures01::stream::iter_ok(input))
-                .wait()
-                .unwrap()
-        });
-
-        drop(sink);
+        let _ = buffered
+            .sink_map_err(drop)
+            .send_all(futures01::stream::iter_ok(input))
+            .compat()
+            .await
+            .unwrap();
 
         let output = Arc::try_unwrap(sent_requests)
             .unwrap()

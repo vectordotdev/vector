@@ -7,7 +7,7 @@ set -euo pipefail
 #
 #   Used to package a tar.gz archive for the specified $TARGET. This assumes
 #   that the binary is already built and in the proper $TARGET dir. See
-#   buid.sh for more info.
+#   build.sh for more info.
 #
 # ENV VARS
 #

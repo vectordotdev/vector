@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
 };
 use serde::{Deserialize, Serialize};
 
@@ -13,12 +13,23 @@ struct FilterConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<FilterConfig>("filter")
+    TransformDescription::new::<FilterConfig>("filter")
 }
 
+impl GenerateConfig for FilterConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"condition.type = "check_fields"
+            condition."message.eq" = "value""#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Filter::new(self.condition.build()?)))
     }
 
@@ -47,9 +58,18 @@ impl Filter {
 
 impl Transform for Filter {
     fn transform(&mut self, event: Event) -> Option<Event> {
-        match self.condition.check(&event) {
-            true => Some(event),
-            false => None,
+        if self.condition.check(&event) {
+            Some(event)
+        } else {
+            None
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::FilterConfig>();
     }
 }

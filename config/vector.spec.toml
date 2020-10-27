@@ -38,16 +38,6 @@ data_dir = "/var/lib/vector"
 data_dir = "/var/local/lib/vector/"
 data_dir = "/home/user/vector/"
 
-# The list of DNS servers Vector will use to resolve DNS requests. When set
-# Vector will ignore the system configuration and use only the list of DNS
-# servers provided. If this option is not set then Vector will attempt to use
-# the system configuration.
-#
-# * optional
-# * no default
-# * type: [string]
-dns_servers = ["0.0.0.0:53"]
-
 #
 # Log schema
 #
@@ -144,6 +134,14 @@ dns_servers = ["0.0.0.0:53"]
   # * type: string
   partial_event_marker_field = "_partial"
 
+  # The amount of time to wait before retrying after an error.
+  #
+  # * optional
+  # * default: 2
+  # * type: uint
+  # * unit: seconds
+  retry_backoff_secs = 2
+
   # The component type. This is a required field that tells Vector which
   # component to use. The value _must_ be `#{name}`.
   #
@@ -207,6 +205,18 @@ dns_servers = ["0.0.0.0:53"]
   # * unit: bytes
   max_line_bytes = 102400
 
+  # Timeout from reaching `eof` after which file will be removed from filesystem,
+  # unless new data is written in the meantime. If not specified, files will not
+  # be removed.
+  #
+  # * optional
+  # * no default
+  # * type: uint
+  # * unit: seconds
+  remove_after = 0
+  remove_after = 5
+  remove_after = 60
+
   # For files with a stored checkpoint at startup, setting this option to `true`
   # will tell Vector to read from the beginning of the file instead of the stored
   # checkpoint.
@@ -248,7 +258,7 @@ dns_servers = ["0.0.0.0:53"]
   # Fingerprinting
   #
 
-  [sources.file.fingerprinting]
+  [sources.file.fingerprint]
     # The number of bytes read off the head of the file to generate a unique
     # fingerprint.
     #
@@ -257,7 +267,7 @@ dns_servers = ["0.0.0.0:53"]
     # * type: uint
     # * unit: bytes
     # * relevant when strategy = "checksum"
-    fingerprint_bytes = 256
+    bytes = 256
 
     # The number of bytes to skip ahead (or ignore) when generating a unique
     # fingerprint. This is helpful if all files share a common header.
@@ -668,7 +678,8 @@ dns_servers = ["0.0.0.0:53"]
   #
 
   [sources.kafka.sasl]
-    # Enable SASL/SCRAM authentication to the remote.
+    # Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+    # this time.)
     #
     # * optional
     # * no default
@@ -1781,11 +1792,11 @@ dns_servers = ["0.0.0.0:53"]
   # * must be: "filter"
   type = "filter"
 
-# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2 and GeoLite2 city databases.
+# Accepts and outputs `log` events, allowing you to enrich events with geolocation data from the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP and GeoLite2-ASN databases.
 [transforms.geoip]
-  # Path to the MaxMind GeoIP2 or GeoLite2 binary city database file
-  # (`GeoLite2-City.mmdb`). Other databases, such as the the country database are
-  # not supported.
+  # Path to the MaxMind GeoIP2-City, GeoLite2-City, GeoIP2-ISP or GeoLite2-ASN
+  # binary database file (`GeoLite2-City.mmdb` or `GeoLite2-ISP.mmdb`). Other
+  # databases, such as the the country database, are not supported.
   #
   # * required
   # * type: string
@@ -2235,8 +2246,8 @@ require('custom_module')
   # * optional
   # * default: ["message"]
   # * type: [string]
-  merge_fields = ["message"]
-  merge_fields = ["message", "parent.child"]
+  fields = ["message"]
+  fields = ["message", "parent.child"]
 
   # The field that indicates that the event is partial. A consequent stream of
   # partial events along with the first non-partial event will be merged together.
@@ -2265,6 +2276,179 @@ require('custom_module')
   # * type: string
   # * must be: "merge"
   type = "merge"
+
+# Accepts and outputs `log` events, allowing you to combine multiple events into a single event based on a set of identifiers.
+[transforms.reduce]
+  #
+  # Ends when
+  #
+
+  [transforms.reduce.ends_when]
+    # The type of the condition to execute.
+    #
+    # * optional
+    # * default: "check_fields"
+    # * type: string
+    # * enum: "check_fields", "is_log", and "is_metric"
+    type = "check_fields"
+    type = "is_log"
+    type = "is_metric"
+
+    # Check whether a fields contents exactly matches the value specified. This may
+    # be a single string or a list of strings, in which case this evaluates to true
+    # if any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.eq" = "this is the content to match against"
+    "message.eq" = ["match this", "or this"]
+
+    # Check whether a field exists or does not exist, depending on the provided
+    # value being `true` or `false` respectively.
+    #
+    # * optional
+    # * no default
+    # * type: bool
+    # * relevant when type = "check_fields"
+    "host.exists" = true
+
+    # Check whether a fields contents does not match the value specified. This may
+    # be a single string or a list of strings, in which case this evaluates to
+    # false if any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "method.neq" = "POST"
+    "method.neq" = ["POST", "GET"]
+
+    # Check if the given `[condition]` does not match.
+    #
+    # * optional
+    # * no default
+    # * type: any
+    # * relevant when type = "check_fields"
+    "message.not_contains" = "some phrase to ignore"
+    "unit.not_starts_with" = "sys-"
+    "unit.not_ends_with" = ".device"
+
+    # Checks whether a string field contains a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.contains" = "foo"
+    "message.contains" = ["foo", "bar"]
+
+    # Checks whether a string field ends with a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "environment.ends_with" = "-staging"
+    "environment.ends_with" = ["-staging", "-running"]
+
+    # Checks whether an IP field is contained within a given IP CIDR (works with
+    # IPv4 and IPv6). This may be a single string or a list of strings, in which
+    # case this evaluates to true if the IP field is contained within any of the
+    # CIDRs in the list.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.ip_cidr_contains" = "10.0.0.0/8"
+    "message.ip_cidr_contains" = ["2000::/10", "192.168.0.0/16"]
+
+    # Checks whether a string field matches a regular expression. Vector uses the
+    # documented Rust Regex syntax. Note that this condition is considerably more
+    # expensive than a regular string match (such as `starts_with` or `contains`)
+    # so the use of those conditions are preferred where possible.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "message.regex" = " (any|of|these|five|words) "
+
+    # Checks whether a string field starts with a string argument. This may be a
+    # single string or a list of strings, in which case this evaluates to true if
+    # any of the list matches.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    # * relevant when type = "check_fields"
+    "environment.starts_with" = "staging-"
+    "environment.starts_with" = ["staging-", "running-"]
+
+  #
+  # General
+  #
+
+  # A maximum period of time to wait after the last event is received before a
+  # combined event should be considered complete.
+  #
+  # * optional
+  # * default: 30000
+  # * type: int
+  expire_after_ms = 30000
+
+  # Controls the frequency that Vector checks for (and flushes) expired events.
+  #
+  # * optional
+  # * default: 1000
+  # * type: int
+  flush_period_ms = 1000
+
+  # An ordered list of fields by which to group events. Each group is combined
+  # independently, allowing you to keep independent events separate. When no
+  # fields are specified, all events will be combined in a single group. Events
+  # missing a specified field will be combined in their own group.
+  #
+  # * optional
+  # * default: []
+  # * type: [string]
+  group_by = ["request_id"]
+  group_by = ["user_id", "transaction_id"]
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "reduce"
+  type = "reduce"
+
+  #
+  # Merge strategies
+  #
+
+  [transforms.reduce.merge_strategies]
+    # The custom merge strategy to use for a field.
+    #
+    # * required
+    # * type: string
+    # * enum: "array", "concat", "concat_newline", "discard", "sum", "max", and "min"
+    method = "discard"
+    path = "discard"
+    duration_ms = "sum"
+    query = "array"
 
 # Accepts and outputs `log` events, allowing you to parse a log field's value with a Regular Expression.
 [transforms.regex_parser]
@@ -2862,6 +3046,16 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
   # Dynamically create a log group if it does not already exist. This will ignore
   # `create_missing_stream` directly after creating the group and will create the
   # first stream.
@@ -2939,13 +3133,21 @@ require('custom_module')
   #
 
   [sinks.aws_cloudwatch_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 1048576
+    # * type: uint
+    # * unit: bytes
+    max_bytes = 1048576
+
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
-    # * default: 1000
+    # * default: 10000
     # * type: uint
     # * unit: events
-    max_events = 1000
+    max_events = 10000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -3110,6 +3312,16 @@ require('custom_module')
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
 
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
+
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
   #
@@ -3188,6 +3400,16 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -3409,6 +3631,16 @@ require('custom_module')
   # * no default
   # * type: string
   assume_role = "arn:aws:iam::123456789098:role/my_role"
+
+  # The compression strategy used to compress the encoded event data before
+  # transmission.
+  #
+  # * optional
+  # * default: "none"
+  # * type: string
+  # * enum: "none" or "gzip"
+  compression = "none"
+  compression = "gzip"
 
   # Custom endpoint for use with AWS-compatible services. Providing a value for
   # this option will make `region` moot.
@@ -3837,7 +4069,8 @@ require('custom_module')
   [sinks.aws_s3.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "ndjson" or "text"
     codec = "ndjson"
@@ -4026,6 +4259,300 @@ require('custom_module')
     # * no default
     # * type: string
     Tag1 = "Value1"
+
+# Batches `log` events to Azure Monitor via the HTTP Data Collector API.
+[sinks.azure_monitor_logs]
+  #
+  # General
+  #
+
+  # The unique identifier for the Log Analytics workspace.
+  #
+  # * required
+  # * type: string
+  customer_id = "5ce893d9-2c32-4b6c-91a9-b0887c2de2d6"
+  customer_id = "97ce69d9-b4be-4241-8dbd-d265edcf06c4"
+
+  # The primary or the secondary key for the Log Analytics workspace.
+  #
+  # * required
+  # * type: string
+  shared_key = "${AZURE_MONITOR_SHARED_KEY_ENV_VAR}"
+  shared_key = "SERsIYhgMVlJB6uPsq49gCxNiruf6v0vhMYE+lfzbSGcXjdViZdV/e5pEMTYtw9f8SkVLf4LFlLCc2KxtRZfCA=="
+
+  # The record type of the data that is being submitted. Can only contain letters,
+  # numbers, and underscore (_), and may not exceed 100 characters.
+  #
+  # * required
+  # * type: string
+  log_type = "MyTableName"
+  log_type = "MyRecordType"
+
+  # Resource ID of the Azure resource the data should be associated with.
+  #
+  # * optional
+  # * no default
+  # * type: string
+  azure_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/otherResourceGroup/providers/Microsoft.Storage/storageAccounts/examplestorage"
+  azure_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/examplegroup/providers/Microsoft.SQL/servers/serverName/databases/databaseName"
+
+  # Enables/disables the sink healthcheck upon start.
+  #
+  # * optional
+  # * default: true
+  # * type: bool
+  healthcheck = true
+  healthcheck = false
+
+  # A list of upstream source or transform IDs. See configuration for more info.
+  #
+  # * required
+  # * type: [string]
+  inputs = ["my-source-or-transform-id"]
+
+  # The component type. This is a required field that tells Vector which
+  # component to use. The value _must_ be `#{name}`.
+  #
+  # * required
+  # * type: string
+  # * must be: "azure_monitor_logs"
+  type = "azure_monitor_logs"
+
+  [sinks.azure_monitor_logs.batch]
+    # The maximum size of a batch, in bytes, before it is flushed.
+    #
+    # * optional
+    # * default: 5242880
+    # * type: uint
+    # * unit: bytes
+    max_bytes = 5242880
+
+    # The maximum size of a batch, in events, before it is flushed.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: events
+    max_events = 1000
+
+    # The maximum age of a batch before it is flushed.
+    #
+    # * optional
+    # * default: 1
+    # * type: uint
+    # * unit: seconds
+    timeout_secs = 1
+
+  #
+  # Buffer
+  #
+
+  [sinks.azure_monitor_logs.buffer]
+    # The maximum number of events allowed in the buffer.
+    #
+    # * optional
+    # * default: 500
+    # * type: uint
+    # * unit: events
+    # * relevant when type = "memory"
+    max_events = 500
+
+    # The maximum size of the buffer on the disk.
+    #
+    # * required
+    # * type: uint
+    # * unit: bytes
+    # * required when type = "disk"
+    max_size = 104900000
+
+    # The buffer's type and storage mechanism.
+    #
+    # * optional
+    # * default: "memory"
+    # * type: string
+    # * enum: "memory" or "disk"
+    type = "memory"
+    type = "disk"
+
+    # The behavior when the buffer becomes full.
+    #
+    # * optional
+    # * default: "block"
+    # * type: string
+    # * enum: "block" or "drop_newest"
+    when_full = "block"
+    when_full = "drop_newest"
+
+  #
+  # Request
+  #
+
+  [sinks.azure_monitor_logs.request]
+    # The maximum number of in-flight requests allowed at any given time. If this
+    # is not set, this limit will vary continuously based on the timing and
+    # contents of responses received from the remote service.
+    #
+    # * optional
+    # * no default
+    # * type: uint
+    # * unit: requests
+    in_flight_limit = 5
+
+    # The time window, in seconds, used for the `rate_limit_num` option.
+    #
+    # * optional
+    # * default: 1
+    # * type: uint
+    # * unit: seconds
+    rate_limit_duration_secs = 1
+
+    # The maximum number of requests allowed within the `rate_limit_duration_secs`
+    # time window.
+    #
+    # * optional
+    # * default: 5
+    # * type: uint
+    rate_limit_num = 5
+
+    # The maximum number of retries to make for failed requests. The default, for
+    # all intents and purposes, represents an infinite number of retries.
+    #
+    # * optional
+    # * default: 18446744073709551615
+    # * type: uint
+    retry_attempts = 18446744073709551615
+
+    # The amount of time to wait before attempting the first retry for a failed
+    # request. Once, the first retry has failed the fibonacci sequence will be used
+    # to select future backoffs.
+    #
+    # * optional
+    # * default: 1
+    # * type: uint
+    # * unit: seconds
+    retry_initial_backoff_secs = 1
+
+    # The maximum amount of time, in seconds, to wait between retries.
+    #
+    # * optional
+    # * default: 10
+    # * type: uint
+    # * unit: seconds
+    retry_max_duration_secs = 10
+
+    # The maximum time a request can take before being aborted. It is highly
+    # recommended that you do not lower value below the service's internal timeout,
+    # as this could create orphaned requests, pile on retries, and result in
+    # duplicate data downstream.
+    #
+    # * optional
+    # * default: 60
+    # * type: uint
+    # * unit: seconds
+    timeout_secs = 60
+
+  #
+  # Encoding
+  #
+
+  [sinks.azure_monitor_logs.encoding]
+    # The encoding codec used to serialize the events before outputting.
+    #
+    # * required
+    # * type: string
+    # * enum: "json" or "text"
+    codec = "json"
+    codec = "text"
+
+    # Prevent the sink from encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    except_fields = ["timestamp", "message", "host"]
+
+    # Limit the sink to only encoding the specified labels.
+    #
+    # * optional
+    # * no default
+    # * type: [string]
+    only_fields = ["timestamp", "message", "host"]
+
+    # How to format event timestamps.
+    #
+    # * optional
+    # * default: "rfc3339"
+    # * type: string
+    # * enum: "rfc3339" or "unix"
+    timestamp_format = "rfc3339"
+    timestamp_format = "unix"
+
+  #
+  # TLS
+  #
+
+  [sinks.azure_monitor_logs.tls]
+    # Absolute path to an additional CA certificate file, in DER or PEM format
+    # (X.509), or an inline CA certificate in PEM format.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    ca_file = "/path/to/certificate_authority.crt"
+
+    # Absolute path to a certificate file used to identify this connection, in DER
+    # or PEM format (X.509) or PKCS#12, or an inline certificate in PEM format. If
+    # this is set and is not a PKCS#12 archive, `key_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    crt_file = "/path/to/host_certificate.crt"
+
+    # Enable TLS during connections to the remote.
+    #
+    # * optional
+    # * default: false
+    # * type: bool
+    enabled = false
+    enabled = true
+
+    # Absolute path to a private key file used to identify this connection, in DER
+    # or PEM format (PKCS#8), or an inline private key in PEM format. If this is
+    # set, `crt_file` must also be set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_file = "/path/to/host_certificate.key"
+
+    # Pass phrase used to unlock the encrypted key file. This has no effect unless
+    # `key_file` is set.
+    #
+    # * optional
+    # * no default
+    # * type: string
+    key_pass = "${KEY_PASS_ENV_VAR}"
+    key_pass = "PassWord1"
+
+    # If `true` (the default), Vector will validate the TLS certificate of the
+    # remote host.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_certificate = true
+    verify_certificate = false
+
+    # If `true` (the default), Vector will validate the configured remote host name
+    # against the remote host's TLS certificate. Do NOT set this to `false` unless
+    # you understand the risks of not verifying the remote hostname.
+    #
+    # * optional
+    # * default: true
+    # * type: bool
+    verify_hostname = true
+    verify_hostname = false
 
 # Streams `log` and `metric` events to a blackhole that simply discards data, designed for testing and benchmarking purposes.
 [sinks.blackhole]
@@ -7574,7 +8101,8 @@ require('custom_module')
   [sinks.kafka.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -7622,7 +8150,8 @@ require('custom_module')
   #
 
   [sinks.kafka.sasl]
-    # Enable SASL/SCRAM authentication to the remote.
+    # Enable SASL/SCRAM authentication to the remote. (Not supported on Windows at
+    # this time.)
     #
     # * optional
     # * no default
@@ -7712,6 +8241,14 @@ require('custom_module')
   # * type: string
   api_key = "${LOGDNA_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # The default environment that will be set for events that do not contain an `env` field.
+  #
+  # * optional
+  # * default: "production"
+  # * type: string
+  default_env = "production"
+  default_env = "staging"
 
   # The default app that will be set for events that do not contain a `file` or
   # `app` field.
@@ -7989,21 +8526,13 @@ require('custom_module')
   #
 
   [sinks.loki.batch]
-    # The maximum size of a batch, in bytes, before it is flushed.
-    #
-    # * optional
-    # * default: 10490000
-    # * type: uint
-    # * unit: bytes
-    max_bytes = 10490000
-
     # The maximum size of a batch, in events, before it is flushed.
     #
     # * optional
-    # * no default
+    # * default: 100000
     # * type: uint
     # * unit: events
-    max_events = 1000
+    max_events = 100000
 
     # The maximum age of a batch before it is flushed.
     #
@@ -8692,7 +9221,7 @@ require('custom_module')
   #
   # * required
   # * type: string
-  address = "127.0.0.1:6650"
+  address = "pulsar://127.0.0.1:6650"
 
   # Enables/disables the sink healthcheck upon start.
   #
@@ -8750,7 +9279,8 @@ require('custom_module')
   [sinks.pulsar.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"
@@ -9281,7 +9811,8 @@ require('custom_module')
   [sinks.splunk_hec.encoding]
     # The encoding codec used to serialize the events before outputting.
     #
-    # * required
+    # * optional
+    # * default: "text"
     # * type: string
     # * enum: "json" or "text"
     codec = "json"

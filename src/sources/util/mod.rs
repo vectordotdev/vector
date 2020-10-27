@@ -1,14 +1,15 @@
-#[cfg(feature = "sources-http")]
+#[cfg(feature = "sources-utils-http")]
 mod http;
-#[cfg(feature = "sources-socket")]
+pub mod multiline_config;
+#[cfg(all(feature = "tls", feature = "listenfd"))]
 mod tcp;
-#[cfg(all(unix, feature = "sources-socket"))]
+#[cfg(all(unix, feature = "sources-utils-unix",))]
 mod unix;
 
-#[cfg(feature = "sources-http")]
-pub use self::http::{ErrorMessage, HttpSource};
-#[cfg(feature = "sources-socket")]
+#[cfg(feature = "sources-utils-http")]
+pub use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
+pub use multiline_config::MultilineConfig;
+#[cfg(all(feature = "tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
-
-#[cfg(all(unix, feature = "sources-socket"))]
+#[cfg(all(unix, feature = "sources-utils-unix",))]
 pub use unix::build_unix_source;

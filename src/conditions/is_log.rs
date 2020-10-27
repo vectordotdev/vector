@@ -14,6 +14,8 @@ inventory::submit! {
     ConditionDescription::new::<IsLogConfig>("is_log")
 }
 
+impl_generate_config_from_default!(IsLogConfig);
+
 #[typetag::serde(name = "is_log")]
 impl ConditionConfig for IsLogConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
@@ -53,6 +55,11 @@ mod test {
     };
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<IsLogConfig>();
+    }
+
+    #[test]
     fn is_log_basic() {
         let cond = IsLogConfig {}.build().unwrap();
 
@@ -60,6 +67,7 @@ mod test {
         assert_eq!(
             cond.check(&Event::from(Metric {
                 name: "test metric".to_string(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,

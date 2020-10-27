@@ -9,33 +9,29 @@ pub struct TcpConnectionEstablished {
 impl InternalEvent for TcpConnectionEstablished {
     fn emit_logs(&self) {
         if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "connected", %peer_addr);
+            debug!(message = "Connected.", %peer_addr);
         } else {
-            debug!(message = "connected", peer_addr = "unknown");
+            debug!(message = "Connected.", peer_addr = "unknown");
         }
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_established", 1,
-            "component_kind" => "sink",
-        );
+        counter!("connections_established_total", 1, "mode" => "tcp");
     }
 }
 
 #[derive(Debug)]
-pub struct TcpConnectionFailed {
-    pub error: crate::tls::TlsError,
+pub struct TcpConnectionFailed<E> {
+    pub error: E,
 }
 
-impl InternalEvent for TcpConnectionFailed {
+impl<E: std::error::Error> InternalEvent for TcpConnectionFailed<E> {
     fn emit_logs(&self) {
-        error!(message = "unable to connect.", error = %self.error);
+        error!(message = "Unable to connect.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_failed", 1,
-            "component_kind" => "sink",
-        );
+        counter!("connections_failed_total", 1, "mode" => "tcp");
     }
 }
 
@@ -46,13 +42,11 @@ pub struct TcpConnectionDisconnected {
 
 impl InternalEvent for TcpConnectionDisconnected {
     fn emit_logs(&self) {
-        error!(message = "connection disconnected.", error = %self.error);
+        error!(message = "Connection disconnected.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_disconnected", 1,
-            "component_kind" => "sink",
-        );
+        counter!("connections_disconnected_total", 1, "mode" => "tcp");
     }
 }
 
@@ -61,32 +55,26 @@ pub struct TcpConnectionShutdown {}
 
 impl InternalEvent for TcpConnectionShutdown {
     fn emit_logs(&self) {
-        debug!(message = "received EOF from the server; reconnecting.");
+        debug!(message = "Received EOF from the server; reconnecting.");
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connection_shutdown", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "tcp",
-        );
+        counter!("connections_shutdown_total", 1, "mode" => "tcp");
     }
 }
 
 #[derive(Debug)]
-pub struct TcpConnectionError {
-    pub error: std::io::Error,
+pub struct TcpConnectionError<T> {
+    pub error: T,
 }
 
-impl InternalEvent for TcpConnectionError {
+impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionError<T> {
     fn emit_logs(&self) {
-        warn!(message = "connection error.", error = %self.error, rate_limit_secs = 10);
+        warn!(message = "Connection error.", error = %self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connection_errors", 1,
-            "component_kind" => "source",
-        );
+        counter!("connection_errors_total", 1, "mode" => "tcp");
     }
 }
 
@@ -97,13 +85,11 @@ pub struct TcpFlushError {
 
 impl InternalEvent for TcpFlushError {
     fn emit_logs(&self) {
-        error!(message = "unable to flush connection.", error = %self.error);
+        error!(message = "Unable to flush connection.", error = %self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_flush_errors", 1,
-            "component_kind" => "sink",
-        );
+        counter!("connection_flush_errors_total", 1, "mode" => "tcp");
     }
 }
 
@@ -114,39 +100,11 @@ pub struct TcpEventSent {
 
 impl InternalEvent for TcpEventSent {
     fn emit_logs(&self) {
-        debug!(message = "sending event.", byte_size = %self.byte_size);
+        trace!(message = "Sending event.", byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "sink",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct TcpEventReceived {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for TcpEventReceived {
-    fn emit_logs(&self) {
-        debug!(message = "sending event.", byte_size = %self.byte_size);
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "tcp",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "socket",
-            "mode" => "tcp",
-        );
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

@@ -8,19 +8,21 @@ set -euo pipefail
 #   Deploys Vector into Kubernetes for testing purposes.
 #   Uses the same installation method our users would use.
 #
-#   This script impements cli interface required by the kubernetes integration
+#   This script implements cli interface required by the kubernetes E2E
 #   tests.
 #
 # USAGE
 #
 #   Deploy:
 #
-#   $ CONTAINER_IMAGE=timberio/vector:alpine-latest scripts/deploy-kubernetes-test.sh up vector-test-qwerty
+#   $ CONTAINER_IMAGE=timberio/vector:alpine-latest scripts/deploy-kubernetes-test.sh up vector-test-qwerty vector
 #
 #   Teardown:
 #
-#   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty
+#   $ scripts/deploy-kubernetes-test.sh down vector-test-qwerty vector
 #
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 # Command to perform.
 COMMAND="${1:?"Specify the command (up/down) as the first argument"}"
@@ -28,47 +30,79 @@ COMMAND="${1:?"Specify the command (up/down) as the first argument"}"
 # A Kubernetes namespace to deploy to.
 NAMESPACE="${2:?"Specify the namespace as the second argument"}"
 
-# Allow overriding kubectl with somethingl like `minikube kubectl --`.
+if [[ "$COMMAND" == "up" ]]; then
+  # The helm chart to deploy.
+  HELM_CHART="${3:?"Specify the helm chart name as the third argument"}"
+fi
+
+# Allow overriding kubectl with something like `minikube kubectl --`.
 VECTOR_TEST_KUBECTL="${VECTOR_TEST_KUBECTL:-"kubectl"}"
 
+# Allow overriding helm with a custom command.
+VECTOR_TEST_HELM="${VECTOR_TEST_HELM:-"helm"}"
+
 # Allow optionally installing custom resource configs.
-CUSTOM_RESOURCE_CONIFGS_FILE="${CUSTOM_RESOURCE_CONIFGS_FILE:-""}"
+CUSTOM_RESOURCE_CONFIGS_FILE="${CUSTOM_RESOURCE_CONFIGS_FILE:-""}"
 
+# Allow optionally passing custom Helm values.
+CUSTOM_HELM_VALUES_FILE="${CUSTOM_HELM_VALUES_FILE:-""}"
 
-# TODO: replace with `helm template | kubectl apply -f -` when Helm Chart is
-# available.
-
-templated-config-global() {
-  sed "s|^    namespace: vector|    namespace: $NAMESPACE|" < "distribution/kubernetes/vector-global.yaml" \
-    | sed "s|^  name: vector|  name: $NAMESPACE|"
+split-container-image() {
+  local INPUT="$1"
+  CONTAINER_IMAGE_REPOSITORY="${INPUT%:*}"
+  CONTAINER_IMAGE_TAG="${INPUT#*:}"
 }
 
 up() {
   # A Vector container image to use.
-  CONTAINER_IMAGE="${CONTAINER_IMAGE:?"You must assing CONTAINER_IMAGE variable with the Vector container image name"}"
-
-  templated-config-global | $VECTOR_TEST_KUBECTL create -f -
+  CONTAINER_IMAGE="${CONTAINER_IMAGE:?"You must assign CONTAINER_IMAGE variable with the Vector container image name"}"
 
   $VECTOR_TEST_KUBECTL create namespace "$NAMESPACE"
 
-  if [[ -n "$CUSTOM_RESOURCE_CONIFGS_FILE" ]]; then
-    $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
+  if [[ -n "$CUSTOM_RESOURCE_CONFIGS_FILE" ]]; then
+    $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
   fi
 
-  sed "s|timerio/vector:latest|$CONTAINER_IMAGE|" < "distribution/kubernetes/vector-namespaced.yaml" \
-    | $VECTOR_TEST_KUBECTL create --namespace "$NAMESPACE" -f -
+  HELM_VALUES=()
+
+  HELM_VALUES+=(
+    # Set a reasonable log level to avoid issues with internal logs
+    # overwriting console output.
+    --set "global.vector.commonEnvKV.LOG=info"
+  )
+
+  if [[ -n "$CUSTOM_HELM_VALUES_FILE" ]]; then
+    HELM_VALUES+=(
+      --values "$CUSTOM_HELM_VALUES_FILE"
+    )
+  fi
+
+  split-container-image "$CONTAINER_IMAGE"
+  HELM_VALUES+=(
+    --set "global.vector.image.repository=$CONTAINER_IMAGE_REPOSITORY"
+    --set "global.vector.image.tag=$CONTAINER_IMAGE_TAG"
+  )
+
+  set -x
+  $VECTOR_TEST_HELM install \
+    --atomic \
+    --namespace "$NAMESPACE" \
+    "${HELM_VALUES[@]}" \
+    "vector" \
+    "./distribution/helm/$HELM_CHART"
+  { set +x; } &>/dev/null
 }
 
 down() {
-  $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f - < "distribution/kubernetes/vector-namespaced.yaml"
+  if [[ -n "$CUSTOM_RESOURCE_CONFIGS_FILE" ]]; then
+    $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONFIGS_FILE"
+  fi
 
-  if [[ -n "$CUSTOM_RESOURCE_CONIFGS_FILE" ]]; then
-    $VECTOR_TEST_KUBECTL delete --namespace "$NAMESPACE" -f "$CUSTOM_RESOURCE_CONIFGS_FILE"
+  if $VECTOR_TEST_HELM status --namespace "$NAMESPACE" "vector" &>/dev/null; then
+    $VECTOR_TEST_HELM delete --namespace "$NAMESPACE" "vector"
   fi
 
   $VECTOR_TEST_KUBECTL delete namespace "$NAMESPACE"
-
-  templated-config-global | $VECTOR_TEST_KUBECTL delete -f -
 }
 
 case "$COMMAND" in

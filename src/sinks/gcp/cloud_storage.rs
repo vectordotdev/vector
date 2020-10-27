@@ -1,25 +1,24 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    event::{self, Event},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    http::{HttpClient, HttpClientFuture},
     serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{HttpClient, HttpClientFuture},
-            retries2::{RetryAction, RetryLogic},
-            service2::{ServiceBuilderExt, TowerCompat, TowerRequestConfig},
-            BatchConfig, BatchSettings, Buffer, Compression, PartitionBatchSink, PartitionBuffer,
-            PartitionInnerBuffer,
+            retries::{RetryAction, RetryLogic},
+            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
-        Healthcheck, RouterSink,
+        Healthcheck, VectorSink,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
-    topology::config::{DataType, SinkConfig, SinkContext, SinkDescription},
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use futures01::{stream::iter_ok, Sink};
 use http::{StatusCode, Uri};
 use hyper::{
@@ -32,8 +31,8 @@ use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::task::Poll;
-use tower03::{Service, ServiceBuilder};
-use tracing::field;
+
+use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
 
 const NAME: &str = "gcp_cloud_storage";
@@ -89,7 +88,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
         encoding: e.into(),
-        compression: Compression::Gzip,
+        compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
         auth: Default::default(),
@@ -123,8 +122,8 @@ enum GcsStorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: Some(25),
-        rate_limit_num: Some(25),
+        in_flight_limit: InFlightLimit::Fixed(25),
+        rate_limit_num: Some(1000),
         ..Default::default()
     };
 }
@@ -146,17 +145,29 @@ impl Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
+    SinkDescription::new::<GcsSinkConfig>(NAME)
 }
 
+impl GenerateConfig for GcsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"bucket = "my-bucket"
+            credentials_path = "/path/to/credentials.json"
+            encoding.codec = "ndjson""#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(RouterSink, Healthcheck)> {
-        let sink = GcsSink::new(self, &cx)?;
-        let healthcheck = sink.clone().healthcheck().boxed().compat();
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        let sink = GcsSink::new(self, &cx).await?;
+        let healthcheck = sink.clone().healthcheck().boxed();
         let service = sink.service(self, &cx)?;
 
-        Ok((service, Box::new(healthcheck)))
+        Ok((service, healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -179,8 +190,11 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
-        let creds = config.auth.make_credentials(Scope::DevStorageReadWrite)?;
+    async fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+        let creds = config
+            .auth
+            .make_credentials(Scope::DevStorageReadWrite)
+            .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
         let client = HttpClient::new(cx.resolver(), tls)?;
@@ -195,21 +209,16 @@ impl GcsSink {
         })
     }
 
-    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<RouterSink> {
+    fn service(self, config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<VectorSink> {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding.clone();
 
-        let batch = config.batch.use_size_as_bytes()?.get_settings_or_default(
-            BatchSettings::default()
-                .bytes(bytesize::mib(10u64))
-                .timeout(300),
-        );
+        let batch = BatchSettings::default()
+            .bytes(bytesize::mib(10u64))
+            .timeout(300)
+            .parse_config(config.batch)?;
 
-        let key_prefix = config
-            .key_prefix
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or("date=%F/");
+        let key_prefix = config.key_prefix.as_deref().unwrap_or("date=%F/");
         let key_prefix = Template::try_from(key_prefix).context(KeyPrefixTemplate)?;
 
         let settings = self.settings.clone();
@@ -221,12 +230,11 @@ impl GcsSink {
 
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
-        let sink =
-            PartitionBatchSink::new(TowerCompat::new(svc), buffer, batch.timeout, cx.acker())
-                .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-                .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
-        Ok(Box::new(sink))
+        Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }
 
     async fn healthcheck(mut self) -> crate::Result<()> {
@@ -315,11 +323,7 @@ impl RequestWrapper {
             settings.extension
         );
 
-        debug!(
-            message = "sending events.",
-            bytes = &field::debug(body.len()),
-            key = &field::debug(&key)
-        );
+        debug!(message = "sending events.", bytes = ?body.len(), ?key);
 
         Self {
             body,
@@ -354,7 +358,7 @@ impl RequestSettings {
             .compression
             .content_encoding()
             .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
-        let storage_class = config.storage_class.unwrap_or(GcsStorageClass::default());
+        let storage_class = config.storage_class.unwrap_or_default();
         let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
         let metadata = config
             .metadata
@@ -365,12 +369,15 @@ impl RequestSettings {
                     .map(make_header)
                     .collect::<Result<Vec<_>, _>>()
             })
-            .unwrap_or(Ok(vec![]))?;
+            .unwrap_or_else(|| Ok(vec![]))?;
         let extension = config
             .filename_extension
             .clone()
             .unwrap_or_else(|| config.compression.extension().into());
-        let time_format = config.filename_time_format.clone().unwrap_or("%s".into());
+        let time_format = config
+            .filename_time_format
+            .clone()
+            .unwrap_or_else(|| "%s".into());
         let append_uuid = config.filename_append_uuid.unwrap_or(true);
         Ok(Self {
             acl,
@@ -398,17 +405,17 @@ fn encode_event(
     key_prefix: &Template,
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PartitionInnerBuffer<Vec<u8>, Bytes>> {
-    encoding.apply_rules(&mut event);
     let key = key_prefix
         .render_string(&event)
         .map_err(|missing_keys| {
             warn!(
-                message = "Keys do not exist on the event. Dropping event.",
+                message = "Keys do not exist on the event; dropping event.",
                 ?missing_keys,
                 rate_limit_secs = 30,
             );
         })
         .ok()?;
+    encoding.apply_rules(&mut event);
     let log = event.into_log();
     let bytes = match encoding.codec() {
         Encoding::Ndjson => serde_json::to_vec(&log)
@@ -419,7 +426,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&event::log_schema().message_key())
+                .get(crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -438,15 +445,15 @@ impl RetryLogic for GcsRetryLogic {
     type Error = hyper::Error;
     type Response = Response<Body>;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_connect() || error.is_closed()
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
         let status = response.status();
 
         match status {
-            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("Too many requests".into()),
+            StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
@@ -460,9 +467,14 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::Event;
 
     use std::collections::HashMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GcsSinkConfig>();
+    }
 
     #[test]
     fn gcs_encode_event_text() {
@@ -493,10 +505,25 @@ mod tests {
         let map: HashMap<String, String> = serde_json::from_slice(&bytes[..]).unwrap();
 
         assert_eq!(
-            map.get(&event::log_schema().message_key().to_string()),
+            map.get(&crate::config::log_schema().message_key().to_string()),
             Some(&message)
         );
         assert_eq!(map["key"], "value".to_string());
+    }
+
+    #[test]
+    fn gcs_encode_event_apply_rules() {
+        crate::test_util::trace_init();
+
+        let message = "hello world".to_string();
+        let mut event = Event::from(message);
+        event.as_mut_log().insert("key", "value");
+
+        let key_format = Template::try_from("key: {{ key }}").unwrap();
+        let bytes = encode_event(event, &key_format, &Encoding::Text.into()).unwrap();
+
+        let (_, key) = bytes.into_parts();
+        assert_eq!(key, "key: value");
     }
 
     fn request_settings(
@@ -521,7 +548,7 @@ mod tests {
 
         let req = RequestWrapper::new(
             buf.clone(),
-            request_settings(Some("ext".into()), false, Compression::None),
+            request_settings(Some("ext"), false, Compression::None),
         );
         assert_eq!(req.key, "key/date.ext".to_string());
 
@@ -533,11 +560,14 @@ mod tests {
 
         let req = RequestWrapper::new(
             buf.clone(),
-            request_settings(None, false, Compression::Gzip),
+            request_settings(None, false, Compression::gzip_default()),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = RequestWrapper::new(buf.clone(), request_settings(None, true, Compression::Gzip));
+        let req = RequestWrapper::new(
+            buf,
+            request_settings(None, true, Compression::gzip_default()),
+        );
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }

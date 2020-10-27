@@ -1,8 +1,9 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
+    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    topology::config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -16,9 +17,10 @@ pub struct SwimlaneConfig {
     condition: AnyCondition,
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
-    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Swimlane::new(self.condition.build()?)))
     }
 
@@ -48,8 +50,10 @@ impl Swimlane {
 impl Transform for Swimlane {
     fn transform(&mut self, event: Event) -> Option<Event> {
         if self.condition.check(&event) {
+            emit!(SwimlanesEventProcessed);
             Some(event)
         } else {
+            emit!(SwimlanesEventDiscarded);
             None
         }
     }
@@ -64,12 +68,22 @@ pub struct SwimlanesConfig {
 }
 
 inventory::submit! {
-    TransformDescription::new_without_default::<SwimlanesConfig>("swimlanes")
+    TransformDescription::new::<SwimlanesConfig>("swimlanes")
 }
 
+impl GenerateConfig for SwimlanesConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            lanes: IndexMap::new(),
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {
-    fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
         Err("this transform must be expanded".into())
     }
 
@@ -101,3 +115,11 @@ impl TransformConfig for SwimlanesConfig {
 }
 
 //------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::SwimlanesConfig>();
+    }
+}

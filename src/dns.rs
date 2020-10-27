@@ -1,4 +1,4 @@
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future::BoxFuture, FutureExt};
 use futures01::Future;
 use hyper::client::connect::dns::Name as Name13;
 use snafu::ResultExt;
@@ -7,7 +7,7 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::task::spawn_blocking;
-use tower03::Service;
+use tower::Service;
 
 pub type ResolverFuture = Box<dyn Future<Item = LookupIp, Error = DnsError> + Send + 'static>;
 
@@ -17,11 +17,6 @@ pub struct LookupIp(std::vec::IntoIter<SocketAddr>);
 pub struct Resolver;
 
 impl Resolver {
-    pub fn lookup_ip_01(self, name: String) -> ResolverFuture {
-        let fut = self.lookup_ip(name).boxed().compat();
-        Box::new(fut)
-    }
-
     pub async fn lookup_ip(self, name: String) -> Result<LookupIp, DnsError> {
         // We need to add port with the name so that `to_socket_addrs`
         // resolves it properly. We will be discarding the port afterwards.
@@ -37,11 +32,20 @@ impl Resolver {
                 vec![SocketAddr::new(Ipv4Addr::LOCALHOST.into(), dummy_port)].into_iter(),
             ))
         } else {
-            spawn_blocking(move || (name.as_ref(), dummy_port).to_socket_addrs())
-                .await
-                .context(JoinError)?
-                .map(LookupIp)
-                .context(UnableLookup)
+            spawn_blocking(move || {
+                let name_ref = match name.as_str() {
+                    // strip IPv6 prefix and suffix
+                    name if name.starts_with('[') && name.ends_with(']') => {
+                        &name[1..name.len() - 1]
+                    }
+                    name => name,
+                };
+                (name_ref, dummy_port).to_socket_addrs()
+            })
+            .await
+            .context(JoinError)?
+            .map(LookupIp)
+            .context(UnableLookup)
         }
     }
 }
@@ -79,33 +83,29 @@ pub enum DnsError {
 #[cfg(test)]
 mod tests {
     use super::Resolver;
-    use crate::test_util::runtime;
 
-    fn resolve(name: &str) -> bool {
-        let mut runtime = runtime();
-
+    async fn resolve(name: &str) -> bool {
         let resolver = Resolver;
-        let fut = resolver.lookup_ip(name.to_owned());
-        runtime.block_on_std(fut).is_ok()
+        resolver.lookup_ip(name.to_owned()).await.is_ok()
     }
 
-    #[test]
-    fn resolve_vector() {
-        assert!(resolve("vector.dev"));
+    #[tokio::test]
+    async fn resolve_vector() {
+        assert!(resolve("vector.dev").await);
     }
 
-    #[test]
-    fn resolve_localhost() {
-        assert!(resolve("localhost"));
+    #[tokio::test]
+    async fn resolve_localhost() {
+        assert!(resolve("localhost").await);
     }
 
-    #[test]
-    fn resolve_ipv4() {
-        assert!(resolve("10.0.4.0"));
+    #[tokio::test]
+    async fn resolve_ipv4() {
+        assert!(resolve("10.0.4.0").await);
     }
 
-    #[test]
-    fn resolve_ipv6() {
-        assert!(resolve("::1"));
+    #[tokio::test]
+    async fn resolve_ipv6() {
+        assert!(resolve("::1").await);
     }
 }

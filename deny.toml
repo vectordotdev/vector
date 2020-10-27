@@ -1,7 +1,7 @@
 [advisories]
 ignore = [
-    "RUSTSEC-2020-0014", # Advisory for dev dependency of `trust-dns` for testing
-                         # dns servers.
-    "RUSTSEC-2020-0002", # tracked in #1639
-    "RUSTSEC-2020-0001", # dev dependency only
+    # net2: `net2` crate has been deprecated; use `socket2` instead
+    "RUSTSEC-2020-0016",
+    # failure: failure is officially deprecated/unmaintained
+    "RUSTSEC-2020-0036",
 ]

@@ -1,7 +1,7 @@
 //! Expiring Hash Map and related types. See [`ExpiringHashMap`].
 #![warn(missing_docs)]
 
-use futures::stream::StreamExt;
+use futures::StreamExt;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt;
@@ -25,14 +25,6 @@ impl<K, V> ExpiringHashMap<K, V>
 where
     K: Eq + Hash + Clone,
 {
-    /// Create a new [`ExpiringHashMap`].
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-            expiration_queue: DelayQueue::new(),
-        }
-    }
-
     /// Insert a new key with a TTL.
     pub fn insert(&mut self, key: K, value: V, ttl: Duration) {
         let delay_queue_key = self.expiration_queue.insert(key.clone(), ttl);
@@ -86,6 +78,13 @@ where
         let (value, expiration_queue_key) = self.map.remove(k)?;
         let expired = self.expiration_queue.remove(&expiration_queue_key);
         Some((value, expired))
+    }
+
+    /// Return an iterator over keys and values of ExpiringHashMap. Useful for
+    /// processing all values in ExpiringHashMap irrespective of expiration. This
+    /// may be required for processing shutdown or other operations.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
+        self.map.iter_mut().map(|(k, (v, _delayed_key))| (k, v))
     }
 
     /// Check whether the [`ExpiringHashMap`] is empty.
@@ -155,7 +154,7 @@ where
     /// use vector::expiring_hash_map::ExpiringHashMap;
     /// use std::time::Duration;
     ///
-    /// let mut map: ExpiringHashMap<String, String> = ExpiringHashMap::new();
+    /// let mut map: ExpiringHashMap<String, String> = ExpiringHashMap::default();
     ///
     /// loop {
     ///     tokio::select! {
@@ -187,6 +186,18 @@ where
     }
 }
 
+impl<K, V> Default for ExpiringHashMap<K, V>
+where
+    K: Eq + Hash + Clone,
+{
+    fn default() -> Self {
+        Self {
+            map: HashMap::new(),
+            expiration_queue: DelayQueue::new(),
+        }
+    }
+}
+
 impl<K, V> fmt::Debug for ExpiringHashMap<K, V>
 where
     K: Eq + Hash + Clone,
@@ -212,14 +223,14 @@ mod tests {
 
     #[test]
     fn next_expired_is_pending_with_empty_map() {
-        let mut map = ExpiringHashMap::<String, String>::new();
+        let mut map = ExpiringHashMap::<String, String>::default();
         let mut fut = task::spawn(map.next_expired());
         assert!(unwrap_ready(fut.poll()).is_none());
     }
 
     #[tokio::test]
     async fn next_expired_is_pending_with_a_non_empty_map() {
-        let mut map = ExpiringHashMap::<String, String>::new();
+        let mut map = ExpiringHashMap::<String, String>::default();
 
         map.insert("key".to_owned(), "val".to_owned(), Duration::from_secs(1));
         map.remove("key");
@@ -230,7 +241,7 @@ mod tests {
 
     #[tokio::test]
     async fn next_expired_does_not_wake_when_the_value_is_available_upfront() {
-        let mut map = ExpiringHashMap::<String, String>::new();
+        let mut map = ExpiringHashMap::<String, String>::default();
 
         let a_minute_ago = Instant::now() - Duration::from_secs(60);
         map.insert_at("key".to_owned(), "val".to_owned(), a_minute_ago);
@@ -241,13 +252,13 @@ mod tests {
     }
 
     // TODO: rewrite this test with tokio::time::clock when it's available.
-    // For now we just wait for an actal second. We should just scroll time instead.
+    // For now we just wait for an actual second. We should just scroll time instead.
     // In theory, this is only possible when the runtime timer used in the
-    // underlying delay queue and the means by which we fresse/adjust time are
+    // underlying delay queue and the means by which we freeze/adjust time are
     // working together.
     #[tokio::test]
     async fn next_expired_wakes_and_becomes_ready_when_value_ttl_expires() {
-        let mut map = ExpiringHashMap::<String, String>::new();
+        let mut map = ExpiringHashMap::<String, String>::default();
 
         let ttl = Duration::from_secs(1);
         map.insert("key".to_owned(), "val".to_owned(), ttl);
@@ -271,7 +282,7 @@ mod tests {
 
     #[tokio::test]
     async fn next_expired_api_allows_inserting_items() {
-        let mut map = ExpiringHashMap::<String, String>::new();
+        let mut map = ExpiringHashMap::<String, String>::default();
 
         // At first, has to be pending.
         let mut fut = task::spawn(map.next_expired());
