@@ -137,7 +137,7 @@ impl SinkConfig for InfluxDBLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}.", e));
+        .sink_map_err(|e| error!(message = "Fatal influxdb_logs sink error: {}.", error = ?e));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

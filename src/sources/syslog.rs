@@ -263,7 +263,7 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!(message = "Error sending line.", ?e));
+    let out = out.sink_map_err(|e| error!(message = "Error sending line.", error = ?e));
 
     Box::new(
         async move {

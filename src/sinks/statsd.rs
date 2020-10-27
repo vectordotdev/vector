@@ -437,11 +437,11 @@ mod test {
         let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {
             UdpFramed::new(socket, BytesCodec::new())
-                .map_err(|e| error!(message = "Error reading line.", ?e))
+                .map_err(|e| error!(message = "Error reading line.", error = ?e))
                 .map_ok(|(bytes, _addr)| bytes.freeze())
                 .forward(
                     tx.sink_compat()
-                        .sink_map_err(|e| error!(message = "Error sending event.", ?e)),
+                        .sink_map_err(|e| error!(message = "Error sending event.", error = ?e)),
                 )
                 .await
                 .unwrap()

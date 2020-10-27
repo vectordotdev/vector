@@ -211,11 +211,11 @@ impl Sink for KafkaSink {
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     match result {
                         Ok((partition, offset)) => trace!(
-                            "Produced message to partition {} at offset {}.",
+                            message = "Produced message.", ?partition, ?offset
                             partition,
                             offset
                         ),
-                        Err((e, _msg)) => error!(message = "Kafka error.", ?e),
+                        Err((error, _msg)) => error!(message = "Kafka error.", ?error),
                     };
 
                     self.pending_acks.insert(seqno);
@@ -229,7 +229,7 @@ impl Sink for KafkaSink {
                 }
 
                 // request got canceled (according to docs)
-                Err(e) => error!(message = "Delivery future canceled.", ?e),
+                Err(error) => error!(message = "Delivery future canceled.", ?error),
             }
         }
     }

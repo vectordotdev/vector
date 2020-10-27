@@ -140,7 +140,7 @@ fn apache_metrics(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!(message = "Error sending metric.", ?e))
+        .sink_map_err(|e| error!(message = "Error sending metric.", error = ?e))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
@@ -329,7 +329,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         tokio::spawn(async move {
             if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", ?e);
+                error!(message = "Server error.", error = ?e);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -373,7 +373,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                         );
                         assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
                     }
-                    None => error!(message = "No tags for metric.", ?m),
+                    None => error!(message = "No tags for metric.", metric = ?m),
                 }
             }
             None => error!(message = "Could not find apache_up metric in.", ?metrics),
@@ -397,7 +397,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         tokio::spawn(async move {
             if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", ?e);
+                error!(message = "Server error.", error = ?e);
             }
         });
         wait_for_tcp(in_addr).await;

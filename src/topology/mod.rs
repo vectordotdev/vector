@@ -143,8 +143,8 @@ impl RunningTopology {
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
             error!(
-                "Failed to gracefully shut down in time. Killing: {}.",
-                remaining_components.join(", ")
+                "Failed to gracefully shut down in time. Killing components.",
+                components = %remaining_components
             );
 
             Ok(())
@@ -170,7 +170,7 @@ impl RunningTopology {
                 };
 
                 info!(
-                    "Shutting down... Waiting on: {}. {}.",
+                    message = "Shutting down... Waiting on running components.", %remaining_components, %time_remaining,
                     remaining_components.join(", "),
                     time_remaining
                 );
@@ -302,7 +302,7 @@ impl RunningTopology {
         // sources.
         if !diff.sources.to_remove.is_empty() {
             info!(
-                "Waiting for up to {} seconds for sources to finish shutting down.",
+                message = "Waiting for sources to finish shutting down.", %timeout,
                 timeout.as_secs()
             );
         }
