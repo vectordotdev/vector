@@ -1,41 +1,41 @@
 use super::{
     dashboard::{init_dashboard, is_tty, Widgets},
-    state::{TopologyRow, TopologyState, WidgetsState},
+    state::{ComponentRow, ComponentsState, WidgetsState},
 };
 use crate::config;
 use std::sync::Arc;
 use url::Url;
 use vector_api_client::{
-    gql::{HealthQueryExt, TopologyQueryExt},
+    gql::{ComponentsQueryExt, HealthQueryExt},
     Client,
 };
 
-/// Executes a toplogy query to the GraphQL server, and creates an initial TopologyState
-/// table based on the returned topology/metrics. This will contain all of the rows initially
-/// to render the topology table widget
-async fn update_topology(
+/// Executes a toplogy query to the GraphQL server, and creates an initial ComponentsState
+/// table based on the returned components/metrics. This will contain all of the rows initially
+/// to render the components table widget
+async fn update_components(
     interval: u64,
     client: Client,
     state: Arc<WidgetsState>,
 ) -> Result<(), ()> {
-    // Loop every `interval` ms to update topology
+    // Loop every `interval` ms to update components
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(interval));
 
     loop {
         interval.tick().await;
 
-        // Execute a query to get the latest topology, and aggregate metrics for each resource
+        // Execute a query to get the latest components, and aggregate metrics for each resource
         let rows = client
-            .topology_query()
+            .components_query()
             .await
             .map_err(|_| ())?
             .data
             .ok_or_else(|| ())?
-            .topology
+            .components
             .into_iter()
-            .map(|d| TopologyRow {
+            .map(|d| ComponentRow {
                 name: d.name,
-                topology_type: d.on.to_string(),
+                component_type: d.on.to_string(),
                 events_processed_total: d
                     .events_processed_total
                     .as_ref()
@@ -46,11 +46,11 @@ async fn update_topology(
             })
             .collect::<Vec<_>>();
 
-        state.update_topology_rows(rows);
+        state.update_component_rows(rows);
     }
 }
 
-/// CLI command func for displaying Vector topology, and communicating with a local/remote
+/// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
 pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Exit early if the terminal is not a teletype
@@ -81,10 +81,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Create initial topology, to be shared by the API client and dashboard renderer
-    let state = Arc::new(WidgetsState::new(url, TopologyState::new()));
+    let state = Arc::new(WidgetsState::new(url, ComponentsState::new()));
 
     // Update dashboard based on the provided refresh interval
-    tokio::spawn(update_topology(
+    tokio::spawn(update_components(
         opts.refresh_interval,
         client,
         Arc::clone(&state),

@@ -1,6 +1,6 @@
 use super::{
     events::capture_key_press,
-    state::{WidgetsState, TOPOLOGY_HEADERS},
+    state::{WidgetsState, COMPONENT_HEADERS},
 };
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
@@ -55,15 +55,15 @@ impl Widgets {
         f.render_widget(w, area);
     }
 
-    /// Renders a topology table, showing sources, transforms and sinks in tabular form, with
-    /// statistics pulled from `TopologyState`,
-    fn topology_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let topology = self.state.topology();
-        let items = topology.rows().into_iter().map(|r| {
+    /// Renders a components table, showing sources, transforms and sinks in tabular form, with
+    /// statistics pulled from `ComponentsState`,
+    fn components_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+        let components = self.state.components();
+        let items = components.rows().into_iter().map(|r| {
             Row::StyledData(
                 vec![
                     r.name.clone(),
-                    r.topology_type.clone(),
+                    r.component_type.clone(),
                     r.format_events_processed_total(),
                     r.format_errors(),
                     r.format_throughput(),
@@ -73,8 +73,8 @@ impl Widgets {
             )
         });
 
-        let w = Table::new(TOPOLOGY_HEADERS.iter(), items)
-            .block(Block::default().borders(Borders::ALL).title("Topology"))
+        let w = Table::new(COMPONENT_HEADERS.iter(), items)
+            .block(Block::default().borders(Borders::ALL).title("Components"))
             .header_gap(1)
             .column_spacing(2)
             .widths(&[
@@ -110,7 +110,7 @@ impl Widgets {
             .split(f.size());
 
         self.title(f, rects[0]);
-        self.topology_table(f, rects[1]);
+        self.components_table(f, rects[1]);
         self.quit_box(f, rects[2]);
     }
 

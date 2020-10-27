@@ -5,19 +5,19 @@ use std::{
 };
 use tokio::sync::watch;
 
-pub static TOPOLOGY_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
-pub static ACQUIRE_LOCK_INVARIANT: &str = "Unable to acquire topology lock. Please report this.";
+pub static COMPONENT_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
+pub static ACQUIRE_LOCK_INVARIANT: &str = "Unable to acquire components lock. Please report this.";
 
 #[derive(Debug, Clone)]
-pub struct TopologyRow {
+pub struct ComponentRow {
     pub name: String,
-    pub topology_type: String,
+    pub component_type: String,
     pub events_processed_total: i64,
     pub errors: i64,
     pub throughput: f64,
 }
 
-impl TopologyRow {
+impl ComponentRow {
     /// Helper method for formatting an f64 value -> String
     fn format_f64(val: f64) -> String {
         if val.is_normal() {
@@ -51,28 +51,28 @@ impl TopologyRow {
     }
 }
 
-pub struct TopologyState {
-    rows: Mutex<BTreeMap<String, TopologyRow>>,
+pub struct ComponentsState {
+    rows: Mutex<BTreeMap<String, ComponentRow>>,
 }
 
-impl TopologyState {
-    /// Creates new, empty topology state
+impl ComponentsState {
+    /// Creates new, empty component state
     pub fn new() -> Self {
         Self {
             rows: Mutex::new(BTreeMap::new()),
         }
     }
 
-    /// Updates the existing topology rows. Rows that don't exist in `rows` will be deleted;
+    /// Updates the existing component rows. Rows that don't exist in `rows` will be deleted;
     /// new rows will be added, and existing rows will be updated
-    pub fn update_rows(&self, rows: Vec<TopologyRow>) {
+    pub fn update_rows(&self, rows: Vec<ComponentRow>) {
         let rows = rows
             .into_iter()
             .map(|r| {
                 (
                     r.name.clone(),
                     match self.rows.lock().expect(ACQUIRE_LOCK_INVARIANT).get(&r.name) {
-                        Some(existing) if existing.topology_type == r.topology_type => {
+                        Some(existing) if existing.component_type == r.component_type => {
                             // TODO - update values > 0 when throughput and other metrics gleaned
                             // are independently updated. For now, just return the new row.
                             r
@@ -86,10 +86,10 @@ impl TopologyState {
         *self.rows.lock().expect(ACQUIRE_LOCK_INVARIANT) = rows;
     }
 
-    /// Returns a cloned copy of topology rows, typically used inside of frame re-renders
+    /// Returns a cloned copy of component rows, typically used inside of frame re-renders
     /// where the row data may be updated during its use in a current render cycle. Borrowing
     /// would prevent the lock from releasing; this keeps contention lower.
-    pub fn rows(&self) -> Vec<TopologyRow> {
+    pub fn rows(&self) -> Vec<ComponentRow> {
         self.rows
             .lock()
             .expect(ACQUIRE_LOCK_INVARIANT)
@@ -102,27 +102,27 @@ impl TopologyState {
 /// Contains the aggregate state required to render each widget in a dashboard.
 pub struct WidgetsState {
     url: url::Url,
-    topology: Arc<TopologyState>,
+    components: Arc<ComponentsState>,
     tx: watch::Sender<()>,
     rx: watch::Receiver<()>,
 }
 
 impl WidgetsState {
     /// Returns new widgets state.
-    pub fn new(url: url::Url, topology: TopologyState) -> Self {
+    pub fn new(url: url::Url, component_state: ComponentsState) -> Self {
         let (tx, rx) = watch::channel(());
 
         Self {
             url,
-            topology: Arc::new(topology),
+            components: Arc::new(component_state),
             tx,
             rx,
         }
     }
 
-    /// Returns a thread-safe clone of current topology state.
-    pub fn topology(&self) -> Arc<TopologyState> {
-        Arc::clone(&self.topology)
+    /// Returns a thread-safe clone of current components state.
+    pub fn components(&self) -> Arc<ComponentsState> {
+        Arc::clone(&self.components)
     }
 
     /// Returns a string representation of the URL.
@@ -140,9 +140,9 @@ impl WidgetsState {
         self.rx.clone()
     }
 
-    /// Update topology rows.
-    pub fn update_topology_rows(&self, rows: Vec<TopologyRow>) {
-        self.topology.update_rows(rows);
+    /// Update component rows.
+    pub fn update_component_rows(&self, rows: Vec<ComponentRow>) {
+        self.components.update_rows(rows);
         self.notify();
     }
 }
