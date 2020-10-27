@@ -8,7 +8,8 @@ use crate::{
 use bytes::Bytes;
 use chrono::TimeZone;
 use futures::{
-    compat::Sink01CompatExt, ready, FutureExt, SinkExt, Stream, StreamExt, TryFutureExt,
+    compat::Sink01CompatExt, ready, stream::BoxStream, FutureExt, SinkExt, Stream, StreamExt,
+    TryFutureExt,
 };
 use futures01::Future;
 use lazy_static::lazy_static;
@@ -309,8 +310,8 @@ impl Stream for Journalctl {
     }
 }
 
-struct JournaldServer<J> {
-    journal: Pin<Box<J>>,
+struct JournaldServer {
+    journal: BoxStream<'static, io::Result<String>>,
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
     out: Pipeline,
@@ -319,7 +320,7 @@ struct JournaldServer<J> {
     remap_priority: bool,
 }
 
-impl<J: JournalStream> JournaldServer<J> {
+impl JournaldServer {
     pub async fn run(mut self) {
         let mut out = self.out.sink_compat();
 
