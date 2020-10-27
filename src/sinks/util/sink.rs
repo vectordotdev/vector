@@ -723,13 +723,13 @@ where
             .then(move |result| {
                 match result {
                     Ok(response) if response.is_successful() => {
-                        trace!(message = "Response successful.", ?response);
+                        trace!(message = "Response successful.", response = ?response);
                     }
                     Ok(response) => {
-                        error!(message = "Response wasn't successful.", ?response);
+                        error!(message = "Response wasn't successful.", response = ?response);
                     }
                     Err(error) => {
-                        error!(message = "Request failed.", ?error,);
+                        error!(message = "Request failed.", error = ?error,);
                     }
                 }
 

@@ -221,7 +221,7 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
             return future::ready(Ok(())).boxed();
         }
 
-        debug!(message = "Sending data.", ?input);
+        debug!(message = "Sending data.", input = ?input);
         let client = self.client.clone();
         Box::pin(async move { client.put_metric_data(input).await })
     }

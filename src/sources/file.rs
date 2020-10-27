@@ -227,7 +227,7 @@ pub fn file_source(
     let multi_line_timeout = config.multi_line_timeout;
 
     Box::new(futures01::future::lazy(move || {
-        info!(message = "Starting file server.", ?include, ?exclude);
+        info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);

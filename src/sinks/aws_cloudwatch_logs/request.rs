@@ -108,7 +108,7 @@ impl Future for CloudwatchFuture {
 
                         let token = stream.upload_sequence_token;
 
-                        info!(message = "Putting logs.", ?token);
+                        info!(message = "Putting logs.", token = ?token);
                         self.state = State::Put(self.client.put_logs(token, events));
                     } else if self.create_missing_stream {
                         info!("Provided stream does not exist; creating a new one.");
@@ -156,10 +156,10 @@ impl Future for CloudwatchFuture {
                     };
 
                     if let Some(events) = self.events.pop() {
-                        debug!(message = "Putting logs.", ?next_token);
+                        debug!(message = "Putting logs.", next_token = ?next_token);
                         self.state = State::Put(self.client.put_logs(next_token, events));
                     } else {
-                        info!(message = "Putting logs was successful.", ?next_token);
+                        info!(message = "Putting logs was successful.", next_token = ?next_token);
 
                         self.token_tx
                             .take()

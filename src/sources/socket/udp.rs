@@ -54,7 +54,7 @@ pub fn udp(
             let mut socket = UdpSocket::bind(&address)
                 .await
                 .expect("Failed to bind to udp listener socket");
-            info!(message = "Listening.", %address);
+            info!(message = "Listening.", address = %address);
 
             let mut buf = BytesMut::with_capacity(max_length);
             loop {

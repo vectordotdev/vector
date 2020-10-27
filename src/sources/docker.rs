@@ -484,7 +484,7 @@ impl DockerSource {
                 .unwrap_or(false);
             if hostname_hint || image_hint {
                 // This container is probably itself.
-                info!(message = "Detected self container.", %id);
+                info!(message = "Detected self container.", id = %id);
                 return false;
             }
         }

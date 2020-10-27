@@ -303,7 +303,7 @@ impl MetadataClient {
 
         let uri = Uri::from_parts(parts)?;
 
-        debug!(message = "Sending metadata request.", %uri);
+        debug!(message = "Sending metadata request.", uri = %uri);
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())

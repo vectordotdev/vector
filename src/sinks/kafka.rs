@@ -160,7 +160,7 @@ impl Sink for KafkaSink {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
-            error!(message = "Missing keys for topic.", ?missing_keys);
+            error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
         })?;
 
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);

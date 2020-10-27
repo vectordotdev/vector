@@ -38,7 +38,7 @@ where
     let fut = async move {
         let mut listener =
             UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
-        info!(message = "Listening.", ?listen_path, r#type = "unix");
+        info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
         let connection_open = OpenGauge::new();
         let mut stream = listener.incoming().take_until(shutdown.clone());

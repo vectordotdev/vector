@@ -548,12 +548,12 @@ impl RetryLogic for CloudwatchRetryLogic {
         match error {
             CloudwatchError::Put(err) => match err {
                 RusotoError::Service(PutLogEventsError::ServiceUnavailable(error)) => {
-                    error!(message = "Put logs service unavailable.", ?error);
+                    error!(message = "Put logs service unavailable.", error = ?error);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Put logs HTTP dispatch.", ?error);
+                    error!(message = "Put logs HTTP dispatch.", error = ?error);
                     true
                 }
 
@@ -565,7 +565,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "Put logs HTTP error.", %status, %body);
+                    error!(message = "Put logs HTTP error.", status = %status, body = %body);
                     true
                 }
 
@@ -582,7 +582,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::Describe(err) => match err {
                 RusotoError::Service(DescribeLogStreamsError::ServiceUnavailable(error)) => {
-                    error!(message = "Describe streams service unavailable.", ?error);
+                    error!(message = "Describe streams service unavailable.", error = ?error);
                     true
                 }
 
@@ -594,12 +594,12 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "Describe streams HTTP error.", %status, %body);
+                    error!(message = "Describe streams HTTP error.", status = %status, body = %body);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Describe streams HTTP dispatch.", ?error);
+                    error!(message = "Describe streams HTTP dispatch.", error = ?error);
                     true
                 }
 
@@ -608,7 +608,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::CreateStream(err) => match err {
                 RusotoError::Service(CreateLogStreamError::ServiceUnavailable(error)) => {
-                    error!(message = "Create stream service unavailable.", ?error);
+                    error!(message = "Create stream service unavailable.", error = ?error);
                     true
                 }
 
@@ -620,12 +620,12 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "Create stream HTTP error.", %status, %body);
+                    error!(message = "Create stream HTTP error.", status = %status, body = %body);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Create stream HTTP dispatch.", ?error);
+                    error!(message = "Create stream HTTP dispatch.", error = ?error);
                     true
                 }
 

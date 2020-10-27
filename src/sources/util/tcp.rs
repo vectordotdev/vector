@@ -129,15 +129,15 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                         let tripwire = tripwire
                             .map(move |_| {
                                 info!(
-                                    "Resetting connection (still open after {} seconds).",
-                                    shutdown_timeout_secs
+                                    message = "Resetting connection (still open after seconds).",
+                                    seconds = ?shutdown_timeout_secs
                                 );
                             })
                             .boxed();
 
                         span.in_scope(|| {
                             let peer_addr = socket.peer_addr();
-                            debug!(message = "Accepted a new connection.", %peer_addr);
+                            debug!(message = "Accepted a new connection.", peer_addr = %peer_addr);
 
                             let open_token =
                                 connection_gauge.open(|count| emit!(ConnectionOpen { count }));

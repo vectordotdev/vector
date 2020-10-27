@@ -43,7 +43,7 @@ pub fn spawn_thread(
         if let Some((mut watcher, receiver)) = watcher.take() {
             while let Ok(RawEvent { op: Ok(event), .. }) = receiver.recv() {
                 if event.intersects(Op::CREATE | Op::REMOVE | Op::WRITE | Op::CLOSE_WRITE) {
-                    debug!(message = "Configuration file change detected.", ?event);
+                    debug!(message = "Configuration file change detected.", event = ?event);
 
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
@@ -58,7 +58,7 @@ pub fn spawn_thread(
                     info!("Configuration file changed.");
                     raise_sighup();
                 } else {
-                    debug!(message = "Ignoring event.", ?event)
+                    debug!(message = "Ignoring event.", event = ?event)
                 }
             }
         }

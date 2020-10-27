@@ -24,7 +24,7 @@ impl<'a> InternalEvent for MetricToLogFailedSerialize {
     fn emit_logs(&self) {
         warn!(
             message = "Metric failed to serialize as JSON.",
-            %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         )
     }

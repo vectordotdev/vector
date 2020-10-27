@@ -208,7 +208,7 @@ impl RunningTopology {
         require_healthy: bool,
     ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
-            error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", ?self.config.global.data_dir);
+            error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
             return Ok(false);
         }
 
@@ -306,7 +306,7 @@ impl RunningTopology {
 
         let deadline = Instant::now() + timeout;
         for name in &diff.sources.to_remove {
-            info!(message = "Removing source.", ?name);
+            info!(message = "Removing source.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -350,7 +350,7 @@ impl RunningTopology {
 
         // Transforms
         for name in &diff.transforms.to_remove {
-            info!(message = "Removing transform.", ?name);
+            info!(message = "Removing transform.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -361,7 +361,7 @@ impl RunningTopology {
 
         // Sinks
         for name in &diff.sinks.to_remove {
-            info!(message = "Removing sink.", ?name);
+            info!(message = "Removing sink.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -406,34 +406,34 @@ impl RunningTopology {
     fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
         for name in &diff.sources.to_change {
-            info!(message = "Rebuilding source.", ?name);
+            info!(message = "Rebuilding source.", name = ?name);
             self.spawn_source(name, &mut new_pieces);
         }
 
         for name in &diff.sources.to_add {
-            info!(message = "Starting source.", ?name);
+            info!(message = "Starting source.", name = ?name);
             self.spawn_source(&name, &mut new_pieces);
         }
 
         // Transforms
         for name in &diff.transforms.to_change {
-            info!(message = "Rebuilding transform.", ?name);
+            info!(message = "Rebuilding transform.", name = ?name);
             self.spawn_transform(&name, &mut new_pieces);
         }
 
         for name in &diff.transforms.to_add {
-            info!(message = "Starting transform.", ?name);
+            info!(message = "Starting transform.", name = ?name);
             self.spawn_transform(&name, &mut new_pieces);
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
-            info!(message = "Rebuilding sink.", ?name);
+            info!(message = "Rebuilding sink.", name = ?name);
             self.spawn_sink(&name, &mut new_pieces);
         }
 
         for name in &diff.sinks.to_add {
-            info!(message = "Starting sink.", ?name);
+            info!(message = "Starting sink.", name = ?name);
             self.spawn_sink(&name, &mut new_pieces);
         }
     }
