@@ -3,7 +3,7 @@ use prettytable::{format, Table};
 use structopt::StructOpt;
 use url::Url;
 use vector_api_client::{
-    gql::{HealthQueryExt, TopologyQueryExt},
+    gql::{ComponentsQueryExt, HealthQueryExt},
     Client,
 };
 
@@ -71,14 +71,14 @@ pub struct Opts {
     human: bool,
 }
 
-async fn print_topology(client: &Client, mut formatter: Box<dyn StatsWriter>) -> Result<(), ()> {
-    let res = client.topology_query().await.map_err(|_| ())?;
+async fn print_components(client: &Client, mut formatter: Box<dyn StatsWriter>) -> Result<(), ()> {
+    let res = client.components_query().await.map_err(|_| ())?;
 
     let mut table = Table::new();
     table.set_format(*format::consts::FORMAT_NO_BORDER_LINE_SEPARATOR);
     table.set_titles(row!("NAME", "TYPE", r->"EVENTS"));
 
-    for data in res.data.unwrap().topology {
+    for data in res.data.unwrap().components {
         table.add_row(row!(
             data.name,
             data.on.to_string(),
@@ -110,13 +110,13 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
         }
     }
 
-    // Print initial topology
+    // Print initial components
     // TODO - make this auto-update!
-    if print_topology(&client, new_formatter(opts.human))
+    if print_components(&client, new_formatter(opts.human))
         .await
         .is_err()
     {
-        eprintln!("Couldn't retrieve topology");
+        eprintln!("Couldn't retrieve components");
         return exitcode::UNAVAILABLE;
     }
 

@@ -111,15 +111,15 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     }
 }
 
-/// Get the events processed by topology component name
-pub fn topology_events_processed_total(topology_name: String) -> Option<EventsProcessedTotal> {
+/// Get the events processed by component name
+pub fn component_events_processed_total(component_name: String) -> Option<EventsProcessedTotal> {
     let key = String::from("component_name");
 
     capture_metrics(&GLOBAL_CONTROLLER)
         .find(|ev| match ev {
             Event::Metric(m)
                 if m.name.as_str().eq("events_processed_total")
-                    && m.tag_matches(&key, &topology_name) =>
+                    && m.tag_matches(&key, &component_name) =>
             {
                 true
             }
