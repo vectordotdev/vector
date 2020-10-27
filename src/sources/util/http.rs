@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{Event, Value},
     internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -11,13 +11,31 @@ use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, error::Error, fmt, net::SocketAddr};
+use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, net::SocketAddr};
 use warp::{
     filters::BoxedFilter,
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
 };
+
+pub fn add_query_parameters(
+    mut events: Vec<Event>,
+    query_parameters_config: &[String],
+    query_parameters: HashMap<String, String>,
+) -> Vec<Event> {
+    for query_parameter_name in query_parameters_config {
+        let value = query_parameters.get(query_parameter_name);
+        for event in events.iter_mut() {
+            event.as_mut_log().insert(
+                query_parameter_name as &str,
+                Value::from(value.map(String::to_owned)),
+            );
+        }
+    }
+
+    events
+}
 
 #[derive(Serialize, Debug)]
 pub struct ErrorMessage {
@@ -107,7 +125,12 @@ impl HttpSourceAuth {
 
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
-    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage>;
+    fn build_event(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_parameters: HashMap<String, String>,
+    ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,
@@ -131,7 +154,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
             .and_then(move |auth_header, headers: HeaderMap, body: Bytes| {
-                info!(message = "Handling HTTP request.", ?headers);
+                info!(message = "Handling HTTP request.", headers = ?headers);
 
                 let out = out.clone();
 
@@ -168,8 +191,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             Err(warp::reject::custom(error))
                         }
                     }
-                }
-            });
+                },
+            );
 
         let ping = warp::get().and(warp::path("ping")).map(|| "pong");
         let routes = svc.or(ping).recover(|r: Rejection| async move {
