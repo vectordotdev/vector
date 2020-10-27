@@ -1,6 +1,6 @@
 {
     "name": "Vector",
-    "description": "Vector is a lightweight tool for building observability pipelines. (With easy setup for CloudWatch!)",
+    "description": "Vector is a lightweight tool for building observability pipelines.",
     "repository": "https://github.com/timberio/vector",
     "logo": "https://vector.dev/press/vector-icon.png",
     "keywords": ["observability"],
@@ -8,18 +8,18 @@
         { "url": "https://github.com/timberio/vector-heroku-buildpack" }
     ],
     "env": {
-        "VECTOR_TOML_URL": {
-            "description": "The URL of the `vector.toml` you use to use. (Refreshed on restart! For static, provision a `vector.toml` with your app.",
-            "required": false
+        "LOGPLEX_AUTH_PASSWORD": {
+            "description": "The unique, private `pass` part of `heroku drains:add https://user:pass@mylogdrain.herokuapp.com/logs -a myapp`.",
+            "required": true
         },
         "LOGPLEX_AUTH_USERNAME": {
             "description": "The unique, private `user` part of `heroku drains:add https://user:pass@mylogdrain.herokuapp.com/logs -a myapp`.",
             "required": true
         },
-        "LOGPLEX_AUTH_PASSWORD": {
-            "description": "The unique, private `pass` part of `heroku drains:add https://user:pass@mylogdrain.herokuapp.com/logs -a myapp`.",
-            "required": true
-        }
+        "VECTOR_TOML_URL": {
+            "description": "It is preferable for you to provision a `vector.toml` with your app. But, if you need, you can enter a URL here instead and Vector will pull it each deploy.",
+            "required": false
+        },
     },
     "formation": {
         "web": {
