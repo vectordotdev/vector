@@ -1,5 +1,4 @@
-use super::InternalEvent;
-
+#[cfg(feature = "sources-aws_s3")]
 pub mod source {
     use super::InternalEvent;
     use crate::sources::aws_s3::sqs::ProcessingError;
