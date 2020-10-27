@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{Event, Value},
     internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -11,13 +11,31 @@ use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::Sink;
 use headers::{Authorization, HeaderMapExt};
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, error::Error, fmt, net::SocketAddr};
+use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, net::SocketAddr};
 use warp::{
     filters::BoxedFilter,
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
 };
+
+pub fn add_query_parameters(
+    mut events: Vec<Event>,
+    query_parameters_config: &[String],
+    query_parameters: HashMap<String, String>,
+) -> Vec<Event> {
+    for query_parameter_name in query_parameters_config {
+        let value = query_parameters.get(query_parameter_name);
+        for event in events.iter_mut() {
+            event.as_mut_log().insert(
+                query_parameter_name as &str,
+                Value::from(value.map(String::to_owned)),
+            );
+        }
+    }
+
+    events
+}
 
 #[derive(Serialize, Debug)]
 pub struct ErrorMessage {
@@ -107,7 +125,12 @@ impl HttpSourceAuth {
 
 #[async_trait]
 pub trait HttpSource: Clone + Send + Sync + 'static {
-    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage>;
+    fn build_event(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_parameters: HashMap<String, String>,
+    ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
         self,
@@ -130,46 +153,52 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             .and(warp::header::optional::<String>("authorization"))
             .and(warp::header::headers_cloned())
             .and(warp::body::bytes())
-            .and_then(move |auth_header, headers: HeaderMap, body: Bytes| {
-                info!("Handling HTTP request: {:?}", headers);
+            .and(warp::query::<HashMap<String, String>>())
+            .and_then(
+                move |auth_header,
+                      headers: HeaderMap,
+                      body: Bytes,
+                      query_parameters: HashMap<String, String>| {
+                    info!("Handling HTTP request: {:?}", headers);
 
-                let out = out.clone();
+                    let out = out.clone();
 
-                let body_size = body.len();
-                let events = match auth.is_valid(&auth_header) {
-                    Ok(()) => self.build_event(body, headers),
-                    Err(err) => Err(err),
-                };
+                    let body_size = body.len();
+                    let events = match auth.is_valid(&auth_header) {
+                        Ok(()) => self.build_event(body, headers, query_parameters),
+                        Err(err) => Err(err),
+                    };
 
-                async move {
-                    match events {
-                        Ok(events) => {
-                            emit!(HTTPEventsReceived {
-                                events_count: events.len(),
-                                byte_size: body_size,
-                            });
-                            out.send_all(futures01::stream::iter_ok(events))
-                                .compat()
-                                .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
-                                    // can only fail if receiving end disconnected, so we are shutting down,
-                                    // probably not gracefully.
-                                    error!("Failed to forward events, downstream is closed");
-                                    error!("Tried to send the following event: {:?}", e);
-                                    warp::reject::custom(RejectShuttingDown)
-                                })
-                                .map_ok(|_| warp::reply())
-                                .await
-                        }
-                        Err(err) => {
-                            emit!(HTTPBadRequest {
-                                error_code: err.code,
-                                error_message: err.message.as_str(),
-                            });
-                            Err(warp::reject::custom(err))
+                    async move {
+                        match events {
+                            Ok(events) => {
+                                emit!(HTTPEventsReceived {
+                                    events_count: events.len(),
+                                    byte_size: body_size,
+                                });
+                                out.send_all(futures01::stream::iter_ok(events))
+                                    .compat()
+                                    .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
+                                        // can only fail if receiving end disconnected, so we are shutting down,
+                                        // probably not gracefully.
+                                        error!("Failed to forward events, downstream is closed");
+                                        error!("Tried to send the following event: {:?}", e);
+                                        warp::reject::custom(RejectShuttingDown)
+                                    })
+                                    .map_ok(|_| warp::reply())
+                                    .await
+                            }
+                            Err(err) => {
+                                emit!(HTTPBadRequest {
+                                    error_code: err.code,
+                                    error_message: err.message.as_str(),
+                                });
+                                Err(warp::reject::custom(err))
+                            }
                         }
                     }
-                }
-            });
+                },
+            );
 
         let ping = warp::get().and(warp::path("ping")).map(|| "pong");
         let routes = svc.or(ping).recover(|r: Rejection| async move {

@@ -96,6 +96,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+      - run: make test-behavior
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
@@ -154,6 +155,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+      - run: make test-behavior
 
   test-windows:
     name: Unit - Windows
