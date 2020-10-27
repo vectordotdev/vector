@@ -9,7 +9,7 @@ use crate::{
         SqsS3EventRecordIgnoredInvalidEvent,
     },
     line_agg::{self, LineAgg},
-    rusoto,
+    rusoto::{self, RegionOrEndpoint},
     shutdown::ShutdownSignal,
     Pipeline,
 };
@@ -64,7 +64,8 @@ impl Default for Strategy {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 struct AwsS3Config {
-    region: Region,
+    #[serde(flatten)]
+    region: RegionOrEndpoint,
 
     compression: Compression,
 
@@ -150,19 +151,19 @@ impl AwsS3Config {
     ) -> Result<SqsIngestor, CreateSqsIngestorError> {
         match self.sqs {
             Some(ref sqs) => {
+                let region: Region = (&self.region).try_into().context(RegionParseError {})?;
                 let resolver = Resolver;
+
                 let client = rusoto::client(resolver).with_context(|| Client {})?;
                 let creds: std::sync::Arc<rusoto::AwsCredentialsProvider> =
-                    rusoto::AwsCredentialsProvider::new(&self.region, self.assume_role.clone())
-                        .with_context(|| Credentials {})?
+                    rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())
+                        .context(Credentials {})?
                         .into();
-                let sqs_client =
-                    SqsClient::new_with(client.clone(), creds.clone(), self.region.clone());
-                let s3_client =
-                    S3Client::new_with(client.clone(), creds.clone(), self.region.clone());
+                let sqs_client = SqsClient::new_with(client.clone(), creds.clone(), region.clone());
+                let s3_client = S3Client::new_with(client.clone(), creds.clone(), region.clone());
 
                 SqsIngestor::new(
-                    self.region.clone(),
+                    region.clone(),
                     sqs_client,
                     s3_client,
                     sqs.clone(),
@@ -170,7 +171,7 @@ impl AwsS3Config {
                     multiline,
                 )
                 .await
-                .with_context(|| Initialize {})
+                .context(Initialize {})
             }
             None => Err(CreateSqsIngestorError::ConfigMissing {}),
         }
@@ -187,6 +188,8 @@ enum CreateSqsIngestorError {
     Credentials { source: crate::Error },
     #[snafu(display("sqs configuration required when strategy=sqs"))]
     ConfigMissing,
+    #[snafu(display("could not parse region configuration: {}", source))]
+    RegionParseError { source: rusoto::region::ParseError },
 }
 
 #[derive(Debug, Snafu)]
@@ -755,6 +758,7 @@ mod integration_tests {
     use crate::{
         config::{GlobalOptions, SourceConfig},
         line_agg,
+        rusoto::RegionOrEndpoint,
         shutdown::ShutdownSignal,
         sources::util::MultilineConfig,
         test_util::{collect_n, random_lines},
@@ -817,10 +821,7 @@ mod integration_tests {
 
     async fn config(queue_name: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
-            region: Region::Custom {
-                name: "minio".to_owned(),
-                endpoint: "http://localhost:4566".to_owned(),
-            },
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
             multiline,
