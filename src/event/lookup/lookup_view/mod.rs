@@ -120,10 +120,34 @@ impl<'a> Lookup<'a> {
         Self::try_from(pair)
     }
 
+    /// Dump the value to a `String`.
+    #[instrument]
+    pub fn to_string(&self) -> String {
+        format!("{}", self)
+    }
+
     /// Become a `LookupBuf` (by allocating).
     #[instrument]
     pub fn into_buf(self) -> LookupBuf {
         LookupBuf::from(self)
+    }
+
+    /// Return a borrow of the Segment set.
+    #[instrument]
+    pub fn as_segments(&self) -> &Vec<Segment<'_>> {
+        &self.segments
+    }
+
+    /// Return the Segment set.
+    #[instrument]
+    pub fn into_segments(self) -> Vec<Segment<'a>> {
+        self.segments
+    }
+
+    /// Merge a lookup.
+    #[instrument]
+    pub fn extend(&mut self, other: Self) {
+        self.segments.extend(other.segments)
     }
 }
 

@@ -211,7 +211,7 @@ impl AzureMonitorLogsSink {
         let timestamp_key = log_schema().timestamp_key();
         default_headers.insert(
             TIME_GENERATED_FIELD_HEADER.clone(),
-            HeaderValue::from_str(timestamp_key)?,
+            HeaderValue::from_str(&timestamp_key.to_string())?,
         );
 
         if let Some(azure_resource_id) = &config.azure_resource_id {

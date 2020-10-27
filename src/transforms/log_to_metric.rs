@@ -5,8 +5,7 @@ use crate::{
         TransformDescription,
     },
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::LogEvent,
-    event::Value,
+    event::{LogEvent, Value, LookupBuf},
     internal_events::{
         LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseFloatError,
         LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
@@ -28,7 +27,7 @@ pub struct LogToMetricConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct CounterConfig {
-    field: String,
+    field: LookupBuf,
     name: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
@@ -37,28 +36,28 @@ pub struct CounterConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GaugeConfig {
-    field: String,
+    field: LookupBuf,
     name: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SetConfig {
-    field: String,
+    field: LookupBuf,
     name: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct HistogramConfig {
-    field: String,
+    field: LookupBuf,
     name: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SummaryConfig {
-    field: String,
+    field: LookupBuf,
     name: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }

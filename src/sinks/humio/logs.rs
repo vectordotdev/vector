@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 
 const HOST: &str = "https://cloud.humio.com";
 
-#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[derive(Clone, Debug, Deserialize, Serialize, Derivative)]
+#[derivative(Default)]
 pub struct HumioLogsConfig {
     token: String,
     // Deprecated name
@@ -27,7 +28,8 @@ pub struct HumioLogsConfig {
     event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
-    host_key: String,
+    #[derivative(default = "default_host_key()")]
+    host_key: LookupBuf,
 
     #[serde(default)]
     compression: Compression,

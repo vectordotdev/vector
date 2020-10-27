@@ -21,7 +21,7 @@ impl LogEventMergeState {
     }
 
     /// Merge the incoming (partial) event in.
-    pub fn merge_in_next_event<'a>(&mut self, incoming: LogEvent, fields: &[impl AsRef<Lookup<'a>>]) {
+    pub fn merge_in_next_event<'a>(&mut self, incoming: LogEvent, fields: &[Lookup<'a>]) {
         merge_log_event(&mut self.intermediate_merged_event, incoming, fields);
     }
 
@@ -30,7 +30,7 @@ impl LogEventMergeState {
     pub fn merge_in_final_event<'a>(
         mut self,
         incoming: LogEvent,
-        fields: &[impl AsRef<Lookup<'a>>],
+        fields: &[Lookup<'a>],
     ) -> LogEvent {
         self.merge_in_next_event(incoming, fields);
         self.intermediate_merged_event

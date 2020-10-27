@@ -30,7 +30,7 @@ impl<'a> Segment<'a> {
         matches!(self, Segment::Index(_))
     }
 
-    #[tracing::instrument(skip(segment))]
+    #[tracing::instrument(level = "trace", skip(segment))]
     pub(crate) fn from_lookup(segment: Pair<'a, Rule>) -> crate::Result<Vec<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
@@ -58,7 +58,7 @@ impl<'a> Segment<'a> {
         Ok(segments)
     }
 
-    #[tracing::instrument(skip(segment))]
+    #[tracing::instrument(level = "trace", skip(segment))]
     pub(crate) fn from_path_segment(segment: Pair<'a, Rule>) -> crate::Result<Vec<Segment<'a>>> {
         let rule = segment.as_rule();
         let full_segment = segment.as_str();
@@ -85,7 +85,7 @@ impl<'a> Segment<'a> {
         Ok(segments)
     }
 
-    #[tracing::instrument(skip(segment))]
+    #[tracing::instrument(level = "trace", skip(segment))]
     pub(crate) fn from_path_index(segment: Pair<'a, Rule>) -> crate::Result<Segment<'a>> {
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");
@@ -109,7 +109,7 @@ impl<'a> Segment<'a> {
         retval
     }
 
-    #[tracing::instrument(skip(segment))]
+    #[tracing::instrument(level = "trace", skip(segment))]
     pub(crate) fn from_quoted_path_segment(segment: Pair<'a, Rule>) -> crate::Result<Segment<'a>> {
         let full_segment = segment.as_str();
         tracing::trace!(segment = %full_segment, rule = ?segment.as_rule(), action = %"enter");

@@ -110,12 +110,12 @@ impl Template {
             .map(|bytes| String::from_utf8(Vec::from(bytes.as_ref())).expect("this is a bug"))
     }
 
-    pub fn get_fields(&self) -> Option<Vec<String>> {
+    pub fn get_fields(&self) -> Option<Vec<LookupBuf>> {
         if self.has_fields {
             RE.captures_iter(&self.src)
                 .map(|c| {
                     c.get(1)
-                        .map(|s| Lookup::from(s.as_str().trim().to_string()))
+                        .map(|s| LookupBuf::from(s.as_str().trim().to_string()))
                         .expect("src should match regex")
                 })
                 .collect::<Vec<_>>()

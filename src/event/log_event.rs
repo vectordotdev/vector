@@ -17,7 +17,7 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn get<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&Value> {
         let lookup = lookup.borrow();
         let mut lookup_iter = lookup.iter();
@@ -28,7 +28,7 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
-            Segment::Field(f) => self.fields.get(f),
+            Segment::Field(ref f) => self.fields.get(*f),
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
@@ -46,9 +46,9 @@ impl LogEvent {
             }
             cursor = match (segment, cursor) {
                 // Fields access maps.
-                (Segment::Field(f), Some(Value::Map(map))) => {
+                (Segment::Field(ref f), Some(Value::Map(map))) => {
                     trace!("Matched field into map.");
-                    map.get(f)
+                    map.get(*f)
                 }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
@@ -67,7 +67,7 @@ impl LogEvent {
         cursor
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn get_mut<'a>(&mut self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&mut Value> {
         let lookup = lookup.borrow();
         let mut lookup_iter = lookup.iter();
@@ -117,12 +117,12 @@ impl LogEvent {
         cursor
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn contains<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> bool {
         self.get(lookup).is_some()
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn insert(
         &mut self,
         lookup: LookupBuf,
@@ -131,27 +131,27 @@ impl LogEvent {
         unimplemented!();
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn remove<'a>(&mut self, lookup: impl Borrow<Lookup<'a>> + Debug, prune: bool) -> Option<Value> {
         unimplemented!();
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
         util::log::keys(&self.fields)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
         util::log::all_fields(&self.fields)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
     }
 
-    #[instrument(skip(self, lookup), fields(lookup = %lookup), err)]
+    #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
     fn entry(&mut self, lookup: LookupBuf) -> crate::Result<Entry<String, Value>> {
         trace!("Seeking to entry.");
         let mut walker = lookup.into_iter().enumerate();
@@ -191,7 +191,7 @@ impl LogEvent {
     }
 
     /// Returns the entire event as a `Value::Map`.
-    #[instrument(skip(self))]
+    #[instrument(level = "trace", skip(self))]
     pub fn take(self) -> Value {
         Value::Map(self.fields)
     }
@@ -275,21 +275,20 @@ where
     }
 }
 
-impl<'a, K, V> Extend<(K, V)> for LogEvent
+impl<'a, V> Extend<(LookupBuf, V)> for LogEvent
 where
-    K: Borrow<Lookup<'a>>,
     V: Into<Value>,
 {
-    fn extend<I: IntoIterator<Item = (K, V)>>(&mut self, iter: I) {
+    fn extend<I: IntoIterator<Item = (LookupBuf, V)>>(&mut self, iter: I) {
         for (k, v) in iter {
-            self.insert(k.borrow(), v.into());
+            self.insert(k, v.into());
         }
     }
 }
 
 // Allow converting any kind of appropriate key/value iterator directly into a LogEvent.
-impl<'a, K: Borrow<Lookup<'a>>, V: Into<Value>> FromIterator<(K, V)> for LogEvent {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+impl<'a, V: Into<Value>> FromIterator<(LookupBuf, V)> for LogEvent {
+    fn from_iter<T: IntoIterator<Item = (LookupBuf, V)>>(iter: T) -> Self {
         let mut log_event = LogEvent::default();
         log_event.extend(iter);
         log_event

@@ -318,7 +318,7 @@ impl CheckFieldsPredicate for ExistsPredicate {
             Event::Metric(m) => m
                 .tags
                 .as_ref()
-                .map_or(false, |t| t.contains_key(&self.target)),
+                .map_or(false, |t| t.contains_key(&self.target.to_string())),
         }) == self.arg
     }
 }
@@ -381,7 +381,7 @@ impl NegatePredicate {
         target: LookupBuf,
         arg: &CheckFieldsPredicateArg,
     ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
-        let subpred = build_predicate(predicate, target, arg)?;
+        let subpred = build_predicate(predicate, target.to_string(), arg)?;
         Ok(Box::new(Self { subpred }))
     }
 }
@@ -441,9 +441,10 @@ impl CheckFieldsPredicate for LengthEqualsPredicate {
 
 fn build_predicate(
     predicate: &str,
-    target: LookupBuf,
+    target: String,
     arg: &CheckFieldsPredicateArg,
 ) -> Result<Box<dyn CheckFieldsPredicate>, String> {
+    let target = LookupBuf::from_str(&target).map_err(|e| format!("{}", e))?;
     match predicate {
         "eq" | "equals" => EqualsPredicate::new(target, arg),
         "neq" | "not_equals" => NotEqualsPredicate::new(target, arg),
@@ -468,7 +469,7 @@ fn build_predicate(
 
 fn build_predicates(
     map: &IndexMap<String, CheckFieldsPredicateArg>,
-) -> Result<IndexMap<LookupBuf, Box<dyn CheckFieldsPredicate>>, Vec<String>> {
+) -> Result<IndexMap<String, Box<dyn CheckFieldsPredicate>>, Vec<String>> {
     let mut predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>> = IndexMap::new();
     let mut errors = Vec::new();
 
@@ -524,7 +525,11 @@ impl_generate_config_from_default!(CheckFieldsConfig);
 impl ConditionConfig for CheckFieldsConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
         build_predicates(&self.predicates)
-            .map(|preds| -> Box<dyn Condition> { Box::new(CheckFields { predicates: preds }) })
+            .map(|preds| -> Box<dyn Condition> {
+                Box::new(CheckFields {
+                    predicates: preds.into_iter().map(|(k, v)| (LookupBuf::from(k), v)).collect()
+                })
+            })
             .map_err(|errs| {
                 if errs.len() > 1 {
                     let mut err_fmt = errs.join("\n");

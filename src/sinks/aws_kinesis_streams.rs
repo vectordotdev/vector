@@ -170,7 +170,7 @@ impl KinesisService {
                 cx.acker(),
             )
             .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, partition_key_field.as_ref(), &encoding)));
+            .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
     }
@@ -275,7 +275,7 @@ fn encode_event(
     encoding: &EncodingConfig<Encoding>,
 ) -> Option<PutRecordsRequestEntry> {
     let partition_key = if let Some(partition_key_field) = partition_key_field {
-        if let Some(v) = event.as_log().get(&partition_key_field) {
+        if let Some(v) = event.as_log().get(partition_key_field) {
             v.to_string_lossy()
         } else {
             warn!(

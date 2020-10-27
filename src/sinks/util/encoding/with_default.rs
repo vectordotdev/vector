@@ -1,5 +1,5 @@
 use crate::{
-    event::{PathComponent, PathIter, Lookup, LookupBuf},
+    event::{PathIter, Lookup, LookupBuf},
     sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat},
 };
 use serde::{
@@ -177,13 +177,7 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-            only_fields: inner.only_fields.map(|fields| {
-                fields
-                    .iter()
-                    .map(|only| PathIter::new(only).collect())
-                    .collect()
-            }),
+            only_fields: inner.only_fields,
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };

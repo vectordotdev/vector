@@ -202,6 +202,24 @@ impl LookupBuf {
     pub fn from_str(value: &str) -> Result<LookupBuf, crate::Error> {
         Lookup::from_str(value).map(|l| l.into_buf())
     }
+
+    /// Return a borrow of the SegmentBuf set.
+    #[instrument]
+    pub fn as_segments(&self) -> &Vec<SegmentBuf> {
+        self.segments.as_ref()
+    }
+
+    /// Return the SegmentBuf set.
+    #[instrument]
+    pub fn into_segments(self) -> Vec<SegmentBuf> {
+        self.segments
+    }
+
+    /// Merge a lookup.
+    #[instrument]
+    pub fn extend(&mut self, other: Self) {
+        self.segments.extend(other.segments)
+    }
 }
 
 impl FromStr for LookupBuf {

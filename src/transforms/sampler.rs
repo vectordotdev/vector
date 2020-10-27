@@ -4,7 +4,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::{Event, Lookup, LookupBuf},
+    event::{Event, LookupBuf},
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
 use regex::RegexSet; // TODO: use regex::bytes

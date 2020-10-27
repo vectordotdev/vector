@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, LookupBuf, Value},
+    event::{Event, LookupBuf, Lookup, Value},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -70,6 +70,7 @@ impl Transform for Logfmt {
                 .filter_map(|logfmt::Pair { key, val }| val.map(|val| (key, val)));
 
             for (key, val) in pairs {
+                let key = Lookup::from(key);
                 if key == self.field {
                     drop_field = false;
                 }
@@ -82,19 +83,19 @@ impl Transform for Logfmt {
                         Err(error) => {
                             debug!(
                                 message = "Could not convert types.",
-                                key = &key[..],
+                                %key,
                                 %error,
                                 rate_limit_secs = 30
                             );
                         }
                     }
                 } else {
-                    event.as_mut_log().insert(key, val);
+                    event.as_mut_log().insert(LookupBuf::from(key), val);
                 }
             }
 
             if drop_field {
-                event.as_mut_log().remove(&self.field);
+                event.as_mut_log().remove(&self.field, false);
             }
         } else {
             debug!(

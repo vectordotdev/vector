@@ -476,7 +476,7 @@ impl DockerSource {
                 .unwrap_or(false);
             let image_hint = image
                 .into()
-                .map(|image| image.starts_with(VECTOR_IMAGE_NAME))
+                .map(|image| image.starts_with(*VECTOR_IMAGE_NAME))
                 .unwrap_or(false);
             if hostname_hint || image_hint {
                 // This container is probably itself.
@@ -820,7 +820,7 @@ impl ContainerLogInfo {
             log_event.insert(log_schema().message_key().into_buf(), bytes_message);
 
             // Stream we got the message from.
-            log_event.insert(STREAM.into_buf(), stream);
+            log_event.insert(*STREAM, stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
@@ -828,7 +828,7 @@ impl ContainerLogInfo {
             }
 
             // Container ID.
-            log_event.insert(CONTAINER, self.id.0.clone());
+            log_event.insert(*CONTAINER, self.id.0.clone());
 
             // Labels.
             for (key, value) in self.metadata.labels.iter() {
@@ -836,13 +836,13 @@ impl ContainerLogInfo {
             }
 
             // Container name.
-            log_event.insert(NAME, self.metadata.name.clone());
+            log_event.insert(*NAME, self.metadata.name.clone());
 
             // Container image.
-            log_event.insert(IMAGE, self.metadata.image.clone());
+            log_event.insert(*IMAGE, self.metadata.image.clone());
 
             // Timestamp of the container creation.
-            log_event.insert(CREATED_AT, self.metadata.created_at);
+            log_event.insert(*CREATED_AT, self.metadata.created_at);
 
             // Return the resulting log event.
             log_event

@@ -165,7 +165,7 @@ impl HttpSink for InfluxDBLogsSink {
         let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
 
         // Timestamp
-        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
+        let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key(), false) {
             Some(Value::Timestamp(ts)) => Some(ts),
             _ => None,
         });

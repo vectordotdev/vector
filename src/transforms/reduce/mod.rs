@@ -3,7 +3,7 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
-    event::{Event, LogEvent},
+    event::{Event, LogEvent, LookupBuf},
     internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
 };
 use async_stream::stream;
@@ -143,8 +143,8 @@ impl ReduceState {
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
-    group_by: Vec<String>,
-    merge_strategies: IndexMap<String, MergeStrategy>,
+    group_by: Vec<LookupBuf>,
+    merge_strategies: IndexMap<LookupBuf, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
 }
@@ -207,7 +207,7 @@ impl Transform for Reduce {
             .unwrap_or(false);
 
         let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
+        let discriminant = Discriminant::from_log_event(&event, self.group_by.as_ref().as_slice());
 
         if ends_here {
             output.push(Event::from(

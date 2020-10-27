@@ -58,12 +58,12 @@ pub struct MetricToLog {
 
 impl MetricToLog {
     pub fn new(host_tag: Option<LookupBuf>) -> Self {
+        let host_tag = host_tag.unwrap_or_else(|| log_schema().host_key().into_buf());
+        let mut tag_lookup = LookupBuf::from("timestamp");
+        tag_lookup.extend(host_tag);
         Self {
             timestamp_key: "timestamp".into(),
-            host_tag: format!(
-                "tags.{}",
-                host_tag.unwrap_or_else(|| log_schema().host_key().into_buf())
-            ),
+            host_tag: tag_lookup,
         }
     }
 }
@@ -91,7 +91,7 @@ impl Transform for MetricToLog {
                     log.insert(log_schema().timestamp_key().into_buf(), timestamp);
 
                     if let Some(host) = log.remove(&self.host_tag, true) {
-                        log.insert(&log_schema().host_key(), host);
+                        log.insert(log_schema().host_key().into_buf(), host);
                     }
 
                     Some(log.into())

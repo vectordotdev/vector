@@ -1,4 +1,4 @@
-use crate::event::{LogEvent, Value};
+use crate::event::{LogEvent, Value, LookupBuf};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -33,7 +33,7 @@ impl ReduceValueMerger for DiscardMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
         v.insert(k, self.v);
         Ok(())
     }
@@ -70,7 +70,7 @@ impl ReduceValueMerger for ConcatMerger {
         }
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
         v.insert(k, Value::Bytes(self.v.into()));
         Ok(())
     }
@@ -99,7 +99,7 @@ impl ReduceValueMerger for ConcatArrayMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
         v.insert(k, Value::Array(self.v));
         Ok(())
     }
@@ -124,7 +124,7 @@ impl ReduceValueMerger for ArrayMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
         v.insert(k, Value::Array(self.v));
         Ok(())
     }
@@ -160,8 +160,8 @@ impl ReduceValueMerger for TimestampWindowMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(format!("{}_end", k), Value::Timestamp(self.latest));
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
+        v.insert(LookupBuf::from(format!("{}_end", k)), Value::Timestamp(self.latest));
         v.insert(k, Value::Timestamp(self.started));
         Ok(())
     }
@@ -223,7 +223,7 @@ impl ReduceValueMerger for AddNumbersMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
             NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
@@ -284,7 +284,7 @@ impl ReduceValueMerger for MaxNumberMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
             NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
@@ -345,7 +345,7 @@ impl ReduceValueMerger for MinNumberMerger {
         Ok(())
     }
 
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String> {
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
         match self.v {
             NumberMergerValue::Float(f) => v.insert(k, Value::Float(f)),
             NumberMergerValue::Int(i) => v.insert(k, Value::Integer(i)),
@@ -358,7 +358,7 @@ impl ReduceValueMerger for MinNumberMerger {
 
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync {
     fn add(&mut self, v: Value) -> Result<(), String>;
-    fn insert_into(self: Box<Self>, k: String, v: &mut LogEvent) -> Result<(), String>;
+    fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String>;
 }
 
 impl From<Value> for Box<dyn ReduceValueMerger> {

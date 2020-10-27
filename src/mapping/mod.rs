@@ -1,4 +1,4 @@
-use crate::event::{Event, Value, Lookup, LookupBuf};
+use crate::event::{Event, Value, LookupBuf};
 use std::collections::BTreeMap;
 
 pub mod parser;
@@ -21,7 +21,7 @@ pub(self) struct Assignment {
 }
 
 impl Assignment {
-    pub(self) fn new(path: String, function: Box<dyn query::Function>) -> Self {
+    pub(self) fn new(path: LookupBuf, function: Box<dyn query::Function>) -> Self {
         Self { path, function }
     }
 }
@@ -30,7 +30,7 @@ impl Function for Assignment {
     fn apply(&self, target: &mut Event) -> Result<()> {
         match self.function.execute(&target)? {
             QueryValue::Value(v) => {
-                target.as_mut_log().insert(&self.path, v);
+                target.as_mut_log().insert(self.path.clone(), v);
                 Ok(())
             }
             _ => Err("assignment must be from a value".to_string()),
@@ -56,7 +56,7 @@ impl Deletion {
 impl Function for Deletion {
     fn apply(&self, target: &mut Event) -> Result<()> {
         for path in &self.paths {
-            target.as_mut_log().remove(&path, false);
+            target.as_mut_log().remove(path, false);
         }
         Ok(())
     }
@@ -84,7 +84,7 @@ impl Function for OnlyFields {
             .filter(|k| {
                 self.paths
                     .iter()
-                    .find(|p| k.starts_with(p.as_str()))
+                    .find(|p| k == p)
                     .is_none()
             })
             .collect();

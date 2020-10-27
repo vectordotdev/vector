@@ -69,7 +69,7 @@ pub enum Encoding {
 pub struct KafkaSink {
     producer: FutureProducer,
     topic: Template,
-    key_field: Option<String>,
+    key_field: Option<LookupBuf>,
     encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
@@ -266,7 +266,7 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
 
 fn encode_event(
     mut event: Event,
-    key_field: &Option<String>,
+    key_field: &Option<LookupBuf>,
     encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
     let key = key_field

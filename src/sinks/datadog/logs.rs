@@ -207,15 +207,15 @@ impl HttpSink for DatadogLogsJsonService {
         let log = event.as_mut_log();
 
         if let Some(message) = log.remove(log_schema().message_key(), false) {
-            log.insert(Lookup::from("message"), message);
+            log.insert(LookupBuf::from("message"), message);
         }
 
         if let Some(timestamp) = log.remove(log_schema().timestamp_key(), false) {
-            log.insert(Lookup::from("date"), timestamp);
+            log.insert(LookupBuf::from("date"), timestamp);
         }
 
         if let Some(host) = log.remove(log_schema().host_key(), false) {
-            log.insert(Lookup::from("host"), host);
+            log.insert(LookupBuf::from("host"), host);
         }
 
         self.config.encoding.apply_rules(&mut event);

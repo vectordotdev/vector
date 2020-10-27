@@ -112,12 +112,12 @@ impl SinkConfig for LogdnaConfig {
 }
 
 lazy_static::lazy_static! {
-    static ref line_lookup: LookupBuf = LookupBuf::from("line");
-    static ref timestamp_lookup: LookupBuf = LookupBuf::from("timestamp");
-    static ref env_lookup: LookupBuf = LookupBuf::from("env");
-    static ref app_lookup: LookupBuf = LookupBuf::from("app");
-    static ref file_lookup: LookupBuf = LookupBuf::from("file");
-    static ref meta_lookup: LookupBuf = LookupBuf::from("meta");
+    static ref line_lookup: String = String::from("line");
+    static ref timestamp_lookup: String = String::from("timestamp");
+    static ref env_lookup: String = String::from("env");
+    static ref app_lookup: String = String::from("app");
+    static ref file_lookup: String = String::from("file");
+    static ref meta_lookup: String = String::from("meta");
 }
 
 #[async_trait::async_trait]
