@@ -111,14 +111,12 @@ impl SinkConfig for LogdnaConfig {
     }
 }
 
-lazy_static::lazy_static! {
-    static ref line_lookup: String = String::from("line");
-    static ref timestamp_lookup: String = String::from("timestamp");
-    static ref env_lookup: String = String::from("env");
-    static ref app_lookup: String = String::from("app");
-    static ref file_lookup: String = String::from("file");
-    static ref meta_lookup: String = String::from("meta");
-}
+const LINE_LOOKUP: &str = "line";
+const TIMESTAMP_LOOKUP: &str = "timestamp";
+const ENV_LOOKUP: &str = "env";
+const APP_LOOKUP: &str = "app";
+const FILE_LOOKUP: &str =  "file";
+const META_LOOKUP: &str =  "meta";
 
 #[async_trait::async_trait]
 impl HttpSink for LogdnaConfig {
@@ -138,38 +136,38 @@ impl HttpSink for LogdnaConfig {
 
         let mut map = serde_json::map::Map::new();
 
-        map.insert(line_lookup.clone(), json!(line));
-        map.insert(timestamp_lookup, json!(timestamp));
+        map.insert(LINE_LOOKUP.clone(), json!(line));
+        map.insert(TIMESTAMP_LOOKUP.clone(), json!(timestamp));
 
-        if let Some(env) = log.remove(&env_lookup, false) {
-            map.insert(env_lookup.clone(), json!(env));
+        if let Some(env) = log.remove(&*ENV_LOOKUP, false) {
+            map.insert(ENV_LOOKUP.clone(), json!(env));
         }
 
-        if let Some(app) = log.remove(&app_lookup, false) {
-            map.insert(app_lookup.clone(), json!(app));
+        if let Some(app) = log.remove(&*APP_LOOKUP, false) {
+            map.insert(APP_LOOKUP.clone(), json!(app));
         }
 
-        if let Some(file) = log.remove(file_lookup, false) {
-            map.insert("file".to_string(), json!(file));
+        if let Some(file) = log.remove(&*file_lookup, false) {
+            map.insert(FILE_LOOKUP.clone(), json!(file));
         }
 
         if !map.contains_key("env") {
             map.insert(
-                env_lookup.clone(),
+                ENV_LOOKUP.clone(),
                 json!(self.default_env.as_deref().unwrap_or("production")),
             );
         }
 
-        if !map.contains_key(app_lookup) && !map.contains_key(file_lookup) {
+        if !map.contains_key(&APP_LOOKUP) && !map.contains_key(&file_lookup) {
             if let Some(default_app) = &self.default_app {
-                map.insert(app_lookup.clone(), json!(default_app.as_str()));
+                map.insert(APP_LOOKUP.clone(), json!(default_app.as_str()));
             } else {
-                map.insert(app_lookup.clone(), json!("vector"));
+                map.insert(APP_LOOKUP.clone(), json!("vector"));
             }
         }
 
         if !log.is_empty() {
-            map.insert(meta_lookup.clone(), json!(&log));
+            map.insert(META_LOOKUP.clone(), json!(&log));
         }
 
         Some(map.into())

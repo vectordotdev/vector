@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
@@ -46,7 +46,7 @@ pub struct KafkaSourceConfig {
     fetch_wait_max_ms: u64,
     #[serde(default = "default_commit_interval_ms")]
     commit_interval_ms: u64,
-    key_field: Option<String>,
+    key_field: Option<LookupBuf>,
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
@@ -135,7 +135,7 @@ fn kafka_source(
                             let log = event.as_mut_log();
 
                             log.insert(
-                                log_schema().message_key(),
+                                log_schema().message_key().into_buf(),
                                 Value::from(Bytes::from(payload.to_owned())),
                             );
 
@@ -145,12 +145,12 @@ fn kafka_source(
                                 .to_millis()
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                                 .unwrap_or_else(Utc::now);
-                            log.insert(log_schema().timestamp_key(), timestamp);
+                            log.insert(log_schema().timestamp_key().into_buf(), timestamp);
 
                             // Add source type
-                            log.insert(log_schema().source_type_key(), Bytes::from("kafka"));
+                            log.insert(log_schema().source_type_key().into_buf(), Bytes::from("kafka"));
 
-                            if let Some(key_field) = &key_field {
+                            if let Some(key_field) = key_field {
                                 match msg.key() {
                                     None => (),
                                     Some(key) => {

@@ -2,7 +2,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::Event,
+    event::{Event, Lookup, LookupBuf},
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
@@ -151,10 +151,10 @@ fn line_to_event(line: String) -> Event {
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(log_schema().timestamp_key(), ts);
+            log.insert(log_schema().timestamp_key().clone(), ts);
         }
 
-        log.insert(log_schema().host_key(), hostname.to_owned());
+        log.insert(log_schema().host_key().clone(), hostname.to_owned());
 
         log.insert(LookupBuf::from("app_name"), app_name.to_owned());
         log.insert(LookupBuf::from("proc_id"), proc_id.to_owned());

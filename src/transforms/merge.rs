@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
-    event::{self, Event},
+    event::{self, Event, LookupBuf, Lookup},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
@@ -14,7 +14,7 @@ pub struct MergeConfig {
     /// The field that indicates that the event is partial. A consequent stream
     /// of partial events along with the first non-partial event will be merged
     /// together.
-    pub partial_event_marker_field: String,
+    pub partial_event_marker_field: LookupBuf,
     /// Fields to merge. The values of these fields will be merged into the
     /// first partial event. Fields not specified here will be ignored.
     /// Merging process takes the first partial event and the base, then it
@@ -23,12 +23,12 @@ pub struct MergeConfig {
     /// merged in, producing the resulting merged event.
     // Deprecated name is merge_fields
     #[serde(alias = "merge_fields")]
-    pub fields: Vec<String>,
+    pub fields: Vec<LookupBuf>,
     /// An ordered list of fields to distinguish streams by. Each stream has a
     /// separate partial event merging state. Should be used to prevent events
     /// from unrelated sources from mixing together, as this affects partial
     /// event processing.
-    pub stream_discriminant_fields: Vec<String>,
+    pub stream_discriminant_fields: Vec<LookupBuf>,
 }
 
 inventory::submit! {
@@ -40,8 +40,8 @@ impl_generate_config_from_default!(MergeConfig);
 impl Default for MergeConfig {
     fn default() -> Self {
         Self {
-            partial_event_marker_field: event::PARTIAL.to_string(),
-            fields: vec![crate::config::log_schema().message_key().to_string()],
+            partial_event_marker_field: event::PARTIAL.clone(),
+            fields: vec![crate::config::log_schema().message_key().into_buf()],
             stream_discriminant_fields: vec![],
         }
     }

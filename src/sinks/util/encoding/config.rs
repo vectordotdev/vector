@@ -12,6 +12,7 @@ use std::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
+use std::borrow::Borrow;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///
@@ -126,13 +127,7 @@ where
 
         let concrete = Self {
             codec: inner.codec,
-            // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-            only_fields: inner.only_fields.map(|fields| {
-                fields
-                    .iter()
-                    .map(|only| PathIter::new(only).collect())
-                    .collect()
-            }),
+            only_fields: inner.only_fields,
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
         };
@@ -146,9 +141,9 @@ where
 pub struct Inner<E> {
     codec: E,
     #[serde(default)]
-    only_fields: Option<Vec<String>>,
+    only_fields: Option<Vec<LookupBuf>>,
     #[serde(default)]
-    except_fields: Option<Vec<String>>,
+    except_fields: Option<Vec<LookupBuf>>,
     #[serde(default)]
     timestamp_format: Option<TimestampFormat>,
 }

@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -19,7 +19,7 @@ use tokio::sync::mpsc::channel;
 pub struct StdinConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
-    pub host_key: Option<String>,
+    pub host_key: Option<LookupBuf>,
 }
 
 impl Default for StdinConfig {
@@ -74,7 +74,7 @@ where
 {
     let host_key = config
         .host_key
-        .unwrap_or_else(|| log_schema().host_key().to_string());
+        .unwrap_or_else(|| log_schema().host_key().into_buf());
     let hostname = crate::get_hostname().ok();
 
     let (mut sender, receiver) = channel(1024);
@@ -98,7 +98,7 @@ where
             emit!(StdinEventReceived {
                 byte_size: line.len()
             });
-            create_event(Bytes::from(line), &host_key, &hostname)
+            create_event(Bytes::from(line), host_key, hostname)
         })
         .forward(
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
@@ -109,16 +109,16 @@ where
     Ok(Box::new(fut.boxed().compat()))
 }
 
-fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
+fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> Event {
     let mut event = Event::from(line);
 
     // Add source type
     event
         .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("stdin"));
+        .insert(log_schema().source_type_key().clone(), Bytes::from("stdin"));
 
-    if let Some(hostname) = &hostname {
-        event.as_mut_log().insert(host_key, hostname.clone());
+    if let Some(hostname) = hostname {
+        event.as_mut_log().insert(host_key, hostname);
     }
 
     event

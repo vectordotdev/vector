@@ -1,7 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf},
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
@@ -36,7 +36,7 @@ pub struct StackdriverConfig {
     pub log_id: String,
 
     pub resource: StackdriverResource,
-    pub severity_key: Option<String>,
+    pub severity_key: Option<LookupBuf>,
 
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -58,7 +58,7 @@ pub struct StackdriverConfig {
 struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
-    severity_key: Option<String>,
+    severity_key: Option<LookupBuf>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]

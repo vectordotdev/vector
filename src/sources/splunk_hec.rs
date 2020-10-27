@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{Event, LogEvent, Value},
+    event::{Event, LogEvent, LookupBuf, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
         SplunkHECRequestReceived,
@@ -26,10 +26,13 @@ use std::{
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
-pub const CHANNEL: &str = "splunk_channel";
-pub const INDEX: &str = "splunk_index";
-pub const SOURCE: &str = "splunk_source";
-pub const SOURCETYPE: &str = "splunk_sourcetype";
+lazy_static::lazy_static! {
+    pub static ref CHANNEL: LookupBuf = LookupBuf::from("splunk_channel");
+    pub static ref INDEX: LookupBuf = LookupBuf::from("splunk_index");
+    pub static ref SOURCE: LookupBuf = LookupBuf::from("splunk_source");
+    pub static ref SOURCETYPE: LookupBuf = LookupBuf::from("splunk_sourcetype");
+}
+
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -339,9 +342,9 @@ impl<R: Read> EventStream<R> {
             time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with("host", log_schema().host_key(), host.map(Value::from)),
-                DefaultExtractor::new("index", &INDEX),
-                DefaultExtractor::new("source", &SOURCE),
-                DefaultExtractor::new("sourcetype", &SOURCETYPE),
+                DefaultExtractor::new("index", &*INDEX),
+                DefaultExtractor::new("source", &*SOURCE),
+                DefaultExtractor::new("sourcetype", &*SOURCETYPE),
             ],
         }
     }
@@ -593,23 +596,23 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert(log_schema().message_key(), message);
+    log.insert(log_schema().message_key().clone(), message);
 
     // Add channel
-    log.insert(CHANNEL, channel);
+    log.insert(*CHANNEL.clone(), channel);
 
     // Add host
     if let Some(host) = host {
-        log.insert(log_schema().host_key(), host);
+        log.insert(log_schema().host_key().clone(), host);
     }
 
     // Add timestamp
-    log.insert(log_schema().timestamp_key(), Utc::now());
+    log.insert(log_schema().timestamp_key().clone(), Utc::now());
 
     // Add source type
     event
         .as_mut_log()
-        .try_insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
+        .insert(log_schema().source_type_key().clone(), Bytes::from("splunk_hec"));
 
     emit!(SplunkHECEventReceived);
 

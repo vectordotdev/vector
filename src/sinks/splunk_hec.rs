@@ -76,8 +76,8 @@ pub enum Encoding {
     Json,
 }
 
-fn default_host_key() -> String {
-    crate::config::LogSchema::default().host_key().to_string()
+fn default_host_key() -> LookupBuf {
+    crate::config::LogSchema::default().host_key().into_buf()
 }
 
 inventory::submit! {

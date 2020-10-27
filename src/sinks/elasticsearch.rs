@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{Event, Lookup},
+    event::{Event, Lookup, LookupBuf},
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
     region::{region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
@@ -40,7 +40,7 @@ pub struct ElasticSearchConfig {
     pub endpoint: String,
     pub index: Option<String>,
     pub doc_type: Option<String>,
-    pub id_key: Option<String>,
+    pub id_key: Option<LookupBuf>,
     pub pipeline: Option<String>,
 
     #[serde(default)]

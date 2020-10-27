@@ -223,7 +223,7 @@ impl LookupBuf {
 
     /// Returns `true` if `needle` is a prefix of the lookup.
     #[instrument]
-    pub fn starts_wit(&self, needle: LookupBuf) -> bool {
+    pub fn starts_with(&self, needle: LookupBuf) -> bool {
         self.segments.starts_with(&needle.segments)
     }
 }

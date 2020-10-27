@@ -99,10 +99,10 @@ fn annotate_from_file_info(
 }
 
 fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata: &ObjectMeta) {
-    for (ref key, ref val) in [
-        (&fields_spec.pod_name, &metadata.name),
-        (&fields_spec.pod_namespace, &metadata.namespace),
-        (&fields_spec.pod_uid, &metadata.uid),
+    for (key, val) in [
+        (fields_spec.pod_name, metadata.name),
+        (fields_spec.pod_namespace, metadata.namespace),
+        (fields_spec.pod_uid, metadata.uid),
     ]
     .iter()
     {
@@ -123,7 +123,7 @@ fn annotate_from_metadata(log: &mut LogEvent, fields_spec: &FieldsSpec, metadata
 }
 
 fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec: &PodSpec) {
-    for (ref key, ref val) in [(&fields_spec.pod_node_name, &pod_spec.node_name)].iter() {
+    for (key, val) in [(fields_spec.pod_node_name, pod_spec.node_name)].iter() {
         if let Some(val) = val {
             log.insert(key.clone(), val.to_owned());
         }
@@ -131,7 +131,7 @@ fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec
 }
 
 fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
-    for (ref key, ref val) in [(&fields_spec.container_image, &container.image)].iter() {
+    for (key, val) in [(fields_spec.container_image, container.image)].iter() {
         if let Some(val) = val {
             log.insert(key.clone(), val.to_owned());
         }

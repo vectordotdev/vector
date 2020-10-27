@@ -5,7 +5,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -37,7 +37,7 @@ pub struct SyslogConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     /// The host key of the log. (This differs from `hostname`)
-    pub host_key: Option<String>,
+    pub host_key: Option<LookupBuf>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, is_enum_variant)]
@@ -74,6 +74,17 @@ inventory::submit! {
     SourceDescription::new::<SyslogConfig>("syslog")
 }
 
+lazy_static::lazy_static! {
+    static ref HOSTNAME_LOOKUP: LookupBuf = LookupBuf::from("hostname");
+    static ref SEVERITY_LOOKUP: LookupBuf = LookupBuf::from("severity");
+    static ref FACILITY_LOOKUP: LookupBuf = LookupBuf::from("facility");
+    static ref VERSION_LOOKUP: LookupBuf = LookupBuf::from("version");
+    static ref APPNAME_LOOKUP: LookupBuf = LookupBuf::from("appname");
+    static ref MSGID_LOOKUP: LookupBuf = LookupBuf::from("msgid");
+    static ref PROCID_LOOKUP: LookupBuf = LookupBuf::from("procid");
+    static ref SOURCE_IP_LOOKUP: LookupBuf = LookupBuf::from("source_ip");
+}
+
 impl GenerateConfig for SyslogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
@@ -101,7 +112,7 @@ impl SourceConfig for SyslogConfig {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or_else(|| log_schema().host_key().to_string());
+            .unwrap_or_else(|| log_schema().host_key().into_buf());
 
         match self.mode.clone() {
             Mode::Tcp { address, tls } => {
@@ -138,7 +149,7 @@ impl SourceConfig for SyslogConfig {
 #[derive(Debug, Clone)]
 struct SyslogTcpSource {
     max_length: usize,
-    host_key: String,
+    host_key: LookupBuf,
 }
 
 impl TcpSource for SyslogTcpSource {
@@ -259,7 +270,7 @@ impl Decoder for SyslogDecoder {
 pub fn udp(
     addr: SocketAddr,
     _max_length: usize,
-    host_key: String,
+    host_key: LookupBuf,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -289,7 +300,7 @@ pub fn udp(
                                     .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
                                     .ok()
                                     .and_then(|s| {
-                                        event_from_str(&host_key, Some(received_from), s).map(Ok)
+                                        event_from_str(host_key, Some(received_from), s).map(Ok)
                                     })
                             }
                             Err(error) => {
@@ -329,7 +340,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 // TODO: many more cases to handle:
 // octet framing (i.e. num bytes as ascii string prefix) with and without delimiters
 // null byte delimiter in place of newline
-fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Option<Event> {
+fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) -> Option<Event> {
     let line = line.trim();
     let parsed = syslog_loose::parse_message_with_year(line, resolve_year);
     let mut event = Event::from(&parsed.msg[..]);
@@ -337,10 +348,10 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
     // Add source type
     event
         .as_mut_log()
-        .insert(log_schema().source_type_key(), Bytes::from("syslog"));
+        .insert(log_schema().source_type_key().clone(), Bytes::from("syslog"));
 
     if let Some(default_host) = default_host.clone() {
-        event.as_mut_log().insert("source_ip", default_host);
+        event.as_mut_log().insert(SOURCE_IP_LOOKUP.clone(), default_host);
     }
 
     let parsed_hostname = parsed.hostname.map(|x| Bytes::from(x.to_owned()));
@@ -374,35 +385,37 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     let log = event.as_mut_log();
 
     if let Some(host) = parsed.hostname {
-        log.insert("hostname", host.to_string());
+        log.insert(HOSTNAME_LOOKUP.clone(), host.to_string());
     }
     if let Some(severity) = parsed.severity {
-        log.insert("severity", severity.as_str().to_owned());
+        log.insert(SEVERITY_LOOKUP.clone(), severity.as_str().to_owned());
     }
     if let Some(facility) = parsed.facility {
-        log.insert("facility", facility.as_str().to_owned());
+        log.insert(FACILITY_LOOKUP.clone(), facility.as_str().to_owned());
     }
     if let Protocol::RFC5424(version) = parsed.protocol {
-        log.insert("version", version as i64);
+        log.insert(VERSION_LOOKUP.clone(), version as i64);
     }
     if let Some(app_name) = parsed.appname {
-        log.insert("appname", app_name.to_owned());
+        log.insert(APPNAME_LOOKUP.clone(), app_name.to_owned());
     }
     if let Some(msg_id) = parsed.msgid {
-        log.insert("msgid", msg_id.to_owned());
+        log.insert(MSGID_LOOKUP.clone(), msg_id.to_owned());
     }
     if let Some(procid) = parsed.procid {
         let value: Value = match procid {
             ProcId::PID(pid) => pid.into(),
             ProcId::Name(name) => name.to_string().into(),
         };
-        log.insert("procid", value);
+        log.insert(PROCID_LOOKUP.clone(), value);
     }
 
     for element in parsed.structured_data.into_iter() {
+        let element_lookup = LookupBuf::from(element.id);
         for (name, value) in element.params.into_iter() {
-            let key = format!("{}.{}", element.id, name);
-            log.insert(key, value.to_string());
+            let mut key_lookup = element_lookup.clone();
+            key_lookup.push(name);
+            log.insert(key_lookup, value.to_string());
         }
     }
 }

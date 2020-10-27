@@ -18,6 +18,7 @@ use crate::{
     sources,
     transforms::Transform,
     Pipeline,
+    event::{LookupBuf},
 };
 use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
@@ -39,9 +40,6 @@ mod util;
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
-
-/// The key we use for `file` field.
-
 
 lazy_static::lazy_static! {
     pub static ref FILE_KEY: LookupBuf = LookupBuf::from("file");
@@ -352,12 +350,12 @@ fn create_event(line: Bytes, file: &str) -> Event {
 
     // Add source type.
     event.as_mut_log().insert(
-        crate::config::log_schema().source_type_key(),
+        crate::config::log_schema().source_type_key().into_buf(),
         COMPONENT_NAME.to_owned(),
     );
 
     // Add file.
-    event.as_mut_log().insert(FILE_KEY, file.to_owned());
+    event.as_mut_log().insert(*FILE_KEY.clone(), file.to_owned());
 
     event
 }

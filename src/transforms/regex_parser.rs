@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
-    event::{Event, LookupBuf, Value},
+    event::{Event, LookupBuf, Lookup, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
         RegexParserMissingField, RegexParserTargetExists,
@@ -181,7 +181,8 @@ impl RegexParser {
             .iter()
             .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
             .flatten()
-            .collect::<Vec<_>>();
+            .map(LookupBuf::from_str)
+            .collect::<Result<Vec<_>>>();
 
         let types = parse_check_conversion_map(&config.types, names)?;
 
@@ -271,10 +272,9 @@ impl Transform for RegexParser {
                 }
 
                 log.extend(captures.map(|(name, value)| {
-                    let name = self.target_field
-                        .map(|target| format!("{}.{}", target, name))
-                        .unwrap_or_else(|| name.clone());
-                    (name, value)
+                    let mut final_name = self.target_field.clone();
+                    final_name.borrow_mut().push(name)
+                    (final_name, value)
                 }));
                 if self.drop_field {
                     log.remove(&self.field, false);

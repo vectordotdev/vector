@@ -36,7 +36,7 @@ enum BuildError {
 pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
-    key_field: Option<String>,
+    key_field: Option<LookupBuf>,
     encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     compression: KafkaCompression,

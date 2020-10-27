@@ -4,7 +4,7 @@ use crate::{
         log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
         TransformDescription,
     },
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{
         AwsCloudwatchLogsSubscriptionParserEventProcessed,
         AwsCloudwatchLogsSubscriptionParserFailedParse,
@@ -23,6 +23,14 @@ pub struct AwsCloudwatchLogsSubscriptionParserConfig {
 
 inventory::submit! {
     TransformDescription::new::<AwsCloudwatchLogsSubscriptionParserConfig>("aws_cloudwatch_logs_subscription_parser")
+}
+
+lazy_static::lazy_static! {
+    static ref ID_LOOKUP: LookupBuf = LookupBuf::from("id");
+    static ref LOG_GROUP_LOOKUP: LookupBuf = LookupBuf::from("log_group");
+    static ref LOG_STREAM_LOOKUP: LookupBuf = LookupBuf::from("log_stream");
+    static ref SUBSCRIPTION_FILTERS_LOOKUP: LookupBuf = LookupBuf::from("subscription_filters");
+    static ref OWNER_LOOKUP: LookupBuf = LookupBuf::from("owner");
 }
 
 #[async_trait::async_trait]
@@ -118,13 +126,13 @@ fn subscription_event_to_events<'a>(
                 let mut event = event.clone();
                 let log = event.as_mut_log();
 
-                log.insert(log_schema().message_key(), log_event.message);
-                log.insert(log_schema().timestamp_key(), log_event.timestamp);
-                log.insert("id", log_event.id);
-                log.insert("log_group", log_group.clone());
-                log.insert("log_stream", log_stream.clone());
-                log.insert("subscription_filters", subscription_filters.clone());
-                log.insert("owner", owner.clone());
+                log.insert(log_schema().message_key().into_buf(), log_event.message);
+                log.insert(log_schema().timestamp_key().into_buf(), log_event.timestamp);
+                log.insert(*ID_LOOKUP.clone(), log_event.id);
+                log.insert(*LOG_GROUP_LOOKUP.clone(), log_group.clone());
+                log.insert(*LOG_STREAM_LOOKUP.clone(), log_stream.clone());
+                log.insert(*SUBSCRIPTION_FILTERS_LOOKUP.clone(), subscription_filters.clone());
+                log.insert(*OWNER_LOOKUP.clone(), owner.clone());
 
                 event
             })) as Box<dyn Iterator<Item = Event> + 'a>

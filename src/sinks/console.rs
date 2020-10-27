@@ -106,7 +106,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
                     Some(v) => Some(v.to_string_lossy()),
                     None => {
                         emit!(ConsoleFieldNotFound {
-                            missing_field: field,
+                            missing_field: field.as_lookup(),
                         });
                         None
                     }

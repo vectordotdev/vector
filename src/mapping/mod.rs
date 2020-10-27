@@ -81,18 +81,18 @@ impl Function for OnlyFields {
 
         let keys: Vec<LookupBuf> = target_log
             .keys()
-            .map(|v| LookupBuf::from_str(v)
+            .map(|v| LookupBuf::from_str(&v)
                 .expect("Got an invalid Lookup while iterating internally over an EventLog. This is an invariant. Please report it."))
             .filter(|k| {
                 self.paths
                     .iter()
-                    .find(|p| k == p)
+                    .find(|&p| k == p)
                     .is_none()
             })
             .collect();
 
         for key in keys {
-            target_log.remove(key, true);
+            target_log.remove(&key, true);
         }
 
         Ok(())
@@ -201,14 +201,14 @@ where
 
 #[derive(Debug)]
 pub(in crate::mapping) struct MergeFn {
-    to_path: String,
+    to_path: LookupBuf,
     from: Box<dyn query::Function>,
     deep: Option<Box<dyn query::Function>>,
 }
 
 impl MergeFn {
     pub(in crate::mapping) fn new(
-        to_path: String,
+        to_path: LookupBuf,
         from: Box<dyn query::Function>,
         deep: Option<Box<dyn query::Function>>,
     ) -> Self {

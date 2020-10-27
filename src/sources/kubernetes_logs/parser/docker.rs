@@ -1,6 +1,6 @@
 use crate::{
     config::log_schema,
-    event::{self, Event, LogEvent, Value},
+    event::{self, Event, LogEvent, LookupBuf, Value},
     internal_events::KubernetesLogsDockerFormatParseFailed,
     transforms::Transform,
 };
@@ -8,8 +8,10 @@ use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
 
-pub const TIME: &str = "time";
-pub const LOG: &str = "log";
+lazy_static::lazy_static! {
+    pub static ref TIME_LOOKUP: LookupBuf = LookupBuf::from("time");
+    pub static ref LOG_LOOKUP: LookupBuf = LookupBuf::from("log");
+}
 
 /// Parser for the docker log format.
 ///
@@ -51,7 +53,7 @@ const DOCKER_MESSAGE_SPLIT_THRESHOLD: usize = 16 * 1024; // 16 Kib
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Parse and rename timestamp.
-    let time = log.remove(&*TIME, false).context(TimeFieldMissing)?;
+    let time = log.remove(&*TIME_LOOKUP, false).context(TimeFieldMissing)?;
     let time = match time {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::TimeValueUnexpectedType),
@@ -61,7 +63,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     log.insert(log_schema().timestamp_key().into_buf(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(&*LOG, false).context(LogFieldMissing)?;
+    let message = log.remove(LOG_LOOKUP, false).context(LogFieldMissing)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),
@@ -82,11 +84,11 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    log.insert(log_schema().message_key(), message);
+    log.insert(log_schema().message_key().clone(), message);
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(&*event::PARTIAL, true);
+        log.insert(event::PARTIAL.clone(), true);
     }
 
     Ok(())

@@ -443,7 +443,7 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 
 fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     let (first, mut other) = split_inner_rules_from_pair(pair)?;
-    let to_path = target_path_from_pair(first)?;
+    let to_path = target_path_from_pair(first).and_then(|v| LookupBuf::from_str(&v))?;
     let query2 = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
     let deep = match other.next() {
         None => None,
@@ -455,8 +455,22 @@ fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
 
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
-        Rule::deletion => Ok(Box::new(Deletion::new(paths_from_pair(pair).into_iter().map(LookupBuf::from_str).collect()?))),
-        Rule::only_fields => Ok(Box::new(OnlyFields::new(paths_from_pair(pair).into_iter().map(LookupBuf::from_str).collect()?))),
+        Rule::deletion => {
+            let paths = paths_from_pair(pair).and_then(|pairs| { 
+                pairs.into_iter()
+                    .map(|v| LookupBuf::from_str(&v))
+                    .collect::<crate::Result<Vec<_>>>().map_err(|e| format!("{}", e))
+            })?;
+            Ok(Box::new(Deletion::new(paths)))
+        },
+        Rule::only_fields => {
+            let paths = paths_from_pair(pair).and_then(|pairs| { 
+                pairs.into_iter()
+                    .map(|v| LookupBuf::from_str(&v))
+                    .collect::<crate::Result<Vec<_>>>().map_err(|e| format!("{}", e))
+            })?;
+            Ok(Box::new(OnlyFields::new(paths)))
+        },
         Rule::merge => merge_function_from_pair(pair),
         _ => unexpected_parser_sytax!(pair),
     }
@@ -472,7 +486,8 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::assignment => {
             let mut inner_rules = pair.into_inner();
-            let path = target_path_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
+            let path = target_path_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)
+                .and_then(|v| LookupBuf::from_str(v))?;
             let query = query_arithmetic_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
             Ok(Box::new(Assignment::new(path, query)))
         }

@@ -1,5 +1,5 @@
 use crate::{
-    async_read::VecAsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
+    async_read::VecAsyncReadExt, emit, event::{Event, LookupBuf}, internal_events::UnixSocketError,
     shutdown::ShutdownSignal, sources::Source, Pipeline,
 };
 use bytes::Bytes;
@@ -19,7 +19,7 @@ use tracing_futures::Instrument;
 pub fn build_unix_source<D, E>(
     listen_path: PathBuf,
     decoder: D,
-    host_key: String,
+    host_key: LookupBuf,
     shutdown: ShutdownSignal,
     out: Pipeline,
     build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,

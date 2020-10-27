@@ -33,11 +33,12 @@ use std::{collections::HashMap, convert::TryFrom, env};
 
 use tokio::sync::mpsc;
 
+const VECTOR_IMAGE_NAME: &str = "timberio/vector";
+
 // The beginning of image names of vector docker images packaged by vector.
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
-    static ref VECTOR_IMAGE_NAME: LookupBuf = LookupBuf::from("timberio/vector");
     static ref IMAGE: LookupBuf = LookupBuf::from("image");
     static ref CREATED_AT: LookupBuf = LookupBuf::from("container_created_at");
     static ref NAME: LookupBuf = LookupBuf::from("container_name");
@@ -476,7 +477,7 @@ impl DockerSource {
                 .unwrap_or(false);
             let image_hint = image
                 .into()
-                .map(|image| image.starts_with(*VECTOR_IMAGE_NAME))
+                .map(|image| image.starts_with(VECTOR_IMAGE_NAME))
                 .unwrap_or(false);
             if hostname_hint || image_hint {
                 // This container is probably itself.
@@ -824,7 +825,7 @@ impl ContainerLogInfo {
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
-                log_event.insert(log_schema().timestamp_key(), timestamp);
+                log_event.insert(log_schema().timestamp_key().into_buf(), timestamp);
             }
 
             // Container ID.

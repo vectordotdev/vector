@@ -109,7 +109,7 @@ impl Transform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        emit!(SplitConvertFailed { field: name, error });
+                        emit!(SplitConvertFailed { field: name.as_lookup(), error });
                     }
                 }
             }

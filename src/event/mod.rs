@@ -15,7 +15,7 @@ mod lookup;
 mod value;
 
 pub use log_event::LogEvent;
-pub use lookup::{Lookup, LookupBuf};
+pub use lookup::{Lookup, LookupBuf, Segment, SegmentBuf};
 pub use metric::{Metric, MetricKind, MetricValue, StatisticKind};
 use std::convert::{TryFrom, TryInto};
 pub(crate) use util::log::PathComponent;
@@ -27,7 +27,7 @@ pub mod proto {
 }
 
 lazy_static::lazy_static! {
-    static ref PARTIAL: LookupBuf = LookupBuf::from("_partial");
+    pub static ref PARTIAL: LookupBuf = LookupBuf::from("_partial");
 }
 
 #[derive(PartialEq, Debug, Clone)]

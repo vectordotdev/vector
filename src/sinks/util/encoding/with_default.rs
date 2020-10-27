@@ -192,9 +192,9 @@ pub struct InnerWithDefault<E: Default> {
     #[serde(default)]
     codec: E,
     #[serde(default)]
-    only_fields: Option<Vec<String>>,
+    only_fields: Option<Vec<LookupBuf>>,
     #[serde(default)]
-    except_fields: Option<Vec<String>>,
+    except_fields: Option<Vec<LookupBuf>>,
     #[serde(default)]
     timestamp_format: Option<TimestampFormat>,
 }

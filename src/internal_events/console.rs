@@ -1,9 +1,10 @@
 use super::InternalEvent;
 use metrics::counter;
+use crate::event::Lookup;
 
 #[derive(Debug)]
 pub struct ConsoleFieldNotFound<'a> {
-    pub missing_field: &'a str,
+    pub missing_field: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
