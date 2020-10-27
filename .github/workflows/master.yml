@@ -131,7 +131,7 @@ jobs:
         run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
   test-misc:
-    name: Shutdown - Linux
+    name: Miscellaneous - Linux
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
