@@ -181,8 +181,8 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                                     .map_err(move |error: futures01::sync::mpsc::SendError<Event>| {
                                         // can only fail if receiving end disconnected, so we are shutting down,
                                         // probably not gracefully.
-                                        error!(message = "Failed to forward events, downstream is closed");
-                                        error!(message = "Tried to send the following event", error = ?error);
+                                        error!(message = "Failed to forward events, downstream is closed.");
+                                        error!(message = "Tried to send the following event.", error = ?error);
                                         warp::reject::custom(RejectShuttingDown)
                                     })
                                     .map_ok(|_| warp::reply())
@@ -214,7 +214,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             }
         });
 
-        info!(message = "Building HTTP server", address = %address);
+        info!(message = "Building HTTP server.", address = %address);
 
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let fut = async move {

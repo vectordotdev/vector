@@ -315,7 +315,7 @@ pub mod service_control {
                 break PollStatus::NoTimeout(service_status);
             }
             debug!(
-                message = "Waiting for service to transition", to = ?state, wait_index = %wait_index
+                message = "Waiting for service to transition.", to = ?state, wait_index = %wait_index
             );
             wait_index += 1;
 

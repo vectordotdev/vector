@@ -127,7 +127,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
             cx.acker(),
         )
         .sink_map_err(
-            |error| error!(message = "Fatal azure_monitor_logs sink error", error = ?error),
+            |error| error!(message = "Fatal azure_monitor_logs sink error.", error = ?error),
         );
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))

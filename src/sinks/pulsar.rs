@@ -179,7 +179,7 @@ impl Sink for PulsarSink {
                 }
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     trace!(
-                        message = "Pulsar sink produced message", message_id = ?result.message_id, producer_id = %result.producer_id, sequence_id = %result.sequence_id
+                        message = "Pulsar sink produced message.", message_id = ?result.message_id, producer_id = %result.producer_id, sequence_id = %result.sequence_id
                     );
                     self.pending_acks.insert(seqno);
                     let mut num_to_ack = 0;
