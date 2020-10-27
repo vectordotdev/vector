@@ -70,8 +70,9 @@ components: sources: logplex: {
 	}
 
 	configuration: {
-		address: sources.http.configuration.address
-		auth:    sources.http.configuration.auth
+		address:          sources.http.configuration.address
+		auth:             sources.http.configuration.auth
+		query_parameters: sources.http.configuration.query_parameters
 	}
 
 	output: logs: line: {

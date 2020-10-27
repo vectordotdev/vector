@@ -4,7 +4,7 @@ use crate::{
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };
@@ -13,7 +13,7 @@ use chrono::Utc;
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr};
 
 use tokio_util::codec::Decoder;
 use warp::http::{HeaderMap, HeaderValue, StatusCode};
@@ -25,6 +25,7 @@ pub struct SimpleHttpConfig {
     encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
+    query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
 }
@@ -39,6 +40,7 @@ impl GenerateConfig for SimpleHttpConfig {
             address: "0.0.0.0:80".parse().unwrap(),
             encoding: Default::default(),
             headers: Vec::new(),
+            query_parameters: Vec::new(),
             tls: None,
             auth: None,
         })
@@ -50,6 +52,7 @@ impl GenerateConfig for SimpleHttpConfig {
 struct SimpleHttpSource {
     encoding: Encoding,
     headers: Vec<String>,
+    query_parameters: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
@@ -63,9 +66,15 @@ pub enum Encoding {
 }
 
 impl HttpSource for SimpleHttpSource {
-    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+    fn build_event(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_parameters: HashMap<String, String>,
+    ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
+            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
             .map(|mut events| {
                 // Add source type
                 let key = log_schema().source_type_key();
@@ -90,6 +99,7 @@ impl SourceConfig for SimpleHttpConfig {
         let source = SimpleHttpSource {
             encoding: self.encoding,
             headers: self.headers.clone(),
+            query_parameters: self.query_parameters.clone(),
         };
         source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
     }
@@ -109,14 +119,12 @@ fn add_headers(
     headers: HeaderMap,
 ) -> Vec<Event> {
     for header_name in headers_config {
-        let value = headers
-            .get(header_name)
-            .map(HeaderValue::as_bytes)
-            .unwrap_or_default();
+        let value = headers.get(header_name).map(HeaderValue::as_bytes);
+
         for event in events.iter_mut() {
             event.as_mut_log().insert(
                 header_name as &str,
-                Value::from(Bytes::from(value.to_owned())),
+                Value::from(value.map(Bytes::copy_from_slice)),
             );
         }
     }
@@ -242,6 +250,7 @@ mod tests {
     async fn source(
         encoding: Encoding,
         headers: Vec<String>,
+        query_parameters: Vec<String>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
@@ -250,6 +259,7 @@ mod tests {
                 address,
                 encoding,
                 headers,
+                query_parameters,
                 tls: None,
                 auth: None,
             }
@@ -292,13 +302,24 @@ mod tests {
             .as_u16()
     }
 
+    async fn send_with_query(address: SocketAddr, body: &str, query: &str) -> u16 {
+        reqwest::Client::new()
+            .post(&format!("http://{}?{}", address, query))
+            .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
     #[tokio::test]
     async fn http_multiline_text() {
         trace_init();
 
         let body = "test body\n\ntest body 2";
 
-        let (rx, addr) = source(Encoding::default(), vec![]).await;
+        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
 
         assert_eq!(200, send(addr, body).await);
 
@@ -326,7 +347,7 @@ mod tests {
         //same as above test but with a newline at the end
         let body = "test body\n\ntest body 2\n";
 
-        let (rx, addr) = source(Encoding::default(), vec![]).await;
+        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
 
         assert_eq!(200, send(addr, body).await);
 
@@ -351,7 +372,7 @@ mod tests {
     async fn http_json_parsing() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![]).await;
+        let (rx, addr) = source(Encoding::Json, vec![], vec![]).await;
 
         assert_eq!(400, send(addr, "{").await); //malformed
         assert_eq!(400, send(addr, r#"{"key"}"#).await); //key without value
@@ -376,7 +397,7 @@ mod tests {
     async fn http_json_values() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![]).await;
+        let (rx, addr) = source(Encoding::Json, vec![], vec![]).await;
 
         assert_eq!(200, send(addr, r#"[{"key":"value"}]"#).await);
         assert_eq!(200, send(addr, r#"{"key2":"value2"}"#).await);
@@ -402,7 +423,7 @@ mod tests {
     async fn http_json_dotted_keys() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Json, vec![]).await;
+        let (rx, addr) = source(Encoding::Json, vec![], vec![]).await;
 
         assert_eq!(200, send(addr, r#"[{"dotted.key":"value"}]"#).await);
         assert_eq!(
@@ -429,7 +450,7 @@ mod tests {
     async fn http_ndjson() {
         trace_init();
 
-        let (rx, addr) = source(Encoding::Ndjson, vec![]).await;
+        let (rx, addr) = source(Encoding::Ndjson, vec![], vec![]).await;
 
         assert_eq!(400, send(addr, r#"[{"key":"value"}]"#).await); //one object per line
 
@@ -470,6 +491,7 @@ mod tests {
                 "Upgrade-Insecure-Requests".to_string(),
                 "AbsentHeader".to_string(),
             ],
+            vec![],
         )
         .await;
 
@@ -485,7 +507,39 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["User-Agent"], "test_client".into());
             assert_eq!(log["Upgrade-Insecure-Requests"], "false".into());
-            assert_eq!(log["AbsentHeader"], "".into());
+            assert_eq!(log["AbsentHeader"], Value::Null);
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_query() {
+        trace_init();
+        let (rx, addr) = source(
+            Encoding::Ndjson,
+            vec![],
+            vec![
+                "source".to_string(),
+                "region".to_string(),
+                "absent".to_string(),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            200,
+            send_with_query(addr, "{\"key1\":\"value1\"}", "source=staging&region=gb").await
+        );
+
+        let mut events = collect_n(rx, 1).await.unwrap();
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log["source"], "staging".into());
+            assert_eq!(log["region"], "gb".into());
+            assert_eq!(log["absent"], Value::Null);
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }

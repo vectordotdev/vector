@@ -5,7 +5,7 @@ use crate::{
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
     shutdown::ShutdownSignal,
-    sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
+    sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
 };
@@ -13,6 +13,7 @@ use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::HashMap,
     io::{BufRead, BufReader},
     net::SocketAddr,
     str::FromStr,
@@ -23,6 +24,7 @@ use warp::http::{HeaderMap, StatusCode};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
+    query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
 }
@@ -35,6 +37,7 @@ impl GenerateConfig for LogplexConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:80".parse().unwrap(),
+            query_parameters: Vec::new(),
             tls: None,
             auth: None,
         })
@@ -43,11 +46,19 @@ impl GenerateConfig for LogplexConfig {
 }
 
 #[derive(Clone, Default)]
-struct LogplexSource;
+struct LogplexSource {
+    query_parameters: Vec<String>,
+}
 
 impl HttpSource for LogplexSource {
-    fn build_event(&self, body: Bytes, header_map: HeaderMap) -> Result<Vec<Event>, ErrorMessage> {
+    fn build_event(
+        &self,
+        body: Bytes,
+        header_map: HeaderMap,
+        query_parameters: HashMap<String, String>,
+    ) -> Result<Vec<Event>, ErrorMessage> {
         decode_message(body, header_map)
+            .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
     }
 }
 
@@ -61,7 +72,9 @@ impl SourceConfig for LogplexConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let source = LogplexSource::default();
+        let source = LogplexSource {
+            query_parameters: self.query_parameters.clone(),
+        };
         source.run(self.address, "events", &self.tls, &self.auth, out, shutdown)
     }
 
@@ -183,7 +196,7 @@ mod tests {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        event::Event,
+        event::{Event, Value},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -198,12 +211,16 @@ mod tests {
         crate::test_util::test_generate_config::<LogplexConfig>();
     }
 
-    async fn source(auth: Option<HttpSourceAuthConfig>) -> (mpsc::Receiver<Event>, SocketAddr) {
+    async fn source(
+        auth: Option<HttpSourceAuthConfig>,
+        query_parameters: Vec<String>,
+    ) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
             LogplexConfig {
                 address,
+                query_parameters,
                 tls: None,
                 auth,
             }
@@ -223,9 +240,14 @@ mod tests {
         (recv, address)
     }
 
-    async fn send(address: SocketAddr, body: &str, auth: Option<HttpSourceAuthConfig>) -> u16 {
+    async fn send(
+        address: SocketAddr,
+        body: &str,
+        auth: Option<HttpSourceAuthConfig>,
+        query: &str,
+    ) -> u16 {
         let len = body.lines().count();
-        let mut req = reqwest::Client::new().post(&format!("http://{}/events", address));
+        let mut req = reqwest::Client::new().post(&format!("http://{}/events?{}", address, query));
         if let Some(auth) = auth {
             req = req.basic_auth(auth.username, Some(auth.password));
         }
@@ -251,9 +273,16 @@ mod tests {
             password: "vector_pass".to_owned(),
         };
 
-        let (rx, addr) = source(Some(auth.clone())).await;
+        let (rx, addr) = source(
+            Some(auth.clone()),
+            vec!["appname".to_string(), "absent".to_string()],
+        )
+        .await;
 
-        assert_eq!(200, send(addr, body, Some(auth)).await);
+        assert_eq!(
+            200,
+            send(addr, body, Some(auth), "appname=lumberjack-store").await
+        );
 
         let mut events = collect_n(rx, body.lines().count()).await.unwrap();
         let event = events.remove(0);
@@ -272,6 +301,8 @@ mod tests {
         );
         assert_eq!(log[&log_schema().host_key()], "host".into());
         assert_eq!(log[log_schema().source_type_key()], "logplex".into());
+        assert_eq!(log["appname"], "lumberjack-store".into());
+        assert_eq!(log["absent"], Value::Null);
     }
 
     #[test]
