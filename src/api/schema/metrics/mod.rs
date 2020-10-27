@@ -70,7 +70,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Component events processed metrics. Streams new data as the metric changes
+    /// Component events processed metrics. Streams new data as the metric increases
     async fn component_events_processed_total(
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
@@ -121,15 +121,24 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     }
 }
 
-pub fn component_counter_metrics(metric_name: &str, interval: i32) -> impl Stream<Item = Metric> {
+/// Returns a stream of metrics, where `metric_name` matches the name of the metric
+/// (e.g. "events_processed"), and the value
+pub fn component_counter_metrics(
+    metric_name: &'static str,
+    interval: i32,
+) -> impl Stream<Item = Metric> {
     let mut cache = BTreeMap::new();
 
-    cache
-        .get_metrics(interval)
-        .filter(|m| m.name == metric_name)
-        .filter_map(|m| match m.tag_value("component_name") {
-            Ok(name) => match m.value {
-                MetricValue::Counter { value } if *cache.entry(name).or_insert(value) >= value => m,
+    get_metrics(interval)
+        .filter(move |m| m.name == metric_name)
+        .filter_map(move |m| match m.tag_value("component_name") {
+            Some(name) => match m.value {
+                MetricValue::Counter { value }
+                    if cache.insert(name, value).unwrap_or(0.00) < value =>
+                {
+                    Some(m)
+                }
+                _ => None,
             },
             _ => None,
         })
