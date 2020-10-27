@@ -721,7 +721,7 @@
 [transforms.remap_function_ceil]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = ceil(.num)
     .b = ceil(.num, precision = 1)
     .c = ceil(.num, precision = 2)
@@ -743,7 +743,7 @@
 [transforms.remap_function_floor]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = floor(.num)
     .b = floor(.num, precision = 1)
     .c = floor(.num, precision = 2)
@@ -765,7 +765,7 @@
 [transforms.remap_function_round]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
     .a = round(.num)
     .b = round(.num, precision = 1)
     .c = round(.num, precision = 2)
@@ -787,7 +787,7 @@
 [transforms.remap_function_parse_syslog]
   inputs = []
   type = "remap"
-  mapping = """
+  source = """
    .a = parse_syslog(.a)
    """
 [[tests]]
@@ -811,7 +811,7 @@
 [transforms.remap_function_split_regex]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     .foo = split(.foo, /a.b/i, 3)
   """
 [[tests]]
@@ -831,7 +831,7 @@
 [transforms.remap_function_split_string]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     .foo = split(.foo, " ", 3)
   """
 [[tests]]
@@ -851,7 +851,7 @@
 [transforms.remap_function_log]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     log(.foo, level=info)
   """
 [[tests]]
@@ -869,7 +869,7 @@
 [transforms.remap_function_replace_regex]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     .bip = replace(.foo, /Eggs/gi, "beans")
     .bar = replace(.foo, /Eggs/i, "beans")
     .zop = replace(.foo, /Eggs/, "beans")
@@ -891,7 +891,7 @@
 [transforms.remap_function_replace_string]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     .foo = replace(.foo, "eggs", "beans")
   """
 [[tests]]
@@ -909,7 +909,7 @@
 [transforms.remap_function_flatten_array]
   inputs=[]
   type = "remap"
-  mapping = """
+  source = """
     .foo = flatten(parse_json(.foo))
   """
 [[tests]]
