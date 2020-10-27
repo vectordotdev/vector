@@ -24,6 +24,7 @@ use warp::http::{HeaderMap, StatusCode};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct LogplexConfig {
     address: SocketAddr,
+    #[serde(default)]
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
