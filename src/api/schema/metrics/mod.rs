@@ -122,7 +122,10 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
 }
 
 /// Returns a stream of metrics, where `metric_name` matches the name of the metric
-/// (e.g. "events_processed"), and the value
+/// (e.g. "events_processed"), and the value is derived from `MetricValue::Counter`. Uses a
+/// local cache to match against the `component_name` of a metric, to return results only when
+/// the value of a current iteration is greater than the previous. This is useful for the client
+/// to be notified as metrics increase without returning 'empty' or identical results.
 pub fn component_counter_metrics(
     metric_name: &'static str,
     interval: i32,
