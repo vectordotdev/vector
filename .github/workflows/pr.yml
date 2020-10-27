@@ -232,7 +232,7 @@ jobs:
         run: make check-kubernetes-yaml
       - name: Check internal events
         if: needs.changes.outputs.internal_events == 'true'
-        run: make check-internal-events
+        run: make check-events
       - name: Check cargo deny
         if: needs.changes.outputs.dependencies == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1
