@@ -86,8 +86,8 @@ impl ReduceState {
                     if let Some(strat) = strategies.get(&k) {
                         match get_value_merger(v, strat) {
                             Ok(m) => Some((k, m)),
-                            Err(err) => {
-                                warn!("Failed to create merger.", field = ?k, ?err);
+                            Err(error) => {
+                                warn!(message = "Failed to create merger.", field = ?k, error = ?error);
                                 None
                             }
                         }

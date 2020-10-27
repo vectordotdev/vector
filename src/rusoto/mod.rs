@@ -257,7 +257,7 @@ where
                 .method(method)
                 .uri(uri)
                 .body(RusotoBody::from(request.payload))
-                .map_err(|e| format!("error building request: {}", e))
+                .map_err(|error| format!("error building request: {}", error))
                 .map_err(HttpDispatchError::new)?;
 
             *request.headers_mut() = headers;

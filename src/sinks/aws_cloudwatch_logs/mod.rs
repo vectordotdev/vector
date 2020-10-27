@@ -199,7 +199,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let sink = {
             let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
             let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(|error| error!("Fatal cloudwatchlogs sink error.", ?error))
+                .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", error = ?error))
                 .with_flat_map(move |event| {
                     iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
                 });
@@ -569,7 +569,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
                 RusotoError::Unknown(res)
                     if rusoto_core::proto::json::Error::parse(&res)
-                        .filter(|err| err.typ.as_str() == "ThrottlingException")
+                        .filter(|error| error.typ.as_str() == "ThrottlingException")
                         .is_some() =>
                 {
                     true

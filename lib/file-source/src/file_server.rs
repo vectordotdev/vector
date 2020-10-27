@@ -290,7 +290,7 @@ where
             match result {
                 Ok(()) => {}
                 Err(error) => {
-                    error!(message = "Output channel closed.", ?error);
+                    error!(message = "Output channel closed.", error = ?error);
                     return Err(error);
                 }
             }
@@ -487,14 +487,14 @@ impl Fingerprinter {
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
         self.get_fingerprint_of_file(path, buffer)
-            .map_err(|err| {
-                if err.kind() == io::ErrorKind::UnexpectedEof {
+            .map_err(|error| {
+                if error.kind() == io::ErrorKind::UnexpectedEof {
                     if !known_small_files.contains(path) {
                         emitter.emit_file_checksum_failed(path);
                         known_small_files.insert(path.clone());
                     }
                 } else {
-                    emitter.emit_file_fingerprint_read_failed(path, err);
+                    emitter.emit_file_fingerprint_read_failed(path, error);
                 }
             })
             .ok()

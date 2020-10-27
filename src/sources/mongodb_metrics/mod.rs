@@ -136,7 +136,7 @@ impl SourceConfig for MongoDBMetricsConfig {
         .await?;
 
         let mut out = out
-            .sink_map_err(|e| error!(message = "Error sending metric.", error = ?e))
+            .sink_map_err(|error| error!(message = "Error sending metric.", error = ?error))
             .sink_compat();
 
         Ok(Box::new(
@@ -196,10 +196,7 @@ impl MongoDBMetrics {
         let node_type = Self::get_node_type(&client).await?;
         let build_info = Self::get_build_info(&client).await?;
         debug!(
-            message = "Connected to server.", %endpoint, ?node_type, server_version = serde_json::to_string(&build_info).unwrap()
-            endpoint,
-            node_type,
-            serde_json::to_string(&build_info).unwrap()
+            message = "Connected to server.", endpoint = %endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
         );
 
         Ok(Self {

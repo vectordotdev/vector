@@ -62,7 +62,7 @@ impl BufferInputCloner {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx
                     .clone()
-                    .sink_map_err(|e| error!(message = "Sender error.", ?e));
+                    .sink_map_err(|error| error!(message = "Sender error.", error = ?error));
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull { inner })
                 } else {
@@ -125,7 +125,7 @@ impl BufferConfig {
                 let buffer_dir = format!("{}_buffer", sink_name);
 
                 let (tx, rx, acker) = disk::open(&data_dir, buffer_dir.as_ref(), *max_size)
-                    .map_err(|err| err.to_string())?;
+                    .map_err(|error| error.to_string())?;
                 let tx = BufferInputCloner::Disk(tx, *when_full);
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))

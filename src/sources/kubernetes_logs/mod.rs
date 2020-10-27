@@ -111,7 +111,7 @@ impl SourceConfig for Config {
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "Source future failed.", ?error);
+                error!(message = "Source future failed.", error = ?error);
             })
         });
         let fut = Box::pin(fut);
@@ -303,7 +303,7 @@ impl Source {
                 util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
                     Ok(()) => info!(message = "Reflector process completed gracefully."),
                     Err(error) => {
-                        error!(message = "Reflector process exited with an error.", ?error)
+                        error!(message = "Reflector process exited with an error.", error = ?error)
                     }
                 });
             slot.bind(Box::pin(fut));
@@ -313,7 +313,7 @@ impl Source {
             let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
                 match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => error!(message = "File server exited with an error.", ?error),
+                    Err(error) => error!(message = "File server exited with an error.", error = ?error),
                 }
             });
             slot.bind(Box::pin(fut));

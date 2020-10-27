@@ -97,7 +97,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Event::Log(log) => match encoding.codec() {
             Encoding::Json => serde_json::to_string(&log)
                 .map_err(|error| {
-                    error!(message = "Error encoding json.", ?error);
+                    error!(message = "Error encoding json.", error = ?error);
                 })
                 .ok(),
             Encoding::Text => {
@@ -116,7 +116,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Event::Metric(metric) => match encoding.codec() {
             Encoding::Json => serde_json::to_string(&metric)
                 .map_err(|error| {
-                    error!(message = "Error encoding json.", ?error);
+                    error!(message = "Error encoding json.", error = ?error);
                 })
                 .ok(),
             Encoding::Text => Some(format!("{}", metric)),

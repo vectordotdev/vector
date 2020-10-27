@@ -174,16 +174,16 @@ impl Sink for KafkaSink {
         debug!(message = "Sending event.", count = 1);
         let future = match self.producer.send_result(record) {
             Ok(f) => f,
-            Err((e, record)) => {
+            Err((error, record)) => {
                 // Docs suggest this will only happen when the producer queue is full, so let's
                 // treat it as we do full buffers in other sinks
-                debug!(message = "The rdkafka queue full.", ?e);
+                debug!(message = "The rdkafka queue full.", error = ?error);
                 self.poll_complete()?;
 
                 match self.producer.send_result(record) {
                     Ok(f) => f,
-                    Err((e, _record)) => {
-                        debug!(message = "The rdkafka queue still full.", ?e);
+                    Err((error, _record)) => {
+                        debug!(message = "The rdkafka queue still full.", error = ?error);
                         return Ok(AsyncSink::NotReady(item));
                     }
                 }
@@ -211,11 +211,9 @@ impl Sink for KafkaSink {
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     match result {
                         Ok((partition, offset)) => trace!(
-                            message = "Produced message.", ?partition, ?offset
-                            partition,
-                            offset
+                            message = "Produced message.", parition = ?partition, offset = ?offset
                         ),
-                        Err((error, _msg)) => error!(message = "Kafka error.", ?error),
+                        Err((error, _msg)) => error!(message = "Kafka error.", error = ?error),
                     };
 
                     self.pending_acks.insert(seqno);
@@ -229,7 +227,7 @@ impl Sink for KafkaSink {
                 }
 
                 // request got canceled (according to docs)
-                Err(error) => error!(message = "Delivery future canceled.", ?error),
+                Err(error) => error!(message = "Delivery future canceled.", error = ?error),
             }
         }
     }

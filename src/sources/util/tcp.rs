@@ -72,7 +72,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out = out.sink_map_err(|e| error!(message = "Error sending event.", error = ?e));
+        let out = out.sink_map_err(|error| error!(message = "Error sending event.", error = ?error));
 
         let listenfd = ListenFd::from_env();
 
@@ -189,7 +189,7 @@ async fn handle_stream(
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();
                     if let Some(socket) = socket {
                         if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", ?error);
+                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", error = ?error);
                         }
                     } else {
                         // Connection hasn't yet been established so we are done here.
@@ -213,7 +213,7 @@ async fn handle_stream(
             source.build_event(frame, host).map(Ok)
         }
         Err(error) => {
-            warn!(message = "Failed to read data from TCP source.", ?error);
+            warn!(message = "Failed to read data from TCP source.", error = ?error);
             None
         }
     }))

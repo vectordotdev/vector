@@ -66,7 +66,7 @@ impl TryFrom<Option<&HttpSourceAuthConfig>> for HttpSourceAuth {
                     Some(value) => {
                         let token = value
                             .to_str()
-                            .map_err(|err| format!("Failed stringify HeaderValue: {:?}", err))?
+                            .map_err(|error| format!("Failed stringify HeaderValue: {:?}", error))?
                             .to_owned();
                         Ok(HttpSourceAuth { token: Some(token) })
                     }
@@ -138,7 +138,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 let body_size = body.len();
                 let events = match auth.is_valid(&auth_header) {
                     Ok(()) => self.build_event(body, headers),
-                    Err(err) => Err(err),
+                    Err(error) => Err(error),
                 };
 
                 async move {
@@ -150,22 +150,22 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                             });
                             out.send_all(futures01::stream::iter_ok(events))
                                 .compat()
-                                .map_err(move |e: futures01::sync::mpsc::SendError<Event>| {
+                                .map_err(move |error: futures01::sync::mpsc::SendError<Event>| {
                                     // can only fail if receiving end disconnected, so we are shutting down,
                                     // probably not gracefully.
                                     error!("Failed to forward events, downstream is closed.");
-                                    error!(message = "Error sending event.", error = ?e);
+                                    error!(message = "Error sending event.", error = ?error);
                                     warp::reject::custom(RejectShuttingDown)
                                 })
                                 .map_ok(|_| warp::reply())
                                 .await
                         }
-                        Err(err) => {
+                        Err(error) => {
                             emit!(HTTPBadRequest {
-                                error_code: err.code,
-                                error_message: err.message.as_str(),
+                                error_code: error.code,
+                                error_message: error.message.as_str(),
                             });
-                            Err(warp::reject::custom(err))
+                            Err(warp::reject::custom(error))
                         }
                     }
                 }

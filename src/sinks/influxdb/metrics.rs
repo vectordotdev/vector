@@ -140,7 +140,7 @@ impl InfluxDBSvc {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!(message = "Fatal influxdb sink error.", error = ?e));
+            .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", error = ?error));
 
         Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }

@@ -109,7 +109,7 @@ impl SinkConfig for StatsdSinkConfig {
                     batch.timeout,
                     cx.acker(),
                 )
-                .sink_map_err(|error| error!("Fatal statsd sink error.", ?error))
+                .sink_map_err(|error| error!(message = "Fatal statsd sink error.", error = ?error))
                 .with_flat_map(move |event| {
                     stream::iter_ok(encode_event(event, namespace.as_deref()))
                 });
@@ -437,11 +437,11 @@ mod test {
         let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {
             UdpFramed::new(socket, BytesCodec::new())
-                .map_err(|e| error!(message = "Error reading line.", error = ?e))
+                .map_err(|error| error!(message = "Error reading line.", error = ?error))
                 .map_ok(|(bytes, _addr)| bytes.freeze())
                 .forward(
                     tx.sink_compat()
-                        .sink_map_err(|e| error!(message = "Error sending event.", error = ?e)),
+                        .sink_map_err(|error| error!(message = "Error sending event.", error = ?error)),
                 )
                 .await
                 .unwrap()

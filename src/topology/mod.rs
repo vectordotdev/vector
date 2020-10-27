@@ -73,7 +73,7 @@ pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<P
     match builder::build_pieces(config, diff).await {
         Err(errors) => {
             for error in errors {
-                error!(message = "Configuration error.", ?error);
+                error!(message = "Configuration error.", error = ?error);
             }
             None
         }
@@ -143,8 +143,8 @@ impl RunningTopology {
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
             error!(
-                "Failed to gracefully shut down in time. Killing components.",
-                components = %remaining_components
+              message = "Failed to gracefully shut down in time. Killing components.",
+                components = ?remaining_components.join(", ")
             );
 
             Ok(())
@@ -170,9 +170,7 @@ impl RunningTopology {
                 };
 
                 info!(
-                    message = "Shutting down... Waiting on running components.", %remaining_components, %time_remaining,
-                    remaining_components.join(", "),
-                    time_remaining
+                    message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
                 );
             })
             .filter(|_| future::ready(false)) // Run indefinitely without emitting items
@@ -302,8 +300,7 @@ impl RunningTopology {
         // sources.
         if !diff.sources.to_remove.is_empty() {
             info!(
-                message = "Waiting for sources to finish shutting down.", %timeout,
-                timeout.as_secs()
+                message = "Waiting for sources to finish shutting down.", timeout = ?timeout.as_secs()
             );
         }
 

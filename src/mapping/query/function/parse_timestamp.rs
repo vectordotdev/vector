@@ -34,7 +34,7 @@ impl Function for ParseTimestampFn {
             v => unexpected_type!(v),
         };
 
-        let conversion: Conversion = format.parse().map_err(|e| format!("{}", e))?;
+        let conversion: Conversion = format.parse().map_err(|error| format!("{}", error))?;
 
         let result = match self.query.execute(ctx) {
             Ok(value) => match value {

@@ -168,7 +168,7 @@ impl SourceConfig for MockSourceConfig {
                 }
                 x
             })
-            .forward(out.sink_map_err(|e| error!(message = "Error sending in sink..", error = %e)))
+            .forward(out.sink_map_err(|error| error!(message = "Error sending in sink..", error = %error)))
             .map(|_| info!("Finished sending."))
         });
         Ok(Box::new(source))
@@ -315,7 +315,7 @@ where
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
         let sink = sink.sink_map_err(|error| {
-            error!(message = "Ingesting an event failed at mock sink.", ?error)
+            error!(message = "Ingesting an event failed at mock sink.", error = ?error)
         });
         let sink = StreamSinkOld::new(sink, cx.acker());
         let healthcheck = if self.healthy {

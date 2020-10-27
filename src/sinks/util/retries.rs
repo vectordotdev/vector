@@ -117,7 +117,7 @@ where
             }
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", ?error);
+                    error!(message = "Retries exhausted; dropping the request.", error = ?error);
                     return None;
                 }
 
