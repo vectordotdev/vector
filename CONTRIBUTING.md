@@ -432,19 +432,19 @@ make fmt
 ##### Logging style
 
 
-* Always use Tracing's key/value style for log events.
-* Never use `e` or `err` - always spell out `error` to enrich logs and make it clear what the output is.
-* Prefer Display over Debug, `?error` and not `%error`.
+- Always use Tracing's key/value style for log events.
+- Never use `e` or `err` - always spell out `error` to enrich logs and make it clear what the output is.
+- Prefer Display over Debug, `?error` and not `%error`.
 
 Nope!
 
-```
+```rust
 warn!("Failed to merge value: {}.", err);
 ```
 
 Yep!
 
-```
+```rust
 warn!(message = "Failed to merge value", error = ?error);
 ```
 
