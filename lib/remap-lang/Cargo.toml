@@ -1,0 +1,14 @@
+[package]
+name = "remap-lang"
+version = "0.1.0"
+authors = ["Vector Contributors <vector@timber.io>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+bytes = "0.5"
+paste = "1"
+pest = "2"
+pest_derive = "2"
+regex = "1"
+thiserror = "1"

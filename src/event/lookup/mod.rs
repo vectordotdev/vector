@@ -90,24 +90,24 @@ impl Display for Lookup {
 
 impl Lookup {
     /// Push onto the internal list of segments.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn push(&mut self, segment: Segment) {
         trace!(length = %self.segments.len(), "Pushing.");
         self.segments.push(segment)
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn pop(&mut self) -> Option<Segment> {
         trace!(length = %self.segments.len(), "Popping.");
         self.segments.pop()
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn iter(&self) -> Iter<'_, Segment> {
         self.segments.iter()
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn from_indexmap(
         values: IndexMap<String, TomlValue>,
     ) -> crate::Result<IndexMap<Lookup, Value>> {
@@ -118,7 +118,7 @@ impl Lookup {
         Ok(discoveries)
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<Lookup, Value>> {
         let mut discoveries = IndexMap::new();
         match value {
@@ -136,7 +136,7 @@ impl Lookup {
         }
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     fn recursive_step(
         lookup: Lookup,
         value: TomlValue,
@@ -170,7 +170,7 @@ impl Lookup {
     }
 
     /// Raise any errors that might stem from the lookup being invalid.
-    #[instrument]
+    #[instrument(level = "trace")]
     fn is_valid(&self) -> crate::Result<()> {
         if self.segments.is_empty() {
             return Err("Lookups must have at least 1 segment to be valid.".into());
