@@ -17,7 +17,7 @@ pub struct AddFieldsTemplateRenderingError<'a> {
 
 impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
     fn emit_logs(&self) {
-        error!(message = "Failed to render templated value; discarding value.", %self.field, rate_limit_secs = 30);
+        error!(message = "Failed to render templated value; discarding value.", field = %self.field, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {

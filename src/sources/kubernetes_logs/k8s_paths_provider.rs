@@ -52,7 +52,7 @@ impl PathsProvider for K8sPathsProvider {
                 let pod = values
                     .get_one()
                     .expect("we are supposed to be working with single-item values only");
-                trace!(message = "Providing log paths for pod.", ?uid);
+                trace!(message = "Providing log paths for pod.", uid = ?uid);
                 let paths_iter = list_pod_log_paths(real_glob, pod);
                 exclude_paths(paths_iter, &self.exclude_paths)
             })
