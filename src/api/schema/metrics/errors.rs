@@ -57,7 +57,7 @@ impl ComponentErrorsTotal {
     }
 
     /// Errors processed metric
-    async fn metric(&self) -> ComponentErrorsTotal {
-        ComponentErrorsTotal::new(self.metric.clone())
+    async fn metric(&self) -> ErrorsTotal {
+        ErrorsTotal::new(self.metric.clone())
     }
 }
