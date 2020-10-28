@@ -42,6 +42,8 @@ impl Remap {
         // Having first-class immutability support in the language allows for
         // more performance (one less clone), and boot-time errors when a
         // program wants to mutate its events.
+        //
+        // see: https://github.com/timberio/vector/issues/4744
         remap::Runtime::default().execute(&mut event.clone(), &self.program)
     }
 }
