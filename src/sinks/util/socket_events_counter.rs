@@ -1,4 +1,8 @@
-use crate::{buffers::Acker, Event};
+use crate::{
+    buffers::Acker,
+    internal_events::{SocketEventsSent, SocketMode},
+    Event,
+};
 use bytes::Bytes;
 use futures::{ready, Sink};
 use pin_project::{pin_project, pinned_drop};
@@ -19,20 +23,20 @@ pub struct EventsCounter {
     sizes: Mutex<Vec<usize>>,
     acker: Acker,
     encode_event_inner: Box<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
-    on_success: Box<dyn Fn(usize) + Send + Sync>,
+    socket_mode: SocketMode,
 }
 
 impl EventsCounter {
-    pub fn new(
+    pub(crate) fn new(
         acker: Acker,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
-        on_success: impl Fn(usize) + Send + Sync + 'static,
+        socket_mode: SocketMode,
     ) -> Self {
         Self {
             sizes: Mutex::new(Vec::with_capacity(MAX_PENDING_ITEMS)),
             acker,
             encode_event_inner: Box::new(encode_event),
-            on_success: Box::new(on_success),
+            socket_mode,
         }
     }
 
@@ -54,10 +58,15 @@ impl EventsCounter {
             count <= sizes.len(),
             "can not ack more then consumed events"
         );
+
         self.acker.ack(count);
-        for size in sizes.drain(..count) {
-            (self.on_success)(size);
-        }
+        let byte_size = sizes.drain(..count).sum();
+
+        emit!(SocketEventsSent {
+            mode: self.socket_mode,
+            count: count as u64,
+            byte_size,
+        })
     }
 
     fn ack_rest(&self) {

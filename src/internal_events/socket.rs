@@ -1,7 +1,7 @@
 use super::InternalEvent;
 use metrics::counter;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum SocketMode {
     Tcp,
     Udp,
@@ -36,18 +36,19 @@ impl InternalEvent for SocketEventReceived {
 }
 
 #[derive(Debug)]
-pub(crate) struct SocketEventSent {
+pub(crate) struct SocketEventsSent {
     pub mode: SocketMode,
+    pub count: u64,
     pub byte_size: usize,
 }
 
-impl InternalEvent for SocketEventSent {
+impl InternalEvent for SocketEventsSent {
     fn emit_logs(&self) {
-        trace!(message = "One event sent.", byte_size = %self.byte_size);
+        trace!(message = "Events sent.", count = %self.count, byte_size = %self.byte_size);
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1, "mode" => self.mode.as_str());
+        counter!("events_processed_total", self.count, "mode" => self.mode.as_str());
         counter!("processed_bytes_total", self.byte_size as u64, "mode" => self.mode.as_str());
     }
 }

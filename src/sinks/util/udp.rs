@@ -4,7 +4,7 @@ use crate::{
     config::SinkContext,
     dns::Resolver,
     internal_events::{
-        SocketEventSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
+        SocketEventsSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
         UdpSocketConnectionFailed, UdpSocketError,
     },
     sinks::{util::StreamSink, Healthcheck, VectorSink},
@@ -252,9 +252,10 @@ impl StreamSink for UdpSink {
                 self.acker.ack(1);
 
                 match result {
-                    Ok(()) => emit!(SocketEventSent {
-                        byte_size: bytes.len(),
+                    Ok(()) => emit!(SocketEventsSent {
                         mode: SocketMode::Udp,
+                        count: 1,
+                        byte_size: bytes.len(),
                     }),
                     Err(error) => {
                         emit!(UdpSocketError { error });

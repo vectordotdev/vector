@@ -3,7 +3,7 @@ use crate::{
     config::SinkContext,
     dns::Resolver,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketEventSent, SocketMode, TcpSocketConnectionEstablished,
+        ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
         TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
     },
     sinks::{
@@ -151,15 +151,9 @@ impl TcpSink {
         acker: Acker,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> Self {
-        let on_success = |byte_size| {
-            emit!(SocketEventSent {
-                byte_size,
-                mode: SocketMode::Tcp,
-            })
-        };
         Self {
             connector,
-            events_counter: Arc::new(EventsCounter::new(acker, encode_event, on_success)),
+            events_counter: Arc::new(EventsCounter::new(acker, encode_event, SocketMode::Tcp)),
         }
     }
 

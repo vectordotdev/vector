@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::SinkContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, SocketEventSent, SocketMode, UnixSocketConnectionEstablished,
+        ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketConnectionFailed, UnixSocketError,
     },
     sinks::{
@@ -110,15 +110,9 @@ impl UnixSink {
         acker: Acker,
         encode_event: impl Fn(Event) -> Option<Bytes> + Send + Sync + 'static,
     ) -> Self {
-        let on_success = |byte_size| {
-            emit!(SocketEventSent {
-                byte_size,
-                mode: SocketMode::Unix,
-            })
-        };
         Self {
             connector,
-            events_counter: Arc::new(EventsCounter::new(acker, encode_event, on_success)),
+            events_counter: Arc::new(EventsCounter::new(acker, encode_event, SocketMode::Unix)),
         }
     }
 
