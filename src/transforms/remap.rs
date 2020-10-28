@@ -3,8 +3,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
-    mapping::{parser::parse as parse_mapping, Mapping},
 };
+use remap::{Program, Runtime};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -43,14 +43,53 @@ impl TransformConfig for RemapConfig {
 
 #[derive(Debug)]
 pub struct Remap {
-    mapping: Mapping,
+    program: Program,
     drop_on_err: bool,
 }
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
+        // TODO: move this into a constant?
+        use crate::remap::*;
+        let definitions: Vec<Box<dyn remap::Function>> = vec![
+            Box::new(Split),
+            Box::new(Del),
+            Box::new(OnlyFields),
+            Box::new(ToString),
+            Box::new(ToInt),
+            Box::new(ToFloat),
+            Box::new(ToBool),
+            Box::new(ToTimestamp),
+            Box::new(Upcase),
+            Box::new(Downcase),
+            Box::new(UuidV4),
+            Box::new(Sha1),
+            Box::new(Md5),
+            Box::new(Now),
+            Box::new(FormatTimestamp),
+            Box::new(Contains),
+            Box::new(StartsWith),
+            Box::new(EndsWith),
+            Box::new(Slice),
+            Box::new(Tokenize),
+            Box::new(Sha2),
+            Box::new(Sha3),
+            Box::new(ParseDuration),
+            Box::new(FormatNumber),
+            Box::new(ParseUrl),
+            Box::new(Ceil),
+            Box::new(Floor),
+            Box::new(Round),
+            Box::new(ParseSyslog),
+            Box::new(ParseTimestamp),
+            Box::new(ParseJson),
+            Box::new(Truncate),
+            Box::new(StripWhitespace),
+            Box::new(StripAnsiEscapeCodes),
+        ];
+
         Ok(Remap {
-            mapping: parse_mapping(&config.source)?,
+            program: Program::new(&config.source, definitions)?,
             drop_on_err: config.drop_on_err,
         })
     }
@@ -60,10 +99,12 @@ impl Transform for Remap {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(RemapEventProcessed);
 
-        if let Err(error) = self.mapping.execute(&mut event) {
+        let mut runtime = Runtime::default();
+
+        if let Err(error) = runtime.execute(&mut event, &self.program) {
             emit!(RemapFailedMapping {
                 event_dropped: self.drop_on_err,
-                error
+                error: error.to_string(),
             });
 
             if self.drop_on_err {

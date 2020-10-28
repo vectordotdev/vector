@@ -8,17 +8,19 @@ mod runtime;
 mod state;
 mod value;
 
-use expression::{Expr, Expression};
-use function::{Argument, ArgumentList, Function, Parameter};
+use expression::Expr;
 use operator::Operator;
-use state::State;
 
+pub mod prelude;
 pub use error::Error;
+pub use expression::{Expression, Literal, Path};
+pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
+pub use state::State;
 pub use value::Value;
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Any object you want to map through the remap language has to implement this
 /// trait.
@@ -58,35 +60,76 @@ pub trait Object: std::fmt::Debug {
     /// When inserting into a coalesced path, the implementor is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
-    fn insert(&mut self, path: &str, value: Value) -> std::result::Result<(), String>;
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String>;
 
     /// Find a value for a given path.
     ///
     /// See [`Object::insert`] for more details.
-    fn find(&self, path: &str) -> std::result::Result<Option<Value>, String>;
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String>;
+
+    /// Get the list of paths in the object.
+    ///
+    /// Paths are represented similar to what's documented in [`Object::insert`].
+    fn paths(&self) -> Vec<String>;
+
+    /// Remove the given path from the object.
+    ///
+    /// If `compact` is true, after deletion, if an empty object or array is
+    /// left behind, it should be removed as well.
+    fn remove(&mut self, path: &str, compact: bool);
+}
+
+impl Object for std::collections::HashMap<String, Value> {
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
+        self.insert(vec_path_to_string(path), value);
+
+        Ok(())
+    }
+
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
+        Ok(self.get(&vec_path_to_string(path)).cloned())
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.keys().cloned().collect::<Vec<_>>()
+    }
+
+    fn remove(&mut self, path: &str, _: bool) {
+        self.remove(path);
+    }
+}
+
+impl Object for std::collections::BTreeMap<String, Value> {
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
+        self.insert(vec_path_to_string(path), value);
+
+        Ok(())
+    }
+
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
+        Ok(self.get(&vec_path_to_string(path)).cloned())
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.keys().cloned().collect::<Vec<_>>()
+    }
+
+    fn remove(&mut self, path: &str, _: bool) {
+        self.remove(path);
+    }
+}
+
+fn vec_path_to_string(path: &[Vec<String>]) -> String {
+    path.iter()
+        .map(|v| v.join("."))
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use std::str::FromStr;
-
-    #[derive(Debug, Default)]
-    struct Event {
-        paths: HashMap<String, Value>,
-    }
-
-    impl Object for Event {
-        fn insert(&mut self, path: &str, value: Value) -> std::result::Result<(), String> {
-            self.paths.insert(path.to_owned(), value);
-            Ok(())
-        }
-
-        fn find(&self, path: &str) -> std::result::Result<Option<Value>, String> {
-            Ok(self.paths.get(path).cloned())
-        }
-    }
 
     #[test]
     fn it_works() {
@@ -96,7 +139,7 @@ mod tests {
             (
                 r#".foo == .bar"#,
                 Err(
-                    expression::Error::Path(expression::path::Error::Missing(".foo".to_owned()))
+                    expression::Error::Path(expression::path::Error::Missing("foo".to_owned()))
                         .into(),
                 ),
             ),
@@ -110,10 +153,6 @@ mod tests {
             //     Ok(Some(Value::Boolean(false))),
             // ),
             (".bar = true\n.foo = .bar", Ok(Some(Value::Boolean(true)))),
-            (
-                r#"split("bar", pattern = /a/)"#,
-                Ok(Some(vec!["b", "r"].into())),
-            ),
             (
                 r#"{
                     .foo = "foo"
@@ -133,16 +172,16 @@ mod tests {
         ];
 
         for (script, result) in cases {
-            let program = Program::from_str(script)
+            let program = Program::new(script, vec![])
                 .map_err(|e| {
                     println!("{}", &e);
                     e
                 })
                 .unwrap();
             let mut runtime = Runtime::new(State::default());
-            let event = Event::default();
+            let mut event = HashMap::default();
 
-            assert_eq!(runtime.execute(event, program), result);
+            assert_eq!(runtime.execute(&mut event, &program), result);
         }
     }
 }

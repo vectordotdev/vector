@@ -33,7 +33,7 @@ not            = { operator_not* ~ (call | primary) }
 
 operator_boolean_expr   = { "||" | "&&" }
 operator_equality       = { "!=" | "==" }
-operator_comparison     = { ">" | ">=" | "<" | "<=" }
+operator_comparison     = { ">=" | ">" | "<=" | "<" }
 operator_addition       = { "-" | "+" }
 operator_multiplication = { "/" | "*" | "%" }
 operator_not            = { "!" }
@@ -45,17 +45,17 @@ path_segment     = ${ (path_field | path_coalesce) ~ path_index* }
 path_field       = ${ ident | string }
 path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
 path_index       =  { "[" ~ path_index_inner ~ "]" }
-path_index_inner =  { "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
+path_index_inner =  { ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
 
 // Literals --------------------------------------------------------------------
 
-null    = { "null" }
-boolean = { "true" | "false" }
-string  = { "\"" ~ string_inner ~ "\"" }
-integer = { "-"? ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT* }
-float   = {
+null    =  { "null" }
+boolean =  { "true" | "false" }
+string  = ${ "\"" ~ string_inner ~ "\"" }
+integer = ${ "-"? ~ ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
+float   = ${
     "-"?
-    ~ "0" | ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*
+    ~ ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT*
     ~ ("." ~ ASCII_DIGIT* ~ (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)?)
         | (^"e" ~ ("+" | "-")? ~ ASCII_DIGIT+)
 }
@@ -67,7 +67,7 @@ regex_flags =  { ("i" | "x" | "m")* }
 
 ident  = @{ ASCII_ALPHANUMERIC ~ (ASCII_ALPHANUMERIC | "_")* }
 target = _{ path }
-block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ "}" }
+block  =  { "{" ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*) ~ NEWLINE* ~ "}" }
 
 string_inner = @{ char* }
 char         =  { !("\"" | "\\") ~ ANY | "\\" ~ ("\"" | "\\" | "n" | "t") }
