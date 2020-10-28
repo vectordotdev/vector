@@ -30,7 +30,7 @@ async fn make_listener(
         SocketListenAddr::SocketAddr(addr) => match tls.bind(&addr).await {
             Ok(listener) => Some(listener),
             Err(error) => {
-                error!(message = "Failed to bind to listener socket.", error = ?error);
+                error!(message = "Failed to bind to listener socket.", %error);
                 None
             }
         },
@@ -38,7 +38,7 @@ async fn make_listener(
             Ok(Some(listener)) => match TcpListener::from_std(listener) {
                 Ok(listener) => Some(listener.into()),
                 Err(error) => {
-                    error!(message = "Failed to bind to listener socket.", error = ?error);
+                    error!(message = "Failed to bind to listener socket.", %error);
                     None
                 }
             },
@@ -47,7 +47,7 @@ async fn make_listener(
                 None
             }
             Err(error) => {
-                error!(message = "Failed to take listen FD.", error = ?error);
+                error!(message = "Failed to take listen FD.", %error);
                 None
             }
         },
@@ -73,7 +73,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
         let out =
-            out.sink_map_err(|error| error!(message = "Error sending event.", error = ?error));
+            out.sink_map_err(|error| error!(message = "Error sending event.", %error));
 
         let listenfd = ListenFd::from_env();
 
@@ -116,7 +116,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                             Err(error) => {
                                 error!(
                                     message = "Failed to accept socket.",
-                                    error = ?error
+                                    %error
                                 );
                                 return;
                             }
@@ -190,7 +190,7 @@ async fn handle_stream(
                     let socket: Option<&TcpStream> = reader.get_ref().get_ref();
                     if let Some(socket) = socket {
                         if let Err(error) = socket.shutdown(std::net::Shutdown::Write) {
-                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", error = ?error);
+                            warn!(message = "Failed in signalling to the other side to close the TCP channel.", %error);
                         }
                     } else {
                         // Connection hasn't yet been established so we are done here.
@@ -214,7 +214,7 @@ async fn handle_stream(
             source.build_event(frame, host).map(Ok)
         }
         Err(error) => {
-            warn!(message = "Failed to read data from TCP source.", error = ?error);
+            warn!(message = "Failed to read data from TCP source.", %error);
             None
         }
     }))

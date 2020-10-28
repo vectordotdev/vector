@@ -123,7 +123,7 @@ fn open_config(path: &Path) -> Option<File> {
                 error!(message = "Config file not found in path.", path = ?path);
                 None
             } else {
-                error!(message = "Error opening config file.", error = ?error);
+                error!(message = "Error opening config file.", %error);
                 None
             }
         }

@@ -34,7 +34,7 @@ pub async fn firehose(
             // can only fail if receiving end disconnected, so we are shutting down,
             // probably not gracefully.
             error!(message = "Failed to forward events, downstream is closed.");
-            error!(message = "Tried to send the following event.", error = ?error);
+            error!(message = "Tried to send the following event.", %error);
             warp::reject::custom(error)
         })
         .map_ok(|_| {

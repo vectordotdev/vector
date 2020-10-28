@@ -214,7 +214,7 @@ impl FileSink {
                             debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
                                 if let Err(error) = file.close().await {
-                                    error!(message = "Failed to close file.", path = ?path, error = ?error);
+                                    error!(message = "Failed to close file.", path = ?path, %error);
                                 } else{
                                     trace!(message = "Successfully closed file.", path = ?path);
                                 }
@@ -233,13 +233,13 @@ impl FileSink {
                             // We got an expired file. All we really want is to
                             // flush and close it.
                             if let Err(error) = expired_file.close().await {
-                                error!(message = "Failed to close file.", path = ?path, error = ?error);
+                                error!(message = "Failed to close file.", path = ?path, %error);
                             }
                             drop(expired_file); // ignore close error
                         }
                         Some(Err(error)) => error!(
                             message = "An error occurred while expiring a file.",
-                            error = ?error,
+                            %error,
                         ),
                     }
                 }
@@ -274,7 +274,7 @@ impl FileSink {
                     // We couldn't open the file for this event.
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
-                    error!(message = "Unable to open the file.", path = ?path, error = ?error);
+                    error!(message = "Unable to open the file.", path = ?path, %error);
                     return;
                 }
             };
@@ -287,7 +287,7 @@ impl FileSink {
 
         trace!(message = "Writing an event to file.", path = ?path);
         if let Err(error) = write_event_to_file(file, event, &self.encoding).await {
-            error!(message = "Failed to write file.", path = ?path, error = ?error);
+            error!(message = "Failed to write file.", path = ?path, %error);
         }
     }
 }

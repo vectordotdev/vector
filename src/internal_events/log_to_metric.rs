@@ -65,7 +65,7 @@ impl InternalEvent for LogToMetricTemplateRenderError {
         let error = format!("Keys {:?} do not exist on the event.", self.missing_keys);
         warn!(
             message = "Failed to render template.",
-            error = ?error,
+            %error,
             rate_limit_secs = 30
         );
     }

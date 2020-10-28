@@ -175,14 +175,14 @@ fn kafka_source(
             // Error: implementation of `futures_core::stream::Stream` is not general enough
             // .forward(
             //     out.sink_compat()
-            //         .sink_map_err(|error| error!(message = "Error sending to sink.", error = ?error)),
+            //         .sink_map_err(|error| error!(message = "Error sending to sink.", %error)),
             // )
             .for_each(|item| {
                 let out = out.clone();
                 async move {
                     if let Ok(item) = item {
                         if let Err(error) = out.send(item).compat().await {
-                            error!(message = "Error sending to sink.", error = ?error);
+                            error!(message = "Error sending to sink.", %error);
                         }
                     }
                 }

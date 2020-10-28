@@ -191,7 +191,7 @@ impl SinkConfig for DatadogConfig {
 
         let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(
-                |error| error!(message = "Fatal datadog metric sink error.", error = ?error),
+                |error| error!(message = "Fatal datadog metric sink error.", %error),
             )
             .with_flat_map(move |event: Event| {
                 let ep = DatadogEndpoint::from_metric(&event);

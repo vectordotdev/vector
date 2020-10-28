@@ -170,7 +170,7 @@ impl JournaldConfig {
             Err(error) => {
                 error!(
                     message = "Could not retrieve saved journald checkpoint.",
-                    error = ?error
+                    %error
                 );
                 None
             }
@@ -347,7 +347,7 @@ where
                     Some(Err(error)) => {
                         error!(
                             message = "Could not read from journald source.",
-                            error = ?error,
+                            %error,
                         );
                         break;
                     }
@@ -386,7 +386,7 @@ where
                     if let Err(error) = self.checkpointer.set(&cursor).await {
                         error!(
                             message = "Could not set journald checkpoint.",
-                            ?error,
+                            %error,
                             filename = ?self.checkpointer.filename,
                         );
                     }

@@ -181,7 +181,7 @@ pub async fn build_pieces(
                             Ok(())
                         }
                         Ok(Err(error)) => {
-                            error!(message = "Healthcheck: Failed Reason.", error = ?error);
+                            error!(message = "Healthcheck: Failed Reason.", %error);
                             Err(())
                         }
                         Err(_) => {
