@@ -145,19 +145,19 @@ impl HttpSink for LogdnaConfig {
 
         let mut map = serde_json::map::Map::new();
 
-        map.insert(LINE_LOOKUP.to_string(), json!(line));
-        map.insert(TIMESTAMP_LOOKUP.to_string(), json!(timestamp));
+        map.insert(LINE_STR.to_string(), json!(line));
+        map.insert(TIMESTAMP_STR.to_string(), json!(timestamp));
 
         if let Some(env) = log.remove(&*ENV_LOOKUP, false) {
-            map.insert(ENV_LOOKUP.to_string(), json!(env));
+            map.insert(ENV_STR.to_string(), json!(env));
         }
 
         if let Some(app) = log.remove(&*APP_LOOKUP, false) {
-            map.insert(APP_LOOKUP.to_string(), json!(app));
+            map.insert(APP_STR.to_string(), json!(app));
         }
 
         if let Some(file) = log.remove(&*FILE_LOOKUP, false) {
-            map.insert(FILE_LOOKUP.to_string(), json!(file));
+            map.insert(FILE_STR.to_string(), json!(file));
         }
 
         if !map.contains_key("env") {
@@ -167,16 +167,16 @@ impl HttpSink for LogdnaConfig {
             );
         }
 
-        if !map.contains_key(&APP_LOOKUP) && !map.contains_key(FILE_LOOKUP) {
+        if !map.contains_key(APP_STR) && !map.contains_key(FILE_LOOKUP) {
             if let Some(default_app) = &self.default_app {
-                map.insert(APP_LOOKUP.to_string(), json!(default_app.as_str()));
+                map.insert(APP_STR.to_string(), json!(default_app.as_str()));
             } else {
-                map.insert(APP_LOOKUP.to_string(), json!("vector"));
+                map.insert(APP_STR.to_string(), json!("vector"));
             }
         }
 
         if !log.is_empty() {
-            map.insert(META_LOOKUP.to_string(), json!(&log));
+            map.insert(META_STR.to_string(), json!(&log));
         }
 
         Some(map.into())

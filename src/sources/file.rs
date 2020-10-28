@@ -117,7 +117,7 @@ impl Default for FileConfig {
         Self {
             include: vec![],
             exclude: vec![],
-            file_key: Some("file".to_string()),
+            file_key: Some(LookupBuf::from("file")),
             start_at_beginning: false,
             ignore_older: None,
             max_line_bytes: default_max_line_bytes(),
@@ -217,7 +217,7 @@ pub fn file_source(
     let host_key = config
         .host_key
         .clone()
-        .unwrap_or_else(|| log_schema().host_key().to_string());
+        .unwrap_or_else(|| log_schema().host_key().to_buf());
     let hostname = crate::get_hostname().ok();
 
     let include = config.include.clone();
@@ -269,7 +269,7 @@ pub fn file_source(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
-                    create_event(msg, file, &host_key, &hostname, &file_key)
+                    create_event(msg, file, host_key, &hostname, file_key)
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())

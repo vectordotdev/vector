@@ -127,12 +127,12 @@ impl Transform for AddFields {
                         field: key.as_lookup(),
                     });
                 }
-            } else if event.as_mut_log().contains(key) {
+            } else if event.as_mut_log().contains(&key) {
                 emit!(AddFieldsFieldNotOverwritten {
                     field: key.as_lookup(),
                 });
             } else {
-                event.as_mut_log().insert(key.into_buf(), value);
+                event.as_mut_log().insert(key, value);
             }
         }
 

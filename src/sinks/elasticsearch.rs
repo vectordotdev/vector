@@ -198,7 +198,7 @@ impl HttpSink for ElasticSearchCommon {
             }
         });
         maybe_set_id(
-            self.config.id_key.as_ref(),
+            &self.config.id_key,
             action.pointer_mut("/index").unwrap(),
             &mut event,
         );
