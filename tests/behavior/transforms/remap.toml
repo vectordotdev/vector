@@ -552,7 +552,7 @@
 [transforms.remap_function_slice]
   inputs = []
   type = "remap"
-  sourcsource = """
+  source = """
     .a = slice(.foo + .bar, 1)
     .b = slice(.foo + .bar, 0, 1)
     .c = slice(.foo + .bar, start = -2)
