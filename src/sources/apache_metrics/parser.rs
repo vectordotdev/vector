@@ -136,7 +136,7 @@ pub fn parse(
         .fold(vec![], |mut acc, v| {
             match v {
                 Ok(metrics) => metrics.for_each(|v| acc.push(Ok(v))),
-                Err(err) => acc.push(Err(err)),
+                Err(error) => acc.push(Err(error)),
             };
             acc
         })
@@ -369,9 +369,9 @@ fn parse_numeric_value<T: std::str::FromStr>(key: &str, value: &str) -> Result<T
 where
     T::Err: Into<ValueParseError> + 'static,
 {
-    value.parse::<T>().map_err(|err| ParseError {
+    value.parse::<T>().map_err(|error| ParseError {
         key: key.to_string(),
-        err: err.into(),
+        error: error.into(),
     })
 }
 
@@ -405,14 +405,14 @@ enum ValueParseError {
 }
 
 impl From<num::ParseFloatError> for ValueParseError {
-    fn from(err: num::ParseFloatError) -> ValueParseError {
-        ValueParseError::Float(err)
+    fn from(error: num::ParseFloatError) -> ValueParseError {
+        ValueParseError::Float(error)
     }
 }
 
 impl From<num::ParseIntError> for ValueParseError {
-    fn from(err: num::ParseIntError) -> ValueParseError {
-        ValueParseError::Int(err)
+    fn from(error: num::ParseIntError) -> ValueParseError {
+        ValueParseError::Int(error)
     }
 }
 
@@ -437,18 +437,18 @@ impl fmt::Display for ValueParseError {
 #[derive(Debug)]
 pub struct ParseError {
     key: String,
-    err: ValueParseError,
+    error: ValueParseError,
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "could not parse value for {}: {}", self.key, self.err)
+        write!(f, "could not parse value for {}: {}", self.key, self.error)
     }
 }
 
 impl error::Error for ParseError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        Some(&self.err)
+        Some(&self.error)
     }
 }
 

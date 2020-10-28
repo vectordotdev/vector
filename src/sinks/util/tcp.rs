@@ -280,7 +280,7 @@ impl Sink for TcpSink {
                             return match connection.start_send(line) {
                                 Ok(AsyncSink::NotReady(line)) => Ok(AsyncSink::NotReady(line)),
                                 Err(error) => {
-                                    error!(message = "connection disconnected.", %error);
+                                    error!(message = "Connection disconnected.", error = ?error);
                                     self.state = TcpSinkState::Disconnected;
                                     return Ok(AsyncSink::Ready);
                                 }

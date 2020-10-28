@@ -173,7 +173,7 @@ impl UnixSink {
                 },
                 UnixSinkState::Disconnected => {
                     debug!(
-                        message = "Connecting",
+                        message = "Connecting.",
                         path = %self.connector.path.to_str().unwrap()
                     );
                     let fut = self.connector.connect();

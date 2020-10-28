@@ -429,6 +429,26 @@ rustup component add rustfmt
 make fmt
 ```
 
+##### Logging style
+
+
+- Always use the [Tracing crate](https://tracing.rs/tracing/)'s key/value style for log events.
+- Events should be capitalized and end with a period, `.`.
+- Never use `e` or `err` - always spell out `error` to enrich logs and make it clear what the output is.
+- Prefer Display over Debug, `?error` and not `%error`.
+
+Nope!
+
+```rust
+warn!("Failed to merge value: {}.", err);
+```
+
+Yep!
+
+```rust
+warn!(message = "Failed to merge value.", error = ?error);
+```
+
 #### Feature flags
 
 When a new component (a source, transform, or sink) is added, it has to be put

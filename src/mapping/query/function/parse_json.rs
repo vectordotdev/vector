@@ -20,7 +20,7 @@ impl Function for ParseJsonFn {
                     let v: Value = v.into();
                     v.into()
                 })
-                .map_err(|err| format!("unable to parse json {}", err)),
+                .map_err(|error| format!("unable to parse json {}", error)),
             v => unexpected_type!(v),
         }
     }

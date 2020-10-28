@@ -31,13 +31,13 @@ where
         loop {
             match T::try_from_parts(StatusCode::OK, &self.pending_data) {
                 Ok((response, consumed_bytes)) => {
-                    debug_assert!(consumed_bytes > 0, "parser must've consumed some data");
+                    debug_assert!(consumed_bytes > 0, "Parser must've consumed some data.");
                     self.pending_data.drain(..consumed_bytes);
                     self.responses_buffer.push(Ok(response));
                 }
                 Err(ResponseError::NeedMoreData) => break,
                 Err(error) => {
-                    error!(message = "error while decoding response", pending_data = ?self.pending_data, ?error);
+                    error!(message = "Error while decoding response.", pending_data = ?self.pending_data, ?error);
                     self.responses_buffer.push(Err(error));
                     break;
                 }

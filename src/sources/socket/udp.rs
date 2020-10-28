@@ -46,14 +46,15 @@ pub fn udp(
     mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    let mut out = out.sink_map_err(|e| error!("Error sending event: {:?}", e));
+    let mut out =
+        out.sink_map_err(|error| error!(message = "Error sending event.", error = ?error));
 
     Box::new(
         async move {
             let mut socket = UdpSocket::bind(&address)
                 .await
                 .expect("Failed to bind to udp listener socket");
-            info!(message = "Listening.", %address);
+            info!(message = "Listening.", address = %address);
 
             let mut buf = BytesMut::with_capacity(max_length);
             loop {

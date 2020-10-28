@@ -127,14 +127,14 @@ impl Application {
                     return Err(code);
                 };
 
-                info!("Log level {:?} is enabled.", level);
+                info!(message = "Log level is enabled.", level = ?level);
 
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 
                 if watch_config {
                     // Start listening for config changes immediately.
                     config::watcher::spawn_thread(&config_paths, None).map_err(|error| {
-                        error!(message = "Unable to start config watcher.", %error);
+                        error!(message = "Unable to start config watcher.", error = ?error);
                         exitcode::CONFIG
                     })?;
                 }

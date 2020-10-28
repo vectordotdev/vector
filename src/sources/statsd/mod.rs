@@ -138,7 +138,7 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
                 // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
                 let mut metrics = stream::iter(metrics).boxed();
                 if let Err(error) = out.send_all(&mut metrics).await {
-                    error!("Error sending metric: {:?}", error);
+                    error!(message = "Error sending metric.", error = ?error);
                     break;
                 }
             }
