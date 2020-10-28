@@ -403,7 +403,7 @@ fn default_max_read_bytes() -> usize {
 }
 
 fn default_glob_minimum_cooldown_ms() -> usize {
-    10000
+    60000
 }
 
 /// This function construct the effective field selector to use, based on
