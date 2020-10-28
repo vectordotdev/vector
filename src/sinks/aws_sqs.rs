@@ -238,8 +238,6 @@ impl RetryLogic for SqsRetryLogic {
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
             RusotoError::HttpDispatch(_) => true,
-            RusotoError::Service(SendMessageBatchError::BatchEntryIdsNotDistinct(_)) => true,
-            RusotoError::Service(SendMessageBatchError::TooManyEntriesInBatchRequest(_)) => true,
             RusotoError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
         }
