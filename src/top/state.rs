@@ -63,6 +63,14 @@ impl ComponentsState {
         }
     }
 
+    /// Returns new component state from the provided `Vec<ComponentRow>`
+    pub fn from_rows(rows: Vec<ComponentRow>) -> Self {
+        let state = Self::new();
+        state.update_rows(rows);
+
+        state
+    }
+
     /// Updates the existing component rows. Rows that don't exist in `rows` will be deleted;
     /// new rows will be added, and existing rows will be updated
     pub fn update_rows(&self, rows: Vec<ComponentRow>) {
@@ -96,6 +104,18 @@ impl ComponentsState {
             .values()
             .cloned()
             .collect()
+    }
+
+    /// Update events processed total
+    pub fn update_events_processed_total(&self, component_name: &str, value: i64) {
+        if let Some(r) = self
+            .rows
+            .lock()
+            .expect(ACQUIRE_LOCK_INVARIANT)
+            .get_mut(component_name)
+        {
+            r.events_processed_total = value;
+        }
     }
 }
 
@@ -143,6 +163,13 @@ impl WidgetsState {
     /// Update component rows.
     pub fn update_component_rows(&self, rows: Vec<ComponentRow>) {
         self.components.update_rows(rows);
+        self.notify();
+    }
+
+    /// Update events processed total for component row
+    pub fn update_component_events_processed_total(&self, component_name: &str, value: i64) {
+        self.components
+            .update_events_processed_total(component_name, value);
         self.notify();
     }
 }

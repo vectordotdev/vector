@@ -26,7 +26,11 @@ use weak_table::WeakValueHashMap;
 
 /// Subscription GraphQL response, returned from an active stream
 pub type StreamResponse<T> = Pin<
-    Box<dyn Stream<Item = Option<graphql_client::Response<<T as GraphQLQuery>::ResponseData>>>>,
+    Box<
+        dyn Stream<Item = Option<graphql_client::Response<<T as GraphQLQuery>::ResponseData>>>
+            + Send
+            + 'static,
+    >,
 >;
 
 /// Payload contains the raw data received back from a GraphQL subscription. At the point
@@ -43,7 +47,10 @@ pub struct Payload {
 
 impl Payload {
     /// Returns a "start" payload necessary for starting a new subscription
-    fn start<T: GraphQLQuery>(id: Uuid, payload: &graphql_client::QueryBody<T::Variables>) -> Self {
+    fn start<T: GraphQLQuery + Send + 'static>(
+        id: Uuid,
+        payload: &graphql_client::QueryBody<T::Variables>,
+    ) -> Self {
         Self {
             id,
             payload_type: "start".to_owned(),
@@ -62,7 +69,9 @@ impl Payload {
 
     /// Attempts to return a definitive ResponseData on the `payload` field, matched against
     /// a generated GraphQLQuery
-    fn response<T: GraphQLQuery>(&self) -> Option<graphql_client::Response<T::ResponseData>> {
+    fn response<T: GraphQLQuery + Send + 'static>(
+        &self,
+    ) -> Option<graphql_client::Response<T::ResponseData>> {
         serde_json::from_value::<graphql_client::Response<T::ResponseData>>(self.payload.clone())
             .ok()
     }
@@ -70,13 +79,13 @@ impl Payload {
 
 /// Receiver<T> has a single method, `stream`, that returns a `StreamResponse<T>` of
 /// `Payload`s received from the server
-pub trait Receiver<T: GraphQLQuery> {
+pub trait Receiver<T: GraphQLQuery + Send + 'static> {
     /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T>;
 }
 
 /// SubscriptionResult<T> returns an `anyhow`-wrapped `Result`, containing a boxed `Receiver<T>`
-pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T>>>>;
+pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T> + Send + 'static>>>;
 
 /// A Subscription is associated with a single GraphQL subscription query. Its methods
 /// allow transmitting `Payload`s upstream to the API server, via its `Receiver<T: GraphQLQuery`
@@ -116,7 +125,7 @@ impl Drop for Subscription {
     }
 }
 
-impl<T: GraphQLQuery> Receiver<T> for Subscription {
+impl<T: GraphQLQuery + Send + 'static> Receiver<T> for Subscription {
     /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T> {
         Box::pin(
@@ -208,7 +217,7 @@ impl SubscriptionClient {
     }
 
     /// Start a new subscription request
-    pub async fn start<T: GraphQLQuery>(
+    pub async fn start<T: GraphQLQuery + Send + 'static>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
     ) -> SubscriptionResult<T> {
@@ -232,7 +241,9 @@ impl SubscriptionClient {
         let _ = self.tx.send(Payload::start::<T>(id, request_body));
 
         // The caller gets back a Box<dyn Receiver<T>>, to consume subscription payloads
-        Ok(Box::new(Arc::clone(&subscription) as Arc<dyn Receiver<T>>))
+        Ok(Box::new(
+            Arc::clone(&subscription) as Arc<dyn Receiver<T> + Send + 'static>
+        ))
     }
 }
 
