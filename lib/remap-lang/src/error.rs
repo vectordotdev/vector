@@ -6,9 +6,6 @@ pub enum Error {
     #[error("parser error: {0}")]
     Parser(String),
 
-    #[error("invalid escape char: {0}")]
-    EscapeChar(char),
-
     #[error("unexpected token sequence")]
     Rule(#[from] Rule),
 
@@ -24,8 +21,23 @@ pub enum Error {
     #[error("value error")]
     Value(#[from] value::Error),
 
+    #[error("function call error: {0}")]
+    Call(String),
+
     #[error("unknown error")]
     Unknown,
+}
+
+impl From<String> for Error {
+    fn from(s: String) -> Self {
+        Error::Call(s)
+    }
+}
+
+impl From<&str> for Error {
+    fn from(s: &str) -> Self {
+        Error::Call(s.to_owned())
+    }
 }
 
 impl std::error::Error for Rule {

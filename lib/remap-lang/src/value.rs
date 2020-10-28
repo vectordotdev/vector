@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::string::String as StdString;
@@ -11,6 +12,7 @@ pub enum Value {
     Boolean(bool),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
+    Timestamp(DateTime<Utc>),
     Null,
 }
 
@@ -54,6 +56,12 @@ pub enum Error {
 
     #[error("unable to compare {0} <= {1}")]
     Le(&'static str, &'static str),
+}
+
+impl From<i32> for Value {
+    fn from(v: i32) -> Self {
+        Value::Integer(v as i64)
+    }
 }
 
 impl From<i64> for Value {
@@ -101,6 +109,18 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 impl From<&str> for Value {
     fn from(v: &str) -> Self {
         Value::String(Vec::from(v.as_bytes()).into())
+    }
+}
+
+impl From<BTreeMap<String, Value>> for Value {
+    fn from(value: BTreeMap<String, Value>) -> Self {
+        Value::Map(value)
+    }
+}
+
+impl From<DateTime<Utc>> for Value {
+    fn from(v: DateTime<Utc>) -> Self {
+        Value::Timestamp(v)
     }
 }
 
@@ -172,6 +192,7 @@ impl Value {
             Boolean(_) => "boolean",
             Map(_) => "map",
             Array(_) => "array",
+            Timestamp(_) => "timestamp",
             Null => "null",
         }
     }
@@ -229,8 +250,8 @@ impl Value {
         let err = || Error::Sub(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv - i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv - f64::try_from(&rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 
@@ -351,6 +372,22 @@ impl Value {
             Integer(lhv) => i64::try_from(rhs).map(|rhv| *lhv == rhv).unwrap_or(false),
             Float(lhv) => f64::try_from(rhs).map(|rhv| *lhv == rhv).unwrap_or(false),
             _ => self == rhs,
+        }
+    }
+
+    /// Returns [`Value::String`], lossy converting any other variant.
+    pub fn as_string_lossy(&self) -> Self {
+        use Value::*;
+
+        match self {
+            s @ String(_) => s.clone(), // cloning a Bytes is cheap
+            Integer(v) => Value::from(format!("{}", v)),
+            Float(v) => Value::from(format!("{}", v)),
+            Boolean(v) => Value::from(format!("{}", v)),
+            Map(_) => Value::from(""),
+            Array(_) => Value::from(""),
+            Timestamp(v) => Value::from(v.to_string()),
+            Null => Value::from(""),
         }
     }
 }

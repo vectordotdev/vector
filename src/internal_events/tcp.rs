@@ -9,7 +9,7 @@ pub struct TcpConnectionEstablished {
 impl InternalEvent for TcpConnectionEstablished {
     fn emit_logs(&self) {
         if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "Connected.", %peer_addr);
+            debug!(message = "Connected.", peer_addr = %peer_addr);
         } else {
             debug!(message = "Connected.", peer_addr = "unknown");
         }
@@ -27,7 +27,7 @@ pub struct TcpConnectionFailed<E> {
 
 impl<E: std::error::Error> InternalEvent for TcpConnectionFailed<E> {
     fn emit_logs(&self) {
-        error!(message = "Unable to connect.", error = %self.error);
+        error!(message = "Unable to connect.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
@@ -42,7 +42,7 @@ pub struct TcpConnectionDisconnected {
 
 impl InternalEvent for TcpConnectionDisconnected {
     fn emit_logs(&self) {
-        error!(message = "Connection disconnected.", error = %self.error);
+        error!(message = "Connection disconnected.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
@@ -70,7 +70,7 @@ pub struct TcpConnectionError<T> {
 
 impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionError<T> {
     fn emit_logs(&self) {
-        warn!(message = "Connection error.", error = %self.error, rate_limit_secs = 10);
+        warn!(message = "Connection error.", error = ?self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
@@ -85,7 +85,7 @@ pub struct TcpFlushError {
 
 impl InternalEvent for TcpFlushError {
     fn emit_logs(&self) {
-        error!(message = "Unable to flush connection.", error = %self.error);
+        error!(message = "Unable to flush connection.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {

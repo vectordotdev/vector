@@ -1,30 +1,25 @@
 #![macro_use]
 
 mod not;
-mod util;
 
 pub(in crate::mapping) use not::NotFn;
 
 use super::Function;
+use crate::mapping::{query::query_value::QueryValue, Result};
 use crate::Event;
-use crate::{
-    event::Value,
-    mapping::{query::query_value::QueryValue, Result},
-};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
 /// Commonly used types when building new functions.
 mod prelude {
-    pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
+    pub(super) use super::{ArgumentList, Parameter};
     pub(super) use crate::event::{Event, Value};
     pub(super) use crate::mapping::query::query_value::QueryValue;
     pub(super) use crate::mapping::query::Function;
     #[cfg(test)]
     pub(super) use crate::mapping::query::Literal;
     pub(super) use crate::mapping::Result;
-    pub(super) use crate::types::Conversion;
     pub(super) use std::convert::TryFrom;
 }
 
@@ -127,37 +122,6 @@ macro_rules! build_signatures {
 
 // List of built-in functions.
 build_signatures! {
-    to_string => ToStringFn,
-    to_int => ToIntegerFn,
-    to_float => ToFloatFn,
-    to_bool => ToBooleanFn,
-    to_timestamp => ToTimestampFn,
-    parse_timestamp => ParseTimestampFn,
-    strip_whitespace => StripWhitespaceFn,
-    upcase => UpcaseFn,
-    downcase => DowncaseFn,
-    uuid_v4 => UuidV4Fn,
-    md5 => Md5Fn,
-    sha1 => Sha1Fn,
-    sha2 => Sha2Fn,
-    sha3 => Sha3Fn,
-    now => NowFn,
-    truncate => TruncateFn,
-    parse_json => ParseJsonFn,
-    format_timestamp => FormatTimestampFn,
-    contains => ContainsFn,
-    slice => SliceFn,
-    tokenize => TokenizeFn,
-    strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
-    parse_duration => ParseDurationFn,
-    format_number => FormatNumberFn,
-    parse_url => ParseUrlFn,
-    starts_with => StartsWithFn,
-    ends_with => EndsWithFn,
-    round => RoundFn,
-    floor => FloorFn,
-    ceil => CeilFn,
-    parse_syslog => ParseSyslogFn,
     split => SplitFn,
     replace => ReplaceFn,
     flatten => FlattenFn,
@@ -277,19 +241,5 @@ impl Function for Argument {
         }
 
         Ok(value)
-    }
-}
-
-fn is_scalar_value(value: &QueryValue) -> bool {
-    match value {
-        QueryValue::Value(value) => match value {
-            Value::Integer(_)
-            | Value::Float(_)
-            | Value::Bytes(_)
-            | Value::Boolean(_)
-            | Value::Timestamp(_) => true,
-            Value::Map(_) | Value::Array(_) | Value::Null => false,
-        },
-        _ => false,
     }
 }

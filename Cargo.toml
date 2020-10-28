@@ -57,7 +57,7 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "signal", "sync"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "signal", "sync", "time", "stream"] }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-util = { version = "0.3.1", features = ["codec"] }
@@ -110,9 +110,13 @@ slab = { version = "0.4.2", optional = true }
 anymap = {version = "0.12.1", optional = true }
 
 # API client
-prettytable-rs = { version = "0.8.0", optional = true }
 human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
+crossterm = { version = "0.18.0", optional = true }
+tui = { version = "0.12.0", optional = true, default-features = false, features = ["crossterm"] }
+
+# Remap Lang
+remap = { package = "remap-lang", path = "lib/remap-lang" }
 
 # External libs
 derivative = "2.1.1"
@@ -187,13 +191,13 @@ heim = { version = "0.1.0-beta.3", optional = true, features = ["full"] }
 uom = { version = "0.29.0", optional = true }
 rust_decimal = "1.8.1"
 mongodb = { version = "1.1.1", optional = true }
+anyhow = { version = "1.0.28" }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
-anyhow = { version = "1.0.28", optional = true }
 async-stream = "0.3.0"
 
 [target.'cfg(windows)'.dependencies]
@@ -263,7 +267,7 @@ rdkafka-plain = ["rdkafka"]
 # The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
 rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 # This feature enables the WASM foreign module support.
-wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
+wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -280,9 +284,10 @@ api = [
 # API client
 api-client = [
   "vector-api-client",
-  "prettytable-rs",
   "human_format",
   "num-format",
+  "crossterm",
+  "tui",
 ]
 
 # Sources

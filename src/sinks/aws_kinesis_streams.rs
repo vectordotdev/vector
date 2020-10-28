@@ -168,7 +168,7 @@ impl KinesisService {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
+            .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error.", %error))
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
@@ -186,7 +186,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
 
     fn call(&mut self, records: Vec<PutRecordsRequestEntry>) -> Self::Future {
         debug!(
-            message = "sending records.",
+            message = "Sending records.",
             events = %records.len(),
         );
 
@@ -504,7 +504,7 @@ mod integration_tests {
 
         match client.create_stream(req).await {
             Ok(_) => (),
-            Err(e) => panic!("Unable to check the stream {:?}", e),
+            Err(error) => panic!("Unable to check the stream {:?}", error),
         };
 
         // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors
