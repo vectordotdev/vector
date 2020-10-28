@@ -173,7 +173,7 @@ fn create_tmp_directory(config: &mut Config, fmt: &mut Formatter) -> Option<Path
 
 fn remove_tmp_directory(path: PathBuf) {
     if let Err(error) = remove_dir_all(&path) {
-        error!(message = "Failed to remove temporary directory.", path = ?path, error = ?error);
+        error!(message = "Failed to remove temporary directory.", path = ?path, %error);
     }
 }
 

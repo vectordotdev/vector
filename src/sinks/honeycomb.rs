@@ -69,7 +69,7 @@ impl SinkConfig for HoneycombConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", error = ?error));
+        .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 

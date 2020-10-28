@@ -110,7 +110,7 @@ impl SinkConfig for HecSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", error = ?error));
+        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 

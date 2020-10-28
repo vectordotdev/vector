@@ -198,7 +198,7 @@ impl Stream for Reader {
                     Ok(Async::Ready(Some(event)))
                 }
                 Err(error) => {
-                    error!(message = "Error deserializing proto.", error = ?error);
+                    error!(message = "Error deserializing proto.", %error);
                     debug_assert!(false);
                     self.poll()
                 }
