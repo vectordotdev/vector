@@ -252,9 +252,10 @@ impl Source {
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
-            /// Max amount of bytes to read from a single file before switching over
-            /// to the next file.
-            /// This allows ditributing the reads more or less evenly accross the files.
+            // Max amount of bytes to read from a single file before switching
+            // over to the next file.
+            // This allows distributing the reads more or less evenly accross
+            // the files.
             max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
