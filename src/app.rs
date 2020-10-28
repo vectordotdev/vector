@@ -134,7 +134,7 @@ impl Application {
                 if watch_config {
                     // Start listening for config changes immediately.
                     config::watcher::spawn_thread(&config_paths, None).map_err(|error| {
-                        error!(message = "Unable to start config watcher.", error = ?error);
+                        error!(message = "Unable to start config watcher.", %error);
                         exitcode::CONFIG
                     })?;
                 }

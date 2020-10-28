@@ -117,7 +117,7 @@ where
             }
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", error = ?error);
+                    error!(message = "Retries exhausted; dropping the request.", %error);
                     return None;
                 }
 
@@ -128,7 +128,7 @@ where
                     } else {
                         error!(
                             message = "Non-retriable error; dropping the request.",
-                            error = ?error
+                            %error
                         );
                         None
                     }
@@ -138,7 +138,7 @@ where
                 } else {
                     error!(
                         message = "Unexpected error type; dropping the request.",
-                        error = ?error
+                        %error
                     );
                     None
                 }

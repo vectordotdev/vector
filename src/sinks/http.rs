@@ -139,7 +139,7 @@ impl SinkConfig for HttpSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", error = ?error));
+        .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
         let sink = super::VectorSink::Futures01Sink(Box::new(sink));
 

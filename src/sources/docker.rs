@@ -134,7 +134,7 @@ impl SourceConfig for DockerConfig {
                 Err(error) => {
                     error!(
                         message = "Listing currently running containers failed.",
-                        ?error
+                        %error
                     );
                 }
             }
@@ -536,7 +536,7 @@ impl EventStreamBuilder {
             }
             // In case of any error we have to notify the main thread that it should try again. This is %error because the API doesn't support Display.
             if let Err(error) = this.main_send.send(Err(id)) {
-                error!(message = "Unable to send ContainerId to main.", error = %error);
+                error!(message = "Unable to send ContainerId to main.", %error);
             }
         });
 
@@ -630,7 +630,7 @@ impl EventStreamBuilder {
         };
         // This is %error because the API doesn't support Display.
         if let Err(error) = self.main_send.send(result) {
-            error!(message = "Unable to return ContainerLogInfo to main.", error = %error);
+            error!(message = "Unable to return ContainerLogInfo to main.", %error);
         }
     }
 }

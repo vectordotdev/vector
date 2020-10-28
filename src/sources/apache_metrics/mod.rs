@@ -140,7 +140,7 @@ fn apache_metrics(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|error| error!(message = "Error sending metric.", error = ?error))
+        .sink_map_err(|error| error!(message = "Error sending metric.", %error))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
@@ -329,7 +329,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         tokio::spawn(async move {
             if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", error = ?error);
+                error!(message = "Server error.", %error);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -397,7 +397,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         tokio::spawn(async move {
             if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
-                error!(message = "Server error.", error = ?error);
+                error!(message = "Server error.", %error);
             }
         });
         wait_for_tcp(in_addr).await;

@@ -62,7 +62,7 @@ impl BufferInputCloner {
             BufferInputCloner::Memory(tx, when_full) => {
                 let inner = tx
                     .clone()
-                    .sink_map_err(|error| error!(message = "Sender error.", error = ?error));
+                    .sink_map_err(|error| error!(message = "Sender error.", %error));
                 if when_full == &WhenFull::DropNewest {
                     Box::new(DropWhenFull { inner })
                 } else {
