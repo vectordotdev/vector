@@ -174,7 +174,7 @@ mod test {
     use super::*;
     use crate::{
         config,
-        sinks::prometheus::PrometheusSinkConfig,
+        sinks::prometheus::sink::PrometheusSinkConfig,
         test_util::{next_addr, start_topology},
     };
     use futures::{compat::Future01CompatExt, TryStreamExt};
