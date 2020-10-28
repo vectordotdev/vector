@@ -101,9 +101,11 @@ impl GeneratorConfig {
                     }
                 })
                 .collect::<Vec<Event>>();
-            let (sink, _) = out.send_all(iter_ok(events)).compat().await.map_err(
-                |error| error!(message="Error sending generated lines.", error = ?error),
-            )?;
+            let (sink, _) = out
+                .send_all(iter_ok(events))
+                .compat()
+                .await
+                .map_err(|error| error!(message="Error sending generated lines.", %error))?;
             out = sink;
         }
         Ok(())

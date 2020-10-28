@@ -97,7 +97,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Event::Log(log) => match encoding.codec() {
             Encoding::Json => serde_json::to_string(&log)
                 .map_err(|error| {
-                    error!(message = "Error encoding json.", error = ?error);
+                    error!(message = "Error encoding json.", %error);
                 })
                 .ok(),
             Encoding::Text => {
@@ -116,7 +116,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Event::Metric(metric) => match encoding.codec() {
             Encoding::Json => serde_json::to_string(&metric)
                 .map_err(|error| {
-                    error!(message = "Error encoding json.", error = ?error);
+                    error!(message = "Error encoding json.", %error);
                 })
                 .ok(),
             Encoding::Text => Some(format!("{}", metric)),
@@ -140,7 +140,7 @@ impl StreamSink for WriterSink {
                 if let Err(error) = self.output.write_all(buf.as_bytes()).await {
                     // Error when writing to stdout/stderr is likely irrecoverable,
                     // so stop the sink.
-                    error!(message = "Error writing to output. Stopping sink.", error = ?error);
+                    error!(message = "Error writing to output. Stopping sink.", %error);
                     return Err(());
                 }
 

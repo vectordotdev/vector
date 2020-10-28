@@ -130,7 +130,7 @@ impl SinkConfig for ElasticSearchConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", error = ?error));
+        .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),

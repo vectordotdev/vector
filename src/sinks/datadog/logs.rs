@@ -120,9 +120,7 @@ impl DatadogLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(
-            |error| error!(message = "Fatal datadog_logs text sink error.", error = ?error),
-        );
+        .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

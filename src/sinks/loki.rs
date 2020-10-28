@@ -108,7 +108,7 @@ impl SinkConfig for LokiConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal loki sink error.", error = ?error));
+        .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
