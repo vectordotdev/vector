@@ -210,8 +210,7 @@ impl StreamSink for TcpSink {
             let mut stream = input.take().unwrap().filter_map(encode_event);
 
             let mut sink = self.connect().await;
-            let _open_token =
-                OpenGauge::new().open(Box::new(|count| emit!(ConnectionOpen { count })));
+            let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
             if let Err(error) = sink.send_all(&mut stream).await {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
                     emit!(TcpSocketConnectionShutdown {});
