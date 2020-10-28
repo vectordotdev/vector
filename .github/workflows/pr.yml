@@ -97,6 +97,26 @@ jobs:
       - run: make slim-builds
       - run: make test
 
+  test-misc:
+    name: Miscellaneous - Linux
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-shutdown
+      - run: make test-cli
+      - run: make test-behavior
+
   cross-linux:
     name: Cross - ${{ matrix.target }}
     runs-on: ubuntu-20.04
@@ -154,6 +174,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+      - run: make test-behavior
 
   test-windows:
     name: Unit - Windows
@@ -228,9 +249,9 @@ jobs:
       - name: Check that generated Kubernetes YAML doesn't diverge from Helm
         if: needs.changes.outputs.helm == 'true'
         run: make check-kubernetes-yaml
-      - name: Check internal events
-        if: needs.changes.outputs.internal_events == 'true'
-        run: make check-internal-events
+      - name: Check events
+        if: needs.changes.outputs.source == 'true'
+        run: make check-events
       - name: Check cargo deny
         if: needs.changes.outputs.dependencies == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1

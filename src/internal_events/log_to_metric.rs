@@ -44,7 +44,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
         warn!(
             message = "Failed to parse field as float.",
             field = %self.field,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         );
     }
@@ -65,7 +65,7 @@ impl InternalEvent for LogToMetricTemplateRenderError {
         let error = format!("Keys {:?} do not exist on the event.", self.missing_keys);
         warn!(
             message = "Failed to render template.",
-            error = %error,
+            error = ?error,
             rate_limit_secs = 30
         );
     }
@@ -83,7 +83,7 @@ pub(crate) struct LogToMetricTemplateParseError {
 
 impl InternalEvent for LogToMetricTemplateParseError {
     fn emit_logs(&self) {
-        warn!(message = "Failed to parse template.", error = %self.error, rate_limit_secs = 30);
+        warn!(message = "Failed to parse template.", error = ?self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {

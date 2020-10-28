@@ -157,7 +157,7 @@ impl SinkConfig for TestConfig {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| panic!("Fatal test sink error: {}", e));
+            .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics

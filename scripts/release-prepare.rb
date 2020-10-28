@@ -117,6 +117,8 @@ def create_release_file!(new_version)
   release_reference_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.cue"
 
   if commits.any?
+    cue_commits = commits.collect(&:to_cue_struct).join(",\n    ")
+
     if File.exists?(release_reference_path)
       words =
         <<~EOF
@@ -127,7 +129,7 @@ def create_release_file!(new_version)
         So that I don't overwrite your work, please copy these commits into
         the release file:
 
-            test
+        #{cue_commits}
 
         All done? Ready to proceed?
         EOF
@@ -136,22 +138,6 @@ def create_release_file!(new_version)
         Util::Printer.error!("Ok, re-run this command when you're ready.")
       end
     else
-      cue_commits =
-        commits.collect do |commit|
-          "{" +
-            "sha: #{commit.sha.to_json}, " +
-            "date: #{commit.date.to_json}, " +
-            "description: #{commit.description.to_json}, " +
-            "pr_number: #{commit.pr_number.to_json}, " +
-            "scopes: #{commit.scopes.to_json}, " +
-            "type: #{commit.type.to_json}, " +
-            "breaking_change: #{commit.breaking_change.to_json}, " +
-            "author: #{commit.author.to_json}, " +
-            "files_count: #{commit.files_count.to_json}, " +
-            "insertions_count: #{commit.insertions_count.to_json}, " +
-            "deletions_count: #{commit.deletions_count.to_json}},"
-        end
-
       File.open(release_reference_path, 'w+') do |file|
         file.write(
           <<~EOF
@@ -164,7 +150,7 @@ def create_release_file!(new_version)
             whats_next: []
 
             commits: [
-              #{cue_commits.join("\n    ")}
+          #{cue_commits}
             ]
           }
           EOF
@@ -184,6 +170,12 @@ def create_release_file!(new_version)
 
       Util::Printer.success(words)
     end
+
+    `cue fmt #{release_reference_path}`
+
+    true
+  else
+    false
   end
 end
 
@@ -295,6 +287,8 @@ end
 #
 # Execute
 #
+
+Dir.chdir "scripts"
 
 Util::Printer.title("Creating release meta file...")
 

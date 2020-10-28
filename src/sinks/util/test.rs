@@ -52,7 +52,7 @@ pub fn build_test_server(
     let server = Server::bind(&addr)
         .serve(service)
         .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
-        .map_err(|e| panic!("Server error: {}", e));
+        .map_err(|error| panic!("Server error: {}", error));
 
     (rx, trigger, server)
 }

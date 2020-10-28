@@ -43,7 +43,7 @@ pub(crate) struct SocketReceiveError {
 
 impl InternalEvent for SocketReceiveError {
     fn emit_logs(&self) {
-        error!(message = "Error receiving data.", error = %self.error, mode = %self.mode.as_str());
+        error!(message = "Error receiving data.", error = ?self.error, mode = %self.mode.as_str());
     }
 
     fn emit_metrics(&self) {

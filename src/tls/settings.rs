@@ -81,11 +81,11 @@ impl TlsSettings {
         if !for_server {
             if options.verify_certificate == Some(false) {
                 warn!(
-                    "`verify_certificate` is DISABLED, this may lead to security vulnerabilities"
+                    "The `verify_certificate` option is DISABLED, this may lead to security vulnerabilities."
                 );
             }
             if options.verify_hostname == Some(false) {
-                warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
+                warn!("The `verify_hostname` option is DISABLED, this may lead to security vulnerabilities.");
             }
         }
 

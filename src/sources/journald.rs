@@ -109,7 +109,7 @@ impl SourceConfig for JournaldConfig {
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
             (true, false) => {
-                warn!("The `units` setting is deprecated, use `include_units` instead");
+                warn!("The `units` setting is deprecated, use `include_units` instead.");
                 &self.units
             }
             (false, _) => &self.include_units,
@@ -194,6 +194,7 @@ impl JournaldSource {
             }
         };
 
+        /*
         loop {
             let (stream, stop) =
                 start_journalctl(self.journalctl_path.clone(), self.current_boot_only, cursor)
@@ -207,6 +208,7 @@ impl JournaldSource {
 
             delay_for(BACKOFF_DURATION).await;
         }
+        */
 
         loop {
             let mut saw_record = false;
@@ -501,10 +503,10 @@ impl JournaldServer {
                         return;
                     }
                     Some(Ok(text)) => text,
-                    Some(Err(err)) => {
+                    Some(Err(error)) => {
                         error!(
                             message = "Could not read from journald source.",
-                            error = %err,
+                            error = %error,
                         );
                         break;
                     }
@@ -546,7 +548,7 @@ impl JournaldServer {
                     if let Err(error) = self.checkpointer.set(&cursor).await {
                         error!(
                             message = "Could not set journald checkpoint.",
-                            %error,
+                            ?error,
                             filename = ?self.checkpointer.filename,
                         );
                     }

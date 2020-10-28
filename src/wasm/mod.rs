@@ -121,7 +121,7 @@ impl WasmModule {
             .and_then(|v| v);
 
         if let None = registration {
-            error!("Not registered! Please fill your `init` call with a `Registration::transform().register()`!");
+            error!("Not registered! Please fill your `init` call with a `Registration::transform().register()`.");
         }
 
         Ok(wasm_module)

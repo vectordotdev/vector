@@ -190,7 +190,9 @@ impl SinkConfig for DatadogConfig {
         let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
 
         let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_map_err(|e| error!("Fatal datadog metric sink error: {}", e))
+            .sink_map_err(
+                |error| error!(message = "Fatal datadog metric sink error.", error = ?error),
+            )
             .with_flat_map(move |event: Event| {
                 let ep = DatadogEndpoint::from_metric(&event);
                 iter_ok(Some(PartitionInnerBuffer::new(event, ep)))
@@ -343,7 +345,7 @@ fn encode_events(
     interval: i64,
     namespace: Option<&str>,
 ) -> DatadogRequest<DatadogMetric> {
-    debug!(message = "series", count = events.len());
+    debug!(message = "Series.", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
@@ -453,7 +455,7 @@ fn encode_distribution_events(
     interval: i64,
     namespace: Option<&str>,
 ) -> DatadogRequest<DatadogDistributionMetric> {
-    debug!(message = "distribution", count = events.len());
+    debug!(message = "Distribution.", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
