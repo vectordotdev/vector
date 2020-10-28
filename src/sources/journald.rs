@@ -7,9 +7,12 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::TimeZone;
+use codec::BytesDelimitedCodec;
 use futures::{
-    compat::Sink01CompatExt, ready, stream::BoxStream, FutureExt, SinkExt, Stream, StreamExt,
-    TryFutureExt,
+    compat::{Compat01As03Sink, Sink01CompatExt},
+    future, ready,
+    stream::BoxStream,
+    FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::Future;
 use lazy_static::lazy_static;
@@ -30,11 +33,14 @@ use std::{
     str::FromStr,
     task::{Context, Poll},
 };
+use tokio_retry::strategy::ExponentialBackoff;
+use tokio_util::codec::FramedRead;
 
 use tokio::{
     fs::{File, OpenOptions},
     io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     process::{ChildStdout, Command},
+    time::delay_for,
 };
 use tracing_futures::Instrument;
 
@@ -148,6 +154,166 @@ impl SourceConfig for JournaldConfig {
     fn source_type(&self) -> &'static str {
         "journald"
     }
+}
+
+struct JournaldSource {
+    journalctl_path: PathBuf,
+    include_units: HashSet<String>,
+    exclude_units: HashSet<String>,
+    current_boot_only: bool,
+    checkpoint_path: PathBuf,
+    batch_size: usize,
+    remap_priority: bool,
+
+    out: Compat01As03Sink<Pipeline, Event>,
+    shutdown: ShutdownSignal,
+}
+
+impl JournaldSource {
+    async fn run(&mut self) -> Result<(), ()> {
+        let mut on_stop: Option<StopJournalctlFn> = None;
+
+        let mut checkpointer = Checkpointer::new(self.checkpoint_path.clone())
+            .await
+            .map_err(|error| {
+                error!(
+                    message = "Unable to open checkpoint file.",
+                    path = ?self.checkpoint_path,
+                    %error,
+                );
+            })?;
+
+        let cursor = match checkpointer.get().await {
+            Ok(cursor) => cursor,
+            Err(error) => {
+                error!(
+                    message = "Could not retrieve saved journald checkpoint",
+                    %error,
+                );
+                None
+            }
+        };
+
+        loop {
+            let (stream, stop) =
+                start_journalctl(self.journalctl_path.clone(), self.current_boot_only, cursor)
+                    .map_err(|error| {
+                        error!(message = "Error starting journalctl process.", %error);
+                    })?;
+
+            self.drive_stream(stream);
+
+            stop();
+
+            delay_for(BACKOFF_DURATION).await;
+        }
+
+        loop {
+            let mut saw_record = false;
+            let mut cursor: Option<String> = None;
+
+            for _ in 0..self.batch_size {
+                let text = match stream.next().await {
+                    None => {
+                        info!("Journalctl process stopped.");
+                        return Err(());
+                    }
+                    Some(Ok(text)) => text,
+                    Some(Err(err)) => {
+                        error!(
+                            message = "Could not read from journald source.",
+                            error = %err,
+                        );
+                        continue;
+                    }
+                };
+
+                let mut record = match decode_record(&text, self.remap_priority) {
+                    Ok(record) => record,
+                    Err(error) => {
+                        emit!(JournaldInvalidRecord { error, text });
+                        continue;
+                    }
+                };
+                if let Some(tmp) = record.remove(&*CURSOR) {
+                    cursor = Some(tmp);
+                }
+
+                saw_record = true;
+
+                let unit = record.get(&*SYSTEMD_UNIT);
+                if filter_unit(unit, &self.include_units, &self.exclude_units) {
+                    continue;
+                }
+
+                emit!(JournaldEventReceived {
+                    byte_size: text.len()
+                });
+
+                match self.out.send(create_event(record)).await {
+                    Ok(_) => {}
+                    Err(error) => {
+                        error!(message = "Could not send journald log", %error);
+                        return Err(());
+                    }
+                }
+            }
+
+            if saw_record {
+                if let Some(cursor) = cursor {
+                    if let Err(error) = checkpointer.set(&cursor).await {
+                        error!(
+                            message = "Could not set journald checkpoint.",
+                            %error,
+                            filename = ?checkpointer.filename,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+type StopJournalctlFn = Box<dyn FnOnce() + Send>;
+
+fn start_journalctl(
+    path: PathBuf,
+    current_boot_only: bool,
+    cursor: Option<String>,
+) -> crate::Result<(BoxStream<'static, io::Result<String>>, StopJournalctlFn)> {
+    let mut command = Command::new(path);
+    command.stdout(Stdio::piped());
+    command.arg("--follow");
+    command.arg("--all");
+    command.arg("--show-cursor");
+    command.arg("--output=json");
+
+    if current_boot_only {
+        command.arg("--boot");
+    }
+
+    if let Some(cursor) = cursor {
+        command.arg(format!("--after-cursor={}", cursor));
+    } else {
+        // journalctl --follow only outputs a few lines without a starting point
+        command.arg("--since=2000-01-01");
+    }
+
+    let mut child = command.spawn().context(JournalctlSpawn)?;
+
+    let stream = FramedRead::new(
+        child.stdout.take().unwrap(),
+        BytesDelimitedCodec::new(b'\n'),
+    )
+    .and_then(|bytes| future::ok(String::from_utf8_lossy(&bytes).into_owned()))
+    .boxed();
+
+    let pid = Pid::from_raw(child.id() as i32);
+    let stop = Box::new(move || {
+        let _ = kill(pid, Signal::SIGTERM);
+    });
+
+    Ok((stream, stop))
 }
 
 async fn journald_source<J: JournalStream>(
