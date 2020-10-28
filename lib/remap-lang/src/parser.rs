@@ -316,10 +316,7 @@ impl Parser<'_> {
                     'n' => escaped_chars.push('\n'),
                     't' => escaped_chars.push('\t'),
                     '"' => escaped_chars.push('"'),
-                    // This isn't reachable currently due to the explicit list of
-                    // allowed escape chars in our parser grammar. However, if that
-                    // changes then we might need to rely on this error.
-                    _ => return Err(Error::EscapeChar(c)),
+                    _ => return Err(e(Rule::char)),
                 }
                 is_escaped = false;
             } else if c == '\\' {
