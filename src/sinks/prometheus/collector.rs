@@ -1,9 +1,12 @@
+use super::proto;
 use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
+
+const METRIC_NAME_LABEL: &str = "__name__";
 
 pub(super) trait MetricCollector {
     fn new() -> Self;
@@ -248,6 +251,70 @@ impl StringCollector {
 
         writeln!(&mut self.result, "# HELP {} {}", fullname, name).ok();
         writeln!(&mut self.result, "# TYPE {} {}", fullname, r#type).ok();
+    }
+}
+
+type Labels = Vec<proto::Label>;
+
+pub(super) struct TimeSeries {
+    buffer: HashMap<Labels, Vec<proto::Sample>>,
+}
+
+impl TimeSeries {
+    fn make_labels(
+        tags: &Option<BTreeMap<String, String>>,
+        name: &str,
+        suffix: &str,
+        extra: Option<(&str, String)>,
+    ) -> Labels {
+        // Each Prometheus metric is grouped by its labels, which
+        // contains all the labels from the source metric, plus the name
+        // label for the actual metric name. For convenience below, an
+        // optional extra tag is added.
+        let mut labels = tags.clone().unwrap_or_default();
+        labels.insert(METRIC_NAME_LABEL.into(), [name, suffix].join(""));
+        if let Some((name, value)) = extra {
+            labels.insert(name.into(), value);
+        }
+
+        // Extract the labels into a vec and sort to produce a
+        // consistent key for the buffer.
+        let mut labels = labels
+            .into_iter()
+            .map(|(name, value)| proto::Label { name, value })
+            .collect::<Labels>();
+        labels.sort();
+        labels
+    }
+
+    pub(super) fn finish(self) -> Vec<proto::TimeSeries> {
+        self.buffer
+            .into_iter()
+            .map(|(labels, samples)| proto::TimeSeries { labels, samples })
+            .collect()
+    }
+}
+
+impl MetricCollector for TimeSeries {
+    fn new() -> Self {
+        Self {
+            buffer: Default::default(),
+        }
+    }
+
+    fn emit(
+        &mut self,
+        timestamp: i64,
+        name: &str,
+        suffix: &str,
+        value: f64,
+        tags: &Option<BTreeMap<String, String>>,
+        extra: Option<(&str, String)>,
+    ) {
+        self.buffer
+            .entry(Self::make_labels(tags, name, suffix, extra))
+            .or_default()
+            .push(proto::Sample { value, timestamp });
     }
 }
 

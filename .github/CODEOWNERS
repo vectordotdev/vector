@@ -121,6 +121,7 @@
 /src/sinks/splunk_hec.rs @ktff
 /src/sinks/kafka.rs @lukesteensen
 /src/sinks/prometheus/collector.rs @bruceg
+/src/sinks/prometheus/remote_write.rs @bruceg
 /src/sinks/prometheus/sink.rs @lukesteensen
 /src/sinks/splunk_hec.rs @lukesteensen
 /src/sinks/statsd.rs @lukesteensen
