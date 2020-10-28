@@ -77,7 +77,7 @@ components: sources: http: {
 		}
 		headers: {
 			common:      false
-			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names. An empty string will be inserted into the log event if the corresponding HTTP header was missing."
+			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names."
 			required:    false
 			type: array: {
 				default: null
@@ -109,6 +109,15 @@ components: sources: http: {
 						}
 					}
 				}
+			}
+		}
+		query_parameters: {
+			common:      false
+			description: "A list of URL query parameters to include in the log event. These will override any values included in the body with conflicting names."
+			required:    false
+			type: array: {
+				default: null
+				items: type: string: examples: ["application", "source"]
 			}
 		}
 	}

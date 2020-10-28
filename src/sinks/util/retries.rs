@@ -103,12 +103,12 @@ where
 
                 match self.logic.should_retry_response(response) {
                     RetryAction::Retry(reason) => {
-                        warn!(message = "Retrying after response.", %reason);
+                        warn!(message = "Retrying after response.", reason = %reason);
                         Some(self.build_retry())
                     }
 
                     RetryAction::DontRetry(reason) => {
-                        error!(message = "Not retriable; dropping the request.", %reason);
+                        error!(message = "Not retriable; dropping the request.", reason = ?reason);
                         None
                     }
 
@@ -117,23 +117,29 @@ where
             }
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", %error);
+                    error!(message = "Retries exhausted; dropping the request.", error = ?error);
                     return None;
                 }
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
-                        warn!("Retrying after error: {}", expected);
+                        warn!(message = "Retrying after error.", error = ?expected);
                         Some(self.build_retry())
                     } else {
-                        error!(message = "Non-retriable error; dropping the request.", %error);
+                        error!(
+                            message = "Non-retriable error; dropping the request.",
+                            error = ?error
+                        );
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!("Request timed out.");
                     Some(self.build_retry())
                 } else {
-                    error!(message = "Unexpected error type; dropping the request.", %error);
+                    error!(
+                        message = "Unexpected error type; dropping the request.",
+                        error = ?error
+                    );
                     None
                 }
             }

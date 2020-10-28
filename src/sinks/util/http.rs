@@ -304,7 +304,7 @@ mod test {
                 async move {
                     let body = hyper::body::aggregate(req.into_body())
                         .await
-                        .map_err(|e| format!("error: {}", e))?;
+                        .map_err(|error| format!("error: {}", error))?;
                     let string = String::from_utf8(body.bytes().into())
                         .map_err(|_| "Wasn't UTF-8".to_string())?;
                     tx.try_send(string).map_err(|_| "Send error".to_string())?;
@@ -317,8 +317,8 @@ mod test {
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&addr).serve(new_service).await {
-                eprintln!("server error: {}", e);
+            if let Err(error) = Server::bind(&addr).serve(new_service).await {
+                eprintln!("Server error: {}", error);
             }
         });
 

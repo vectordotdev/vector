@@ -20,7 +20,7 @@ impl Function for ParseUrlFn {
         let bytes = required_value!(ctx, self.query, Value::Bytes(v) => v);
 
         Url::parse(&String::from_utf8_lossy(&bytes))
-            .map_err(|e| format!("unable to parse url: {}", e))
+            .map_err(|error| format!("unable to parse url: {}", error))
             .map(QueryValue::from_value)
     }
 

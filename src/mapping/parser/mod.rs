@@ -526,11 +526,11 @@ pub fn parse(input: &str) -> Result<Mapping> {
         // parse error. Since we have several different sets of arithmetic
         // operator rules we first remove all but one type and then we rename it
         // to a more general 'operator' rule.
-        Err(mut err) => {
+        Err(mut error) => {
             if let ErrorVariant::ParsingError {
                 ref mut positives,
                 negatives: _,
-            } = err.variant
+            } = error.variant
             {
                 let mut i = 0;
                 while i != positives.len() {
@@ -546,11 +546,11 @@ pub fn parse(input: &str) -> Result<Mapping> {
                     };
                 }
             }
-            err = err.renamed_rules(|rule| match *rule {
+            error = error.renamed_rules(|rule| match *rule {
                 Rule::arithmetic_operator_product => "operator".to_owned(),
                 _ => format!("{:?}", rule),
             });
-            Err(format!("mapping parse error\n{}", err))
+            Err(format!("mapping parse error\n{}", error))
         }
     }
 }
@@ -1328,7 +1328,7 @@ mod tests {
         for (mapping, exp) in cases {
             match parse(mapping) {
                 Ok(p) => assert_eq!(format!("{:?}", p), format!("{:?}", exp), "{}", mapping),
-                Err(e) => panic!("{}, mapping: {}", e, mapping),
+                Err(error) => panic!("{}, mapping: {}", error, mapping),
             }
         }
     }

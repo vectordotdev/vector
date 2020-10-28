@@ -140,7 +140,7 @@ fn apache_metrics(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_map_err(|error| error!(message = "Error sending metric.", error = ?error))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
@@ -251,7 +251,7 @@ fn apache_metrics(
         })
         .flatten()
         .forward(out)
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending."));
 
     Box::new(task.boxed().compat())
 }
@@ -328,8 +328,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", error = ?error);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -373,10 +373,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                         );
                         assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
                     }
-                    None => error!("no tags for metric {:?}", m),
+                    None => error!(message = "No tags for metric.", metric = ?m),
                 }
             }
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
         }
     }
 
@@ -396,8 +396,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", error = ?error);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -434,7 +434,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
         match metrics.iter().find(|m| m.name == "apache_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
         }
     }
 
@@ -472,7 +472,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         match metrics.iter().find(|m| m.name == "custom_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 0.0 }),
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
         }
     }
 }

@@ -348,7 +348,7 @@ impl IpCidrPredicate {
         };
         let cidrs = match cidr_strings.iter().map(IpCidr::from_str).collect() {
             Ok(v) => v,
-            Err(e) => return Err(format!("Invalid IP CIDR: {}", e)),
+            Err(error) => return Err(format!("Invalid IP CIDR: {}", error)),
         };
         Ok(Box::new(Self { target, cidrs }))
     }
@@ -450,7 +450,7 @@ fn build_predicate(
         "contains" => ContainsPredicate::new(target, arg),
         "prefix" => {
             warn!(
-                message = "The \"prefix\" comparison predicate is deprecated, use \"starts_with\" instead",
+                message = "The `prefix` comparison predicate is deprecated, use `starts_with` instead.",
                 %target,
             );
             StartsWithPredicate::new(target, arg)

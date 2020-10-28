@@ -68,7 +68,7 @@ impl Function for ParseDurationFn {
             .ok_or(format!("unable to parse duration: '{}'", value))?;
 
         let value = Decimal::from_str(&captures["value"])
-            .map_err(|e| format!("unable to parse number: {}", e))?;
+            .map_err(|error| format!("unable to parse number: {}", error))?;
 
         let unit = UNITS
             .get(&captures["unit"])

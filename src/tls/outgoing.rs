@@ -19,7 +19,7 @@ impl MaybeTlsSettings {
                     .await
                     .context(Handshake)?;
 
-                debug!(message = "Negotiated TLS");
+                debug!(message = "Negotiated TLS.");
 
                 Ok(MaybeTlsStream::Tls(stream))
             }

@@ -101,8 +101,10 @@ where
             create_event(Bytes::from(line), &host_key, &hostname)
         })
         .forward(
-            out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
-                .sink_compat(),
+            out.sink_map_err(
+                |error| error!(message = "Unable to send event to out.", error = ?error),
+            )
+            .sink_compat(),
         )
         .inspect(|_| info!("Finished sending"));
 

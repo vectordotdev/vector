@@ -291,10 +291,10 @@ pub mod service_control {
 
         match exit_code {
             ServiceExitCode::Win32(ec) if ec != NO_ERROR => {
-                warn!(message = "Service stopped with error", exit_code = ec);
+                warn!(message = "Service stopped with error.", exit_code = ec);
             }
             ServiceExitCode::ServiceSpecific(ec) => {
-                warn!(message = "Service stopped with error", exit_code = ec);
+                warn!(message = "Service stopped with error.", exit_code = ec);
             }
             _ => {}
         };
@@ -315,8 +315,7 @@ pub mod service_control {
                 break PollStatus::NoTimeout(service_status);
             }
             debug!(
-                "Waiting for service to transition to state {:?}... {}",
-                state, wait_index
+                message = "Waiting for service to transition.", to = ?state, wait_index = %wait_index
             );
             wait_index += 1;
 

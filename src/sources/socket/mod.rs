@@ -487,7 +487,7 @@ mod test {
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
         let bind = next_addr();
         let socket = UdpSocket::bind(bind)
-            .map_err(|e| panic!("{:}", e))
+            .map_err(|error| panic!("{:}", error))
             .ok()
             .unwrap();
 
@@ -495,7 +495,7 @@ mod test {
             assert_eq!(
                 socket
                     .send_to(line.as_bytes(), addr)
-                    .map_err(|e| panic!("{:}", e))
+                    .map_err(|error| panic!("{:}", error))
                     .ok()
                     .unwrap(),
                 line.as_bytes().len()
