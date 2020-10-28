@@ -29,7 +29,7 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 
-const MESSAGE_GROUP_ID: &'static str = "vector-sinks-aws-sqs------------------------------------------------------------------------------------------------------------";
+const MESSAGE_GROUP_ID: &str = "vector-sinks-aws-sqs------------------------------------------------------------------------------------------------------------";
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
