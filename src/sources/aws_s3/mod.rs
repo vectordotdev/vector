@@ -17,31 +17,23 @@ use std::convert::TryInto;
 
 pub mod sqs;
 
-#[derive(Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
+#[derivative(Default)]
 pub enum Compression {
+    #[derivative(Default)]
     Auto,
     None,
     Gzip,
     Zstd,
 }
 
-impl Default for Compression {
-    fn default() -> Self {
-        Compression::Auto
-    }
-}
-
-#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+#[derive(Derivative, Copy, Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[derivative(Default)]
 enum Strategy {
+    #[derivative(Default)]
     Sqs,
-}
-
-impl Default for Strategy {
-    fn default() -> Self {
-        Strategy::Sqs
-    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -81,7 +73,7 @@ impl SourceConfig for AwsS3Config {
             .multiline
             .as_ref()
             .map(|config| config.try_into())
-            .map_or(Ok(None), |r| r.map(Some))?;
+            .transpose()?;
 
         match self.strategy {
             Strategy::Sqs => Ok(Box::new(
@@ -108,24 +100,25 @@ impl AwsS3Config {
         &self,
         multiline: Option<line_agg::Config>,
     ) -> Result<sqs::Ingestor, CreateSqsIngestorError> {
+        use std::sync::Arc;
+
+        let region: Region = (&self.region).try_into().context(RegionParse {})?;
+        let resolver = Resolver;
+
+        let client = rusoto::client(resolver).with_context(|| Client {})?;
+        let creds: Arc<rusoto::AwsCredentialsProvider> =
+            rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())
+                .context(Credentials {})?
+                .into();
+        let s3_client = S3Client::new_with(
+            client.clone(),
+            Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
+            region.clone(),
+        );
+
         match self.sqs {
             Some(ref sqs) => {
-                use std::sync::Arc;
-
-                let region: Region = (&self.region).try_into().context(RegionParse {})?;
-                let resolver = Resolver;
-
-                let client = rusoto::client(resolver).with_context(|| Client {})?;
-                let creds: Arc<rusoto::AwsCredentialsProvider> =
-                    rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())
-                        .context(Credentials {})?
-                        .into();
                 let sqs_client = SqsClient::new_with(
-                    client.clone(),
-                    Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
-                    region.clone(),
-                );
-                let s3_client = S3Client::new_with(
                     client.clone(),
                     Arc::<rusoto::AwsCredentialsProvider>::clone(&creds),
                     region.clone(),
@@ -155,9 +148,9 @@ enum CreateSqsIngestorError {
     Client { source: crate::Error },
     #[snafu(display("Unable to create AWS credentials provider: {}", source))]
     Credentials { source: crate::Error },
-    #[snafu(display("sqs configuration required when strategy=sqs"))]
+    #[snafu(display("Configuration for `sqs` required when strategy=sqs"))]
     ConfigMissing,
-    #[snafu(display("could not parse region configuration: {}", source))]
+    #[snafu(display("Could not parse region configuration: {}", source))]
     RegionParse { source: rusoto::region::ParseError },
 }
 
@@ -172,10 +165,11 @@ fn s3_object_decoder(
 
     let r = tokio::io::BufReader::new(body.into_async_read());
 
-    let mut compression = compression;
-    if let Auto = compression {
-        compression =
-            determine_compression(key, content_encoding, content_type).unwrap_or(Compression::None);
+    let compression = match compression {
+        Auto => {
+            determine_compression(content_encoding, content_type, key).unwrap_or(Compression::None)
+        }
+        _ => compression,
     };
 
     use Compression::*;
@@ -194,13 +188,13 @@ fn s3_object_decoder(
 ///
 /// It will use this information in this order
 fn determine_compression(
-    key: &str,
     content_encoding: Option<&str>,
     content_type: Option<&str>,
+    key: &str,
 ) -> Option<Compression> {
     content_encoding
-        .and_then(|e| content_encoding_to_compression(e))
-        .or_else(|| content_type.and_then(|t| content_type_to_compression(t)))
+        .and_then(content_encoding_to_compression)
+        .or_else(|| content_type.and_then(content_type_to_compression))
         .or_else(|| object_key_to_compression(key))
 }
 
@@ -251,10 +245,15 @@ mod test {
             ("out.log.gz", None, None, Some(Compression::Gzip)),
             ("out.txt", None, None, None),
         ];
-        for (key, content_encoding, content_type, expected) in cases {
+        for case in cases {
+            let (key, content_encoding, content_type, expected) = case;
             assert_eq!(
-                super::determine_compression(key, content_encoding, content_type),
-                expected
+                super::determine_compression(content_encoding, content_type, key),
+                expected,
+                "key={:?} content_encoding={:?} content_type={:?}",
+                key,
+                content_encoding,
+                content_type,
             );
         }
     }
@@ -328,7 +327,7 @@ mod integration_tests {
         .await;
     }
 
-    async fn config(queue_name: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
+    fn config(queue_name: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             strategy: Strategy::Sqs,
@@ -358,7 +357,7 @@ mod integration_tests {
         let queue = create_queue(&sqs).await;
         let bucket = create_bucket(&s3, &queue).await;
 
-        let config = config(&queue, multiline).await;
+        let config = config(&queue, multiline);
 
         s3.put_object(PutObjectRequest {
             bucket: bucket.to_owned(),

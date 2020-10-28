@@ -11,7 +11,7 @@ components: sources: aws_s3: {
 			checkpoint: enabled: false
 			from: {
 				name:     "AWS S3"
-				thing:    "a \(name) bucket"
+				thing:    "an \(name) bucket"
 				url:      urls.aws_s3
 				versions: null
 

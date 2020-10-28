@@ -1,6 +1,6 @@
 #[cfg(feature = "sources-aws_s3")]
 pub mod source {
-    use super::InternalEvent;
+    use crate::internal_events::InternalEvent;
     use crate::sources::aws_s3::sqs::ProcessingError;
     use metrics::counter;
     use rusoto_core::RusotoError;

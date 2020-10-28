@@ -31,32 +31,25 @@ use std::{convert::TryInto, time::Duration};
 use tokio::{select, time};
 use tokio_util::codec::FramedRead;
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Derivative, Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct Config {
-    pub queue_name: String,
-    pub queue_owner: Option<String>,
-    #[serde(default = "default_poll_interval_secs")]
-    pub poll_secs: u64,
-    #[serde(default = "default_visibility_timeout_secs")]
-    pub visibility_timeout_secs: u64,
-    #[serde(default = "default_true")]
-    pub delete_message: bool,
-}
+pub(super) struct Config {
+    pub(super) queue_name: String,
+    pub(super) queue_owner: Option<String>,
 
-const fn default_poll_interval_secs() -> u64 {
-    15
-}
-
-const fn default_visibility_timeout_secs() -> u64 {
-    300
-}
-const fn default_true() -> bool {
-    true
+    #[serde(default)]
+    #[derivative(Default(value = "15"))]
+    pub(super) poll_secs: u64,
+    #[serde(default)]
+    #[derivative(Default(value = "300"))]
+    pub(super) visibility_timeout_secs: u64,
+    #[serde(default)]
+    #[derivative(Default(value = "true"))]
+    pub(super) delete_message: bool,
 }
 
 #[derive(Debug, Snafu)]
-pub enum IngestorNewError {
+pub(super) enum IngestorNewError {
     #[snafu(display("Unable to fetch queue URL for {}: {}", name, source))]
     FetchQueueUrl {
         source: RusotoError<GetQueueUrlError>,
@@ -108,7 +101,7 @@ pub enum ProcessingError {
     },
 }
 
-pub struct Ingestor {
+pub(super) struct Ingestor {
     region: Region,
 
     s3_client: S3Client,
@@ -124,7 +117,7 @@ pub struct Ingestor {
 }
 
 impl Ingestor {
-    pub async fn new(
+    pub(super) async fn new(
         region: Region,
         sqs_client: SqsClient,
         s3_client: S3Client,
@@ -177,7 +170,7 @@ impl Ingestor {
         })
     }
 
-    pub async fn run(self, out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
+    pub(super) async fn run(self, out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut interval = time::interval(self.poll_interval).map(|_| ());
 
         loop {
@@ -323,7 +316,7 @@ impl Ingestor {
 
         match object.body {
             Some(body) => {
-                let r = super::s3_object_decoder(
+                let object_reader = super::s3_object_decoder(
                     self.compression,
                     &s3_event.s3.object.key,
                     object.content_encoding.as_deref(),
@@ -345,10 +338,10 @@ impl Ingestor {
                 // the offset of the object that has been read, but this would only be relevant in
                 // the case that the same vector instance processes the same message.
                 let mut read_error: Option<String> = None;
-                let mut lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
-                    FramedRead::new(r, BytesDelimitedCodec::new(b'\n'))
-                        .take_while(|r| {
-                            futures::future::ready(match r {
+                let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
+                    FramedRead::new(object_reader, BytesDelimitedCodec::new(b'\n'))
+                        .take_while(|res| {
+                            futures::future::ready(match res {
                                 Ok(_) => true,
                                 Err(err) => {
                                     read_error = Some(err.to_string());
@@ -358,15 +351,17 @@ impl Ingestor {
                         })
                         .map(|r| r.unwrap()), // validated by take_while
                 );
-                if let Some(config) = &self.multiline {
-                    lines = Box::new(
+
+                let lines = match &self.multiline {
+                    Some(config) => Box::new(
                         LineAgg::new(
                             lines.map(|line| ((), line, ())),
                             line_agg::Logic::new(config.clone()),
                         )
                         .map(|(_src, line, _context)| line),
-                    );
-                }
+                    ),
+                    None => lines,
+                };
 
                 let stream = lines.filter_map(|line| {
                     let mut event = Event::from(line);
@@ -474,7 +469,7 @@ impl<'de> Deserialize<'de> for S3EventName {
 
         let kind = parts
             .next()
-            .ok_or_else(|| D::Error::custom("Missing event type"))?
+            .ok_or_else(|| D::Error::custom("Missing event kind"))?
             .parse::<String>()
             .map_err(D::Error::custom)?;
 
