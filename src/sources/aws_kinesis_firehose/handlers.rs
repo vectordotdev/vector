@@ -26,16 +26,16 @@ pub async fn firehose(
     let request_id = request_id.clone();
     out.send_all(futures01::stream::iter_ok(events))
         .compat()
-        .map_err(|err| {
-            let err = RequestError::ShuttingDown {
+        .map_err(|error| {
+            let error = RequestError::ShuttingDown {
                 request_id: request_id.clone(),
-                source: err,
+                source: error,
             };
             // can only fail if receiving end disconnected, so we are shutting down,
             // probably not gracefully.
-            error!("Failed to forward events, downstream is closed");
-            error!("Tried to send the following event: {:?}", err);
-            warp::reject::custom(err)
+            error!(message = "Failed to forward events, downstream is closed.");
+            error!(message = "Tried to send the following event.", error = ?error);
+            warp::reject::custom(error)
         })
         .map_ok(|_| {
             warp::reply::json(&FirehoseResponse {

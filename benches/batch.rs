@@ -41,7 +41,7 @@ fn batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
                 let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
@@ -86,7 +86,7 @@ fn partitioned_batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
                 let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },

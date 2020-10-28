@@ -28,7 +28,7 @@ impl InternalEvent for RemapFailedMapping {
 
         warn!(
             message,
-            %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         )
     }

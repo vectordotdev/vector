@@ -139,7 +139,9 @@ impl CloudWatchMetricsSvc {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("CloudwatchMetrics sink error: {}", e));
+            .sink_map_err(
+                |error| error!(message = "CloudwatchMetrics sink error.", error = ?error),
+            );
 
         Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
@@ -219,7 +221,7 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
             return future::ready(Ok(())).boxed();
         }
 
-        debug!(message = "Sending data.", ?input);
+        debug!(message = "Sending data.", input = ?input);
         let client = self.client.clone();
         Box::pin(async move { client.put_metric_data(input).await })
     }

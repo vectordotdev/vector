@@ -140,9 +140,12 @@ impl GcpCredentials {
         let task = interval.for_each(move |_| {
             let this = this.clone();
             async move {
-                debug!("Renewing GCP authentication token");
+                debug!("Renewing GCP authentication token.");
                 if let Err(error) = this.regenerate_token().await {
-                    error!(message = "Failed to update GCP authentication token", %error);
+                    error!(
+                        message = "Failed to update GCP authentication token.",
+                        ?error
+                    );
                 }
             }
         });

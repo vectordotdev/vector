@@ -216,7 +216,7 @@ impl S3SinkConfig {
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+            .sink_map_err(|error| error!(message = "Sink failed to flush.", error = ?error));
 
         Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
@@ -336,7 +336,7 @@ fn build_request(
     let key = format!("{}{}.{}", key, filename, extension);
 
     debug!(
-        message = "sending events.",
+        message = "Sending events.",
         bytes = ?inner.len(),
         bucket = ?bucket,
         key = ?key

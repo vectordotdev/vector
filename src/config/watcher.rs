@@ -43,7 +43,7 @@ pub fn spawn_thread(
         if let Some((mut watcher, receiver)) = watcher.take() {
             while let Ok(RawEvent { op: Ok(event), .. }) = receiver.recv() {
                 if event.intersects(Op::CREATE | Op::REMOVE | Op::WRITE | Op::CLOSE_WRITE) {
-                    debug!(message = "Configuration file change detected.", ?event);
+                    debug!(message = "Configuration file change detected.", event = ?event);
 
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
@@ -51,14 +51,14 @@ pub fn spawn_thread(
                     // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = add_paths(&mut watcher, &config_paths) {
-                        error!(message = "Failed to read files to watch.", ?error);
+                        error!(message = "Failed to read files to watch.", error = ?error);
                         break;
                     }
 
                     info!("Configuration file changed.");
                     raise_sighup();
                 } else {
-                    debug!(message = "Ignoring event.", ?event)
+                    debug!(message = "Ignoring event.", event = ?event)
                 }
             }
         }
@@ -66,7 +66,7 @@ pub fn spawn_thread(
         thread::sleep(RETRY_TIMEOUT);
 
         watcher = create_watcher(&config_paths)
-            .map_err(|error| error!(message = "Failed to create file watcher.", ?error))
+            .map_err(|error| error!(message = "Failed to create file watcher.", error = ?error))
             .ok();
 
         if watcher.is_some() {

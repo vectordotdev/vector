@@ -12,7 +12,7 @@ pub struct PrometheusEventReceived {
 
 impl InternalEvent for PrometheusEventReceived {
     fn emit_logs(&self) {
-        debug!(message = "Scraped events.", ?self.count);
+        debug!(message = "Scraped events.", count = ?self.count);
     }
 
     fn emit_metrics(&self) {
@@ -47,7 +47,7 @@ pub struct PrometheusParseError<'a> {
 
 impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit_logs(&self) {
-        error!(message = "Parsing error.", url = %self.url, error = %self.error);
+        error!(message = "Parsing error.", url = %self.url, error = ?self.error);
         debug!(
             message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
             url = %self.url,
@@ -84,7 +84,7 @@ pub struct PrometheusHttpError {
 
 impl InternalEvent for PrometheusHttpError {
     fn emit_logs(&self) {
-        error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
+        error!(message = "HTTP request processing error.", url = %self.url, error = ?self.error);
     }
 
     fn emit_metrics(&self) {

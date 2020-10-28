@@ -140,9 +140,9 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     let mut decoder = BytesDelimitedCodec::new(b'\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
-            Err(e) => Some(Err(ErrorMessage::new(
+            Err(error) => Some(Err(ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", e),
+                format!("Bad request: {}", error),
             ))),
             Ok(Some(b)) => Some(Ok(b)),
             Ok(None) => None, // actually done
@@ -163,13 +163,13 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
                 let parsed_json = serde_json::from_slice(&j?)
-                    .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))?;
+                    .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
                 json_parse_object(parsed_json)
             })
             .collect::<Result<_, _>>(),
         Encoding::Json => {
             let parsed_json = serde_json::from_slice(&body)
-                .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))?;
+                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
             json_parse_array_of_object(parsed_json)
         }
     }
