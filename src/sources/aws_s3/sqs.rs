@@ -19,6 +19,7 @@ use futures::{
     stream::{Stream, StreamExt},
 };
 use futures01::Sink;
+use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
 use rusoto_sqs::{
@@ -30,6 +31,11 @@ use snafu::{ResultExt, Snafu};
 use std::{convert::TryInto, time::Duration};
 use tokio::{select, time};
 use tokio_util::codec::FramedRead;
+
+lazy_static! {
+    static ref SUPPORTED_S3S_EVENT_VERSION: semver::VersionReq =
+        semver::VersionReq::parse("~2").unwrap();
+}
 
 #[derive(Derivative, Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -99,6 +105,8 @@ pub enum ProcessingError {
         bucket: String,
         key: String,
     },
+    #[snafu(display("Unsupported S3 event version: {}.", version,))]
+    UnsupportedS3EventVersion { version: semver::Version },
 }
 
 pub(super) struct Ingestor {
@@ -271,6 +279,12 @@ impl Ingestor {
         s3_event: S3EventRecord,
         out: Pipeline,
     ) -> Result<(), ProcessingError> {
+        if !SUPPORTED_S3S_EVENT_VERSION.matches(&s3_event.event_version) {
+            return Err(ProcessingError::UnsupportedS3EventVersion {
+                version: s3_event.event_version.clone(),
+            });
+        }
+
         if s3_event.event_name.kind != "ObjectCreated" {
             emit!(SqsS3EventRecordIgnoredInvalidEvent {
                 bucket: &s3_event.s3.bucket.name,
@@ -438,7 +452,7 @@ struct S3Event {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct S3EventRecord {
-    event_version: String, // TODO compare >=
+    event_version: semver::Version,
     event_source: String,
     aws_region: String,
     event_name: S3EventName,
