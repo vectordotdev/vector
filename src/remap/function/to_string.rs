@@ -1,6 +1,6 @@
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ToString;
 
 impl Function for ToString {

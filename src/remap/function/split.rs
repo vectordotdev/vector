@@ -1,7 +1,7 @@
 use remap::prelude::*;
 use std::convert::{TryFrom, TryInto};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Split;
 
 impl Function for Split {

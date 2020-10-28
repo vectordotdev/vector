@@ -12,8 +12,8 @@ use std::str::FromStr;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "../grammar.pest"]
-pub(super) struct Parser {
-    pub function_definitions: Vec<Box<dyn Fn>>,
+pub(super) struct Parser<'a> {
+    pub function_definitions: &'a [Box<dyn Fn>],
 }
 
 type R = Rule;
@@ -54,7 +54,7 @@ macro_rules! operation_fns {
     );
 }
 
-impl Parser {
+impl Parser<'_> {
     /// Converts the set of known "root" rules into boxed [`Expression`] trait
     /// objects.
     pub(crate) fn pairs_to_expressions(&self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
@@ -316,10 +316,7 @@ impl Parser {
                     'n' => escaped_chars.push('\n'),
                     't' => escaped_chars.push('\t'),
                     '"' => escaped_chars.push('"'),
-                    // This isn't reachable currently due to the explicit list of
-                    // allowed escape chars in our parser grammar. However, if that
-                    // changes then we might need to rely on this error.
-                    _ => return Err(Error::EscapeChar(c)),
+                    _ => return Err(e(Rule::char)),
                 }
                 is_escaped = false;
             } else if c == '\\' {

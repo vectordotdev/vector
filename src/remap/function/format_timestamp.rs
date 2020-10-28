@@ -2,7 +2,7 @@ use chrono::format::{strftime::StrftimeItems, Item};
 use chrono::{DateTime, Utc};
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct FormatTimestamp;
 
 impl Function for FormatTimestamp {

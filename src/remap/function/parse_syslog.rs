@@ -3,7 +3,7 @@ use remap::prelude::*;
 use std::collections::BTreeMap;
 use syslog_loose::{IncompleteDate, Message, ProcId};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ParseSyslog;
 
 impl Function for ParseSyslog {
