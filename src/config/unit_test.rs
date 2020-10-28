@@ -433,7 +433,11 @@ async fn build_unit_test(
                     );
                 }
                 Err(err) => {
-                    errors.push(format!("failed to build transform '{}': {}", name, err));
+                    errors.push(format!(
+                        "failed to build transform '{}': {:#}",
+                        name,
+                        anyhow::anyhow!(err)
+                    ));
                 }
             }
         }
