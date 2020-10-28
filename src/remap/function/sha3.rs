@@ -1,7 +1,7 @@
 use remap::prelude::*;
 use sha3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Sha3;
 
 impl Function for Sha3 {

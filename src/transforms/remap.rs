@@ -49,47 +49,8 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
-        // TODO: move this into a constant?
-        use crate::remap::*;
-        let definitions: Vec<Box<dyn remap::Function>> = vec![
-            Box::new(Split),
-            Box::new(Del),
-            Box::new(OnlyFields),
-            Box::new(ToString),
-            Box::new(ToInt),
-            Box::new(ToFloat),
-            Box::new(ToBool),
-            Box::new(ToTimestamp),
-            Box::new(Upcase),
-            Box::new(Downcase),
-            Box::new(UuidV4),
-            Box::new(Sha1),
-            Box::new(Md5),
-            Box::new(Now),
-            Box::new(FormatTimestamp),
-            Box::new(Contains),
-            Box::new(StartsWith),
-            Box::new(EndsWith),
-            Box::new(Slice),
-            Box::new(Tokenize),
-            Box::new(Sha2),
-            Box::new(Sha3),
-            Box::new(ParseDuration),
-            Box::new(FormatNumber),
-            Box::new(ParseUrl),
-            Box::new(Ceil),
-            Box::new(Floor),
-            Box::new(Round),
-            Box::new(ParseSyslog),
-            Box::new(ParseTimestamp),
-            Box::new(ParseJson),
-            Box::new(Truncate),
-            Box::new(StripWhitespace),
-            Box::new(StripAnsiEscapeCodes),
-        ];
-
         Ok(Remap {
-            program: Program::new(&config.source, definitions)?,
+            program: Program::new(&config.source, &crate::remap::FUNCTIONS_MUT)?,
             drop_on_err: config.drop_on_err,
         })
     }

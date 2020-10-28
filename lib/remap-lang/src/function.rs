@@ -91,7 +91,7 @@ impl TryInto<Box<dyn Expression>> for Argument {
     }
 }
 
-pub trait Function: std::fmt::Debug {
+pub trait Function: std::fmt::Debug + Sync + CloneFunction {
     /// The identifier by which the function can be called.
     fn identifier(&self) -> &'static str;
 
@@ -115,5 +115,24 @@ pub trait Function: std::fmt::Debug {
     /// resolved `Value` type is checked against the parameter properties.
     fn parameters(&self) -> &'static [Parameter] {
         &[]
+    }
+}
+
+pub trait CloneFunction {
+    fn clone_function(&self) -> Box<dyn Function>;
+}
+
+impl<T> CloneFunction for T
+where
+    T: Function + Clone + 'static,
+{
+    fn clone_function(&self) -> Box<dyn Function> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Function> {
+    fn clone(&self) -> Self {
+        self.clone_function()
     }
 }

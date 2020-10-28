@@ -259,3 +259,86 @@
       "mins.equals" = 5
       "maxs.equals" = 7
       "timestamp_end.exists" = true
+
+##------------------------------------------------------------------------------
+
+[transforms.ends_when_remap]
+  inputs = []
+  type = "reduce"
+  group_by = ["request_id"]
+
+  [transforms.ends_when_remap.ends_when]
+    "type" = "remap"
+    "source" = """
+        .test_end_message == true
+    """
+
+[[tests]]
+  name = "reduce_ends_when_remap"
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 1
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 3
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "2"
+      counter = 5
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 2
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "1"
+      counter = 7
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "2"
+      counter = 2
+      test_end_message = true
+
+  [[tests.inputs]]
+    insert_at = "ends_when_remap"
+    type = "log"
+    [tests.inputs.log_fields]
+      request_id = "3"
+      counter = 5
+      test_end_message = true
+
+  [[tests.outputs]]
+    extract_from = "ends_when_remap"
+    [[tests.outputs.conditions]]
+      "request_id.equals" = "1"
+      "counter.equals" = 6
+      "timestamp_end.exists" = true
+    [[tests.outputs.conditions]]
+      "request_id.equals" = "2"
+      "counter.equals" = 7
+      "test_end_message.exists" = true
+    [[tests.outputs.conditions]]
+      "request_id.equals" = "3"
+      "counter.equals" = 5
+      "test_end_message.exists" = true

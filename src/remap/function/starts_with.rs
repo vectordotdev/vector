@@ -1,6 +1,6 @@
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct StartsWith;
 
 impl Function for StartsWith {

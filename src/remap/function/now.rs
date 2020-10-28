@@ -1,7 +1,7 @@
 use chrono::Utc;
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Now;
 
 impl Function for Now {

@@ -13,7 +13,7 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn new(source: &str, function_definitions: Vec<Box<dyn Function>>) -> Result<Self> {
+    pub fn new(source: &str, function_definitions: &[Box<dyn Function>]) -> Result<Self> {
         let pairs = parser::Parser::parse(parser::Rule::program, source)
             .map_err(|s| Error::Parser(s.to_string()))?;
 

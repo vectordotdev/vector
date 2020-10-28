@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::iter::FromIterator;
 use url::Url;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct ParseUrl;
 
 impl Function for ParseUrl {

@@ -1,6 +1,6 @@
 use remap::prelude::*;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct EndsWith;
 
 impl Function for EndsWith {

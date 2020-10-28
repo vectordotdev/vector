@@ -2,7 +2,7 @@ use bytes::Bytes;
 use remap::prelude::*;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct FormatNumber;
 
 impl Function for FormatNumber {

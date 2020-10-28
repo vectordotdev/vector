@@ -6,9 +6,6 @@ pub enum Error {
     #[error("parser error: {0}")]
     Parser(String),
 
-    #[error("invalid escape char: {0}")]
-    EscapeChar(char),
-
     #[error("unexpected token sequence")]
     Rule(#[from] Rule),
 
