@@ -56,16 +56,19 @@ pub trait EncodingConfiguration<E> {
                 Event::Log(log_event) => {
                     let to_remove = log_event
                         .keys()
+                        .map(|field|  {
+                            let field_lookup = LookupBuf::from_str(&field)
+                                .expect("Got invalid Lookup from an EventLog iteration. This is an invariant. Please report it.");
+                            field_lookup
+                        })
                         .filter(|field| {
-                            let field_path = LookupBuf::from_str(field)
-                                .expect("Got invalid Lookup from an EventLog iteration. This is an invariant. Please report it."); 
                             !only_fields.iter().any(|only| {
-                                field_path.starts_with(only)
+                                field.starts_with(only)
                             })
                         })
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(removal, false);
+                        log_event.remove(&removal, false);
                     }
                 }
                 Event::Metric(_) => {
@@ -128,8 +131,7 @@ pub trait EncodingConfiguration<E> {
             (&self.only_fields(), &self.except_fields())
         {
             if except_fields.iter().any(|f| {
-                let path_iter = PathIter::new(f).collect::<Vec<_>>();
-                only_fields.iter().any(|v| v == &path_iter)
+                only_fields.iter().any(|v| v == f)
             }) {
                 return Err(
                     "`except_fields` and `only_fields` should be mutually exclusive.".into(),

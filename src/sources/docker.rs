@@ -52,7 +52,7 @@ pub struct DockerConfig {
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
-    partial_event_marker_field: Option<String>,
+    partial_event_marker_field: Option<LookupBuf>,
     auto_partial_merge: bool,
     multiline: Option<MultilineConfig>,
     retry_backoff_secs: u64,
@@ -93,15 +93,6 @@ impl DockerConfig {
         } else {
             true
         }
-    }
-
-    fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
-        if let Some(val) = &self.partial_event_marker_field {
-            if val.is_empty() {
-                self.partial_event_marker_field = None;
-            }
-        }
-        self
     }
 }
 
@@ -739,7 +730,7 @@ impl ContainerLogInfo {
     fn new_event(
         &mut self,
         log_output: LogOutput,
-        partial_event_marker_field: Option<String>,
+        partial_event_marker_field: Option<LookupBuf>,
         auto_partial_merge: bool,
         partial_event_merge_state: &mut Option<LogEventMergeState>,
     ) -> Option<Event> {
@@ -864,7 +855,7 @@ impl ContainerLogInfo {
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state
-                        .merge_in_next_event(log_event, &[log_schema().message_key().to_string()]);
+                        .merge_in_next_event(log_event, &[log_schema().message_key()]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -877,7 +868,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[log_schema().message_key().to_string()]),
+                    .merge_in_final_event(log_event, &[log_schema().message_key()]),
                 None => log_event,
             }
         } else {
@@ -907,7 +898,7 @@ impl ContainerLogInfo {
 
 struct ContainerMetadata {
     /// label.key -> String
-    labels: Vec<(String, Value)>,
+    labels: Vec<(LookupBuf, Value)>,
     /// name -> String
     name: Value,
     /// image -> String

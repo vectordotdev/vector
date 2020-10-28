@@ -355,7 +355,7 @@ fn create_event(line: Bytes, file: &str) -> Event {
     );
 
     // Add file.
-    event.as_mut_log().insert(*FILE_KEY.clone(), file.to_owned());
+    event.as_mut_log().insert(FILE_KEY.clone(), file.to_owned());
 
     event
 }

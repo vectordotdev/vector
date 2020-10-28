@@ -443,7 +443,7 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 
 fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     let (first, mut other) = split_inner_rules_from_pair(pair)?;
-    let to_path = target_path_from_pair(first).and_then(|v| LookupBuf::from_str(&v))?;
+    let to_path = target_path_from_pair(first).and_then(|v| LookupBuf::from_str(&v).map_err(|e| format!("{}", e)))?;
     let query2 = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
     let deep = match other.next() {
         None => None,
@@ -487,7 +487,7 @@ fn statement_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
         Rule::assignment => {
             let mut inner_rules = pair.into_inner();
             let path = target_path_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)
-                .and_then(|v| LookupBuf::from_str(v))?;
+                .and_then(|v| LookupBuf::from_str(&v).map_err(|e| format!("{:?}", e)))?;
             let query = query_arithmetic_from_pair(inner_rules.next().ok_or(TOKEN_ERR)?)?;
             Ok(Box::new(Assignment::new(path, query)))
         }

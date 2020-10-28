@@ -159,7 +159,7 @@ impl HttpSink for AzureMonitorLogsSink {
         // it seems like Azure Monitor doesn't support full 9-digit nanosecond precision
         // adjust the timestamp format accordingly, keeping only milliseconds
         let mut log = event.into_log();
-        let timestamp_key = log_schema().timestamp_key().into_buf();
+        let timestamp_key = log_schema().timestamp_key();
 
         let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(timestamp_key, false) {
             ts
@@ -170,7 +170,7 @@ impl HttpSink for AzureMonitorLogsSink {
         let mut entry = serde_json::json!(log);
         let object_entry = entry.as_object_mut().unwrap();
         object_entry.insert(
-            timestamp_key.clone(),
+            timestamp_key.to_string(),
             JsonValue::String(timestamp.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
         );
 

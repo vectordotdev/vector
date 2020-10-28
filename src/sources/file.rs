@@ -1,7 +1,7 @@
 use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{Event, Lookup},
+    event::{Event, Lookup, LookupBuf},
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -61,12 +61,12 @@ enum BuildError {
 pub struct FileConfig {
     pub include: Vec<PathBuf>,
     pub exclude: Vec<PathBuf>,
-    pub file_key: Option<String>,
+    pub file_key: Option<LookupBuf>,
     pub start_at_beginning: bool,
     pub ignore_older: Option<u64>, // secs
     #[serde(default = "default_max_line_bytes")]
     pub max_line_bytes: usize,
-    pub host_key: Option<String>,
+    pub host_key: Option<LookupBuf>,
     pub data_dir: Option<PathBuf>,
     pub glob_minimum_cooldown: u64, // millis
     // Deprecated name

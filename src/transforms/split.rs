@@ -38,7 +38,7 @@ impl TransformConfig for SplitConfig {
             .map_err(|err| format!("{}", err))?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.field_names.iter().any(|f| **f == *field);
+        let drop_field = self.drop_field && !self.field_names.iter().any(|f| *f == field);
 
         Ok(Box::new(Split::new(
             self.field_names.clone(),

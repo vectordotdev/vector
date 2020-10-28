@@ -58,12 +58,12 @@ impl TcpSource for RawTcpSource {
         let mut event = Event::from(frame);
 
         event.as_mut_log().insert(
-            crate::config::log_schema().source_type_key(),
+            crate::config::log_schema().source_type_key().into_buf(),
             Bytes::from("socket"),
         );
 
         let host_key = (self.config.host_key.clone())
-            .unwrap_or_else(|| crate::config::log_schema().host_key().to_string());
+            .unwrap_or_else(|| crate::config::log_schema().host_key().into_buf());
 
         event.as_mut_log().insert(host_key, host);
 

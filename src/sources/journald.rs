@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{Event, LogEvent, Value},
+    event::{Event, LogEvent, LookupBuf, Lookup, Value},
     internal_events::{JournaldEventReceived, JournaldInvalidRecord},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -39,14 +39,14 @@ const DEFAULT_BATCH_SIZE: usize = 16;
 
 const CHECKPOINT_FILENAME: &str = "checkpoint.txt";
 const CURSOR: &str = "__CURSOR";
-const HOSTNAME: &str = "_HOSTNAME";
-const MESSAGE: &str = "MESSAGE";
 const SYSTEMD_UNIT: &str = "_SYSTEMD_UNIT";
-const SOURCE_TIMESTAMP: &str = "_SOURCE_REALTIME_TIMESTAMP";
-const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
 lazy_static! {
     static ref JOURNALCTL: PathBuf = "journalctl".into();
+    static ref HOSTNAME: LookupBuf = LookupBuf::from("_HOSTNAME");
+    static ref MESSAGE: LookupBuf = LookupBuf::from("MESSAGE");
+    static ref SOURCE_TIMESTAMP: LookupBuf = LookupBuf::from("_SOURCE_REALTIME_TIMESTAMP");
+    static ref RECEIVED_TIMESTAMP: LookupBuf = LookupBuf::from("__REALTIME_TIMESTAMP");
 }
 
 #[derive(Debug, Snafu)]
@@ -217,8 +217,8 @@ fn create_event(record: Record) -> Event {
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
-        .get(&*SOURCE_TIMESTAMP)
-        .or_else(|| log.get(RECEIVED_TIMESTAMP))
+        .get(*SOURCE_TIMESTAMP)
+        .or_else(|| log.get(*RECEIVED_TIMESTAMP.as_lookup()))
     {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {
@@ -226,7 +226,7 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+                log.insert(log_schema().timestamp_key().into_buf(), Value::Timestamp(timestamp));
             }
         }
     }
