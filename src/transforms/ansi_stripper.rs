@@ -70,7 +70,7 @@ impl Transform for AnsiStripper {
                     }),
                 };
             }
-            _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
+            _ => emit!(ANSIStripperFieldInvalid { field: self.field.as_lookup() }),
         }
 
         emit!(ANSIStripperEventProcessed);

@@ -348,7 +348,7 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
     // Add source type
     event
         .as_mut_log()
-        .insert(log_schema().source_type_key().clone(), Bytes::from("syslog"));
+        .insert(log_schema().source_type_key().into_buf(), Bytes::from("syslog"));
 
     if let Some(default_host) = default_host.clone() {
         event.as_mut_log().insert(SOURCE_IP_LOOKUP.clone(), default_host);
@@ -365,7 +365,7 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
         .unwrap_or_else(Utc::now);
     event
         .as_mut_log()
-        .insert(log_schema().timestamp_key(), timestamp);
+        .insert(log_schema().timestamp_key().into_buf(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
 

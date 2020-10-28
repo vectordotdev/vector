@@ -77,7 +77,7 @@ pub fn udp(
 
                             event
                                 .as_mut_log()
-                                .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
+                                .insert(crate::config::log_schema().source_type_key().clone(), Bytes::from("socket"));
                             event
                                 .as_mut_log()
                                 .insert(host_key.clone(), address.to_string());

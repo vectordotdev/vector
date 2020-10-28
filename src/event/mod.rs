@@ -3,6 +3,7 @@ use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::collections::{BTreeMap, HashMap};
+use serde::{Serialize, Deserialize};
 
 pub mod discriminant;
 pub mod merge;

@@ -63,7 +63,7 @@ impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {
 
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParser {
-    field: String,
+    field: LookupBuf,
 }
 
 impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscriptionParser {

@@ -167,7 +167,7 @@ impl HttpSink for LogdnaConfig {
             );
         }
 
-        if !map.contains_key(APP_STR) && !map.contains_key(FILE_LOOKUP) {
+        if !map.contains_key(APP_STR) && !map.contains_key(FILE_STR) {
             if let Some(default_app) = &self.default_app {
                 map.insert(APP_STR.to_string(), json!(default_app.as_str()));
             } else {

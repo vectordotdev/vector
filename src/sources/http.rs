@@ -2,7 +2,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf, LogEvent},
     shutdown::ShutdownSignal,
     sources::util::{ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -69,7 +69,7 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event.as_mut_log().insert(key, Bytes::from("http"));
+                    event.as_mut_log().insert(key.clone(), Bytes::from("http"));
                 }
                 events
             })
@@ -114,7 +114,7 @@ fn add_headers(
             .unwrap_or_default();
         for event in events.iter_mut() {
             event.as_mut_log().insert(
-                header_name as &str,
+                LookupBuf::from(header_name),
                 Value::from(Bytes::from(value.to_owned())),
             );
         }
@@ -152,15 +152,15 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
             .collect::<Result<_, _>>(),
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
-                let parsed_json = serde_json::from_slice(&j?)
-                    .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))?;
-                serde_json::from_value(parsed_json)
+                serde_json::from_slice(&j?)
+                    .and_then(|parsed_json| serde_json::from_value(parsed_json))
+                    .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))
             })
             .collect::<Result<_, _>>(),
         Encoding::Json => {
-            let parsed_json = serde_json::from_slice(&body)
-                .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))?;
-            serde_json::from_value(parsed_json)
+            serde_json::from_slice(&body)
+                .and_then(|parsed_json| serde_json::from_value(parsed_json))
+                .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))
         }
     }
 }

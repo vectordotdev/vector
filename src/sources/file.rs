@@ -217,7 +217,7 @@ pub fn file_source(
     let host_key = config
         .host_key
         .clone()
-        .unwrap_or_else(|| log_schema().host_key().to_buf());
+        .unwrap_or_else(|| log_schema().host_key().into_buf());
     let hostname = crate::get_hostname().ok();
 
     let include = config.include.clone();
@@ -269,7 +269,7 @@ pub fn file_source(
             messages
                 .map(move |(msg, file): (Bytes, String)| {
                     let _enter = span2.enter();
-                    create_event(msg, file, host_key, &hostname, file_key)
+                    create_event(msg, file, &host_key, &hostname, &file_key)
                 })
                 .forward(out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())
@@ -295,9 +295,9 @@ pub fn file_source(
 fn create_event<'a>(
     line: Bytes,
     file: String,
-    host_key: &'a Lookup<'a>,
+    host_key: &LookupBuf,
     hostname: &Option<String>,
-    file_key: &'a Option<Lookup<'a>>,
+    file_key: &'a Option<LookupBuf>,
 ) -> Event {
     emit!(FileEventReceived {
         file: &file,

@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode},
     sources::util::{SocketListenAddr, TcpSource},
     tls::TlsConfig,
@@ -16,7 +16,7 @@ pub struct TcpConfig {
     pub max_length: usize,
     #[serde(default = "default_shutdown_timeout_secs")]
     pub shutdown_timeout_secs: u64,
-    pub host_key: Option<String>,
+    pub host_key: Option<LookupBuf>,
     pub tls: Option<TlsConfig>,
 }
 

@@ -171,7 +171,7 @@ impl HttpSink for HecSinkConfig {
         let fields = self
             .indexed_fields
             .iter()
-            .filter_map(|field| event.get(field).map(|value| (field.as_lookup(), value.clone())))
+            .filter_map(|field| event.get(field).map(|value| (field.clone(), value.clone())))
             .collect::<LogEvent>();
 
         let mut event = Event::Log(event);

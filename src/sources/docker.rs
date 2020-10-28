@@ -64,7 +64,7 @@ impl Default for DockerConfig {
             include_containers: None,
             include_labels: None,
             include_images: None,
-            partial_event_marker_field: Some(event::PARTIAL.to_string()),
+            partial_event_marker_field: Some(event::PARTIAL.clone()),
             auto_partial_merge: true,
             multiline: None,
             retry_backoff_secs: 2,
@@ -113,7 +113,7 @@ impl SourceConfig for DockerConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let source = DockerSource::new(
-            self.clone().with_empty_partial_event_marker_field_as_none(),
+            self.clone(),
             out,
             shutdown.clone(),
         )?;
@@ -920,7 +920,7 @@ impl ContainerMetadata {
                 map.iter()
                     .map(|(key, value)| {
                         let mut label = LookupBuf::from("label");
-                        let key = LookupBuf::from(key);
+                        let key = LookupBuf::from(key.clone());
                         label.extend(key);
                         (label, Value::from(value.to_owned()))
                     })

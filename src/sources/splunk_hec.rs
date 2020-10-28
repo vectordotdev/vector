@@ -27,10 +27,16 @@ use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filte
 
 // Event fields unique to splunk_hec source
 lazy_static::lazy_static! {
-    pub static ref CHANNEL: LookupBuf = LookupBuf::from("splunk_channel");
-    pub static ref INDEX: LookupBuf = LookupBuf::from("splunk_index");
-    pub static ref SOURCE: LookupBuf = LookupBuf::from("splunk_source");
-    pub static ref SOURCETYPE: LookupBuf = LookupBuf::from("splunk_sourcetype");
+    pub static ref SPLUNK_CHANNEL_LOOKUP: LookupBuf = LookupBuf::from("splunk_channel");
+    pub static ref SPLUNK_INDEX_LOOKUP: LookupBuf = LookupBuf::from("splunk_index");
+    pub static ref SPLUNK_SOURCE_LOOKUP: LookupBuf = LookupBuf::from("splunk_source");
+    pub static ref SPLUNK_SOURCETYPE_LOOKUP: LookupBuf = LookupBuf::from("splunk_sourcetype");
+    pub static ref HOST_LOOKUP: LookupBuf = LookupBuf::from("HOST");
+    pub static ref CHANNEL_LOOKUP: LookupBuf = LookupBuf::from("channel");
+    pub static ref INDEX_LOOKUP: LookupBuf = LookupBuf::from("index");
+    pub static ref SOURCE_LOOKUP: LookupBuf = LookupBuf::from("source");
+    pub static ref SOURCETYPE_LOOKUP: LookupBuf = LookupBuf::from("sourcetype");
+    pub static ref LINE_LOOKUP: LookupBuf = LookupBuf::from("line");
 }
 
 
@@ -341,10 +347,10 @@ impl<R: Read> EventStream<R> {
             channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
-                DefaultExtractor::new_with("host", log_schema().host_key(), host.map(Value::from)),
-                DefaultExtractor::new("index", &*INDEX),
-                DefaultExtractor::new("source", &*SOURCE),
-                DefaultExtractor::new("sourcetype", &*SOURCETYPE),
+                DefaultExtractor::new_with(&*HOST_LOOKUP, log_schema().host_key(), host.map(Value::from)),
+                DefaultExtractor::new(&*INDEX_LOOKUP, &*SPLUNK_INDEX_LOOKUP),
+                DefaultExtractor::new(&*SOURCE_LOOKUP, &*SPLUNK_SOURCE_LOOKUP),
+                DefaultExtractor::new(&*SOURCETYPE_LOOKUP, &*SPLUNK_SOURCETYPE_LOOKUP),
             ],
         }
     }
@@ -391,7 +397,7 @@ impl<R: Read> Stream for EventStream<R> {
         let log = event.as_mut_log();
 
         // Add source type
-        log.insert(log_schema().source_type_key(), Bytes::from("splunk_hec"));
+        log.insert(log_schema().source_type_key().into_buf(), Bytes::from("splunk_hec"));
 
         // Process event field
         match json.get_mut("event") {
@@ -400,7 +406,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(log_schema().message_key(), string);
+                    log.insert(log_schema().message_key().into_buf(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -408,20 +414,20 @@ impl<R: Read> Stream for EventStream<R> {
                     }
 
                     // Add 'line' value as 'event::schema().message_key'
-                    if let Some(line) = object.remove("line") {
+                    if let Some(line) = object.remove(&LINE_LOOKUP) {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
                             JsonValue::Array(_) | JsonValue::Object(_) => {
-                                log.insert("line", line);
+                                log.insert(LINE_LOOKUP.clone(), line);
                             }
                             _ => {
-                                log.insert(log_schema().message_key(), line);
+                                log.insert(log_schema().message_key().into_buf(), line);
                             }
                         }
                     }
 
                     for (key, value) in object {
-                        log.insert(key, value);
+                        log.insert(LookupBuf::from(key), value);
                     }
                 }
                 _ => return Err(ApiError::InvalidDataFormat { event: self.events }.into()),
@@ -431,15 +437,15 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process channel field
         if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
-            log.insert(CHANNEL, guid);
+            log.insert(SPLUNK_CHANNEL_LOOKUP.clone(), guid);
         } else if let Some(guid) = self.channel.as_ref() {
-            log.insert(CHANNEL, guid.clone());
+            log.insert(SPLUNK_CHANNEL_LOOKUP, guid.clone());
         }
 
         // Process fields field
         if let Some(JsonValue::Object(object)) = json.get_mut("fields").map(JsonValue::take) {
             for (key, value) in object {
-                log.insert(key, value);
+                log.insert(LookupBuf::from(key), value);
             }
         }
 
@@ -471,8 +477,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert(log_schema().timestamp_key(), time),
-            Time::Now(time) => log.insert(log_schema().timestamp_key(), time),
+            Time::Provided(time) => log.insert(log_schema().timestamp_key().into_buf(), time),
+            Time::Now(time) => log.insert(log_schema().timestamp_key().into_buf(), time),
         };
 
         // Extract default extracted fields
@@ -521,13 +527,13 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
 
 /// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
-    field: &'static str,
-    to_field: &'static str,
+    field: LookupBuf,
+    to_field: LookupBuf,
     value: Option<Value>,
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static str, to_field: &'static str) -> Self {
+    fn new(field: LookupBuf, to_field: LookupBuf) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -536,8 +542,8 @@ impl DefaultExtractor {
     }
 
     fn new_with(
-        field: &'static str,
-        to_field: &'static str,
+        field: LookupBuf,
+        to_field: LookupBuf,
         value: impl Into<Option<Value>>,
     ) -> Self {
         DefaultExtractor {
@@ -596,18 +602,18 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert(log_schema().message_key().clone(), message);
+    log.insert(log_schema().message_key().into_buf(), message);
 
     // Add channel
-    log.insert(*CHANNEL.clone(), channel);
+    log.insert(*SPLUNK_CHANNEL_LOOKUP.clone(), channel);
 
     // Add host
     if let Some(host) = host {
-        log.insert(log_schema().host_key().clone(), host);
+        log.insert(log_schema().host_key().into_buf(), host);
     }
 
     // Add timestamp
-    log.insert(log_schema().timestamp_key().clone(), Utc::now());
+    log.insert(log_schema().timestamp_key().into_buf(), Utc::now());
 
     // Add source type
     event
@@ -664,7 +670,7 @@ mod splunk_response {
             json_to_bytes(json!({"text":"Server is shutting down","code":9}));
         pub static ref UNSUPPORTED_MEDIA_TYPE: Bytes =
             json_to_bytes(json!({"text":"unsupported content encoding"}));
-        pub static ref NO_CHANNEL: Bytes =
+        pub static ref NO_SPLUNK_CHANNEL_LOOKUP: Bytes =
             json_to_bytes(json!({"text":"Data channel is missing","code":10}));
     }
 }
@@ -691,7 +697,7 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
             ),
             ApiError::MissingChannel => response_json(
                 StatusCode::BAD_REQUEST,
-                splunk_response::NO_CHANNEL.as_ref(),
+                splunk_response::NO_SPLUNK_CHANNEL_LOOKUP.as_ref(),
             ),
             ApiError::NoData => {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::NO_DATA.as_ref())
@@ -1008,7 +1014,7 @@ mod tests {
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
+        assert_eq!(event.as_log()[&super::SPLUNK_CHANNEL_LOOKUP], "guid".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
@@ -1090,19 +1096,19 @@ mod tests {
             events[0].as_log()[log_schema().message_key()],
             "first".into()
         );
-        assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
+        assert_eq!(events[0].as_log()[&super::SOURCE_LOOKUP], "main".into());
 
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
             "second".into()
         );
-        assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
+        assert_eq!(events[1].as_log()[&super::SOURCE_LOOKUP], "main".into());
 
         assert_eq!(
             events[2].as_log()[log_schema().message_key()],
             "third".into()
         );
-        assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());
+        assert_eq!(events[2].as_log()[&super::SOURCE_LOOKUP], "secondary".into());
     }
 
     #[test]

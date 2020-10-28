@@ -12,8 +12,7 @@ use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::collections::HashMap;
-use std::str;
+use std::{collections::HashMap, str, borrow::BorrowMut};
 
 #[derive(Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
@@ -85,8 +84,8 @@ impl CompiledRegex {
             .enumerate()
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
-                    let conv = types.get(Lookup::from(cn)).unwrap_or(&Conversion::Bytes);
-                    let name = cn.to_string();
+                    let name = Lookup::from(cn).into_buf();
+                    let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
                     (idx, name, conv.clone())
                 })
             })
@@ -182,7 +181,7 @@ impl RegexParser {
             .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
             .flatten()
             .map(LookupBuf::from_str)
-            .collect::<Result<Vec<_>>>();
+            .collect::<crate::Result<Vec<_>>>();
 
         let types = parse_check_conversion_map(&config.types, names)?;
 

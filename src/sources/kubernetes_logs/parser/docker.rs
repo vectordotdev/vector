@@ -63,7 +63,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     log.insert(log_schema().timestamp_key().into_buf(), time.with_timezone(&Utc));
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log.remove(*LOG_LOOKUP, false).context(LogFieldMissing)?;
+    let message = log.remove(LOG_LOOKUP.as_lookup(), false).context(LogFieldMissing)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),

@@ -483,8 +483,8 @@ async fn finish_signer(
     Ok(builder)
 }
 
-fn maybe_set_id<'a>(key: Option<Lookup<'a>>, doc: &mut serde_json::Value, event: &mut Event) {
-    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(k, false)) {
+fn maybe_set_id<'a>(key: &Option<LookupBuf>, doc: &mut serde_json::Value, event: &mut Event) {
+    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(&k, false)) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()

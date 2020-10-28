@@ -207,18 +207,20 @@ impl JournaldConfig {
 }
 
 fn create_event(record: Record) -> Event {
-    let mut log = LogEvent::from_iter(record);
+    let mut log = LogEvent::from_iter(
+        record.into_iter().map(|(k, v)| (LookupBuf::from(k), v))
+    );
     // Convert some journald-specific field names into Vector standard ones.
-    if let Some(message) = log.remove(MESSAGE, false) {
-        log.insert(log_schema().message_key(), message);
+    if let Some(message) = log.remove(MESSAGE.as_lookup(), false) {
+        log.insert(log_schema().message_key().into_buf(), message);
     }
-    if let Some(host) = log.remove(HOSTNAME, false) {
-        log.insert(log_schema().host_key(), host);
+    if let Some(host) = log.remove(HOSTNAME.as_lookup(), false) {
+        log.insert(log_schema().host_key().into_buf(), host);
     }
     // Translate the timestamp, and so leave both old and new names.
     if let Some(timestamp) = log
-        .get(*SOURCE_TIMESTAMP)
-        .or_else(|| log.get(*RECEIVED_TIMESTAMP.as_lookup()))
+        .get(SOURCE_TIMESTAMP.as_lookup())
+        .or_else(|| log.get(RECEIVED_TIMESTAMP.as_lookup()))
     {
         if let Value::Bytes(timestamp) = timestamp {
             if let Ok(timestamp) = String::from_utf8_lossy(timestamp).parse::<u64>() {

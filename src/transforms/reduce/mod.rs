@@ -72,12 +72,12 @@ impl TransformConfig for ReduceConfig {
 
 #[derive(Debug)]
 struct ReduceState {
-    fields: HashMap<String, Box<dyn ReduceValueMerger>>,
+    fields: HashMap<LookupBuf, Box<dyn ReduceValueMerger>>,
     stale_since: Instant,
 }
 
 impl ReduceState {
-    fn new(e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) -> Self {
+    fn new(e: LogEvent, strategies: &IndexMap<LookupBuf, MergeStrategy>) -> Self {
         Self {
             stale_since: Instant::now(),
             fields: e
@@ -99,7 +99,7 @@ impl ReduceState {
         }
     }
 
-    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<String, MergeStrategy>) {
+    fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<LookupBuf, MergeStrategy>) {
         for (k, v) in e.into_iter() {
             let strategy = strategies.get(&k);
             match self.fields.entry(k) {

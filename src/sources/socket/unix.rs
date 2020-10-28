@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
     sources::{util::build_unix_source, Source},
@@ -16,7 +16,7 @@ pub struct UnixConfig {
     pub path: PathBuf,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
-    pub host_key: Option<String>,
+    pub host_key: Option<LookupBuf>,
 }
 
 fn default_max_length() -> usize {
@@ -37,15 +37,15 @@ impl UnixConfig {
 * Function to pass to build_unix_source, specific to the basic unix source.
 * Takes a single line of a received message and builds an Event object.
 **/
-fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Option<Event> {
+fn build_event(host_key: &LookupBuf, received_from: Option<Bytes>, line: &str) -> Option<Event> {
     let byte_size = line.len();
     let mut event = Event::from(line);
     event.as_mut_log().insert(
-        crate::config::log_schema().source_type_key(),
+        crate::config::log_schema().source_type_key().clone(),
         Bytes::from("socket"),
     );
     if let Some(host) = received_from {
-        event.as_mut_log().insert(host_key, host);
+        event.as_mut_log().insert(host_key.clone(), host);
     }
     emit!(SocketEventReceived {
         byte_size,
@@ -57,7 +57,7 @@ fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Opti
 pub fn unix(
     path: PathBuf,
     max_length: usize,
-    host_key: String,
+    host_key: LookupBuf,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
