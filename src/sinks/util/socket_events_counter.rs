@@ -61,8 +61,9 @@ impl EventsCounter {
     }
 
     fn ack_rest(&self) {
-        let count = self.sizes.lock().unwrap().len();
-        self.ack(count);
+        let mut sizes = self.sizes.lock().unwrap();
+        self.acker.ack(sizes.len());
+        sizes.clear();
     }
 }
 
