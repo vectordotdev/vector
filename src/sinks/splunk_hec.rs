@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::{Event, LogEvent, Value},
     http::HttpClient,
     internal_events::{
@@ -101,7 +100,7 @@ impl SinkConfig for HecSinkConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(dns::Resolver, tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -632,11 +631,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck() {
-        let resolver = crate::dns::Resolver;
-
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(resolver, tls_settings).unwrap();
+            let client = HttpClient::new(tls_settings).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 

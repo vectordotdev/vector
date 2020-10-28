@@ -1,7 +1,6 @@
 use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
-    dns,
     event::Event,
     http::HttpClient,
 };
@@ -133,7 +132,7 @@ impl TransformConfig for Ec2Metadata {
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let http_client = HttpClient::new(dns::Resolver, None)?;
+        let http_client = HttpClient::new(None)?;
 
         let mut client =
             MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);

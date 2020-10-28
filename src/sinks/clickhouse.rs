@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -76,7 +75,7 @@ impl SinkConfig for ClickhouseConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(dns::Resolver, tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

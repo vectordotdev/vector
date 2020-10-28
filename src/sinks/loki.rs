@@ -14,7 +14,6 @@
 
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::{self, Event, Value},
     http::{Auth, HttpClient},
     sinks::util::{
@@ -99,7 +98,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(dns::Resolver, tls)?;
+        let client = HttpClient::new(tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -324,7 +323,7 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client = HttpClient::new(dns::Resolver, tls).expect("could not cerate HTTP client");
+        let client = HttpClient::new(tls).expect("could not cerate HTTP client");
 
         healthcheck(config.clone(), client)
             .await

@@ -1,7 +1,6 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::Event,
     http::{HttpClient, HttpClientFuture},
     serde::to_string,
@@ -198,7 +197,7 @@ impl GcsSink {
             .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = HttpClient::new(dns::Resolver, tls)?;
+        let client = HttpClient::new(tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {

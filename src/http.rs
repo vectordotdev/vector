@@ -31,11 +31,8 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
-    pub fn new(
-        resolver: Resolver,
-        tls_settings: impl Into<MaybeTlsSettings>,
-    ) -> crate::Result<HttpClient<B>> {
-        let mut http = HttpConnector::new_with_resolver(resolver);
+    pub fn new(tls_settings: impl Into<MaybeTlsSettings>) -> crate::Result<HttpClient<B>> {
+        let mut http = HttpConnector::new_with_resolver(Resolver);
         http.enforce_http(false);
 
         let settings = tls_settings.into();

@@ -45,7 +45,6 @@ pub struct TcpSinkConfig {
 struct TcpConnector {
     host: String,
     port: u16,
-    resolver: dns::Resolver,
     tls: MaybeTlsSettings,
 }
 
@@ -74,7 +73,7 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let connector = TcpConnector::new(host, port, dns::Resolver, tls);
+        let connector = TcpConnector::new(host, port, tls);
 
         Ok(connector)
     }
@@ -98,23 +97,17 @@ impl TcpSinkConfig {
 }
 
 impl TcpConnector {
-    fn new(host: String, port: u16, resolver: dns::Resolver, tls: MaybeTlsSettings) -> Self {
-        Self {
-            host,
-            port,
-            resolver,
-            tls,
-        }
+    fn new(host: String, port: u16, tls: MaybeTlsSettings) -> Self {
+        Self { host, port, tls }
     }
 
     fn connect(&self) -> BoxFuture<'static, Result<TcpOrTlsStream, TcpError>> {
         let host = self.host.clone();
         let port = self.port;
-        let resolver = self.resolver;
         let tls = self.tls.clone();
 
         async move {
-            let ip = resolver
+            let ip = dns::Resolver
                 .lookup_ip(host.clone())
                 .await
                 .context(DnsError)?
@@ -135,7 +128,7 @@ impl TcpConnector {
 
 impl Into<TcpSink> for TcpConnector {
     fn into(self) -> TcpSink {
-        TcpSink::new(self.host, self.port, self.resolver, self.tls)
+        TcpSink::new(self.host, self.port, self.tls)
     }
 }
 
@@ -157,14 +150,9 @@ type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
 type TcpOrTlsStream01 = CompatSink<TcpOrTlsStream, Bytes>;
 
 impl TcpSink {
-    pub fn new(host: String, port: u16, resolver: dns::Resolver, tls: MaybeTlsSettings) -> Self {
+    pub fn new(host: String, port: u16, tls: MaybeTlsSettings) -> Self {
         let span = info_span!("connection", %host, %port);
-        let connector = TcpConnector {
-            host,
-            port,
-            resolver,
-            tls,
-        };
+        let connector = TcpConnector { host, port, tls };
         Self {
             connector,
             state: TcpSinkState::Disconnected,
@@ -331,24 +319,18 @@ mod test {
         trace_init();
 
         let addr = next_addr();
-        let resolver = crate::dns::Resolver;
 
         let _listener = TcpListener::bind(&addr).await.unwrap();
 
         let healthcheck =
-            TcpConnector::new(addr.ip().to_string(), addr.port(), resolver, None.into())
-                .healthcheck();
+            TcpConnector::new(addr.ip().to_string(), addr.port(), None.into()).healthcheck();
 
         assert!(healthcheck.await.is_ok());
 
         let bad_addr = next_addr();
-        let bad_healthcheck = TcpConnector::new(
-            bad_addr.ip().to_string(),
-            bad_addr.port(),
-            resolver,
-            None.into(),
-        )
-        .healthcheck();
+        let bad_healthcheck =
+            TcpConnector::new(bad_addr.ip().to_string(), bad_addr.port(), None.into())
+                .healthcheck();
 
         assert!(bad_healthcheck.await.is_err());
     }

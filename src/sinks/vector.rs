@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::proto,
     internal_events::VectorEventSent,
     sinks::util::{tcp::TcpSink, StreamSinkOld},
@@ -62,7 +61,7 @@ impl SinkConfig for VectorSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let sink = TcpSink::new(host, port, dns::Resolver, tls);
+        let sink = TcpSink::new(host, port, tls);
         let healthcheck = sink.healthcheck();
         let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));

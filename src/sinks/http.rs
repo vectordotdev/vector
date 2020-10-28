@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
@@ -120,7 +119,7 @@ impl SinkConfig for HttpSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(dns::Resolver, tls)?;
+        let client = HttpClient::new(tls)?;
 
         let mut config = self.clone();
         config.uri = build_uri(config.uri.clone()).into();

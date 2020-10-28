@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::Event,
     rusoto::{self, RegionOrEndpoint},
     serde::to_string,
@@ -147,7 +146,7 @@ impl SinkConfig for S3SinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(dns::Resolver)?;
+        let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
@@ -242,9 +241,9 @@ impl S3SinkConfig {
         }
     }
 
-    pub fn create_client(&self, resolver: dns::Resolver) -> crate::Result<S3Client> {
+    pub fn create_client(&self) -> crate::Result<S3Client> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
 
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
@@ -561,7 +560,7 @@ mod integration_tests {
 
         let config = config(1000000).await;
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(dns::Resolver).unwrap();
+        let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 10);
@@ -591,7 +590,7 @@ mod integration_tests {
             ..config(1010).await
         };
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(dns::Resolver).unwrap();
+        let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30);
@@ -636,7 +635,7 @@ mod integration_tests {
         };
 
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(dns::Resolver).unwrap();
+        let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 500);
@@ -660,22 +659,18 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_healthchecks() {
-        let resolver = dns::Resolver;
-
         let config = config(1).await;
-        let client = config.create_client(resolver).unwrap();
+        let client = config.create_client().unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
-        let resolver = dns::Resolver;
-
         let config = S3SinkConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),
             ..config(1).await
         };
-        let client = config.create_client(resolver).unwrap();
+        let client = config.create_client().unwrap();
         assert_downcast_matches!(
             config.healthcheck(client).await.unwrap_err(),
             HealthcheckError,

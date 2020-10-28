@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns,
     event::Event,
     http::HttpClient,
     sinks::{
@@ -111,7 +110,7 @@ impl DatadogLogsConfig {
             false,
         )?;
 
-        let client = HttpClient::new(dns::Resolver, tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
         let sink = BatchedHttpSink::new(
             service,

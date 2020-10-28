@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         tcp::TcpSink,
@@ -59,7 +58,7 @@ impl SinkConfig for PapertrailConfig {
             false,
         )?;
 
-        let sink = TcpSink::new(host, port, dns::Resolver, tls);
+        let sink = TcpSink::new(host, port, tls);
         let healthcheck = sink.healthcheck();
 
         let pid = std::process::id();
