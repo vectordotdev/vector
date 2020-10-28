@@ -2,7 +2,7 @@ use super::{Expr, Expression, Object, Result, State, Value};
 use crate::Operator;
 
 #[derive(Debug)]
-pub(crate) struct Arithmetic {
+pub struct Arithmetic {
     lhs: Box<Expr>,
     rhs: Box<Expr>,
     op: Operator,
