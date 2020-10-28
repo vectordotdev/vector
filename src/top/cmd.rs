@@ -1,62 +1,12 @@
 use super::{
     dashboard::{init_dashboard, is_tty, Widgets},
-    state::{ComponentRow, ComponentsState, WidgetsState},
+    metrics,
+    state::WidgetsState,
 };
 use crate::config;
 use std::sync::Arc;
-use tokio::stream::StreamExt;
 use url::Url;
-use vector_api_client::{
-    connect_subscription_client,
-    gql::{ComponentsQueryExt, HealthQueryExt, MetricsSubscriptionExt},
-    Client, SubscriptionClient,
-};
-
-/// Retrieve the initial components/metrics for first paint. Further updating the metrics
-/// will be handled by subscriptions.
-async fn init_components(client: &Client) -> Result<ComponentsState, ()> {
-    // Execute a query to get the latest components, and aggregate metrics for each resource
-    let rows = client
-        .components_query()
-        .await
-        .map_err(|_| ())?
-        .data
-        .ok_or_else(|| ())?
-        .components
-        .into_iter()
-        .map(|d| ComponentRow {
-            name: d.name,
-            component_type: d.on.to_string(),
-            events_processed_total: d
-                .events_processed_total
-                .as_ref()
-                .map(|ep| ep.events_processed_total as i64)
-                .unwrap_or(0),
-            errors: 0,
-            throughput: 0.00,
-        })
-        .collect::<Vec<_>>();
-
-    Ok(ComponentsState::from_rows(rows))
-}
-
-/// Subscribe to metrics updates, for patching widget state
-async fn subscribe_metrics(
-    client: Arc<SubscriptionClient>,
-    state: Arc<WidgetsState>,
-    interval: i64,
-) -> Result<(), ()> {
-    // Events processed
-    let mut events = client
-        .component_events_processed_total_subscription(interval)
-        .await
-        .map_err(|_| ())?
-        .stream();
-
-    tokio::spawn(async move { while let Some(res) = events.next().await {} });
-
-    Ok(())
-}
+use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
@@ -89,7 +39,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Get the initial component state
-    let component_state = match init_components(&client).await {
+    let component_state = match metrics::init_components(&client).await {
         Ok(component_state) => component_state,
         _ => {
             eprintln!("Couldn't query Vector components");
@@ -97,9 +47,17 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         }
     };
 
-    // Create a new subscription client
-    let subscription_client = match connect_subscription_client(&url).await {
-        Ok(c) => Arc::new(c),
+    // Change the HTTP schema to WebSockets
+    let mut ws_url = url.clone();
+    ws_url
+        .set_scheme(match url.scheme() {
+            "https" => "wss",
+            _ => "ws",
+        })
+        .expect("Couldn't build WebSocket URL. Please report.");
+
+    let subscription_client = match connect_subscription_client(&ws_url).await {
+        Ok(c) => c,
         _ => {
             eprintln!("Couldn't connect to Vector API via WebSockets");
             return exitcode::UNAVAILABLE;
@@ -109,17 +67,12 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Create initial topology, to be shared by the API client and dashboard renderer
     let state = Arc::new(WidgetsState::new(url, component_state));
 
-    // Subscribe to metrics updates
-    if let Err(_) = subscribe_metrics(
-        Arc::clone(&subscription_client),
+    // Subscribe to updated metrics
+    metrics::subscribe(
+        subscription_client,
         Arc::clone(&state),
         opts.refresh_interval as i64,
-    )
-    .await
-    {
-        eprintln!("Couldn't subscribe to Vector metrics");
-        return exitcode::UNAVAILABLE;
-    }
+    );
 
     // Render a dashboard with the configured widgets
     let widgets = Widgets::new(Arc::clone(&state));
