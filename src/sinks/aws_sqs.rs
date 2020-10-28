@@ -185,7 +185,7 @@ impl Service<Vec<SendMessageBatchRequestEntry>> for SqsSink {
 
     fn call(&mut self, mut entries: Vec<SendMessageBatchRequestEntry>) -> Self::Future {
         debug!(
-            message = "sending records.",
+            message = "Sending records.",
             events = %entries.len(),
         );
 
