@@ -272,9 +272,6 @@ impl Source {
             data_dir,
             // This value specifies not exactly the globbing, but interval
             // between the polling the files to watch from the `paths_provider`.
-            // This is quite efficient, yet might still create some load of the
-            // file system, so this call is 10 times larger than the default for
-            // the files.
             glob_minimum_cooldown,
             // The shape of the log files is well-known in the Kubernetes
             // environment, so we pick the a specially crafted fingerprinter
