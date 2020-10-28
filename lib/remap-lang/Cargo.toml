@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 bytes = "0.5"
+chrono = "0.4"
 paste = "1"
 pest = "2"
 pest_derive = "2"

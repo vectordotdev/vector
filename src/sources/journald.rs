@@ -182,7 +182,6 @@ impl JournaldConfig {
             include_units,
             exclude_units,
             channel: out,
-            shutdown: shutdown.clone(),
             checkpointer,
             batch_size,
             remap_priority,
@@ -324,7 +323,6 @@ struct JournaldServer<J, T> {
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
     channel: T,
-    shutdown: ShutdownSignal,
     checkpointer: Checkpointer,
     batch_size: usize,
     remap_priority: bool,
@@ -344,10 +342,7 @@ where
 
             for _ in 0..self.batch_size {
                 let text = match self.journal.next().await {
-                    None => {
-                        let _ = self.shutdown.await;
-                        return;
-                    }
+                    None => return,
                     Some(Ok(text)) => text,
                     Some(Err(error)) => {
                         error!(

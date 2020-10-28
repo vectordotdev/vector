@@ -41,6 +41,7 @@ pub struct ReduceConfig {
     /// An optional condition that determines when an event is the end of a
     /// reduce.
     pub ends_when: Option<AnyCondition>,
+    pub starts_when: Option<AnyCondition>,
 }
 
 inventory::submit! {
@@ -147,16 +148,17 @@ pub struct Reduce {
     merge_strategies: IndexMap<String, MergeStrategy>,
     reduce_merge_states: HashMap<Discriminant, ReduceState>,
     ends_when: Option<Box<dyn Condition>>,
+    starts_when: Option<Box<dyn Condition>>,
 }
 
 impl Reduce {
     fn new(config: &ReduceConfig) -> crate::Result<Self> {
-        let ends_when = if let Some(ends_conf) = &config.ends_when {
-            Some(ends_conf.build()?)
-        } else {
-            None
-        };
+        if config.ends_when.is_some() && config.starts_when.is_some() {
+            return Err("only one of `ends_when` and `starts_when` can be provided".into());
+        }
 
+        let ends_when = config.ends_when.as_ref().map(|c| c.build()).transpose()?;
+        let starts_when = config.starts_when.as_ref().map(|c| c.build()).transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
@@ -166,6 +168,7 @@ impl Reduce {
             merge_strategies: config.merge_strategies.clone(),
             reduce_merge_states: HashMap::new(),
             ends_when,
+            starts_when,
         })
     }
 
@@ -189,6 +192,17 @@ impl Reduce {
             .drain()
             .for_each(|(_, s)| output.push(Event::from(s.flush())));
     }
+
+    fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
+        match self.reduce_merge_states.entry(discriminant) {
+            hash_map::Entry::Vacant(entry) => {
+                entry.insert(ReduceState::new(event, &self.merge_strategies));
+            }
+            hash_map::Entry::Occupied(mut entry) => {
+                entry.get_mut().add_event(event, &self.merge_strategies);
+            }
+        }
+    }
 }
 
 impl Transform for Reduce {
@@ -200,6 +214,12 @@ impl Transform for Reduce {
     }
 
     fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+        let starts_here = self
+            .starts_when
+            .as_ref()
+            .map(|c| c.check(&event))
+            .unwrap_or(false);
+
         let ends_here = self
             .ends_when
             .as_ref()
@@ -209,24 +229,24 @@ impl Transform for Reduce {
         let event = event.into_log();
         let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
-        if ends_here {
-            output.push(Event::from(
-                if let Some(mut state) = self.reduce_merge_states.remove(&discriminant) {
-                    state.add_event(event, &self.merge_strategies);
-                    state.flush()
-                } else {
-                    ReduceState::new(event, &self.merge_strategies).flush()
-                },
-            ));
-        } else {
-            match self.reduce_merge_states.entry(discriminant) {
-                hash_map::Entry::Vacant(entry) => {
-                    entry.insert(ReduceState::new(event, &self.merge_strategies));
-                }
-                hash_map::Entry::Occupied(mut entry) => {
-                    entry.get_mut().add_event(event, &self.merge_strategies);
-                }
+        if starts_here {
+            if let Some(state) = self.reduce_merge_states.remove(&discriminant) {
+                output.push(state.flush().into());
             }
+
+            self.push_or_new_reduce_state(event, discriminant)
+        } else if ends_here {
+            output.push(match self.reduce_merge_states.remove(&discriminant) {
+                Some(mut state) => {
+                    state.add_event(event, &self.merge_strategies);
+                    state.flush().into()
+                }
+                None => ReduceState::new(event, &self.merge_strategies)
+                    .flush()
+                    .into(),
+            })
+        } else {
+            self.push_or_new_reduce_state(event, discriminant)
         }
 
         emit!(ReduceEventProcessed);

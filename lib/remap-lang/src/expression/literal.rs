@@ -1,7 +1,7 @@
 use crate::{Expression, Object, Result, State, Value};
 
 #[derive(Debug)]
-pub(crate) struct Literal(Value);
+pub struct Literal(Value);
 
 impl<T: Into<Value>> From<T> for Literal {
     fn from(value: T) -> Self {

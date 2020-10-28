@@ -9,7 +9,7 @@ pub enum Error {
 
 #[derive(Debug)]
 pub(crate) enum Target {
-    Path(String),
+    Path(Vec<Vec<String>>),
 }
 
 #[derive(Debug)]

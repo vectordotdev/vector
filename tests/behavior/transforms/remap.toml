@@ -104,8 +104,8 @@
   inputs = []
   type = "remap"
   source = """
-    only_fields(.foo, .bar, .buz.second)
-    del(.foo.second)
+    only_fields(".foo", ".bar", ".buz.second")
+    del(".foo.second")
   """
 [[tests]]
   name = "remap_delete_only_fields"
@@ -140,7 +140,6 @@
     .a = to_timestamp(.a)
     .b = to_timestamp(.nope, 10)
     .c = to_timestamp(.nope, "2020-09-14T12:51:12+02:00")
-    .d = parse_timestamp(.quix, format = "%d/%m/%Y:%H:%M:%S %z")
   """
 [[tests]]
   name = "remap_coercion"
@@ -164,7 +163,6 @@
       "a.equals" = "2020-09-14T09:53:44Z"
       "b.equals" = "1970-01-01T00:00:10Z"
       "c.equals" = "2020-09-14T10:51:12Z"
-      "d.equals" = "2019-06-19T21:20:49Z"
 
 [transforms.remap_quoted_path]
   inputs = []
@@ -848,86 +846,73 @@
     "foo[1].equals" = "bat"
     "foo[2].equals" = "fizz buzz"
 
-[transforms.remap_function_log]
-  inputs=[]
+[transforms.remap_function_parse_timestamp]
+  inputs = []
   type = "remap"
   source = """
-    log(.foo, level=info)
+    .foo = parse_timestamp("10", "%s")
   """
 [[tests]]
-  name = "remap_function_log"
+  name = "remap_function_parse_timestamp"
   [tests.input]
-    insert_at = "remap_function_log"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "this should be unchanged"
+    insert_at = "remap_function_parse_timestamp"
+    type = "raw"
+    value = ""
   [[tests.outputs]]
-    extract_from = "remap_function_log"
+    extract_from = "remap_function_parse_timestamp"
     [[tests.outputs.conditions]]
-    "foo.equals" = "this should be unchanged"
+    "foo.equals" = "1970-01-01T00:00:10Z"
 
-[transforms.remap_function_replace_regex]
-  inputs=[]
+[transforms.remap_function_truncate]
+  inputs = []
   type = "remap"
   source = """
-    .bip = replace(.foo, /Eggs/gi, "beans")
-    .bar = replace(.foo, /Eggs/i, "beans")
-    .zop = replace(.foo, /Eggs/, "beans")
+    .foo = truncate("foobar", limit = 3)
+    .bar = truncate("foobar", limit = 4, ellipsis = true)
   """
 [[tests]]
-  name = "remap_function_replace_regex"
+  name = "remap_function_truncate"
   [tests.input]
-    insert_at = "remap_function_replace_regex"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "peas, eggs, chips and more eggs"
+    insert_at = "remap_function_truncate"
+    type = "raw"
+    value = ""
   [[tests.outputs]]
-    extract_from = "remap_function_replace_regex"
+    extract_from = "remap_function_truncate"
     [[tests.outputs.conditions]]
-    "bip.equals" = "peas, beans, chips and more beans"
-    "bar.equals" = "peas, beans, chips and more eggs"
-    "zop.equals" = "peas, eggs, chips and more eggs"
+    "foo.equals" = "foo"
+    "bar.equals" = "foob..."
 
-[transforms.remap_function_replace_string]
-  inputs=[]
+[transforms.remap_function_strip_whitespace]
+  inputs = []
   type = "remap"
   source = """
-    .foo = replace(.foo, "eggs", "beans")
+    .foo = strip_whitespace("  foobar  ")
   """
 [[tests]]
-  name = "remap_function_replace_string"
+  name = "remap_function_strip_whitespace"
   [tests.input]
-    insert_at = "remap_function_replace_string"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "peas, eggs, chips and more eggs"
+    insert_at = "remap_function_strip_whitespace"
+    type = "raw"
+    value = ""
   [[tests.outputs]]
-    extract_from = "remap_function_replace_string"
+    extract_from = "remap_function_strip_whitespace"
     [[tests.outputs.conditions]]
-    "foo.equals" = "peas, beans, chips and more beans"
+    "foo.equals" = "foobar"
 
-[transforms.remap_function_flatten_array]
-  inputs=[]
-  type = "remap"
-  source = """
-    .foo = flatten(parse_json(.foo))
-  """
-[[tests]]
-  name = "remap_function_flatten_array"
-  [tests.input]
-    insert_at = "remap_function_flatten_array"
-    type = "log"
-    [tests.input.log_fields]
-      foo = "[1, 2, [3, 4, [5, 6], 7], [8, 9]]"
-  [[tests.outputs]]
-    extract_from = "remap_function_flatten_array"
-    [[tests.outputs.conditions]]
-    "foo[0].equals" = 1
-    "foo[1].equals" = 2
-    "foo[2].equals" = 3
-    "foo[3].equals" = 4
-    "foo[4].equals" = 5
-    "foo[5].equals" = 6
-    "foo[6].equals" = 7
-    "foo[7].equals" = 8
-    "foo[8].equals" = 9
+# [transforms.remap_function_log]
+#   inputs=[]
+#   type = "remap"
+#   source = """
+#     log(.foo, level=info)
+#   """
+# [[tests]]
+#   name = "remap_function_log"
+#   [tests.input]
+#     insert_at = "remap_function_log"
+#     type = "log"
+#     [tests.input.log_fields]
+#       foo = "this should be unchanged"
+#   [[tests.outputs]]
+#     extract_from = "remap_function_log"
+#     [[tests.outputs.conditions]]
+#     "foo.equals" = "this should be unchanged"

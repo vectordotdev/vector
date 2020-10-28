@@ -77,7 +77,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, LogEvent},
+        event::Event,
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
     };
