@@ -16,7 +16,6 @@ use futures::{future::BoxFuture, ready, stream::BoxStream, FutureExt, StreamExt}
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
-    cell::Cell,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
     sync::Arc,
@@ -153,14 +152,14 @@ enum UdpServiceState {
 
 pub struct UdpService {
     connector: UdpConnector,
-    state: Cell<UdpServiceState>,
+    state: UdpServiceState,
 }
 
 impl UdpService {
     fn new(connector: UdpConnector) -> Self {
         Self {
             connector,
-            state: Cell::new(UdpServiceState::Disconnected),
+            state: UdpServiceState::Disconnected,
         }
     }
 }
@@ -172,7 +171,7 @@ impl tower::Service<Bytes> for UdpService {
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         loop {
-            self.state = Cell::new(match self.state.get_mut() {
+            self.state = match &mut self.state {
                 UdpServiceState::Disconnected => {
                     let connector = self.connector.clone();
                     UdpServiceState::Connecting(Box::pin(async move {
@@ -191,7 +190,7 @@ impl tower::Service<Bytes> for UdpService {
                     };
                     UdpServiceState::Connected(socket)
                 }
-            });
+            };
         }
         Poll::Ready(Ok(()))
     }
@@ -199,10 +198,11 @@ impl tower::Service<Bytes> for UdpService {
     fn call(&mut self, msg: Bytes) -> Self::Future {
         let (sender, receiver) = oneshot::channel();
 
-        let mut socket = match self.state.replace(UdpServiceState::Sending(receiver)) {
-            UdpServiceState::Connected(socket) => socket,
-            _ => panic!("UdpService::poll_ready should be called first"),
-        };
+        let mut socket =
+            match std::mem::replace(&mut self.state, UdpServiceState::Sending(receiver)) {
+                UdpServiceState::Connected(socket) => socket,
+                _ => panic!("UdpService::poll_ready should be called first"),
+            };
 
         Box::pin(async move {
             // TODO: Add reconnect support as TCP/Unix?
