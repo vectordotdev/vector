@@ -1,8 +1,10 @@
 use crate::{metadata_ext::PortableFileExt, FileFingerprint, FileSourceInternalEvents};
-use std::collections::HashSet;
-use std::fs::{self, File};
-use std::io::{self, Read, Seek, Write};
-use std::path::PathBuf;
+use std::{
+    collections::HashSet,
+    fs::{self, File},
+    io::{self, Read, Seek, SeekFrom, Write},
+    path::PathBuf,
+};
 
 #[derive(Clone)]
 pub enum Fingerprinter {
@@ -12,6 +14,7 @@ pub enum Fingerprinter {
     },
     FirstLineChecksum {
         max_line_length: usize,
+        ignored_header_bytes: usize,
     },
     DevInode,
 }
@@ -35,16 +38,18 @@ impl Fingerprinter {
                 ignored_header_bytes,
                 bytes,
             } => {
-                let i = ignored_header_bytes as u64;
-                let b = bytes;
-                buffer.resize(b, 0u8);
+                buffer.resize(bytes, 0u8);
                 let mut fp = fs::File::open(path)?;
-                fp.seek(io::SeekFrom::Start(i))?;
-                fp.read_exact(&mut buffer[..b])?;
+                fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
+                fp.read_exact(&mut buffer[..bytes])?;
             }
-            Fingerprinter::FirstLineChecksum { max_line_length } => {
+            Fingerprinter::FirstLineChecksum {
+                max_line_length,
+                ignored_header_bytes,
+            } => {
                 buffer.resize(max_line_length, 0u8);
-                let fp = fs::File::open(path)?;
+                let mut fp = fs::File::open(path)?;
+                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
                 fingerprinter_read_until(fp, b'\n', buffer)?;
             }
         }
@@ -83,7 +88,7 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
             Err(e) => return Err(e),
         };
 
-        if let Some((pos, _)) = buf[..read].iter().enumerate().find(|(_, &c)| c == delim) {
+        if let Some(pos) = buf[..read].iter().position(|&c| c == delim) {
             for el in &mut buf[(pos + 1)..] {
                 *el = 0;
             }

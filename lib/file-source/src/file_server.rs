@@ -545,7 +545,10 @@ mod test {
     #[test]
     fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
-        let fingerprinter = Fingerprinter::FirstLineChecksum { max_line_length };
+        let fingerprinter = Fingerprinter::FirstLineChecksum {
+            max_line_length,
+            ignored_header_bytes: 0,
+        };
 
         let target_dir = tempdir().unwrap();
         let prepare_test = |file: &str, contents: &[u8]| {
