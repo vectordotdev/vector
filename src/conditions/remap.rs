@@ -1,5 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
+    emit,
+    internal_events::{RemapConditionExecutionFailed, RemapConditionNonBooleanReturned},
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -51,19 +53,27 @@ impl Remap {
 impl Condition for Remap {
     fn check(&self, event: &Event) -> bool {
         self.execute(&event)
-            .ok()
-            .flatten()
+            .unwrap_or_else(|_| {
+                emit!(RemapConditionExecutionFailed);
+                None
+            })
             .map(|value| match value {
                 remap::Value::Boolean(boolean) => boolean,
-                _ => false,
+                _ => {
+                    emit!(RemapConditionNonBooleanReturned);
+                    false
+                }
             })
-            .unwrap_or(false)
+            .unwrap_or_else(|| {
+                emit!(RemapConditionNonBooleanReturned);
+                false
+            })
     }
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
         self.execute(event)
-            .map_err(|err| format!("source execution failed: {}", err))?
-            .ok_or("source execution resolved to no value".into())
+            .map_err(|err| format!("source execution failed: {:#}", err))?
+            .ok_or_else(|| "source execution resolved to no value".into())
             .and_then(|value| match value {
                 remap::Value::Boolean(v) if v => Ok(()),
                 remap::Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
