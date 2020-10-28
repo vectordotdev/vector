@@ -82,11 +82,12 @@ pub struct Config {
     #[serde(default = "default_max_read_bytes")]
     max_read_bytes: usize,
 
-    // This value specifies not exactly the globbing, but interval
-    // between the polling the files to watch from the `paths_provider`.
-    // This is quite efficient, yet might still create some load of the
-    // file system, so this call is 10 times larger than the default for
-    // the files.
+    /// This value specifies not exactly the globbing, but interval
+    /// between the polling the files to watch from the `paths_provider`.
+    /// This is quite efficient, yet might still create some load of the
+    /// file system; in addition, it is currently coupled with chechsum dumping
+    /// in the underlying file server, so setting it too low may itroduce
+    /// a significant overhead.
     #[serde(default = "default_glob_minimum_cooldown_ms")]
     glob_minimum_cooldown_ms: usize,
 }
