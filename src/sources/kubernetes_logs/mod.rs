@@ -313,9 +313,7 @@ impl Source {
             let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
                 match result {
                     Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
-                    Err(error) => {
-                        error!(message = "File server exited with an error.", %error)
-                    }
+                    Err(error) => error!(message = "File server exited with an error.", %error),
                 }
             });
             slot.bind(Box::pin(fut));

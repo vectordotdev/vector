@@ -72,8 +72,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<crate::sources::Source> {
-        let out =
-            out.sink_map_err(|error| error!(message = "Error sending event.", %error));
+        let out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
 
         let listenfd = ListenFd::from_env();
 
