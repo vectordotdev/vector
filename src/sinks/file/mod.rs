@@ -211,12 +211,12 @@ impl FileSink {
                             debug!(message = "Receiver exhausted, terminating the processing loop.");
 
                             // Close all the open files.
-                            debug!(message = "Closing all the open files");
+                            debug!(message = "Closing all the open files.");
                             for (path, file) in self.files.iter_mut() {
                                 if let Err(error) = file.close().await {
-                                    error!(message = "Failed to close file.", ?path, %error);
+                                    error!(message = "Failed to close file.", path = ?path, error = ?error);
                                 } else{
-                                    trace!(message = "Successfully closed file", ?path);
+                                    trace!(message = "Successfully closed file.", path = ?path);
                                 }
                             }
 
@@ -233,13 +233,13 @@ impl FileSink {
                             // We got an expired file. All we really want is to
                             // flush and close it.
                             if let Err(error) = expired_file.close().await {
-                                error!(message = "Failed to close file.", ?path, %error);
+                                error!(message = "Failed to close file.", path = ?path, error = ?error);
                             }
                             drop(expired_file); // ignore close error
                         }
                         Some(Err(error)) => error!(
                             message = "An error occurred while expiring a file.",
-                            %error,
+                            error = ?error,
                         ),
                     }
                 }
@@ -261,10 +261,10 @@ impl FileSink {
         };
 
         let next_deadline = self.deadline_at();
-        trace!(message = "Computed next deadline.", ?next_deadline, ?path);
+        trace!(message = "Computed next deadline.", next_deadline = ?next_deadline, path = ?path);
 
         let file = if let Some(file) = self.files.reset_at(&path, next_deadline) {
-            trace!(message = "Working with an already opened file.", ?path);
+            trace!(message = "Working with an already opened file.", path = ?path);
             file
         } else {
             trace!(message = "Opening new file.", ?path);
@@ -274,7 +274,7 @@ impl FileSink {
                     // We couldn't open the file for this event.
                     // Maybe other events will work though! Just log
                     // the error and skip this event.
-                    error!(message = "Unable to open the file.", ?path, %error);
+                    error!(message = "Unable to open the file.", path = ?path, error = ?error);
                     return;
                 }
             };
@@ -285,9 +285,9 @@ impl FileSink {
             self.files.get_mut(&path).unwrap()
         };
 
-        trace!(message = "Writing an event to file.", ?path);
+        trace!(message = "Writing an event to file.", path = ?path);
         if let Err(error) = write_event_to_file(file, event, &self.encoding).await {
-            error!(message = "Failed to write file.", ?path, %error);
+            error!(message = "Failed to write file.", path = ?path, error = ?error);
         }
     }
 }
@@ -412,7 +412,7 @@ mod tests {
         let mut template = directory.to_string_lossy().to_string();
         template.push_str("/{{level}}s-{{date}}.log");
 
-        trace!(message = "Template", %template);
+        trace!(message = "Template.", %template);
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),

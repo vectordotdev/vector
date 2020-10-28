@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016
-exec find src/internal_events -type f -name \*.rs -exec awk '
+exec find src -type f -name \*.rs -exec awk '
   BEGIN {
     RS = ""
     FS = "\n"
     error_count = 0
   }
 
-  match($0, /(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^"]+)"/, groups) {
+  match($0, /(trace|debug|info|warn|error)!\(\s*(message\s*=\s*)?"([^({)][^("]+)"/, groups) {
     message = groups[3]
     delete errors;
     if (!match(message, /^[A-Z]/)) { errors[1] = "Message must begin with a capital." }

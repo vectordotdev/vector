@@ -93,7 +93,7 @@ impl SinkConfig for LogdnaConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal logdna sink error.", error = ?error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 

@@ -169,7 +169,7 @@ impl std::str::FromStr for LogFormat {
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     for error in errors {
-        error!("Configuration error: {}", error);
+        error!(message = "Configuration error.", error = ?error);
     }
 
     exitcode::CONFIG

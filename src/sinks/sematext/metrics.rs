@@ -151,7 +151,9 @@ impl SematextMetricsService {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("Fatal sematext metrics sink error: {}", e));
+            .sink_map_err(
+                |error| error!(message = "Fatal sematext metrics sink error.", error = ?error),
+            );
 
         Ok(VectorSink::Futures01Sink(Box::new(sink)))
     }

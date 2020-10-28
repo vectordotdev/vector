@@ -119,7 +119,7 @@ impl UdpConnector {
             match self.connect().await {
                 Ok(socket) => return socket,
                 Err(error) => {
-                    error!(message = "Unable to connect UDP socket.", %error);
+                    error!(message = "Unable to connect UDP socket.", error = ?error);
                     delay_for(backoff.next().unwrap()).await;
                 }
             }
@@ -253,7 +253,7 @@ impl UdpSink {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(socket)) => State::Connected(socket),
                     Err(error) => {
-                        error!(message = "unable to connect UDP socket", %error);
+                        error!(message = "Unable to connect UDP socket.", error = ?error);
                         State::Backoff(self.next_delay01())
                     }
                 },
@@ -279,13 +279,13 @@ impl Sink for UdpSink {
         match self.poll_socket() {
             Ok(Async::Ready(socket)) => {
                 debug!(
-                    message = "sending event.",
+                    message = "Sending event.",
                     bytes = %line.len()
                 );
                 match udp_send(socket, &line) {
                     Err(error) => {
                         self.state = State::Backoff(self.next_delay01());
-                        error!(message = "send failed", %error);
+                        error!(message = "Send failed.", error = ?error);
                         Ok(AsyncSink::NotReady(line))
                     }
                     Ok(_) => Ok(AsyncSink::Ready),

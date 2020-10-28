@@ -508,7 +508,7 @@ where
         // is apply back pressure.
         if self.sending.len() > 5 {
             trace!(
-                message = "too many sending batches.",
+                message = "Too many sending batches.",
                 amount = self.sending.len()
             );
             self.poll_complete()?;
@@ -715,7 +715,7 @@ where
         self.next_request_id = request_id.wrapping_add(1);
 
         trace!(
-            message = "submitting service request.",
+            message = "Submitting service request.",
             in_flight_requests = self.in_flight.len()
         );
         let response = Compat::new(Box::pin(self.service.call(req)))
@@ -723,16 +723,13 @@ where
             .then(move |result| {
                 match result {
                     Ok(response) if response.is_successful() => {
-                        trace!(message = "Response successful.", ?response);
+                        trace!(message = "Response successful.", response = ?response);
                     }
                     Ok(response) => {
-                        error!(message = "Response wasn't successful.", ?response);
+                        error!(message = "Response wasn't successful.", response = ?response);
                     }
                     Err(error) => {
-                        error!(
-                            message = "Request failed.",
-                            %error,
-                        );
+                        error!(message = "Request failed.", error = ?error,);
                     }
                 }
 
@@ -761,10 +758,10 @@ where
                         num_to_ack += ack_size;
                         self.seq_tail += 1
                     }
-                    trace!(message = "acking events.", acking_num = num_to_ack);
+                    trace!(message = "Acking events.", acking_num = num_to_ack);
                     self.acker.ack(num_to_ack);
                 }
-                Err(_) => panic!("ServiceSink service sender dropped"),
+                Err(_) => panic!("ServiceSink service sender dropped."),
             }
         }
     }

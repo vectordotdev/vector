@@ -150,7 +150,9 @@ impl Auth {
             }
             Auth::Bearer { token } => match Authorization::bearer(&token) {
                 Ok(auth) => req.headers_mut().typed_insert(auth),
-                Err(error) => error!(message = "invalid bearer token", %token, %error),
+                Err(error) => {
+                    error!(message = "Invalid bearer token.", token = %token, error = ?error)
+                }
             },
         }
     }

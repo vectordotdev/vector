@@ -225,7 +225,7 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             if let Err(error) = self.refresh_metadata().await {
-                error!(message = "Unable to fetch EC2 metadata; Retrying.", %error);
+                error!(message = "Unable to fetch EC2 metadata; Retrying.", error = ?error);
                 delay_for(Duration::from_secs(1)).await;
                 continue;
             }
@@ -303,7 +303,7 @@ impl MetadataClient {
 
         let uri = Uri::from_parts(parts)?;
 
-        debug!(message = "Sending metadata request.", %uri);
+        debug!(message = "Sending metadata request.", uri = %uri);
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())

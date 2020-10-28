@@ -40,7 +40,7 @@ impl<'a> InternalEvent for SplitConvertFailed<'a> {
         warn!(
             message = "Could not convert types.",
             field = %self.field,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 10
         );
     }
