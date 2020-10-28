@@ -57,7 +57,7 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "signal", "sync"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "signal", "sync", "time", "stream"] }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-util = { version = "0.3.1", features = ["codec"] }
@@ -109,9 +109,10 @@ slab = { version = "0.4.2", optional = true }
 anymap = {version = "0.12.1", optional = true }
 
 # API client
-prettytable-rs = { version = "0.8.0", optional = true }
 human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
+crossterm = { version = "0.18.0", optional = true }
+tui = { version = "0.12.0", optional = true, default-features = false, features = ["crossterm"] }
 
 # External libs
 derivative = "2.1.1"
@@ -279,9 +280,10 @@ api = [
 # API client
 api-client = [
   "vector-api-client",
-  "prettytable-rs",
   "human_format",
   "num-format",
+  "crossterm",
+  "tui",
 ]
 
 # Sources
