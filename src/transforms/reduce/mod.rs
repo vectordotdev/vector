@@ -153,9 +153,12 @@ pub struct Reduce {
 
 impl Reduce {
     fn new(config: &ReduceConfig) -> crate::Result<Self> {
+        if config.ends_when.is_some() && config.starts_when.is_some() {
+            return Err("only one of `ends_when` and `starts_when` can be provided".into());
+        }
+
         let ends_when = config.ends_when.as_ref().map(|c| c.build()).transpose()?;
         let starts_when = config.starts_when.as_ref().map(|c| c.build()).transpose()?;
-
         let group_by = config.group_by.clone().into_iter().collect();
 
         Ok(Reduce {
