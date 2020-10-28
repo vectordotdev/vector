@@ -1,9 +1,10 @@
 mod bytes_processed;
+mod errors;
 mod events_processed;
 mod host;
 mod uptime;
 
-use crate::event::{Event, Metric};
+use crate::event::{Event, Metric, MetricValue};
 use crate::metrics::{capture_metrics, get_controller, Controller};
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
@@ -13,9 +14,11 @@ use std::sync::Arc;
 use tokio::stream::{Stream, StreamExt};
 use tokio::time::Duration;
 
-pub use bytes_processed::ProcessedBytesTotal;
-pub use events_processed::EventsProcessedTotal;
+pub use bytes_processed::{ComponentProcessedBytesTotal, ProcessedBytesTotal};
+pub use errors::{ComponentErrorsTotal, ErrorsTotal};
+pub use events_processed::{ComponentEventsProcessedTotal, EventsProcessedTotal};
 pub use host::HostMetrics;
+use nom::lib::std::collections::BTreeMap;
 pub use uptime::Uptime;
 
 lazy_static! {
@@ -69,6 +72,16 @@ impl MetricsSubscription {
         })
     }
 
+    /// Component events processed metrics. Streams new data as the metric increases
+    async fn component_events_processed_total(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ComponentEventsProcessedTotal> {
+        component_counter_metrics(interval)
+            .filter(|m| m.name == "events_processed_total")
+            .map(ComponentEventsProcessedTotal::new)
+    }
+
     /// Bytes processed metrics
     async fn processed_bytes_total(
         &self,
@@ -78,6 +91,36 @@ impl MetricsSubscription {
             "processed_bytes_total" => Some(ProcessedBytesTotal::new(m)),
             _ => None,
         })
+    }
+
+    /// Component events processed metrics. Streams new data as the metric increases
+    async fn component_processed_bytes_total(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ComponentProcessedBytesTotal> {
+        component_counter_metrics(interval)
+            .filter(|m| m.name == "processed_bytes_total")
+            .map(ComponentProcessedBytesTotal::new)
+    }
+
+    /// Total error metrics
+    async fn errors_total(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ErrorsTotal> {
+        get_metrics(interval)
+            .filter(|m| m.name.ends_with("_errors_total"))
+            .map(ErrorsTotal::new)
+    }
+
+    /// Component errors metrics. Streams new data as the metric increases
+    async fn component_errors_total(
+        &self,
+        #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ComponentErrorsTotal> {
+        component_counter_metrics(interval)
+            .filter(|m| m.name.ends_with("_errors_total"))
+            .map(ComponentErrorsTotal::new)
     }
 
     /// All metrics
@@ -126,4 +169,23 @@ pub fn component_events_processed_total(component_name: String) -> Option<Events
             _ => false,
         })
         .map(|ev| EventsProcessedTotal::new(ev.into_metric()))
+}
+
+/// Returns a stream of metrics, where `metric_name` matches the name of the metric
+/// (e.g. "events_processed"), and the value is derived from `MetricValue::Counter`. Uses a
+/// local cache to match against the `component_name` of a metric, to return results only when
+/// the value of a current iteration is greater than the previous. This is useful for the client
+/// to be notified as metrics increase without returning 'empty' or identical results.
+pub fn component_counter_metrics(interval: i32) -> impl Stream<Item = Metric> {
+    let mut cache = BTreeMap::new();
+
+    get_metrics(interval).filter_map(move |m| match m.tag_value("component_name") {
+        Some(name) => match m.value {
+            MetricValue::Counter { value } if cache.insert(name, value).unwrap_or(0.00) < value => {
+                Some(m)
+            }
+            _ => None,
+        },
+        _ => None,
+    })
 }
