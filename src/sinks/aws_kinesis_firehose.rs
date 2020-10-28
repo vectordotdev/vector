@@ -164,7 +164,9 @@ impl KinesisFirehoseService {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("Fatal kinesis firehose sink error: {}", e))
+            .sink_map_err(
+                |error| error!(message = "Fatal kinesis firehose sink error.", error = ?error),
+            )
             .with_flat_map(move |e| iter_ok(encode_event(e, &encoding)));
 
         Ok(sink)
@@ -182,7 +184,7 @@ impl Service<Vec<Record>> for KinesisFirehoseService {
 
     fn call(&mut self, records: Vec<Record>) -> Self::Future {
         debug!(
-            message = "sending records.",
+            message = "Sending records.",
             events = %records.len(),
         );
 
@@ -419,7 +421,7 @@ mod integration_tests {
 
         let arn = match client.create_elasticsearch_domain(req).await {
             Ok(res) => res.domain_status.expect("no domain status").arn,
-            Err(e) => panic!("Unable to create the Elasticsearch domain {:?}", e),
+            Err(error) => panic!("Unable to create the Elasticsearch domain {:?}", error),
         };
 
         // wait for ES to be available; it starts up when the ES domain is created
@@ -468,7 +470,7 @@ mod integration_tests {
 
         match client.create_delivery_stream(req).await {
             Ok(_) => (),
-            Err(e) => panic!("Unable to create the delivery stream {:?}", e),
+            Err(error) => panic!("Unable to create the delivery stream {:?}", error),
         };
     }
 

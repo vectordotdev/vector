@@ -139,7 +139,7 @@ impl SinkConfig for HttpSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal HTTP sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", error = ?error));
 
         let sink = super::VectorSink::Futures01Sink(Box::new(sink));
 
@@ -187,7 +187,7 @@ impl HttpSink for HttpSinkConfig {
 
             Encoding::Ndjson => {
                 let mut b = serde_json::to_vec(&event)
-                    .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 b.push(b'\n');
                 b
@@ -195,7 +195,7 @@ impl HttpSink for HttpSinkConfig {
 
             Encoding::Json => {
                 let mut b = serde_json::to_vec(&event)
-                    .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 b.push(b',');
                 b

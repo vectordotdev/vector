@@ -99,8 +99,8 @@ mod wrapped_for_ffi {
             internal_events::WasmHostcallProgress::begin(Role::Transform, "register");
         match super::register(vmctx, data, length) {
             Ok(_) => internal_event.complete(),
-            Err(e) => {
-                internal_event.error(format!("{}", e));
+            Err(error) => {
+                internal_event.error(format!("{}", error));
             }
         }
     }
@@ -114,8 +114,8 @@ mod wrapped_for_ffi {
                 internal_event.complete();
                 retval
             }
-            Err(e) => {
-                internal_event.error(format!("{}", e));
+            Err(error) => {
+                internal_event.error(format!("{}", error));
                 0
             }
         }

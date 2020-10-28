@@ -187,6 +187,10 @@ build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector
 build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-graphql-schema
+build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
+
 ##@ Cross Compiling
 .PHONY: cross-enable
 cross-enable: cargo-install-cross
@@ -847,8 +851,8 @@ check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
-check-internal-events: ## Check that internal events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-internal-events.sh
+check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
 
 ##@ Packaging
 

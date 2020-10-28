@@ -77,7 +77,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
         b.push(b'\n');
         Bytes::from(b)
     })
-    .map_err(|error| error!(message = "Unable to encode.", %error))
+    .map_err(|error| error!(message = "Unable to encode.", error = ?error))
     .ok()
 }
 

@@ -189,7 +189,7 @@ where
                                     ) {
                                         if old_modified_time < new_modified_time {
                                             info!(
-                                                message = "switching to watch most recently modified file.",
+                                                message = "Switching to watch most recently modified file.",
                                                 new_modified_time = ?new_modified_time,
                                                 old_modified_time = ?old_modified_time,
                                             );
@@ -224,7 +224,7 @@ where
 
                     let sz = line.len();
                     trace!(
-                        message = "read bytes.",
+                        message = "Read bytes.",
                         path = ?watcher.path,
                         bytes = ?sz
                     );
@@ -290,7 +290,7 @@ where
             match result {
                 Ok(()) => {}
                 Err(error) => {
-                    error!(message = "output channel closed.", ?error);
+                    error!(message = "Output channel closed.", error = ?error);
                     return Err(error);
                 }
             }
@@ -487,14 +487,14 @@ impl Fingerprinter {
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
         self.get_fingerprint_of_file(path, buffer)
-            .map_err(|err| {
-                if err.kind() == io::ErrorKind::UnexpectedEof {
+            .map_err(|error| {
+                if error.kind() == io::ErrorKind::UnexpectedEof {
                     if !known_small_files.contains(path) {
                         emitter.emit_file_checksum_failed(path);
                         known_small_files.insert(path.clone());
                     }
                 } else {
-                    emitter.emit_file_fingerprint_read_failed(path, err);
+                    emitter.emit_file_fingerprint_read_failed(path, error);
                 }
             })
             .ok()

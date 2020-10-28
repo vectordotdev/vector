@@ -133,7 +133,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             }
         },
         None => {
-            error!("You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall]");
+            error!("You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall].");
             exitcode::USAGE
         }
     }
@@ -176,8 +176,8 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
 
     match res {
         Ok(()) => exitcode::OK,
-        Err(err) => {
-            error!(message="Error controlling service.", %err);
+        Err(error) => {
+            error!(message = "Error controlling service.", error = ?error);
             exitcode::SOFTWARE
         }
     }

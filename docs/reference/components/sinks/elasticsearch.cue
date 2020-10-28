@@ -146,6 +146,14 @@ components: sinks: elasticsearch: {
 				default: "_doc"
 			}
 		}
+		endpoint: {
+			description: "The Elasticsearch endpoint to send logs to. This should be the full URL as shown in the example."
+			required:    true
+			warnings: []
+			type: string: {
+				examples: ["http://10.24.32.122:9000", "https://example.com"]
+			}
+		}
 		headers: {
 			common:      false
 			description: "Options for custom headers."
