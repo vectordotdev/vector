@@ -99,3 +99,152 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use super::Fingerprinter;
+    use std::fs;
+    use tempfile::tempdir;
+
+    #[test]
+    fn test_checksum_fingerprint() {
+        let fingerprinter = Fingerprinter::Checksum {
+            bytes: 256,
+            ignored_header_bytes: 0,
+        };
+
+        let target_dir = tempdir().unwrap();
+        let enough_data = vec![b'x'; 256];
+        let not_enough_data = vec![b'x'; 199];
+        let empty_path = target_dir.path().join("empty.log");
+        let big_enough_path = target_dir.path().join("big_enough.log");
+        let duplicate_path = target_dir.path().join("duplicate.log");
+        let not_big_enough_path = target_dir.path().join("not_big_enough.log");
+        fs::write(&empty_path, &[]).unwrap();
+        fs::write(&big_enough_path, &enough_data).unwrap();
+        fs::write(&duplicate_path, &enough_data).unwrap();
+        fs::write(&not_big_enough_path, &not_enough_data).unwrap();
+
+        let mut buf = Vec::new();
+        assert!(fingerprinter
+            .get_fingerprint_of_file(&empty_path, &mut buf)
+            .is_err());
+        assert!(fingerprinter
+            .get_fingerprint_of_file(&big_enough_path, &mut buf)
+            .is_ok());
+        assert!(fingerprinter
+            .get_fingerprint_of_file(&not_big_enough_path, &mut buf)
+            .is_err());
+        assert_eq!(
+            fingerprinter
+                .get_fingerprint_of_file(&big_enough_path, &mut buf)
+                .unwrap(),
+            fingerprinter
+                .get_fingerprint_of_file(&duplicate_path, &mut buf)
+                .unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_first_line_checksum_fingerprint() {
+        let max_line_length = 64;
+        let fingerprinter = Fingerprinter::FirstLineChecksum {
+            max_line_length,
+            ignored_header_bytes: 0,
+        };
+
+        let target_dir = tempdir().unwrap();
+        let prepare_test = |file: &str, contents: &[u8]| {
+            let path = target_dir.path().join(file);
+            fs::write(&path, contents).unwrap();
+            path
+        };
+        let prepare_test_long = |file: &str, amount| {
+            prepare_test(
+                file,
+                b"hello world "
+                    .iter()
+                    .cloned()
+                    .cycle()
+                    .clone()
+                    .take(amount)
+                    .collect::<Box<_>>()
+                    .as_ref(),
+            )
+        };
+
+        let empty = prepare_test("empty.log", b"");
+        let incomlete_line = prepare_test("incomlete_line.log", b"missing newline char");
+        let one_line = prepare_test("one_line.log", b"hello world\n");
+        let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
+        let one_line_continued =
+            prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
+        let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
+
+        let exactly_max_line_length =
+            prepare_test_long("exactly_max_line_length.log", max_line_length);
+        let exceeding_max_line_length =
+            prepare_test_long("exceeding_max_line_length.log", max_line_length + 1);
+        let incomplete_under_max_line_length_by_one = prepare_test_long(
+            "incomplete_under_max_line_length_by_one.log",
+            max_line_length - 1,
+        );
+
+        let mut buf = Vec::new();
+        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
+
+        assert!(run(&empty).is_err());
+        assert!(run(&incomlete_line).is_err());
+        assert!(run(&incomplete_under_max_line_length_by_one).is_err());
+
+        assert!(run(&one_line).is_ok());
+        assert!(run(&one_line_duplicate).is_ok());
+        assert!(run(&one_line_continued).is_ok());
+        assert!(run(&different_two_lines).is_ok());
+        assert!(run(&exactly_max_line_length).is_ok());
+        assert!(run(&exceeding_max_line_length).is_ok());
+
+        assert_eq!(run(&one_line).unwrap(), run(&one_line_duplicate).unwrap());
+        assert_eq!(run(&one_line).unwrap(), run(&one_line_continued).unwrap());
+
+        assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
+
+        assert_eq!(
+            run(&exactly_max_line_length).unwrap(),
+            run(&exceeding_max_line_length).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_inode_fingerprint() {
+        let fingerprinter = Fingerprinter::DevInode;
+
+        let target_dir = tempdir().unwrap();
+        let small_data = vec![b'x'; 1];
+        let medium_data = vec![b'x'; 256];
+        let empty_path = target_dir.path().join("empty.log");
+        let small_path = target_dir.path().join("small.log");
+        let medium_path = target_dir.path().join("medium.log");
+        let duplicate_path = target_dir.path().join("duplicate.log");
+        fs::write(&empty_path, &[]).unwrap();
+        fs::write(&small_path, &small_data).unwrap();
+        fs::write(&medium_path, &medium_data).unwrap();
+        fs::write(&duplicate_path, &medium_data).unwrap();
+
+        let mut buf = Vec::new();
+        assert!(fingerprinter
+            .get_fingerprint_of_file(&empty_path, &mut buf)
+            .is_ok());
+        assert!(fingerprinter
+            .get_fingerprint_of_file(&small_path, &mut buf)
+            .is_ok());
+        assert_ne!(
+            fingerprinter
+                .get_fingerprint_of_file(&medium_path, &mut buf)
+                .unwrap(),
+            fingerprinter
+                .get_fingerprint_of_file(&duplicate_path, &mut buf)
+                .unwrap()
+        );
+    }
+}

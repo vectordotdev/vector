@@ -3,6 +3,7 @@ extern crate scan_fmt;
 #[macro_use]
 extern crate tracing;
 
+mod checkpointer;
 mod file_server;
 mod file_watcher;
 mod fingerprinter;
