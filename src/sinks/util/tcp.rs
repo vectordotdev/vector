@@ -167,7 +167,7 @@ impl TcpSink {
         let stream = self.connector.connect_backoff().await;
         BytesSink::new(
             stream,
-            Box::new(Self::shutdown_check),
+            Self::shutdown_check,
             Arc::clone(&self.events_counter),
         )
     }
@@ -213,11 +213,10 @@ impl StreamSink for TcpSink {
             let _open_token =
                 OpenGauge::new().open(Box::new(|count| emit!(ConnectionOpen { count })));
             if let Err(error) = sink.send_all(&mut stream).await {
-                let peer_addr = sink.get_ref().get_ref().peer_addr().ok();
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
-                    emit!(TcpSocketConnectionShutdown { peer_addr });
+                    emit!(TcpSocketConnectionShutdown {});
                 } else {
-                    emit!(TcpSocketError { peer_addr, error });
+                    emit!(TcpSocketError { error });
                 }
             }
 

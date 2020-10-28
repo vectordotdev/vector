@@ -126,7 +126,7 @@ impl UnixSink {
         let stream = self.connector.connect_backoff().await;
         BytesSink::new(
             stream,
-            Box::new(|_| ShutdownCheck::Alive),
+            |_| ShutdownCheck::Alive,
             Arc::clone(&self.events_counter),
         )
     }

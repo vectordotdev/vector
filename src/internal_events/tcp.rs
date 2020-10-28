@@ -39,20 +39,11 @@ where
 }
 
 #[derive(Debug)]
-pub struct TcpSocketConnectionShutdown {
-    pub peer_addr: Option<std::net::SocketAddr>,
-}
+pub struct TcpSocketConnectionShutdown;
 
 impl InternalEvent for TcpSocketConnectionShutdown {
     fn emit_logs(&self) {
-        if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "Received EOF from the server, shutdown.", %peer_addr);
-        } else {
-            debug!(
-                message = "Received EOF from the server, shutdown.",
-                peer_addr = "unknow"
-            );
-        }
+        debug!(message = "Received EOF from the server, shutdown.");
     }
 
     fn emit_metrics(&self) {
@@ -78,16 +69,11 @@ impl InternalEvent for TcpSocketConnectionError {
 #[derive(Debug)]
 pub struct TcpSocketError {
     pub error: std::io::Error,
-    pub peer_addr: Option<std::net::SocketAddr>,
 }
 
 impl InternalEvent for TcpSocketError {
     fn emit_logs(&self) {
-        if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "TCP socket error.", error = %self.error, %peer_addr);
-        } else {
-            debug!(message = "TCP socket error.", error = %self.error, peer_addr = "unknow");
-        }
+        debug!(message = "TCP socket error.", error = %self.error);
     }
 
     fn emit_metrics(&self) {

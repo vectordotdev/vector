@@ -12,7 +12,7 @@ use std::{
 use tokio::io::AsyncWrite;
 use tokio_util::codec::{BytesCodec, FramedWrite};
 
-const MAX_PENDING_ITEMS: usize = 10_000;
+const MAX_PENDING_ITEMS: usize = 1_000;
 
 /// Count number of encoded events and ack on request.
 pub struct EventsCounter {
@@ -89,15 +89,18 @@ pub struct BytesSink<T> {
     events_counter: Arc<EventsCounter>,
 }
 
-impl<T: AsyncWrite> BytesSink<T> {
+impl<T> BytesSink<T>
+where
+    T: AsyncWrite,
+{
     pub fn new(
         inner: T,
-        shutdown_check: Box<dyn Fn(&mut T) -> ShutdownCheck + Send>,
+        shutdown_check: impl Fn(&mut T) -> ShutdownCheck + Send + 'static,
         events_counter: Arc<EventsCounter>,
     ) -> Self {
         Self {
             inner: FramedWrite::new(inner, BytesCodec::new()),
-            shutdown_check,
+            shutdown_check: Box::new(shutdown_check),
             events_count: 0,
             events_counter,
         }
@@ -127,19 +130,6 @@ where
     type Error = <FramedWrite<T, BytesCodec> as Sink<Bytes>>::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let pinned = self.as_mut().project();
-        match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
-            ShutdownCheck::Error(error) => return Poll::Ready(Err(error)),
-            ShutdownCheck::Close(reason) => {
-                if let Err(error) = ready!(self.as_mut().poll_close(cx)) {
-                    return Poll::Ready(Err(error));
-                }
-
-                return Poll::Ready(Err(IoError::new(ErrorKind::Other, reason)));
-            }
-            ShutdownCheck::Alive => {}
-        }
-
         if self.as_mut().project().events_counter.is_full() {
             if let Err(error) = ready!(self.as_mut().poll_flush(cx)) {
                 return Poll::Ready(Err(error));
@@ -156,6 +146,19 @@ where
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let pinned = self.as_mut().project();
+        match (pinned.shutdown_check)(pinned.inner.get_mut().get_mut()) {
+            ShutdownCheck::Error(error) => return Poll::Ready(Err(error)),
+            ShutdownCheck::Close(reason) => {
+                if let Err(error) = ready!(self.as_mut().poll_close(cx)) {
+                    return Poll::Ready(Err(error));
+                }
+
+                return Poll::Ready(Err(IoError::new(ErrorKind::Other, reason)));
+            }
+            ShutdownCheck::Alive => {}
+        }
+
         let result = ready!(self.as_mut().project().inner.poll_flush(cx));
         self.as_mut().get_mut().ack();
         Poll::Ready(result)
