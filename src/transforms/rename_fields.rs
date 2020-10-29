@@ -102,10 +102,7 @@ mod tests {
         event.as_mut_log().insert("to_move", "some value");
         event.as_mut_log().insert("do_not_move", "not moved");
         let mut fields = IndexMap::new();
-        fields.insert(
-            String::from("to_move"),
-            String::from("moved"),
-        );
+        fields.insert(String::from("to_move"), String::from("moved"));
         fields.insert(
             String::from("not_present"),
             String::from("should_not_exist"),

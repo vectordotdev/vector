@@ -112,9 +112,7 @@ impl Transform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
-                        emit!(AddFieldsTemplateRenderingError {
-                            field: &key,
-                        });
+                        emit!(AddFieldsTemplateRenderingError { field: &key });
                         continue;
                     }
                 }
@@ -123,14 +121,10 @@ impl Transform for AddFields {
             };
             if self.overwrite {
                 if event.as_mut_log().insert(&key_string, value).is_some() {
-                    emit!(AddFieldsFieldOverwritten {
-                        field: &key,
-                    });
+                    emit!(AddFieldsFieldOverwritten { field: &key });
                 }
             } else if event.as_mut_log().contains(&key_string) {
-                emit!(AddFieldsFieldNotOverwritten {
-                    field: &key,
-                });
+                emit!(AddFieldsFieldNotOverwritten { field: &key });
             } else {
                 event.as_mut_log().insert(&key_string, value);
             }
@@ -205,15 +199,9 @@ mod tests {
         let mut fields = IndexMap::new();
         fields.insert(String::from("float"), Value::from(4.5));
         fields.insert(String::from("int"), Value::from(4));
-        fields.insert(
-            String::from("string"),
-            Value::from("thisisastring"),
-        );
+        fields.insert(String::from("string"), Value::from("thisisastring"));
         fields.insert(String::from("bool"), Value::from(true));
-        fields.insert(
-            String::from("array"),
-            Value::from(vec![1_isize, 2, 3]),
-        );
+        fields.insert(String::from("array"), Value::from(vec![1_isize, 2, 3]));
 
         let mut map = IndexMap::new();
         map.insert(String::from("key"), Value::from("value"));
