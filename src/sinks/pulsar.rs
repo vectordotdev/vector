@@ -66,7 +66,17 @@ inventory::submit! {
     SinkDescription::new::<PulsarSinkConfig>("pulsar")
 }
 
-impl GenerateConfig for PulsarSinkConfig {}
+impl GenerateConfig for PulsarSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoint: "pulsar://127.0.0.1:6650".to_string(),
+            topic: "topic-1234".to_string(),
+            encoding: Encoding::Text.into(),
+            auth: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "pulsar")]
@@ -169,10 +179,7 @@ impl Sink for PulsarSink {
                 }
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     trace!(
-                        "Pulsar sink produced message {:?} from {} at sequence id {}",
-                        result.message_id,
-                        result.producer_id,
-                        result.sequence_id
+                        message = "Pulsar sink produced message.", message_id = ?result.message_id, producer_id = %result.producer_id, sequence_id = %result.sequence_id
                     );
                     self.pending_acks.insert(seqno);
                     let mut num_to_ack = 0;
@@ -182,7 +189,7 @@ impl Sink for PulsarSink {
                     }
                     self.acker.ack(num_to_ack);
                 }
-                Err(e) => error!("Pulsar sink generated an error: {}", e),
+                Err(error) => error!(message = "Pulsar sink generated an error.", %error),
             }
         }
     }
@@ -205,6 +212,11 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 mod tests {
     use super::*;
     use std::collections::HashMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PulsarSinkConfig>();
+    }
 
     #[test]
     fn pulsar_event_json() {
@@ -298,7 +310,7 @@ mod integration_tests {
         for _ in 0..num_events {
             let msg = match consumer.next().await.unwrap() {
                 Ok(msg) => msg,
-                Err(err) => panic!("{:?}", err),
+                Err(error) => panic!("{:?}", error),
             };
             consumer.ack(&msg).await.unwrap();
         }

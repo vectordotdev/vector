@@ -21,7 +21,7 @@ impl<'a> InternalEvent for CoercerConversionFailed<'a> {
         debug!(
             message = "Could not convert types.",
             field = %self.field,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         );
     }

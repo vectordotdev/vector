@@ -2,10 +2,11 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
@@ -93,7 +94,7 @@ impl SinkConfig for PubsubConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal gcp pubsub sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

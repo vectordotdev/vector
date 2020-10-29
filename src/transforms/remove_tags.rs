@@ -20,7 +20,11 @@ inventory::submit! {
     TransformDescription::new::<RemoveTagsConfig>("remove_tags")
 }
 
-impl GenerateConfig for RemoveTagsConfig {}
+impl GenerateConfig for RemoveTagsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { tags: Vec::new() }).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
@@ -78,9 +82,15 @@ mod tests {
     };
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoveTagsConfig>();
+    }
+
+    #[test]
     fn remove_tags() {
         let event = Event::Metric(Metric {
             name: "foo".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(
                 vec![
@@ -109,6 +119,7 @@ mod tests {
     fn remove_all_tags() {
         let event = Event::Metric(Metric {
             name: "foo".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(
                 vec![("env".to_owned(), "production".to_owned())]
@@ -129,6 +140,7 @@ mod tests {
     fn remove_tags_from_none() {
         let event = Event::Metric(Metric {
             name: "foo".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,

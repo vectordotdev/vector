@@ -63,7 +63,7 @@ pub fn drop(criterion: &mut Criterion) {
                 "#,
                     )
                     .unwrap(),
-                )
+                )r
                 .unwrap(),
             ),
         ),

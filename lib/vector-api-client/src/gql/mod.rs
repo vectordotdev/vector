@@ -1,9 +1,9 @@
 //! Queries, subscriptions, and extension methods for executing them
 
+mod components;
 mod health;
 mod metrics;
-mod topology;
 
+pub use components::*;
 pub use health::*;
 pub use metrics::*;
-pub use topology::*;

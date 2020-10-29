@@ -130,9 +130,7 @@ pub enum DataType {
 }
 
 pub trait GenerateConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::Table(Default::default())
-    }
+    fn generate_config() -> toml::Value;
 }
 
 #[macro_export]

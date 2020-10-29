@@ -100,7 +100,7 @@ impl SourceConfig for JournaldConfig {
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
             (true, false) => {
-                warn!("The `units` setting is deprecated, use `include_units` instead");
+                warn!("The `units` setting is deprecated, use `include_units` instead.");
                 &self.units
             }
             (false, _) => &self.include_units,
@@ -167,10 +167,10 @@ impl JournaldConfig {
         // Retrieve the saved checkpoint, and use it to seek forward in the journald log
         let cursor = match checkpointer.get().await {
             Ok(cursor) => cursor,
-            Err(err) => {
+            Err(error) => {
                 error!(
-                    message = "Could not retrieve saved journald checkpoint",
-                    error = %err
+                    message = "Could not retrieve saved journald checkpoint.",
+                    %error
                 );
                 None
             }
@@ -182,7 +182,6 @@ impl JournaldConfig {
             include_units,
             exclude_units,
             channel: out,
-            shutdown: shutdown.clone(),
             checkpointer,
             batch_size,
             remap_priority,
@@ -324,7 +323,6 @@ struct JournaldServer<J, T> {
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
     channel: T,
-    shutdown: ShutdownSignal,
     checkpointer: Checkpointer,
     batch_size: usize,
     remap_priority: bool,
@@ -344,15 +342,12 @@ where
 
             for _ in 0..self.batch_size {
                 let text = match self.journal.next().await {
-                    None => {
-                        let _ = self.shutdown.await;
-                        return;
-                    }
+                    None => return,
                     Some(Ok(text)) => text,
-                    Some(Err(err)) => {
+                    Some(Err(error)) => {
                         error!(
-                            message = "Could not read from journald source",
-                            error = %err,
+                            message = "Could not read from journald source.",
+                            %error,
                         );
                         break;
                     }
@@ -382,7 +377,7 @@ where
 
                 match channel.send(record).compat().await {
                     Ok(_) => {}
-                    Err(()) => error!(message = "Could not send journald log"),
+                    Err(()) => error!(message = "Could not send journald log."),
                 }
             }
 

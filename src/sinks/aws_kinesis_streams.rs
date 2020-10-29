@@ -3,11 +3,10 @@ use crate::{
     dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
-    region::RegionOrEndpoint,
+    rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto,
         sink::Response,
         BatchConfig, BatchSettings, Compression, EncodedLength, TowerRequestConfig, VecBuffer,
     },
@@ -74,7 +73,16 @@ inventory::submit! {
     SinkDescription::new::<KinesisSinkConfig>("aws_kinesis_streams")
 }
 
-impl GenerateConfig for KinesisSinkConfig {}
+impl GenerateConfig for KinesisSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"region = "us-east-1"
+            stream_name = "my-stream"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_kinesis_streams")]
@@ -160,7 +168,7 @@ impl KinesisService {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
+            .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error.", %error))
             .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
 
         Ok(sink)
@@ -178,7 +186,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
 
     fn call(&mut self, records: Vec<PutRecordsRequestEntry>) -> Self::Future {
         debug!(
-            message = "sending records.",
+            message = "Sending records.",
             events = %records.len(),
         );
 
@@ -320,6 +328,11 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KinesisSinkConfig>();
+    }
+
+    #[test]
     fn kinesis_encode_event_text() {
         let message = "hello world".to_string();
         let event = encode_event(message.clone().into(), &None, &Encoding::Text.into()).unwrap();
@@ -382,7 +395,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::SinkContext,
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
     use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
@@ -491,7 +504,7 @@ mod integration_tests {
 
         match client.create_stream(req).await {
             Ok(_) => (),
-            Err(e) => panic!("Unable to check the stream {:?}", e),
+            Err(error) => panic!("Unable to check the stream {:?}", error),
         };
 
         // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors

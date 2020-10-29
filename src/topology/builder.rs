@@ -83,7 +83,7 @@ pub async fn build_pieces(
             .select(Box::new(
                 force_shutdown_tripwire.unit_error().boxed().compat(),
             ))
-            .map(|_| debug!("Finished"))
+            .map(|_| debug!("Finished."))
             .map_err(|_| ())
             .compat();
         let server = Task::new(name, typetag, server);
@@ -136,13 +136,13 @@ pub async fn build_pieces(
             }
             Transform::Task(t) => {
                 let filtered = filter_event_type(input_rx, input_type);
-                let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> = t.transform(filtered);
+                let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
+                    t.transform(filtered);
                 transformed.forward(output)
             }
         }
-        .map(|_| debug!("Finished"))
+        .map(|_| debug!("Finished."))
         .compat();
-
         let task = Task::new(name, typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
@@ -188,7 +188,7 @@ pub async fn build_pieces(
                     .take_while(|e| future::ready(e.is_ok()))
                     .map(|x| x.unwrap()),
             )
-            .inspect(|_| debug!("Finished"));
+            .inspect(|_| debug!("Finished."));
         let task = Task::new(name, typetag, sink);
 
         let healthcheck_task = async move {
@@ -201,11 +201,11 @@ pub async fn build_pieces(
                             Ok(())
                         }
                         Ok(Err(error)) => {
-                            error!("Healthcheck: Failed Reason: {}", error);
+                            error!(message = "Healthcheck: Failed Reason.", %error);
                             Err(())
                         }
                         Err(_) => {
-                            error!("Healthcheck: timeout");
+                            error!("Healthcheck: timeout.");
                             Err(())
                         }
                     })

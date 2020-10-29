@@ -2,13 +2,14 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
+    http::HttpClient,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region::{region_from_endpoint, RegionOrEndpoint},
+    rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         retries::{RetryAction, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -129,7 +130,7 @@ impl SinkConfig for ElasticSearchConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
         Ok((
             super::VectorSink::Futures01Sink(Box::new(sink)),
@@ -590,7 +591,7 @@ mod integration_tests {
     use crate::{
         config::{SinkConfig, SinkContext},
         dns::Resolver,
-        sinks::util::http::HttpClient,
+        http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
         Event,

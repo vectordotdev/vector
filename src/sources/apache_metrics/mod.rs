@@ -44,7 +44,16 @@ inventory::submit! {
     SourceDescription::new::<ApacheMetricsConfig>("apache_metrics")
 }
 
-impl GenerateConfig for ApacheMetricsConfig {}
+impl GenerateConfig for ApacheMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoints: vec!["http://localhost:8080/server-status/?auto".to_owned()],
+            scrape_interval_secs: default_scrape_interval_secs(),
+            namespace: default_namespace(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "apache_metrics")]
@@ -131,7 +140,7 @@ fn apache_metrics(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_map_err(|error| error!(message = "Error sending metric.", %error))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
@@ -174,6 +183,7 @@ fn apache_metrics(
                             let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
                                 .chain(vec![Ok(Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -207,6 +217,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -224,6 +235,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: encode_namespace(&namespace, "up"),
+                                    namespace: None,
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -239,7 +251,7 @@ fn apache_metrics(
         })
         .flatten()
         .forward(out)
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending."));
 
     Box::new(task.boxed().compat())
 }
@@ -259,6 +271,11 @@ mod test {
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ApacheMetricsConfig>();
+    }
 
     #[tokio::test]
     async fn test_apache_up() {
@@ -311,8 +328,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", %error);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -356,10 +373,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                         );
                         assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
                     }
-                    None => error!("no tags for metric {:?}", m),
+                    None => error!(message = "No tags for metric.", metric = ?m),
                 }
             }
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
         }
     }
 
@@ -379,8 +396,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", %error);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -417,7 +434,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
         match metrics.iter().find(|m| m.name == "apache_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
         }
     }
 
@@ -455,7 +472,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         match metrics.iter().find(|m| m.name == "custom_up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 0.0 }),
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
         }
     }
 }

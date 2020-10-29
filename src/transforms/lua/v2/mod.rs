@@ -224,7 +224,7 @@ impl Lua {
                 .lua
                 .gc_collect()
                 .context(RuntimeErrorGC)
-                .map_err(|e| error!(error = %e, rate_limit = 30));
+                .map_err(|error| error!(%error, rate_limit = 30));
             self.invocations_after_gc = 0;
         }
     }
@@ -280,7 +280,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksInit)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -302,7 +302,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksInit)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -323,7 +323,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorTimerHandler)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -787,6 +787,7 @@ mod tests {
 
         let event = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -799,6 +800,7 @@ mod tests {
 
         let expected = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,

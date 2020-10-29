@@ -2,11 +2,11 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::{HttpClient, HttpClientFuture},
     serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -148,7 +148,16 @@ inventory::submit! {
     SinkDescription::new::<GcsSinkConfig>(NAME)
 }
 
-impl GenerateConfig for GcsSinkConfig {}
+impl GenerateConfig for GcsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"bucket = "my-bucket"
+            credentials_path = "/path/to/credentials.json"
+            encoding.codec = "ndjson""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
@@ -222,7 +231,7 @@ impl GcsSink {
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
+            .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(VectorSink::Futures01Sink(Box::new(sink)))
@@ -314,7 +323,7 @@ impl RequestWrapper {
             settings.extension
         );
 
-        debug!(message = "sending events.", bytes = ?body.len(), ?key);
+        debug!(message = "Sending events.", bytes = ?body.len(), key = ?key);
 
         Self {
             body,
@@ -461,6 +470,11 @@ mod tests {
     use crate::event::Event;
 
     use std::collections::HashMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GcsSinkConfig>();
+    }
 
     #[test]
     fn gcs_encode_event_text() {

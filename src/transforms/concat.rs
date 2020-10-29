@@ -22,7 +22,16 @@ inventory::submit! {
     TransformDescription::new::<ConcatConfig>("concat")
 }
 
-impl GenerateConfig for ConcatConfig {}
+impl GenerateConfig for ConcatConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            target: String::new(),
+            joiner: None,
+            items: Vec::new(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
@@ -205,6 +214,11 @@ impl FunctionTransform for Concat {
 mod tests {
     use super::*;
     use crate::event::Event;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ConcatConfig>();
+    }
 
     #[test]
     fn concat_to_from() {

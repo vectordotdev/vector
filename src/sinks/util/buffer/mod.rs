@@ -63,15 +63,6 @@ impl Buffer {
         }
     }
 
-    // This is not guaranteed to be completely accurate as the gzip library does
-    // some internal buffering.
-    pub fn size(&self) -> usize {
-        match &self.inner {
-            InnerBuffer::Plain(inner) => inner.len(),
-            InnerBuffer::Gzip(inner) => inner.get_ref().len(),
-        }
-    }
-
     pub fn is_empty(&self) -> bool {
         match &self.inner {
             InnerBuffer::Plain(inner) => inner.is_empty(),

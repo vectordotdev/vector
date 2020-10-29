@@ -42,7 +42,6 @@ impl Regex {
         &self.compiled
     }
 
-    #[allow(dead_code)]
     pub fn is_global(&self) -> bool {
         self.global
     }
@@ -52,7 +51,7 @@ impl Regex {
             .case_insensitive(insensitive)
             .multi_line(multiline)
             .build()
-            .map_err(|err| format!("invalid regex: {}", err))
+            .map_err(|error| format!("invalid regex: {}", error))
     }
 }
 

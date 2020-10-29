@@ -48,7 +48,11 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
     }
 }
 
-impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {}
+impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { field: None }).unwrap()
+    }
+}
 
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParser {
@@ -153,9 +157,14 @@ struct AwsCloudWatchLogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{event::Event, event::LogEvent, log_event};
+    use crate::{event::Event, log_event};
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AwsCloudwatchLogsSubscriptionParserConfig>();
+    }
 
     #[test]
     fn aws_cloudwatch_logs_subscription_parser_emits_events() {

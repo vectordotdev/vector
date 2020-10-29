@@ -138,7 +138,7 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
                 // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
                 let mut metrics = stream::iter(metrics).boxed();
                 if let Err(error) = out.send_all(&mut metrics).await {
-                    error!("Error sending metric: {:?}", error);
+                    error!(message = "Error sending metric.", %error);
                     break;
                 }
             }
@@ -184,7 +184,7 @@ mod test {
     use tokio::time::{delay_for, Duration};
 
     #[test]
-    fn test_generate_config() {
+    fn generate_config() {
         crate::test_util::test_generate_config::<StatsdConfig>();
     }
 

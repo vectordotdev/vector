@@ -24,7 +24,7 @@ messages
         counter!("bytes_processed", msg.len() as u64, "source" => "file");
         create_event(msg, file, &host_key, &hostname, &file_key)
     })
-    .forward(out.sink_map_err(|e| error!(%e)))
+    .forward(out.sink_map_err(|error| error!(?error)))
 ```
 
 It's immediately obvious that we're trading off brevity for thoroughness. There
@@ -79,7 +79,7 @@ messages
         });
         create_event(msg, file, &host_key, &hostname, &file_key)
     })
-    .forward(out.sink_map_err(|e| error!(%e)))
+    .forward(out.sink_map_err(|error| error!(?error)))
 ```
 
 And in the `internal_events` module, we would add the following:

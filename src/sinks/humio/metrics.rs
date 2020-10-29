@@ -23,7 +23,16 @@ inventory::submit! {
     SinkDescription::new::<HumioMetricsConfig>("humio_metrics")
 }
 
-impl GenerateConfig for HumioMetricsConfig {}
+impl GenerateConfig for HumioMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"host_key = "hostname"
+            token = "${HUMIO_TOKEN}"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_metrics")]
@@ -66,6 +75,11 @@ mod tests {
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HumioMetricsConfig>();
+    }
+
     #[tokio::test]
     async fn smoke_json() {
         let (mut config, cx) = load_sink::<HumioMetricsConfig>(
@@ -91,6 +105,7 @@ mod tests {
         let metrics = vec![
             Event::from(Metric {
                 name: "metric1".to_string(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 1)),
                 tags: Some(
                     vec![("os.host".to_string(), "somehost".to_string())]
@@ -102,6 +117,7 @@ mod tests {
             }),
             Event::from(Metric {
                 name: "metric2".to_string(),
+                namespace: None,
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms(21, 0, 2)),
                 tags: Some(
                     vec![("os.host".to_string(), "somehost".to_string())]

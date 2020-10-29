@@ -144,33 +144,36 @@ impl SourceConfig for MockSourceConfig {
         let mut recv = wrapped.lock().unwrap().take().unwrap();
         let mut shutdown = Some(shutdown.unit_error().boxed().compat());
         let mut _token = None;
-        let source = futures01::future::lazy(move || {
-            stream::poll_fn(move || {
-                if let Some(until) = shutdown.as_mut() {
-                    match until.poll() {
-                        Ok(Async::Ready(res)) => {
-                            _token = Some(res);
-                            shutdown.take();
-                            recv.close();
+        let source =
+            futures01::future::lazy(move || {
+                stream::poll_fn(move || {
+                    if let Some(until) = shutdown.as_mut() {
+                        match until.poll() {
+                            Ok(Async::Ready(res)) => {
+                                _token = Some(res);
+                                shutdown.take();
+                                recv.close();
+                            }
+                            Err(_) => {
+                                shutdown.take();
+                            }
+                            Ok(Async::NotReady) => {}
                         }
-                        Err(_) => {
-                            shutdown.take();
-                        }
-                        Ok(Async::NotReady) => {}
                     }
-                }
 
-                recv.poll()
-            })
-            .map(move |x| {
-                if let Some(counter) = &event_counter {
-                    counter.fetch_add(1, Ordering::Relaxed);
-                }
-                x
-            })
-            .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-            .map(|_| info!("Finished sending"))
-        });
+                    recv.poll()
+                })
+                .map(move |x| {
+                    if let Some(counter) = &event_counter {
+                        counter.fetch_add(1, Ordering::Relaxed);
+                    }
+                    x
+                })
+                .forward(out.sink_map_err(
+                    |error| error!(message = "Error sending in sink..", error = ?error),
+                ))
+                .map(|_| info!("Finished sending."))
+            });
         Ok(Box::new(source))
     }
 
@@ -314,9 +317,9 @@ where
 {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
-        let sink = sink.sink_map_err(|error| {
-            error!(message = "Ingesting an event failed at mock sink", ?error)
-        });
+        let sink = sink.sink_map_err(
+            |error| error!(message = "Ingesting an event failed at mock sink.", error = ?error),
+        );
         let sink = StreamSinkOld::new(sink, cx.acker());
         let healthcheck = if self.healthy {
             future::ok(())

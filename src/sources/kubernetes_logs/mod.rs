@@ -111,7 +111,7 @@ impl SourceConfig for Config {
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "Source future failed", ?error);
+                error!(message = "Source future failed.", %error);
             })
         });
         let fut = Box::pin(fut);
@@ -268,22 +268,26 @@ impl Source {
         };
 
         let (file_source_tx, file_source_rx) =
-            futures::channel::mpsc::channel::<(Bytes, String)>(100);
+            futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
         let mut parser = parser::build();
         let mut partial_events_merger = partial_events_merger::build(auto_partial_merge);
 
-        let events = file_source_rx.map(move |(bytes, file)| {
-            emit!(KubernetesLogsEventReceived {
-                file: &file,
-                byte_size: bytes.len(),
-            });
-            let mut event = create_event(bytes, &file);
-            if annotator.annotate(&mut event, &file).is_none() {
-                emit!(KubernetesLogsEventAnnotationFailed { event: &event });
-            }
-            event
-        });
+        let events =
+            file_source_rx
+                .map(futures::stream::iter)
+                .flatten()
+                .map(move |(bytes, file)| {
+                    emit!(KubernetesLogsEventReceived {
+                        file: &file,
+                        byte_size: bytes.len(),
+                    });
+                    let mut event = create_event(bytes, &file);
+                    if annotator.annotate(&mut event, &file).is_none() {
+                        emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+                    }
+                    event
+                });
         let events = events
             .flat_map(move |event| {
                 let mut buf = Vec::with_capacity(1);
@@ -303,9 +307,9 @@ impl Source {
             let (slot, shutdown) = lifecycle.add();
             let fut =
                 util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
-                    Ok(()) => info!(message = "reflector process completed gracefully"),
+                    Ok(()) => info!(message = "Reflector process completed gracefully."),
                     Err(error) => {
-                        error!(message = "reflector process exited with an error", ?error)
+                        error!(message = "Reflector process exited with an error.", %error)
                     }
                 });
             slot.bind(Box::pin(fut));
@@ -314,8 +318,8 @@ impl Source {
             let (slot, shutdown) = lifecycle.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
                 match result {
-                    Ok(FileServerShutdown) => info!(message = "file server completed gracefully"),
-                    Err(error) => error!(message = "file server exited with an error", ?error),
+                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+                    Err(error) => error!(message = "File server exited with an error.", %error),
                 }
             });
             slot.bind(Box::pin(fut));
@@ -329,14 +333,14 @@ impl Source {
             )
             .map(|result| {
                 match result {
-                    Ok(Ok(())) => info!(message = "event processing loop completed gracefully"),
+                    Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
                     Ok(Err(error)) => error!(
-                        message = "event processing loop exited with an error",
-                        ?error
+                        message = "Event processing loop exited with an error.",
+                        %error
                     ),
                     Err(error) => error!(
-                        message = "event processing loop timed out during the shutdown",
-                        ?error
+                        message = "Event processing loop timed out during the shutdown.",
+                        %error
                     ),
                 };
             });
@@ -344,7 +348,7 @@ impl Source {
         }
 
         lifecycle.run(global_shutdown).await;
-        info!(message = "done");
+        info!(message = "Done.");
         Ok(())
     }
 }
@@ -386,7 +390,7 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
         config.self_node_name.clone()
     };
     info!(
-        message = "obtained Kubernetes Node name to collect logs for (self)",
+        message = "Obtained Kubernetes Node name to collect logs for (self).",
         ?self_node_name
     );
 

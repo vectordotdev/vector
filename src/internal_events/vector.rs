@@ -37,7 +37,7 @@ pub struct VectorProtoDecodeError {
 
 impl InternalEvent for VectorProtoDecodeError {
     fn emit_logs(&self) {
-        error!(message = "Failed to decode protobuf message.", error = %self.error, rate_limit_secs = 10);
+        error!(message = "Failed to decode protobuf message.", error = ?self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {

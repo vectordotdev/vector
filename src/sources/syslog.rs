@@ -74,7 +74,19 @@ inventory::submit! {
     SourceDescription::new::<SyslogConfig>("syslog")
 }
 
-impl GenerateConfig for SyslogConfig {}
+impl GenerateConfig for SyslogConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            mode: Mode::Tcp {
+                address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
+                tls: None,
+            },
+            host_key: None,
+            max_length: default_max_length(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "syslog")]
@@ -251,7 +263,7 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|e| error!("Error sending line: {:?}.", e));
+    let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     Box::new(
         async move {
@@ -271,7 +283,7 @@ pub fn udp(
                     async move {
                         match frame {
                             Ok((bytes, received_from)) => {
-                                let received_from = received_from.to_string().into();
+                                let received_from = received_from.ip().to_string().into();
 
                                 std::str::from_utf8(&bytes)
                                     .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
@@ -351,7 +363,7 @@ fn event_from_str(host_key: &str, default_host: Option<Bytes>, line: &str) -> Op
     });
 
     trace!(
-        message = "processing one event.",
+        message = "Processing one event.",
         event = ?event
     );
 
@@ -400,6 +412,11 @@ mod test {
     use super::{event_from_str, SyslogConfig};
     use crate::{config::log_schema, event::Event};
     use chrono::prelude::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SyslogConfig>();
+    }
 
     #[test]
     fn config_tcp() {

@@ -25,7 +25,7 @@ pub(crate) struct JournaldInvalidRecord {
 
 impl InternalEvent for JournaldInvalidRecord {
     fn emit_logs(&self) {
-        error!(message = "Invalid record from journald, discarding.", error = %self.error, text = %self.text);
+        error!(message = "Invalid record from journald, discarding.", error = ?self.error, text = %self.text);
     }
 
     fn emit_metrics(&self) {

@@ -1,13 +1,14 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
+    http::HttpClient,
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
         SplunkSourceTypeMissingKeys,
     },
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
     },
     template::Template,
@@ -109,7 +110,7 @@ impl SinkConfig for HecSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 

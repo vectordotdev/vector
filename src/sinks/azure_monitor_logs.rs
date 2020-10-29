@@ -1,10 +1,11 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -125,7 +126,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal azure_monitor_logs sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }

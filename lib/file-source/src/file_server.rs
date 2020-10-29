@@ -7,7 +7,7 @@ use futures::{
 };
 use glob::glob;
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs::{self, remove_file, File};
 use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
@@ -65,10 +65,10 @@ where
         self,
         mut chans: C,
         mut shutdown: impl Future + Unpin,
-    ) -> Result<Shutdown, <C as Sink<(Bytes, String)>>::Error>
+    ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
     where
-        C: Sink<(Bytes, String)> + Unpin,
-        <C as Sink<(Bytes, String)>>::Error: std::error::Error,
+        C: Sink<Vec<(Bytes, String)>> + Unpin,
+        <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
     {
         let mut fingerprint_buffer = Vec::new();
 
@@ -110,6 +110,8 @@ where
             );
         }
 
+        let mut stats = TimingStats::default();
+
         // Alright friends, how does this work?
         //
         // We want to avoid burning up users' CPUs. To do this we sleep after
@@ -127,14 +129,25 @@ where
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
+                if stats.started_at.elapsed() > Duration::from_secs(1) {
+                    stats.report();
+                }
+
+                if stats.started_at.elapsed() > Duration::from_secs(10) {
+                    stats = TimingStats::default();
+                }
+
+                let start = time::Instant::now();
                 // Write any stored checkpoints (uses glob to find old checkpoints).
                 checkpointer
                     .write_checkpoints()
                     .map_err(|error| self.emitter.emit_file_checkpoint_write_failed(error))
                     .map(|count| self.emitter.emit_file_checkpointed(count))
                     .ok();
+                stats.record("checkpointing", start.elapsed());
 
                 // Search (glob) for files to detect major file changes.
+                let start = time::Instant::now();
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
@@ -176,7 +189,7 @@ where
                                     ) {
                                         if old_modified_time < new_modified_time {
                                             info!(
-                                                message = "switching to watch most recently modified file.",
+                                                message = "Switching to watch most recently modified file.",
                                                 new_modified_time = ?new_modified_time,
                                                 old_modified_time = ?old_modified_time,
                                             );
@@ -191,6 +204,7 @@ where
                         }
                     }
                 }
+                stats.record("discovery", start.elapsed());
             }
 
             // Collect lines by polling files.
@@ -201,6 +215,7 @@ where
                     continue;
                 }
 
+                let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line() {
                     if line.is_empty() {
@@ -209,10 +224,11 @@ where
 
                     let sz = line.len();
                     trace!(
-                        message = "read bytes.",
+                        message = "Read bytes.",
                         path = ?watcher.path,
                         bytes = ?sz
                     );
+                    stats.record_bytes(sz);
 
                     bytes_read += sz;
 
@@ -226,6 +242,7 @@ where
                         break;
                     }
                 }
+                stats.record("reading", start.elapsed());
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
@@ -266,16 +283,20 @@ where
                 }
             });
 
-            let mut stream = stream::iter(lines.drain(..).map(Ok));
+            let start = time::Instant::now();
+            let to_send = std::mem::take(&mut lines);
+            let mut stream = stream::once(futures::future::ok(to_send));
             let result = block_on(chans.send_all(&mut stream));
             match result {
                 Ok(()) => {}
                 Err(error) => {
-                    error!(message = "output channel closed.", ?error);
+                    error!(message = "Output channel closed.", error = ?error);
                     return Err(error);
                 }
             }
+            stats.record("sending", start.elapsed());
 
+            let start = time::Instant::now();
             // When no lines have been read we kick the backup_cap up by twice,
             // limited by the hard-coded cap. Else, we set the backup_cap to its
             // minimum on the assumption that next time through there will be
@@ -297,13 +318,17 @@ where
             // call. Also since we are using block_on here and in the above code,
             // this should be run in it's own thread. `spawn_blocking` fulfills
             // all of these requirements.
-            match block_on(select(
-                shutdown,
-                delay_for(Duration::from_millis(backoff as u64)),
-            )) {
+            let sleep = async move {
+                if backoff > 0 {
+                    delay_for(Duration::from_millis(backoff as u64)).await;
+                }
+            };
+            futures::pin_mut!(sleep);
+            match block_on(select(shutdown, sleep)) {
                 Either::Left((_, _)) => return Ok(Shutdown),
                 Either::Right((_, future)) => shutdown = future,
             }
+            stats.record("sleeping", start.elapsed());
         }
     }
 
@@ -462,14 +487,14 @@ impl Fingerprinter {
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
         self.get_fingerprint_of_file(path, buffer)
-            .map_err(|err| {
-                if err.kind() == io::ErrorKind::UnexpectedEof {
+            .map_err(|error| {
+                if error.kind() == io::ErrorKind::UnexpectedEof {
                     if !known_small_files.contains(path) {
                         emitter.emit_file_checksum_failed(path);
                         known_small_files.insert(path.clone());
                     }
                 } else {
-                    emitter.emit_file_fingerprint_read_failed(path, err);
+                    emitter.emit_file_fingerprint_read_failed(path, error);
                 }
             })
             .ok()
@@ -495,6 +520,68 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
         buf = &mut buf[read..];
     }
     Ok(())
+}
+
+struct TimingStats {
+    started_at: time::Instant,
+    segments: BTreeMap<&'static str, Duration>,
+    events: usize,
+    bytes: usize,
+}
+
+impl TimingStats {
+    fn record(&mut self, key: &'static str, duration: Duration) {
+        let segment = self.segments.entry(key).or_default();
+        *segment += duration;
+    }
+
+    fn record_bytes(&mut self, bytes: usize) {
+        self.events += 1;
+        self.bytes += bytes;
+    }
+
+    fn report(&self) {
+        let total = self.started_at.elapsed();
+        let counted = self.segments.values().sum();
+        let other = self.started_at.elapsed() - counted;
+        let mut ratios = self
+            .segments
+            .iter()
+            .map(|(k, v)| (*k, v.as_secs_f32() / total.as_secs_f32()))
+            .collect::<BTreeMap<_, _>>();
+        ratios.insert("other", other.as_secs_f32() / total.as_secs_f32());
+        let (event_throughput, bytes_throughput) = if total.as_secs() > 0 {
+            (
+                self.events as u64 / total.as_secs(),
+                self.bytes as u64 / total.as_secs(),
+            )
+        } else {
+            (0, 0)
+        };
+        debug!(event_throughput = %scale(event_throughput), bytes_throughput = %scale(bytes_throughput), ?ratios);
+    }
+}
+
+fn scale(bytes: u64) -> String {
+    let units = ["", "k", "m", "g"];
+    let mut bytes = bytes as f32;
+    let mut i = 0;
+    while bytes > 1000.0 && i <= 3 {
+        bytes /= 1000.0;
+        i += 1;
+    }
+    format!("{:.3}{}/sec", bytes, units[i])
+}
+
+impl Default for TimingStats {
+    fn default() -> Self {
+        Self {
+            started_at: time::Instant::now(),
+            segments: Default::default(),
+            events: Default::default(),
+            bytes: Default::default(),
+        }
+    }
 }
 
 #[cfg(test)]

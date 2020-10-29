@@ -32,8 +32,8 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Received bad request.",
-            code = %self.error_code,
-            error_message = %self.error_message,
+            code = ?self.error_code,
+            error_message = ?self.error_message,
             rate_limit_secs = 10,
         );
     }

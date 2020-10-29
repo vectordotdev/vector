@@ -58,6 +58,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             let val: f64 = parts[0].parse()?;
             Metric {
                 name,
+                namespace: None,
                 timestamp: None,
                 tags,
                 kind: MetricKind::Incremental,
@@ -70,6 +71,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             let val: f64 = parts[0].parse()?;
             Metric {
                 name,
+                namespace: None,
                 timestamp: None,
                 tags,
                 kind: MetricKind::Incremental,
@@ -95,6 +97,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
             match parse_direction(parts[0])? {
                 None => Metric {
                     name,
+                    namespace: None,
                     timestamp: None,
                     tags,
                     kind: MetricKind::Absolute,
@@ -102,6 +105,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 },
                 Some(sign) => Metric {
                     name,
+                    namespace: None,
                     timestamp: None,
                     tags,
                     kind: MetricKind::Incremental,
@@ -113,6 +117,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
         }
         "s" => Metric {
             name,
+            namespace: None,
             timestamp: None,
             tags,
             kind: MetricKind::Incremental,
@@ -244,6 +249,7 @@ mod test {
             parse("foo:1|c"),
             Ok(Metric {
                 name: "foo".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -258,6 +264,7 @@ mod test {
             parse("foo:1|c|#tag1,tag2:value"),
             Ok(Metric {
                 name: "foo".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -279,6 +286,7 @@ mod test {
             parse("bar:2|c|@0.1"),
             Ok(Metric {
                 name: "bar".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -293,6 +301,7 @@ mod test {
             parse("bar:2|c|@0"),
             Ok(Metric {
                 name: "bar".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -307,6 +316,7 @@ mod test {
             parse("glork:320|ms|@0.1"),
             Ok(Metric {
                 name: "glork".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -325,6 +335,7 @@ mod test {
             parse("glork:320|h|@0.1|#region:us-west1,production,e:"),
             Ok(Metric {
                 name: "glork".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -351,6 +362,7 @@ mod test {
             parse("glork:320|d|@0.1|#region:us-west1,production,e:"),
             Ok(Metric {
                 name: "glork".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -377,6 +389,7 @@ mod test {
             parse("gaugor:333|g"),
             Ok(Metric {
                 name: "gaugor".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -391,6 +404,7 @@ mod test {
             parse("gaugor:-4|g"),
             Ok(Metric {
                 name: "gaugor".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -401,6 +415,7 @@ mod test {
             parse("gaugor:+10|g"),
             Ok(Metric {
                 name: "gaugor".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -415,6 +430,7 @@ mod test {
             parse("uniques:765|s"),
             Ok(Metric {
                 name: "uniques".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,

@@ -26,7 +26,8 @@ use futures::{
     FutureExt,
 };
 use futures01::Sink;
-use rand::{distributions::Exp1, prelude::*};
+use rand::{thread_rng, Rng};
+use rand_distr::Exp1;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -156,7 +157,7 @@ impl SinkConfig for TestConfig {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| panic!("Fatal test sink error: {}", e));
+            .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
@@ -206,7 +207,7 @@ impl TestSink {
             * (1.0
                 + self.params.concurrency.scale(in_flight)
                 + self.params.rate.scale(rate)
-                + thread_rng().sample(Exp1) * self.params.jitter)
+                + thread_rng().sample::<f64, _>(Exp1) * self.params.jitter)
     }
 }
 

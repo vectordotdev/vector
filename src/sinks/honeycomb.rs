@@ -1,8 +1,9 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::util::{
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
@@ -35,7 +36,15 @@ inventory::submit! {
     SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
 
-impl GenerateConfig for HoneycombConfig {}
+impl GenerateConfig for HoneycombConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"api_key = "${HONEYCOMB_API_KEY}"
+            dataset = "my-honeycomb-dataset""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
@@ -60,7 +69,7 @@ impl SinkConfig for HoneycombConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
@@ -154,5 +163,12 @@ async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::
             status, body
         )
         .into())
+    }
+}
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::HoneycombConfig>();
     }
 }

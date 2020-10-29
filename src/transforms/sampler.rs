@@ -24,7 +24,16 @@ inventory::submit! {
     TransformDescription::new::<SamplerConfig>("sampler")
 }
 
-impl GenerateConfig for SamplerConfig {}
+impl GenerateConfig for SamplerConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            rate: 10,
+            key_field: None,
+            pass_list: Vec::new(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
@@ -96,6 +105,11 @@ mod tests {
     use crate::event::Event;
     use approx::assert_relative_eq;
     use regex::RegexSet;
+
+    #[test]
+    fn genreate_config() {
+        crate::test_util::test_generate_config::<SamplerConfig>();
+    }
 
     #[test]
     fn samples_at_roughly_the_configured_rate() {
@@ -198,8 +212,8 @@ mod tests {
     }
 
     fn random_events(n: usize) -> Vec<Event> {
-        use rand::distributions::Alphanumeric;
         use rand::{thread_rng, Rng};
+        use rand_distr::Alphanumeric;
 
         (0..n)
             .map(|_| {

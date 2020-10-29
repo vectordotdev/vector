@@ -1,9 +1,10 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
@@ -84,7 +85,7 @@ impl SinkConfig for ClickhouseConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
         let healthcheck = healthcheck(client, self.clone()).boxed();
 
