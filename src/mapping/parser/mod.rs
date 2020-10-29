@@ -571,6 +571,13 @@ mod tests {
                 ))]),
             ),
             (
+                ".123 = 38",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "123".to_string(),
+                    Box::new(Literal::from(Value::from(38))),
+                ))]),
+            ),
+            (
                 ".foo = \"bar\"",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
