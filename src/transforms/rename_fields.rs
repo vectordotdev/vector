@@ -2,7 +2,6 @@ use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
     event::Event,
-    event::Lookup,
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
@@ -14,12 +13,12 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
-    pub fields: Fields<Lookup>,
+    pub fields: Fields<String>,
     drop_empty: Option<bool>,
 }
 
 pub struct RenameFields {
-    fields: IndexMap<Lookup, Lookup>,
+    fields: IndexMap<String, String>,
     drop_empty: bool,
 }
 
@@ -40,8 +39,8 @@ impl TransformConfig for RenameFieldsConfig {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(
-                key.to_string().parse::<Lookup>()?,
-                value.to_string().parse::<Lookup>()?,
+                key.to_string(),
+                value.to_string(),
             );
         }
         Ok(Box::new(RenameFields::new(
@@ -64,7 +63,7 @@ impl TransformConfig for RenameFieldsConfig {
 }
 
 impl RenameFields {
-    pub fn new(fields: IndexMap<Lookup, Lookup>, drop_empty: bool) -> crate::Result<Self> {
+    pub fn new(fields: IndexMap<String, String>, drop_empty: bool) -> crate::Result<Self> {
         Ok(RenameFields { fields, drop_empty })
     }
 }
@@ -74,20 +73,18 @@ impl Transform for RenameFields {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
-            let old_key_string = old_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
-            let new_key_string = new_key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
             let log = event.as_mut_log();
-            match log.remove_prune(&old_key_string, self.drop_empty) {
+            match log.remove_prune(&old_key, self.drop_empty) {
                 Some(v) => {
-                    if event.as_mut_log().insert(&new_key_string, v).is_some() {
+                    if event.as_mut_log().insert(&new_key, v).is_some() {
                         emit!(RenameFieldsFieldOverwritten {
-                            field: &old_key_string
+                            field: &old_key
                         });
                     }
                 }
                 None => {
                     emit!(RenameFieldsFieldDoesNotExist {
-                        field: &old_key_string
+                        field: &old_key
                     });
                 }
             }

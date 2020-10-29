@@ -2,7 +2,6 @@ use super::Transform;
 use crate::serde::Fields;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Lookup,
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
@@ -12,7 +11,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, str::FromStr};
+use std::{convert::TryFrom};
 use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -43,7 +42,7 @@ impl From<Value> for TemplateOrValue {
 
 #[derive(Clone)]
 pub struct AddFields {
-    fields: IndexMap<Lookup, TemplateOrValue>,
+    fields: IndexMap<String, TemplateOrValue>,
     overwrite: bool,
 }
 
@@ -64,7 +63,7 @@ impl TransformConfig for AddFieldsConfig {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {
-            fields.insert(Lookup::from_str(&key)?, Value::try_from(value)?);
+            fields.insert(key, Value::try_from(value)?);
         }
         Ok(Box::new(AddFields::new(fields, self.overwrite)?))
     }
@@ -83,7 +82,7 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(mut fields: IndexMap<Lookup, Value>, overwrite: bool) -> crate::Result<Self> {
+    pub fn new(mut fields: IndexMap<String, Value>, overwrite: bool) -> crate::Result<Self> {
         let mut with_templates = IndexMap::with_capacity(fields.len());
         for (k, v) in fields.drain(..) {
             let maybe_template = match v {
