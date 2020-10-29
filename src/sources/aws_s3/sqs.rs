@@ -88,9 +88,9 @@ pub enum ProcessingError {
         bucket: String,
         key: String,
     },
-    #[snafu(display("Failed to read all of s3://{}/{}: {}", bucket, key, error))]
+    #[snafu(display("Failed to read all of s3://{}/{}: {}", bucket, key, source))]
     ReadObject {
-        error: String,
+        source: std::io::Error,
         bucket: String,
         key: String,
     },
@@ -351,18 +351,17 @@ impl Ingestor {
                 // prefer duplicate lines over message loss. Future work could include recording
                 // the offset of the object that has been read, but this would only be relevant in
                 // the case that the same vector instance processes the same message.
-                let mut read_error: Option<String> = None;
+                let mut read_error: Option<std::io::Error> = None;
                 let lines: Box<dyn Stream<Item = Bytes> + Send + Unpin> = Box::new(
                     FramedRead::new(object_reader, BytesDelimitedCodec::new(b'\n'))
-                        .take_while(|res| {
-                            futures::future::ready(match res {
-                                Ok(_) => true,
-                                Err(err) => {
-                                    read_error = Some(err.to_string());
-                                    false
-                                }
+                        .map(|res| {
+                            res.map_err(|err| {
+                                read_error = Some(err);
+                                ()
                             })
+                            .ok()
                         })
+                        .take_while(|res| futures::future::ready(res.is_some()))
                         .map(|r| r.unwrap()), // validated by take_while
                 );
 
@@ -399,6 +398,7 @@ impl Ingestor {
                     .compat()
                     .await
                     .map_err(|error| {
+                        // TODO handle error
                         error!(message = "Error sending S3 Logs", %error);
                     })
                     .ok();
@@ -406,7 +406,7 @@ impl Ingestor {
                 read_error
                     .map(|error| {
                         Err(ProcessingError::ReadObject {
-                            error,
+                            source: error,
                             bucket: s3_event.s3.bucket.name.clone(),
                             key: s3_event.s3.object.key.clone(),
                         })
