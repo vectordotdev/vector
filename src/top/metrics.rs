@@ -20,13 +20,16 @@ async fn events_processed(
         let stream = events.stream();
     };
 
-    for res in stream.next().await.ok_or(())? {
-        let c = res.data.ok_or(())?.component_events_processed_total;
-
-        state.update_component_events_processed_total(
-            &c.name,
-            c.metric.events_processed_total as i64,
-        );
+    loop {
+        if let Some(Some(res)) = stream.next().await {
+            if let Some(d) = res.data {
+                let c = d.component_events_processed_total;
+                state.update_component_events_processed_total(
+                    &c.name,
+                    c.metric.events_processed_total as i64,
+                );
+            }
+        }
     }
 
     Ok(())
@@ -41,7 +44,7 @@ pub fn subscribe(client: SubscriptionClient, state: Arc<WidgetsState>, interval:
         let interval = interval;
 
         tokio::spawn(async move {
-            let _ = metric_fn(client, state, interval);
+            let _ = metric_fn(client, state, interval).await;
         });
     }
 }

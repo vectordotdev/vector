@@ -115,7 +115,7 @@ impl Widgets {
     }
 
     /// Listen for state updates. Used to determine when to redraw.
-    fn listen(&self) -> tokio::sync::watch::Receiver<()> {
+    pub fn listen(&self) -> tokio::sync::watch::Receiver<()> {
         self.state.listen()
     }
 }

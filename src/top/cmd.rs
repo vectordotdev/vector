@@ -5,6 +5,7 @@ use super::{
 };
 use crate::config;
 use std::sync::Arc;
+use tokio::stream::StreamExt;
 use url::Url;
 use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
 

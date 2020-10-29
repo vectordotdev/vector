@@ -28,7 +28,8 @@ use weak_table::WeakValueHashMap;
 pub type StreamResponse<T> = Pin<
     Box<
         dyn Stream<Item = Option<graphql_client::Response<<T as GraphQLQuery>::ResponseData>>>
-            + Send,
+            + Send
+            + Sync,
     >,
 >;
 
@@ -46,7 +47,7 @@ pub struct Payload {
 
 impl Payload {
     /// Returns a "start" payload necessary for starting a new subscription
-    fn start<T: GraphQLQuery + Send>(
+    fn start<T: GraphQLQuery + Send + Sync>(
         id: Uuid,
         payload: &graphql_client::QueryBody<T::Variables>,
     ) -> Self {
@@ -68,7 +69,7 @@ impl Payload {
 
     /// Attempts to return a definitive ResponseData on the `payload` field, matched against
     /// a generated GraphQLQuery
-    fn response<T: GraphQLQuery + Send>(
+    fn response<T: GraphQLQuery + Send + Sync>(
         &self,
     ) -> Option<graphql_client::Response<T::ResponseData>> {
         serde_json::from_value::<graphql_client::Response<T::ResponseData>>(self.payload.clone())
@@ -78,13 +79,13 @@ impl Payload {
 
 /// Receiver<T> has a single method, `stream`, that returns a `StreamResponse<T>` of
 /// `Payload`s received from the server
-pub trait Receiver<T: GraphQLQuery + Send> {
+pub trait Receiver<T: GraphQLQuery + Send + Sync> {
     /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T>;
 }
 
 /// SubscriptionResult<T> returns an `anyhow`-wrapped `Result`, containing a boxed `Receiver<T>`
-pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T> + Send>>>;
+pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T> + Send + Sync>>>;
 
 /// A Subscription is associated with a single GraphQL subscription query. Its methods
 /// allow transmitting `Payload`s upstream to the API server, via its `Receiver<T: GraphQLQuery`
@@ -124,7 +125,7 @@ impl Drop for Subscription {
     }
 }
 
-impl<T: GraphQLQuery + Send> Receiver<T> for Subscription {
+impl<T: GraphQLQuery + Send + Sync> Receiver<T> for Subscription {
     /// Returns a stream of `Payload` responses, received from the GraphQL server
     fn stream(&self) -> StreamResponse<T> {
         Box::pin(
@@ -153,7 +154,9 @@ impl SubscriptionClient {
     /// Takes a tokio_tungstenite WebSocketStream, and returns a new subscription client.
     /// Typically the stream would be TcpStream, but any protocol that matches `TStream`
     /// can be used, making this a flexible client for passing messages via WebSockets.
-    pub fn new<TStream: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Unpin + 'static>(
+    pub fn new<
+        TStream: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
+    >(
         ws: WebSocketStream<TStream>,
     ) -> Self {
         // Oneshot channel for cancelling the listener if SubscriptionClient is dropped
@@ -216,7 +219,7 @@ impl SubscriptionClient {
     }
 
     /// Start a new subscription request
-    pub async fn start<T: GraphQLQuery + Send>(
+    pub async fn start<T: GraphQLQuery + Send + Sync>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
     ) -> SubscriptionResult<T> {
@@ -241,7 +244,7 @@ impl SubscriptionClient {
 
         // The caller gets back a Box<dyn Receiver<T>>, to consume subscription payloads
         Ok(Box::new(
-            Arc::clone(&subscription) as Arc<dyn Receiver<T> + Send>
+            Arc::clone(&subscription) as Arc<dyn Receiver<T> + Send + Sync>
         ))
     }
 }
