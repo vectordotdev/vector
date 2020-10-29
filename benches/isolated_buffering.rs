@@ -4,13 +4,11 @@ use futures::{
     stream::StreamExt,
 };
 use futures01::{stream, AsyncSink, Poll, Sink, StartSend, Stream};
-use rand::distributions::Alphanumeric;
-use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use tempfile::tempdir;
 use vector::{
     buffers::disk::{leveldb_buffer, DiskBuffer},
     sinks::util::StreamSinkOld,
-    test_util::runtime,
+    test_util::{random_lines, runtime},
     Event,
 };
 
@@ -187,13 +185,5 @@ criterion_group!(buffers, benchmark_buffers);
 criterion_main!(buffers);
 
 fn random_events(size: usize) -> impl Stream<Item = Event, Error = ()> {
-    let rng = SmallRng::from_rng(thread_rng()).unwrap();
-
-    let lines = std::iter::repeat(()).map(move |_| {
-        rng.clone()
-            .sample_iter(&Alphanumeric)
-            .take(size)
-            .collect::<String>()
-    });
-    stream::iter_ok(lines).map(Event::from)
+    stream::iter_ok(random_lines(size)).map(Event::from)
 }

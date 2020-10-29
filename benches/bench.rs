@@ -19,7 +19,9 @@ use vector::{
     config::{self, log_schema, TransformConfig, TransformContext},
     event::{Event, Value},
     sinks, sources,
-    test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
+    test_util::{
+        next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
+    },
     transforms,
 };
 
@@ -831,17 +833,6 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 }
 
-fn random_lines(size: usize) -> impl Iterator<Item = String> {
-    let rng = SmallRng::from_rng(thread_rng()).unwrap();
-
-    std::iter::repeat(()).map(move |_| {
-        rng.clone()
-            .sample_iter(&Alphanumeric)
-            .take(size)
-            .collect::<String>()
-    })
-}
-
 fn http_access_log_lines() -> impl Iterator<Item = String> {
     let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
     let code = Uniform::from(200..600);
@@ -858,9 +849,9 @@ fn http_access_log_lines() -> impl Iterator<Item = String> {
                 rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), // IP
                 year.sample(&mut rng), mday.sample(&mut rng), // date
                 hour.sample(&mut rng), minsec.sample(&mut rng), minsec.sample(&mut rng), // time
-                rng.clone().sample_iter(&Alphanumeric).take(url_size).collect::<String>(), // URL
+                (&mut rng).sample_iter(&Alphanumeric).take(url_size).collect::<String>(), // URL
                 code.sample(&mut rng), size.sample(&mut rng),
-                rng.clone().sample_iter(&Alphanumeric).take(browser_size).collect::<String>(),
+                (&mut rng).sample_iter(&Alphanumeric).take(browser_size).collect::<String>(),
         )
     })
 }
