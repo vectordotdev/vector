@@ -159,7 +159,7 @@ impl Transform for Geoip {
                     address: &ipaddress
                 });
             }
-        } else 
+        } else {
             emit!(GeoipFieldDoesNotExist {
                 field: &self.source
             });
