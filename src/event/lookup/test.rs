@@ -159,7 +159,8 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
     let mut buf = Vec::new();
     test_file.read_to_end(&mut buf)?;
     let string = String::from_utf8(buf).unwrap();
-    Ok(string.trim_end_matches('\n').to_owned())
+    // remove trailing newline introduced by editors
+    Ok(string.trim_end().to_owned())
 }
 
 // This test iterates over the `tests/data/fixtures/lookup` folder and ensures the lookup parsed,
