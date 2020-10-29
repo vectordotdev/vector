@@ -86,7 +86,7 @@ pub struct Config {
     /// between the polling the files to watch from the `paths_provider`.
     /// This is quite efficient, yet might still create some load of the
     /// file system; in addition, it is currently coupled with chechsum dumping
-    /// in the underlying file server, so setting it too low may itroduce
+    /// in the underlying file server, so setting it too low may introduce
     /// a significant overhead.
     #[serde(default = "default_glob_minimum_cooldown_ms")]
     glob_minimum_cooldown_ms: usize,
