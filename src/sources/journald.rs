@@ -32,8 +32,8 @@ use std::{
     process::Stdio,
     str::FromStr,
     task::{Context, Poll},
+    time::Duration,
 };
-use tokio_retry::strategy::ExponentialBackoff;
 use tokio_util::codec::FramedRead;
 
 use tokio::{
@@ -53,6 +53,8 @@ const MESSAGE: &str = "MESSAGE";
 const SYSTEMD_UNIT: &str = "_SYSTEMD_UNIT";
 const SOURCE_TIMESTAMP: &str = "_SOURCE_REALTIME_TIMESTAMP";
 const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
+
+const BACKOFF_DURATION: Duration = Duration::from_secs(5);
 
 lazy_static! {
     static ref JOURNALCTL: PathBuf = "journalctl".into();
@@ -194,22 +196,29 @@ impl JournaldSource {
             }
         };
 
-        /*
         loop {
-            let (stream, stop) =
-                start_journalctl(self.journalctl_path.clone(), self.current_boot_only, cursor)
-                    .map_err(|error| {
-                        error!(message = "Error starting journalctl process.", %error);
-                    })?;
+            let (stream, stop) = start_journalctl(
+                self.journalctl_path.clone(),
+                self.current_boot_only,
+                cursor.clone(),
+            )
+            .map_err(|error| {
+                error!(message = "Error starting journalctl process.", %error);
+            })?;
 
-            self.drive_stream(stream);
+            self.run_stream(stream, &mut checkpointer).await;
 
             stop();
 
             delay_for(BACKOFF_DURATION).await;
         }
-        */
+    }
 
+    async fn run_stream<'a>(
+        &'a mut self,
+        mut stream: BoxStream<'static, io::Result<String>>,
+        checkpointer: &'a mut Checkpointer,
+    ) {
         loop {
             let mut saw_record = false;
             let mut cursor: Option<String> = None;
@@ -218,7 +227,7 @@ impl JournaldSource {
                 let text = match stream.next().await {
                     None => {
                         info!("Journalctl process stopped.");
-                        return Err(());
+                        return;
                     }
                     Some(Ok(text)) => text,
                     Some(Err(err)) => {
@@ -256,7 +265,7 @@ impl JournaldSource {
                     Ok(_) => {}
                     Err(error) => {
                         error!(message = "Could not send journald log", %error);
-                        return Err(());
+                        return;
                     }
                 }
             }
