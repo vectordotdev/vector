@@ -616,7 +616,7 @@ mod tests {
             header,
             "# HELP vector_requests requests\n# TYPE vector_requests histogram\n".to_owned()
         );
-        assert_eq!(frame, "vector_requests_bucket{le=\"0\"} 0\nvector_requests_bucket{le=\"2.5\"} 6\nvector_requests_bucket{le=\"5\"} 8\nvector_requests_bucket{le=\"+Inf\"} 8\nvector_requests_sum 15\nrequests_count 8\n".to_owned());
+        assert_eq!(frame, "vector_requests_bucket{le=\"0\"} 0\nvector_requests_bucket{le=\"2.5\"} 6\nvector_requests_bucket{le=\"5\"} 8\nvector_requests_bucket{le=\"+Inf\"} 8\nvector_requests_sum 15\nvector_requests_count 8\n".to_owned());
     }
 
     #[test]

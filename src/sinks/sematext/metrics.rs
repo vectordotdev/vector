@@ -359,7 +359,7 @@ mod tests {
         for (i, (namespace, metric, val)) in metrics.iter().enumerate() {
             let event = Event::from(Metric {
                 name: metric.to_string(),
-                namespace: Some(namespace.into()),
+                namespace: Some(namespace.to_string()),
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32)),
                 tags: Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]

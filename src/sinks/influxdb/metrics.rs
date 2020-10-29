@@ -406,7 +406,6 @@ mod tests {
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
             ns.check,metric_type=counter,normal_tag=value,true_tag=true value=1 1542182950000000011"
         );
-        None
     }
 
     #[test]

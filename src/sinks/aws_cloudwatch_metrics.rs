@@ -277,7 +277,6 @@ mod tests {
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
-    use rusoto_cloudwatch::PutMetricDataInput;
 
     #[test]
     fn generate_config() {
@@ -286,7 +285,7 @@ mod tests {
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
-            namespace: "vector".into(),
+            default_namespace: "vector".into(),
             region: RegionOrEndpoint::with_endpoint("local".to_owned()),
             ..Default::default()
         }
@@ -334,32 +333,29 @@ mod tests {
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![
-                    MetricDatum {
-                        metric_name: "exception_total".into(),
-                        value: Some(1.0),
-                        ..Default::default()
-                    },
-                    MetricDatum {
-                        metric_name: "bytes_out".into(),
-                        value: Some(2.5),
-                        timestamp: Some("2018-11-14T08:09:10.123Z".into()),
-                        ..Default::default()
-                    },
-                    MetricDatum {
-                        metric_name: "healthcheck".into(),
-                        value: Some(1.0),
-                        timestamp: Some("2018-11-14T08:09:10.123Z".into()),
-                        dimensions: Some(vec![Dimension {
-                            name: "region".into(),
-                            value: "local".into()
-                        }]),
-                        ..Default::default()
-                    },
-                ],
-            }
+            vec![
+                MetricDatum {
+                    metric_name: "exception_total".into(),
+                    value: Some(1.0),
+                    ..Default::default()
+                },
+                MetricDatum {
+                    metric_name: "bytes_out".into(),
+                    value: Some(2.5),
+                    timestamp: Some("2018-11-14T08:09:10.123Z".into()),
+                    ..Default::default()
+                },
+                MetricDatum {
+                    metric_name: "healthcheck".into(),
+                    value: Some(1.0),
+                    timestamp: Some("2018-11-14T08:09:10.123Z".into()),
+                    dimensions: Some(vec![Dimension {
+                        name: "region".into(),
+                        value: "local".into()
+                    }]),
+                    ..Default::default()
+                },
+            ]
         );
     }
 
@@ -376,14 +372,11 @@ mod tests {
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![MetricDatum {
-                    metric_name: "temperature".into(),
-                    value: Some(10.0),
-                    ..Default::default()
-                }],
-            }
+            vec![MetricDatum {
+                metric_name: "temperature".into(),
+                value: Some(10.0),
+                ..Default::default()
+            }]
         );
     }
 
@@ -404,15 +397,12 @@ mod tests {
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![MetricDatum {
-                    metric_name: "latency".into(),
-                    values: Some(vec![11.0, 12.0]),
-                    counts: Some(vec![100.0, 50.0]),
-                    ..Default::default()
-                }],
-            }
+            vec![MetricDatum {
+                metric_name: "latency".into(),
+                values: Some(vec![11.0, 12.0]),
+                counts: Some(vec![100.0, 50.0]),
+                ..Default::default()
+            }]
         );
     }
 
@@ -431,14 +421,11 @@ mod tests {
 
         assert_eq!(
             svc().encode_events(events),
-            PutMetricDataInput {
-                namespace: "vector".into(),
-                metric_data: vec![MetricDatum {
-                    metric_name: "users".into(),
-                    value: Some(2.0),
-                    ..Default::default()
-                }],
-            }
+            vec![MetricDatum {
+                metric_name: "users".into(),
+                value: Some(2.0),
+                ..Default::default()
+            }]
         );
     }
 }
@@ -458,7 +445,7 @@ mod integration_tests {
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
-            namespace: "vector".into(),
+            default_namespace: "vector".into(),
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             ..Default::default()
         }
