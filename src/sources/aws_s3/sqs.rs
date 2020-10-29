@@ -94,6 +94,12 @@ pub enum ProcessingError {
         bucket: String,
         key: String,
     },
+    #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
+    PipelineSend {
+        source: futures01::sync::mpsc::SendError<Event>,
+        bucket: String,
+        key: String,
+    },
     #[snafu(display(
         "Object notification for s3://{}/{} is a bucket in another region: {}",
         bucket,
@@ -394,12 +400,13 @@ impl Ingestor {
                     futures::future::ready(Some(Ok(event)))
                 });
 
+                let mut send_error: Option<futures01::sync::mpsc::SendError<Event>> = None;
                 out.send_all(Compat::new(Box::pin(stream)))
                     .compat()
                     .await
-                    .map_err(|error| {
-                        // TODO handle error
-                        error!(message = "Error sending S3 Logs", %error);
+                    .map_err(|err| {
+                        send_error = Some(err);
+                        ()
                     })
                     .ok();
 
@@ -411,7 +418,17 @@ impl Ingestor {
                             key: s3_event.s3.object.key.clone(),
                         })
                     })
-                    .unwrap_or(Ok(()))
+                    .unwrap_or(
+                        send_error
+                            .map(|error| {
+                                Err(ProcessingError::PipelineSend {
+                                    source: error,
+                                    bucket: s3_event.s3.bucket.name.clone(),
+                                    key: s3_event.s3.object.key.clone(),
+                                })
+                            })
+                            .unwrap_or(Ok(())),
+                    )
             }
             None => Ok(()),
         }
