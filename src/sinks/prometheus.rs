@@ -3,7 +3,6 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{
-        encode_namespace,
         statistic::{validate_quantiles, DistributionStatistic},
         MetricEntry, StreamSink,
     },
@@ -39,7 +38,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
-    pub namespace: Option<String>,
+    pub default_namespace: String,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
@@ -77,7 +76,7 @@ inventory::submit! {
 impl GenerateConfig for PrometheusSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
-            namespace: None,
+            default_namespace: "vector".into(),
             address: default_address(),
             buckets: default_histogram_buckets(),
             quantiles: default_summary_quantiles(),
@@ -157,10 +156,11 @@ fn encode_tags_with_extra(
     format!("{{{}}}", parts.join(","))
 }
 
-fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
+fn encode_metric_header(default_namespace: &str, metric: &Metric) -> String {
     let mut s = String::new();
     let name = &metric.name;
-    let fullname = encode_namespace(namespace, '_', name);
+    let namespace = metric.namespace.as_deref().unwrap_or(default_namespace);
+    let fullname = format!("{}_{}", namespace, name);
 
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
@@ -184,14 +184,15 @@ fn encode_metric_header(namespace: Option<&str>, metric: &Metric) -> String {
 }
 
 fn encode_metric_datum(
-    namespace: Option<&str>,
+    default_namespace: &str,
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
     metric: &Metric,
 ) -> String {
     let mut s = String::new();
-    let fullname = encode_namespace(namespace, '_', &metric.name);
+    let namespace = metric.namespace.as_deref().unwrap_or(default_namespace);
+    let fullname = format!("{}_{}", namespace, metric.name);
 
     if metric.kind.is_absolute() {
         let tags = &metric.tags;
@@ -328,7 +329,7 @@ fn encode_metric_datum(
 
 fn handle(
     req: Request<Body>,
-    namespace: Option<&str>,
+    default_namespace: &str,
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
@@ -345,10 +346,11 @@ fn handle(
 
             for metric in metrics {
                 let name = &metric.0.name;
-                let frame = encode_metric_datum(namespace, &buckets, quantiles, expired, &metric.0);
+                let frame =
+                    encode_metric_datum(default_namespace, &buckets, quantiles, expired, &metric.0);
 
                 if !processed_headers.contains(&name) {
-                    let header = encode_metric_header(namespace, &metric.0);
+                    let header = encode_metric_header(default_namespace, &metric.0);
                     s.push_str(&header);
                     processed_headers.insert(name);
                 };
@@ -393,7 +395,7 @@ impl PrometheusSink {
         }
 
         let metrics = Arc::clone(&self.metrics);
-        let namespace = self.config.namespace.clone();
+        let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
@@ -401,7 +403,7 @@ impl PrometheusSink {
 
         let new_service = make_service_fn(move |_| {
             let metrics = Arc::clone(&metrics);
-            let namespace = namespace.clone();
+            let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
@@ -422,7 +424,7 @@ impl PrometheusSink {
                     .in_scope(|| {
                         handle(
                             req,
-                            namespace.as_deref(),
+                            &default_namespace,
                             &buckets,
                             &quantiles,
                             expired,
@@ -515,8 +517,8 @@ mod tests {
             value: MetricValue::Counter { value: 10.0 },
         };
 
-        let header = encode_metric_header(Some("vector"), &metric);
-        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -536,8 +538,8 @@ mod tests {
             value: MetricValue::Gauge { value: -1.1 },
         };
 
-        let header = encode_metric_header(Some("vector"), &metric);
-        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -559,14 +561,14 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], &[], false, &metric);
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
 
         assert_eq!(
             header,
-            "# HELP users users\n# TYPE users gauge\n".to_owned()
+            "# HELP vector_users users\n# TYPE vector_users gauge\n".to_owned()
         );
-        assert_eq!(frame, "users 1\n".to_owned());
+        assert_eq!(frame, "vector_users 1\n".to_owned());
     }
 
     #[test]
@@ -582,14 +584,14 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], &[], true, &metric);
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[], &[], true, &metric);
 
         assert_eq!(
             header,
-            "# HELP users users\n# TYPE users gauge\n".to_owned()
+            "# HELP vector_users users\n# TYPE vector_users gauge\n".to_owned()
         );
-        assert_eq!(frame, "users 0\n".to_owned());
+        assert_eq!(frame, "vector_users 0\n".to_owned());
     }
 
     #[test]
@@ -607,14 +609,14 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[0.0, 2.5, 5.0], &[], false, &metric);
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[0.0, 2.5, 5.0], &[], false, &metric);
 
         assert_eq!(
             header,
-            "# HELP requests requests\n# TYPE requests histogram\n".to_owned()
+            "# HELP vector_requests requests\n# TYPE vector_requests histogram\n".to_owned()
         );
-        assert_eq!(frame, "requests_bucket{le=\"0\"} 0\nrequests_bucket{le=\"2.5\"} 6\nrequests_bucket{le=\"5\"} 8\nrequests_bucket{le=\"+Inf\"} 8\nrequests_sum 15\nrequests_count 8\n".to_owned());
+        assert_eq!(frame, "vector_requests_bucket{le=\"0\"} 0\nvector_requests_bucket{le=\"2.5\"} 6\nvector_requests_bucket{le=\"5\"} 8\nvector_requests_bucket{le=\"+Inf\"} 8\nvector_requests_sum 15\nrequests_count 8\n".to_owned());
     }
 
     #[test]
@@ -633,14 +635,14 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], &[], false, &metric);
+        let header = encode_metric_header("vector", &metric);
+        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
 
         assert_eq!(
             header,
-            "# HELP requests requests\n# TYPE requests histogram\n".to_owned()
+            "# HELP vector_requests requests\n# TYPE vector_requests histogram\n".to_owned()
         );
-        assert_eq!(frame, "requests_bucket{le=\"1\"} 1\nrequests_bucket{le=\"2.1\"} 2\nrequests_bucket{le=\"3\"} 3\nrequests_bucket{le=\"+Inf\"} 6\nrequests_sum 12.5\nrequests_count 6\n".to_owned());
+        assert_eq!(frame, "vector_requests_bucket{le=\"1\"} 1\nvector_requests_bucket{le=\"2.1\"} 2\nvector_requests_bucket{le=\"3\"} 3\nvector_requests_bucket{le=\"+Inf\"} 6\nvector_requests_sum 12.5\nvector_requests_count 6\n".to_owned());
     }
 
     #[test]
@@ -659,14 +661,14 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], &[], false, &metric);
+        let header = encode_metric_header("ns", &metric);
+        let frame = encode_metric_datum("ns", &[], &[], false, &metric);
 
         assert_eq!(
             header,
-            "# HELP requests requests\n# TYPE requests summary\n".to_owned()
+            "# HELP ns_requests requests\n# TYPE ns_requests summary\n".to_owned()
         );
-        assert_eq!(frame, "requests{code=\"200\",quantile=\"0.01\"} 1.5\nrequests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 12\nrequests_count{code=\"200\"} 6\n".to_owned());
+        assert_eq!(frame, "ns_requests{code=\"200\",quantile=\"0.01\"} 1.5\nns_requests{code=\"200\",quantile=\"0.5\"} 2\nns_requests{code=\"200\",quantile=\"0.99\"} 3\nns_requests_sum{code=\"200\"} 12\nns_requests_count{code=\"200\"} 6\n".to_owned());
     }
 
     #[test]
@@ -684,13 +686,13 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header(None, &metric);
-        let frame = encode_metric_datum(None, &[], &default_summary_quantiles(), false, &metric);
+        let header = encode_metric_header("ns", &metric);
+        let frame = encode_metric_datum("ns", &[], &default_summary_quantiles(), false, &metric);
 
         assert_eq!(
             header,
-            "# HELP requests requests\n# TYPE requests summary\n".to_owned()
+            "# HELP ns_requests requests\n# TYPE ns_requests summary\n".to_owned()
         );
-        assert_eq!(frame, "requests{code=\"200\",quantile=\"0.5\"} 2\nrequests{code=\"200\",quantile=\"0.75\"} 2\nrequests{code=\"200\",quantile=\"0.9\"} 3\nrequests{code=\"200\",quantile=\"0.95\"} 3\nrequests{code=\"200\",quantile=\"0.99\"} 3\nrequests_sum{code=\"200\"} 15\nrequests_count{code=\"200\"} 8\nrequests_min{code=\"200\"} 1\nrequests_max{code=\"200\"} 3\nrequests_avg{code=\"200\"} 1.875\n".to_owned());
+        assert_eq!(frame, "ns_requests{code=\"200\",quantile=\"0.5\"} 2\nns_requests{code=\"200\",quantile=\"0.75\"} 2\nns_requests{code=\"200\",quantile=\"0.9\"} 3\nns_requests{code=\"200\",quantile=\"0.95\"} 3\nns_requests{code=\"200\",quantile=\"0.99\"} 3\nns_requests_sum{code=\"200\"} 15\nns_requests_count{code=\"200\"} 8\nns_requests_min{code=\"200\"} 1\nns_requests_max{code=\"200\"} 3\nns_requests_avg{code=\"200\"} 1.875\n".to_owned());
     }
 }

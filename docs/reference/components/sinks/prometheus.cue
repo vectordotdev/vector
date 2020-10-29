@@ -92,9 +92,13 @@ components: sinks: prometheus: {
 				unit:    "seconds"
 			}
 		}
-		namespace: {
+		default_namespace: {
 			common:      true
-			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming))."
+			description: """
+				Used as a namespace for metrics that don't have it.
+				A namespace will be prefixed to a metric's name.
+				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
+				"""
 			required:    false
 			warnings: []
 			type: string: {
