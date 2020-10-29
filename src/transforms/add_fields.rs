@@ -11,7 +11,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom};
+use std::convert::TryFrom;
 use toml::value::Value as TomlValue;
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -113,7 +113,7 @@ impl Transform for AddFields {
                     Ok(v) => v,
                     Err(_) => {
                         emit!(AddFieldsTemplateRenderingError {
-                            field: &format!("{}", &key),
+                            field: &key,
                         });
                         continue;
                     }
@@ -124,12 +124,12 @@ impl Transform for AddFields {
             if self.overwrite {
                 if event.as_mut_log().insert(&key_string, value).is_some() {
                     emit!(AddFieldsFieldOverwritten {
-                        field: &format!("{}", &key),
+                        field: &key,
                     });
                 }
             } else if event.as_mut_log().contains(&key_string) {
                 emit!(AddFieldsFieldNotOverwritten {
-                    field: &format!("{}", &key),
+                    field: &key,
                 });
             } else {
                 event.as_mut_log().insert(&key_string, value);
@@ -159,7 +159,7 @@ mod tests {
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let key = "some_key".to_string();
         let kv = new_event.as_log().get_flat(&key);
 
         let val = "some_val".to_string();
@@ -175,7 +175,7 @@ mod tests {
 
         let new_event = augment.transform(event).unwrap();
 
-        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let key = "some_key".to_string();
         let kv = new_event.as_log().get_flat(&key);
 
         let val = "augment me augment me".to_string();
@@ -203,22 +203,22 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
-        fields.insert(Lookup::from_str("float").unwrap(), Value::from(4.5));
-        fields.insert(Lookup::from_str("int").unwrap(), Value::from(4));
+        fields.insert(String::from("float"), Value::from(4.5));
+        fields.insert(String::from("int"), Value::from(4));
         fields.insert(
-            Lookup::from_str("string").unwrap(),
+            String::from("string"),
             Value::from("thisisastring"),
         );
-        fields.insert(Lookup::from_str("bool").unwrap(), Value::from(true));
+        fields.insert(String::from("bool"), Value::from(true));
         fields.insert(
-            Lookup::from_str("array").unwrap(),
+            String::from("array"),
             Value::from(vec![1_isize, 2, 3]),
         );
 
         let mut map = IndexMap::new();
         map.insert(String::from("key"), Value::from("value"));
 
-        fields.insert(Lookup::from_str("table").unwrap(), Value::from_iter(map));
+        fields.insert(String::from("table"), Value::from_iter(map));
 
         let mut transform = AddFields::new(fields, false).unwrap();
 

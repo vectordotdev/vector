@@ -38,10 +38,7 @@ impl TransformConfig for RenameFieldsConfig {
     async fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
-            fields.insert(
-                key.to_string(),
-                value.to_string(),
-            );
+            fields.insert(key.to_string(), value.to_string());
         }
         Ok(Box::new(RenameFields::new(
             fields,
@@ -77,15 +74,11 @@ impl Transform for RenameFields {
             match log.remove_prune(&old_key, self.drop_empty) {
                 Some(v) => {
                     if event.as_mut_log().insert(&new_key, v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten {
-                            field: &old_key
-                        });
+                        emit!(RenameFieldsFieldOverwritten { field: old_key });
                     }
                 }
                 None => {
-                    emit!(RenameFieldsFieldDoesNotExist {
-                        field: &old_key
-                    });
+                    emit!(RenameFieldsFieldDoesNotExist { field: old_key });
                 }
             }
         }
@@ -97,7 +90,6 @@ impl Transform for RenameFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::convert::TryFrom;
 
     #[test]
     fn generate_config() {
@@ -111,12 +103,12 @@ mod tests {
         event.as_mut_log().insert("do_not_move", "not moved");
         let mut fields = IndexMap::new();
         fields.insert(
-            Lookup::try_from("to_move").unwrap(),
-            Lookup::try_from("moved").unwrap(),
+            String::from("to_move"),
+            String::from("moved"),
         );
         fields.insert(
-            Lookup::try_from("not_present").unwrap(),
-            Lookup::try_from("should_not_exist").unwrap(),
+            String::from("not_present"),
+            String::from("should_not_exist"),
         );
 
         let mut transform = RenameFields::new(fields, false).unwrap();
