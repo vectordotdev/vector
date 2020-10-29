@@ -134,6 +134,7 @@ mod tests {
     #[test]
     fn it_works() {
         let cases: Vec<(&str, Result<Option<Value>>)> = vec![
+            (r#".foo = null || "bar""#, Ok(Some("bar".into()))),
             (r#"$foo = null || "bar""#, Ok(Some("bar".into()))),
             // (r#".foo == .bar"#, Ok(Some(Value::Boolean(false)))),
             (
