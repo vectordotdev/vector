@@ -113,6 +113,7 @@ human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
 crossterm = { version = "0.18.0", optional = true }
 tui = { version = "0.12.0", optional = true, default-features = false, features = ["crossterm"] }
+parking_lot = { version = "0.11.0", optional = true }
 
 # External libs
 derivative = "2.1.1"
@@ -284,6 +285,7 @@ api-client = [
   "num-format",
   "crossterm",
   "tui",
+  "parking_lot"
 ]
 
 # Sources

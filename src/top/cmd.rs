@@ -1,11 +1,8 @@
 use super::{
-    dashboard::{init_dashboard, is_tty, Widgets},
-    metrics,
-    state::WidgetsState,
+    dashboard::{init_dashboard, is_tty},
+    metrics, state,
 };
 use crate::config;
-use std::sync::Arc;
-use tokio::stream::StreamExt;
 use url::Url;
 use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
 
@@ -39,9 +36,12 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         }
     }
 
+    // Create a metrics state updater
+    let (tx, rx) = tokio::sync::mpsc::channel(1);
+
     // Get the initial component state
-    let component_state = match metrics::init_components(&client).await {
-        Ok(component_state) => component_state,
+    let sender = match metrics::init_components(&client).await {
+        Ok(state) => state::updater(state, rx),
         _ => {
             eprintln!("Couldn't query Vector components");
             return exitcode::UNAVAILABLE;
@@ -65,20 +65,21 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         }
     };
 
-    // Create initial topology, to be shared by the API client and dashboard renderer
-    let state = Arc::new(WidgetsState::new(url, component_state));
-
     // Subscribe to updated metrics
-    metrics::subscribe(
-        subscription_client,
-        Arc::clone(&state),
-        opts.refresh_interval as i64,
-    );
+    metrics::subscribe(subscription_client, tx, opts.refresh_interval as i64);
 
-    // Render a dashboard with the configured widgets
-    let widgets = Widgets::new(Arc::clone(&state));
+    // let mut state_rx = sender.subscribe();
+    //
+    // loop {
+    //     tokio::select! {
+    //         Ok(state) = state_rx.recv() => {
+    //             // println!("state: {:?}", state);
+    //         },
+    //     }
+    // }
 
-    match init_dashboard(&widgets).await {
+    // Initialize the dashboard
+    match init_dashboard(url.as_str(), sender.subscribe()).await {
         Ok(_) => exitcode::OK,
         _ => {
             eprintln!("Your terminal doesn't support building a dashboard. Exiting.");
