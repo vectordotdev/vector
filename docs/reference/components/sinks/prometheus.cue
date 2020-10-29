@@ -99,10 +99,9 @@ components: sinks: prometheus: {
 				A namespace will be prefixed to a metric's name.
 				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
 				"""
-			required:    false
+			required:    true
 			warnings: []
 			type: string: {
-				default: null
 				examples: ["service"]
 			}
 		}

@@ -56,7 +56,17 @@ components: sinks: sematext_metrics: {
 		notices: []
 	}
 
-	configuration: sinks._sematext.configuration
+	configuration: sinks._sematext.configuration & {
+		default_namespace: {
+			common:      true
+			description: "Used as a namespace for metrics that don't have it."
+			required:    true
+			warnings: []
+			type: string: {
+				examples: ["service"]
+			}
+		}
+	}
 
 	input: {
 		logs: false
