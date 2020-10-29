@@ -1,6 +1,8 @@
 use crate::{
-    checkpointer::Checkpointer, file_watcher::FileWatcher, FileFingerprint,
-    FileSourceInternalEvents, Fingerprinter,
+    checkpointer::Checkpointer,
+    file_watcher::FileWatcher,
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    FileSourceInternalEvents,
 };
 use bytes::Bytes;
 use futures::{
@@ -101,6 +103,8 @@ where
                 .and_then(|m| m.created())
                 .unwrap_or_else(|_| time::SystemTime::now())
         });
+
+        checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
 
         for (path, file_id) in existing_files {
             self.watch_new_file(

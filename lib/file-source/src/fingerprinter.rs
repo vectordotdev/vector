@@ -1,4 +1,4 @@
-use crate::{metadata_ext::PortableFileExt, FileFingerprint, FileSourceInternalEvents};
+use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
 use std::{
     collections::HashSet,
     fs::{self, File},
@@ -19,20 +19,52 @@ pub enum Fingerprinter {
     DevInode,
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum FileFingerprint {
+    Checksum(u64),
+    FirstLineChecksum(u64),
+    DevInode(u64, u64),
+    Unknown(u64),
+}
+
+impl FileFingerprint {
+    pub fn to_legacy(&self) -> u64 {
+        use FileFingerprint::*;
+
+        match self {
+            Checksum(c) => *c,
+            FirstLineChecksum(c) => *c,
+            DevInode(dev, ino) => {
+                let mut buf = Vec::with_capacity(std::mem::size_of_val(dev) * 2);
+                buf.write_all(&dev.to_be_bytes()).expect("writing to array");
+                buf.write_all(&ino.to_be_bytes()).expect("writing to array");
+                crc::crc64::checksum_ecma(&buf[..])
+            }
+            Unknown(c) => *c,
+        }
+    }
+}
+
+impl From<u64> for FileFingerprint {
+    fn from(c: u64) -> Self {
+        FileFingerprint::Unknown(c)
+    }
+}
+
 impl Fingerprinter {
     pub fn get_fingerprint_of_file(
         &self,
         path: &PathBuf,
         buffer: &mut Vec<u8>,
     ) -> Result<FileFingerprint, io::Error> {
+        use FileFingerprint::*;
+
         match *self {
             Fingerprinter::DevInode => {
                 let file_handle = File::open(path)?;
                 let dev = file_handle.portable_dev()?;
                 let ino = file_handle.portable_ino()?;
-                buffer.clear();
-                buffer.write_all(&dev.to_be_bytes())?;
-                buffer.write_all(&ino.to_be_bytes())?;
+                Ok(DevInode(dev, ino))
             }
             Fingerprinter::Checksum {
                 ignored_header_bytes,
@@ -42,6 +74,8 @@ impl Fingerprinter {
                 let mut fp = fs::File::open(path)?;
                 fp.seek(io::SeekFrom::Start(ignored_header_bytes as u64))?;
                 fp.read_exact(&mut buffer[..bytes])?;
+                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
+                Ok(Checksum(fingerprint))
             }
             Fingerprinter::FirstLineChecksum {
                 max_line_length,
@@ -51,10 +85,10 @@ impl Fingerprinter {
                 let mut fp = fs::File::open(path)?;
                 fp.seek(SeekFrom::Start(ignored_header_bytes as u64))?;
                 fingerprinter_read_until(fp, b'\n', buffer)?;
+                let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
+                Ok(FirstLineChecksum(fingerprint))
             }
         }
-        let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
-        Ok(fingerprint)
     }
 
     pub fn get_fingerprint_or_log_error(

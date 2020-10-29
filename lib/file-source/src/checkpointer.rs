@@ -1,4 +1,4 @@
-use super::{FileFingerprint, FilePosition};
+use super::{fingerprinter::FileFingerprint, FilePosition};
 use glob::glob;
 use std::{
     collections::HashMap,
@@ -24,12 +24,53 @@ impl Checkpointer {
         }
     }
 
+    /// Encode a fingerprint to a file name, including legacy Unknown values
+    ///
+    /// For each of the non-legacy variants, prepend an identifier byte that falls outside of the
+    /// hex range used by the legacy implementation. This allows them to be differentiated by
+    /// simply peeking at the first byte.
     fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
-        self.directory.join(format!("{:x}.{}", fng, pos))
+        use FileFingerprint::*;
+
+        let path = match fng {
+            Checksum(c) => format!("g{:x}.{}", c, pos),
+            FirstLineChecksum(c) => format!("h{:x}.{}", c, pos),
+            DevInode(dev, ino) => format!("i{:x}.{:x}.{}", dev, ino, pos),
+            Unknown(x) => format!("{:x}.{}", x, pos),
+        };
+        self.directory.join(path)
     }
+
+    /// Decode a fingerprint from a file name, accounting for unknowns due to the legacy
+    /// implementation.
+    ///
+    /// The trick here is to rely on the hex encoding of the legacy format. Because hex encoding
+    /// only allows [0-9a-f], we can use any character outside of that range as a magic byte
+    /// identifier for the newer formats.
     fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
+        use FileFingerprint::*;
+
         let file_name = &path.file_name().unwrap().to_string_lossy();
-        scan_fmt!(file_name, "{x}.{}", [hex FileFingerprint], FilePosition).unwrap()
+        match file_name.chars().next().expect("empty file name") {
+            'g' => {
+                let (c, pos) = scan_fmt!(file_name, "g{x}.{}", [hex u64], FilePosition).unwrap();
+                (Checksum(c), pos)
+            }
+            'h' => {
+                let (c, pos) = scan_fmt!(file_name, "h{x}.{}", [hex u64], FilePosition).unwrap();
+                (FirstLineChecksum(c), pos)
+            }
+            'i' => {
+                let (dev, ino, pos) =
+                    scan_fmt!(file_name, "i{x}.{y}.{}", [hex u64], [hex u64], FilePosition)
+                        .unwrap();
+                (DevInode(dev, ino), pos)
+            }
+            _ => {
+                let (c, pos) = scan_fmt!(file_name, "{x}.{}", [hex u64], FilePosition).unwrap();
+                (Unknown(c), pos)
+            }
+        }
     }
 
     pub fn set_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
@@ -38,6 +79,19 @@ impl Checkpointer {
 
     pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(&fng).cloned()
+    }
+
+    /// Scan through a given list of fresh fingerprints (i.e. not legacy Unknown) to see if any
+    /// match an existing legacy fingerprint. If so, upgrade the existing fingerprint.
+    pub fn maybe_upgrade(&mut self, fresh: impl Iterator<Item = FileFingerprint>) {
+        for fng in fresh {
+            if let Some(pos) = self
+                .checkpoints
+                .remove(&FileFingerprint::Unknown(fng.to_legacy()))
+            {
+                self.checkpoints.insert(fng, pos);
+            }
+        }
     }
 
     pub fn write_checkpoints(&mut self) -> Result<usize, io::Error> {
@@ -72,7 +126,7 @@ mod test {
 
     #[test]
     fn test_checkpointer_basics() {
-        let fingerprint: FileFingerprint = 0x1234567890abcdef;
+        let fingerprint: FileFingerprint = 0x1234567890abcdef.into();
         let position: FilePosition = 1234;
         let data_dir = tempdir().unwrap();
         let mut chkptr = Checkpointer::new(&data_dir.path());
@@ -86,7 +140,7 @@ mod test {
 
     #[test]
     fn test_checkpointer_restart() {
-        let fingerprint: FileFingerprint = 0x1234567890abcdef;
+        let fingerprint: FileFingerprint = 0x1234567890abcdef.into();
         let position: FilePosition = 1234;
         let data_dir = tempdir().unwrap();
         {
@@ -100,6 +154,31 @@ mod test {
             assert_eq!(chkptr.get_checkpoint(fingerprint), None);
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        }
+    }
+
+    #[test]
+    fn test_checkpointer_upgrades() {
+        let new_fingerprint = FileFingerprint::DevInode(1, 2);
+        let old_fingerprint = FileFingerprint::Unknown(new_fingerprint.to_legacy());
+        let position: FilePosition = 1234;
+
+        let data_dir = tempdir().unwrap();
+        {
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+            chkptr.set_checkpoint(old_fingerprint, position);
+            assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
+            chkptr.write_checkpoints().ok();
+        }
+        {
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+            chkptr.read_checkpoints(None);
+            assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
+
+            chkptr.maybe_upgrade(std::iter::once(new_fingerprint));
+
+            assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
+            assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
         }
     }
 }
