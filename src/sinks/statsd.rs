@@ -29,7 +29,6 @@ pub struct StatsdSvc {
 // TODO: add back when serde-rs/serde#1358 is addressed
 // #[serde(deny_unknown_fields)]
 pub struct StatsdSinkConfig {
-    pub namespace: Option<String>,
     #[serde(flatten)]
     pub mode: Mode,
 }
@@ -63,7 +62,6 @@ fn default_address() -> SocketAddr {
 impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
-            namespace: None,
             mode: Mode::Udp(StatsdUdpConfig {
                 batch: Default::default(),
                 udp: UdpSinkConfig {
@@ -82,12 +80,9 @@ impl SinkConfig for StatsdSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let namespace = self.namespace.clone();
-
         match &self.mode {
             Mode::Tcp(config) => {
-                let encode_event =
-                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                let encode_event = move |event| encode_event(event).map(Into::into);
                 config.build(cx, encode_event)
             }
             Mode::Udp(config) => {
@@ -110,9 +105,7 @@ impl SinkConfig for StatsdSinkConfig {
                     cx.acker(),
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
-                .with_flat_map(move |event| {
-                    stream::iter_ok(encode_event(event, namespace.as_deref()))
-                });
+                .with_flat_map(move |event| stream::iter_ok(encode_event(event)));
 
                 Ok((
                     super::VectorSink::Futures01Sink(Box::new(sink)),
@@ -121,8 +114,7 @@ impl SinkConfig for StatsdSinkConfig {
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
-                let encode_event =
-                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                let encode_event = move |event| encode_event(event).map(Into::into);
                 config.build(cx, encode_event)
             }
         }
@@ -172,7 +164,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
+fn encode_event(event: Event) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -216,7 +208,7 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
         }
     };
 
-    let message = encode_namespace(namespace, '.', buf.join("|"));
+    let message = encode_namespace(metric.namespace.as_deref(), '.', buf.join("|"));
 
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
@@ -290,7 +282,7 @@ mod test {
             value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
+        let frame = &encode_event(event).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -307,7 +299,7 @@ mod test {
             value: MetricValue::Counter { value: 1.5 },
         };
         let event = Event::Metric(metric1);
-        let frame = &encode_event(event, None).unwrap();
+        let frame = &encode_event(event).unwrap();
         // The statsd parser will parse the counter as Incremental,
         // so we can't compare it with the parsed value.
         assert_eq!("counter:1.5|c\n", from_utf8(&frame).unwrap());
@@ -325,7 +317,7 @@ mod test {
             value: MetricValue::Gauge { value: -1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
+        let frame = &encode_event(event).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -342,7 +334,7 @@ mod test {
             value: MetricValue::Gauge { value: 1.5 },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
+        let frame = &encode_event(event).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -363,7 +355,7 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
+        let frame = &encode_event(event).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -382,7 +374,7 @@ mod test {
             },
         };
         let event = Event::Metric(metric1.clone());
-        let frame = &encode_event(event, None).unwrap();
+        let frame = &encode_event(event).unwrap();
         let metric2 = parse(from_utf8(&frame).unwrap().trim()).unwrap();
         assert_eq!(metric1, metric2);
     }
@@ -394,7 +386,6 @@ mod test {
         let addr = next_addr();
 
         let config = StatsdSinkConfig {
-            namespace: Some("vector".into()),
             mode: Mode::Udp(StatsdUdpConfig {
                 batch: BatchConfig {
                     max_bytes: Some(512),
@@ -413,7 +404,7 @@ mod test {
         let events = vec![
             Event::Metric(Metric {
                 name: "counter".to_owned(),
-                namespace: None,
+                namespace: Some("vector".into()),
                 timestamp: None,
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
@@ -421,7 +412,7 @@ mod test {
             }),
             Event::Metric(Metric {
                 name: "histogram".to_owned(),
-                namespace: None,
+                namespace: Some("vector".into()),
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,

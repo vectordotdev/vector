@@ -55,16 +55,6 @@ components: sinks: datadog_metrics: {
 	configuration: {
 		api_key:  sinks._datadog.configuration.api_key
 		endpoint: sinks._datadog.configuration.endpoint
-		namespace: {
-			common:      true
-			description: "A prefix that will be added to all metric names."
-			required:    false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
 	}
 
 	input: {

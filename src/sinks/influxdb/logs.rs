@@ -4,8 +4,8 @@ use crate::{
     http::HttpClient,
     sinks::{
         influxdb::{
-            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
-            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
+            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
@@ -163,7 +163,12 @@ impl HttpSink for InfluxDBLogsSink {
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
+        let name = "vector";
+        let measurement = if self.namespace.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}{}{}", self.namespace, '.', name)
+        };
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {

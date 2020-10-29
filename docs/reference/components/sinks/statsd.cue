@@ -48,16 +48,5 @@ components: sinks: statsd: {
 		}
 	}
 
-	configuration: sinks.socket.configuration & {
-		namespace: {
-			common:      true
-			description: "A prefix that will be added to all metric names."
-			required:    false
-			warnings: []
-			type: string: {
-				default: null
-				examples: ["service"]
-			}
-		}
-	}
+	configuration: sinks.socket.configuration
 }

@@ -65,7 +65,7 @@ components: sinks: _influxdb: {
 			}
 		}
 		namespace: {
-			description: "A prefix that will be added to all metric names."
+			description: "A prefix that will be added to all logs names."
 			groups: ["v1", "v2"]
 			required: true
 			warnings: []
