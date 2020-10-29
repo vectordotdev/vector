@@ -8,6 +8,7 @@ use crate::{
             InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
+            encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
@@ -164,11 +165,11 @@ impl HttpSink for InfluxDBLogsSink {
 
         // Measurement
         let name = "vector";
-        let measurement = if self.namespace.is_empty() {
-            name.to_string()
-        } else {
-            format!("{}{}{}", self.namespace, '.', name)
-        };
+        let measurement = encode_namespace(
+            Some(self.namespace.as_str()).filter(|namespace| !namespace.is_empty()),
+            '.',
+            name,
+        );
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
