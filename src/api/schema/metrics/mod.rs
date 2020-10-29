@@ -77,8 +77,7 @@ impl MetricsSubscription {
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ComponentEventsProcessedTotal> {
-        component_counter_metrics(interval)
-            .filter(|m| m.name == "events_processed_total")
+        component_counter_metrics(interval, &|m| m.name == "events_processed_total")
             .map(ComponentEventsProcessedTotal::new)
     }
 
@@ -98,8 +97,7 @@ impl MetricsSubscription {
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ComponentProcessedBytesTotal> {
-        component_counter_metrics(interval)
-            .filter(|m| m.name == "processed_bytes_total")
+        component_counter_metrics(interval, &|m| m.name == "processed_bytes_total")
             .map(ComponentProcessedBytesTotal::new)
     }
 
@@ -118,8 +116,7 @@ impl MetricsSubscription {
         &self,
         #[arg(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = ComponentErrorsTotal> {
-        component_counter_metrics(interval)
-            .filter(|m| m.name.ends_with("_errors_total"))
+        component_counter_metrics(interval, &|m| m.name.ends_with("_errors_total"))
             .map(ComponentErrorsTotal::new)
     }
 
@@ -171,21 +168,30 @@ pub fn component_events_processed_total(component_name: String) -> Option<Events
         .map(|ev| EventsProcessedTotal::new(ev.into_metric()))
 }
 
+type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
+
 /// Returns a stream of metrics, where `metric_name` matches the name of the metric
 /// (e.g. "events_processed"), and the value is derived from `MetricValue::Counter`. Uses a
 /// local cache to match against the `component_name` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.
-pub fn component_counter_metrics(interval: i32) -> impl Stream<Item = Metric> {
+pub fn component_counter_metrics(
+    interval: i32,
+    filter_fn: &'static MetricFilterFn,
+) -> impl Stream<Item = Metric> {
     let mut cache = BTreeMap::new();
 
-    get_metrics(interval).filter_map(move |m| match m.tag_value("component_name") {
-        Some(name) => match m.value {
-            MetricValue::Counter { value } if cache.insert(name, value).unwrap_or(0.00) < value => {
-                Some(m)
-            }
+    get_metrics(interval)
+        .filter(filter_fn)
+        .filter_map(move |m| match m.tag_value("component_name") {
+            Some(name) => match m.value {
+                MetricValue::Counter { value }
+                    if cache.insert(name, value).unwrap_or(0.00) < value =>
+                {
+                    Some(m)
+                }
+                _ => None,
+            },
             _ => None,
-        },
-        _ => None,
-    })
+        })
 }
