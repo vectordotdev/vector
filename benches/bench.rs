@@ -490,6 +490,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         &["in1", "in2"],
                         transforms::regex_parser::RegexParserConfig {
                             patterns: vec![r"status=(?P<status>\d+)".to_string()],
+                            drop_field: false,
                             field: None,
                             ..Default::default()
                         },
