@@ -134,9 +134,9 @@ pub fn add_fields(criterion: &mut Criterion) {
             "native",
             Box::new({
                 let mut fields = indexmap::IndexMap::default();
-                fields.insert("test_key".into(), "test_value".into());
-                fields.insert("test_key2".into(), "test_value2".into());
-                vector::transforms::add_fields::AddFields::new(fields, false)
+                fields.insert("test_key".into(), String::from("test_value").into());
+                fields.insert("test_key2".into(), String::from("test_value2").into());
+                vector::transforms::add_fields::AddFields::new(fields, false).unwrap()
             }),
         ),
     ];
