@@ -59,7 +59,9 @@ fn add_fields(c: &mut Criterion) {
                         r#"
                         hooks.process = """
                             function (event, emit)
-                                event['{}'] = '{}'
+                                event.log['{}'] = '{}'
+
+                                emit(event)
                             end
                         """
                         "#,
@@ -140,9 +142,12 @@ fn field_filter(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let config = r#"
-                        hooks.proces = """
-                            if event["the_field"] ~= "0" then
-                              event = nil
+                        hooks.process = """
+                            function (event, emit)
+                                if event.log["the_field"] ~= "0" then
+                                  event = nil
+                                end
+                                emit(event)
                             end
                         """
                     "#;
