@@ -1,16 +1,19 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     dns::Resolver,
-    event::metric::{Metric, MetricKind, MetricValue},
+    event::{
+        metric::{Metric, MetricKind, MetricValue},
+        Event,
+    },
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
-        TowerRequestConfig,
+        PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
 use futures::{future, future::BoxFuture, FutureExt};
-use futures01::Sink;
+use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
@@ -31,7 +34,7 @@ pub struct CloudWatchMetricsSvc {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct CloudWatchMetricsSinkConfig {
-    pub namespace: String,
+    pub default_namespace: String,
     #[serde(flatten)]
     pub region: RegionOrEndpoint,
     #[serde(default)]
@@ -87,7 +90,7 @@ impl CloudWatchMetricsSinkConfig {
             ..Default::default()
         };
         let request = PutMetricDataInput {
-            namespace: self.namespace.clone(),
+            namespace: self.default_namespace.clone(),
             metric_data: vec![datum],
         };
 
@@ -123,6 +126,7 @@ impl CloudWatchMetricsSvc {
         client: CloudWatchClient,
         cx: SinkContext,
     ) -> crate::Result<super::VectorSink> {
+        let default_namespace = config.default_namespace.clone();
         let batch = BatchSettings::default()
             .events(20)
             .timeout(1)
@@ -131,21 +135,26 @@ impl CloudWatchMetricsSvc {
 
         let cloudwatch_metrics = CloudWatchMetricsSvc { client, config };
 
-        let sink = request
-            .batch_sink(
-                CloudWatchMetricsRetryLogic,
-                cloudwatch_metrics,
-                MetricBuffer::new(batch.size),
-                batch.timeout,
-                cx.acker(),
-            )
-            .sink_map_err(|error| error!(message = "CloudwatchMetrics sink error.", %error));
+        let svc = request.service(CloudWatchMetricsRetryLogic, cloudwatch_metrics);
+
+        let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
+
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
+            .with_flat_map(move |mut event: Event| {
+                let namespace = event
+                    .as_mut_metric()
+                    .namespace
+                    .take()
+                    .unwrap_or_else(|| default_namespace.clone());
+                iter_ok(Some(PartitionInnerBuffer::new(event, namespace)))
+            });
 
         Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
 
-    fn encode_events(&mut self, events: Vec<Metric>) -> PutMetricDataInput {
-        let metric_data: Vec<_> = events
+    fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
+        events
             .into_iter()
             .filter_map(|event| {
                 let metric_name = event.name.to_string();
@@ -193,18 +202,11 @@ impl CloudWatchMetricsSvc {
                     },
                 }
             })
-            .collect();
-
-        let namespace = self.config.namespace.clone();
-
-        PutMetricDataInput {
-            namespace,
-            metric_data,
-        }
+            .collect()
     }
 }
 
-impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
+impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc {
     type Response = ();
     type Error = RusotoError<PutMetricDataError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
@@ -213,11 +215,17 @@ impl Service<Vec<Metric>> for CloudWatchMetricsSvc {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = self.encode_events(items);
-        if input.metric_data.is_empty() {
+    fn call(&mut self, items: PartitionInnerBuffer<Vec<Metric>, String>) -> Self::Future {
+        let (items, namespace) = items.into_parts();
+        let metric_data = self.encode_events(items);
+        if metric_data.is_empty() {
             return future::ready(Ok(())).boxed();
         }
+
+        let input = PutMetricDataInput {
+            namespace,
+            metric_data,
+        };
 
         debug!(message = "Sending data.", input = ?input);
         let client = self.client.clone();
