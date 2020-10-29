@@ -564,6 +564,13 @@ mod tests {
     fn check_parser() {
         let cases = vec![
             (
+                ".v3ctor = \"bar\"",
+                Mapping::new(vec![Box::new(Assignment::new(
+                    "v3ctor".to_string(),
+                    Box::new(Literal::from(Value::from("bar"))),
+                ))]),
+            ),
+            (
                 ".foo = \"bar\"",
                 Mapping::new(vec![Box::new(Assignment::new(
                     "foo".to_string(),
