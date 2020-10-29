@@ -20,7 +20,7 @@ lookup = { (path_segment | quoted_path_segment) ~ ("." ~ (path_segment | quoted_
 path_index =$ { "[" ~ inner_path_index ~ "]" }
 inner_path_index = { '0'..'9'+ }
 path_segment = ${ path_field_name ~ path_index* }
-path_field_name = { (ASCII_ALPHA | "_" | "-" )+ }
+path_field_name = { (ASCII_ALPHANUMERIC | "_" | "-" )+ }
 quoted_path_segment = ${ "\"" ~ inner_quoted_string ~ "\"" ~ path_index* }
 
 target_path = @{ ("." ~ (path_segment | quoted_path_segment))+ }
