@@ -90,7 +90,6 @@ components: sinks: aws_cloudwatch_metrics: {
 
 	configuration: {
 		default_namespace: {
-			common: true
 			description: """
 				A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.
 				Used as a namespace for metrics that don't have it.
