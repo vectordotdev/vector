@@ -462,6 +462,7 @@ fn benchmark_regex(c: &mut Criterion) {
 
 fn benchmark_complex(c: &mut Criterion) {
     let num_lines: usize = 100_000;
+    let sample_rate: u64 = 10;
 
     let in_addr1 = next_addr();
     let in_addr2 = next_addr();
@@ -523,7 +524,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         "sampler",
                         &["parser"],
                         transforms::sampler::SamplerConfig {
-                            rate: 10,
+                            rate: sample_rate,
                             key_field: None,
                             pass_list: vec![],
                         },
@@ -629,11 +630,17 @@ fn benchmark_complex(c: &mut Criterion) {
                         let output_lines_200 = output_lines_200.await.len();
                         let output_lines_404 = output_lines_404.await.len();
 
+                        // binomial distribution
+                        let sample_stdev = (output_lines_all as f64
+                            * (1f64 / sample_rate as f64)
+                            * (1f64 - (1f64 / sample_rate as f64)))
+                            .sqrt();
+
                         assert_eq!(output_lines_all, num_lines * 2);
                         assert_relative_eq!(
-                            output_lines_sampled as f32 / num_lines as f32,
-                            0.1,
-                            epsilon = 0.01
+                            output_lines_sampled as f64,
+                            output_lines_all as f64 * (1f64 / sample_rate as f64),
+                            epsilon = sample_stdev * 4f64 // should cover 99.993666% of cases
                         );
                         assert!(output_lines_200 > 0);
                         assert!(output_lines_404 > 0);
