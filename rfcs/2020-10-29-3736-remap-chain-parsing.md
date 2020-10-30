@@ -95,14 +95,16 @@ are not required.
 
 Assigning values to variables is only permitted if the condition is wrapped
 with parentheses. If the condition is not wrapped in a group, only the
-    double equals (`==`) is permitted. This helps to avoid the potential bug
+double equals (`==`) is permitted. This helps to avoid the potential bug
 where a typo with a single equals results in valid, but incorrect code.
+
+The scoping for any assignment to variables in the condition is global within
+the script. The variable is modified even if the condition fails.
 
 *Note, `matches` is currently unimplemented, but in this example it is
 intended as a function that would match a regular expression and return any
 matching groups in a `Value::map`. If there were no match, it returns an 
 empty map.*
-
 
 ## Rationale
 
@@ -125,11 +127,11 @@ transform will likely be necessary to do the processing required.
 
 ## Drawbacks
 
-By allowing side effects within the condition, the user could potentially write
-code that they didn't intend. For example, The assignment still
-occurs even if the condition doesn't succeed. The script writer needs to be 
-aware that the variable will not still hold the original value if the predicate 
-doesn't succeed.
+Because the scope of the variables is global within the script, by allowing side
+effects within the condition, the user could potentially write code that they
+didn't intend. For example, The assignment still occurs even if the condition
+doesn't succeed. The script writer needs to be aware that the variable will not
+still hold the original value if the predicate doesn't succeed.
 
 
 ## Alternatives
@@ -178,6 +180,11 @@ values. However, I'm not convinced this would be a good idea as having
 conditions working differently depending on their context could be confusing for
 the user.
 
+### Scoping
+We could introduce scoping rules into the condition. Any modifications to the
+variables would only be visible in the block that is run should the condition
+succeed. This could avoid surprises outlined in the Drawbacks section where
+the state is modified even on failure.
 
 ## Outstanding Questions
 
