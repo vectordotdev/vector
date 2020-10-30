@@ -92,7 +92,7 @@ pub struct Subscription {
 impl Subscription {
     /// Returns a new Subscription, that is associated with a particular GraphQL query
     pub fn new(id: Uuid, client_tx: broadcast::Sender<Payload>) -> Self {
-        let (tx, _) = broadcast::channel(1);
+        let (tx, _) = broadcast::channel(10);
         Self { id, tx, client_tx }
     }
 
