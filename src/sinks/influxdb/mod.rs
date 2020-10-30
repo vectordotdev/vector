@@ -62,14 +62,14 @@ pub struct InfluxDB2Settings {
 }
 
 trait InfluxDBSettings: std::fmt::Debug {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn token(self: &Self) -> String;
-    fn protocol_version(self: &Self) -> ProtocolVersion;
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
+    fn token(&self) -> String;
+    fn protocol_version(&self) -> ProtocolVersion;
 }
 
 impl InfluxDBSettings for InfluxDB1Settings {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "write",
@@ -84,21 +84,21 @@ impl InfluxDBSettings for InfluxDB1Settings {
         )
     }
 
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(self: &Self) -> String {
+    fn token(&self) -> String {
         "".to_string()
     }
 
-    fn protocol_version(self: &Self) -> ProtocolVersion {
+    fn protocol_version(&self) -> ProtocolVersion {
         ProtocolVersion::V1
     }
 }
 
 impl InfluxDBSettings for InfluxDB2Settings {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "api/v2/write",
@@ -110,15 +110,15 @@ impl InfluxDBSettings for InfluxDB2Settings {
         )
     }
 
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(&endpoint, "health", &[])
     }
 
-    fn token(self: &Self) -> String {
+    fn token(&self) -> String {
         self.token.clone()
     }
 
-    fn protocol_version(self: &Self) -> ProtocolVersion {
+    fn protocol_version(&self) -> ProtocolVersion {
         ProtocolVersion::V2
     }
 }

@@ -35,6 +35,8 @@ where
             }
         }
         decoder.finish().map_err(|data| Error::UnparsedDataUponCompletion { data })?;
+
+        ()
     }
 }
 

@@ -245,7 +245,7 @@ where
 }
 
 impl RuntimeTransform for Lua {
-    fn hook_process<F>(self: &mut Self, event: Event, emit_fn: F)
+    fn hook_process<F>(&mut self, event: Event, emit_fn: F)
     where
         F: FnMut(Event),
     {
@@ -265,7 +265,7 @@ impl RuntimeTransform for Lua {
         self.attempt_gc();
     }
 
-    fn hook_init<F>(self: &mut Self, emit_fn: F)
+    fn hook_init<F>(&mut self, emit_fn: F)
     where
         F: FnMut(Event),
     {
@@ -285,7 +285,7 @@ impl RuntimeTransform for Lua {
         self.attempt_gc();
     }
 
-    fn hook_shutdown<F>(self: &mut Self, emit_fn: F)
+    fn hook_shutdown<F>(&mut self, emit_fn: F)
     where
         F: FnMut(Event),
     {
@@ -307,7 +307,7 @@ impl RuntimeTransform for Lua {
         self.attempt_gc();
     }
 
-    fn timer_handler<F>(self: &mut Self, timer: Timer, emit_fn: F)
+    fn timer_handler<F>(&mut self, timer: Timer, emit_fn: F)
     where
         F: FnMut(Event),
     {

@@ -115,7 +115,7 @@ impl Expression for FormatNumberFn {
 
                 if i > parts[1].len() {
                     for _ in 0..i - parts[1].len() {
-                        parts[1].push_str("0")
+                        parts[1].push('0')
                     }
                 } else {
                     parts[1].truncate(i)

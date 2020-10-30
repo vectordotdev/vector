@@ -85,8 +85,7 @@ impl GlobalOptions {
         local_data_dir: Option<&PathBuf>,
     ) -> crate::Result<PathBuf> {
         let data_dir = local_data_dir
-            .or_else(|| self.data_dir.as_ref())
-            .ok_or_else(|| DataDirError::MissingDataDir)
+            .or_else(|| self.data_dir.as_ref()).ok_or(DataDirError::MissingDataDir)
             .map_err(Box::new)?
             .to_path_buf();
         if !data_dir.exists() {

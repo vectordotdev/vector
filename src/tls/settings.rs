@@ -203,8 +203,7 @@ impl TlsOptions {
                     .into_iter();
 
                 let crt = crt_stack
-                    .next()
-                    .ok_or_else(|| TlsError::MissingCertificate)?;
+                    .next().ok_or(TlsError::MissingCertificate)?;
                 let key = load_key(&key_file, &self.key_pass)?;
 
                 let mut ca_stack = Stack::new().context(NewCaStack)?;

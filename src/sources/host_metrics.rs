@@ -867,10 +867,7 @@ mod tests {
 
     #[tokio::test]
     async fn filters_on_collectors() {
-        let all_metrics = HostMetricsConfig::default()
-            .capture_metrics()
-            .await
-            .collect::<Vec<_>>();
+        let all_metrics_count = HostMetricsConfig::default().capture_metrics().await.count();
 
         for collector in &[
             Collector::Cpu,
@@ -885,11 +882,10 @@ mod tests {
                 ..Default::default()
             }
             .capture_metrics()
-            .await
-            .collect::<Vec<_>>();
+            .await;
 
             assert!(
-                all_metrics.len() > some_metrics.len(),
+                all_metrics_count > some_metrics.count(),
                 "collector={:?}",
                 collector
             );
@@ -898,12 +894,9 @@ mod tests {
 
     #[tokio::test]
     async fn are_taged_with_hostname() {
-        let metrics = HostMetricsConfig::default()
-            .capture_metrics()
-            .await
-            .collect::<Vec<_>>();
+        let mut metrics = HostMetricsConfig::default().capture_metrics().await;
         let hostname = crate::get_hostname().expect("Broken hostname");
-        assert!(!metrics.into_iter().any(|event| event
+        assert!(!metrics.any(|event| event
             .into_metric()
             .tags
             .expect("Missing tags")
@@ -914,17 +907,14 @@ mod tests {
 
     #[tokio::test]
     async fn uses_custom_namespace() {
-        let metrics = HostMetricsConfig {
+        let mut metrics = HostMetricsConfig {
             namespace: Namespace("other".into()),
             ..Default::default()
         }
         .capture_metrics()
-        .await
-        .collect::<Vec<_>>();
+        .await;
 
-        assert!(!metrics
-            .into_iter()
-            .any(|event| !event.into_metric().name.starts_with("other_")));
+        assert!(!metrics.any(|event| !event.into_metric().name.starts_with("other_")));
     }
 
     #[tokio::test]
