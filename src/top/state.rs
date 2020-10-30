@@ -1,7 +1,7 @@
 use num_format::{Locale, ToFormattedString};
 use std::collections::btree_map::BTreeMap;
 
-pub static COMPONENT_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Errors", "Throughput"];
+pub static COMPONENT_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Bytes", "Errors"];
 
 pub type State = BTreeMap<String, ComponentRow>;
 pub type EventTx = tokio::sync::mpsc::Sender<(String, EventType)>;
@@ -12,6 +12,7 @@ pub type StateRx = tokio::sync::broadcast::Receiver<State>;
 #[derive(Debug)]
 pub enum EventType {
     EventsProcessedTotal(i64),
+    BytesProcessedTotal(i64),
 }
 
 #[derive(Debug, Clone)]
@@ -19,20 +20,11 @@ pub struct ComponentRow {
     pub name: String,
     pub component_type: String,
     pub events_processed_total: i64,
+    pub bytes_processed_total: i64,
     pub errors: i64,
-    pub throughput: f64,
 }
 
 impl ComponentRow {
-    /// Helper method for formatting an f64 value -> String
-    fn format_f64(val: f64) -> String {
-        if val.is_normal() {
-            val.to_string()
-        } else {
-            "--".into()
-        }
-    }
-
     /// Helper method for formatting an i64 value -> String
     fn format_i64(val: i64) -> String {
         match val {
@@ -46,14 +38,14 @@ impl ComponentRow {
         Self::format_i64(self.events_processed_total)
     }
 
+    /// Format bytes processed total
+    pub fn format_bytes_processed_total(&self) -> String {
+        Self::format_i64(self.bytes_processed_total)
+    }
+
     /// Format errors count
     pub fn format_errors(&self) -> String {
         Self::format_i64(self.errors)
-    }
-
-    /// Format throughput
-    pub fn format_throughput(&self) -> String {
-        Self::format_f64(self.throughput)
     }
 }
 
@@ -71,6 +63,9 @@ pub fn updater(mut state: State, mut rx: EventRx) -> StateTx {
                         match event_type {
                             EventType::EventsProcessedTotal(v) => {
                                 r.events_processed_total = v;
+                            }
+                            EventType::BytesProcessedTotal(v) => {
+                                r.bytes_processed_total = v;
                             }
                         }
 

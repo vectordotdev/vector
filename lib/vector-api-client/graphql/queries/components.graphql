@@ -5,5 +5,8 @@ query ComponentsQuery {
     eventsProcessedTotal {
       eventsProcessedTotal
     }
+    bytesProcessedTotal {
+      bytesProcessedTotal
+    }
   }
 }

@@ -69,6 +69,11 @@ impl Source {
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
         metrics::component_events_processed_total(self.0.name.clone())
     }
+
+    /// Metric indicating bytes processed for the current source
+    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
+        metrics::component_bytes_processed_total(self.0.name.clone())
+    }
 }
 
 #[derive(Clone)]
@@ -113,6 +118,11 @@ impl Transform {
     /// Metric indicating events processed for the current transform
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
         metrics::component_events_processed_total(self.0.name.clone())
+    }
+
+    /// Metric indicating bytes processed for the current transform
+    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
+        metrics::component_bytes_processed_total(self.0.name.clone())
     }
 }
 
@@ -160,6 +170,11 @@ impl Sink {
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
         metrics::component_events_processed_total(self.0.name.clone())
     }
+
+    /// Metric indicating bytes processed for the current sink
+    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
+        metrics::component_bytes_processed_total(self.0.name.clone())
+    }
 }
 
 #[derive(Clone, Interface)]
@@ -168,6 +183,10 @@ impl Sink {
     field(
         name = "events_processed_total",
         type = "Option<metrics::EventsProcessedTotal>"
+    ),
+    field(
+        name = "bytes_processed_total",
+        type = "Option<metrics::BytesProcessedTotal>"
     )
 )]
 pub enum Component {

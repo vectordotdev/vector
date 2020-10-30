@@ -6,47 +6,63 @@ use vector_api_client::{
     Client, SubscriptionClient,
 };
 
-async fn events_processed(
-    client: Arc<SubscriptionClient>,
-    mut tx: state::EventTx,
-    interval: i64,
-) -> Result<(), ()> {
-    let events = client
+/// Events processed metrics
+async fn events_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx, interval: i64) {
+    if let Ok(res) = client
         .component_events_processed_total_subscription(interval)
         .await
-        .map_err(|_| ())?;
+    {
+        tokio::pin! {
+            let stream = res.stream();
+        };
 
-    tokio::pin! {
-        let stream = events.stream();
-    };
-
-    while let Some(Some(res)) = stream.next().await {
-        if let Some(d) = res.data {
-            let c = d.component_events_processed_total;
-            let _ = tx
-                .send((
-                    c.name,
-                    state::EventType::EventsProcessedTotal(c.metric.events_processed_total as i64),
-                ))
-                .await;
+        while let Some(Some(res)) = stream.next().await {
+            if let Some(d) = res.data {
+                let c = d.component_events_processed_total;
+                let _ = tx
+                    .send((
+                        c.name,
+                        state::EventType::EventsProcessedTotal(
+                            c.metric.events_processed_total as i64,
+                        ),
+                    ))
+                    .await;
+            }
         }
     }
+}
 
-    Ok(())
+/// Bytes processed metrics
+async fn bytes_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx, interval: i64) {
+    if let Ok(res) = client
+        .component_bytes_processed_total_subscription(interval)
+        .await
+    {
+        tokio::pin! {
+            let stream = res.stream();
+        };
+
+        while let Some(Some(res)) = stream.next().await {
+            if let Some(d) = res.data {
+                let c = d.component_bytes_processed_total;
+                let _ = tx
+                    .send((
+                        c.name,
+                        state::EventType::BytesProcessedTotal(
+                            c.metric.bytes_processed_total as i64,
+                        ),
+                    ))
+                    .await;
+            }
+        }
+    }
 }
 
 pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) {
     let client = Arc::new(client);
 
-    for metric_fn in [events_processed].iter() {
-        let client = Arc::clone(&client);
-        let interval = interval;
-        let tx = tx.clone();
-
-        tokio::spawn(async move {
-            let _ = metric_fn(client, tx, interval).await;
-        });
-    }
+    tokio::spawn(events_processed(Arc::clone(&client), tx.clone(), interval));
+    tokio::spawn(bytes_processed(Arc::clone(&client), tx.clone(), interval));
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
@@ -72,8 +88,12 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                         .as_ref()
                         .map(|ep| ep.events_processed_total as i64)
                         .unwrap_or(0),
+                    bytes_processed_total: d
+                        .bytes_processed_total
+                        .as_ref()
+                        .map(|ep| ep.bytes_processed_total as i64)
+                        .unwrap_or(0),
                     errors: 0,
-                    throughput: 0.00,
                 },
             )
         })

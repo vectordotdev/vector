@@ -34,6 +34,16 @@ pub struct EventsProcessedTotalSubscription;
 )]
 pub struct ComponentEventsProcessedTotalSubscription;
 
+/// ComponentBytesProcessedTotalSubscription contains metrics on the number of bytes
+/// that have been processed by a Vector instance, against a specific component
+#[derive(GraphQLQuery, Debug, Copy, Clone)]
+#[graphql(
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/subscriptions/component_bytes_processed_total.graphql",
+    response_derives = "Debug"
+)]
+pub struct ComponentBytesProcessedTotalSubscription;
+
 /// Extension methods for metrics subscriptions
 #[async_trait]
 pub trait MetricsSubscriptionExt {
@@ -51,6 +61,12 @@ pub trait MetricsSubscriptionExt {
         &self,
         interval: i64,
     ) -> crate::SubscriptionResult<ComponentEventsProcessedTotalSubscription>;
+
+    /// Executes a components bytes processed total metrics subscription
+    async fn component_bytes_processed_total_subscription(
+        &self,
+        interval: i64,
+    ) -> crate::SubscriptionResult<ComponentBytesProcessedTotalSubscription>;
 }
 
 #[async_trait]
@@ -85,6 +101,19 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         );
 
         self.start::<ComponentEventsProcessedTotalSubscription>(&request_body)
+            .await
+    }
+
+    /// Executes a components events processed total metrics subscription
+    async fn component_bytes_processed_total_subscription(
+        &self,
+        interval: i64,
+    ) -> SubscriptionResult<ComponentBytesProcessedTotalSubscription> {
+        let request_body = ComponentBytesProcessedTotalSubscription::build_query(
+            component_bytes_processed_total_subscription::Variables { interval },
+        );
+
+        self.start::<ComponentBytesProcessedTotalSubscription>(&request_body)
             .await
     }
 }

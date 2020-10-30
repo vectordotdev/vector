@@ -60,8 +60,8 @@ impl<'a> Widgets<'a> {
                     r.name.clone(),
                     r.component_type.clone(),
                     r.format_events_processed_total(),
+                    r.format_bytes_processed_total(),
                     r.format_errors(),
-                    r.format_throughput(),
                 ]
                 .into_iter(),
                 Style::default().fg(Color::White),

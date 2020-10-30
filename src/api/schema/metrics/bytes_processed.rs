@@ -2,16 +2,16 @@ use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 
-pub struct ProcessedBytesTotal(Metric);
+pub struct BytesProcessedTotal(Metric);
 
-impl ProcessedBytesTotal {
+impl BytesProcessedTotal {
     pub fn new(m: Metric) -> Self {
         Self(m)
     }
 }
 
 #[Object]
-impl ProcessedBytesTotal {
+impl BytesProcessedTotal {
     /// Metric timestamp
     pub async fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.0.timestamp
@@ -26,18 +26,18 @@ impl ProcessedBytesTotal {
     }
 }
 
-impl From<Metric> for ProcessedBytesTotal {
+impl From<Metric> for BytesProcessedTotal {
     fn from(m: Metric) -> Self {
         Self(m)
     }
 }
 
-pub struct ComponentProcessedBytesTotal {
+pub struct ComponentBytesProcessedTotal {
     name: String,
     metric: Metric,
 }
 
-impl ComponentProcessedBytesTotal {
+impl ComponentBytesProcessedTotal {
     /// Returns a new `ComponentBytesProcessedTotal` struct, which is a GraphQL type. The
     /// component name is hoisted for clear field resolution in the resulting payload
     pub fn new(metric: Metric) -> Self {
@@ -50,14 +50,14 @@ impl ComponentProcessedBytesTotal {
 }
 
 #[Object]
-impl ComponentProcessedBytesTotal {
+impl ComponentBytesProcessedTotal {
     /// Component name
     async fn name(&self) -> String {
         self.name.clone()
     }
 
     /// Bytes processed total metric
-    async fn metric(&self) -> ProcessedBytesTotal {
-        ProcessedBytesTotal::new(self.metric.clone())
+    async fn metric(&self) -> BytesProcessedTotal {
+        BytesProcessedTotal::new(self.metric.clone())
     }
 }
