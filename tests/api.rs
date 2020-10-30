@@ -331,6 +331,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::float_cmp)]
     /// Tests componentEventsProcessedTotal returns increasing metrics, ordered by
     /// source -> transform -> sink
     async fn api_graphql_component_events_processed_total() {
