@@ -168,13 +168,10 @@ struct JournaldSource {
     remap_priority: bool,
 
     out: Compat01As03Sink<Pipeline, Event>,
-    shutdown: ShutdownSignal,
 }
 
 impl JournaldSource {
-    async fn run(&mut self) -> Result<(), ()> {
-        let mut on_stop: Option<StopJournalctlFn> = None;
-
+    async fn run_shutdown(self, shutdown: ShutdownSignal) -> Result<(), ()> {
         let mut checkpointer = Checkpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
@@ -185,7 +182,7 @@ impl JournaldSource {
                 );
             })?;
 
-        let cursor = match checkpointer.get().await {
+        let mut cursor = match checkpointer.get().await {
             Ok(cursor) => cursor,
             Err(error) => {
                 error!(
@@ -196,20 +193,49 @@ impl JournaldSource {
             }
         };
 
+        let mut on_stop = None;
+        let run = Box::pin(self.run(&mut checkpointer, &mut cursor, &mut on_stop));
+        future::select(run, shutdown).await;
+
+        on_stop.map(|stop| stop());
+
+        if let Some(cursor) = cursor {
+            if let Err(error) = checkpointer.set(&cursor).await {
+                error!(
+                    message = "Could not set journald checkpoint.",
+                    %error,
+                    filename = ?checkpointer.filename,
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn run<'a>(
+        mut self,
+        checkpointer: &'a mut Checkpointer,
+        cursor: &'a mut Option<String>,
+        on_stop: &'a mut Option<StopJournalctlFn>,
+    ) -> Result<(), ()> {
         loop {
-            let (stream, stop) = start_journalctl(
+            match start_journalctl(
                 self.journalctl_path.clone(),
                 self.current_boot_only,
                 cursor.clone(),
-            )
-            .map_err(|error| {
-                error!(message = "Error starting journalctl process.", %error);
-            })?;
+            ) {
+                Ok((stream, stop)) => {
+                    *on_stop = Some(stop);
+                    self.run_stream(stream, checkpointer, cursor).await;
+                    on_stop.take().map(|stop| stop());
+                }
+                Err(error) => {
+                    error!(message = "Error starting journalctl process.", %error);
+                }
+            };
 
-            self.run_stream(stream, &mut checkpointer).await;
-
-            stop();
-
+            // journalctl process should never stop,
+            // so it is an error if we reach here.
             delay_for(BACKOFF_DURATION).await;
         }
     }
@@ -218,10 +244,10 @@ impl JournaldSource {
         &'a mut self,
         mut stream: BoxStream<'static, io::Result<String>>,
         checkpointer: &'a mut Checkpointer,
+        cursor: &'a mut Option<String>,
     ) {
         loop {
             let mut saw_record = false;
-            let mut cursor: Option<String> = None;
 
             for _ in 0..self.batch_size {
                 let text = match stream.next().await {
@@ -247,7 +273,7 @@ impl JournaldSource {
                     }
                 };
                 if let Some(tmp) = record.remove(&*CURSOR) {
-                    cursor = Some(tmp);
+                    *cursor = Some(tmp);
                 }
 
                 saw_record = true;
@@ -272,7 +298,7 @@ impl JournaldSource {
 
             if saw_record {
                 if let Some(cursor) = cursor {
-                    if let Err(error) = checkpointer.set(&cursor).await {
+                    if let Err(error) = checkpointer.set(cursor).await {
                         error!(
                             message = "Could not set journald checkpoint.",
                             %error,
