@@ -279,10 +279,9 @@ where
                 })
                 .collect();
 
-            let body = response.into_body().map(|try_chunk| {
-                try_chunk
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-            });
+            let body = response
+                .into_body()
+                .map(|try_chunk| try_chunk.map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
 
             Ok(HttpResponse {
                 status,
