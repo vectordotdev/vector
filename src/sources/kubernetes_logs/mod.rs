@@ -281,6 +281,7 @@ impl Source {
                 // Max line length to expect during fingerprinting, see the
                 // explanation above.
                 max_line_length: max_line_bytes,
+                ignored_header_bytes: 0,
             },
             // We expect the files distribution to not be a concern because of
             // the way we pick files for gathering: for each container, only the
