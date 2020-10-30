@@ -20,23 +20,19 @@ async fn events_processed(
         let stream = events.stream();
     };
 
-    for i in stream.next().await {
-        println!("payload: {:?}", i);
-    }
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_events_processed_total;
+            println!("metric: {:?}", &c);
 
-    // while let Some(Some(res)) = stream.next().await {
-    //     if let Some(d) = res.data {
-    //         let c = d.component_events_processed_total;
-    //         println!("metric: {:?}", &c);
-    //
-    //         let _ = tx
-    //             .send((
-    //                 c.name,
-    //                 state::EventType::EventsProcessedTotal(c.metric.events_processed_total as i64),
-    //             ))
-    //             .await;
-    //     }
-    // }
+            let _ = tx
+                .send((
+                    c.name,
+                    state::EventType::EventsProcessedTotal(c.metric.events_processed_total as i64),
+                ))
+                .await;
+        }
+    }
 
     Ok(())
 }

@@ -6689,7 +6689,6 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
- "parking_lot 0.11.0",
  "pest",
  "pest_derive",
  "pin-project 0.4.26",

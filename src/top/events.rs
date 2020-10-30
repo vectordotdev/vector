@@ -6,11 +6,7 @@ static INPUT_INVARIANT: &str = "Couldn't capture keyboard input. Please report."
 /// Capture keyboard input, and send it upstream via a channel. This is used for interaction
 /// with the dashboard, and exiting from `vector top`.
 pub fn capture_key_press() -> (mpsc::Receiver<KeyCode>, oneshot::Sender<()>) {
-<<<<<<< HEAD
     let (tx, rx) = mpsc::channel(10);
-=======
-    let (tx, rx) = mpsc::channel(5);
->>>>>>> leebenson/component_counter_metrics
     let (kill_tx, mut kill_rx) = oneshot::channel();
 
     tokio::spawn(async move {

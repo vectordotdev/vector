@@ -1,10 +1,7 @@
 mod cmd;
 mod dashboard;
 mod events;
-<<<<<<< HEAD
 mod metrics;
-=======
->>>>>>> leebenson/component_counter_metrics
 mod state;
 
 use structopt::StructOpt;
