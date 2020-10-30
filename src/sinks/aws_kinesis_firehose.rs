@@ -164,9 +164,7 @@ impl KinesisFirehoseService {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(
-                |error| error!(message = "Fatal kinesis firehose sink error.", error = ?error),
-            )
+            .sink_map_err(|error| error!(message = "Fatal kinesis firehose sink error.", %error))
             .with_flat_map(move |e| iter_ok(encode_event(e, &encoding)));
 
         Ok(sink)

@@ -3,8 +3,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformContext, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
-    mapping::{parser::parse as parse_mapping, Mapping},
 };
+use remap::{Program, Runtime};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -43,14 +43,14 @@ impl TransformConfig for RemapConfig {
 
 #[derive(Debug)]
 pub struct Remap {
-    mapping: Mapping,
+    program: Program,
     drop_on_err: bool,
 }
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
         Ok(Remap {
-            mapping: parse_mapping(&config.source)?,
+            program: Program::new(&config.source, &crate::remap::FUNCTIONS_MUT)?,
             drop_on_err: config.drop_on_err,
         })
     }
@@ -60,10 +60,12 @@ impl Transform for Remap {
     fn transform(&mut self, mut event: Event) -> Option<Event> {
         emit!(RemapEventProcessed);
 
-        if let Err(error) = self.mapping.execute(&mut event) {
+        let mut runtime = Runtime::default();
+
+        if let Err(error) = runtime.execute(&mut event, &self.program) {
             emit!(RemapFailedMapping {
                 event_dropped: self.drop_on_err,
-                error
+                error: error.to_string(),
             });
 
             if self.drop_on_err {

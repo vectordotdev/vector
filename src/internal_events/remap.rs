@@ -37,3 +37,27 @@ impl InternalEvent for RemapFailedMapping {
         counter!("processing_errors_total", 1, "error_type" => "failed_mapping");
     }
 }
+
+#[derive(Debug, Copy, Clone)]
+pub struct RemapConditionExecutionFailed;
+
+impl InternalEvent for RemapConditionExecutionFailed {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Remap condition execution failed.",
+            rate_limit_secs = 120
+        )
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct RemapConditionNonBooleanReturned;
+
+impl InternalEvent for RemapConditionNonBooleanReturned {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Remap condition non-boolean value returned.",
+            rate_limit_secs = 120
+        )
+    }
+}

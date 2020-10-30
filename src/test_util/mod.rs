@@ -54,8 +54,9 @@ macro_rules! assert_downcast_matches {
 #[macro_export]
 macro_rules! log_event {
     ($($key:expr => $value:expr),*  $(,)?) => {
+        #[allow(unused_variables)]
         {
-            let mut event = Event::Log(LogEvent::default());
+            let mut event = crate::event::Event::Log(crate::event::LogEvent::default());
             let log = event.as_mut_log();
             $(
                 log.insert($key, $value);
@@ -511,4 +512,16 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()
+}
+
+#[macro_export]
+macro_rules! map {
+    () => (
+        ::std::collections::BTreeMap::new()
+    );
+    ($($k:tt: $v:expr),+ $(,)?) => {
+        vec![$(($k.into(), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>()
+    };
 }

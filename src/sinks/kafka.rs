@@ -177,13 +177,13 @@ impl Sink for KafkaSink {
             Err((error, record)) => {
                 // Docs suggest this will only happen when the producer queue is full, so let's
                 // treat it as we do full buffers in other sinks
-                debug!(message = "The rdkafka queue full.", error = ?error);
+                debug!(message = "The rdkafka queue full.", %error);
                 self.poll_complete()?;
 
                 match self.producer.send_result(record) {
                     Ok(f) => f,
                     Err((error, _record)) => {
-                        debug!(message = "The rdkafka queue still full.", error = ?error);
+                        debug!(message = "The rdkafka queue still full.", %error);
                         return Ok(AsyncSink::NotReady(item));
                     }
                 }
@@ -213,7 +213,7 @@ impl Sink for KafkaSink {
                         Ok((partition, offset)) => trace!(
                             message = "Produced message.", parition = ?partition, offset = ?offset
                         ),
-                        Err((error, _msg)) => error!(message = "Kafka error.", error = ?error),
+                        Err((error, _msg)) => error!(message = "Kafka error.", %error),
                     };
 
                     self.pending_acks.insert(seqno);
@@ -227,7 +227,7 @@ impl Sink for KafkaSink {
                 }
 
                 // request got canceled (according to docs)
-                Err(error) => error!(message = "Delivery future canceled.", error = ?error),
+                Err(error) => error!(message = "Delivery future canceled.", %error),
             }
         }
     }

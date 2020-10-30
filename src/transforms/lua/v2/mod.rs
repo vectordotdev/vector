@@ -224,7 +224,7 @@ impl Lua {
                 .lua
                 .gc_collect()
                 .context(RuntimeErrorGC)
-                .map_err(|error| error!(error = ?error, rate_limit = 30));
+                .map_err(|error| error!(%error, rate_limit = 30));
             self.invocations_after_gc = 0;
         }
     }
@@ -280,7 +280,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksInit)
-            .map_err(|error| error!(error = ?error, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -302,7 +302,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksInit)
-            .map_err(|error| error!(error = ?error, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -323,7 +323,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorTimerHandler)
-            .map_err(|error| error!(error = ?error, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }

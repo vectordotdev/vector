@@ -161,7 +161,7 @@ struct AwsCloudWatchLogEvent {
 #[cfg(test)]
 mod test {
     use super::{AwsCloudwatchLogsSubscriptionParser, AwsCloudwatchLogsSubscriptionParserConfig};
-    use crate::{event::Event, event::LogEvent, log_event, transforms::Transform};
+    use crate::{event::Event, log_event, transforms::Transform};
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
 
