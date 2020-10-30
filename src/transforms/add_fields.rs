@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, , TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,

@@ -3,7 +3,7 @@ use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::TransformContext,
+    config::TransformConfig,
     test_util::runtime,
     transforms::{self, Transform},
     Event,
