@@ -77,9 +77,10 @@ impl SinkConfig for ClickhouseConfig {
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(cx.resolver(), tls_settings)?;
 
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::with_retry_logic(
             self.clone(),
             Buffer::new(batch.size, self.compression),
+            ClickhouseRetryLogic::default(),
             request,
             batch.timeout,
             client.clone(),
@@ -183,7 +184,7 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
     Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Default, Clone)]
 struct ClickhouseRetryLogic {
     inner: HttpRetryLogic,
 }
