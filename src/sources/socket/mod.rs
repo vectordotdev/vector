@@ -143,7 +143,6 @@ mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        dns::Resolver,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSink,
         test_util::{
@@ -453,7 +452,6 @@ mod test {
         let sink = TcpSink::new(
             "localhost".to_owned(),
             addr.port(),
-            Resolver,
             MaybeTlsSettings::Raw(()),
         );
         let message = random_string(512);

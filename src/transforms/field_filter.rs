@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
@@ -29,7 +29,7 @@ impl GenerateConfig for FieldFilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         warn!(
             message =
                 r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#

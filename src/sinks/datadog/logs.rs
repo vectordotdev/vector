@@ -110,7 +110,7 @@ impl DatadogLogsConfig {
             false,
         )?;
 
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
         let sink = BatchedHttpSink::new(
             service,

@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
     rusoto::{self, RegionOrEndpoint},
@@ -91,7 +90,7 @@ impl SinkConfig for KinesisSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisService::new(self.clone(), client, cx)?;
         Ok((
@@ -132,10 +131,10 @@ impl KinesisSinkConfig {
         }
     }
 
-    fn create_client(&self, resolver: Resolver) -> crate::Result<KinesisClient> {
+    fn create_client(&self) -> crate::Result<KinesisClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -431,7 +430,7 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client().unwrap();
         let sink = KinesisService::new(config, client, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
