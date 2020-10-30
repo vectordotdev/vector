@@ -37,7 +37,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Create a metrics state updater
-    let (tx, rx) = tokio::sync::mpsc::channel(1);
+    let (tx, rx) = tokio::sync::mpsc::channel(10);
 
     // Get the initial component state
     let sender = match metrics::init_components(&client).await {
@@ -68,15 +68,15 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Subscribe to updated metrics
     metrics::subscribe(subscription_client, tx, opts.refresh_interval as i64);
 
-    // let mut state_rx = sender.subscribe();
-    //
-    // loop {
-    //     tokio::select! {
-    //         Ok(state) = state_rx.recv() => {
-    //             // println!("state: {:?}", state);
-    //         },
-    //     }
-    // }
+    let mut state_rx = sender.subscribe();
+
+    loop {
+        tokio::select! {
+            Ok(state) = state_rx.recv() => {
+                // println!("state: {:?}", state);
+            },
+        }
+    }
 
     // Initialize the dashboard
     match init_dashboard(url.as_str(), sender.subscribe()).await {

@@ -58,7 +58,7 @@ impl ComponentRow {
 }
 
 pub fn updater(mut state: State, mut rx: EventRx) -> StateTx {
-    let (tx, _) = tokio::sync::broadcast::channel(1);
+    let (tx, _) = tokio::sync::broadcast::channel(10);
 
     // Local sender clone
     let sender = tx.clone();
