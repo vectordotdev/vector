@@ -196,7 +196,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 3cdf25b37a769fb1b12b40d3efed89539b7cea6f26110ad0b7166b419e9c9254
+        checksum/config: 2b97a22daf2ebfde5eb7486caecd73a826b30715e98fe40cc2c0a3a07ab1dc78
       labels:
         app.kubernetes.io/name: vector-agent
         app.kubernetes.io/instance: vector
@@ -300,6 +300,8 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        checksum/config: 5ef9ad798d288ca3aec45303d221f8ce0c413ec73d25d498f509fed43a389b8c
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
@@ -316,6 +318,8 @@ spec:
           args:
             - --config
             - /etc/vector/*.toml
+          env:
+            
           resources:
             {}
           volumeMounts:
