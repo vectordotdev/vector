@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 set -x
 
-CHANNEL="${CHANNEL:-"$(scripts/util/release-channel.sh)"}"
+CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
 VERSION="${VERSION:-"$(scripts/version.sh)"}"
 
 if [[ "$CHANNEL" == "nightly" ]]; then
@@ -43,12 +43,29 @@ capture_stderr() {
 rm -rf "$REPO_DIR"
 mkdir -p "$REPO_DIR"
 
-# Package our chart.
-helm package \
-  distribution/helm/vector \
-  --version "$CHART_VERSION" \
-  --app-version "$APP_VERSION" \
-  --destination "$REPO_DIR"
+# Ensure chart dependencies are up to date.
+echo "Validating the dependencies"
+scripts/helm-dependencies.sh validate
+
+# Read the shared scripting config.
+source "distribution/helm/scripting-config.sh"
+
+# Package our charts.
+for CHART in "${CHARTS_TO_PUBLISH[@]}"; do
+  helm package \
+    "distribution/helm/$CHART" \
+    --version "$CHART_VERSION" \
+    --app-version "$APP_VERSION" \
+    --destination "$REPO_DIR"
+
+  # Apply a workaround to fix the subchart versions.
+  PACKAGED_ARCHIVE_PATH="$REPO_DIR/$CHART-$CHART_VERSION.tgz"
+  scripts/patch-packaged-helm-chart-versions.sh \
+    "$PACKAGED_ARCHIVE_PATH" \
+    "$CHART" \
+    "$CHART_VERSION" \
+    "$APP_VERSION"
+done
 
 # Download previous manifest.
 # If it doesn't exist - ignore the error and continue.

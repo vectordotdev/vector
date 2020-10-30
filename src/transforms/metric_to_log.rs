@@ -1,9 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{self, Event, LogEvent},
     internal_events::{MetricToLogEventProcessed, MetricToLogFailedSerialize},
     types::Conversion,
@@ -11,24 +8,30 @@ use crate::{
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use string_cache::DefaultAtom as Atom;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Clone, Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct MetricToLogConfig {
-    pub host_tag: Option<Atom>,
+    pub host_tag: Option<String>,
 }
 
 inventory::submit! {
     TransformDescription::new::<MetricToLogConfig>("metric_to_log")
 }
 
-impl GenerateConfig for MetricToLogConfig {}
+impl GenerateConfig for MetricToLogConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            host_tag: Some("host-tag".to_string()),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(MetricToLog::new(self.host_tag.clone())))
     }
 
@@ -46,18 +49,18 @@ impl TransformConfig for MetricToLogConfig {
 }
 
 pub struct MetricToLog {
-    timestamp_key: Atom,
-    host_tag: Atom,
+    timestamp_key: String,
+    host_tag: String,
 }
 
 impl MetricToLog {
-    pub fn new(host_tag: Option<Atom>) -> Self {
+    pub fn new(host_tag: Option<String>) -> Self {
         Self {
-            timestamp_key: Atom::from("timestamp"),
-            host_tag: Atom::from(format!(
+            timestamp_key: "timestamp".into(),
+            host_tag: format!(
                 "tags.{}",
-                host_tag.unwrap_or_else(|| Atom::from(log_schema().host_key()))
-            )),
+                host_tag.unwrap_or_else(|| log_schema().host_key().to_string())
+            ),
         }
     }
 }
@@ -105,9 +108,14 @@ mod tests {
     use chrono::{offset::TimeZone, DateTime, Utc};
     use std::collections::BTreeMap;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<MetricToLogConfig>();
+    }
+
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some(Atom::from("host")));
+        let mut transformer = MetricToLog::new(Some("host".into()));
 
         transformer.transform(event).map(|event| event.into_log())
     }
@@ -129,6 +137,7 @@ mod tests {
     fn transform_counter() {
         let counter = Metric {
             name: "counter".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -155,6 +164,7 @@ mod tests {
     fn transform_gauge() {
         let gauge = Metric {
             name: "gauge".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -179,6 +189,7 @@ mod tests {
     fn transform_set() {
         let set = Metric {
             name: "set".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -206,6 +217,7 @@ mod tests {
     fn transform_distribution() {
         let distro = Metric {
             name: "distro".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -247,6 +259,7 @@ mod tests {
     fn transform_histogram() {
         let histo = Metric {
             name: "histo".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -293,6 +306,7 @@ mod tests {
     fn transform_summary() {
         let summary = Metric {
             name: "summary".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,

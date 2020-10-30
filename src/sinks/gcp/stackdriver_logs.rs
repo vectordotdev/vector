@@ -2,10 +2,11 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -21,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -59,7 +59,7 @@ pub struct StackdriverConfig {
 struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
-    severity_key: Option<Atom>,
+    severity_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -121,15 +121,12 @@ impl SinkConfig for StackdriverConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = StackdriverSink {
             config: self.clone(),
             creds,
-            severity_key: self
-                .severity_key
-                .as_ref()
-                .map(|key| Atom::from(key.as_str())),
+            severity_key: self.severity_key.clone(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -142,7 +139,7 @@ impl SinkConfig for StackdriverConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
@@ -180,7 +177,7 @@ impl HttpSink for StackdriverSink {
         entry.insert("severity".into(), json!(severity));
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(&Atom::from(log_schema().timestamp_key())) {
+        if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
@@ -231,7 +228,7 @@ fn remap_severity(severity: Value) -> Value {
                     s if s.starts_with("DEFAULT") => 0,
                     _ => {
                         warn!(
-                            message = "Unknown severity value string, using DEFAULT",
+                            message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
                             rate_limit_secs = 10
                         );
@@ -242,7 +239,7 @@ fn remap_severity(severity: Value) -> Value {
         }
         value => {
             warn!(
-                message = "Unknown severity value type, using DEFAULT",
+                message = "Unknown severity value type, using DEFAULT.",
                 ?value,
                 rate_limit_secs = 10
             );

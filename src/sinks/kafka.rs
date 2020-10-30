@@ -21,7 +21,6 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::time::Duration;
-use string_cache::DefaultAtom as Atom;
 
 type MetadataFuture<F, M> = future01::Join<F, future01::FutureResult<M, <F as Future>::Error>>;
 
@@ -37,7 +36,7 @@ enum BuildError {
 pub struct KafkaSinkConfig {
     bootstrap_servers: String,
     topic: String,
-    key_field: Option<Atom>,
+    key_field: Option<String>,
     encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     compression: KafkaCompression,
@@ -70,7 +69,7 @@ pub enum Encoding {
 pub struct KafkaSink {
     producer: FutureProducer,
     topic: Template,
-    key_field: Option<Atom>,
+    key_field: Option<String>,
     encoding: EncodingConfig<Encoding>,
     in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
 
@@ -84,7 +83,17 @@ inventory::submit! {
     SinkDescription::new::<KafkaSinkConfig>("kafka")
 }
 
-impl GenerateConfig for KafkaSinkConfig {}
+impl GenerateConfig for KafkaSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"bootstrap_servers = "10.14.22.123:9092,10.14.23.332:9092"
+            key_field = "user_id"
+            topic = "topic-1234"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "kafka")]
@@ -151,32 +160,30 @@ impl Sink for KafkaSink {
 
     fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
-            error!(message = "Missing keys for topic", ?missing_keys);
+            error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
         })?;
 
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
 
         let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
 
-        if let Some(Value::Timestamp(timestamp)) =
-            item.as_log().get(&Atom::from(log_schema().timestamp_key()))
-        {
+        if let Some(Value::Timestamp(timestamp)) = item.as_log().get(log_schema().timestamp_key()) {
             record = record.timestamp(timestamp.timestamp_millis());
         }
 
-        debug!(message = "sending event.", count = 1);
+        debug!(message = "Sending event.", count = 1);
         let future = match self.producer.send_result(record) {
             Ok(f) => f,
-            Err((e, record)) => {
+            Err((error, record)) => {
                 // Docs suggest this will only happen when the producer queue is full, so let's
                 // treat it as we do full buffers in other sinks
-                debug!("rdkafka queue full: {}", e);
+                debug!(message = "The rdkafka queue full.", %error);
                 self.poll_complete()?;
 
                 match self.producer.send_result(record) {
                     Ok(f) => f,
-                    Err((e, _record)) => {
-                        debug!("rdkafka queue still full: {}", e);
+                    Err((error, _record)) => {
+                        debug!(message = "The rdkafka queue still full.", %error);
                         return Ok(AsyncSink::NotReady(item));
                     }
                 }
@@ -204,11 +211,9 @@ impl Sink for KafkaSink {
                 Ok(Async::Ready(Some((result, seqno)))) => {
                     match result {
                         Ok((partition, offset)) => trace!(
-                            "Produced message to partition {} at offset {}",
-                            partition,
-                            offset
+                            message = "Produced message.", parition = ?partition, offset = ?offset
                         ),
-                        Err((e, _msg)) => error!("Kafka error: {}", e),
+                        Err((error, _msg)) => error!(message = "Kafka error.", %error),
                     };
 
                     self.pending_acks.insert(seqno);
@@ -222,7 +227,7 @@ impl Sink for KafkaSink {
                 }
 
                 // request got canceled (according to docs)
-                Err(e) => error!("delivery future canceled: {}", e),
+                Err(error) => error!(message = "Delivery future canceled.", %error),
             }
         }
     }
@@ -237,7 +242,7 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
         Ok(topic) => Some(topic),
         Err(missing_keys) => {
             warn!(
-                message = "Could not generate topic for healthcheck",
+                message = "Could not generate topic for healthcheck.",
                 ?missing_keys
             );
             None
@@ -259,7 +264,7 @@ async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
 
 fn encode_event(
     mut event: Event,
-    key_field: &Option<Atom>,
+    key_field: &Option<String>,
     encoding: &EncodingConfig<Encoding>,
 ) -> (Vec<u8>, Vec<u8>) {
     let key = key_field
@@ -274,7 +279,7 @@ fn encode_event(
         Encoding::Json => serde_json::to_vec(&event.as_log()).unwrap(),
         Encoding::Text => event
             .as_log()
-            .get(&Atom::from(log_schema().message_key()))
+            .get(log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
     };
@@ -287,6 +292,11 @@ mod tests {
     use super::*;
     use crate::event::Event;
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<KafkaSinkConfig>();
+    }
 
     #[test]
     fn kafka_encode_event_text() {
@@ -333,7 +343,7 @@ mod tests {
             &Some("key".into()),
             &EncodingConfigWithDefault {
                 codec: Encoding::Json,
-                except_fields: Some(vec![Atom::from("key")]),
+                except_fields: Some(vec!["key".into()]),
                 ..Default::default()
             }
             .into(),

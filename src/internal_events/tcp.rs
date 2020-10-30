@@ -9,29 +9,29 @@ pub struct TcpConnectionEstablished {
 impl InternalEvent for TcpConnectionEstablished {
     fn emit_logs(&self) {
         if let Some(peer_addr) = self.peer_addr {
-            debug!(message = "Connected.", %peer_addr);
+            debug!(message = "Connected.", peer_addr = %peer_addr);
         } else {
             debug!(message = "Connected.", peer_addr = "unknown");
         }
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_established", 1);
+        counter!("connections_established_total", 1, "mode" => "tcp");
     }
 }
 
 #[derive(Debug)]
-pub struct TcpConnectionFailed {
-    pub error: crate::tls::TlsError,
+pub struct TcpConnectionFailed<E> {
+    pub error: E,
 }
 
-impl InternalEvent for TcpConnectionFailed {
+impl<E: std::error::Error> InternalEvent for TcpConnectionFailed<E> {
     fn emit_logs(&self) {
-        error!(message = "Unable to connect.", error = %self.error);
+        error!(message = "Unable to connect.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_failed", 1);
+        counter!("connections_failed_total", 1, "mode" => "tcp");
     }
 }
 
@@ -42,11 +42,11 @@ pub struct TcpConnectionDisconnected {
 
 impl InternalEvent for TcpConnectionDisconnected {
     fn emit_logs(&self) {
-        error!(message = "Connection disconnected.", error = %self.error);
+        error!(message = "Connection disconnected.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connections_disconnected", 1);
+        counter!("connections_disconnected_total", 1, "mode" => "tcp");
     }
 }
 
@@ -59,7 +59,7 @@ impl InternalEvent for TcpConnectionShutdown {
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connection_shutdown", 1, "mode" => "tcp");
+        counter!("connections_shutdown_total", 1, "mode" => "tcp");
     }
 }
 
@@ -70,11 +70,11 @@ pub struct TcpConnectionError<T> {
 
 impl<T: std::fmt::Debug + std::fmt::Display> InternalEvent for TcpConnectionError<T> {
     fn emit_logs(&self) {
-        warn!(message = "Connection error.", error = %self.error, rate_limit_secs = 10);
+        warn!(message = "Connection error.", error = ?self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_connection_errors", 1);
+        counter!("connection_errors_total", 1, "mode" => "tcp");
     }
 }
 
@@ -85,11 +85,11 @@ pub struct TcpFlushError {
 
 impl InternalEvent for TcpFlushError {
     fn emit_logs(&self) {
-        error!(message = "Unable to flush connection.", error = %self.error);
+        error!(message = "Unable to flush connection.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!("tcp_flush_errors", 1);
+        counter!("connection_flush_errors_total", 1, "mode" => "tcp");
     }
 }
 
@@ -104,7 +104,7 @@ impl InternalEvent for TcpEventSent {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
-        counter!("bytes_processed", self.byte_size as u64);
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }

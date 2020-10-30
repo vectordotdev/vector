@@ -1,26 +1,20 @@
 use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
 };
 use bytes::Bytes;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
     #[serde(rename = "match")]
-    MatchFields(Vec<Atom>),
+    MatchFields(Vec<String>),
     #[serde(rename = "ignore")]
     IgnoreFields(Vec<String>),
-    #[serde(skip)]
-    Default,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -29,11 +23,11 @@ pub struct CacheConfig {
     pub num_events: usize,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct DedupeConfig {
-    #[serde(default = "default_field_match_config")]
-    pub fields: FieldMatchConfig,
+    #[serde(default)]
+    pub fields: Option<FieldMatchConfig>,
     #[serde(default = "default_cache_config")]
     pub cache: CacheConfig,
 }
@@ -42,34 +36,24 @@ fn default_cache_config() -> CacheConfig {
     CacheConfig { num_events: 5000 }
 }
 
-/// Note that the value returned by this is just a placeholder.  To get the real default you must
-/// call fill_default() on the parsed DedupeConfig instance.
-fn default_field_match_config() -> FieldMatchConfig {
-    FieldMatchConfig::Default
-}
-
 impl DedupeConfig {
     /// We cannot rely on Serde to populate the default since we want it to be based on the user's
     /// configured log_schema, which we only know about after we've already parsed the config.
-    pub fn fill_default(&self) -> Self {
-        let fields = match &self.fields {
-            FieldMatchConfig::MatchFields(x) => FieldMatchConfig::MatchFields(x.clone()),
-            FieldMatchConfig::IgnoreFields(y) => FieldMatchConfig::IgnoreFields(y.clone()),
-            FieldMatchConfig::Default => FieldMatchConfig::MatchFields(vec![
+    pub fn fill_default_fields_match(&self) -> FieldMatchConfig {
+        match &self.fields {
+            Some(FieldMatchConfig::MatchFields(x)) => FieldMatchConfig::MatchFields(x.clone()),
+            Some(FieldMatchConfig::IgnoreFields(y)) => FieldMatchConfig::IgnoreFields(y.clone()),
+            None => FieldMatchConfig::MatchFields(vec![
                 log_schema().timestamp_key().into(),
                 log_schema().host_key().into(),
                 log_schema().message_key().into(),
             ]),
-        };
-        Self {
-            fields,
-            cache: self.cache.clone(),
         }
     }
 }
 
 pub struct Dedupe {
-    config: DedupeConfig,
+    fields: FieldMatchConfig,
     cache: LruCache<CacheEntry, bool>,
 }
 
@@ -77,13 +61,21 @@ inventory::submit! {
     TransformDescription::new::<DedupeConfig>("dedupe")
 }
 
-impl GenerateConfig for DedupeConfig {}
+impl GenerateConfig for DedupeConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            fields: None,
+            cache: default_cache_config(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Dedupe::new(self.fill_default())))
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+        Ok(Box::new(Dedupe::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -123,7 +115,7 @@ type TypeId = u8;
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(Atom, TypeId, Bytes)>),
+    Ignore(Vec<(String, TypeId, Bytes)>),
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
@@ -143,8 +135,9 @@ fn type_id_for_value(val: &Value) -> TypeId {
 impl Dedupe {
     pub fn new(config: DedupeConfig) -> Self {
         let num_entries = config.cache.num_events;
+        let fields = config.fill_default_fields_match();
         Self {
-            config,
+            fields,
             cache: LruCache::new(num_entries),
         }
     }
@@ -171,18 +164,11 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 
             for (field_name, value) in event.as_log().all_fields() {
                 if !fields.contains(&field_name) {
-                    entry.push((
-                        Atom::from(field_name),
-                        type_id_for_value(&value),
-                        value.as_bytes(),
-                    ));
+                    entry.push((field_name, type_id_for_value(&value), value.as_bytes()));
                 }
             }
 
             CacheEntry::Ignore(entry)
-        }
-        FieldMatchConfig::Default => {
-            panic!("Dedupe transform config contains Default FieldMatchConfig while running");
         }
     }
 }
@@ -190,7 +176,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 impl Transform for Dedupe {
     fn transform(&mut self, event: Event) -> Option<Event> {
         emit!(DedupeEventProcessed);
-        let cache_entry = build_cache_entry(&event, &self.config.fields);
+        let cache_entry = build_cache_entry(&event, &self.fields);
         if self.cache.put(cache_entry, true).is_some() {
             emit!(DedupeEventDiscarded { event });
             None
@@ -206,12 +192,16 @@ mod tests {
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
     use crate::{event::Event, event::Value, transforms::Transform};
     use std::collections::BTreeMap;
-    use string_cache::DefaultAtom as Atom;
 
-    fn make_match_transform(num_events: usize, fields: Vec<Atom>) -> Dedupe {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<DedupeConfig>();
+    }
+
+    fn make_match_transform(num_events: usize, fields: Vec<String>) -> Dedupe {
         Dedupe::new(DedupeConfig {
             cache: CacheConfig { num_events },
-            fields: { FieldMatchConfig::MatchFields(fields) },
+            fields: Some(FieldMatchConfig::MatchFields(fields)),
         })
     }
 
@@ -222,7 +212,7 @@ mod tests {
 
         Dedupe::new(DedupeConfig {
             cache: CacheConfig { num_events },
-            fields: { FieldMatchConfig::IgnoreFields(fields) },
+            fields: Some(FieldMatchConfig::IgnoreFields(fields)),
         })
     }
 
@@ -255,12 +245,12 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched"], "some value".into());
 
         // Second event differs in matched field so should be outputted even though it
         // has the same value for unmatched field.
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value2".into());
+        assert_eq!(new_event.as_log()["matched"], "some value2".into());
 
         // Third event has the same value for "matched" as first event, so it should be dropped.
         assert_eq!(None, transform.transform(event3));
@@ -287,12 +277,12 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched1".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched1"], "some value".into());
 
         // Second event has a different matched field name with the same value, so it should not be
         // considered a dupe
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched2".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched2"], "some value".into());
     }
 
     #[test]
@@ -321,8 +311,8 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched1".into()], "value1".into());
-        assert_eq!(new_event.as_log()[&"matched2".into()], "value2".into());
+        assert_eq!(new_event.as_log()["matched1"], "value1".into());
+        assert_eq!(new_event.as_log()["matched2"], "value2".into());
 
         // Second event is the same just with different field order, so it shouldn't be outputted.
         assert_eq!(None, transform.transform(event2));
@@ -355,17 +345,17 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched"], "some value".into());
 
         // Second event gets outputted because it's not a dupe.  This causes the first
         // Event to be evicted from the cache.
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value2".into());
+        assert_eq!(new_event.as_log()["matched"], "some value2".into());
 
         // Third event is a dupe but gets outputted anyway because the first event has aged
         // out of the cache.
         let new_event = transform.transform(event3).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "some value".into());
+        assert_eq!(new_event.as_log()["matched"], "some value".into());
     }
 
     #[test]
@@ -391,12 +381,12 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], "123".into());
+        assert_eq!(new_event.as_log()["matched"], "123".into());
 
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], 123.into());
+        assert_eq!(new_event.as_log()["matched"], 123.into());
     }
 
     #[test]
@@ -426,7 +416,7 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        let res_value = new_event.as_log()[&"matched".into()].clone();
+        let res_value = new_event.as_log()["matched"].clone();
         if let Value::Map(map) = res_value {
             assert_eq!(map.get("key").unwrap(), &Value::from("123"));
         }
@@ -434,7 +424,7 @@ mod tests {
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
         let new_event = transform.transform(event2).unwrap();
-        let res_value = new_event.as_log()[&"matched".into()].clone();
+        let res_value = new_event.as_log()["matched"].clone();
         if let Value::Map(map) = res_value {
             assert_eq!(map.get("key").unwrap(), &Value::from(123));
         }
@@ -461,10 +451,10 @@ mod tests {
 
         // First event should always be passed through as-is.
         let new_event = transform.transform(event1).unwrap();
-        assert_eq!(new_event.as_log()[&"matched".into()], Value::Null);
+        assert_eq!(new_event.as_log()["matched"], Value::Null);
 
         // Second event should also get passed through as null is different than missing
         let new_event = transform.transform(event2).unwrap();
-        assert_eq!(false, new_event.as_log().contains(&"matched"));
+        assert_eq!(false, new_event.as_log().contains("matched"));
     }
 }

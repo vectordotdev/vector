@@ -2,7 +2,9 @@
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding},
+    sinks::util::{
+        encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
+    },
     tls::TlsConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -28,7 +31,16 @@ inventory::submit! {
     SinkDescription::new::<SocketSinkConfig>("socket")
 }
 
-impl GenerateConfig for SocketSinkConfig {}
+impl GenerateConfig for SocketSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"address = "92.12.333.224:5000"
+            mode = "tcp"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(
@@ -36,32 +48,14 @@ impl SocketSinkConfig {
         encoding: EncodingConfig<Encoding>,
         tls: Option<TlsConfig>,
     ) -> Self {
-        TcpSinkConfig {
-            address,
+        SocketSinkConfig {
+            mode: Mode::Tcp(TcpSinkConfig { address, tls }),
             encoding,
-            tls,
         }
-        .into()
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
-        TcpSinkConfig::new(address, EncodingConfig::from(Encoding::Text)).into()
-    }
-}
-
-impl From<TcpSinkConfig> for SocketSinkConfig {
-    fn from(config: TcpSinkConfig) -> Self {
-        Self {
-            mode: Mode::Tcp(config),
-        }
-    }
-}
-
-impl From<UdpSinkConfig> for SocketSinkConfig {
-    fn from(config: UdpSinkConfig) -> Self {
-        Self {
-            mode: Mode::Udp(config),
-        }
+        Self::make_tcp_config(address, EncodingConfig::from(Encoding::Text), None)
     }
 }
 
@@ -72,11 +66,13 @@ impl SinkConfig for SocketSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let encoding = self.encoding.clone();
+        let encode_event = move |event| encode_event(event, &encoding);
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx),
-            Mode::Udp(config) => config.build(cx),
+            Mode::Tcp(config) => config.build(cx, encode_event),
+            Mode::Udp(config) => config.build(cx, encode_event),
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx),
+            Mode::Unix(config) => config.build(cx, encode_event),
         }
     }
 
@@ -109,14 +105,19 @@ mod test {
     use tokio::{net::TcpListener, time::timeout};
     use tokio_util::codec::{FramedRead, LinesCodec};
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SocketSinkConfig>();
+    }
+
     async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
 
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
             }),
+            encoding: Encoding::Json.into(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -159,9 +160,9 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
                 tls: None,
             }),
+            encoding: Encoding::Json.into(),
         };
 
         let context = SinkContext::new_test();
@@ -193,7 +194,7 @@ mod test {
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
+    #[cfg(all(feature = "tls", feature = "listenfd"))]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
@@ -220,7 +221,6 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Text.into(),
                 tls: Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
@@ -231,6 +231,7 @@ mod test {
                     },
                 }),
             }),
+            encoding: Encoding::Text.into(),
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
@@ -335,9 +336,9 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Text.into(),
                 tls: None,
             }),
+            encoding: Encoding::Text.into(),
         };
 
         let context = SinkContext::new_test();

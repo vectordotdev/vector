@@ -21,11 +21,11 @@ impl InternalEvent for FileEventReceived<'_> {
 
     fn emit_metrics(&self) {
         counter!(
-            "events_processed", 1,
+            "events_processed_total", 1,
             "file" => self.file.to_owned(),
         );
         counter!(
-            "bytes_processed", self.byte_size as u64,
+            "processed_bytes_total", self.byte_size as u64,
             "file" => self.file.to_owned(),
         );
     }
@@ -219,7 +219,7 @@ impl InternalEvent for FileCheckpointed {
     }
 
     fn emit_metrics(&self) {
-        counter!("checkpoints", self.count as u64);
+        counter!("checkpoints_total", self.count as u64);
     }
 }
 
@@ -234,7 +234,7 @@ impl InternalEvent for FileCheckpointWriteFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("checkpoint_write_errors", 1);
+        counter!("checkpoint_write_errors_total", 1);
     }
 }
 

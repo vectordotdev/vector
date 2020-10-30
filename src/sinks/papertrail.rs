@@ -11,7 +11,7 @@ use crate::{
 use bytes::Bytes;
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
+
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -26,7 +26,15 @@ inventory::submit! {
     SinkDescription::new::<PapertrailConfig>("papertrail")
 }
 
-impl GenerateConfig for PapertrailConfig {}
+impl GenerateConfig for PapertrailConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "logs.papertrailapp.com:12345"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]
@@ -50,7 +58,7 @@ impl SinkConfig for PapertrailConfig {
             false,
         )?;
 
-        let sink = TcpSink::new(host, port, cx.resolver(), tls);
+        let sink = TcpSink::new(host, port, tls);
         let healthcheck = sink.healthcheck();
 
         let pid = std::process::id();
@@ -76,10 +84,7 @@ impl SinkConfig for PapertrailConfig {
 }
 
 fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>) -> Option<Bytes> {
-    let host = if let Some(host) = event
-        .as_mut_log()
-        .remove(&Atom::from(log_schema().host_key()))
-    {
+    let host = if let Some(host) = event.as_mut_log().remove(log_schema().host_key()) {
         Some(host.to_string_lossy())
     } else {
         None
@@ -100,7 +105,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&Atom::from(log_schema().message_key()))
+            .get(log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_default(),
     };
@@ -117,7 +122,11 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PapertrailConfig>();
+    }
 
     #[test]
     fn encode_event_apply_rules() {
@@ -130,7 +139,7 @@ mod tests {
             &EncodingConfig {
                 codec: Encoding::Json,
                 only_fields: None,
-                except_fields: Some(vec![Atom::from("magic")]),
+                except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,
             },
         )

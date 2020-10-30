@@ -4,7 +4,7 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::{FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -39,7 +39,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             let _ = warp::serve(svc)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
-                    shutdown.clone().compat().map(|_| ()),
+                    shutdown.clone().map(|_| ()),
                 )
                 .await;
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
@@ -62,24 +62,39 @@ inventory::submit! {
     SourceDescription::new::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
-impl GenerateConfig for AwsKinesisFirehoseConfig {}
+impl GenerateConfig for AwsKinesisFirehoseConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "0.0.0.0:443".parse().unwrap(),
+            access_key: None,
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, LogEvent},
+        event::Event,
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
+    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::{
         io::{Cursor, Read},
         net::SocketAddr,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AwsKinesisFirehoseConfig>();
+    }
 
     async fn source(access_key: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();

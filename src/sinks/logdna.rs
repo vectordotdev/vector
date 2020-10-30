@@ -1,9 +1,10 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
@@ -13,7 +14,6 @@ use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::time::SystemTime;
-use string_cache::DefaultAtom as Atom;
 
 lazy_static::lazy_static! {
     static ref HOST: UriSerde = Uri::from_static("https://logs.logdna.com").into();
@@ -40,6 +40,7 @@ pub struct LogdnaConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     default_app: Option<String>,
+    default_env: Option<String>,
 
     #[serde(default)]
     batch: BatchConfig,
@@ -52,7 +53,15 @@ inventory::submit! {
     SinkDescription::new::<LogdnaConfig>("logdna")
 }
 
-impl GenerateConfig for LogdnaConfig {}
+impl GenerateConfig for LogdnaConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"hostname = "hostname"
+            api_key = "${LOGDNA_API_KEY}""#,
+        )
+        .unwrap()
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
 #[serde(rename_all = "snake_case")]
@@ -74,7 +83,7 @@ impl SinkConfig for LogdnaConfig {
             .bytes(bytesize::mib(10u64))
             .timeout(1)
             .parse_config(self.batch)?;
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -84,7 +93,7 @@ impl SinkConfig for LogdnaConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal logdna sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal logdna sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
@@ -113,10 +122,10 @@ impl HttpSink for LogdnaConfig {
         let mut log = event.into_log();
 
         let line = log
-            .remove(&Atom::from(crate::config::log_schema().message_key()))
+            .remove(crate::config::log_schema().message_key())
             .unwrap_or_else(|| String::from("").into());
         let timestamp = log
-            .remove(&Atom::from(crate::config::log_schema().timestamp_key()))
+            .remove(crate::config::log_schema().timestamp_key())
             .unwrap_or_else(|| chrono::Utc::now().into());
 
         let mut map = serde_json::map::Map::new();
@@ -124,12 +133,23 @@ impl HttpSink for LogdnaConfig {
         map.insert("line".to_string(), json!(line));
         map.insert("timestamp".to_string(), json!(timestamp));
 
-        if let Some(app) = log.remove(&"app".into()) {
+        if let Some(env) = log.remove("env") {
+            map.insert("env".to_string(), json!(env));
+        }
+
+        if let Some(app) = log.remove("app") {
             map.insert("app".to_string(), json!(app));
         }
 
-        if let Some(file) = log.remove(&"file".into()) {
+        if let Some(file) = log.remove("file") {
             map.insert("file".to_string(), json!(file));
+        }
+
+        if !map.contains_key("env") {
+            map.insert(
+                "env".to_string(),
+                json!(self.default_env.as_deref().unwrap_or("production")),
+            );
         }
 
         if !map.contains_key("app") && !map.contains_key("file") {
@@ -240,11 +260,17 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogdnaConfig>();
+    }
+
+    #[test]
     fn encode_event() {
         let (config, _cx) = load_sink::<LogdnaConfig>(
             r#"
             api_key = "mylogtoken"
             hostname = "vector"
+            default_env = "acceptance"
             codec.except_fields = ["magic"]
         "#,
         )
@@ -259,16 +285,23 @@ mod tests {
 
         let event3 = Event::from("hello world");
 
+        let mut event4 = Event::from("hello world");
+        event4.as_mut_log().insert("env", "staging");
+
         let event1_out = config.encode_event(event1).unwrap();
         let event1_out = event1_out.as_object().unwrap();
         let event2_out = config.encode_event(event2).unwrap();
         let event2_out = event2_out.as_object().unwrap();
         let event3_out = config.encode_event(event3).unwrap();
         let event3_out = event3_out.as_object().unwrap();
+        let event4_out = config.encode_event(event4).unwrap();
+        let event4_out = event4_out.as_object().unwrap();
 
         assert_eq!(event1_out.get("app").unwrap(), &json!("notvector"));
         assert_eq!(event2_out.get("file").unwrap(), &json!("log.txt"));
         assert_eq!(event3_out.get("app").unwrap(), &json!("vector"));
+        assert_eq!(event3_out.get("env").unwrap(), &json!("acceptance"));
+        assert_eq!(event4_out.get("env").unwrap(), &json!("staging"));
     }
 
     #[tokio::test]
@@ -343,6 +376,7 @@ mod tests {
             let line = line.as_object().unwrap();
 
             assert_eq!(line.get("app").unwrap(), &json!("vector"));
+            assert_eq!(line.get("env").unwrap(), &json!("production"));
             assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
 
             if i == 0 {

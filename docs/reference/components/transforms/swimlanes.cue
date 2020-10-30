@@ -1,22 +1,19 @@
 package metadata
 
 components: transforms: swimlanes: {
-	title:             "Swimlanes"
-	short_description: "Accepts log events and allows you to route events across parallel streams using logical filters."
-	long_description:  "Accepts log events and allows you to route events across parallel streams using logical filters."
+	title: "Swimlanes"
 
 	classes: {
 		commonly_used: false
-		function:      "route"
+		development:   "beta"
+		egress_method: "stream"
 	}
 
-	statuses: {
-		development: "beta"
+	features: {
+		route: {}
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -36,11 +33,25 @@ components: transforms: swimlanes: {
 			description: "A table of swimlane identifiers to logical conditions representing the filter of the swimlane. Each swimlane can then be referenced as an input by other components with the name `<transform_name>.<swimlane_id>`."
 			required:    true
 			warnings: []
-			type: object: components._conditions
+			type: object: {
+				options: {
+					"*": {
+						description: "test"
+						required:    true
+						warnings: []
+						type: object: configuration._conditions
+					}
+				}
+			}
 		}
 	}
 
-	examples: log: [
+	input: {
+		logs:    true
+		metrics: null
+	}
+
+	examples: [
 		{
 			title: "Split by log level"
 			configuration: {
@@ -51,10 +62,10 @@ components: transforms: swimlanes: {
 					error: "level.eq": "error"
 				}
 			}
-			input: {
+			input: log: {
 				level: "info"
 			}
-			output: {
+			output: log: {
 				level: "info"
 			}
 		},

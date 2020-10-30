@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
@@ -69,12 +69,21 @@ inventory::submit! {
     TransformDescription::new::<TagCardinalityLimitConfig>("tag_cardinality_limit")
 }
 
-impl GenerateConfig for TagCardinalityLimitConfig {}
+impl GenerateConfig for TagCardinalityLimitConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            mode: Mode::Exact,
+            value_limit: default_value_limit(),
+            limit_exceeded_action: default_limit_exceeded_action(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(TagCardinalityLimit::new(self.clone())))
     }
 
@@ -239,9 +248,15 @@ mod tests {
     use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
     use std::collections::BTreeMap;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
+    }
+
     fn make_metric(tags: BTreeMap<String, String>) -> Event {
         Event::Metric(Metric {
             name: "event".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags),
             kind: metric::MetricKind::Incremental,

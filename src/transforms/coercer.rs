@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{CoercerConversionFailed, CoercerEventProcessed},
     types::{parse_conversion_map, Conversion},
@@ -8,13 +8,12 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct CoercerConfig {
-    types: HashMap<Atom, String>,
+    types: HashMap<String, String>,
     drop_unspecified: bool,
 }
 
@@ -27,7 +26,7 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let types = parse_conversion_map(&self.types)?;
         Ok(Box::new(Coercer {
             types,
@@ -49,7 +48,7 @@ impl TransformConfig for CoercerConfig {
 }
 
 pub struct Coercer {
-    types: HashMap<Atom, Conversion>,
+    types: HashMap<String, Conversion>,
     drop_unspecified: bool,
 }
 
@@ -95,10 +94,7 @@ impl Transform for Coercer {
 mod tests {
     use super::CoercerConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        Event,
-    };
+    use crate::{config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -127,7 +123,7 @@ mod tests {
             extra
         ))
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
         coercer.transform(event).unwrap().into_log()
@@ -136,20 +132,20 @@ mod tests {
     #[tokio::test]
     async fn converts_valid_fields() {
         let log = parse_it("").await;
-        assert_eq!(log[&"number".into()], Value::Integer(1234));
-        assert_eq!(log[&"bool".into()], Value::Boolean(true));
+        assert_eq!(log["number"], Value::Integer(1234));
+        assert_eq!(log["bool"], Value::Boolean(true));
     }
 
     #[tokio::test]
     async fn leaves_unnamed_fields_as_is() {
         let log = parse_it("").await;
-        assert_eq!(log[&"other".into()], Value::Bytes("no".into()));
+        assert_eq!(log["other"], Value::Bytes("no".into()));
     }
 
     #[tokio::test]
     async fn drops_nonconvertible_fields() {
         let log = parse_it("").await;
-        assert!(log.get(&"float".into()).is_none());
+        assert!(log.get("float").is_none());
     }
 
     #[tokio::test]

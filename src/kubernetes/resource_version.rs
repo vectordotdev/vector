@@ -64,7 +64,7 @@ impl Candidate {
         let new_resource_version = match metadata.resource_version {
             Some(ref val) => val,
             None => {
-                warn!(message = "Got empty resource version at object metadata");
+                warn!(message = "Got empty resource version at object metadata.");
                 return None;
             }
         };

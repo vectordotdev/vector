@@ -4,8 +4,6 @@ pub mod buffer;
 pub mod encoding;
 pub mod http;
 pub mod retries;
-#[cfg(feature = "rusoto_core")]
-pub mod rusoto;
 pub mod service;
 pub mod sink;
 pub mod statistic;
@@ -13,7 +11,7 @@ pub mod tcp;
 #[cfg(test)]
 pub mod test;
 pub mod udp;
-#[cfg(all(feature = "sinks-socket", unix))]
+#[cfg(all(any(feature = "sinks-socket", feature = "sinks-statsd"), unix))]
 pub mod unix;
 pub mod uri;
 
@@ -23,7 +21,6 @@ use encoding::{EncodingConfig, EncodingConfiguration};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::borrow::Cow;
-use string_cache::DefaultAtom as Atom;
 
 pub use batch::{Batch, BatchConfig, BatchSettings, BatchSize, PushResult};
 pub use buffer::json::{BoxedRawValue, JsonArrayBuffer};
@@ -69,7 +66,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
         Encoding::Json => serde_json::to_vec(&log),
         Encoding::Text => {
             let bytes = log
-                .get(&Atom::from(crate::config::log_schema().message_key()))
+                .get(crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)

@@ -7,10 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future, stream, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
@@ -37,7 +34,15 @@ inventory::submit! {
     SourceDescription::new::<PrometheusConfig>("prometheus")
 }
 
-impl GenerateConfig for PrometheusConfig {}
+impl GenerateConfig for PrometheusConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoints: vec!["http://localhost:9090/metrics".to_string()],
+            scrape_interval_secs: default_scrape_interval_secs(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
@@ -49,11 +54,11 @@ impl SourceConfig for PrometheusConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let mut urls = Vec::new();
-        for host in self.endpoints.iter() {
-            let base_uri = host.parse::<http::Uri>().context(super::UriParseError)?;
-            urls.push(format!("{}metrics", base_uri));
-        }
+        let urls = self
+            .endpoints
+            .iter()
+            .map(|s| s.parse::<http::Uri>().context(super::UriParseError))
+            .collect::<Result<Vec<http::Uri>, super::BuildError>>()?;
         Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
     }
 
@@ -67,16 +72,16 @@ impl SourceConfig for PrometheusConfig {
 }
 
 fn prometheus(
-    urls: Vec<String>,
+    urls: Vec<http::Uri>,
     interval: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_map_err(|error| error!(message = "Error sending metric.", %error))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
-        .take_until(shutdown.compat())
+        .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
@@ -116,6 +121,13 @@ fn prometheus(
                                     Some(stream::iter(metrics).map(Event::Metric).map(Ok))
                                 }
                                 Err(error) => {
+                                    if url.path() == "/" {
+                                        // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                        warn!(
+                                            message = "No path is set on the endpoint and we got a parse error, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                            endpoint = %url
+                                        );
+                            }
                                     emit!(PrometheusParseError {
                                         error,
                                         url: url.clone(),
@@ -126,6 +138,13 @@ fn prometheus(
                             }
                         }
                         Ok((header, _)) => {
+                            if header.status == hyper::StatusCode::NOT_FOUND && url.path() == "/" {
+                                // https://github.com/timberio/vector/pull/3801#issuecomment-700723178
+                                warn!(
+                                    message = "No path is set on the endpoint and we got a 404, did you mean to use /metrics? This behavior changed in version 0.11.",
+                                    endpoint = %url
+                                );
+                            }
                             emit!(PrometheusErrorResponse {
                                 code: header.status,
                                 url: url.clone(),
@@ -145,7 +164,7 @@ fn prometheus(
         })
         .flatten()
         .forward(out)
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending."));
 
     Box::new(task.boxed().compat())
 }
@@ -167,6 +186,11 @@ mod test {
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn genreate_config() {
+        crate::test_util::test_generate_config::<PrometheusConfig>();
+    }
 
     #[tokio::test]
     async fn test_prometheus_routing() {
@@ -209,8 +233,8 @@ mod test {
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", %error);
             }
         });
 
@@ -229,6 +253,7 @@ mod test {
                 address: out_addr,
                 namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
+                quantiles: vec![],
                 flush_period_secs: 1,
             },
         );

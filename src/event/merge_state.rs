@@ -1,6 +1,5 @@
 use crate::event::merge::merge_log_event;
 use crate::event::LogEvent;
-use string_cache::DefaultAtom as Atom;
 
 /// Encapsulates the inductive events merging algorithm.
 ///
@@ -22,13 +21,17 @@ impl LogEventMergeState {
     }
 
     /// Merge the incoming (partial) event in.
-    pub fn merge_in_next_event(&mut self, incoming: LogEvent, fields: &[Atom]) {
+    pub fn merge_in_next_event(&mut self, incoming: LogEvent, fields: &[impl AsRef<str>]) {
         merge_log_event(&mut self.intermediate_merged_event, incoming, fields);
     }
 
     /// Merge the final (non-partial) event in and return the resulting (merged)
     /// event.
-    pub fn merge_in_final_event(mut self, incoming: LogEvent, fields: &[Atom]) -> LogEvent {
+    pub fn merge_in_final_event(
+        mut self,
+        incoming: LogEvent,
+        fields: &[impl AsRef<str>],
+    ) -> LogEvent {
         self.merge_in_next_event(incoming, fields);
         self.intermediate_merged_event
     }
@@ -38,7 +41,6 @@ impl LogEventMergeState {
 mod test {
     use super::LogEventMergeState;
     use crate::event::{Event, LogEvent};
-    use string_cache::DefaultAtom as Atom;
 
     fn log_event_with_message(message: &str) -> LogEvent {
         Event::from(message).into_log()
@@ -46,18 +48,14 @@ mod test {
 
     #[test]
     fn log_event_merge_state_example() {
-        let fields = &[Atom::from("message")];
+        let fields = vec!["message".to_string()];
 
         let mut state = LogEventMergeState::new(log_event_with_message("hel"));
-        state.merge_in_next_event(log_event_with_message("lo "), fields);
-        let merged_event = state.merge_in_final_event(log_event_with_message("world"), fields);
+        state.merge_in_next_event(log_event_with_message("lo "), &fields);
+        let merged_event = state.merge_in_final_event(log_event_with_message("world"), &fields);
 
         assert_eq!(
-            merged_event
-                .get(&Atom::from("message"))
-                .unwrap()
-                .as_bytes()
-                .as_ref(),
+            merged_event.get("message").unwrap().as_bytes().as_ref(),
             b"hello world"
         );
     }

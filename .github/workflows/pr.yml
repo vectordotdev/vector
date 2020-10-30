@@ -16,6 +16,16 @@ env:
   PROFILE: debug
 
 jobs:
+  cancel-previous:
+    name: Cancel redundant jobs
+    runs-on: ubuntu-20.04
+    timeout-minutes: 3
+    if: github.ref != 'refs/heads/master'
+    steps:
+      - uses: styfle/cancel-workflow-action@0.5.0
+        with:
+          access_token: ${{ secrets.GITHUB_TOKEN }}
+
   changes:
       runs-on: ubuntu-latest
       # Set job outputs to values from filter step
@@ -27,17 +37,13 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
-      - uses: styfle/cancel-workflow-action@0.4.1
-        if: github.ref != 'refs/heads/master'
-        with:
-          access_token: ${{ secrets.GITHUB_TOKEN }}
       # For pull requests it's not necessary to checkout the code
       - uses: dorny/paths-filter@v2
         id: filter
         with:
           filters: |
             source:
-              - ".github/workflows/prs.yml"
+              - ".github/workflows/pr.yml"
               - ".cargo/**"
               - "benches/**"
               - "lib/**"
@@ -49,7 +55,6 @@ jobs:
               - "build.rs"
               - "Cargo.lock"
               - "Cargo.toml"
-              - "docker-compose.yml"
               - "Makefile"
               - "rust-toolchain"
             docs:
@@ -60,7 +65,7 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain'
-              - '.github/workflows/prs.yml'
+              - '.github/workflows/pr.yml'
               - 'Makefile'
               - 'scripts/cross/**'
             internal_events:
@@ -91,6 +96,26 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+
+  test-misc:
+    name: Miscellaneous - Linux
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-shutdown
+      - run: make test-cli
+      - run: make test-behavior
 
   cross-linux:
     name: Cross - ${{ matrix.target }}
@@ -149,6 +174,7 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make test
+      - run: make test-behavior
 
   test-windows:
     name: Unit - Windows
@@ -163,6 +189,21 @@ jobs:
       - env:
           RUSTFLAGS: "-D warnings"
         run: cargo test --no-fail-fast --no-default-features --features default-msvc
+
+  check-component-features:
+    name: Component Features - Linux
+    needs: changes
+    if: ${{ needs.changes.outputs.source == 'true' }}
+    runs-on: ubuntu-20.04
+    container: timberio/ci_image
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
+      - run: make check-component-features
+        env:
+          RUSTFLAGS: "-D warnings"
 
   checks:
     name: Checks
@@ -199,15 +240,18 @@ jobs:
         run: make check-version
       - name: Check scripts
         run: make check-scripts
-      - name: Check helm
+      - name: Check helm dependencies
         if: needs.changes.outputs.helm == 'true'
-        run: make check-helm
+        run: make check-helm-dependencies
+      - name: Check helm lint
+        if: needs.changes.outputs.helm == 'true'
+        run: make check-helm-lint
       - name: Check that generated Kubernetes YAML doesn't diverge from Helm
         if: needs.changes.outputs.helm == 'true'
         run: make check-kubernetes-yaml
-      - name: Check internal events
-        if: needs.changes.outputs.internal_events == 'true'
-        run: make check-internal-events
+      - name: Check events
+        if: needs.changes.outputs.source == 'true'
+        run: make check-events
       - name: Check cargo deny
         if: needs.changes.outputs.dependencies == 'true'
         uses: EmbarkStudios/cargo-deny-action@v1

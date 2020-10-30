@@ -1,10 +1,11 @@
-image:
-  # Use the latest release image.
-  version: latest
-  # Use the alpine flavor of vector image.
-  base: alpine
+vector-agent:
+  image:
+    # Use the latest release image.
+    version: latest
+    # Use the alpine flavor of vector image.
+    base: alpine
 
-env:
-  # Set the log level reasonably high.
-  - name: LOG
-    value: info
+  env:
+    # Set the log level reasonably high.
+    - name: LOG
+      value: info

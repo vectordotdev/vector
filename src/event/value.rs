@@ -97,6 +97,15 @@ impl From<DateTime<Utc>> for Value {
     }
 }
 
+impl<T: Into<Value>> From<Option<T>> for Value {
+    fn from(value: Option<T>) -> Self {
+        match value {
+            None => Value::Null,
+            Some(v) => v.into(),
+        }
+    }
+}
+
 impl From<f32> for Value {
     fn from(value: f32) -> Self {
         Value::Float(f64::from(value))
@@ -189,6 +198,40 @@ impl TryInto<serde_json::Value> for Value {
             Value::Array(v) => Ok(serde_json::to_value(v)?),
             Value::Null => Ok(serde_json::Value::Null),
             Value::Timestamp(v) => Ok(serde_json::Value::from(timestamp_to_string(&v))),
+        }
+    }
+}
+
+impl From<remap::Value> for Value {
+    fn from(v: remap::Value) -> Self {
+        use remap::Value::*;
+
+        match v {
+            String(v) => Value::Bytes(v),
+            Integer(v) => Value::Integer(v),
+            Float(v) => Value::Float(v),
+            Boolean(v) => Value::Boolean(v),
+            Map(v) => Value::Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Array(v) => Value::Array(v.into_iter().map(Into::into).collect()),
+            Timestamp(v) => Value::Timestamp(v),
+            Null => Value::Null,
+        }
+    }
+}
+
+impl From<Value> for remap::Value {
+    fn from(v: Value) -> Self {
+        use remap::Value::*;
+
+        match v {
+            Value::Bytes(v) => String(v),
+            Value::Integer(v) => Integer(v),
+            Value::Float(v) => Float(v),
+            Value::Boolean(v) => Boolean(v),
+            Value::Map(v) => Map(v.into_iter().map(|(k, v)| (k, v.into())).collect()),
+            Value::Array(v) => Array(v.into_iter().map(Into::into).collect()),
+            Value::Timestamp(v) => Timestamp(v),
+            Value::Null => Null,
         }
     }
 }

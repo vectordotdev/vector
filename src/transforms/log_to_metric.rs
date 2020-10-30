@@ -1,9 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::LogEvent,
     event::Value,
@@ -19,7 +16,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::num::ParseFloatError;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -28,45 +24,40 @@ pub struct LogToMetricConfig {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct CounterConfig {
-    field: Atom,
-    name: Option<Atom>,
+    field: String,
+    name: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
-    tags: Option<IndexMap<Atom, String>>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct GaugeConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct SetConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct HistogramConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type", rename_all = "snake_case")]
 pub struct SummaryConfig {
-    field: Atom,
-    name: Option<Atom>,
-    tags: Option<IndexMap<Atom, String>>,
+    field: String,
+    name: Option<String>,
+    tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -91,12 +82,24 @@ inventory::submit! {
     TransformDescription::new::<LogToMetricConfig>("log_to_metric")
 }
 
-impl GenerateConfig for LogToMetricConfig {}
+impl GenerateConfig for LogToMetricConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            metrics: vec![MetricConfig::Counter(CounterConfig {
+                field: "field_name".to_string(),
+                name: None,
+                increment_by_value: false,
+                tags: None,
+            })],
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(LogToMetric::new(self.clone())))
     }
 
@@ -120,26 +123,28 @@ impl LogToMetric {
 }
 
 enum TransformError {
-    FieldNotFound { field: Atom },
+    FieldNotFound {
+        field: String,
+    },
     TemplateParseError(TemplateError),
-    TemplateRenderError { missing_keys: Vec<String> },
-    ParseFloatError { field: Atom, error: ParseFloatError },
+    TemplateRenderError {
+        missing_keys: Vec<String>,
+    },
+    ParseFloatError {
+        field: String,
+        error: ParseFloatError,
+    },
 }
 
 fn render_template(s: &str, event: &Event) -> Result<String, TransformError> {
     let template = Template::try_from(s).map_err(TransformError::TemplateParseError)?;
-    template.render_string(&event).map_err(|missing_keys| {
-        // convert to String to avoid printing Atom in Debug format
-        let missing_keys = missing_keys
-            .into_iter()
-            .map(|k| k.to_string())
-            .collect::<Vec<String>>();
-        TransformError::TemplateRenderError { missing_keys }
-    })
+    template
+        .render_string(&event)
+        .map_err(|missing_keys| TransformError::TemplateRenderError { missing_keys })
 }
 
 fn render_tags(
-    tags: &Option<IndexMap<Atom, String>>,
+    tags: &Option<IndexMap<String, String>>,
     event: &Event,
 ) -> Result<Option<BTreeMap<String, String>>, TransformError> {
     Ok(match tags {
@@ -166,17 +171,17 @@ fn render_tags(
     })
 }
 
-fn parse_field(log: &LogEvent, field: &Atom) -> Result<f64, TransformError> {
+fn parse_field(log: &LogEvent, field: &str) -> Result<f64, TransformError> {
     let value = log
         .get(field)
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: field.clone(),
+            field: field.to_string(),
         })?;
     value
         .to_string_lossy()
         .parse()
         .map_err(|error| TransformError::ParseFloatError {
-            field: field.clone(),
+            field: field.to_string(),
             error,
         })
 }
@@ -185,7 +190,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
     let log = event.as_log();
 
     let timestamp = log
-        .get(&Atom::from(log_schema().timestamp_key()))
+        .get(log_schema().timestamp_key())
         .and_then(Value::as_timestamp)
         .cloned();
 
@@ -214,6 +219,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -230,6 +236,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -250,6 +257,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -270,6 +278,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Absolute,
@@ -291,6 +300,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 
             Ok(Metric {
                 name,
+                namespace: None,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -317,11 +327,14 @@ impl Transform for LogToMetric {
                 Ok(metric) => {
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound { field }) => {
-                    emit!(LogToMetricFieldNotFound { field })
-                }
+                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
+                    field: field.as_ref()
+                }),
                 Err(TransformError::ParseFloatError { field, error }) => {
-                    emit!(LogToMetricParseFloatError { field, error })
+                    emit!(LogToMetricParseFloatError {
+                        field: field.as_ref(),
+                        error
+                    })
                 }
                 Err(TransformError::TemplateRenderError { missing_keys }) => {
                     emit!(LogToMetricTemplateRenderError { missing_keys })
@@ -344,6 +357,11 @@ mod tests {
         transforms::Transform,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LogToMetricConfig>();
+    }
 
     fn parse_config(s: &str) -> LogToMetricConfig {
         toml::from_str(s).unwrap()
@@ -378,6 +396,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "status".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -409,6 +428,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "http_requests_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: Some(
                     vec![
@@ -444,6 +464,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -489,6 +510,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "amount_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -516,6 +538,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "memory_rss_bytes".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -590,6 +613,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -600,6 +624,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "status".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -643,6 +668,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "xyz_exception_total".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -653,6 +679,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "local_abc_status_set".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -682,6 +709,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "unique_user_ip".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -710,6 +738,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "response_time".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -740,6 +769,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "response_time".into(),
+                namespace: None,
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,

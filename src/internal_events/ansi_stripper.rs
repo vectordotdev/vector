@@ -1,19 +1,18 @@
 use super::InternalEvent;
 use metrics::counter;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub struct ANSIStripperEventProcessed;
 
 impl InternalEvent for ANSIStripperEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
 #[derive(Debug)]
 pub struct ANSIStripperFieldMissing<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl InternalEvent for ANSIStripperFieldMissing<'_> {
@@ -26,13 +25,13 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "field_missing");
+        counter!("processing_errors_total", 1, "error_type" => "field_missing");
     }
 }
 
 #[derive(Debug)]
 pub struct ANSIStripperFieldInvalid<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
 }
 
 impl InternalEvent for ANSIStripperFieldInvalid<'_> {
@@ -45,13 +44,13 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "value_invalid");
+        counter!("processing_errors_total", 1, "error_type" => "value_invalid");
     }
 }
 
 #[derive(Debug)]
 pub struct ANSIStripperFailed<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
     pub error: std::io::Error,
 }
 
@@ -60,12 +59,12 @@ impl InternalEvent for ANSIStripperFailed<'_> {
         debug!(
             message = "Could not strip ANSI escape sequences.",
             field = %self.field,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 10,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1);
+        counter!("processing_errors_total", 1);
     }
 }

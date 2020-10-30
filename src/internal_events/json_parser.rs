@@ -1,7 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
 use serde_json::Error;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug)]
 pub(crate) struct JsonParserEventProcessed;
@@ -12,13 +11,13 @@ impl InternalEvent for JsonParserEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
 #[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {
-    pub field: &'a Atom,
+    pub field: &'a str,
     pub value: &'a str,
     pub error: Error,
 }
@@ -29,13 +28,13 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
             message = "Event failed to parse as JSON.",
             field = %self.field,
             value = %self.value,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         )
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
             "error_type" => "failed_parse",
         );
     }
@@ -43,7 +42,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
 
 #[derive(Debug)]
 pub(crate) struct JsonParserTargetExists<'a> {
-    pub target_field: &'a Atom,
+    pub target_field: &'a str,
 }
 
 impl<'a> InternalEvent for JsonParserTargetExists<'a> {
@@ -56,7 +55,7 @@ impl<'a> InternalEvent for JsonParserTargetExists<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
             "error_type" => "target_field_exists",
         );
     }

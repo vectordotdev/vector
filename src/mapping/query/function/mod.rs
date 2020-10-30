@@ -1,24 +1,25 @@
 #![macro_use]
 
 mod not;
+
 pub(in crate::mapping) use not::NotFn;
 
 use super::Function;
+use crate::mapping::{query::query_value::QueryValue, Result};
 use crate::Event;
-use crate::{event::Value, mapping::Result};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
 /// Commonly used types when building new functions.
 mod prelude {
-    pub(super) use super::{is_scalar_value, ArgumentList, Parameter};
+    pub(super) use super::{ArgumentList, Parameter};
     pub(super) use crate::event::{Event, Value};
+    pub(super) use crate::mapping::query::query_value::QueryValue;
     pub(super) use crate::mapping::query::Function;
     #[cfg(test)]
     pub(super) use crate::mapping::query::Literal;
     pub(super) use crate::mapping::Result;
-    pub(super) use crate::types::Conversion;
     pub(super) use std::convert::TryFrom;
 }
 
@@ -31,23 +32,43 @@ macro_rules! unexpected_type {
 }
 
 macro_rules! required {
-    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+ $(,)?) => {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
         match $fn.execute($ctx)? {
-            $($pattern => $then,)+
+            $($pattern $(if $if)? => $then,)+
             v => unexpected_type!(v),
         }
     }
 }
 
+macro_rules! required_value {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
+        required!($ctx, $fn,
+            QueryValue::Value(value) => match value {
+                $($pattern $(if $if)? => $then,)+
+                v => unexpected_type!(v),
+            })
+    }
+}
+
 macro_rules! optional {
-    ($ctx:expr, $fn:expr, $($pattern:pat => $then:expr),+ $(,)?) => {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
         $fn.as_ref()
             .map(|v| v.execute($ctx))
             .transpose()?
             .map(|v| match v {
-                $($pattern => $then,)+
+                $($pattern $(if $if)? => $then,)+
                 v => unexpected_type!(v),
             })
+    }
+}
+
+macro_rules! optional_value {
+    ($ctx:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
+        optional!($ctx, $fn,
+                  QueryValue::Value(value) => match value {
+                      $($pattern $(if $if)? => $then,)+
+                          v => unexpected_type!(v),
+                  })
     }
 }
 
@@ -101,30 +122,9 @@ macro_rules! build_signatures {
 
 // List of built-in functions.
 build_signatures! {
-    to_string => ToStringFn,
-    to_int => ToIntegerFn,
-    to_float => ToFloatFn,
-    to_bool => ToBooleanFn,
-    to_timestamp => ToTimestampFn,
-    parse_timestamp => ParseTimestampFn,
-    strip_whitespace => StripWhitespaceFn,
-    upcase => UpcaseFn,
-    downcase => DowncaseFn,
-    uuid_v4 => UuidV4Fn,
-    md5 => Md5Fn,
-    sha1 => Sha1Fn,
-    sha2 => Sha2Fn,
-    sha3 => Sha3Fn,
-    now => NowFn,
-    truncate => TruncateFn,
-    parse_json => ParseJsonFn,
-    format_timestamp => FormatTimestampFn,
-    contains => ContainsFn,
-    slice => SliceFn,
-    tokenize => TokenizeFn,
-    strip_ansi_escape_codes => StripAnsiEscapeCodesFn,
-    parse_duration => ParseDurationFn,
-    format_number => FormatNumberFn,
+    split => SplitFn,
+    replace => ReplaceFn,
+    flatten => FlattenFn,
 }
 
 /// A parameter definition accepted by a function.
@@ -138,7 +138,7 @@ pub(in crate::mapping) struct Parameter {
 
     /// The parser calls this method to determine if a given argument value is
     /// accepted by the parameter.
-    pub accepts: fn(&Value) -> bool,
+    pub accepts: fn(&QueryValue) -> bool,
 
     /// Whether or not this is a required parameter.
     ///
@@ -228,7 +228,7 @@ impl Argument {
 }
 
 impl Function for Argument {
-    fn execute(&self, ctx: &Event) -> Result<Value> {
+    fn execute(&self, ctx: &Event) -> Result<QueryValue> {
         let value = self.resolver.execute(ctx)?;
 
         // Ask the parameter if it accepts the given value.
@@ -241,16 +241,5 @@ impl Function for Argument {
         }
 
         Ok(value)
-    }
-}
-
-fn is_scalar_value(value: &Value) -> bool {
-    match value {
-        Value::Integer(_)
-        | Value::Float(_)
-        | Value::Bytes(_)
-        | Value::Boolean(_)
-        | Value::Timestamp(_) => true,
-        Value::Map(_) | Value::Array(_) | Value::Null => false,
     }
 }

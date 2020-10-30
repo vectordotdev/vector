@@ -1,13 +1,14 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
+    http::HttpClient,
     internal_events::{
         SplunkEventEncodeError, SplunkEventSent, SplunkSourceMissingKeys,
         SplunkSourceTypeMissingKeys,
     },
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
     },
     template::Template,
@@ -22,7 +23,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use snafu::{ResultExt, Snafu};
 use std::convert::TryFrom;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 pub enum BuildError {
@@ -40,7 +40,7 @@ pub struct HecSinkConfig {
     #[serde(default = "default_host_key")]
     pub host_key: String,
     #[serde(default)]
-    pub indexed_fields: Vec<Atom>,
+    pub indexed_fields: Vec<String>,
     pub index: Option<String>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
@@ -100,7 +100,7 @@ impl SinkConfig for HecSinkConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -110,7 +110,7 @@ impl SinkConfig for HecSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
@@ -139,7 +139,9 @@ impl HttpSink for HecSinkConfig {
             sourcetype
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceTypeMissingKeys { keys: missing_keys });
+                    emit!(SplunkSourceTypeMissingKeys {
+                        keys: &missing_keys
+                    });
                 })
                 .ok()
         });
@@ -148,16 +150,18 @@ impl HttpSink for HecSinkConfig {
             source
                 .render_string(&event)
                 .map_err(|missing_keys| {
-                    emit!(SplunkSourceMissingKeys { keys: missing_keys });
+                    emit!(SplunkSourceMissingKeys {
+                        keys: &missing_keys
+                    });
                 })
                 .ok()
         });
 
         let mut event = event.into_log();
 
-        let host = event.get(&Atom::from(self.host_key.to_owned())).cloned();
+        let host = event.get(self.host_key.to_owned()).cloned();
 
-        let timestamp = match event.remove(&Atom::from(log_schema().timestamp_key())) {
+        let timestamp = match event.remove(log_schema().timestamp_key()) {
             Some(Value::Timestamp(ts)) => ts,
             _ => chrono::Utc::now(),
         };
@@ -176,7 +180,7 @@ impl HttpSink for HecSinkConfig {
         let event = match self.encoding.codec() {
             Encoding::Json => json!(event),
             Encoding::Text => json!(event
-                .get(&Atom::from(log_schema().message_key()))
+                .get(log_schema().message_key())
                 .map(|v| v.to_string_lossy())
                 .unwrap_or_else(|| "".into())),
         };
@@ -535,7 +539,7 @@ mod integration_tests {
     async fn splunk_custom_fields() {
         let cx = SinkContext::new_test();
 
-        let indexed_fields = vec![Atom::from("asdf")];
+        let indexed_fields = vec!["asdf".into()];
         let config = config(Encoding::Json, indexed_fields).await;
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -555,7 +559,7 @@ mod integration_tests {
     async fn splunk_hostname() {
         let cx = SinkContext::new_test();
 
-        let indexed_fields = vec![Atom::from("asdf")];
+        let indexed_fields = vec!["asdf".into()];
         let config = config(Encoding::Json, indexed_fields).await;
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -578,7 +582,7 @@ mod integration_tests {
     async fn splunk_sourcetype() {
         let cx = SinkContext::new_test();
 
-        let indexed_fields = vec![Atom::from("asdf")];
+        let indexed_fields = vec!["asdf".to_string()];
         let mut config = config(Encoding::Json, indexed_fields).await;
         config.sourcetype = Template::try_from("_json".to_string()).ok();
 
@@ -604,7 +608,7 @@ mod integration_tests {
 
         let config = HecSinkConfig {
             host_key: "roast".into(),
-            ..config(Encoding::Json, vec![Atom::from("asdf")]).await
+            ..config(Encoding::Json, vec!["asdf".to_string()]).await
         };
 
         let (sink, _) = config.build(cx).await.unwrap();
@@ -627,11 +631,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck() {
-        let resolver = crate::dns::Resolver;
-
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(resolver, tls_settings).unwrap();
+            let client = HttpClient::new(tls_settings).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 
@@ -717,7 +719,7 @@ mod integration_tests {
 
     async fn config(
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
-        indexed_fields: Vec<Atom>,
+        indexed_fields: Vec<String>,
     ) -> HecSinkConfig {
         HecSinkConfig {
             endpoint: "http://localhost:8088/".into(),

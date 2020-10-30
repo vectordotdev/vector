@@ -111,7 +111,7 @@ fn kafka_source(
     let fut = async move {
         Arc::clone(&consumer)
             .start()
-            .take_until(shutdown.clone().compat())
+            .take_until(shutdown.clone())
             .then(move |message| {
                 let key_field = key_field.clone();
                 let consumer = Arc::clone(&consumer);
@@ -175,14 +175,14 @@ fn kafka_source(
             // Error: implementation of `futures_core::stream::Stream` is not general enough
             // .forward(
             //     out.sink_compat()
-            //         .sink_map_err(|e| error!(message = "Error sending to sink", error = ?e)),
+            //         .sink_map_err(|error| error!(message = "Error sending to sink.", %error)),
             // )
             .for_each(|item| {
                 let out = out.clone();
                 async move {
                     if let Ok(item) = item {
-                        if let Err(e) = out.send(item).compat().await {
-                            error!(message = "Error sending to sink", error = ?e);
+                        if let Err(error) = out.send(item).compat().await {
+                            error!(message = "Error sending to sink.", %error);
                         }
                     }
                 }
@@ -284,7 +284,6 @@ mod integration_test {
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
     };
-    use string_cache::DefaultAtom as Atom;
 
     const BOOTSTRAP_SERVER: &str = "localhost:9092";
 
@@ -301,8 +300,8 @@ mod integration_test {
             .key(key)
             .timestamp(timestamp);
 
-        if let Err(err) = producer.send(record, Timeout::Never).await {
-            panic!("Cannot send event to Kafka: {:?}", err);
+        if let Err(error) = producer.send(record, Timeout::Never).await {
+            panic!("Cannot send event to Kafka: {:?}", error);
         }
     }
 
@@ -346,20 +345,14 @@ mod integration_test {
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().message_key())],
+            events[0].as_log()[log_schema().message_key()],
             "my message".into()
         );
+        assert_eq!(events[0].as_log()["message_key"], "my key".into());
         assert_eq!(
-            events[0].as_log()[&Atom::from("message_key")],
-            "my key".into()
-        );
-        assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().source_type_key())],
+            events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(
-            events[0].as_log()[&Atom::from(log_schema().timestamp_key())],
-            now.into()
-        );
+        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
     }
 }

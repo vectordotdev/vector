@@ -1,8 +1,9 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::util::{
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
@@ -11,7 +12,6 @@ use futures01::Sink;
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use string_cache::DefaultAtom as Atom;
 
 lazy_static::lazy_static! {
     static ref HOST: UriSerde = Uri::from_static("https://api.honeycomb.io/1/batch").into();
@@ -36,7 +36,15 @@ inventory::submit! {
     SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
 
-impl GenerateConfig for HoneycombConfig {}
+impl GenerateConfig for HoneycombConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"api_key = "${HONEYCOMB_API_KEY}"
+            dataset = "my-honeycomb-dataset""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
@@ -51,7 +59,7 @@ impl SinkConfig for HoneycombConfig {
             .timeout(1)
             .parse_config(self.batch)?;
 
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -61,7 +69,7 @@ impl SinkConfig for HoneycombConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
@@ -88,8 +96,7 @@ impl HttpSink for HoneycombConfig {
     fn encode_event(&self, event: Event) -> Option<Self::Input> {
         let mut log = event.into_log();
 
-        let timestamp = if let Some(Value::Timestamp(ts)) =
-            log.remove(&Atom::from(log_schema().timestamp_key()))
+        let timestamp = if let Some(Value::Timestamp(ts)) = log.remove(log_schema().timestamp_key())
         {
             ts
         } else {
@@ -156,5 +163,12 @@ async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::
             status, body
         )
         .into())
+    }
+}
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::HoneycombConfig>();
     }
 }

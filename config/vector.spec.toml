@@ -2418,8 +2418,8 @@ require('custom_module')
   # * optional
   # * default: []
   # * type: [string]
-  identifier_fields = ["request_id"]
-  identifier_fields = ["user_id", "transaction_id"]
+  group_by = ["request_id"]
+  group_by = ["user_id", "transaction_id"]
 
   # A list of upstream source or transform IDs. See configuration for more info.
   #
@@ -2444,7 +2444,7 @@ require('custom_module')
     #
     # * required
     # * type: string
-    # * enum: "array", "concat", "discard", "sum", "max", and "min"
+    # * enum: "array", "concat", "concat_newline", "discard", "sum", "max", and "min"
     method = "discard"
     path = "discard"
     duration_ms = "sum"
@@ -8241,6 +8241,14 @@ require('custom_module')
   # * type: string
   api_key = "${LOGDNA_API_KEY}"
   api_key = "ef8d5de700e7989468166c40fc8a0ccd"
+
+  # The default environment that will be set for events that do not contain an `env` field.
+  #
+  # * optional
+  # * default: "production"
+  # * type: string
+  default_env = "production"
+  default_env = "staging"
 
   # The default app that will be set for events that do not contain a `file` or
   # `app` field.

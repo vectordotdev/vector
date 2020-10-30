@@ -1,10 +1,11 @@
 use crate::event::{Event, Value};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 
 pub mod parser;
 pub mod query;
 
-use string_cache::DefaultAtom as Atom;
+use query::query_value::QueryValue;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -28,9 +29,13 @@ impl Assignment {
 
 impl Function for Assignment {
     fn apply(&self, target: &mut Event) -> Result<()> {
-        let v = self.function.execute(&target)?;
-        target.as_mut_log().insert(&self.path, v);
-        Ok(())
+        match self.function.execute(&target)? {
+            QueryValue::Value(v) => {
+                target.as_mut_log().insert(&self.path, v);
+                Ok(())
+            }
+            _ => Err("assignment must be from a value".to_string()),
+        }
     }
 }
 
@@ -38,14 +43,13 @@ impl Function for Assignment {
 
 #[derive(Debug)]
 pub(self) struct Deletion {
-    // TODO: Switch to String once Event API is cleaned up.
-    paths: Vec<Atom>,
+    paths: Vec<String>,
 }
 
 impl Deletion {
     pub(self) fn new(mut paths: Vec<String>) -> Self {
         Self {
-            paths: paths.drain(..).map(Atom::from).collect(),
+            paths: paths.drain(..).collect(),
         }
     }
 }
@@ -87,7 +91,7 @@ impl Function for OnlyFields {
             .collect();
 
         for key in keys {
-            target_log.remove_prune(&Atom::from(key), true);
+            target_log.remove_prune(key, true);
         }
 
         Ok(())
@@ -120,8 +124,8 @@ impl IfStatement {
 impl Function for IfStatement {
     fn apply(&self, target: &mut Event) -> Result<()> {
         match self.query.execute(target)? {
-            Value::Boolean(true) => self.true_statement.apply(target),
-            Value::Boolean(false) => self.false_statement.apply(target),
+            QueryValue::Value(Value::Boolean(true)) => self.true_statement.apply(target),
+            QueryValue::Value(Value::Boolean(false)) => self.false_statement.apply(target),
             _ => Err("query returned non-boolean value".to_string()),
         }
     }
@@ -196,14 +200,14 @@ where
 
 #[derive(Debug)]
 pub(in crate::mapping) struct MergeFn {
-    to_path: Atom,
+    to_path: String,
     from: Box<dyn query::Function>,
     deep: Option<Box<dyn query::Function>>,
 }
 
 impl MergeFn {
     pub(in crate::mapping) fn new(
-        to_path: Atom,
+        to_path: String,
         from: Box<dyn query::Function>,
         deep: Option<Box<dyn query::Function>>,
     ) -> Self {
@@ -221,7 +225,7 @@ impl Function for MergeFn {
         let deep = match &self.deep {
             None => false,
             Some(deep) => match deep.execute(target)? {
-                Value::Boolean(value) => value,
+                QueryValue::Value(Value::Boolean(value)) => value,
                 _ => return Err("deep parameter passed to merge is a non-boolean value".into()),
             },
         };
@@ -232,13 +236,74 @@ impl Function for MergeFn {
         ))?;
 
         match (to_value, from_value) {
-            (Value::Map(ref mut map1), Value::Map(ref map2)) => {
+            (Value::Map(ref mut map1), QueryValue::Value(Value::Map(ref map2))) => {
                 merge_maps(map1, &map2, deep);
                 Ok(())
             }
 
             _ => Err("parameters passed to merge are non-map values".into()),
         }
+    }
+}
+
+//------------------------------------------------------------------------------
+
+/// Represents the different log levels that can be used by LogFn
+#[derive(Debug, Clone, Copy)]
+pub(in crate::mapping) enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl TryFrom<&str> for LogLevel {
+    type Error = String;
+
+    fn try_from(level: &str) -> Result<Self> {
+        match level {
+            "trace" => Ok(Self::Trace),
+            "debug" => Ok(Self::Debug),
+            "info" => Ok(Self::Info),
+            "warn" => Ok(Self::Warn),
+            "error" => Ok(Self::Error),
+            _ => Err("invalid log level".to_string()),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(in crate::mapping) struct LogFn {
+    msg: Box<dyn query::Function>,
+    level: Option<LogLevel>,
+}
+
+impl LogFn {
+    pub(in crate::mapping) fn new(msg: Box<dyn query::Function>, level: Option<LogLevel>) -> Self {
+        Self { msg, level }
+    }
+}
+
+impl Function for LogFn {
+    fn apply(&self, target: &mut Event) -> Result<()> {
+        let msg = match self.msg.execute(target)? {
+            QueryValue::Value(value) => value,
+            _ => return Err("Can only log Value parameters".to_string()),
+        };
+        let msg = msg.into_bytes();
+        let string = String::from_utf8_lossy(&msg);
+        let level = self.level.unwrap_or(LogLevel::Info);
+
+        match level {
+            LogLevel::Trace => trace!("{}", string),
+            LogLevel::Debug => debug!("{}", string),
+            LogLevel::Info => info!("{}", string),
+            LogLevel::Warn => warn!("{}", string),
+            LogLevel::Error => error!("{}", string),
+        }
+
+        Ok(())
     }
 }
 
@@ -259,13 +324,13 @@ mod tests {
             (
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("foo", Value::from("bar"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![Box::new(Assignment::new(
@@ -277,7 +342,7 @@ mod tests {
             (
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 {
@@ -285,7 +350,7 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("foo bar\\.baz.buz", Value::from("quack"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![Box::new(Assignment::new(
@@ -297,13 +362,13 @@ mod tests {
             (
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event.as_mut_log().insert("foo", Value::from("bar"));
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
@@ -313,13 +378,13 @@ mod tests {
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("bar", Value::from("baz"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("foo", Value::from("bar"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![
@@ -335,14 +400,14 @@ mod tests {
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("bar", Value::from("baz"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("bar", Value::from("baz"));
                     event.as_mut_log().insert("foo", Value::from("bar is baz"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![Box::new(IfStatement::new(
@@ -363,12 +428,12 @@ mod tests {
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("bar", Value::from("buz"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![Box::new(IfStatement::new(
@@ -389,13 +454,13 @@ mod tests {
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("bar", Value::from("buz"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().insert("bar", Value::from("buz"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![Box::new(IfStatement::new(
@@ -441,8 +506,8 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("nested.and_here", Value::from("sixth"));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
-                    event.as_mut_log().remove(&Atom::from("message"));
+                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("message");
                     event
                 },
                 Mapping::new(vec![Box::new(OnlyFields::new(vec![
@@ -471,7 +536,7 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 {
@@ -480,7 +545,7 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
+                    event.as_mut_log().remove("timestamp");
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(
@@ -502,8 +567,8 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
-                    event.as_mut_log().remove(&Atom::from("message"));
+                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("message");
                     event
                 },
                 {
@@ -514,8 +579,8 @@ mod tests {
                     event
                         .as_mut_log()
                         .insert("bar", serde_json::json!({ "key2": "val2" }));
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
-                    event.as_mut_log().remove(&Atom::from("message"));
+                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("message");
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(
@@ -546,8 +611,8 @@ mod tests {
                                }
                         }),
                     );
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
-                    event.as_mut_log().remove(&Atom::from("message"));
+                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("message");
                     event
                 },
                 {
@@ -571,8 +636,8 @@ mod tests {
                               }
                         }),
                     );
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
-                    event.as_mut_log().remove(&Atom::from("message"));
+                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("message");
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(
@@ -603,8 +668,8 @@ mod tests {
                                }
                         }),
                     );
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
-                    event.as_mut_log().remove(&Atom::from("message"));
+                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("message");
                     event
                 },
                 {
@@ -629,8 +694,8 @@ mod tests {
                               }
                         }),
                     );
-                    event.as_mut_log().remove(&Atom::from("timestamp"));
-                    event.as_mut_log().remove(&Atom::from("message"));
+                    event.as_mut_log().remove("timestamp");
+                    event.as_mut_log().remove("message");
                     event
                 },
                 Mapping::new(vec![Box::new(MergeFn::new(

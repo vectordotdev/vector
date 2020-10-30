@@ -1,13 +1,11 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
     event::Event,
-    region::RegionOrEndpoint,
+    rusoto::{self, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
-        rusoto,
         sink::Response,
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -30,7 +28,7 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::task::Context;
 use std::task::Poll;
-use string_cache::DefaultAtom as Atom;
+
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -57,7 +55,7 @@ pub struct S3SinkConfig {
         default
     )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
-    #[serde(default = "Compression::default_gzip")]
+    #[serde(default = "Compression::gzip_default")]
     pub compression: Compression,
     #[serde(default)]
     pub batch: BatchConfig,
@@ -148,7 +146,7 @@ impl SinkConfig for S3SinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = self.new(client, cx)?;
         Ok((sink, healthcheck))
@@ -217,7 +215,7 @@ impl S3SinkConfig {
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
-            .sink_map_err(|error| error!("Sink failed to flush: {}", error));
+            .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
         Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
     }
@@ -243,9 +241,9 @@ impl S3SinkConfig {
         }
     }
 
-    pub fn create_client(&self, resolver: Resolver) -> crate::Result<S3Client> {
+    pub fn create_client(&self) -> crate::Result<S3Client> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
 
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
@@ -300,7 +298,12 @@ impl Service<Request> for S3Sink {
             ..Default::default()
         };
 
-        Box::pin(async move { client.put_object(request).await }.instrument(info_span!("request")))
+        Box::pin(async move {
+            client
+                .put_object(request)
+                .instrument(info_span!("request"))
+                .await
+        })
     }
 }
 
@@ -332,7 +335,7 @@ fn build_request(
     let key = format!("{}{}.{}", key, filename, extension);
 
     debug!(
-        message = "sending events.",
+        message = "Sending events.",
         bytes = ?inner.len(),
         bucket = ?bucket,
         key = ?key
@@ -402,7 +405,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&Atom::from(log_schema().message_key()))
+                .get(log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -511,7 +514,7 @@ mod tests {
             "date".into(),
             None,
             false,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -522,7 +525,7 @@ mod tests {
             "date".into(),
             None,
             true,
-            Compression::Gzip,
+            Compression::gzip_default(),
             "bucket".into(),
             S3Options::default(),
         );
@@ -537,9 +540,8 @@ mod integration_tests {
     use crate::{
         assert_downcast_matches,
         config::SinkContext,
-        dns::Resolver,
         event::Event,
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};
@@ -558,7 +560,7 @@ mod integration_tests {
 
         let config = config(1000000).await;
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 10);
@@ -571,7 +573,7 @@ mod integration_tests {
         assert!(key.ends_with(".log"));
 
         let obj = get_object(key).await;
-        assert_eq!(obj.content_encoding, None);
+        assert_eq!(obj.content_encoding, Some("identity".to_string()));
 
         let response_lines = get_lines(obj).await;
         assert_eq!(lines, response_lines);
@@ -588,7 +590,7 @@ mod integration_tests {
             ..config(1010).await
         };
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, _events) = random_lines_with_stream(100, 30);
@@ -627,13 +629,13 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let config = S3SinkConfig {
-            compression: Compression::Gzip,
+            compression: Compression::gzip_default(),
             filename_time_format: Some("%s%f".into()),
             ..config(10000).await
         };
 
         let prefix = config.key_prefix.clone();
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client().unwrap();
         let sink = config.new(client, cx).unwrap();
 
         let (lines, events) = random_lines_with_stream(100, 500);
@@ -657,22 +659,18 @@ mod integration_tests {
 
     #[tokio::test]
     async fn s3_healthchecks() {
-        let resolver = Resolver;
-
         let config = config(1).await;
-        let client = config.create_client(resolver).unwrap();
+        let client = config.create_client().unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
     #[tokio::test]
     async fn s3_healthchecks_invalid_bucket() {
-        let resolver = Resolver;
-
         let config = S3SinkConfig {
             bucket: "asdflkjadskdaadsfadf".to_string(),
             ..config(1).await
         };
-        let client = config.create_client(resolver).unwrap();
+        let client = config.create_client().unwrap();
         assert_downcast_matches!(
             config.healthcheck(client).await.unwrap_err(),
             HealthcheckError,
@@ -683,7 +681,7 @@ mod integration_tests {
     fn client() -> S3Client {
         let region = Region::Custom {
             name: "minio".to_owned(),
-            endpoint: "http://localhost:4572".to_owned(),
+            endpoint: "http://localhost:4566".to_owned(),
         };
 
         use rusoto_core::HttpClient;
@@ -707,7 +705,7 @@ mod integration_tests {
                 timeout_secs: Some(5),
                 ..Default::default()
             },
-            region: RegionOrEndpoint::with_endpoint("http://localhost:4572".to_owned()),
+            region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             ..Default::default()
         }
     }

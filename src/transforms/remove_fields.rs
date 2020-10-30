@@ -1,23 +1,20 @@
 use super::Transform;
-use crate::event::Lookup;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
 };
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveFieldsConfig {
-    fields: Vec<Lookup>,
+    fields: Vec<String>,
     drop_empty: Option<bool>,
 }
 
 pub struct RemoveFields {
-    fields: Vec<Lookup>,
+    fields: Vec<String>,
     drop_empty: bool,
 }
 
@@ -25,12 +22,20 @@ inventory::submit! {
     TransformDescription::new::<RemoveFieldsConfig>("remove_fields")
 }
 
-impl GenerateConfig for RemoveFieldsConfig {}
+impl GenerateConfig for RemoveFieldsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            fields: Vec::new(),
+            drop_empty: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveFields {
             fields: self.fields.clone(),
             drop_empty: self.drop_empty.unwrap_or(false),
@@ -51,16 +56,8 @@ impl TransformConfig for RemoveFieldsConfig {
 }
 
 impl RemoveFields {
-    pub fn new(fields: Vec<Atom>, drop_empty: bool) -> crate::Result<Self> {
-        let mut lookups = Vec::with_capacity(fields.len());
-        for field in fields {
-            let string = field.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
-            lookups.push(Lookup::try_from(string)?);
-        }
-        Ok(RemoveFields {
-            fields: lookups,
-            drop_empty,
-        })
+    pub fn new(fields: Vec<String>, drop_empty: bool) -> crate::Result<Self> {
+        Ok(RemoveFields { fields, drop_empty })
     }
 }
 
@@ -85,8 +82,13 @@ impl Transform for RemoveFields {
 
 #[cfg(test)]
 mod tests {
-    use super::RemoveFields;
+    use super::{RemoveFields, RemoveFieldsConfig};
     use crate::{event::Event, transforms::Transform};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemoveFieldsConfig>();
+    }
 
     #[test]
     fn remove_fields() {
@@ -99,11 +101,8 @@ mod tests {
 
         let new_event = transform.transform(event).unwrap();
 
-        assert!(new_event.as_log().get(&"to_remove".into()).is_none());
-        assert!(new_event.as_log().get(&"unknown".into()).is_none());
-        assert_eq!(
-            new_event.as_log()[&"to_keep".into()],
-            "another value".into()
-        );
+        assert!(new_event.as_log().get("to_remove").is_none());
+        assert!(new_event.as_log().get("unknown").is_none());
+        assert_eq!(new_event.as_log()["to_keep"], "another value".into());
     }
 }

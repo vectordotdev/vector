@@ -14,11 +14,11 @@ use file_source::{
     FileServer, Fingerprinter,
 };
 use futures::{
-    compat::{Compat, Compat01As03, Compat01As03Sink, Future01CompatExt},
+    compat::{Compat, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
+    stream::{Stream, StreamExt},
 };
-use futures01::{future, Future, Sink, Stream};
+use futures01::{Future, Sink};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -225,25 +225,15 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
-    Box::new(future::lazy(move || {
-        info!(message = "Starting file server.", ?include, ?exclude);
+
+    Box::new(futures01::future::lazy(move || {
+        info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         // sizing here is just a guess
-        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let rx = rx.map(futures::stream::iter).flatten();
 
-        // This closure is overcomplicated because of the compatibility layer.
-        let wrap_with_line_agg = |rx, config| {
-            let rx = StreamExt::filter_map(Compat01As03::new(rx), |val| {
-                futures::future::ready(val.ok())
-            });
-            let logic = line_agg::Logic::new(config);
-            Box::new(Compat::new(
-                LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
-                    .map(|(src, line, _context)| (line, src))
-                    .map(Ok),
-            ))
-        };
-        let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
+        let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
                 wrap_with_line_agg(
                     rx,
@@ -265,13 +255,15 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
+        let messages01 = Compat::new(StreamExt::map(
+            messages,
+            move |(msg, file): (Bytes, String)| {
+                let _enter = span2.enter();
+                Ok::<_, ()>(create_event(msg, file, &host_key, &hostname, &file_key))
+            },
+        ));
         tokio::spawn(
-            messages
-                .map(move |(msg, file): (Bytes, String)| {
-                    let _enter = span2.enter();
-                    create_event(msg, file, &host_key, &hostname, &file_key)
-                })
-                .forward(out.sink_map_err(|e| error!(%e)))
+            futures01::Stream::forward(messages01, out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())
                 .compat()
                 .instrument(span),
@@ -280,7 +272,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(Compat01As03Sink::new(tx), shutdown.compat());
+            let result = file_server.run(tx, shutdown);
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -288,8 +280,19 @@ pub fn file_source(
         })
         .boxed()
         .compat()
-        .map_err(|error| error!(message="file server unexpectedly stopped.",%error))
+        .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
     }))
+}
+
+fn wrap_with_line_agg(
+    rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
+    config: line_agg::Config,
+) -> Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static> {
+    let logic = line_agg::Logic::new(config);
+    Box::new(
+        LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
+            .map(|(src, line, _context)| (line, src)),
+    )
 }
 
 fn create_event(
@@ -334,7 +337,7 @@ mod tests {
         future::Future,
         io::{Seek, Write},
     };
-    use string_cache::DefaultAtom as Atom;
+
     use tempfile::tempdir;
     use tokio::time::{delay_for, timeout, Duration};
 
@@ -447,16 +450,10 @@ mod tests {
         let event = create_event(line, file, &host_key, &hostname, &file_key);
         let log = event.into_log();
 
-        assert_eq!(log[&"file".into()], "some_file.rs".into());
-        assert_eq!(log[&"host".into()], "Some.Machine".into());
-        assert_eq!(
-            log[&Atom::from(log_schema().message_key())],
-            "hello world".into()
-        );
-        assert_eq!(
-            log[&Atom::from(log_schema().source_type_key())],
-            "file".into()
-        );
+        assert_eq!(log["file"], "some_file.rs".into());
+        assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log[log_schema().message_key()], "hello world".into());
+        assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
 
     #[tokio::test]
@@ -496,18 +493,18 @@ mod tests {
         let mut goodbye_i = 0;
 
         for event in received {
-            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
+            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
-                    event.as_log()[&"file".into()].to_string_lossy(),
+                    event.as_log()["file"].to_string_lossy(),
                     path1.to_str().unwrap()
                 );
                 hello_i += 1;
             } else {
                 assert_eq!(line, format!("goodbye {}", goodbye_i));
                 assert_eq!(
-                    event.as_log()[&"file".into()].to_string_lossy(),
+                    event.as_log()["file"].to_string_lossy(),
                     path2.to_str().unwrap()
                 );
                 goodbye_i += 1;
@@ -562,11 +559,11 @@ mod tests {
 
         for event in received {
             assert_eq!(
-                event.as_log()[&"file".into()].to_string_lossy(),
+                event.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
+            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
 
             if pre_trunc {
                 assert_eq!(line, format!("pretrunc {}", i));
@@ -628,11 +625,11 @@ mod tests {
 
         for event in received {
             assert_eq!(
-                event.as_log()[&"file".into()].to_string_lossy(),
+                event.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
 
-            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
+            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
 
             if pre_rot {
                 assert_eq!(line, format!("prerot {}", i));
@@ -691,7 +688,7 @@ mod tests {
         let mut is = [0; 3];
 
         for event in received {
-            let line = event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy();
+            let line = event.as_log()[log_schema().message_key()].to_string_lossy();
             let mut split = line.split(' ');
             let file = split.next().unwrap().parse::<usize>().unwrap();
             assert_ne!(file, 4);
@@ -730,14 +727,14 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
                 .0
                 .unwrap();
             assert_eq!(
-                received.as_log()[&"file".into()].to_string_lossy(),
+                received.as_log()["file"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -767,14 +764,14 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
                 .0
                 .unwrap();
             assert_eq!(
-                received.as_log()[&"source".into()].to_string_lossy(),
+                received.as_log()["source"].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -804,7 +801,7 @@ mod tests {
             sleep_500_millis().await;
 
             drop(trigger_shutdown);
-            shutdown_done.compat().await.unwrap();
+            shutdown_done.await;
 
             let received = wait_with_timeout(rx.into_future().compat())
                 .await
@@ -814,7 +811,7 @@ mod tests {
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
                     log_schema().host_key().to_string(),
-                    Atom::from(log_schema().message_key()).to_string(),
+                    log_schema().message_key().to_string(),
                     log_schema().timestamp_key().to_string(),
                     log_schema().source_type_key().to_string()
                 ]
@@ -854,9 +851,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["zeroth line", "first line"]);
         }
@@ -877,9 +872,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -905,9 +898,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(
                 lines,
@@ -944,9 +935,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["first line"]);
         }
@@ -971,9 +960,7 @@ mod tests {
             let received = wait_with_timeout(rx.collect().compat()).await;
             let lines = received
                 .into_iter()
-                .map(|event| {
-                    event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy()
-                })
+                .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
                 .collect::<Vec<_>>();
             assert_eq!(lines, vec!["second line"]);
         }
@@ -1046,21 +1033,13 @@ mod tests {
         let received = wait_with_timeout(rx.collect().compat()).await;
         let before_lines = received
             .iter()
-            .filter(|event| {
-                event.as_log()[&"file".into()]
-                    .to_string_lossy()
-                    .ends_with("before")
-            })
-            .map(|event| event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy())
+            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
+            .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|event| {
-                event.as_log()[&"file".into()]
-                    .to_string_lossy()
-                    .ends_with("after")
-            })
-            .map(|event| event.as_log()[&Atom::from(log_schema().message_key())].to_string_lossy())
+            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("after"))
+            .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);
         assert_eq!(after_lines, vec!["_first line", "_second line"]);
@@ -1109,7 +1088,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&Atom::from(log_schema().message_key()))
+                    .get(log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1171,7 +1150,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&Atom::from(log_schema().message_key()))
+                    .get(log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1246,7 +1225,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&Atom::from(log_schema().message_key()))
+                    .get(log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1313,7 +1292,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&Atom::from(log_schema().message_key()))
+                    .get(log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1378,7 +1357,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&Atom::from(log_schema().message_key()))
+                    .get(log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1440,7 +1419,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&Atom::from(log_schema().message_key()))
+                    .get(log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1480,7 +1459,7 @@ mod tests {
             rx.map(|event| {
                 event
                     .as_log()
-                    .get(&Atom::from(log_schema().message_key()))
+                    .get(log_schema().message_key())
                     .unwrap()
                     .clone()
             })
@@ -1499,5 +1478,57 @@ mod tests {
                 "hooray".into(),
             ]
         );
+    }
+
+    // TODO: Renable test for Mac after https://github.com/timberio/vector/issues/4196 has been resolved
+    // TODO: and check if the original issue has been resolved https://github.com/timberio/vector/issues/3780.
+    #[cfg(not(target_os = "macos"))]
+    #[tokio::test]
+    async fn remove_file() {
+        let n = 5;
+        let remove_after = 1;
+
+        let (tx, rx) = Pipeline::new_test();
+        let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
+
+        let dir = tempdir().unwrap();
+        let config = file::FileConfig {
+            include: vec![dir.path().join("*")],
+            remove_after: Some(remove_after),
+            glob_minimum_cooldown: 100,
+            ..test_default_file_config(&dir)
+        };
+
+        let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
+        tokio::spawn(source.compat());
+
+        let path = dir.path().join("file");
+        let mut file = File::create(&path).unwrap();
+
+        sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
+
+        for i in 0..n {
+            writeln!(&mut file, "{}", i).unwrap();
+        }
+        std::mem::drop(file);
+
+        for _ in 0..10 {
+            // Wait for remove grace period to end.
+            delay_for(Duration::from_secs(remove_after + 1)).await;
+
+            if File::open(&path).is_err() {
+                break;
+            }
+        }
+
+        drop(trigger_shutdown);
+
+        let received = wait_with_timeout(rx.collect().compat()).await;
+        assert_eq!(received.len(), n);
+
+        match File::open(&path) {
+            Ok(_) => panic!("File wasn't removed"),
+            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::NotFound),
+        }
     }
 }

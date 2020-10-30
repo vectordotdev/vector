@@ -41,7 +41,7 @@ fn batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
                 let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
@@ -86,7 +86,7 @@ fn partitioned_batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
                 let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
             },
@@ -112,7 +112,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "batch",
         batching(
             "gzip 10mb with 2mb batches",
-            Compression::Gzip,
+            Compression::gzip_default(),
             2_000_000,
             100_000,
             100,
@@ -122,7 +122,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "batch",
         batching(
             "gzip 10mb with 500kb batches",
-            Compression::Gzip,
+            Compression::gzip_default(),
             500_000,
             100_000,
             100,
@@ -143,7 +143,7 @@ fn benchmark_batching(c: &mut Criterion) {
         "partitioned_batch",
         partitioned_batching(
             "gzip 10mb with 2mb batches",
-            Compression::Gzip,
+            Compression::gzip_default(),
             2_000_000,
             100_000,
             100,

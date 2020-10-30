@@ -1,11 +1,9 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
-use std::str::FromStr;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
-    event::Lookup,
+    config::TransformConfig,
     test_util::runtime,
     transforms::{self, Transform},
     Event,
@@ -17,11 +15,8 @@ fn add_fields(c: &mut Criterion) {
     let key = "the key";
     let value = "this is the value";
 
-    let key_atom_native = key.into();
     let value_bytes_native = Bytes::from(value).into();
-    let key_atom_v1 = key.into();
     let value_bytes_v1 = Bytes::from(value).into();
-    let key_atom_v2 = key.into();
     let value_bytes_v2 = Bytes::from(value).into();
 
     c.bench(
@@ -30,14 +25,14 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut map = IndexMap::new();
-                    map.insert(Lookup::from_str(key).unwrap(), String::from(value).into());
+                    map.insert(String::from(key), String::from(value).into());
                     transforms::add_fields::AddFields::new(map, true).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_native], value_bytes_native);
+                        assert_eq!(event.as_log()[key], value_bytes_native);
                     }
                 },
             )
@@ -52,7 +47,7 @@ fn add_fields(c: &mut Criterion) {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_v1], value_bytes_v1);
+                        assert_eq!(event.as_log()[key], value_bytes_v1);
                     }
                 },
             )
@@ -77,7 +72,7 @@ fn add_fields(c: &mut Criterion) {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_v2], value_bytes_v2);
+                        assert_eq!(event.as_log()[key], value_bytes_v2);
                     }
                 },
             )
@@ -100,7 +95,7 @@ fn field_filter(c: &mut Criterion) {
                             field: "the_field".to_string(),
                             value: "0".to_string(),
                         }
-                        .build(TransformContext::new_test())
+                        .build()
                         .await
                         .unwrap()
                     })

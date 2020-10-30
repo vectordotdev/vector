@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Value,
     internal_events::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
@@ -9,28 +9,31 @@ use crate::{
     Event,
 };
 use serde::{Deserialize, Serialize};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AnsiStripperConfig {
-    field: Option<Atom>,
+    field: Option<String>,
 }
 
 inventory::submit! {
     TransformDescription::new::<AnsiStripperConfig>("ansi_stripper")
 }
 
-impl GenerateConfig for AnsiStripperConfig {}
+impl GenerateConfig for AnsiStripperConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { field: None }).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| Atom::from(crate::config::log_schema().message_key()));
+            .unwrap_or_else(|| crate::config::log_schema().message_key().into());
 
         Ok(Box::new(AnsiStripper { field }))
     }
@@ -49,7 +52,7 @@ impl TransformConfig for AnsiStripperConfig {
 }
 
 pub struct AnsiStripper {
-    field: Atom,
+    field: String,
 }
 
 impl Transform for AnsiStripper {
@@ -78,12 +81,16 @@ impl Transform for AnsiStripper {
 
 #[cfg(test)]
 mod tests {
-    use super::AnsiStripper;
+    use super::{AnsiStripper, AnsiStripperConfig};
     use crate::{
         event::{Event, Value},
         transforms::Transform,
     };
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AnsiStripperConfig>();
+    }
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {
@@ -96,7 +103,7 @@ mod tests {
                 let event = transform.transform(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(&Atom::from(crate::config::log_schema().message_key())).unwrap(),
+                    event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),
                     Value::from("foo bar")
                 );
             )+

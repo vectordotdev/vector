@@ -1,25 +1,26 @@
 package metadata
 
 components: transforms: aws_cloudwatch_logs_subscription_parser: {
-	title:             "AWS CloudWatch Logs Subscription Parser"
-	short_description: "Parses [AWS CloudWatch Logs Subscription events][urls.aws_cloudwatch_logs_subscriptions] to pull out individual log lines."
-	long_description:  "[AWS CloudWatch Logs Subscription events][urls.aws_cloudwatch_logs_subscriptions] allow you to forward [AWS CloudWatch Logs][urls.aws_cloudwatch_logs] to external systems. Through the subscriiption, you can: call a Lambda, send to AWS Kinesis, or send to AWS Kinesis Firehose (which can then be forwarded to many destinations)."
+	title:       "AWS CloudWatch Logs Subscription Parser"
+	description: "[AWS CloudWatch Logs Subscription events](\(urls.aws_cloudwatch_logs_subscriptions)) allow you to forward [AWS CloudWatch Logs](\(urls.aws_cloudwatch_logs)) to external systems. Through the subscriiption, you can: call a Lambda, send to AWS Kinesis, or send to AWS Kinesis Firehose (which can then be forwarded to many destinations)."
 
 	classes: {
 		commonly_used: false
-		function:      "parse"
+		development:   "beta"
+		egress_method: "batch"
 	}
 
 	features: {
-	}
-
-	statuses: {
-		development: "beta"
+		parse: {
+			format: {
+				name:     "AWS CloudWatch Logs subscription events"
+				url:      urls.aws_cloudwatch_logs_subscriptions
+				versions: null
+			}
+		}
 	}
 
 	support: {
-		input_types: ["log"]
-
 		platforms: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
@@ -44,8 +45,13 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 		}
 	}
 
+	input: {
+		logs:    true
+		metrics: null
+	}
+
 	output: logs: line: {
-		description: "One event will be published per logEvent in the subscription message."
+		description: "One event will be published per log event in the subscription message."
 		fields: {
 			timestamp: {
 				description: "The timestamp of the log event."
@@ -80,19 +86,18 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			subscription_filters: {
 				description: "The list of subscription filter names that the logs were sent by."
 				required:    true
-				type: "[string]": {examples: [["Destination"]]
-				}
+				type: array: items: type: string: examples: ["Destination"]
 			}
 		}
 	}
 
-	examples: log: [
+	examples: [
 		{
 			title: "Default"
 			configuration: {
 				field: "message"
 			}
-			input: {
+			input: log: {
 				message: """
 						{
 						  "messageType": "DATA_MESSAGE",
@@ -119,13 +124,15 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			}
 			output: [
 				{
-					id:         "35683658089614582423604394983260738922885519999578275840"
-					log_group:  "test"
-					log_stream: "test"
-					message:    "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-latform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
-					owner:      "111111111111"
-					timestamp:  "2020-09-14T19:09:29.039Z"
-					subscription_filters: [ "Destination"]
+					log: {
+						id:         "35683658089614582423604394983260738922885519999578275840"
+						log_group:  "test"
+						log_stream: "test"
+						message:    "{\"bytes\":26780,\"datetime\":\"14/Sep/2020:11:45:41 -0400\",\"host\":\"157.130.216.193\",\"method\":\"PUT\",\"protocol\":\"HTTP/1.0\",\"referer\":\"https://www.principalcross-latform.io/markets/ubiquitous\",\"request\":\"/expedite/convergence\",\"source_type\":\"stdin\",\"status\":301,\"user-identifier\":\"-\"}"
+						owner:      "111111111111"
+						timestamp:  "2020-09-14T19:09:29.039Z"
+						subscription_filters: [ "Destination"]
+					}
 				},
 				{
 					id:         "35683658089659183914001456229543810359430816722590236673"
@@ -143,7 +150,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	how_it_works: {
 		structured_events: {
 			title: "Structured Log Events"
-			body:  "Note that the events themselves are not parsed. If they are structured data, you will typically want to pass them through a [parsing transform][urls.vector_parsing_transforms]."
+			body:  "Note that the events themselves are not parsed. If they are structured data, you will typically want to pass them through a [parsing transform](\(urls.vector_parsing_transforms))."
 		}
 	}
 }

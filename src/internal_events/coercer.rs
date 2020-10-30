@@ -6,7 +6,7 @@ pub struct CoercerEventProcessed;
 
 impl InternalEvent for CoercerEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -21,12 +21,12 @@ impl<'a> InternalEvent for CoercerConversionFailed<'a> {
         debug!(
             message = "Could not convert types.",
             field = %self.field,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "type_conversion_failed");
+        counter!("processing_errors_total", 1, "error_type" => "type_conversion_failed");
     }
 }

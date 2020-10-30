@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
 };
@@ -20,7 +20,7 @@ pub struct SwimlaneConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
-    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Swimlane::new(self.condition.build()?)))
     }
 
@@ -71,12 +71,19 @@ inventory::submit! {
     TransformDescription::new::<SwimlanesConfig>("swimlanes")
 }
 
-impl GenerateConfig for SwimlanesConfig {}
+impl GenerateConfig for SwimlanesConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            lanes: IndexMap::new(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {
-    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Err("this transform must be expanded".into())
     }
 
@@ -108,3 +115,11 @@ impl TransformConfig for SwimlanesConfig {
 }
 
 //------------------------------------------------------------------------------
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::SwimlanesConfig>();
+    }
+}

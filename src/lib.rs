@@ -36,11 +36,10 @@ pub mod wasm;
 pub mod internal_events;
 #[cfg(feature = "api")]
 pub mod api;
-#[cfg(feature = "api_client")]
-pub mod api_client;
 pub mod app;
 pub mod async_read;
 pub mod heartbeat;
+pub mod http;
 #[cfg(feature = "rdkafka")]
 pub mod kafka;
 pub mod kubernetes;
@@ -49,7 +48,9 @@ pub mod list;
 pub mod mapping;
 pub mod metrics;
 pub(crate) mod pipeline;
-pub mod region;
+pub mod remap;
+#[cfg(feature = "rusoto_core")]
+pub mod rusoto;
 pub mod serde;
 pub mod service;
 pub mod shutdown;
@@ -60,6 +61,8 @@ pub mod stream;
 pub mod template;
 pub mod test_util;
 pub mod tls;
+#[cfg(feature = "api-client")]
+pub mod top;
 pub mod topology;
 pub mod trace;
 pub mod transforms;
@@ -76,12 +79,18 @@ pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn get_version() -> String {
+pub fn vector_version() -> impl std::fmt::Display {
     #[cfg(feature = "nightly")]
     let pkg_version = format!("{}-nightly", built_info::PKG_VERSION);
+
     #[cfg(not(feature = "nightly"))]
     let pkg_version = built_info::PKG_VERSION;
 
+    pkg_version
+}
+
+pub fn get_version() -> String {
+    let pkg_version = vector_version();
     let commit_hash = built_info::GIT_VERSION.and_then(|v| v.split('-').last());
     let built_date = chrono::DateTime::parse_from_rfc2822(built_info::BUILT_TIME_UTC)
         .unwrap()

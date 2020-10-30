@@ -1,3 +1,5 @@
+#[cfg(feature = "api-client")]
+use crate::top;
 use crate::{generate, get_version, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
@@ -112,6 +114,10 @@ pub enum SubCommand {
     /// For guidance on how to write unit tests check out: https://vector.dev/docs/setup/guides/unit-testing/
     Test(unit_test::Opts),
 
+    /// Display topology and metrics in the console, for a local or remote Vector instance
+    #[cfg(feature = "api-client")]
+    Top(top::Opts),
+
     /// Manage the vector service.
     #[cfg(windows)]
     Service(service::Opts),
@@ -163,7 +169,7 @@ impl std::str::FromStr for LogFormat {
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     for error in errors {
-        error!("Configuration error: {}", error);
+        error!(message = "Configuration error.", %error);
     }
 
     exitcode::CONFIG

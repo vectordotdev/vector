@@ -153,23 +153,24 @@ jobs:
   release-docker:
     runs-on: ubuntu-latest
     needs:
-      - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
     steps:
       - uses: actions/checkout@v1
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-amd64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-arm64.deb
           path: target/artifacts
@@ -192,43 +193,43 @@ jobs:
       - build-x86_64-pc-windows-msvc-packages
     steps:
       - uses: actions/checkout@v1
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64-unknown-linux-gnu.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-amd64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-arm64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64-apple-darwin.tar.gz
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64-pc-windows-msvc.zip
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x64.msi
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64.rpm
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64.rpm
           path: target/artifacts
@@ -244,19 +245,19 @@ jobs:
       - build-aarch64-unknown-linux-musl-packages
     steps:
       - uses: actions/checkout@v1
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-amd64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-arm64.deb
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64.rpm
           path: target/artifacts
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64.rpm
           path: target/artifacts

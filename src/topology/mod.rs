@@ -73,7 +73,7 @@ pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<P
     match builder::build_pieces(config, diff).await {
         Err(errors) => {
             for error in errors {
-                error!("Configuration error: {}", error);
+                error!(message = "Configuration error.", %error);
             }
             None
         }
@@ -95,7 +95,7 @@ pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String,
 
 impl RunningTopology {
     /// Returned future will finish once all current sources have finished.
-    pub fn sources_finished(&self) -> impl Future<Item = (), Error = ()> {
+    pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }
 
@@ -143,8 +143,8 @@ impl RunningTopology {
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
             error!(
-                "Failed to gracefully shut down in time. Killing: {}",
-                remaining_components.join(", ")
+              message = "Failed to gracefully shut down in time. Killing components.",
+                components = ?remaining_components.join(", ")
             );
 
             Ok(())
@@ -170,9 +170,7 @@ impl RunningTopology {
                 };
 
                 info!(
-                    "Shutting down... Waiting on: {}. {}",
-                    remaining_components.join(", "),
-                    time_remaining
+                    message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
                 );
             })
             .filter(|_| future::ready(false)) // Run indefinitely without emitting items
@@ -210,7 +208,7 @@ impl RunningTopology {
         require_healthy: bool,
     ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
-            error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.data_dir);
+            error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
             return Ok(false);
         }
 
@@ -302,14 +300,13 @@ impl RunningTopology {
         // sources.
         if !diff.sources.to_remove.is_empty() {
             info!(
-                "Waiting for up to {} seconds for sources to finish shutting down",
-                timeout.as_secs()
+                message = "Waiting for sources to finish shutting down.", timeout = ?timeout.as_secs()
             );
         }
 
         let deadline = Instant::now() + timeout;
         for name in &diff.sources.to_remove {
-            info!("Removing source {:?}", name);
+            info!(message = "Removing source.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -329,7 +326,7 @@ impl RunningTopology {
         // Only log message if there are actual futures to check.
         if !source_shutdown_complete_futures.is_empty() {
             info!(
-                "Waiting for up to {} seconds for sources to finish shutting down",
+                "Waiting for up to {} seconds for sources to finish shutting down.",
                 timeout.as_secs()
             );
         }
@@ -353,7 +350,7 @@ impl RunningTopology {
 
         // Transforms
         for name in &diff.transforms.to_remove {
-            info!("Removing transform {:?}", name);
+            info!(message = "Removing transform.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -364,7 +361,7 @@ impl RunningTopology {
 
         // Sinks
         for name in &diff.sinks.to_remove {
-            info!("Removing sink {:?}", name);
+            info!(message = "Removing sink.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -409,34 +406,34 @@ impl RunningTopology {
     fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
         for name in &diff.sources.to_change {
-            info!("Rebuilding source {:?}", name);
+            info!(message = "Rebuilding source.", name = ?name);
             self.spawn_source(name, &mut new_pieces);
         }
 
         for name in &diff.sources.to_add {
-            info!("Starting source {:?}", name);
+            info!(message = "Starting source.", name = ?name);
             self.spawn_source(&name, &mut new_pieces);
         }
 
         // Transforms
         for name in &diff.transforms.to_change {
-            info!("Rebuilding transform {:?}", name);
+            info!(message = "Rebuilding transform.", name = ?name);
             self.spawn_transform(&name, &mut new_pieces);
         }
 
         for name in &diff.transforms.to_add {
-            info!("Starting transform {:?}", name);
+            info!(message = "Starting transform.", name = ?name);
             self.spawn_transform(&name, &mut new_pieces);
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
-            info!("Rebuilding sink {:?}", name);
+            info!(message = "Rebuilding sink.", name = ?name);
             self.spawn_sink(&name, &mut new_pieces);
         }
 
         for name in &diff.sinks.to_add {
-            info!("Starting sink {:?}", name);
+            info!(message = "Starting sink.", name = ?name);
             self.spawn_sink(&name, &mut new_pieces);
         }
     }
@@ -778,7 +775,6 @@ mod source_finished_tests {
         sources::generator::GeneratorConfig,
         test_util::start_topology,
     };
-    use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
     #[tokio::test]
@@ -797,9 +793,8 @@ mod source_finished_tests {
 
         let (topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
-        timeout(Duration::from_secs(2), topology.sources_finished().compat())
+        timeout(Duration::from_secs(2), topology.sources_finished())
             .await
-            .unwrap()
             .unwrap();
     }
 }
@@ -821,8 +816,7 @@ mod transient_state_tests {
         transforms::json_parser::JsonParserConfig,
         Error, Pipeline,
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Future;
+    use futures::{future, FutureExt, TryFutureExt};
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
 
@@ -854,11 +848,18 @@ mod transient_state_tests {
             shutdown: ShutdownSignal,
             out: Pipeline,
         ) -> Result<Source, Error> {
-            let source = shutdown
-                .map(|_| ())
-                .select(self.tripwire.clone().unwrap())
-                .map(|_| std::mem::drop(out))
-                .map_err(|_| ());
+            let source = future::select(
+                shutdown.map(|_| ()).boxed(),
+                self.tripwire
+                    .clone()
+                    .unwrap()
+                    .then(crate::stream::tripwire_handler)
+                    .boxed(),
+            )
+            .map(|_| std::mem::drop(out))
+            .unit_error()
+            .boxed()
+            .compat();
             Ok(Box::new(source))
         }
 
@@ -904,8 +905,7 @@ mod transient_state_tests {
 
         trigger_old.cancel();
 
-        let finished = topology.sources_finished();
-        finished.compat().await.unwrap();
+        topology.sources_finished().await;
 
         assert!(topology
             .reload_config_and_respawn(new_config.build().unwrap(), false)
