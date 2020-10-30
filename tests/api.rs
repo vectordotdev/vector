@@ -222,6 +222,20 @@ mod tests {
         }
     }
 
+    async fn new_component_events_processed_total_subscription(
+        client: &SubscriptionClient,
+        interval: i64,
+    ) {
+        // Emit events for the duration of the test
+        let _shutdown = emit_fake_generator_events();
+
+        let subscription = client.com(interval).await.unwrap();
+
+        tokio::pin! {
+            let events_processed_total = subscription.stream().take(num_results);
+        }
+    }
+
     #[tokio::test]
     /// Tests the /health endpoint returns a 200 responses (non-GraphQL)
     async fn api_health() {
@@ -311,5 +325,13 @@ mod tests {
             new_uptime_subscription(&client),
             new_heartbeat_subscription(&client, 3, 500),
         };
+    }
+
+    #[tokio::test]
+    /// Tests componentEventsProcessedTotal returns increasing metrics, ordered by
+    /// source -> transform -> sink
+    async fn api_graphql_component_events_processed_total() {
+        let server = start_server();
+        let client = new_subscription_client(server.addr()).await;
     }
 }
