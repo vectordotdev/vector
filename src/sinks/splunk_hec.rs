@@ -8,7 +8,7 @@ use crate::{
     },
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
     },
     template::Template,
@@ -105,6 +105,7 @@ impl SinkConfig for HecSinkConfig {
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
+            HttpRetryLogic,
             request,
             batch.timeout,
             client.clone(),

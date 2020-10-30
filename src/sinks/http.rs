@@ -4,7 +4,7 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
+        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
         UriSerde,
     },
@@ -134,6 +134,7 @@ impl SinkConfig for HttpSinkConfig {
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, compression),
+            HttpRetryLogic,
             request,
             batch.timeout,
             client.clone(),

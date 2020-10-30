@@ -6,7 +6,7 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -134,6 +134,7 @@ impl SinkConfig for StackdriverConfig {
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch.size),
+            HttpRetryLogic,
             request,
             batch.timeout,
             client,

@@ -6,7 +6,7 @@ use crate::{
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpSink},
+            http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, UriParseError, VectorSink,
@@ -89,6 +89,7 @@ impl SinkConfig for PubsubConfig {
         let sink = BatchedHttpSink::new(
             sink,
             JsonArrayBuffer::new(batch_settings.size),
+            HttpRetryLogic,
             request_settings,
             batch_settings.timeout,
             client,
