@@ -10,10 +10,6 @@ pub(in crate::mapping) enum QueryValue {
 }
 
 impl QueryValue {
-    pub(in crate::mapping) fn from_value<T: Into<Value>>(value: T) -> Self {
-        From::from(value.into())
-    }
-
     pub fn kind(&self) -> &str {
         match self {
             QueryValue::Value(value) => value.kind(),

@@ -225,7 +225,7 @@ impl MetadataClient {
     async fn run(&mut self) {
         loop {
             if let Err(error) = self.refresh_metadata().await {
-                error!(message = "Unable to fetch EC2 metadata; Retrying.", error = ?error);
+                error!(message = "Unable to fetch EC2 metadata; Retrying.", %error);
                 delay_for(Duration::from_secs(1)).await;
                 continue;
             }

@@ -199,9 +199,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let sink = {
             let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
             let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(
-                    |error| error!(message = "Fatal cloudwatchlogs sink error.", error = ?error),
-                )
+                .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
                 .with_flat_map(move |event| {
                     iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
                 });
@@ -474,7 +472,7 @@ fn partition_encode(
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
-        .map_err(|error| error!(message = "Could not encode event.", error = ?error, rate_limit_secs = 5))
+        .map_err(|error| error!(message = "Could not encode event.", %error, rate_limit_secs = 5))
         .ok()?;
 
     Some(PartitionInnerBuffer::new(event, key))
@@ -548,12 +546,12 @@ impl RetryLogic for CloudwatchRetryLogic {
         match error {
             CloudwatchError::Put(err) => match err {
                 RusotoError::Service(PutLogEventsError::ServiceUnavailable(error)) => {
-                    error!(message = "Put logs service unavailable.", error = ?error);
+                    error!(message = "Put logs service unavailable.", %error);
                     true
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Put logs HTTP dispatch.", error = ?error);
+                    error!(message = "Put logs HTTP dispatch.", %error);
                     true
                 }
 
@@ -582,7 +580,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::Describe(err) => match err {
                 RusotoError::Service(DescribeLogStreamsError::ServiceUnavailable(error)) => {
-                    error!(message = "Describe streams service unavailable.", error = ?error);
+                    error!(message = "Describe streams service unavailable.", %error);
                     true
                 }
 
@@ -599,7 +597,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Describe streams HTTP dispatch.", error = ?error);
+                    error!(message = "Describe streams HTTP dispatch.", %error);
                     true
                 }
 
@@ -608,7 +606,7 @@ impl RetryLogic for CloudwatchRetryLogic {
 
             CloudwatchError::CreateStream(err) => match err {
                 RusotoError::Service(CreateLogStreamError::ServiceUnavailable(error)) => {
-                    error!(message = "Create stream service unavailable.", error = ?error);
+                    error!(message = "Create stream service unavailable.", %error);
                     true
                 }
 
@@ -625,7 +623,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                 }
 
                 RusotoError::HttpDispatch(error) => {
-                    error!(message = "Create stream HTTP dispatch.", error = ?error);
+                    error!(message = "Create stream HTTP dispatch.", %error);
                     true
                 }
 

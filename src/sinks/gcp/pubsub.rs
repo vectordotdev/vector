@@ -94,7 +94,7 @@ impl SinkConfig for PubsubConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", error = ?error));
+        .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
