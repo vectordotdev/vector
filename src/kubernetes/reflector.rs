@@ -90,7 +90,7 @@ where
                 }
                 Err(watcher::invocation::Error::Other { source }) => {
                     // Not a desync, fail everything.
-                    error!(message = "watcher error", error = ?source);
+                    error!(message = "Watcher error.", error = ?source);
                     return Err(Error::Invocation { source });
                 }
             };
@@ -112,7 +112,7 @@ where
                     // outside.
                     val = stream.next() => val,
                 };
-                trace!(message = "got an item from watch stream");
+                trace!(message = "Got an item from watch stream.");
 
                 if let Some(item) = val {
                     // A new item arrived from the watch response stream
@@ -170,7 +170,7 @@ where
                 // our code doesn't know of.
                 // TODO: add more details on the data here if we
                 // encounter these messages in practice.
-                warn!(message = "got unexpected data in the watch response");
+                warn!(message = "Got unexpected data in the watch response.");
                 return Ok(());
             }
         };
@@ -201,22 +201,22 @@ where
     async fn process_event(&mut self, event: WatchEvent<<W as Watcher>::Object>) {
         match event {
             WatchEvent::Added(object) => {
-                trace!(message = "got an object event", event = "added");
+                trace!(message = "Got an object event.", event = "added");
                 self.state_writer.add(object).await;
             }
             WatchEvent::Deleted(object) => {
-                trace!(message = "got an object event", event = "deleted");
+                trace!(message = "Got an object event.", event = "deleted");
                 self.state_writer.delete(object).await;
             }
             WatchEvent::Modified(object) => {
-                trace!(message = "got an object event", event = "modified");
+                trace!(message = "Got an object event.", event = "modified");
                 self.state_writer.update(object).await;
             }
             WatchEvent::Bookmark { .. } => {
-                trace!(message = "got an object event", event = "bookmark");
+                trace!(message = "Got an object event.", event = "bookmark");
                 // noop
             }
-            _ => unreachable!("other event types should never reach this code"),
+            _ => unreachable!("Other event types should never reach this code."),
         }
     }
 }

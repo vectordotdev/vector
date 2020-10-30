@@ -289,7 +289,7 @@ impl Function for LogFn {
     fn apply(&self, target: &mut Event) -> Result<()> {
         let msg = match self.msg.execute(target)? {
             QueryValue::Value(value) => value,
-            _ => return Err("can only log Value parameters".to_string()),
+            _ => return Err("Can only log Value parameters".to_string()),
         };
         let msg = msg.into_bytes();
         let string = String::from_utf8_lossy(&msg);

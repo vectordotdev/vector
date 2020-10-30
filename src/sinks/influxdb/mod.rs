@@ -157,7 +157,7 @@ fn healthcheck(
         client
             .call(request)
             .await
-            .map_err(|err| err.into())
+            .map_err(|error| error.into())
             .and_then(|response| match response.status() {
                 StatusCode::OK => Ok(()),
                 StatusCode::NO_CONTENT => Ok(()),

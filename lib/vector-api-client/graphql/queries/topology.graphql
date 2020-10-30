@@ -1,9 +1,0 @@
-query TopologyQuery {
-  topology {
-    __typename
-    name
-    eventsProcessedTotal {
-      eventsProcessedTotal
-    }
-  }
-}

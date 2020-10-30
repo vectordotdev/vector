@@ -26,7 +26,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketConnectionFailure<'_, E> 
     fn emit_logs(&self) {
         error!(
             message = "Unix socket connection failure.",
-            error = %self.error,
+            error = ?self.error,
             path = ?self.path,
         );
     }
@@ -46,7 +46,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketSendFailed<'_, E> {
     fn emit_logs(&self) {
         error!(
             message = "Unix socket send failed.",
-            error = %self.error,
+            error = ?self.error,
             path = ?self.path,
         );
     }
@@ -66,7 +66,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketFlushFailed<'_, E> {
     fn emit_logs(&self) {
         error!(
             message = "Flush failed.",
-            error = %self.error,
+            error = ?self.error,
             path = ?self.path,
         );
     }
@@ -98,7 +98,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketReceiveFailed<'_, E> {
     fn emit_logs(&self) {
         error!(
             message = "Error receiving data.",
-            error = %self.error,
+            error = ?self.error,
             path = ?self.path,
         );
     }
@@ -120,7 +120,7 @@ impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEven
     fn emit_logs(&self) {
         debug!(
             message = "Unix socket error.",
-            error = %self.error,
+            error = ?self.error,
             path = ?self.path,
         );
     }

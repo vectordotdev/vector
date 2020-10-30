@@ -27,7 +27,7 @@ pub struct MongoDBMetricsRequestError<'a> {
 
 impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
     fn emit_logs(&self) {
-        error!(message = "MongoDB request error.", endpoint = %self.endpoint, error = %self.error)
+        error!(message = "MongoDB request error.", endpoint = %self.endpoint, error = ?self.error)
     }
 
     fn emit_metrics(&self) {

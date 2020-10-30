@@ -167,7 +167,7 @@ impl rlua::UserData for LuaEvent {
                     _ => {
                         info!(
                             message =
-                                "Could not set field to Lua value of invalid type, dropping field",
+                                "Could not set field to Lua value of invalid type, dropping field.",
                             field = key.as_str(),
                             rate_limit_secs = 30
                         );

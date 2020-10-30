@@ -131,7 +131,7 @@ jobs:
         run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
   test-misc:
-    name: Shutdown - Linux
+    name: Miscellaneous - Linux
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -407,4 +407,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.0
       with:
-        args: "Master failed and is red: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}"
+        args: "Master failed and is red: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
