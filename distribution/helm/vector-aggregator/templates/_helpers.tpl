@@ -14,3 +14,10 @@ Resolve effective service ports to use.
 {{ toYaml . }}
 {{- end }}
 {{- end }}
+
+{{/*
+Determines whether there are any ports present.
+*/}}
+{{- define "vector-aggregator.servicePortsPresent" -}}
+{{- or .Values.vectorSource.enabled (not (empty .Values.service.ports)) }}
+{{- end }}
