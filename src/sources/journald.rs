@@ -106,7 +106,6 @@ impl SourceConfig for JournaldConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         let data_dir = globals.resolve_and_make_data_subdir(self.data_dir.as_ref(), name)?;
-        let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
 
         let include_units = match (!self.units.is_empty(), !self.include_units.is_empty()) {
             (true, true) => return Err(BuildError::BothUnitsAndIncludeUnits.into()),
@@ -128,25 +127,32 @@ impl SourceConfig for JournaldConfig {
             return Err(BuildError::DuplicatedUnit { unit }.into());
         }
 
-        let mut checkpoint = data_dir;
-        checkpoint.push(CHECKPOINT_FILENAME);
-        let checkpointer = Checkpointer::new(checkpoint.clone())
-            .await
-            .map_err(|error| {
-                format!("Unable to open checkpoint file {:?}: {}", checkpoint, error)
-            })?;
+        let mut checkpoint_path = data_dir;
+        checkpoint_path.push(CHECKPOINT_FILENAME);
 
-        journald_source::<Journalctl>(
-            self,
-            out,
-            shutdown,
-            checkpointer,
-            include_units,
-            exclude_units,
-            batch_size,
-            self.remap_priority,
-        )
-        .await
+        let journalctl_path = self
+            .journalctl_path
+            .clone()
+            .unwrap_or_else(|| JOURNALCTL.clone());
+
+        let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
+        let current_boot_only = self.current_boot_only.unwrap_or(true);
+
+        Ok(Box::new(
+            JournaldSource {
+                journalctl_path,
+                include_units,
+                exclude_units,
+                current_boot_only,
+                checkpoint_path,
+                batch_size,
+                remap_priority: self.remap_priority,
+                out: out.sink_compat(),
+            }
+            .run_shutdown(shutdown)
+            .boxed()
+            .compat(),
+        ))
     }
 
     fn output_type(&self) -> DataType {
@@ -166,7 +172,6 @@ struct JournaldSource {
     checkpoint_path: PathBuf,
     batch_size: usize,
     remap_priority: bool,
-
     out: Compat01As03Sink<Pipeline, Event>,
 }
 
@@ -261,7 +266,7 @@ impl JournaldSource {
                             message = "Could not read from journald source.",
                             error = %err,
                         );
-                        continue;
+                        break;
                     }
                 };
 
@@ -353,56 +358,6 @@ fn start_journalctl(
     Ok((stream, stop))
 }
 
-async fn journald_source<J: JournalStream>(
-    config: &JournaldConfig,
-    out: Pipeline,
-    shutdown: ShutdownSignal,
-    mut checkpointer: Checkpointer,
-    include_units: HashSet<String>,
-    exclude_units: HashSet<String>,
-    batch_size: usize,
-    remap_priority: bool,
-) -> crate::Result<super::Source> {
-    // Retrieve the saved checkpoint, and use it to seek forward in the journald log
-    let cursor = match checkpointer.get().await {
-        Ok(cursor) => cursor,
-        Err(err) => {
-            error!(
-                message = "Could not retrieve saved journald checkpoint",
-                error = %err
-            );
-            None
-        }
-    };
-
-    let (journal, close) = J::new(config, cursor)?;
-    let journald_server = JournaldServer {
-        journal: Box::pin(journal),
-        include_units,
-        exclude_units,
-        out,
-        checkpointer,
-        batch_size,
-        remap_priority,
-    };
-
-    Ok(Box::new(
-        async move {
-            info!(message = "Starting journald server.",);
-            journald_server.run().await;
-            Ok(())
-        }
-        .instrument(info_span!("journald-server"))
-        .boxed()
-        .compat()
-        .select(Box::new(
-            shutdown.map(move |_| close()).unit_error().boxed().compat(),
-        ))
-        .map(|_| ())
-        .map_err(|_| ()),
-    ))
-}
-
 fn create_event(record: Record) -> Event {
     let mut log = LogEvent::from_iter(record);
     // Convert some journald-specific field names into Vector standard ones.
@@ -440,156 +395,6 @@ fn fixup_unit(unit: &str) -> String {
         unit.into()
     } else {
         format!("{}.service", unit)
-    }
-}
-
-/// `JournalStream` is a stream of lines from output of `journalctl` process.
-trait JournalStream: Stream<Item = io::Result<String>> + Sized + Send + 'static {
-    /// (source, close_underlying_stream)
-    fn new(
-        config: &JournaldConfig,
-        cursor: Option<String>,
-    ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)>;
-}
-
-#[pin_project::pin_project]
-struct Journalctl {
-    #[pin]
-    inner: io::Split<BufReader<ChildStdout>>,
-}
-
-impl JournalStream for Journalctl {
-    fn new(
-        config: &JournaldConfig,
-        cursor: Option<String>,
-    ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)> {
-        let journalctl = config.journalctl_path.as_ref().unwrap_or(&JOURNALCTL);
-        let mut command = Command::new(journalctl);
-        command.stdout(Stdio::piped());
-        command.arg("--follow");
-        command.arg("--all");
-        command.arg("--show-cursor");
-        command.arg("--output=json");
-
-        let current_boot = config.current_boot_only.unwrap_or(true);
-        if current_boot {
-            command.arg("--boot");
-        }
-
-        if let Some(cursor) = cursor {
-            command.arg(format!("--after-cursor={}", cursor));
-        } else {
-            // journalctl --follow only outputs a few lines without a starting point
-            command.arg("--since=2000-01-01");
-        }
-
-        let mut child = command.spawn().context(JournalctlSpawn)?;
-        let stdout = BufReader::new(child.stdout.take().unwrap());
-
-        let pid = Pid::from_raw(child.id() as i32);
-        Ok((
-            Journalctl {
-                inner: stdout.split(b'\n'),
-            },
-            Box::new(move || {
-                // Signal the child process to terminate so that the
-                // blocking future can be unblocked sooner rather
-                // than later.
-                let _ = kill(pid, Signal::SIGTERM);
-            }),
-        ))
-    }
-}
-
-impl Stream for Journalctl {
-    type Item = io::Result<String>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<Self::Item>> {
-        Poll::Ready(match ready!(self.project().inner.poll_next(cx)) {
-            Some(Ok(segment)) => Some(Ok(String::from_utf8_lossy(&segment).into())),
-            Some(Err(err)) => Some(Err(err)),
-            None => None,
-        })
-    }
-}
-
-struct JournaldServer {
-    journal: BoxStream<'static, io::Result<String>>,
-    include_units: HashSet<String>,
-    exclude_units: HashSet<String>,
-    out: Pipeline,
-    checkpointer: Checkpointer,
-    batch_size: usize,
-    remap_priority: bool,
-}
-
-impl JournaldServer {
-    pub async fn run(mut self) {
-        let mut out = self.out.sink_compat();
-
-        loop {
-            let mut saw_record = false;
-            let mut cursor: Option<String> = None;
-
-            for _ in 0..self.batch_size {
-                let text = match self.journal.next().await {
-                    None => {
-                        info!("Journald process stopped.");
-                        return;
-                    }
-                    Some(Ok(text)) => text,
-                    Some(Err(error)) => {
-                        error!(
-                            message = "Could not read from journald source.",
-                            %error,
-                        );
-                        break;
-                    }
-                };
-
-                let mut record = match decode_record(&text, self.remap_priority) {
-                    Ok(record) => record,
-                    Err(error) => {
-                        emit!(JournaldInvalidRecord { error, text });
-                        continue;
-                    }
-                };
-                if let Some(tmp) = record.remove(&*CURSOR) {
-                    cursor = Some(tmp);
-                }
-
-                saw_record = true;
-
-                let unit = record.get(&*SYSTEMD_UNIT);
-                if filter_unit(unit, &self.include_units, &self.exclude_units) {
-                    continue;
-                }
-
-                emit!(JournaldEventReceived {
-                    byte_size: text.len()
-                });
-
-                match out.send(create_event(record)).await {
-                    Ok(_) => {}
-                    Err(error) => {
-                        error!(message = "Could not send journald log", %error);
-                        return;
-                    }
-                }
-            }
-
-            if saw_record {
-                if let Some(cursor) = cursor {
-                    if let Err(error) = self.checkpointer.set(&cursor).await {
-                        error!(
-                            message = "Could not set journald checkpoint.",
-                            %error,
-                            filename = ?self.checkpointer.filename,
-                        );
-                    }
-                }
-            }
-        }
     }
 }
 
