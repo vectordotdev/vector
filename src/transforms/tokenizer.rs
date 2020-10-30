@@ -1,7 +1,7 @@
 use super::util::tokenize::parse;
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
     types::{parse_check_conversion_map, Conversion},
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(TokenizerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .clone()
@@ -124,10 +124,7 @@ impl Transform for Tokenizer {
 mod tests {
     use super::TokenizerConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        Event,
-    };
+    use crate::{config::TransformConfig, Event};
 
     #[test]
     fn generate_config() {
@@ -150,7 +147,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
 

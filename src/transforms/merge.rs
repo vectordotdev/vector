@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
@@ -50,7 +50,7 @@ impl Default for MergeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Merge::from(self.clone())))
     }
 

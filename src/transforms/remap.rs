@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
 };
@@ -24,7 +24,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Remap::new(self.clone())?))
     }
 

@@ -3,7 +3,7 @@ use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
+    config::TransformConfig,
     test_util::runtime,
     transforms::{self, Transform},
     Event,
@@ -95,7 +95,7 @@ fn field_filter(c: &mut Criterion) {
                             field: "the_field".to_string(),
                             value: "0".to_string(),
                         }
-                        .build(TransformContext::new_test())
+                        .build()
                         .await
                         .unwrap()
                     })

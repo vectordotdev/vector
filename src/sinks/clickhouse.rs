@@ -75,7 +75,7 @@ impl SinkConfig for ClickhouseConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),

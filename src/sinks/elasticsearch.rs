@@ -109,7 +109,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
+        let client = HttpClient::new(common.tls_settings.clone())?;
 
         let healthcheck = healthcheck(client.clone(), common).boxed();
 
@@ -590,7 +590,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        dns::Resolver,
         http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
@@ -645,7 +644,7 @@ mod integration_tests {
             .unwrap();
 
         // make sure writes all all visible
-        flush(cx.resolver(), common).await.unwrap();
+        flush(common).await.unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", base_url, index))
@@ -783,9 +782,7 @@ mod integration_tests {
         }
 
         // make sure writes all all visible
-        flush(cx.resolver(), common)
-            .await
-            .expect("Flushing writes failed");
+        flush(common).await.expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -840,12 +837,12 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    async fn flush(resolver: Resolver, common: ElasticSearchCommon) -> crate::Result<()> {
+    async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let mut client = HttpClient::new(resolver, common.tls_settings.clone())
-            .expect("Could not build client to flush");
+        let mut client =
+            HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
         let response = client.send(request).await?;
         match response.status() {
             StatusCode::OK => Ok(()),

@@ -19,7 +19,7 @@
 //!   The reference implementation on preparing the in-cluster config.
 //!
 
-use crate::{dns::Resolver, http::HttpClient, tls::TlsSettings};
+use crate::{http::HttpClient, tls::TlsSettings};
 use http::{
     header::{self, HeaderValue},
     uri, Request, Response, Uri,
@@ -44,14 +44,12 @@ pub struct Client {
 impl Client {
     /// Create a new [`Client`].
     ///
-    /// Takes the common kubernetes API cluster configuration [`Config`] and
-    /// a [`Resolver`] that is generally not the part of the config, but is
-    /// specific to our [`HttpClient`] implementation.
+    /// Takes the common kubernetes API cluster configuration [`Config`].
     ///
     /// Consumes the configuration to populate the internal state.
     /// Returns an error if the configuration is not valid.
     // TODO: add a proper error type.
-    pub fn new(config: Config, resolver: Resolver) -> crate::Result<Self> {
+    pub fn new(config: Config) -> crate::Result<Self> {
         let Config {
             base,
             tls_options,
@@ -59,7 +57,7 @@ impl Client {
         } = config;
 
         let tls_settings = TlsSettings::from_options(&Some(tls_options))?;
-        let inner = HttpClient::new(resolver, tls_settings)?;
+        let inner = HttpClient::new(tls_settings)?;
 
         let uri::Parts {
             scheme, authority, ..

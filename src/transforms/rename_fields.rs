@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
@@ -35,7 +35,7 @@ impl GenerateConfig for RenameFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    async fn build(&self, _exec: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(key.to_string(), value.to_string());

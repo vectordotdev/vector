@@ -58,7 +58,7 @@ impl SinkConfig for PapertrailConfig {
             false,
         )?;
 
-        let sink = TcpSink::new(host, port, cx.resolver(), tls);
+        let sink = TcpSink::new(host, port, tls);
         let healthcheck = sink.healthcheck();
 
         let pid = std::process::id();

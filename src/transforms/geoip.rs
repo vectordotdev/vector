@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
@@ -43,7 +43,7 @@ impl GenerateConfig for GeoipConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, crate::Error> {
+    async fn build(&self) -> Result<Box<dyn Transform>, crate::Error> {
         let reader = maxminddb::Reader::open_readfile(self.database.clone())?;
         Ok(Box::new(Geoip::new(
             reader,
