@@ -101,6 +101,7 @@ impl Namespace {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
     scrape_interval_secs: u64,
