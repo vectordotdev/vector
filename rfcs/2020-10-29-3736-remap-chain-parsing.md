@@ -31,16 +31,18 @@ See issues:
 
 Within a `remap` mapping it is possible to specify a number of conditions. Each
 condition will be run sequentially - the first condition that passes the
-associated mapping block will be performed. This is performed using
-`if...else if...else`:
+associated mapping block will be performed. A condition will pass when it
+evaluates to a boolean `True`.
+
+This is performed using `if...else if...else`:
 
 ```
 if ... {
    ...
 } else if ... {
-   ... 
+   ...
 } else if ... {
-   ... 
+   ...
 } else {
    ...
 }
@@ -54,22 +56,30 @@ A default code block can be specified at the end using `else`. This is run if
 none of the conditions pass. If there is no `else` and no condition matches, no
 code blocks are run.
 
-The script is able to make the most of any processing that has been done to run
-the condition - for example, if a regular expression has been run, the block
-that is subsequently run can have access to the results of this regex. The Remap
-syntax also allows assignment to variables within the condition. A condition is
-considered to be successful if the value it returns is not `false` or `nil`.
-This allows a regular expression match to pass 
-the condition and pass it's results into the block via the variable assignment.
+
+## Condition
+
+It is possible to have multiple statements within the condition. The statements
+must be surrounded with parentheses and separated by a semicolon.
+
+```
+(statement1; statement2; statement3)
+```
+
+This allows you to, for example, assign the results of a regular expression
+to a variable and then test the results. If the regular expression matches
+you have the results to work with.
 
 The following code will be possible:
 
 ```coffee
-if $match = matches(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\s]*)/) {
+if ($match = matches(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\s]*)/);
+    !is_empty($match)) {
   .method = $match.method
   .remote_addr = $match.remote_addr
   .source = "nginx"
-} else if $match = matches(.message, /^(?P<remote_addr>[^\s]*).*"(?P<method>[^\s]*).*"$/ {
+} else if ($match = matches(.message, /^(?P<remote_addr>[^\s]*).*"(?P<method>[^\s]*).*"$/);
+           !is_empty($match)) {
   .method = $match.method
   .remote_addr = $match.remote_addr
   .source = "haproxy"
@@ -78,11 +88,20 @@ if $match = matches(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[
 }
 ```
 
+The final statement must evaluate to a Boolean.
+
+If there is only a single predicate evaluated in the condition, the parentheses 
+are not required.
+
+Assigning values to variables is only permitted if the condition is wrapped
+with parentheses. If the condition is not wrapped in a group, only the
+    double equals (`==`) is permitted. This helps to avoid the potential bug
+where a typo with a single equals results in valid, but incorrect code.
+
 *Note, `matches` is currently unimplemented, but in this example it is
 intended as a function that would match a regular expression and return any
-matching groups in a `Value::map`. If there were no match, it would return
-either `false` or `null`.* 
-
+matching groups in a `Value::map`. If there were no match, it returns an 
+empty map.*
 
 
 ## Rationale
@@ -106,56 +125,28 @@ transform will likely be necessary to do the processing required.
 
 ## Drawbacks
 
-Allowing `if` statements to work with non-boolean values is a controversial
-topic in programming language design. It is possible to create unintended bugs
-because the code hasn't been explicit enough about what should and should not
-pass the condition. Decisions need to be made as to what actually constitutes
-a failure condition - for example, should a result of `0` be a pass or a fail?
-This does add additional documentation requirements and cognitive load when
-writing the script.
-
-The same can be said for allowing assignment within an `if` statement. The
-condition will be valid for both a single (`=`) and double (`==`) equals in the
-condition, yet both variations do very different things:
-
-```
-if .foo == true {
-
-}
-```
-
-```
-if .foo = true {
-
-}
-```
-
-This has haunted C programmers for decades.
-
-Also, the assignment still occurs even if the condition doesn't succeed. Side
-effects such as this can be unexpected for the script writer and could cause
-unexpected bugs to creep in.
+By allowing side effects within the condition, the user could potentially write
+code that they didn't intend. For example, The assignment still
+occurs even if the condition doesn't succeed. The script writer needs to be 
+aware that the variable will not still hold the original value if the predicate 
+doesn't succeed.
 
 
 ## Alternatives
 
-### Enforce boolean conditions
-Allowing for non-boolean conditions in the `if` condition is not strictly
-necessary. A similar result could be achieved by running the regular expression
-twice, one with `match` which returns a boolean if it matches, and then again
-with `matches` which would extract the matches out of the text.
+### Don't enforce boolean conditions
+We could loosen the typing rules and allow non boolean values to signal a
+success of a condition. This would mean we wouldn't need to have multiple
+statements within a condition. In the following code, match returns a non-empty
+map on success, which is then passed to the condition after the assignment.
 
 ```coffeescript
-if match(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\s]*)/) {
-  $match = matches(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\s]*)/)
+if $match = match(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\s]*)/) {
   .method = $match.method
   .remote_addr = $match.remote_addr
   .source = "nginx"
 }
 ```
-
-However, this has performance implications as the regular expression has to be
-run twice.
 
 ### Use `switch`
 There are some alternative syntaxes that may be worth considering. One
@@ -203,12 +194,10 @@ Incremental steps that execute this change. Generally this is in the form of:
 
 - [ ] Add `else if` to the remap language parser and add multiple branches to
       the `IfStatement` struct to handle multiple conditions.
-- [ ] Change the `IfStatement` functionality to treat non-boolean values as pass
-      and fail for the conditional.
-- [ ] Enhance the remap parser to allow assignment within `if` statements. The
-      underlying code already allows for assignments to 
-      pass on the assigned value to the outer expression, so no change should be
-      necessary there.
+      (Already in progress, see [#4814](https://github.com/timberio/vector/pull/4814))
+- [ ] Enhance the parser to allow for multiple statements in the condition.
+- [ ] Adapt the Evaluation code to run with multiple statements. (It is very
+      possible very little work will be needed to do this.)
 - [ ] Write the `matches` function that will run a regular expression and return
       any matched groups found. This is potentially out of scope for this rfc,
       but would be useful nevertheless.
