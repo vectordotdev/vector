@@ -6564,6 +6564,7 @@ dependencies = [
  "hyper-openssl",
  "indexmap",
  "inventory",
+ "itertools 0.9.0",
  "jemallocator",
  "k8s-openapi",
  "lazy_static",

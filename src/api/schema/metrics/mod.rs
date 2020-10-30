@@ -4,21 +4,26 @@ mod events_processed;
 mod host;
 mod uptime;
 
-use crate::event::{Event, Metric, MetricValue};
-use crate::metrics::{capture_metrics, get_controller, Controller};
+use super::components::{self, Component, COMPONENTS};
+use crate::{
+    event::{Event, Metric, MetricValue},
+    metrics::{capture_metrics, get_controller, Controller},
+};
 use async_graphql::{validators::IntRange, Interface, Object, Subscription};
 use async_stream::stream;
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use lazy_static::lazy_static;
-use std::sync::Arc;
-use tokio::stream::{Stream, StreamExt};
-use tokio::time::Duration;
+use std::{collections::BTreeMap, sync::Arc};
+use tokio::{
+    stream::{Stream, StreamExt},
+    time::Duration,
+};
 
 pub use bytes_processed::{ComponentProcessedBytesTotal, ProcessedBytesTotal};
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
 pub use events_processed::{ComponentEventsProcessedTotal, EventsProcessedTotal};
 pub use host::HostMetrics;
-use nom::lib::std::collections::BTreeMap;
 pub use uptime::Uptime;
 
 lazy_static! {
@@ -151,6 +156,41 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     }
 }
 
+/// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order
+fn get_metrics_sorted(interval: i32) -> impl Stream<Item = Metric> {
+    let controller = get_controller().unwrap();
+    let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
+
+    // Sort each interval 'batch' of metrics by key
+    stream! {
+        loop {
+            interval.tick().await;
+
+            let sorted = capture_metrics(&controller)
+                .filter_map(|m| match m {
+                    Event::Metric(m) => match m.tag_value("component_name") {
+                        Some(name) => match COMPONENTS.read().expect(components::INVARIANT).get(&name) {
+                            Some(t) => Some(match t {
+                                Component::Source(_) => (m, 1),
+                                Component::Transform(_) => (m, 2),
+                                Component::Sink(_) => (m, 3),
+                            }),
+                            _ => None,
+                        },
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .sorted_by_key(|m| m.1)
+                .map(|(m, _)| m);
+
+            for m in sorted {
+                yield m;
+            }
+        }
+    }
+}
+
 /// Get the events processed by component name
 pub fn component_events_processed_total(component_name: String) -> Option<EventsProcessedTotal> {
     let key = String::from("component_name");
@@ -181,7 +221,7 @@ pub fn component_counter_metrics(
 ) -> impl Stream<Item = Metric> {
     let mut cache = BTreeMap::new();
 
-    get_metrics(interval)
+    get_metrics_sorted(interval)
         .filter(filter_fn)
         .filter_map(move |m| match m.tag_value("component_name") {
             Some(name) => match m.value {
