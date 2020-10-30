@@ -5,7 +5,12 @@ use crate::config::{
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    fs::{create_dir_all, File},
+    io::Write,
+    path::PathBuf,
+};
 use structopt::StructOpt;
 use toml::Value;
 
@@ -46,6 +51,10 @@ pub struct Opts {
     /// is then up to you to restructure the `inputs` of each component to build
     /// the topology you need.
     expression: String,
+
+    /// Generate config as a file
+    #[structopt(long, parse(from_os_str))]
+    file: Option<PathBuf>,
 }
 
 #[derive(Serialize)]
@@ -71,7 +80,11 @@ pub struct Config {
     pub sinks: Option<IndexMap<String, SinkOuter>>,
 }
 
-fn generate_example(include_globals: bool, expression: &str) -> Result<String, Vec<String>> {
+fn generate_example(
+    include_globals: bool,
+    expression: &str,
+    file: &Option<PathBuf>,
+) -> Result<String, Vec<String>> {
     let components: Vec<Vec<_>> = expression
         .split(|c| c == '|' || c == '/')
         .map(|s| {
@@ -309,6 +322,16 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
         }
     }
 
+    if file.is_some() {
+        match write_config(file.as_ref().unwrap(), &builder) {
+            Ok(_) => println!(
+                "Config file written to {:?}",
+                &file.as_ref().unwrap().join("\n")
+            ),
+            Err(e) => errs.push(format!("failed to write to file: {}", e)),
+        };
+    };
+
     if !errs.is_empty() {
         Err(errs)
     } else {
@@ -317,7 +340,7 @@ fn generate_example(include_globals: bool, expression: &str) -> Result<String, V
 }
 
 pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
-    match generate_example(!opts.fragment, &opts.expression) {
+    match generate_example(!opts.fragment, &opts.expression, &opts.file) {
         Ok(s) => {
             println!("{}", s);
             exitcode::OK
@@ -329,9 +352,27 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 }
 
+fn write_config(filepath: &PathBuf, body: &str) -> Result<usize, crate::Error> {
+    if filepath.exists() {
+        // If the file exists, we don't want to overwrite, that's just rude.
+        Err(format!("{:?} already exists", &filepath).into())
+    } else {
+        if let Some(directory) = filepath.parent() {
+            create_dir_all(directory)?;
+        }
+        File::create(filepath)
+            .and_then(|mut file| file.write(body.as_bytes()))
+            .map_err(Into::into)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    use tempfile::tempdir;
 
     #[test]
     fn generate_all() {
@@ -339,7 +380,7 @@ mod tests {
 
         for name in SourceDescription::types() {
             let param = format!("{}//", name);
-            let cfg = generate_example(true, &param).unwrap();
+            let cfg = generate_example(true, &param, &None).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -347,7 +388,7 @@ mod tests {
 
         for name in TransformDescription::types() {
             let param = format!("/{}/", name);
-            let cfg = generate_example(true, &param).unwrap();
+            let cfg = generate_example(true, &param, &None).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -355,7 +396,7 @@ mod tests {
 
         for name in SinkDescription::types() {
             let param = format!("//{}", name);
-            let cfg = generate_example(true, &param).unwrap();
+            let cfg = generate_example(true, &param, &None).unwrap();
             if let Err(error) = toml::from_str::<crate::config::ConfigBuilder>(&cfg) {
                 errors.push((param, error));
             }
@@ -367,11 +408,28 @@ mod tests {
         assert!(errors.is_empty());
     }
 
+    #[test]
+    fn generate_configfile() {
+        let tempdir = tempdir().expect("Unable to create tempdir for config");
+        let filepath = tempdir.path().join("./config.example.toml");
+        let cfg = generate_example(true, "stdin/json_parser/console", &Some(filepath.clone()));
+        let filecontents = fs::read_to_string(
+            fs::canonicalize(&filepath).expect("Could not return canonicalized filepath"),
+        )
+        .expect("Could not read config file");
+        cleanup_configfile(&filepath);
+        assert_eq!(cfg.unwrap(), filecontents)
+    }
+
+    fn cleanup_configfile(filepath: &PathBuf) {
+        fs::remove_file(filepath).expect("Could not cleanup config file!");
+    }
+
     #[cfg(all(feature = "transforms-json_parser", feature = "sinks-console"))]
     #[test]
     fn generate_basic() {
         assert_eq!(
-            generate_example(true, "stdin/json_parser/console"),
+            generate_example(true, "stdin/json_parser/console", &None),
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sources.source0]
@@ -402,7 +460,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example(true, "stdin|json_parser|console"),
+            generate_example(true, "stdin|json_parser|console", &None),
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sources.source0]
@@ -433,7 +491,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example(true, "stdin//console"),
+            generate_example(true, "stdin//console", &None),
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sources.source0]
@@ -458,7 +516,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example(true, "//console"),
+            generate_example(true, "//console", &None),
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [sinks.sink0]
@@ -479,7 +537,7 @@ when_full = "block"
         );
 
         assert_eq!(
-            generate_example(true, "/add_fields,json_parser,remove_fields"),
+            generate_example(true, "/add_fields,json_parser,remove_fields", &None),
             Ok(r#"data_dir = "/var/lib/vector/"
 
 [transforms.transform0]
@@ -504,7 +562,7 @@ type = "remove_fields"
         );
 
         assert_eq!(
-            generate_example(false, "/add_fields,json_parser,remove_fields"),
+            generate_example(false, "/add_fields,json_parser,remove_fields", &None),
             Ok(r#"
 [transforms.transform0]
 inputs = []
