@@ -10,11 +10,10 @@ use chrono::TimeZone;
 use codec::BytesDelimitedCodec;
 use futures::{
     compat::{Compat01As03Sink, Sink01CompatExt},
-    future, ready,
+    future,
     stream::BoxStream,
-    FutureExt, SinkExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
+    FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
 };
-use futures01::Future;
 use lazy_static::lazy_static;
 use nix::{
     sys::signal::{kill, Signal},
@@ -28,18 +27,16 @@ use std::{
     io::SeekFrom,
     iter::FromIterator,
     path::PathBuf,
-    pin::Pin,
     process::Stdio,
     str::FromStr,
-    task::{Context, Poll},
     time::Duration,
 };
 use tokio_util::codec::FramedRead;
 
 use tokio::{
     fs::{File, OpenOptions},
-    io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    process::{ChildStdout, Command},
+    io::{self, AsyncReadExt, AsyncWriteExt},
+    process::Command,
     time::delay_for,
 };
 use tracing_futures::Instrument;
@@ -54,7 +51,7 @@ const SYSTEMD_UNIT: &str = "_SYSTEMD_UNIT";
 const SOURCE_TIMESTAMP: &str = "_SOURCE_REALTIME_TIMESTAMP";
 const RECEIVED_TIMESTAMP: &str = "__REALTIME_TIMESTAMP";
 
-const BACKOFF_DURATION: Duration = Duration::from_secs(5);
+const BACKOFF_DURATION: Duration = Duration::from_secs(1);
 
 lazy_static! {
     static ref JOURNALCTL: PathBuf = "journalctl".into();
@@ -224,10 +221,11 @@ impl JournaldSource {
         on_stop: &'a mut Option<StopJournalctlFn>,
     ) -> Result<(), ()> {
         loop {
+            info!("Starting journalctl.");
             match start_journalctl(
                 self.journalctl_path.clone(),
                 self.current_boot_only,
-                cursor.clone(),
+                &*cursor,
             ) {
                 Ok((stream, stop)) => {
                     *on_stop = Some(stop);
@@ -257,7 +255,7 @@ impl JournaldSource {
             for _ in 0..self.batch_size {
                 let text = match stream.next().await {
                     None => {
-                        info!("Journalctl process stopped.");
+                        warn!("Journalctl process stopped.");
                         return;
                     }
                     Some(Ok(text)) => text,
@@ -321,7 +319,7 @@ type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 fn start_journalctl(
     path: PathBuf,
     current_boot_only: bool,
-    cursor: Option<String>,
+    cursor: &Option<String>,
 ) -> crate::Result<(BoxStream<'static, io::Result<String>>, StopJournalctlFn)> {
     let mut command = Command::new(path);
     command.stdout(Stdio::piped());
