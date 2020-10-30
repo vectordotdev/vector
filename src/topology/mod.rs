@@ -73,7 +73,7 @@ pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<P
     match builder::build_pieces(config, diff).await {
         Err(errors) => {
             for error in errors {
-                error!(message = "Configuration error.", error = ?error);
+                error!(message = "Configuration error.", %error);
             }
             None
         }

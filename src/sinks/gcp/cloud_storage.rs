@@ -231,9 +231,7 @@ impl GcsSink {
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_map_err(
-                |error| error!(message = "Fatal gcp_cloud_storage error.", error = ?error),
-            )
+            .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))
             .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
 
         Ok(VectorSink::Futures01Sink(Box::new(sink)))

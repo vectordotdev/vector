@@ -6,9 +6,10 @@ mod support;
 
 #[cfg(all(feature = "api", feature = "vector-api-client"))]
 mod tests {
-    use crate::support::{sink, source};
+    use crate::support::{sink, source_with_event_counter};
     use chrono::Utc;
     use futures::StreamExt;
+    use std::collections::HashMap;
     use std::{
         net::SocketAddr,
         sync::Once,
@@ -19,7 +20,7 @@ mod tests {
     use vector::{
         self,
         api::{self, Server},
-        config::Config,
+        config::{self, Config},
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
@@ -34,6 +35,7 @@ mod tests {
     // Initialize the metrics system. Idempotent.
     fn init_metrics() -> oneshot::Sender<()> {
         METRICS_INIT.call_once(|| {
+            vector::trace::init(true, true, "info");
             let _ = vector::metrics::init();
         });
 
@@ -59,12 +61,27 @@ mod tests {
     // tests that the config shape matches expectations
     fn api_enabled_config() -> Config {
         let mut config = Config::builder();
-        config.add_source("in1", source().1);
+        config.add_source("in1", source_with_event_counter().1);
         config.add_sink("out1", &["in1"], sink(10).1);
         config.api.enabled = true;
         config.api.bind = Some(next_addr());
 
         config.build().unwrap()
+    }
+
+    async fn from_str_config(conf: &str) -> vector::topology::RunningTopology {
+        let mut c = config::load_from_str(conf).unwrap();
+        c.api.bind = Some(next_addr());
+
+        let diff = config::ConfigDiff::initial(&c);
+        let pieces = vector::topology::build_or_log_errors(&c, &diff)
+            .await
+            .unwrap();
+
+        let result = vector::topology::start_validated(c, diff, pieces, false).await;
+        let (topology, _graceful_crash) = result.unwrap();
+
+        topology
     }
 
     // Starts and returns the server
@@ -311,5 +328,71 @@ mod tests {
             new_uptime_subscription(&client),
             new_heartbeat_subscription(&client, 3, 500),
         };
+    }
+
+    #[tokio::test]
+    #[allow(clippy::float_cmp)]
+    /// Tests componentEventsProcessedTotal returns increasing metrics, ordered by
+    /// source -> transform -> sink
+    async fn api_graphql_component_events_processed_total() {
+        init_metrics();
+
+        let topology = from_str_config(
+            r#"
+            [api]
+              enabled = true
+
+            [sources.gen]
+              type = "generator"
+              lines = ["Random line", "And another"]
+              batch_interval = 0.1
+
+            [sinks.out]
+              # General
+              type = "blackhole"
+              inputs = ["gen"]
+              print_amount = 100000
+        "#,
+        )
+        .await;
+
+        let server = api::Server::start(topology.config());
+
+        let client = new_subscription_client(server.addr()).await;
+
+        let subscription = client
+            .component_events_processed_total_subscription(500)
+            .await
+            .unwrap();
+
+        tokio::pin! {
+            let component_events_processed_total = subscription.stream();
+        }
+
+        // Results should be sorted by source -> sink, so we'll need to assert that
+        // order. The events generated should be the same in both cases
+        let mut map = HashMap::new();
+
+        for r in 0..=1 {
+            map.insert(
+                r,
+                component_events_processed_total
+                    .next()
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .data
+                    .unwrap()
+                    .component_events_processed_total,
+            );
+        }
+
+        assert_eq!(map[&0].name, "gen");
+        assert_eq!(map[&1].name, "out");
+
+        assert_eq!(
+            map[&0].metric.events_processed_total,
+            map[&1].metric.events_processed_total
+        );
     }
 }

@@ -144,7 +144,7 @@ impl GcpCredentials {
                 if let Err(error) = this.regenerate_token().await {
                     error!(
                         message = "Failed to update GCP authentication token.",
-                        ?error
+                        %error
                     );
                 }
             }

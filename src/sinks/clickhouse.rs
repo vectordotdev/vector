@@ -85,7 +85,7 @@ impl SinkConfig for ClickhouseConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", error = ?error));
+        .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
         let healthcheck = healthcheck(client, self.clone()).boxed();
 

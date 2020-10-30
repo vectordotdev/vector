@@ -177,7 +177,7 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     match res {
         Ok(()) => exitcode::OK,
         Err(error) => {
-            error!(message = "Error controlling service.", error = ?error);
+            error!(message = "Error controlling service.", %error);
             exitcode::SOFTWARE
         }
     }

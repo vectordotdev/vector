@@ -51,7 +51,7 @@ pub fn spawn_thread(
                     // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = add_paths(&mut watcher, &config_paths) {
-                        error!(message = "Failed to read files to watch.", error = ?error);
+                        error!(message = "Failed to read files to watch.", %error);
                         break;
                     }
 
@@ -66,7 +66,7 @@ pub fn spawn_thread(
         thread::sleep(RETRY_TIMEOUT);
 
         watcher = create_watcher(&config_paths)
-            .map_err(|error| error!(message = "Failed to create file watcher.", error = ?error))
+            .map_err(|error| error!(message = "Failed to create file watcher.", %error))
             .ok();
 
         if watcher.is_some() {
@@ -94,7 +94,7 @@ pub fn spawn_thread(
 fn raise_sighup() {
     use nix::sys::signal;
     let _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
-        error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = ?error)
+        error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
     });
 }
 

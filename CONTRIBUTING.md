@@ -434,8 +434,9 @@ make fmt
 
 - Always use the [Tracing crate](https://tracing.rs/tracing/)'s key/value style for log events.
 - Events should be capitalized and end with a period, `.`.
-- Never use `e` or `err` - always spell out `error` to enrich logs and make it clear what the output is.
-- Prefer Display over Debug, `?error` and not `%error`.
+- Never use `e` or `err` - always spell out `error` to enrich logs and make it
+  clear what the output is.
+- Prefer Display over Debug, `%error` and not `?error`.
 
 Nope!
 

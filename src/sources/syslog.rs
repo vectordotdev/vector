@@ -263,7 +263,7 @@ pub fn udp(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
-    let out = out.sink_map_err(|error| error!(message = "Error sending line.", error = ?error));
+    let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     Box::new(
         async move {
@@ -283,7 +283,7 @@ pub fn udp(
                     async move {
                         match frame {
                             Ok((bytes, received_from)) => {
-                                let received_from = received_from.to_string().into();
+                                let received_from = received_from.ip().to_string().into();
 
                                 std::str::from_utf8(&bytes)
                                     .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
