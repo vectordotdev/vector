@@ -8,7 +8,7 @@ use std::{
 };
 use tokio::stream::{Stream, StreamExt};
 
-const INVARIANT: &str =
+pub const INVARIANT: &str =
     "It is an invariant for the API to be active but not have COMPONENTS. Please report this.";
 
 #[derive(Enum, Eq, PartialEq, Copy, Clone)]
@@ -183,7 +183,7 @@ pub struct ComponentAdded(Component);
 pub struct ComponentRemoved(Component);
 
 lazy_static! {
-    static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
+    pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
