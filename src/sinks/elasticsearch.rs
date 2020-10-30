@@ -295,6 +295,7 @@ struct ESErrorDetails {
 impl RetryLogic for ElasticSearchRetryLogic {
     type Error = hyper::Error;
     type Response = hyper::Response<Bytes>;
+    type Request = Vec<u8>;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true

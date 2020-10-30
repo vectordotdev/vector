@@ -134,7 +134,7 @@ impl SinkConfig for HttpSinkConfig {
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, compression),
-            HttpRetryLogic,
+            HttpRetryLogic::default(),
             request,
             batch.timeout,
             client.clone(),

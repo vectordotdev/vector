@@ -444,6 +444,7 @@ struct GcsRetryLogic;
 impl RetryLogic for GcsRetryLogic {
     type Error = hyper::Error;
     type Response = Response<Body>;
+    type Request = RequestWrapper;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true

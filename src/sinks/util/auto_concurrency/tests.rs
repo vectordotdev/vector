@@ -289,6 +289,7 @@ struct TestRetryLogic;
 impl RetryLogic for TestRetryLogic {
     type Response = Response;
     type Error = Error;
+    type Request = Vec<Event>;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true

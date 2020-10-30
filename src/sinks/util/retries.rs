@@ -22,12 +22,17 @@ pub enum RetryAction {
 pub trait RetryLogic: Clone + Send + Sync + 'static {
     type Error: std::error::Error + Send + Sync + 'static;
     type Response;
+    type Request;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool;
 
     fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
         // Treat the default as the request is successful
         RetryAction::Successful
+    }
+
+    fn clone_request(&self, _request: &Self::Request) -> Option<Self::Request> {
+        None
     }
 }
 
@@ -89,7 +94,7 @@ impl<L: RetryLogic> FixedRetryPolicy<L> {
 impl<Req, Res, L> Policy<Req, Res, Error> for FixedRetryPolicy<L>
 where
     Req: Clone,
-    L: RetryLogic<Response = Res>,
+    L: RetryLogic<Response = Res, Request = Req>,
 {
     type Future = RetryPolicyFuture<L>;
 
@@ -141,7 +146,9 @@ where
     }
 
     fn clone_request(&self, request: &Req) -> Option<Req> {
-        Some(request.clone())
+        self.logic
+            .clone_request(request)
+            .or_else(|| Some(request.clone()))
     }
 }
 
@@ -299,6 +306,7 @@ mod tests {
     impl RetryLogic for SvcRetryLogic {
         type Error = Error;
         type Response = &'static str;
+        type Request = &'static str;
 
         fn is_retriable_error(&self, error: &Self::Error) -> bool {
             error.0

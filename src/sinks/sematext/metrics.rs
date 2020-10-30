@@ -145,7 +145,7 @@ impl SematextMetricsService {
 
         let sink = request
             .batch_sink(
-                HttpRetryLogic,
+                HttpRetryLogic::default(),
                 sematext_service,
                 MetricBuffer::new(batch.size),
                 batch.timeout,

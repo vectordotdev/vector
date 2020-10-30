@@ -234,6 +234,7 @@ struct SqsRetryLogic;
 impl RetryLogic for SqsRetryLogic {
     type Error = RusotoError<SendMessageBatchError>;
     type Response = SendMessageBatchResult;
+    type Request = Vec<SendMessageBatchRequestEntry>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {

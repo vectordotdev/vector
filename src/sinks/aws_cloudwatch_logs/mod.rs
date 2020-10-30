@@ -541,6 +541,7 @@ struct CloudwatchRetryLogic;
 impl RetryLogic for CloudwatchRetryLogic {
     type Error = CloudwatchError;
     type Response = ();
+    type Request = Vec<InputLogEvent>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {

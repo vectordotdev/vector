@@ -97,7 +97,7 @@ impl DatadogLogsConfig {
         timeout: Duration,
     ) -> crate::Result<(VectorSink, Healthcheck)>
     where
-        O: 'static,
+        O: Sync + 'static,
         B: Batch<Output = Vec<O>> + std::marker::Send + 'static,
         B::Output: std::marker::Send + Clone,
         B::Input: std::marker::Send,
@@ -115,7 +115,7 @@ impl DatadogLogsConfig {
         let sink = BatchedHttpSink::new(
             service,
             batch,
-            HttpRetryLogic,
+            HttpRetryLogic::default(),
             request_settings,
             timeout,
             client,
