@@ -479,6 +479,7 @@ all-integration-tests = [
   "kafka-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
+  "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
 ]
@@ -508,6 +509,7 @@ influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
+prometheus-integration-tests = ["sinks-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 

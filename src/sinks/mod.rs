@@ -42,7 +42,7 @@ pub mod honeycomb;
 pub mod http;
 #[cfg(feature = "sinks-humio")]
 pub mod humio;
-#[cfg(feature = "sinks-influxdb")]
+#[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
 pub mod influxdb;
 #[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
 pub mod kafka;

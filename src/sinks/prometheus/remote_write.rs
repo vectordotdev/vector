@@ -192,4 +192,77 @@ mod tests {
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
 mod integration_tests {
     use super::*;
+    use crate::{
+        config::{SinkConfig, SinkContext},
+        event::metric::{Metric, MetricKind, MetricValue},
+        sinks::influxdb::test_util::{cleanup_v1, onboarding_v1, query_v1},
+        tls::TlsOptions,
+        Event,
+    };
+    use futures::stream;
+    use std::ops::Range;
+
+    const HTTP_URL: &str = "http://localhost:8086";
+    const HTTPS_URL: &str = "https://localhost:8087";
+
+    #[tokio::test]
+    async fn insert_metrics_over_http() {
+        insert_metrics(HTTP_URL).await;
+    }
+
+    #[tokio::test]
+    async fn insert_metrics_over_https() {
+        insert_metrics(HTTPS_URL).await;
+    }
+
+    async fn insert_metrics(url: &str) {
+        let database = onboarding_v1(url).await;
+
+        let cx = SinkContext::new_test();
+
+        let config = RemoteWriteConfig {
+            endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
+            tls: Some(TlsOptions {
+                ca_file: Some("tests/data/Vector_CA.crt".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let events = create_events(0..10);
+
+        let (sink, _) = config.build(cx).await.expect("error building config");
+        sink.run(stream::iter(events)).await.unwrap();
+
+        let result = query_v1(url, &format!("show series on {}", database)).await;
+        let text = result.text().await.unwrap();
+        let result: serde_json::Value =
+            serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON");
+
+        let values = &result["results"][0]["series"][0]["values"];
+        assert_eq!(values.as_array().unwrap().len(), 10);
+
+        cleanup_v1(url, &database).await;
+    }
+
+    fn create_events(range: Range<i32>) -> Vec<Event> {
+        range.map(create_event).collect()
+    }
+
+    fn create_event(i: i32) -> Event {
+        Event::Metric(Metric {
+            name: format!("gauge-{}", i),
+            namespace: None,
+            timestamp: Some(chrono::Utc::now()),
+            tags: Some(
+                vec![
+                    ("region".to_owned(), "us-west-1".to_owned()),
+                    ("production".to_owned(), "true".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+            ),
+            kind: MetricKind::Absolute,
+            value: MetricValue::Gauge { value: i as f64 },
+        })
+    }
 }
