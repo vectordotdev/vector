@@ -169,6 +169,35 @@ mod tests {
                 "#,
                 Ok(Some(true.into())),
             ),
+            (r#"if false { 1 }"#, Ok(None)),
+            (r#"if true { 1 }"#, Ok(Some(1.into()))),
+            (r#"if false { 1 } else { 2 }"#, Ok(Some(2.into()))),
+            (r#"if false { 1 } else if false { 2 }"#, Ok(None)),
+            (r#"if false { 1 } else if true { 2 }"#, Ok(Some(2.into()))),
+            (
+                r#"if false { 1 } else if false { 2 } else { 3 }"#,
+                Ok(Some(3.into())),
+            ),
+            (
+                r#"if false { 1 } else if true { 2 } else { 3 }"#,
+                Ok(Some(2.into())),
+            ),
+            (
+                r#"if false { 1 } else if false { 2 } else if false { 3 }"#,
+                Ok(None),
+            ),
+            (
+                r#"if false { 1 } else if false { 2 } else if true { 3 }"#,
+                Ok(Some(3.into())),
+            ),
+            (
+                r#"if false { 1 } else if true { 2 } else if false { 3 } else { 4 }"#,
+                Ok(Some(2.into())),
+            ),
+            (
+                r#"if false { 1 } else if false { 2 } else if false { 3 } else { 4 }"#,
+                Ok(Some(4.into())),
+            ),
         ];
 
         for (script, result) in cases {
