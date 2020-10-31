@@ -6,9 +6,10 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
         TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
     },
+    sink::VecSinkExt,
     sinks::{
         util::{
-            socket_events_counter::{BytesSink, EventsCounter, ShutdownCheck},
+            socket_bytes_sink::{BytesSink, ShutdownCheck},
             SinkBuildError, StreamSink,
         },
         Healthcheck, VectorSink,
@@ -18,7 +19,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{future, stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
+use futures::{stream::BoxStream, task::noop_waker_ref, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -135,7 +136,8 @@ impl TcpConnector {
 
 struct TcpSink {
     connector: TcpConnector,
-    events_counter: Arc<EventsCounter>,
+    acker: Acker,
+    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
 }
 
 impl TcpSink {
@@ -146,7 +148,8 @@ impl TcpSink {
     ) -> Self {
         Self {
             connector,
-            events_counter: Arc::new(EventsCounter::new(acker, encode_event, SocketMode::Tcp)),
+            acker,
+            encode_event: Arc::new(encode_event),
         }
     }
 
@@ -155,7 +158,8 @@ impl TcpSink {
         BytesSink::new(
             stream,
             Self::shutdown_check,
-            Arc::clone(&self.events_counter),
+            self.acker.clone(),
+            SocketMode::Tcp,
         )
     }
 
@@ -187,26 +191,27 @@ impl StreamSink for TcpSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
         // We need [Peekable](https://docs.rs/futures/0.3.6/futures/stream/struct.Peekable.html) for initiating
         // connection only when we have something to send.
-        // It would be cool encode events before `peekable()` but [SendAll](https://docs.rs/futures-util/0.3.6/src/futures_util/sink/send_all.rs.html)
-        // have buffered item, so if our connection fail we will completely lost one item.
-        // As result `EventsCounter` was added for calculating encoded events and ack only consumed items on failed send.
-        let mut input = Some(input.peekable());
-        while Pin::new(input.as_mut().unwrap()).peek().await.is_some() {
-            let events_counter = Arc::clone(&self.events_counter);
-            let encode_event = move |event| future::ready(events_counter.encode_event(event));
-            let mut stream = input.take().unwrap().filter_map(encode_event);
+        let encode_event = Arc::clone(&self.encode_event);
+        let mut input = input
+            .map(|event| encode_event(event).unwrap_or_else(Bytes::new))
+            .peekable();
 
+        while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
-            if let Err(error) = sink.send_all(&mut stream).await {
+
+            let result = match sink.send_all_peekable(&mut input).await {
+                Ok(()) => sink.close().await,
+                Err(error) => Err(error),
+            };
+
+            if let Err(error) = result {
                 if error.kind() == ErrorKind::Other && error.to_string() == "ShutdownCheck::Close" {
                     emit!(TcpSocketConnectionShutdown {});
                 } else {
                     emit!(TcpSocketError { error });
                 }
             }
-
-            input.replace(stream.into_inner());
         }
 
         Ok(())

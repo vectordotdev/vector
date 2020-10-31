@@ -6,7 +6,7 @@ pub mod http;
 pub mod retries;
 pub mod service;
 pub mod sink;
-pub mod socket_events_counter;
+pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
 #[cfg(test)]

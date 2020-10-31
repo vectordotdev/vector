@@ -5,9 +5,10 @@ use crate::{
         ConnectionOpen, OpenGauge, SocketMode, UnixSocketConnectionEstablished,
         UnixSocketConnectionFailed, UnixSocketError,
     },
+    sink::VecSinkExt,
     sinks::{
         util::{
-            socket_events_counter::{BytesSink, EventsCounter, ShutdownCheck},
+            socket_bytes_sink::{BytesSink, ShutdownCheck},
             StreamSink,
         },
         Healthcheck, VectorSink,
@@ -16,7 +17,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::{future, stream::BoxStream, SinkExt, StreamExt};
+use futures::{stream::BoxStream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{path::PathBuf, pin::Pin, sync::Arc, time::Duration};
@@ -101,7 +102,8 @@ impl UnixConnector {
 
 struct UnixSink {
     connector: UnixConnector,
-    events_counter: Arc<EventsCounter>,
+    acker: Acker,
+    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
 }
 
 impl UnixSink {
@@ -112,7 +114,8 @@ impl UnixSink {
     ) -> Self {
         Self {
             connector,
-            events_counter: Arc::new(EventsCounter::new(acker, encode_event, SocketMode::Unix)),
+            acker,
+            encode_event: Arc::new(encode_event),
         }
     }
 
@@ -121,7 +124,8 @@ impl UnixSink {
         BytesSink::new(
             stream,
             |_| ShutdownCheck::Alive,
-            Arc::clone(&self.events_counter),
+            self.acker.clone(),
+            SocketMode::Unix,
         )
     }
 }
@@ -130,22 +134,26 @@ impl UnixSink {
 impl StreamSink for UnixSink {
     // Same as TcpSink, more details there.
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mut input = Some(input.peekable());
-        while Pin::new(input.as_mut().unwrap()).peek().await.is_some() {
-            let events_counter = Arc::clone(&self.events_counter);
-            let encode_event = move |event| future::ready(events_counter.encode_event(event));
-            let mut stream = input.take().unwrap().filter_map(encode_event);
+        let encode_event = Arc::clone(&self.encode_event);
+        let mut input = input
+            .map(|event| encode_event(event).unwrap_or_else(Bytes::new))
+            .peekable();
 
+        while Pin::new(&mut input).peek().await.is_some() {
             let mut sink = self.connect().await;
             let _open_token = OpenGauge::new().open(|count| emit!(ConnectionOpen { count }));
-            if let Err(error) = sink.send_all(&mut stream).await {
+
+            let result = match sink.send_all_peekable(&mut input).await {
+                Ok(()) => sink.close().await,
+                Err(error) => Err(error),
+            };
+
+            if let Err(error) = result {
                 emit!(UnixSocketError {
                     error,
                     path: &self.connector.path
                 });
             }
-
-            input.replace(stream.into_inner());
         }
 
         Ok(())
