@@ -1,20 +1,24 @@
-use crate::{file_watcher::FileWatcher, FileFingerprint, FilePosition, FileSourceInternalEvents};
+use crate::{
+    checkpointer::Checkpointer,
+    file_watcher::FileWatcher,
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    FileSourceInternalEvents,
+};
 use bytes::Bytes;
 use futures::{
     executor::block_on,
     future::{select, Either},
     stream, Future, Sink, SinkExt,
 };
-use glob::glob;
 use indexmap::IndexMap;
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::fs::{self, remove_file, File};
-use std::io::{self, Read, Seek, Write};
-use std::path::{Path, PathBuf};
-use std::time::{self, Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs::{self, remove_file},
+    path::PathBuf,
+    time::{self, Duration},
+};
 use tokio::time::delay_for;
 
-use crate::metadata_ext::PortableFileExt;
 use crate::paths_provider::PathsProvider;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -99,6 +103,8 @@ where
                 .and_then(|m| m.created())
                 .unwrap_or_else(|_| time::SystemTime::now())
         });
+
+        checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
 
         for (path, file_id) in existing_files {
             self.watch_new_file(
@@ -373,155 +379,6 @@ where
 #[derive(Debug)]
 pub struct Shutdown;
 
-pub struct Checkpointer {
-    directory: PathBuf,
-    glob_string: String,
-    checkpoints: HashMap<FileFingerprint, FilePosition>,
-}
-
-impl Checkpointer {
-    pub fn new(data_dir: &Path) -> Checkpointer {
-        let directory = data_dir.join("checkpoints");
-        let glob_string = directory.join("*").to_string_lossy().into_owned();
-        Checkpointer {
-            directory,
-            glob_string,
-            checkpoints: HashMap::new(),
-        }
-    }
-
-    fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
-        self.directory.join(format!("{:x}.{}", fng, pos))
-    }
-    fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
-        let file_name = &path.file_name().unwrap().to_string_lossy();
-        scan_fmt!(file_name, "{x}.{}", [hex FileFingerprint], FilePosition).unwrap()
-    }
-
-    pub fn set_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.insert(fng, pos);
-    }
-
-    pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
-        self.checkpoints.get(&fng).cloned()
-    }
-
-    pub fn write_checkpoints(&mut self) -> Result<usize, io::Error> {
-        fs::remove_dir_all(&self.directory).ok();
-        fs::create_dir_all(&self.directory)?;
-        for (&fng, &pos) in self.checkpoints.iter() {
-            fs::File::create(self.encode(fng, pos))?;
-        }
-        Ok(self.checkpoints.len())
-    }
-
-    pub fn read_checkpoints(&mut self, ignore_before: Option<time::SystemTime>) {
-        for path in glob(&self.glob_string).unwrap().flatten() {
-            if let Some(ignore_before) = ignore_before {
-                if let Ok(Ok(modified)) = fs::metadata(&path).map(|metadata| metadata.modified()) {
-                    if modified < ignore_before {
-                        fs::remove_file(path).ok();
-                        continue;
-                    }
-                }
-            }
-            let (fng, pos) = self.decode(&path);
-            self.checkpoints.insert(fng, pos);
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum Fingerprinter {
-    Checksum {
-        bytes: usize,
-        ignored_header_bytes: usize,
-    },
-    FirstLineChecksum {
-        max_line_length: usize,
-    },
-    DevInode,
-}
-
-impl Fingerprinter {
-    fn get_fingerprint_of_file(
-        &self,
-        path: &PathBuf,
-        buffer: &mut Vec<u8>,
-    ) -> Result<FileFingerprint, io::Error> {
-        match *self {
-            Fingerprinter::DevInode => {
-                let file_handle = File::open(path)?;
-                let dev = file_handle.portable_dev()?;
-                let ino = file_handle.portable_ino()?;
-                buffer.clear();
-                buffer.write_all(&dev.to_be_bytes())?;
-                buffer.write_all(&ino.to_be_bytes())?;
-            }
-            Fingerprinter::Checksum {
-                ignored_header_bytes,
-                bytes,
-            } => {
-                let i = ignored_header_bytes as u64;
-                let b = bytes;
-                buffer.resize(b, 0u8);
-                let mut fp = fs::File::open(path)?;
-                fp.seek(io::SeekFrom::Start(i))?;
-                fp.read_exact(&mut buffer[..b])?;
-            }
-            Fingerprinter::FirstLineChecksum { max_line_length } => {
-                buffer.resize(max_line_length, 0u8);
-                let fp = fs::File::open(path)?;
-                fingerprinter_read_until(fp, b'\n', buffer)?;
-            }
-        }
-        let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
-        Ok(fingerprint)
-    }
-
-    fn get_fingerprint_or_log_error(
-        &self,
-        path: &PathBuf,
-        buffer: &mut Vec<u8>,
-        known_small_files: &mut HashSet<PathBuf>,
-        emitter: &impl FileSourceInternalEvents,
-    ) -> Option<FileFingerprint> {
-        self.get_fingerprint_of_file(path, buffer)
-            .map_err(|error| {
-                if error.kind() == io::ErrorKind::UnexpectedEof {
-                    if !known_small_files.contains(path) {
-                        emitter.emit_file_checksum_failed(path);
-                        known_small_files.insert(path.clone());
-                    }
-                } else {
-                    emitter.emit_file_fingerprint_read_failed(path, error);
-                }
-            })
-            .ok()
-    }
-}
-
-fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> io::Result<()> {
-    while !buf.is_empty() {
-        let read = match r.read(buf) {
-            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
-            Ok(n) => n,
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(e),
-        };
-
-        if let Some((pos, _)) = buf[..read].iter().enumerate().find(|(_, &c)| c == delim) {
-            for el in &mut buf[(pos + 1)..] {
-                *el = 0;
-            }
-            break;
-        }
-
-        buf = &mut buf[read..];
-    }
-    Ok(())
-}
-
 struct TimingStats {
     started_at: time::Instant,
     segments: BTreeMap<&'static str, Duration>,
@@ -580,185 +437,6 @@ impl Default for TimingStats {
             segments: Default::default(),
             events: Default::default(),
             bytes: Default::default(),
-        }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::{Checkpointer, FileFingerprint, FilePosition, Fingerprinter};
-    use std::fs;
-    use tempfile::tempdir;
-
-    #[test]
-    fn test_checksum_fingerprint() {
-        let fingerprinter = Fingerprinter::Checksum {
-            bytes: 256,
-            ignored_header_bytes: 0,
-        };
-
-        let target_dir = tempdir().unwrap();
-        let enough_data = vec![b'x'; 256];
-        let not_enough_data = vec![b'x'; 199];
-        let empty_path = target_dir.path().join("empty.log");
-        let big_enough_path = target_dir.path().join("big_enough.log");
-        let duplicate_path = target_dir.path().join("duplicate.log");
-        let not_big_enough_path = target_dir.path().join("not_big_enough.log");
-        fs::write(&empty_path, &[]).unwrap();
-        fs::write(&big_enough_path, &enough_data).unwrap();
-        fs::write(&duplicate_path, &enough_data).unwrap();
-        fs::write(&not_big_enough_path, &not_enough_data).unwrap();
-
-        let mut buf = Vec::new();
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&empty_path, &mut buf)
-            .is_err());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&big_enough_path, &mut buf)
-            .is_ok());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&not_big_enough_path, &mut buf)
-            .is_err());
-        assert_eq!(
-            fingerprinter
-                .get_fingerprint_of_file(&big_enough_path, &mut buf)
-                .unwrap(),
-            fingerprinter
-                .get_fingerprint_of_file(&duplicate_path, &mut buf)
-                .unwrap(),
-        );
-    }
-
-    #[test]
-    fn test_first_line_checksum_fingerprint() {
-        let max_line_length = 64;
-        let fingerprinter = Fingerprinter::FirstLineChecksum { max_line_length };
-
-        let target_dir = tempdir().unwrap();
-        let prepare_test = |file: &str, contents: &[u8]| {
-            let path = target_dir.path().join(file);
-            fs::write(&path, contents).unwrap();
-            path
-        };
-        let prepare_test_long = |file: &str, amount| {
-            prepare_test(
-                file,
-                b"hello world "
-                    .iter()
-                    .cloned()
-                    .cycle()
-                    .clone()
-                    .take(amount)
-                    .collect::<Box<_>>()
-                    .as_ref(),
-            )
-        };
-
-        let empty = prepare_test("empty.log", b"");
-        let incomlete_line = prepare_test("incomlete_line.log", b"missing newline char");
-        let one_line = prepare_test("one_line.log", b"hello world\n");
-        let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
-        let one_line_continued =
-            prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
-        let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
-
-        let exactly_max_line_length =
-            prepare_test_long("exactly_max_line_length.log", max_line_length);
-        let exceeding_max_line_length =
-            prepare_test_long("exceeding_max_line_length.log", max_line_length + 1);
-        let incomplete_under_max_line_length_by_one = prepare_test_long(
-            "incomplete_under_max_line_length_by_one.log",
-            max_line_length - 1,
-        );
-
-        let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
-
-        assert!(run(&empty).is_err());
-        assert!(run(&incomlete_line).is_err());
-        assert!(run(&incomplete_under_max_line_length_by_one).is_err());
-
-        assert!(run(&one_line).is_ok());
-        assert!(run(&one_line_duplicate).is_ok());
-        assert!(run(&one_line_continued).is_ok());
-        assert!(run(&different_two_lines).is_ok());
-        assert!(run(&exactly_max_line_length).is_ok());
-        assert!(run(&exceeding_max_line_length).is_ok());
-
-        assert_eq!(run(&one_line).unwrap(), run(&one_line_duplicate).unwrap());
-        assert_eq!(run(&one_line).unwrap(), run(&one_line_continued).unwrap());
-
-        assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
-
-        assert_eq!(
-            run(&exactly_max_line_length).unwrap(),
-            run(&exceeding_max_line_length).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_inode_fingerprint() {
-        let fingerprinter = Fingerprinter::DevInode;
-
-        let target_dir = tempdir().unwrap();
-        let small_data = vec![b'x'; 1];
-        let medium_data = vec![b'x'; 256];
-        let empty_path = target_dir.path().join("empty.log");
-        let small_path = target_dir.path().join("small.log");
-        let medium_path = target_dir.path().join("medium.log");
-        let duplicate_path = target_dir.path().join("duplicate.log");
-        fs::write(&empty_path, &[]).unwrap();
-        fs::write(&small_path, &small_data).unwrap();
-        fs::write(&medium_path, &medium_data).unwrap();
-        fs::write(&duplicate_path, &medium_data).unwrap();
-
-        let mut buf = Vec::new();
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&empty_path, &mut buf)
-            .is_ok());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&small_path, &mut buf)
-            .is_ok());
-        assert_ne!(
-            fingerprinter
-                .get_fingerprint_of_file(&medium_path, &mut buf)
-                .unwrap(),
-            fingerprinter
-                .get_fingerprint_of_file(&duplicate_path, &mut buf)
-                .unwrap()
-        );
-    }
-
-    #[test]
-    fn test_checkpointer_basics() {
-        let fingerprint: FileFingerprint = 0x1234567890abcdef;
-        let position: FilePosition = 1234;
-        let data_dir = tempdir().unwrap();
-        let mut chkptr = Checkpointer::new(&data_dir.path());
-        assert_eq!(
-            chkptr.decode(&chkptr.encode(fingerprint, position)),
-            (fingerprint, position)
-        );
-        chkptr.set_checkpoint(fingerprint, position);
-        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-    }
-
-    #[test]
-    fn test_checkpointer_restart() {
-        let fingerprint: FileFingerprint = 0x1234567890abcdef;
-        let position: FilePosition = 1234;
-        let data_dir = tempdir().unwrap();
-        {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
-            chkptr.set_checkpoint(fingerprint, position);
-            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-            chkptr.write_checkpoints().ok();
-        }
-        {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
-            assert_eq!(chkptr.get_checkpoint(fingerprint), None);
-            chkptr.read_checkpoints(None);
-            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
     }
 }

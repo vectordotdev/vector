@@ -2,7 +2,7 @@ use super::SinkBuildError;
 use crate::{
     buffers::Acker,
     config::SinkContext,
-    dns::Resolver,
+    dns,
     internal_events::{
         SocketEventsSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
         UdpSocketConnectionFailed, UdpSocketError,
@@ -52,11 +52,11 @@ impl UdpSinkConfig {
         Self { address }
     }
 
-    fn build_connector(&self, cx: SinkContext) -> crate::Result<UdpConnector> {
+    fn build_connector(&self, _cx: SinkContext) -> crate::Result<UdpConnector> {
         let uri = self.address.parse::<http::Uri>()?;
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
-        Ok(UdpConnector::new(host, port, cx.resolver()))
+        Ok(UdpConnector::new(host, port))
     }
 
     pub fn build_service(&self, cx: SinkContext) -> crate::Result<(UdpService, Healthcheck)> {
@@ -85,16 +85,11 @@ impl UdpSinkConfig {
 struct UdpConnector {
     host: String,
     port: u16,
-    resolver: Resolver,
 }
 
 impl UdpConnector {
-    fn new(host: String, port: u16, resolver: Resolver) -> Self {
-        Self {
-            host,
-            port,
-            resolver,
-        }
+    fn new(host: String, port: u16) -> Self {
+        Self { host, port }
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -105,8 +100,7 @@ impl UdpConnector {
     }
 
     async fn connect(&self) -> Result<UdpSocket, UdpError> {
-        let ip = self
-            .resolver
+        let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
             .context(DnsError)?

@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Value,
     internal_events::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
@@ -29,7 +29,7 @@ impl GenerateConfig for AnsiStripperConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .clone()

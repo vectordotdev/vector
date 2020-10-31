@@ -5,8 +5,7 @@ use super::{
 };
 use crate::{
     buffers,
-    config::{DataType, SinkContext, TransformContext},
-    dns::Resolver,
+    config::{DataType, SinkContext},
     event::Event,
     shutdown::SourceShutdownCoordinator,
     Pipeline,
@@ -41,9 +40,6 @@ pub async fn build_pieces(
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
 
     let mut errors = vec![];
-
-    // TODO: remove the unimplemented
-    let resolver = Resolver;
 
     // Build sources
     for (name, source) in config
@@ -102,10 +98,8 @@ pub async fn build_pieces(
 
         let typetag = transform.inner.transform_type();
 
-        let cx = TransformContext { resolver };
-
         let input_type = transform.inner.input_type();
-        let transform = match transform.inner.build(cx).await {
+        let transform = match transform.inner.build().await {
             Err(error) => {
                 errors.push(format!("Transform \"{}\": {}", name, error));
                 continue;
@@ -151,7 +145,7 @@ pub async fn build_pieces(
             Ok(buffer) => buffer,
         };
 
-        let cx = SinkContext { resolver, acker };
+        let cx = SinkContext { acker };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {

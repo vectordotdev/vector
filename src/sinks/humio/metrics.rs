@@ -1,9 +1,6 @@
 use super::logs::HumioLogsConfig;
 use crate::{
-    config::{
-        DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig,
-        TransformContext,
-    },
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
     sinks::{Healthcheck, VectorSink},
     transforms::metric_to_log::MetricToLogConfig,
 };
@@ -38,11 +35,7 @@ impl GenerateConfig for HumioMetricsConfig {
 #[typetag::serde(name = "humio_metrics")]
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let tcx = TransformContext {
-            resolver: cx.resolver(),
-        };
-
-        let mut transform = self.transform.clone().build(tcx).await?;
+        let mut transform = self.transform.clone().build().await?;
         let (sink, healthcheck) = self.sink.clone().build(cx).await?;
 
         let sink = Box::new(

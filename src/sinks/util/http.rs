@@ -248,7 +248,7 @@ impl RetryLogic for HttpRetryLogic {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{dns::Resolver, test_util::next_addr};
+    use crate::test_util::next_addr;
     use futures::{compat::Future01CompatExt, future::ready};
     use futures01::Stream;
     use hyper::{
@@ -279,14 +279,13 @@ mod test {
     #[tokio::test]
     async fn util_http_it_makes_http_requests() {
         let addr = next_addr();
-        let resolver = Resolver;
 
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()
             .unwrap();
 
         let request = b"hello".to_vec();
-        let client = HttpClient::new(resolver, None).unwrap();
+        let client = HttpClient::new(None).unwrap();
         let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
             Box::pin(ready(
                 http::Request::post(&uri).body(body).map_err(Into::into),

@@ -1,6 +1,6 @@
 use crate::{
-    buffers::Acker, conditions, dns::Resolver, event::Metric, shutdown::ShutdownSignal, sinks,
-    sources, transforms, Pipeline,
+    buffers::Acker, conditions, event::Metric, shutdown::ShutdownSignal, sinks, sources,
+    transforms, Pipeline,
 };
 use async_trait::async_trait;
 use component::ComponentDescription;
@@ -192,24 +192,16 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 #[derive(Debug, Clone)]
 pub struct SinkContext {
     pub(super) acker: Acker,
-    pub(super) resolver: Resolver,
 }
 
 impl SinkContext {
     #[cfg(test)]
     pub fn new_test() -> Self {
-        Self {
-            acker: Acker::Null,
-            resolver: Resolver,
-        }
+        Self { acker: Acker::Null }
     }
 
     pub fn acker(&self) -> Acker {
         self.acker.clone()
-    }
-
-    pub fn resolver(&self) -> Resolver {
-        self.resolver
     }
 }
 
@@ -227,7 +219,7 @@ pub struct TransformOuter {
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait TransformConfig: core::fmt::Debug + Send + Sync {
-    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn transforms::Transform>>;
+    async fn build(&self) -> crate::Result<Box<dyn transforms::Transform>>;
 
     fn input_type(&self) -> DataType;
 
@@ -240,21 +232,6 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync {
     /// for various patterns.
     fn expand(&mut self) -> crate::Result<Option<IndexMap<String, Box<dyn TransformConfig>>>> {
         Ok(None)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct TransformContext {
-    pub(super) resolver: Resolver,
-}
-
-impl TransformContext {
-    pub fn new_test() -> Self {
-        Self { resolver: Resolver }
-    }
-
-    pub fn resolver(&self) -> Resolver {
-        self.resolver
     }
 }
 

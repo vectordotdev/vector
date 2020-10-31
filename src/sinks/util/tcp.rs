@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::SinkContext,
-    dns::Resolver,
+    dns,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketMode, TcpSocketConnectionEstablished,
         TcpSocketConnectionFailed, TcpSocketConnectionShutdown, TcpSocketError,
@@ -37,7 +37,7 @@ enum TcpError {
     #[snafu(display("Connect error: {}", source))]
     ConnectError { source: TlsError },
     #[snafu(display("Unable to resolve DNS: {}", source))]
-    DnsError { source: crate::dns::DnsError },
+    DnsError { source: dns::DnsError },
     #[snafu(display("No addresses returned."))]
     NoAddresses,
     #[snafu(display("Send error: {}", source))]
@@ -66,7 +66,7 @@ impl TcpSinkConfig {
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let connector = TcpConnector::new(host, port, cx.resolver(), tls);
+        let connector = TcpConnector::new(host, port, tls);
         let sink = TcpSink::new(connector.clone(), cx.acker(), encode_event);
 
         Ok((
@@ -80,18 +80,12 @@ impl TcpSinkConfig {
 struct TcpConnector {
     host: String,
     port: u16,
-    resolver: Resolver,
     tls: MaybeTlsSettings,
 }
 
 impl TcpConnector {
-    fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
-        Self {
-            host,
-            port,
-            resolver,
-            tls,
-        }
+    fn new(host: String, port: u16, tls: MaybeTlsSettings) -> Self {
+        Self { host, port, tls }
     }
 
     fn fresh_backoff() -> ExponentialBackoff {
@@ -102,8 +96,7 @@ impl TcpConnector {
     }
 
     async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {
-        let ip = self
-            .resolver
+        let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
             .context(DnsError)?
@@ -232,11 +225,11 @@ mod test {
 
         let addr = next_addr();
         let _listener = TcpListener::bind(&addr).await.unwrap();
-        let good = TcpConnector::new(addr.ip().to_string(), addr.port(), Resolver, None.into());
+        let good = TcpConnector::new(addr.ip().to_string(), addr.port(), None.into());
         assert!(good.healthcheck().await.is_ok());
 
         let addr = next_addr();
-        let bad = TcpConnector::new(addr.ip().to_string(), addr.port(), Resolver, None.into());
+        let bad = TcpConnector::new(addr.ip().to_string(), addr.port(), None.into());
         assert!(bad.healthcheck().await.is_err());
     }
 }

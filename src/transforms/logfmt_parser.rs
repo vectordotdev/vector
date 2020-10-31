@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .clone()
@@ -111,7 +111,7 @@ impl Transform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::{TransformConfig, TransformContext},
+        config::TransformConfig,
         event::{LogEvent, Value},
         Event,
     };
@@ -129,7 +129,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
 

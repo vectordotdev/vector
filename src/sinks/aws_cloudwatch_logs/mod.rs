@@ -2,7 +2,6 @@ mod request;
 
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
     event::{Event, LogEvent, Value},
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
@@ -159,10 +158,10 @@ pub enum CloudwatchError {
 }
 
 impl CloudwatchLogsSinkConfig {
-    fn create_client(&self, resolver: Resolver) -> crate::Result<CloudWatchLogsClient> {
+    fn create_client(&self) -> crate::Result<CloudWatchLogsClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -187,7 +186,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.in_flight_limit.unwrap())
             .service(CloudwatchLogsPartitionSvc::new(
@@ -676,7 +675,6 @@ impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
 mod tests {
     use super::*;
     use crate::{
-        dns::Resolver,
         event::{Event, Value},
         rusoto::RegionOrEndpoint,
     };
@@ -795,7 +793,7 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let client = config.create_client(Resolver).unwrap();
+        let client = config.create_client().unwrap();
         CloudwatchLogsSvc::new(&config, &key, client)
     }
 
@@ -1249,7 +1247,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let client = config.create_client(Resolver).unwrap();
+        let client = config.create_client().unwrap();
         healthcheck(config, client).await.unwrap();
     }
 
@@ -1259,7 +1257,7 @@ mod integration_tests {
             endpoint: "http://localhost:6000".into(),
         };
 
-        let client = rusoto::client(Resolver).unwrap();
+        let client = rusoto::client().unwrap();
         let creds = rusoto::AwsCredentialsProvider::new(&region, None).unwrap();
         CloudWatchLogsClient::new_with(client, creds, region)
     }
