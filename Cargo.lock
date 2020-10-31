@@ -3154,9 +3154,9 @@ checksum = "7ffc5c5338469d4d3ea17d269fa8ea3512ad247247c30bd2df69e68309ed0a08"
 
 [[package]]
 name = "maxminddb"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9d4f312870f536f2f87d6afe80570c3df890bd9b9985dfadd3c2e9bba183d80"
+checksum = "912cf8c0da1a673a0e0c6b230a858ea71ccaf3ded184041a1c2172d81c1d54d7"
 dependencies = [
  "log",
  "serde",
