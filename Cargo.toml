@@ -66,7 +66,7 @@ async-trait = "0.1"
 # Tracing
 tracing = "0.1.15"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
-tracing-subscriber = "0.2.2"
+tracing-subscriber = "0.2.14"
 tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
