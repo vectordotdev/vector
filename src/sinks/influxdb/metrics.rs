@@ -36,6 +36,7 @@ struct InfluxDBSvc {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct InfluxDBConfig {
+    pub default_namespace: Option<String>,
     pub endpoint: String,
     #[serde(flatten)]
     pub influxdb1_settings: Option<InfluxDB1Settings>,
@@ -158,6 +159,7 @@ impl Service<Vec<Metric>> for InfluxDBSvc {
         let input = encode_events(
             self.protocol_version,
             items,
+            self.config.default_namespace.as_deref(),
             self.config.tags.as_ref(),
             &self.config.quantiles,
         );
@@ -208,12 +210,17 @@ fn merge_tags(
 fn encode_events(
     protocol_version: ProtocolVersion,
     events: Vec<Metric>,
+    default_namespace: Option<&str>,
     tags: Option<&HashMap<String, String>>,
     quantiles: &[f64],
 ) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
-        let fullname = encode_namespace(event.namespace.as_deref(), '.', &event.name);
+        let fullname = encode_namespace(
+            event.namespace.as_deref().or(default_namespace),
+            '.',
+            &event.name,
+        );
         let ts = encode_timestamp(event.timestamp);
         let tags = merge_tags(&event, tags);
         match event.value {
@@ -400,7 +407,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, Some("vector"), None, &[]);
         assert_eq!(
             line_protocols,
             "ns.total,metric_type=counter value=1.5 1542182950000000011\n\
@@ -419,7 +426,7 @@ mod tests {
             value: MetricValue::Gauge { value: -1.5 },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(
             line_protocols,
             "ns.meter,metric_type=gauge,normal_tag=value,true_tag=true value=-1.5 1542182950000000011"
@@ -439,7 +446,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(
             line_protocols,
             "ns.users,metric_type=set,normal_tag=value,true_tag=true value=2 1542182950000000011"
@@ -462,7 +469,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -502,7 +509,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -542,7 +549,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V1, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -582,7 +589,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, None, events, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 
@@ -647,7 +654,7 @@ mod tests {
             },
         ];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 3);
 
@@ -724,7 +731,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -743,7 +750,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -762,7 +769,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         assert_eq!(line_protocols.len(), 0);
     }
 
@@ -784,6 +791,7 @@ mod tests {
         let line_protocols = encode_events(
             ProtocolVersion::V2,
             events,
+            None,
             None,
             &default_summary_quantiles(),
         );
@@ -843,7 +851,13 @@ mod tests {
         tags.insert("host".to_owned(), "local".to_owned());
         tags.insert("datacenter".to_owned(), "us-east".to_owned());
 
-        let line_protocols = encode_events(ProtocolVersion::V1, events, Some(tags).as_ref(), &[]);
+        let line_protocols = encode_events(
+            ProtocolVersion::V1,
+            events,
+            Some("ns"),
+            Some(tags).as_ref(),
+            &[],
+        );
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 2);
         assert_eq!(
@@ -901,6 +915,7 @@ mod integration_tests {
             }),
             quantiles: default_summary_quantiles(),
             tags: None,
+            default_namespace: None,
         };
 
         let events: Vec<_> = (0..10).map(create_event).collect();
@@ -962,6 +977,7 @@ mod integration_tests {
             request: Default::default(),
             tags: None,
             tls: None,
+            default_namespace: None,
         };
 
         let metric = format!("counter-{}", Utc::now().timestamp_nanos());
