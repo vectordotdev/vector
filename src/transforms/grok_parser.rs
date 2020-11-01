@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
@@ -40,7 +40,7 @@ impl_generate_config_from_default!(GrokParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .clone()
@@ -133,7 +133,7 @@ mod tests {
     use super::GrokParserConfig;
     use crate::event::LogEvent;
     use crate::{
-        config::{log_schema, TransformConfig, TransformContext},
+        config::{log_schema, TransformConfig},
         event, Event,
     };
     use pretty_assertions::assert_eq;
@@ -158,7 +158,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
         parser.transform(event).unwrap().into_log()

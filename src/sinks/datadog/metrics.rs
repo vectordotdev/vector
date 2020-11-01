@@ -160,7 +160,7 @@ impl_generate_config_from_default!(DatadogConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(None)?;
         let healthcheck = healthcheck(self.clone(), client.clone()).boxed();
 
         let batch = BatchSettings::default()

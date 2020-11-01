@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
 };
@@ -20,7 +20,7 @@ pub struct SwimlaneConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
-    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Swimlane::new(self.condition.build()?)))
     }
 
@@ -83,7 +83,7 @@ impl GenerateConfig for SwimlanesConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {
-    async fn build(&self, _ctx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Err("this transform must be expanded".into())
     }
 

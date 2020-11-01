@@ -30,8 +30,7 @@ TEMPDIR="$(mktemp -d)"
 tar -xf "$PACKAGED_CHART_FILE" --directory "$TEMPDIR"
 pushd "$TEMPDIR" >/dev/null
 
-mapfile -t CHART_FILES < <(find "$CHART_NAME" -mindepth 2 -name Chart.yaml )
-for CHART_FILE in "${CHART_FILES[@]}"; do
+while IFS= read -r CHART_FILE; do
   echo "=> Patching versions at $CHART_FILE"
 
   {
@@ -39,7 +38,7 @@ for CHART_FILE in "${CHART_FILES[@]}"; do
     | sed 's/^appVersion: .*$/appVersion: '"$APP_VERSION"'/g'
   } < "$CHART_FILE" > "$CHART_FILE.new"
   mv "$CHART_FILE.new" "$CHART_FILE"
-done
+done < <(find "$CHART_NAME" -mindepth 2 -name Chart.yaml )
 
 popd >/dev/null
 tar -czf "$PACKAGED_CHART_FILE" -C "$TEMPDIR" -T - <<< "$STRUCTURE_BEFORE"
