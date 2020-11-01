@@ -299,13 +299,6 @@ impl MongoDBMetrics {
         from_document(doc).context(CommandBuildInfoParseError)
     }
 
-    fn encode_namespace(&self, name: &str) -> String {
-        match self.namespace.as_str() {
-            "" => name.to_string(),
-            _ => format!("{}_{}", self.namespace, name),
-        }
-    }
-
     fn create_metric(
         &self,
         name: &str,
@@ -313,8 +306,8 @@ impl MongoDBMetrics {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric {
-            name: self.encode_namespace(name),
-            namespace: None,
+            name: name.into(),
+            namespace: Some(self.namespace.clone()),
             timestamp: Some(Utc::now()),
             tags: Some(tags),
             kind: MetricKind::Absolute,
@@ -585,12 +578,12 @@ impl MongoDBMetrics {
 
         // mongod_metrics_operation_total
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_operation_total",
+            "mongod_metrics_operation_total",
             counter!(status.metrics.operation.scan_and_order),
             tags!(self.tags, "type" => "scan_and_order"),
         ));
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_operation_total",
+            "mongod_metrics_operation_total",
             counter!(status.metrics.operation.write_conflicts),
             tags!(self.tags, "type" => "write_conflicts"),
         ));
@@ -657,17 +650,17 @@ impl MongoDBMetrics {
 
         // mongod_metrics_repl_executor_*
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_repl_executor_queue",
+            "mongod_metrics_repl_executor_queue",
             gauge!(status.metrics.repl.executor.queues.network_in_progress),
             tags!(self.tags, "type" => "network_in_progress"),
         ));
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_repl_executor_queue",
+            "mongod_metrics_repl_executor_queue",
             gauge!(status.metrics.repl.executor.queues.sleepers),
             tags!(self.tags, "type" => "sleepers"),
         ));
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_repl_executor_unsignaled_events",
+            "mongod_metrics_repl_executor_unsignaled_events",
             gauge!(status.metrics.repl.executor.unsignaled_events),
             tags!(self.tags),
         ));
@@ -1110,7 +1103,7 @@ mod integration_tests {
         for event in events {
             let metric = event.expect("Valid Event").into_metric();
             // validate namespace
-            assert!(metric.name.starts_with(&format!("{}_", namespace)));
+            assert!(metric.namespace == Some(namespace.to_string()));
             // validate timestamp
             let timestamp = metric.timestamp.expect("existed timestamp");
             assert!((timestamp - Utc::now()).num_seconds() < 1);
