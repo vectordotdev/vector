@@ -1,7 +1,8 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use futures::compat::Future01CompatExt;
-use rand::{distributions::Alphanumeric, rngs::SmallRng, thread_rng, Rng, SeedableRng};
+use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
+use rand_distr::Alphanumeric;
 use tempfile::tempdir;
 use vector::test_util::{
     next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
@@ -158,10 +159,11 @@ criterion_group!(buffers, benchmark_buffers);
 criterion_main!(buffers);
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
-    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
+    let rng = SmallRng::from_rng(thread_rng()).unwrap();
 
     std::iter::repeat(()).map(move |_| {
-        rng.sample_iter(&Alphanumeric)
+        rng.clone()
+            .sample_iter(&Alphanumeric)
             .take(size)
             .collect::<String>()
     })

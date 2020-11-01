@@ -67,7 +67,15 @@ inventory::submit! {
     SourceDescription::new::<SocketConfig>("socket")
 }
 
-impl GenerateConfig for SocketConfig {}
+impl GenerateConfig for SocketConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"mode = "tcp"
+            address = "0.0.0.0:9000""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
@@ -135,7 +143,6 @@ mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        dns::Resolver,
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
         sinks::util::tcp::TcpSink,
         test_util::{
@@ -170,6 +177,11 @@ mod test {
         tokio::{net::UnixStream, task::yield_now},
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SocketConfig>();
+    }
 
     //////// TCP TESTS ////////
     #[tokio::test]
@@ -440,7 +452,6 @@ mod test {
         let sink = TcpSink::new(
             "localhost".to_owned(),
             addr.port(),
-            Resolver,
             MaybeTlsSettings::Raw(()),
         );
         let message = random_string(512);
@@ -476,7 +487,7 @@ mod test {
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
         let bind = next_addr();
         let socket = UdpSocket::bind(bind)
-            .map_err(|e| panic!("{:}", e))
+            .map_err(|error| panic!("{:}", error))
             .ok()
             .unwrap();
 
@@ -484,7 +495,7 @@ mod test {
             assert_eq!(
                 socket
                     .send_to(line.as_bytes(), addr)
-                    .map_err(|e| panic!("{:}", e))
+                    .map_err(|error| panic!("{:}", error))
                     .ok()
                     .unwrap(),
                 line.as_bytes().len()

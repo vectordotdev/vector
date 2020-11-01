@@ -1,11 +1,9 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion};
 use indexmap::IndexMap;
-use std::str::FromStr;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
-    event::Lookup,
+    config::TransformConfig,
     test_util::runtime,
     transforms::{self, Transform},
     Event,
@@ -27,7 +25,7 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut map = IndexMap::new();
-                    map.insert(Lookup::from_str(key).unwrap(), String::from(value).into());
+                    map.insert(String::from(key), String::from(value).into());
                     transforms::add_fields::AddFields::new(map, true).unwrap()
                 },
                 |mut transform| {
@@ -97,7 +95,7 @@ fn field_filter(c: &mut Criterion) {
                             field: "the_field".to_string(),
                             value: "0".to_string(),
                         }
-                        .build(TransformContext::new_test())
+                        .build()
                         .await
                         .unwrap()
                     })

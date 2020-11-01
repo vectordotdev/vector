@@ -1,7 +1,10 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
+    internal_events::{
+        LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
+    },
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
@@ -25,7 +28,7 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .clone()
@@ -80,12 +83,10 @@ impl Transform for Logfmt {
                             event.as_mut_log().insert(key, value);
                         }
                         Err(error) => {
-                            debug!(
-                                message = "Could not convert types.",
-                                key = &key[..],
-                                %error,
-                                rate_limit_secs = 30
-                            );
+                            emit!(LogfmtParserConversionFailed {
+                                name: key.as_ref(),
+                                error
+                            });
                         }
                     }
                 } else {
@@ -97,12 +98,10 @@ impl Transform for Logfmt {
                 event.as_mut_log().remove(&self.field);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = %self.field,
-                rate_limit_secs = 30
-            );
+            emit!(LogfmtParserMissingField { field: &self.field });
         };
+
+        emit!(LogfmtParserEventProcessed {});
 
         Some(event)
     }
@@ -112,7 +111,7 @@ impl Transform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::{TransformConfig, TransformContext},
+        config::TransformConfig,
         event::{LogEvent, Value},
         Event,
     };
@@ -130,7 +129,7 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
 

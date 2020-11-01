@@ -2,7 +2,9 @@
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding},
+    sinks::util::{
+        encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
+    },
     tls::TlsConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -29,7 +31,16 @@ inventory::submit! {
     SinkDescription::new::<SocketSinkConfig>("socket")
 }
 
-impl GenerateConfig for SocketSinkConfig {}
+impl GenerateConfig for SocketSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"address = "92.12.333.224:5000"
+            mode = "tcp"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(
@@ -55,11 +66,13 @@ impl SinkConfig for SocketSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let encoding = self.encoding.clone();
+        let encode_event = move |event| encode_event(event, &encoding);
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx, self.encoding.clone()),
-            Mode::Udp(config) => config.build(cx, self.encoding.clone()),
+            Mode::Tcp(config) => config.build(cx, encode_event),
+            Mode::Udp(config) => config.build(cx, encode_event),
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx, self.encoding.clone()),
+            Mode::Unix(config) => config.build(cx, encode_event),
         }
     }
 
@@ -91,6 +104,11 @@ mod test {
     };
     use tokio::{net::TcpListener, time::timeout};
     use tokio_util::codec::{FramedRead, LinesCodec};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SocketSinkConfig>();
+    }
 
     async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
@@ -176,7 +194,7 @@ mod test {
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
+    #[cfg(all(feature = "tls", feature = "listenfd"))]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};

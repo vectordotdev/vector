@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::sinks::util::{encode_namespace, http::HttpClient};
+use crate::{http::HttpClient, sinks::util::encode_namespace};
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
@@ -157,7 +157,7 @@ fn healthcheck(
         client
             .call(request)
             .await
-            .map_err(|err| err.into())
+            .map_err(|error| error.into())
             .and_then(|response| match response.status() {
                 StatusCode::OK => Ok(()),
                 StatusCode::NO_CONTENT => Ok(()),
@@ -755,20 +755,18 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
-        config::SinkContext,
+        http::HttpClient,
         sinks::influxdb::{
             healthcheck,
             test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN},
             InfluxDB1Settings, InfluxDB2Settings,
         },
-        sinks::util::http::HttpClient,
     };
 
     #[tokio::test]
     async fn influxdb2_healthchecks_ok() {
         onboarding_v2().await;
 
-        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -776,7 +774,7 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -788,7 +786,6 @@ mod integration_tests {
     async fn influxdb2_healthchecks_fail() {
         onboarding_v2().await;
 
-        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -796,7 +793,7 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -806,7 +803,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn influxdb1_healthchecks_ok() {
-        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -816,7 +812,7 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -826,7 +822,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn influxdb1_healthchecks_fail() {
-        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -836,7 +831,7 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()

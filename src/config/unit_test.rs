@@ -1,7 +1,4 @@
-use super::{
-    Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue,
-    TransformContext,
-};
+use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
@@ -154,7 +151,7 @@ impl UnitTest {
                     inspections.push(format!(
                         "check transform '{}' payloads (events encoded as JSON):\n{}\n{}",
                         check.extract_from,
-                        events_to_string("input", inputs),
+                        events_to_string(" input", inputs),
                         events_to_string("output", outputs),
                     ));
                     continue;
@@ -190,7 +187,7 @@ impl UnitTest {
                         "check transform '{}' failed conditions:\n  {}\npayloads (events encoded as JSON):\n{}\n{}",
                         check.extract_from,
                         failed_conditions.join("\n  "),
-                        events_to_string("input", inputs),
+                        events_to_string(" input", inputs),
                         events_to_string("output", outputs),
                     ));
                 }
@@ -214,7 +211,7 @@ impl UnitTest {
                     errors.push(format!(
                         "check transform '{}' failed: expected no outputs.\npayloads (events encoded as JSON):\n{}\n{}",
                         tform,
-                        events_to_string("input", inputs),
+                        events_to_string(" input", inputs),
                         events_to_string("output", outputs),
                     ));
                 }
@@ -418,11 +415,7 @@ async fn build_unit_test(
     let mut transforms: IndexMap<String, UnitTestTransform> = IndexMap::new();
     for (name, transform_config) in &config.transforms {
         if let Some(outputs) = transform_outputs.remove(name) {
-            match transform_config
-                .inner
-                .build(TransformContext::new_test())
-                .await
-            {
+            match transform_config.inner.build().await {
                 Ok(transform) => {
                     transforms.insert(
                         name.clone(),
@@ -433,7 +426,11 @@ async fn build_unit_test(
                     );
                 }
                 Err(err) => {
-                    errors.push(format!("failed to build transform '{}': {}", name, err));
+                    errors.push(format!(
+                        "failed to build transform '{}': {:#}",
+                        name,
+                        anyhow::anyhow!(err)
+                    ));
                 }
             }
         }

@@ -101,7 +101,7 @@ impl Namespace {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-struct HostMetricsConfig {
+pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
     scrape_interval_secs: u64,
 
@@ -159,10 +159,9 @@ macro_rules! tags {
 }
 
 impl HostMetricsConfig {
-    async fn run(self, mut out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run(self, mut out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
         let interval = Duration::from_secs(self.scrape_interval_secs);
         let mut interval = time::interval(interval).map(|_| ());
-        let mut shutdown = shutdown.compat();
 
         loop {
             select! {
@@ -177,7 +176,7 @@ impl HostMetricsConfig {
                 .send_all(futures01::stream::iter_ok(metrics))
                 .compat()
                 .await
-                .map_err(|error| error!(message = "Error sending host metrics", %error))?;
+                .map_err(|error| error!(message = "Error sending host metrics.", %error))?;
             out = sink;
         }
 
@@ -224,11 +223,11 @@ impl HostMetricsConfig {
         metrics.into_iter().map(Into::into)
     }
 
-    async fn cpu_metrics(&self) -> Vec<Metric> {
+    pub async fn cpu_metrics(&self) -> Vec<Metric> {
         match heim::cpu::times().await {
             Ok(times) => {
                 times
-                    .filter_map(|result| filter_result(result, "Failed to load/parse CPU time"))
+                    .filter_map(|result| filter_result(result, "Failed to load/parse CPU time."))
                     .enumerate()
                     .map(|(index, times)| {
                         let timestamp = Utc::now();
@@ -269,13 +268,13 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load CPU times", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load CPU times.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
     }
 
-    async fn memory_metrics(&self) -> Vec<Metric> {
+    pub async fn memory_metrics(&self) -> Vec<Metric> {
         match heim::memory::memory().await {
             Ok(memory) => {
                 let timestamp = Utc::now();
@@ -350,13 +349,13 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load memory info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load memory info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
     }
 
-    async fn swap_metrics(&self) -> Vec<Metric> {
+    pub async fn swap_metrics(&self) -> Vec<Metric> {
         match heim::memory::swap().await {
             Ok(swap) => {
                 let timestamp = Utc::now();
@@ -396,13 +395,13 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load swap info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load swap info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
     }
 
-    async fn loadavg_metrics(&self) -> Vec<Metric> {
+    pub async fn loadavg_metrics(&self) -> Vec<Metric> {
         #[cfg(unix)]
         let result = match heim::cpu::os::unix::loadavg().await {
             Ok(loadavg) => {
@@ -419,7 +418,7 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load load average info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load load average info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         };
@@ -429,11 +428,13 @@ impl HostMetricsConfig {
         result
     }
 
-    async fn network_metrics(&self) -> Vec<Metric> {
+    pub async fn network_metrics(&self) -> Vec<Metric> {
         match heim::net::io_counters().await {
             Ok(counters) => {
                 counters
-                    .filter_map(|result| filter_result(result, "Failed to load/parse network data"))
+                    .filter_map(|result| {
+                        filter_result(result, "Failed to load/parse network data.")
+                    })
                     // The following pair should be possible to do in one
                     // .filter_map, but it results in a strange "one type is
                     // more general than the other" error.
@@ -464,7 +465,7 @@ impl HostMetricsConfig {
                                 self.counter(
                                     "network_receive_packets_total",
                                     timestamp,
-                                    counter.drop_recv() as f64,
+                                    counter.packets_recv() as f64,
                                     tags!["device" => interface],
                                 ),
                                 self.counter(
@@ -502,18 +503,18 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load network I/O counters", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load network I/O counters.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
     }
 
-    async fn filesystem_metrics(&self) -> Vec<Metric> {
+    pub async fn filesystem_metrics(&self) -> Vec<Metric> {
         match heim::disk::partitions().await {
             Ok(partitions) => {
                 partitions
                     .filter_map(|result| {
-                        filter_result(result, "Failed to load/parse partition data")
+                        filter_result(result, "Failed to load/parse partition data.")
                     })
                     // Filter on configured mountpoints
                     .map(|partition| {
@@ -549,7 +550,7 @@ impl HostMetricsConfig {
                             .await
                             .map_err(|error| {
                                 error!(
-                                    message = "Failed to load partition usage data",
+                                    message = "Failed to load partition usage data.",
                                     mount_point = ?partition.mount_point(),
                                     %error,
                                     rate_limit_secs = 60,
@@ -603,12 +604,12 @@ impl HostMetricsConfig {
         }
     }
 
-    async fn disk_metrics(&self) -> Vec<Metric> {
+    pub async fn disk_metrics(&self) -> Vec<Metric> {
         match heim::disk::io_counters().await {
             Ok(counters) => {
                 counters
                     .filter_map(|result| {
-                        filter_result(result, "Failed to load/parse disk I/O data")
+                        filter_result(result, "Failed to load/parse disk I/O data.")
                     })
                     .map(|counter| {
                         self.disk
@@ -657,7 +658,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load disk I/O info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load disk I/O info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -672,6 +673,7 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric {
             name: self.namespace.encode(name),
+            namespace: None,
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Counter { value },
@@ -688,6 +690,7 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric {
             name: self.namespace.encode(name),
+            namespace: None,
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value },

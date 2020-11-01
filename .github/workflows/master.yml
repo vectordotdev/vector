@@ -131,7 +131,7 @@ jobs:
         run: cargo test --no-fail-fast --no-default-features --features default-msvc
 
   test-misc:
-    name: Shutdown - Linux
+    name: Miscellaneous - Linux
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -311,6 +311,24 @@ jobs:
       - run: make slim-builds
       - run: make test-integration-loki
 
+  test-integration-mongodb_metrics:
+    name: Integration - Linux, MongoDB Metrics
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
+      - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
+      - run: make test-integration-mongodb_metrics
+
   test-integration-pulsar:
     name: Integration - Linux, Pulsar
     runs-on: ubuntu-20.04
@@ -357,6 +375,8 @@ jobs:
       - run: make slim-builds
       - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
       - run: make check-component-features
+        env:
+          RUSTFLAGS: "-D warnings"
 
   master-failure:
     name: master-failure
@@ -387,4 +407,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.0
       with:
-        args: "Master failed and is red: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}"
+        args: "Master failed and is red: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"

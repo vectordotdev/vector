@@ -58,7 +58,7 @@ components: sources: http: {
 
 	configuration: {
 		address: {
-			description: "The address to listen for connections on"
+			description: "The address to accept connections on. The address _must_ include a port."
 			required:    true
 			type: string: examples: ["0.0.0.0:\(_port)", "localhost:\(_port)"]
 		}
@@ -77,11 +77,47 @@ components: sources: http: {
 		}
 		headers: {
 			common:      false
-			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names. An empty string will be inserted into the log event if the corresponding HTTP header was missing."
+			description: "A list of HTTP headers to include in the log event. These will override any values included in the JSON payload with conflicting names."
 			required:    false
 			type: array: {
 				default: null
 				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
+			}
+		}
+		auth: {
+			common:      false
+			description: "Options for HTTP Basic Authentication."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					username: {
+						description: "The basic authentication user name."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${HTTP_USERNAME}", "username"]
+						}
+					}
+					password: {
+						description: "The basic authentication password."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${HTTP_PASSWORD}", "password"]
+						}
+					}
+				}
+			}
+		}
+		query_parameters: {
+			common:      false
+			description: "A list of URL query parameters to include in the log event. These will override any values included in the body with conflicting names."
+			required:    false
+			type: array: {
+				default: null
+				items: type: string: examples: ["application", "source"]
 			}
 		}
 	}

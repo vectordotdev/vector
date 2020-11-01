@@ -1,6 +1,8 @@
 package metadata
 
 components: sinks: prometheus: {
+	_port: 9598
+
 	title:       "Prometheus"
 	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
@@ -8,14 +10,34 @@ components: sinks: prometheus: {
 		commonly_used: true
 		delivery:      "best_effort"
 		development:   "beta"
-		egress_method: "aggregate"
+		egress_method: "expose"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      false
 		healthcheck: enabled: false
-		exposes: {}
+		exposes: {
+			for: {
+				name:     "Prometheus"
+				thing:    "a \(name) database"
+				url:      urls.prometheus
+				versions: ">= 1.0"
+
+				interface: {
+					socket: {
+						api: {
+							title: "Prometheus text exposition format"
+							url:   urls.prometheus_text_based_exposition_format
+						}
+						direction: "incoming"
+						port:      _port
+						protocols: ["http"]
+						ssl: "disabled"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
@@ -28,11 +50,7 @@ components: sinks: prometheus: {
 			"x86_64-unknown-linux-musl":  true
 		}
 
-		requirements: [
-			"""
-				[Prometheus](\(urls.prometheus)) version `>= 1.0` is required.
-				""",
-		]
+		requirements: []
 		warnings: [
 			"""
 				High cardinality metric names and labels are discouraged by
@@ -40,10 +58,6 @@ components: sinks: prometheus: {
 				problems. You should consider alternative strategies to reduce
 				the cardinality. Vector offers a [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit]
 				as a way to protect against this.
-				""",
-			"""
-				This component exposes a configured port. You must ensure your
-				network allows access to this port.
 				""",
 		]
 		notices: []
@@ -55,7 +69,7 @@ components: sinks: prometheus: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["0.0.0.0:9598"]
+				examples: ["0.0.0.0:\(_port)"]
 			}
 		}
 		buckets: {
@@ -120,6 +134,7 @@ components: sinks: prometheus: {
 			title:  "Counter"
 			configuration: {}
 			input: metric: {
+				kind: "incremental"
 				name: _name
 				counter: {
 					value: _value
@@ -131,7 +146,7 @@ components: sinks: prometheus: {
 			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) counter
-				\(_name) \(_value)
+				\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
@@ -141,6 +156,7 @@ components: sinks: prometheus: {
 			title:  "Gauge"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				gauge: {
 					value: _value
@@ -152,7 +168,7 @@ components: sinks: prometheus: {
 			output: """
 				# HELP \(_name) \(_name)
 				# TYPE \(_name) gauge
-				\(_name) \(_value)
+				\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
@@ -161,15 +177,13 @@ components: sinks: prometheus: {
 			title: "Histogram"
 			configuration: {}
 			input: metric: {
+				kind: "absolute"
 				name: _name
 				histogram: {
 					buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 					counts: [0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0]
 					count: 2
 					sum:   0.789
-				}
-				tags: {
-					host: _host
 				}
 			}
 			output: """
@@ -191,6 +205,95 @@ components: sinks: prometheus: {
 				\(_name)_count 2
 				"""
 		},
+		{
+			_host: _values.local_host
+			_name: "request_retries"
+			title: "Distribution to histogram"
+			notes: "Histogram will be computed out of values and then passed to prometheus."
+			configuration: {
+				buckets: [0.0, 1.0, 3.0]
+			}
+			input: metric: {
+				name: _name
+				kind: "incremental"
+				distribution: {
+					values: [0.0, 1.0, 4.0]
+					sample_rates: [4, 2, 1]
+					statistic: "histogram"
+				}
+				tags: {
+					host: _host
+				}
+			}
+			output: """
+				# HELP \(_name) \(_name)
+				# TYPE \(_name) histogram
+				\(_name)_bucket{host="\(_host)",le="0"} 4
+				\(_name)_bucket{host="\(_host)",le="1"} 6
+				\(_name)_bucket{host="\(_host)",le="3"} 6
+				\(_name)_bucket{host="\(_host)",le="+Inf"} 7
+				\(_name)_sum{host="\(_host)"} 6
+				\(_name)_count{host="\(_host)"} 7
+				"""
+		},
+		{
+			_host: _values.local_host
+			_name: "request_retries"
+			title: "Distribution to summary"
+			notes: "Summary will be computed out of values and then passed to prometheus."
+			configuration: {
+				quantiles: [0.5, 0.75, 0.95]
+			}
+			input: metric: {
+				name: _name
+				kind: "incremental"
+				distribution: {
+					values: [0.0, 1.0, 4.0]
+					sample_rates: [3, 2, 1]
+					statistic: "summary"
+				}
+			}
+			output: """
+				# HELP \(_name) \(_name)
+				# TYPE \(_name) summary
+				\(_name){quantile="0.5"} 0
+				\(_name){quantile="0.75"} 1
+				\(_name){quantile="0.95"} 4
+				\(_name)_sum 6
+				\(_name)_count 6
+				\(_name)_min 0
+				\(_name)_max 4
+				\(_name)_avg 1				
+				"""
+		},
+		{
+			_host: _values.local_host
+			_name: "requests"
+			title: "Summary"
+			configuration: {}
+			input: metric: {
+				name: _name
+				kind: "absolute"
+				summary: {
+					quantiles: [0.01, 0.5, 0.99]
+					values: [1.5, 2.0, 3.0]
+					count: 6
+					sum:   12.0
+				}
+				tags: {
+					host: _host
+				}
+			}
+			output: """
+				# HELP \(_name) \(_name)
+				# TYPE \(_name) summary
+				\(_name){host="\(_host)",quantile="0.01"} 1.5
+				\(_name){host="\(_host)",quantile="0.5"} 2
+				\(_name){host="\(_host)",quantile="0.99"} 3
+				\(_name)_sum{host="\(_host)"} 12
+				\(_name)_count{host="\(_host)"} 6		
+				"""
+		},
 	]
 
 	how_it_works: {
@@ -198,8 +301,7 @@ components: sinks: prometheus: {
 			title: "Histogram Buckets"
 			body: #"""
 				Choosing the appropriate buckets for Prometheus histograms is a complicated
-				point of discussion. The [Histograms and Summaries Prometheus \
-				guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
+				point of discussion. The [Histograms and Summaries Prometheus guide](\(urls.prometheus_histograms_guide)) provides a good overview of histograms,
 				buckets, summaries, and how you should think about configuring them. The buckets
 				you choose should align with your known range and distribution of values as
 				well as how you plan to report on them. The aforementioned guide provides
@@ -209,23 +311,10 @@ components: sinks: prometheus: {
 				{
 					title: "Default Buckets"
 					body: """
-						The `buckets` option defines the global default buckets for histograms:
-
-						```toml
-						<%= component.options.buckets.default %>
-						```
-
+						The `buckets` option defines the global default buckets for histograms.
 						These defaults are tailored to broadly measure the response time (in seconds)
 						of a network service. Most likely, however, you will be required to define
 						buckets customized to your use case.
-
-						<Alert type="warning">
-
-						Note: These values are in `<%= component.options.buckets.unit %>`, therefore,
-						your metric values should also be in `<%= component.options.buckets.unit %>`.
-						If this is not the case you should adjust your metric or buckets to coincide.
-
-						</Alert>
 						"""
 				},
 			]
@@ -234,7 +323,7 @@ components: sinks: prometheus: {
 		memory_usage: {
 			title: "Memory Usage"
 			body: """
-				Like other Prometheus instances, the `<%= component.name %>` sink aggregates
+				Like other Prometheus instances, the `prometheus` sink aggregates
 				metrics in memory which keeps the memory footprint to a minimum if Prometheus
 				fails to scrape the Vector instance over an extended period of time. The
 				downside is that data will be lost if Vector is restarted. This is by design of

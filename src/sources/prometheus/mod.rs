@@ -7,10 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future, stream, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
@@ -37,7 +34,15 @@ inventory::submit! {
     SourceDescription::new::<PrometheusConfig>("prometheus")
 }
 
-impl GenerateConfig for PrometheusConfig {}
+impl GenerateConfig for PrometheusConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            endpoints: vec!["http://localhost:9090/metrics".to_string()],
+            scrape_interval_secs: default_scrape_interval_secs(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
@@ -73,10 +78,10 @@ fn prometheus(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_map_err(|error| error!(message = "Error sending metric.", %error))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
-        .take_until(shutdown.compat())
+        .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
@@ -159,7 +164,7 @@ fn prometheus(
         })
         .flatten()
         .forward(out)
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending."));
 
     Box::new(task.boxed().compat())
 }
@@ -181,6 +186,11 @@ mod test {
     };
     use pretty_assertions::assert_eq;
     use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn genreate_config() {
+        crate::test_util::test_generate_config::<PrometheusConfig>();
+    }
 
     #[tokio::test]
     async fn test_prometheus_routing() {
@@ -223,8 +233,8 @@ mod test {
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", %error);
             }
         });
 

@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{
         encode_namespace,
@@ -11,9 +11,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use futures::{
-    compat::Future01CompatExt, future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -72,20 +70,25 @@ pub fn default_flush_period_secs() -> u64 {
     60
 }
 
+impl Default for PrometheusSinkConfig {
+    fn default() -> Self {
+        Self {
+            namespace: None,
+            address: default_address(),
+            buckets: default_histogram_buckets(),
+            quantiles: default_summary_quantiles(),
+            flush_period_secs: default_flush_period_secs(),
+        }
+    }
+}
+
 inventory::submit! {
     SinkDescription::new::<PrometheusSinkConfig>("prometheus")
 }
 
 impl GenerateConfig for PrometheusSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
-            namespace: None,
-            address: default_address(),
-            buckets: default_histogram_buckets(),
-            quantiles: default_summary_quantiles(),
-            flush_period_secs: default_flush_period_secs(),
-        })
-        .unwrap()
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -116,6 +119,10 @@ impl SinkConfig for PrometheusSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "prometheus"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![Resource::Port(self.address.port())]
     }
 }
 
@@ -371,7 +378,7 @@ fn handle(
     }
 
     info!(
-        message = "Request complete",
+        message = "Request complete.",
         response_code = ?response.status()
     );
 
@@ -441,8 +448,8 @@ impl PrometheusSink {
 
         let server = Server::bind(&self.config.address)
             .serve(new_service)
-            .with_graceful_shutdown(tripwire.compat().map(|_| ()))
-            .map_err(|e| eprintln!("server error: {}", e));
+            .with_graceful_shutdown(tripwire.then(crate::stream::tripwire_handler))
+            .map_err(|error| eprintln!("Server error: {}", error));
 
         tokio::spawn(server);
         self.server_shutdown_trigger = Some(trigger);
@@ -510,6 +517,7 @@ mod tests {
     fn test_encode_counter() {
         let metric = Metric {
             name: "hits".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -530,6 +538,7 @@ mod tests {
     fn test_encode_gauge() {
         let metric = Metric {
             name: "temperature".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -550,6 +559,7 @@ mod tests {
     fn test_encode_set() {
         let metric = Metric {
             name: "users".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -572,6 +582,7 @@ mod tests {
     fn test_encode_expired_set() {
         let metric = Metric {
             name: "users".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -594,6 +605,7 @@ mod tests {
     fn test_encode_distribution() {
         let metric = Metric {
             name: "requests".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -618,6 +630,7 @@ mod tests {
     fn test_encode_histogram() {
         let metric = Metric {
             name: "requests".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -643,6 +656,7 @@ mod tests {
     fn test_encode_summary() {
         let metric = Metric {
             name: "requests".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -668,6 +682,7 @@ mod tests {
     fn test_encode_distribution_summary() {
         let metric = Metric {
             name: "requests".to_owned(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags()),
             kind: MetricKind::Absolute,

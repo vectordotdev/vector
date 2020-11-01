@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
-use futures::{future, FutureExt};
+use futures::{future, FutureExt, TryFutureExt};
 use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
@@ -22,7 +22,6 @@ use std::{
 use tracing::{error, info};
 use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
-    TransformContext,
 };
 use vector::event::{metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
@@ -142,35 +141,38 @@ impl SourceConfig for MockSourceConfig {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
         let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(shutdown);
+        let mut shutdown = Some(shutdown.unit_error().boxed().compat());
         let mut _token = None;
-        let source = futures01::future::lazy(move || {
-            stream::poll_fn(move || {
-                if let Some(until) = shutdown.as_mut() {
-                    match until.poll() {
-                        Ok(Async::Ready(res)) => {
-                            _token = Some(res);
-                            shutdown.take();
-                            recv.close();
+        let source =
+            futures01::future::lazy(move || {
+                stream::poll_fn(move || {
+                    if let Some(until) = shutdown.as_mut() {
+                        match until.poll() {
+                            Ok(Async::Ready(res)) => {
+                                _token = Some(res);
+                                shutdown.take();
+                                recv.close();
+                            }
+                            Err(_) => {
+                                shutdown.take();
+                            }
+                            Ok(Async::NotReady) => {}
                         }
-                        Err(_) => {
-                            shutdown.take();
-                        }
-                        Ok(Async::NotReady) => {}
                     }
-                }
 
-                recv.poll()
-            })
-            .map(move |x| {
-                if let Some(counter) = &event_counter {
-                    counter.fetch_add(1, Ordering::Relaxed);
-                }
-                x
-            })
-            .forward(out.sink_map_err(|e| error!("Error sending in sink {}", e)))
-            .map(|_| info!("Finished sending"))
-        });
+                    recv.poll()
+                })
+                .map(move |x| {
+                    if let Some(counter) = &event_counter {
+                        counter.fetch_add(1, Ordering::Relaxed);
+                    }
+                    x
+                })
+                .forward(out.sink_map_err(
+                    |error| error!(message = "Error sending in sink..", error = ?error),
+                ))
+                .map(|_| info!("Finished sending."))
+            });
         Ok(Box::new(source))
     }
 
@@ -254,7 +256,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self, _cx: TransformContext) -> Result<Box<dyn Transform>, vector::Error> {
+    async fn build(&self) -> Result<Box<dyn Transform>, vector::Error> {
         Ok(Box::new(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
@@ -314,9 +316,9 @@ where
 {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         let sink = self.sink.clone().unwrap();
-        let sink = sink.sink_map_err(|error| {
-            error!(message = "Ingesting an event failed at mock sink", ?error)
-        });
+        let sink = sink.sink_map_err(
+            |error| error!(message = "Ingesting an event failed at mock sink.", error = ?error),
+        );
         let sink = StreamSinkOld::new(sink, cx.acker());
         let healthcheck = if self.healthy {
             future::ok(())

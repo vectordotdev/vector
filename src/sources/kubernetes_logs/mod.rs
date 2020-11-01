@@ -13,7 +13,6 @@ use crate::internal_events::{
 use crate::kubernetes as k8s;
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
-    dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
     transforms::Transform,
@@ -24,6 +23,7 @@ use file_source::{FileServer, FileServerShutdown, Fingerprinter};
 use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -70,6 +70,25 @@ pub struct Config {
 
     /// Specifies the field names for metadata annotation.
     annotation_fields: pod_metadata_annotator::FieldsSpec,
+
+    /// A list of glob patterns to exclude from reading the files.
+    exclude_paths_glob_patterns: Vec<PathBuf>,
+
+    /// Max amount of bytes to read from a single file before switching over
+    /// to the next file.
+    /// This allows distributing the reads more or less evenly accross
+    /// the files.
+    #[serde(default = "default_max_read_bytes")]
+    max_read_bytes: usize,
+
+    /// This value specifies not exactly the globbing, but interval
+    /// between the polling the files to watch from the `paths_provider`.
+    /// This is quite efficient, yet might still create some load of the
+    /// file system; in addition, it is currently coupled with chechsum dumping
+    /// in the underlying file server, so setting it too low may introduce
+    /// a significant overhead.
+    #[serde(default = "default_glob_minimum_cooldown_ms")]
+    glob_minimum_cooldown_ms: usize,
 }
 
 inventory::submit! {
@@ -99,7 +118,7 @@ impl SourceConfig for Config {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
-        let source = Source::new(self, Resolver, globals, name)?;
+        let source = Source::new(self, globals, name)?;
 
         // TODO: this is a workaround for the legacy futures 0.1.
         // When the core is updated to futures 0.3 this should be simplified
@@ -108,7 +127,7 @@ impl SourceConfig for Config {
         let fut = source.run(out, shutdown);
         let fut = fut.map(|result| {
             result.map_err(|error| {
-                error!(message = "Source future failed", ?error);
+                error!(message = "Source future failed.", %error);
             })
         });
         let fut = Box::pin(fut);
@@ -134,22 +153,36 @@ struct Source {
     fields_spec: pod_metadata_annotator::FieldsSpec,
     field_selector: String,
     label_selector: String,
+    exclude_paths: Vec<glob::Pattern>,
+    max_read_bytes: usize,
+    glob_minimum_cooldown: Duration,
 }
 
 impl Source {
-    fn new(
-        config: &Config,
-        resolver: Resolver,
-        globals: &GlobalOptions,
-        name: &str,
-    ) -> crate::Result<Self> {
+    fn new(config: &Config, globals: &GlobalOptions, name: &str) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
 
         let k8s_config = k8s::client::config::Config::in_cluster()?;
-        let client = k8s::client::Client::new(k8s_config, resolver)?;
+        let client = k8s::client::Client::new(k8s_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
+
+        let exclude_paths = config
+            .exclude_paths_glob_patterns
+            .iter()
+            .map(|pattern| {
+                let pattern = pattern
+                    .to_str()
+                    .ok_or_else(|| "glob pattern is not a valid UTF-8 string")?;
+                Ok(glob::Pattern::new(pattern)?)
+            })
+            .collect::<crate::Result<Vec<_>>>()?;
+
+        let glob_minimum_cooldown =
+            Duration::from_millis(config.glob_minimum_cooldown_ms.try_into().expect(
+                "unable to convert glob_minimum_cooldown_ms from usize to u64 without data loss",
+            ));
 
         Ok(Self {
             client,
@@ -158,6 +191,9 @@ impl Source {
             fields_spec: config.annotation_fields.clone(),
             field_selector,
             label_selector,
+            exclude_paths,
+            max_read_bytes: config.max_read_bytes,
+            glob_minimum_cooldown,
         })
     }
 
@@ -173,6 +209,9 @@ impl Source {
             fields_spec,
             field_selector,
             label_selector,
+            exclude_paths,
+            max_read_bytes,
+            glob_minimum_cooldown,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -193,10 +232,10 @@ impl Source {
         );
         let reflector_process = reflector.run();
 
-        let paths_provider = K8sPathsProvider::new(state_reader.clone());
+        let paths_provider = K8sPathsProvider::new(state_reader.clone(), exclude_paths);
         let annotator = PodMetadataAnnotator::new(state_reader, fields_spec);
 
-        // TODO: maybe some of the parameters have to be configurable.
+        // TODO: maybe more of the parameters have to be configurable.
 
         // The 16KB is the maximum size of the payload at single line for both
         // docker and CRI log formats.
@@ -207,8 +246,11 @@ impl Source {
         let file_server = FileServer {
             // Use our special paths provider.
             paths_provider,
-            // This is the default value for the read buffer size.
-            max_read_bytes: 2048,
+            // Max amount of bytes to read from a single file before switching
+            // over to the next file.
+            // This allows distributing the reads more or less evenly accross
+            // the files.
+            max_read_bytes,
             // We want to use checkpoining mechanism, and resume from where we
             // left off.
             start_at_beginning: false,
@@ -225,10 +267,7 @@ impl Source {
             data_dir,
             // This value specifies not exactly the globbing, but interval
             // between the polling the files to watch from the `paths_provider`.
-            // This is quite efficient, yet might still create some load of the
-            // file system, so this call is 10 times larger than the default for
-            // the files.
-            glob_minimum_cooldown: Duration::from_secs(10),
+            glob_minimum_cooldown,
             // The shape of the log files is well-known in the Kubernetes
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
@@ -236,6 +275,7 @@ impl Source {
                 // Max line length to expect during fingerprinting, see the
                 // explanation above.
                 max_line_length: max_line_bytes,
+                ignored_header_bytes: 0,
             },
             // We expect the files distribution to not be a concern because of
             // the way we pick files for gathering: for each container, only the
@@ -251,22 +291,26 @@ impl Source {
         };
 
         let (file_source_tx, file_source_rx) =
-            futures::channel::mpsc::channel::<(Bytes, String)>(100);
+            futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
         let mut parser = parser::build();
         let mut partial_events_merger = partial_events_merger::build(auto_partial_merge);
 
-        let events = file_source_rx.map(move |(bytes, file)| {
-            emit!(KubernetesLogsEventReceived {
-                file: &file,
-                byte_size: bytes.len(),
-            });
-            let mut event = create_event(bytes, &file);
-            if annotator.annotate(&mut event, &file).is_none() {
-                emit!(KubernetesLogsEventAnnotationFailed { event: &event });
-            }
-            event
-        });
+        let events =
+            file_source_rx
+                .map(futures::stream::iter)
+                .flatten()
+                .map(move |(bytes, file)| {
+                    emit!(KubernetesLogsEventReceived {
+                        file: &file,
+                        byte_size: bytes.len(),
+                    });
+                    let mut event = create_event(bytes, &file);
+                    if annotator.annotate(&mut event, &file).is_none() {
+                        emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+                    }
+                    event
+                });
         let events = events
             .filter_map(move |event| futures::future::ready(parser.transform(event)))
             .filter_map(move |event| {
@@ -280,9 +324,9 @@ impl Source {
             let (slot, shutdown) = lifecycle.add();
             let fut =
                 util::cancel_on_signal(reflector_process, shutdown).map(|result| match result {
-                    Ok(()) => info!(message = "reflector process completed gracefully"),
+                    Ok(()) => info!(message = "Reflector process completed gracefully."),
                     Err(error) => {
-                        error!(message = "reflector process exited with an error", ?error)
+                        error!(message = "Reflector process exited with an error.", %error)
                     }
                 });
             slot.bind(Box::pin(fut));
@@ -291,8 +335,8 @@ impl Source {
             let (slot, shutdown) = lifecycle.add();
             let fut = util::run_file_server(file_server, file_source_tx, shutdown).map(|result| {
                 match result {
-                    Ok(FileServerShutdown) => info!(message = "file server completed gracefully"),
-                    Err(error) => error!(message = "file server exited with an error", ?error),
+                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+                    Err(error) => error!(message = "File server exited with an error.", %error),
                 }
             });
             slot.bind(Box::pin(fut));
@@ -306,14 +350,14 @@ impl Source {
             )
             .map(|result| {
                 match result {
-                    Ok(Ok(())) => info!(message = "event processing loop completed gracefully"),
+                    Ok(Ok(())) => info!(message = "Event processing loop completed gracefully."),
                     Ok(Err(error)) => error!(
-                        message = "event processing loop exited with an error",
-                        ?error
+                        message = "Event processing loop exited with an error.",
+                        %error
                     ),
                     Err(error) => error!(
-                        message = "event processing loop timed out during the shutdown",
-                        ?error
+                        message = "Event processing loop timed out during the shutdown.",
+                        %error
                     ),
                 };
             });
@@ -321,7 +365,7 @@ impl Source {
         }
 
         lifecycle.run(global_shutdown).await;
-        info!(message = "done");
+        info!(message = "Done.");
         Ok(())
     }
 }
@@ -347,6 +391,14 @@ fn default_self_node_name_env_template() -> String {
     format!("${{{}}}", SELF_NODE_NAME_ENV_KEY.to_owned())
 }
 
+fn default_max_read_bytes() -> usize {
+    2048
+}
+
+fn default_glob_minimum_cooldown_ms() -> usize {
+    60000
+}
+
 /// This function construct the effective field selector to use, based on
 /// the specified configuration.
 fn prepare_field_selector(config: &Config) -> crate::Result<String> {
@@ -363,7 +415,7 @@ fn prepare_field_selector(config: &Config) -> crate::Result<String> {
         config.self_node_name.clone()
     };
     info!(
-        message = "obtained Kubernetes Node name to collect logs for (self)",
+        message = "Obtained Kubernetes Node name to collect logs for (self).",
         ?self_node_name
     );
 

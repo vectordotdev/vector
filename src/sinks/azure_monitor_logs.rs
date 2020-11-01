@@ -1,10 +1,11 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -110,7 +111,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         }
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), Some(tls_settings))?;
+        let client = HttpClient::new(Some(tls_settings))?;
 
         let sink = AzureMonitorLogsSink::new(self)?;
         let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -125,7 +126,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal azure_monitor_logs sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
@@ -268,8 +269,9 @@ impl AzureMonitorLogsSink {
             len, CONTENT_TYPE, X_MS_DATE, rfc1123date, RESOURCE
         );
         let mut signer = sign::Signer::new(hash::MessageDigest::sha256(), &self.shared_key)?;
+        signer.update(string_to_hash.as_bytes())?;
 
-        let signature = signer.sign_oneshot_to_vec(string_to_hash.as_bytes())?;
+        let signature = signer.sign_to_vec()?;
         let signature_base64 = base64::encode_block(&signature);
 
         Ok(format!(

@@ -8,6 +8,7 @@ components: sinks: [Name=string]: {
 	if strings.HasPrefix(Name, "aws_") {
 		configuration: {
 			assume_role: {
+				category:    "Auth"
 				common:      false
 				description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
 				required:    false
@@ -34,6 +35,79 @@ components: sinks: [Name=string]: {
 				relevant_when: "endpoint = null"
 				type: string: {
 					examples: ["us-east-1"]
+				}
+			}
+		}
+
+		env_vars: {
+			AWS_ACCESS_KEY_ID: {
+				description: "The AWS access key id. Used for AWS authentication when communicating with AWS services."
+				type: string: {
+					default: null
+					examples: ["AKIAIOSFODNN7EXAMPLE"]
+				}
+			}
+
+			AWS_CONFIG_FILE: {
+				description: "Specifies the location of the file that the AWS CLI uses to store configuration profiles."
+				type: string: {
+					default: "~/.aws/config"
+				}
+			}
+
+			AWS_CREDENTIAL_EXPIRATION: {
+				description: "Expiration time in RFC 3339 format. If unset, credentials won't expire."
+				type: string: {
+					default: null
+					examples: ["1996-12-19T16:39:57-08:00"]
+				}
+			}
+
+			AWS_DEFAULT_REGION: {
+				description:   "The default [AWS region](\(urls.aws_regions))."
+				relevant_when: "endpoint = null"
+				type: string: {
+					default: null
+					examples: ["/path/to/credentials.json"]
+				}
+			}
+
+			AWS_PROFILE: {
+				description: "Specifies the name of the CLI profile with the credentials and options to use. This can be the name of a profile stored in a credentials or config file."
+				type: string: {
+					default: "default"
+					examples: ["my-custom-profile"]
+				}
+			}
+
+			AWS_ROLE_SESSION_NAME: {
+				description: "Specifies a name to associate with the role session. This value appears in CloudTrail logs for commands performed by the user of this profile."
+				type: string: {
+					default: null
+					examples: ["vector-session"]
+				}
+			}
+
+			AWS_SECRET_ACCESS_KEY: {
+				description: "The AWS secret access key. Used for AWS authentication when communicating with AWS services."
+				type: string: {
+					default: null
+					examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+				}
+			}
+
+			AWS_SHARED_CREDENTIALS_FILE: {
+				description: "Specifies the location of the file that the AWS CLI uses to store access keys."
+				type: string: {
+					default: "~/.aws/credentials"
+				}
+			}
+
+			AWS_SESSION_TOKEN: {
+				description: "The AWS session token. Used for AWS authentication when communicating with AWS services."
+				type: string: {
+					default: null
+					examples: ["/path/to/credentials.json"]
 				}
 			}
 		}

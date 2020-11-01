@@ -1,6 +1,6 @@
 use super::{BuildError, Transform};
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
 };
@@ -21,12 +21,21 @@ inventory::submit! {
     TransformDescription::new::<ConcatConfig>("concat")
 }
 
-impl GenerateConfig for ConcatConfig {}
+impl GenerateConfig for ConcatConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            target: String::new(),
+            joiner: None,
+            items: Vec::new(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var,
@@ -198,9 +207,13 @@ impl Transform for Concat {
 
 #[cfg(test)]
 mod tests {
-    use super::Concat;
-    use super::Substring;
+    use super::{Concat, ConcatConfig, Substring};
     use crate::{event::Event, transforms::Transform};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ConcatConfig>();
+    }
 
     #[test]
     fn concat_to_from() {

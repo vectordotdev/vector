@@ -42,4 +42,4 @@ encoding = "json"
 inputs = ["log_to_metric"]
 type = "aws_cloudwatch_metrics"
 namespace = "vector"
-endpoint = "http://localhost:4582"
+endpoint = "http://localhost:4566"

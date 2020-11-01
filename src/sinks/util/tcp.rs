@@ -1,16 +1,15 @@
 use crate::{
     config::SinkContext,
-    dns::Resolver,
-    emit,
+    dns, emit,
     internal_events::{
-        TcpConnectionDisconnected, TcpConnectionEstablished, TcpConnectionFailed,
-        TcpConnectionShutdown, TcpEventSent, TcpFlushError,
+        ConnectionOpen, OpenGauge, OpenTokenDyn, TcpConnectionDisconnected,
+        TcpConnectionEstablished, TcpConnectionFailed, TcpConnectionShutdown, TcpEventSent,
+        TcpFlushError,
     },
-    sinks::util::{
-        encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld,
-    },
+    sinks::util::{SinkBuildError, StreamSinkOld},
     sinks::{Healthcheck, VectorSink},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsConfig, TlsError},
+    Event,
 };
 use bytes::Bytes;
 use futures::{
@@ -46,7 +45,6 @@ pub struct TcpSinkConfig {
 struct TcpConnector {
     host: String,
     port: u16,
-    resolver: Resolver,
     tls: MaybeTlsSettings,
 }
 
@@ -67,7 +65,7 @@ impl TcpSinkConfig {
         Self { address, tls: None }
     }
 
-    fn build_connector(&self, cx: SinkContext) -> crate::Result<TcpConnector> {
+    fn build_connector(&self, _cx: SinkContext) -> crate::Result<TcpConnector> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
@@ -75,50 +73,41 @@ impl TcpSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let connector = TcpConnector::new(host, port, cx.resolver(), tls);
+        let connector = TcpConnector::new(host, port, tls);
 
         Ok(connector)
     }
 
-    pub fn build_service(&self, cx: SinkContext) -> crate::Result<(TcpService, Healthcheck)> {
-        let connector = self.build_connector(cx)?;
-        let healthcheck = connector.healthcheck();
-        Ok((connector.into(), healthcheck))
-    }
-
-    pub fn build(
+    pub fn build<F>(
         &self,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        encode_event: F,
+    ) -> crate::Result<(VectorSink, Healthcheck)>
+    where
+        F: Fn(Event) -> Option<Bytes> + Send + 'static,
+    {
         let connector = self.build_connector(cx.clone())?;
         let healthcheck = connector.healthcheck();
         let sink: TcpSink = connector.into();
         let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+            .with_flat_map(move |event| iter_ok(encode_event(event)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
 }
 
 impl TcpConnector {
-    fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
-        Self {
-            host,
-            port,
-            resolver,
-            tls,
-        }
+    fn new(host: String, port: u16, tls: MaybeTlsSettings) -> Self {
+        Self { host, port, tls }
     }
 
     fn connect(&self) -> BoxFuture<'static, Result<TcpOrTlsStream, TcpError>> {
         let host = self.host.clone();
         let port = self.port;
-        let resolver = self.resolver;
         let tls = self.tls.clone();
 
         async move {
-            let ip = resolver
+            let ip = dns::Resolver
                 .lookup_ip(host.clone())
                 .await
                 .context(DnsError)?
@@ -139,38 +128,7 @@ impl TcpConnector {
 
 impl Into<TcpSink> for TcpConnector {
     fn into(self) -> TcpSink {
-        TcpSink::new(self.host, self.port, self.resolver, self.tls)
-    }
-}
-
-impl Into<TcpService> for TcpConnector {
-    fn into(self) -> TcpService {
-        TcpService { connector: self }
-    }
-}
-
-pub struct TcpService {
-    connector: TcpConnector,
-}
-
-impl tower::Service<Bytes> for TcpService {
-    type Response = ();
-    type Error = TcpError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, msg: Bytes) -> Self::Future {
-        use futures::SinkExt;
-        let connector = self.connector.clone();
-        async move {
-            let mut connection = connector.connect().await?;
-            connection.send(msg).await.context(SendError)?;
-            Ok(())
-        }
-        .boxed()
+        TcpSink::new(self.host, self.port, self.tls)
     }
 }
 
@@ -184,7 +142,7 @@ pub struct TcpSink {
 enum TcpSinkState {
     Disconnected,
     Connecting(Box<dyn Future<Item = TcpOrTlsStream, Error = TcpError> + Send>),
-    Connected(TcpOrTlsStream01),
+    Connected(TcpOrTlsStream01, OpenTokenDyn),
     Backoff(Box<dyn Future<Item = (), Error = ()> + Send>),
 }
 
@@ -192,14 +150,9 @@ type TcpOrTlsStream = FramedWrite<MaybeTlsStream<TcpStream>, BytesCodec>;
 type TcpOrTlsStream01 = CompatSink<TcpOrTlsStream, Bytes>;
 
 impl TcpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver, tls: MaybeTlsSettings) -> Self {
+    pub fn new(host: String, port: u16, tls: MaybeTlsSettings) -> Self {
         let span = info_span!("connection", %host, %port);
-        let connector = TcpConnector {
-            host,
-            port,
-            resolver,
-            tls,
-        };
+        let connector = TcpConnector { host, port, tls };
         Self {
             connector,
             state: TcpSinkState::Disconnected,
@@ -241,14 +194,20 @@ impl TcpSink {
                             peer_addr: connection.get_mut().peer_addr().ok(),
                         });
                         self.backoff = Self::fresh_backoff();
-                        TcpSinkState::Connected(CompatSink::new(connection))
+                        TcpSinkState::Connected(
+                            CompatSink::new(connection),
+                            OpenGauge::new()
+                                .open(Box::new(|count| emit!(ConnectionOpen { count }))),
+                        )
                     }
                     Err(error) => {
                         emit!(TcpConnectionFailed { error });
                         TcpSinkState::Backoff(self.next_delay01())
                     }
                 },
-                TcpSinkState::Connected(ref mut connection) => return Ok(Async::Ready(connection)),
+                TcpSinkState::Connected(ref mut connection, _) => {
+                    return Ok(Async::Ready(connection))
+                }
                 TcpSinkState::Backoff(ref mut delay) => match delay.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(())) => TcpSinkState::Disconnected,
@@ -308,7 +267,7 @@ impl Sink for TcpSink {
                             return match connection.start_send(line) {
                                 Ok(AsyncSink::NotReady(line)) => Ok(AsyncSink::NotReady(line)),
                                 Err(error) => {
-                                    error!(message = "connection disconnected.", %error);
+                                    error!(message = "Connection disconnected.", %error);
                                     self.state = TcpSinkState::Disconnected;
                                     return Ok(AsyncSink::Ready);
                                 }
@@ -360,24 +319,18 @@ mod test {
         trace_init();
 
         let addr = next_addr();
-        let resolver = crate::dns::Resolver;
 
         let _listener = TcpListener::bind(&addr).await.unwrap();
 
         let healthcheck =
-            TcpConnector::new(addr.ip().to_string(), addr.port(), resolver, None.into())
-                .healthcheck();
+            TcpConnector::new(addr.ip().to_string(), addr.port(), None.into()).healthcheck();
 
         assert!(healthcheck.await.is_ok());
 
         let bad_addr = next_addr();
-        let bad_healthcheck = TcpConnector::new(
-            bad_addr.ip().to_string(),
-            bad_addr.port(),
-            resolver,
-            None.into(),
-        )
-        .healthcheck();
+        let bad_healthcheck =
+            TcpConnector::new(bad_addr.ip().to_string(), bad_addr.port(), None.into())
+                .healthcheck();
 
         assert!(bad_healthcheck.await.is_err());
     }

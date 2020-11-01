@@ -11,7 +11,7 @@ impl InternalEvent for MetricToLogEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -24,12 +24,12 @@ impl<'a> InternalEvent for MetricToLogFailedSerialize {
     fn emit_logs(&self) {
         warn!(
             message = "Metric failed to serialize as JSON.",
-            %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         )
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "failed_serialize");
+        counter!("processing_errors_total", 1, "error_type" => "failed_serialize");
     }
 }

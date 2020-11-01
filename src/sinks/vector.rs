@@ -37,7 +37,15 @@ inventory::submit! {
     SinkDescription::new::<VectorSinkConfig>("vector")
 }
 
-impl GenerateConfig for VectorSinkConfig {}
+impl GenerateConfig for VectorSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "127.0.0.1:5000".to_string(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
@@ -53,7 +61,7 @@ impl SinkConfig for VectorSinkConfig {
 
         let tls = MaybeTlsSettings::from_config(&self.tls, false)?;
 
-        let sink = TcpSink::new(host, port, cx.resolver(), tls);
+        let sink = TcpSink::new(host, port, tls);
         let healthcheck = sink.healthcheck();
         let sink = StreamSinkOld::new(sink, cx.acker())
             .with_flat_map(move |event| iter_ok(encode_event(event)));
@@ -93,4 +101,12 @@ fn encode_event(event: Event) -> Option<Bytes> {
     event.encode(&mut out).unwrap();
 
     Some(out.into())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::VectorSinkConfig>();
+    }
 }

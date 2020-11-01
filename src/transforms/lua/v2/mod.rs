@@ -1,8 +1,8 @@
 mod interop;
 
 use crate::{
+    config::DataType,
     config::CONFIG_PATHS,
-    config::{DataType, TransformContext},
     event::Event,
     internal_events::{LuaBuildError, LuaEventProcessed, LuaGcTriggered},
     transforms::{
@@ -88,7 +88,7 @@ struct TimerConfig {
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
-    pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    pub fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self).map(|lua| Box::new(lua) as Box<dyn Transform>)
     }
 
@@ -224,7 +224,7 @@ impl Lua {
                 .lua
                 .gc_collect()
                 .context(RuntimeErrorGC)
-                .map_err(|e| error!(error = %e, rate_limit = 30));
+                .map_err(|error| error!(%error, rate_limit = 30));
             self.invocations_after_gc = 0;
         }
     }
@@ -280,7 +280,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksInit)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -302,7 +302,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorHooksInit)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -323,7 +323,7 @@ impl RuntimeTransform for Lua {
                 })
             })
             .context(RuntimeErrorTimerHandler)
-            .map_err(|e| error!(error = %e, rate_limit = 30));
+            .map_err(|error| error!(%error, rate_limit = 30));
 
         self.attempt_gc();
     }
@@ -739,6 +739,7 @@ mod tests {
 
         let event = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -747,6 +748,7 @@ mod tests {
 
         let expected = Event::Metric(Metric {
             name: "example counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,

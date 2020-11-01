@@ -1,7 +1,7 @@
 use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
 };
 use serde::{Deserialize, Serialize};
@@ -16,12 +16,20 @@ inventory::submit! {
     TransformDescription::new::<FilterConfig>("filter")
 }
 
-impl GenerateConfig for FilterConfig {}
+impl GenerateConfig for FilterConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"condition.type = "check_fields"
+            condition."message.eq" = "value""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Filter::new(self.condition.build()?)))
     }
 
@@ -55,5 +63,13 @@ impl Transform for Filter {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::FilterConfig>();
     }
 }

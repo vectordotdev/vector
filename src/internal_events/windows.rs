@@ -46,6 +46,24 @@ impl<'a> InternalEvent for WindowsServiceStop<'a> {
 }
 
 #[derive(Debug)]
+pub struct WindowsServiceRestart<'a> {
+    pub name: &'a str,
+}
+
+impl<'a> InternalEvent for WindowsServiceRestart<'a> {
+    fn emit_logs(&self) {
+        info!(
+            name = ?self.name,
+            "Restarted Windows Service."
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("windows_service_restart", 1)
+    }
+}
+
+#[derive(Debug)]
 pub struct WindowsServiceInstall<'a> {
     pub name: &'a str,
 }

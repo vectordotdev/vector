@@ -24,6 +24,20 @@ list-chart-dependencies() {
   helm dependency list "$CHART" | tail -n +2 | sed '/^$/d' | awk '{ gsub("file://", "", $3); print $1, $3 }'
 }
 
+symlink_posix() {
+  local LINK_TARGET="$1"
+  local LINK_NAME="$2"
+  ln -sfn -T "$LINK_TARGET" "$LINK_NAME"
+}
+
+symlink_windows() {
+  local LINK_TARGET="$1"
+  local LINK_NAME="$2"
+  cmd >/dev/null <<EOF
+mklink /D "${LINK_NAME//\//\\}" "${LINK_TARGET//\//\\}"
+EOF
+}
+
 list() {
   for CHART in "${DEPENDENCY_UPDATE_ORDER[@]}"; do
     echo "=> $CHART"
@@ -32,6 +46,12 @@ list() {
 }
 
 update() {
+  if [[ "${OS:-}" == "Windows_NT" ]]; then
+    SYMLINK_COMMAND="symlink_windows"
+  else
+    SYMLINK_COMMAND="symlink_posix"
+  fi
+
   for CHART in "${DEPENDENCY_UPDATE_ORDER[@]}"; do
     echo "=> $CHART"
 
@@ -41,8 +61,7 @@ update() {
     rm -rf "$CHART_VENDORED_DEPENDENCIES_PATH"
     mkdir -p "$CHART_VENDORED_DEPENDENCIES_PATH"
 
-    mapfile -t DEPENDENCIES < <(list-chart-dependencies "$CHART_PATH")
-    for DEPENDENCY_PAIR in "${DEPENDENCIES[@]}"; do
+    while IFS= read -r DEPENDENCY_PAIR; do
       read -ra KV <<<"$DEPENDENCY_PAIR"
       DEPENDENCY_NAME="${KV[0]}"
       DEPENDENCY_PATH="${KV[1]}"
@@ -51,8 +70,8 @@ update() {
       LINK_NAME="$CHART_VENDORED_DEPENDENCIES_PATH/$DEPENDENCY_NAME"
 
       echo "Symlinking \"$DEPENDENCY_NAME\" with name \"$LINK_NAME\" and target \"$LINK_TARGET\"..."
-      ln -sfn -T "$LINK_TARGET" "$LINK_NAME"
-    done
+      "$SYMLINK_COMMAND" "$LINK_TARGET" "$LINK_NAME"
+    done < <(list-chart-dependencies "$CHART_PATH")
   done
 }
 
@@ -63,8 +82,7 @@ validate() {
     CHART_PATH="distribution/helm/$CHART"
     CHART_VENDORED_DEPENDENCIES_PATH="$CHART_PATH/charts"
 
-    mapfile -t DEPENDENCIES < <(list-chart-dependencies "$CHART_PATH")
-    for DEPENDENCY_PAIR in "${DEPENDENCIES[@]}"; do
+    while IFS= read -r DEPENDENCY_PAIR; do
       read -ra KV <<<"$DEPENDENCY_PAIR"
       DEPENDENCY_NAME="${KV[0]}"
       DEPENDENCY_PATH="${KV[1]}"
@@ -74,7 +92,7 @@ validate() {
 
       echo "Validating \"$DEPENDENCY_NAME\" at \"$VENDORED_PATH\" against \"$UPSTREAM_PATH\"..."
       diff -qr "$VENDORED_PATH" "$UPSTREAM_PATH"
-    done
+    done < <(list-chart-dependencies "$CHART_PATH")
   done
 }
 
@@ -94,10 +112,10 @@ EOF
 
 MODE="${1:-}"
 case "$MODE" in
-  list|update|validate)
-    "$MODE"
-    ;;
-  *)
-    usage
-    ;;
+list | update | validate)
+  "$MODE"
+  ;;
+*)
+  usage
+  ;;
 esac

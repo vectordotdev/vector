@@ -20,11 +20,11 @@ messages
             file = file.as_str(),
             rate_limit_secs = 10
         );
-        counter!("events_processed", 1, "source" => "file");
+        counter!("events_processed_total", 1, "source" => "file");
         counter!("bytes_processed", msg.len() as u64, "source" => "file");
         create_event(msg, file, &host_key, &hostname, &file_key)
     })
-    .forward(out.sink_map_err(|e| error!(%e)))
+    .forward(out.sink_map_err(|error| error!(?error)))
 ```
 
 It's immediately obvious that we're trading off brevity for thoroughness. There
@@ -79,7 +79,7 @@ messages
         });
         create_event(msg, file, &host_key, &hostname, &file_key)
     })
-    .forward(out.sink_map_err(|e| error!(%e)))
+    .forward(out.sink_map_err(|error| error!(?error)))
 ```
 
 And in the `internal_events` module, we would add the following:
@@ -100,7 +100,7 @@ impl InternalEvent for FileEventReceived<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1, "source" => "file");
+        counter!("events_processed_total", 1, "source" => "file");
         counter!("bytes_processed", self.byte_size as u64, "source" => "file");
     }
 }

@@ -2,7 +2,7 @@ pub mod v1;
 pub mod v2;
 
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     transforms::Transform,
 };
 use serde::{Deserialize, Serialize};
@@ -46,15 +46,23 @@ inventory::submit! {
     TransformDescription::new::<LuaConfig>("lua")
 }
 
-impl GenerateConfig for LuaConfig {}
+impl GenerateConfig for LuaConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"version = "2"
+            hooks.process = """#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         match self {
-            LuaConfig::V1(v1) => v1.config.build(cx),
-            LuaConfig::V2(v2) => v2.config.build(cx),
+            LuaConfig::V1(v1) => v1.config.build(),
+            LuaConfig::V2(v2) => v2.config.build(),
         }
     }
 
@@ -77,5 +85,13 @@ impl TransformConfig for LuaConfig {
             LuaConfig::V1(v1) => v1.config.transform_type(),
             LuaConfig::V2(v2) => v2.config.transform_type(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::LuaConfig>();
     }
 }

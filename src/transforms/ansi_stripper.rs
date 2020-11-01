@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Value,
     internal_events::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
@@ -20,12 +20,16 @@ inventory::submit! {
     TransformDescription::new::<AnsiStripperConfig>("ansi_stripper")
 }
 
-impl GenerateConfig for AnsiStripperConfig {}
+impl GenerateConfig for AnsiStripperConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { field: None }).unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let field = self
             .field
             .clone()
@@ -77,11 +81,16 @@ impl Transform for AnsiStripper {
 
 #[cfg(test)]
 mod tests {
-    use super::AnsiStripper;
+    use super::{AnsiStripper, AnsiStripperConfig};
     use crate::{
         event::{Event, Value},
         transforms::Transform,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AnsiStripperConfig>();
+    }
 
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {

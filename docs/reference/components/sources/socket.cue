@@ -65,6 +65,7 @@ components: sources: socket: {
 			}
 		}
 		host_key: {
+			category:    "Context"
 			common:      false
 			description: "The key name added to each event representing the current host. This can also be globally set via the [global `host_key` option][docs.reference.global-options#host_key]."
 			groups: ["tcp", "udp", "unix"]
@@ -99,7 +100,7 @@ components: sources: socket: {
 			}
 		}
 		path: {
-			description: "The unix socket path. *This should be absolute path*."
+			description: "The unix socket path. *This should be an absolute path*."
 			groups: ["unix"]
 			required: true
 			warnings: []

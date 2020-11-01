@@ -83,6 +83,11 @@ components: transforms: grok_parser: {
 	}
 
 	how_it_works: {
+		available_patterns: {
+			title: "Available Patterns"
+			body:  support.notices[0]
+		}
+
 		testing: {
 			title: "Testing"
 			body:  """

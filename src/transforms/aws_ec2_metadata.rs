@@ -1,8 +1,8 @@
 use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::Event,
-    sinks::util::http::HttpClient,
+    http::HttpClient,
 };
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
@@ -102,7 +102,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self, cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -132,7 +132,7 @@ impl TransformConfig for Ec2Metadata {
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let http_client = HttpClient::new(cx.resolver(), None)?;
+        let http_client = HttpClient::new(None)?;
 
         let mut client =
             MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
@@ -303,7 +303,7 @@ impl MetadataClient {
 
         let uri = Uri::from_parts(parts)?;
 
-        debug!(message = "Sending metadata request.", %uri);
+        debug!(message = "Sending metadata request.", uri = %uri);
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
@@ -497,7 +497,7 @@ mod integration_tests {
             endpoint: Some(HOST.to_string()),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -531,7 +531,7 @@ mod integration_tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -559,7 +559,7 @@ mod integration_tests {
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
@@ -584,7 +584,7 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;

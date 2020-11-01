@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    internal_events::ConsoleFieldNotFound,
+    internal_events::{ConsoleEventProcessed, ConsoleFieldNotFound},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
@@ -46,7 +46,15 @@ inventory::submit! {
     SinkDescription::new::<ConsoleSinkConfig>("console")
 }
 
-impl GenerateConfig for ConsoleSinkConfig {}
+impl GenerateConfig for ConsoleSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            target: Target::Stdout,
+            encoding: Encoding::Json.into(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "console")]
@@ -89,7 +97,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Event::Log(log) => match encoding.codec() {
             Encoding::Json => serde_json::to_string(&log)
                 .map_err(|error| {
-                    error!("Error encoding json: {}.", error);
+                    error!(message = "Error encoding json.", %error);
                 })
                 .ok(),
             Encoding::Text => {
@@ -108,7 +116,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
         Event::Metric(metric) => match encoding.codec() {
             Encoding::Json => serde_json::to_string(&metric)
                 .map_err(|error| {
-                    error!("Error encoding json: {}.", error);
+                    error!(message = "Error encoding json.", %error);
                 })
                 .ok(),
             Encoding::Text => Some(format!("{}", metric)),
@@ -132,9 +140,13 @@ impl StreamSink for WriterSink {
                 if let Err(error) = self.output.write_all(buf.as_bytes()).await {
                     // Error when writing to stdout/stderr is likely irrecoverable,
                     // so stop the sink.
-                    error!("Error writing to output: {}. Stopping sink.", error);
+                    error!(message = "Error writing to output. Stopping sink.", %error);
                     return Err(());
                 }
+
+                emit!(ConsoleEventProcessed {
+                    byte_size: buf.len(),
+                });
             }
         }
         Ok(())
@@ -143,10 +155,15 @@ impl StreamSink for WriterSink {
 
 #[cfg(test)]
 mod test {
-    use super::{encode_event, Encoding, EncodingConfig};
+    use super::{encode_event, ConsoleSinkConfig, Encoding, EncodingConfig};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use crate::event::{Event, Value};
     use chrono::{offset::TimeZone, Utc};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ConsoleSinkConfig>();
+    }
 
     #[test]
     fn encodes_raw_logs() {
@@ -174,6 +191,7 @@ mod test {
     fn encodes_counter() {
         let event = Event::Metric(Metric {
             name: "foos".into(),
+            namespace: None,
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
                 vec![
@@ -197,6 +215,7 @@ mod test {
     fn encodes_set() {
         let event = Event::Metric(Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -214,6 +233,7 @@ mod test {
     fn encodes_histogram_without_timestamp() {
         let event = Event::Metric(Metric {
             name: "glork".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -233,6 +253,7 @@ mod test {
     fn encodes_metric_text() {
         let event = Event::Metric(Metric {
             name: "users".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,

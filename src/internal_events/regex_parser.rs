@@ -10,7 +10,7 @@ impl InternalEvent for RegexParserEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1);
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -29,7 +29,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "failed_match");
+        counter!("processing_errors_total", 1, "error_type" => "failed_match");
     }
 }
 
@@ -44,7 +44,7 @@ impl InternalEvent for RegexParserMissingField<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "missing_field");
+        counter!("processing_errors_total", 1, "error_type" => "missing_field");
     }
 }
 
@@ -63,7 +63,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "target_field_exists");
+        counter!("processing_errors_total", 1, "error_type" => "target_field_exists");
     }
 }
 
@@ -78,12 +78,12 @@ impl<'a> InternalEvent for RegexParserConversionFailed<'a> {
         debug!(
             message = "Could not convert types.",
             name = %self.name,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1, "error_type" => "type_conversion_failed");
+        counter!("processing_errors_total", 1, "error_type" => "type_conversion_failed");
     }
 }

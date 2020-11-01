@@ -1,12 +1,13 @@
-use super::{encode_event, encoding::EncodingConfig, Encoding, SinkBuildError, StreamSinkOld};
+use super::{SinkBuildError, StreamSinkOld};
 use crate::{
     config::SinkContext,
-    dns::Resolver,
+    dns,
     internal_events::UdpSendIncomplete,
     sinks::{Healthcheck, VectorSink},
+    Event,
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
+use futures::{future, future::BoxFuture, FutureExt, TryFutureExt};
 use futures01::{stream::iter_ok, Async, AsyncSink, Future, Poll as Poll01, Sink, StartSend};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -41,13 +42,13 @@ impl UdpSinkConfig {
         Self { address }
     }
 
-    fn build_connector(&self, cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
+    fn build_connector(&self, _cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
 
-        let connector = UdpConnector::new(host, port, cx.resolver());
+        let connector = UdpConnector::new(host, port);
         let healthcheck = connector.healthcheck();
 
         Ok((connector, healthcheck))
@@ -58,15 +59,18 @@ impl UdpSinkConfig {
         Ok((connector.into(), healthcheck))
     }
 
-    pub fn build(
+    pub fn build<F>(
         &self,
         cx: SinkContext,
-        encoding: EncodingConfig<Encoding>,
-    ) -> crate::Result<(VectorSink, Healthcheck)> {
+        encode_event: F,
+    ) -> crate::Result<(VectorSink, Healthcheck)>
+    where
+        F: Fn(Event) -> Option<Bytes> + Send + 'static,
+    {
         let (connector, healthcheck) = self.build_connector(cx.clone())?;
         let sink: UdpSink = connector.into();
         let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |event| iter_ok(encode_event(event, &encoding)));
+            .with_flat_map(move |event| iter_ok(encode_event(event)));
 
         Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
     }
@@ -76,81 +80,113 @@ impl UdpSinkConfig {
 struct UdpConnector {
     host: String,
     port: u16,
-    resolver: Resolver,
 }
 
 impl UdpConnector {
-    fn new(host: String, port: u16, resolver: Resolver) -> Self {
-        Self {
-            host,
-            port,
-            resolver,
-        }
+    fn new(host: String, port: u16) -> Self {
+        Self { host, port }
     }
 
-    fn connect(&self) -> BoxFuture<'static, Result<UdpSocket, UdpError>> {
-        let host = self.host.clone();
-        let port = self.port;
-        let resolver = self.resolver;
+    async fn connect(&self) -> Result<UdpSocket, UdpError> {
+        let ip = dns::Resolver
+            .lookup_ip(self.host.clone())
+            .await
+            .context(DnsError)?
+            .next()
+            .ok_or(UdpError::NoAddresses)?;
 
-        async move {
-            let ip = resolver
-                .lookup_ip(host.clone())
-                .await
-                .context(DnsError)?
-                .next()
-                .ok_or(UdpError::NoAddresses)?;
+        let addr = SocketAddr::new(ip, self.port);
+        let bind_address = find_bind_address(&addr);
 
-            let addr = SocketAddr::new(ip, port);
-            let bind_address = find_bind_address(&addr);
+        let socket = UdpSocket::bind(bind_address).context(BindError)?;
+        socket.connect(addr).context(ConnectError)?;
 
-            let socket = UdpSocket::bind(bind_address).context(BindError)?;
-            socket.connect(addr).context(ConnectError)?;
+        Ok(socket)
+    }
 
-            Ok(socket)
+    async fn connect_backoff(self) -> UdpSocket {
+        let mut backoff = ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(Duration::from_secs(60));
+
+        loop {
+            match self.connect().await {
+                Ok(socket) => return socket,
+                Err(error) => {
+                    error!(message = "Unable to connect UDP socket.", %error);
+                    delay_for(backoff.next().unwrap()).await;
+                }
+            }
         }
-        .boxed()
     }
 
     fn healthcheck(&self) -> BoxFuture<'static, crate::Result<()>> {
-        self.connect().map_ok(|_| ()).map_err(|e| e.into()).boxed()
+        let this = self.clone();
+        async move { this.connect().await }
+            .map_ok(|_| ())
+            .err_into()
+            .boxed()
     }
 }
 
 impl Into<UdpSink> for UdpConnector {
     fn into(self) -> UdpSink {
-        UdpSink::new(self.host, self.port, self.resolver)
+        UdpSink::new(self.host, self.port)
     }
+}
+
+enum UdpServiceState {
+    Connecting(BoxFuture<'static, UdpSocket>),
+    Connected(UdpSocket),
+}
+
+pub struct UdpService {
+    state: UdpServiceState,
 }
 
 impl Into<UdpService> for UdpConnector {
     fn into(self) -> UdpService {
-        UdpService { connector: self }
+        UdpService {
+            state: UdpServiceState::Connecting(self.connect_backoff().boxed()),
+        }
     }
-}
-
-pub struct UdpService {
-    connector: UdpConnector,
 }
 
 impl tower::Service<Bytes> for UdpService {
     type Response = ();
     type Error = UdpError;
-    type Future = BoxFuture<'static, Result<(), Self::Error>>;
+    type Future = future::Ready<Result<(), Self::Error>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match &mut self.state {
+            UdpServiceState::Connected(_) => Poll::Ready(Ok(())),
+            UdpServiceState::Connecting(fut) => {
+                let socket = futures::ready!(fut.poll_unpin(cx));
+                self.state = UdpServiceState::Connected(socket);
+                Poll::Ready(Ok(()))
+            }
+        }
     }
 
     fn call(&mut self, msg: Bytes) -> Self::Future {
-        let connector = self.connector.clone();
-        async move {
-            let socket = connector.connect().await?;
-            socket.send(&msg).context(SendError)?;
-            Ok(())
+        match &mut self.state {
+            UdpServiceState::Connecting(_) => unreachable!(),
+            UdpServiceState::Connected(socket) => {
+                future::ready(udp_send(socket, &msg).context(SendError))
+            }
         }
-        .boxed()
     }
+}
+
+fn udp_send(socket: &mut UdpSocket, msg: &[u8]) -> Result<(), std::io::Error> {
+    let sent = socket.send(&msg)?;
+    if sent != msg.len() {
+        emit!(UdpSendIncomplete {
+            data_size: msg.len(),
+            sent,
+        });
+    }
+    Ok(())
 }
 
 pub struct UdpSink {
@@ -168,13 +204,9 @@ enum State {
 }
 
 impl UdpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver) -> Self {
+    pub fn new(host: String, port: u16) -> Self {
         let span = info_span!("connection", %host, %port);
-        let connector = UdpConnector {
-            host,
-            port,
-            resolver,
-        };
+        let connector = UdpConnector { host, port };
         Self {
             connector,
             state: State::Initializing,
@@ -203,13 +235,15 @@ impl UdpSink {
         loop {
             self.state = match self.state {
                 State::Initializing => {
-                    State::Connecting(Box::new(self.connector.connect().compat()))
+                    let connector = self.connector.clone();
+                    let fut = async move { connector.connect().await };
+                    State::Connecting(Box::new(fut.boxed().compat()))
                 }
                 State::Connecting(ref mut fut) => match fut.poll() {
                     Ok(Async::NotReady) => return Ok(Async::NotReady),
                     Ok(Async::Ready(socket)) => State::Connected(socket),
                     Err(error) => {
-                        error!(message = "unable to connect UDP socket", %error);
+                        error!(message = "Unable to connect UDP socket.", %error);
                         State::Backoff(self.next_delay01())
                     }
                 },
@@ -235,24 +269,16 @@ impl Sink for UdpSink {
         match self.poll_socket() {
             Ok(Async::Ready(socket)) => {
                 debug!(
-                    message = "sending event.",
+                    message = "Sending event.",
                     bytes = %line.len()
                 );
-                match socket.send(&line) {
+                match udp_send(socket, &line) {
                     Err(error) => {
                         self.state = State::Backoff(self.next_delay01());
-                        error!(message = "send failed", %error);
+                        error!(message = "Send failed.", %error);
                         Ok(AsyncSink::NotReady(line))
                     }
-                    Ok(sent) => {
-                        if sent != line.len() {
-                            emit!(UdpSendIncomplete {
-                                data_size: line.len(),
-                                sent,
-                            });
-                        }
-                        Ok(AsyncSink::Ready)
-                    }
+                    Ok(_) => Ok(AsyncSink::Ready),
                 }
             }
             Ok(Async::NotReady) => Ok(AsyncSink::NotReady(line)),

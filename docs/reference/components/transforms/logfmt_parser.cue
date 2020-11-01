@@ -60,6 +60,56 @@ components: transforms: logfmt_parser: {
 		metrics: null
 	}
 
+	examples: [
+		{
+			title: "Heroku Router Log"
+			configuration: {
+				field:      "message"
+				drop_field: true
+				types: {
+					bytes:  "int"
+					status: "int"
+				}
+			}
+			input: log: {
+				"message": #"at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd="204.204.204.204" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"#
+			}
+			output: log: {
+				"at":          "info"
+				"method":      "GET"
+				"path":        "/"
+				"host":        "myapp.herokuapp.com"
+				"request_id":  "8601b555-6a83-4c12-8269-97c8e32cdb22"
+				"fwd":         "204.204.204.204"
+				"dyno":        "web.1"
+				"connect":     "1ms"
+				"service":     "18ms"
+				"status":      200
+				"bytes":       13
+				"tls_version": "tls1.1"
+				"protocol":    "http"
+			}
+		},
+		{
+			title: "Loosely Structured"
+			configuration: {
+				field:      "message"
+				drop_field: false
+				types: {
+					status: "int"
+				}
+			}
+			input: log: {
+				"message": #"info | Sent 200 in 54.2ms duration=54.2ms status=200"#
+			}
+			output: log: {
+				"message":  "info | Sent 200 in 54.2ms duration=54.2ms status=200"
+				"duration": "54.2ms"
+				"status":   200
+			}
+		},
+	]
+
 	how_it_works: {
 		key_value_parsing: {
 			title: "Key/Value Parsing"
@@ -122,55 +172,4 @@ components: transforms: logfmt_parser: {
 				"""
 		}
 	}
-
-	examples: [
-		{
-			title: "Heroku Router Log"
-			configuration: {
-				field:      "message"
-				drop_field: true
-				types: {
-					bytes:  "int"
-					status: "int"
-				}
-			}
-			input: log: {
-				"message": #"at=info method=GET path=/ host=myapp.herokuapp.com request_id=8601b555-6a83-4c12-8269-97c8e32cdb22 fwd="204.204.204.204" dyno=web.1 connect=1ms service=18ms status=200 bytes=13 tls_version=tls1.1 protocol=http"#
-			}
-			output: log: {
-				"at":          "info"
-				"method":      "GET"
-				"path":        "/"
-				"host":        "myapp.herokuapp.com"
-				"request_id":  "8601b555-6a83-4c12-8269-97c8e32cdb22"
-				"fwd":         "204.204.204.204"
-				"dyno":        "web.1"
-				"connect":     "1ms"
-				"service":     "18ms"
-				"status":      200
-				"bytes":       13
-				"tls_version": "tls1.1"
-				"protocol":    "http"
-			}
-		},
-		{
-			title: "Loosely Structured"
-			configuration: {
-				field:      "message"
-				drop_field: false
-				types: {
-					status: "int"
-				}
-			}
-			input: log: {
-				"message": #"info | Sent 200 in 54.2ms duration=54.2ms status=200"#
-			}
-			output: log: {
-				"message":  "info | Sent 200 in 54.2ms duration=54.2ms status=200"
-				"duration": "54.2ms"
-				"status":   200
-			}
-		},
-	]
-
 }

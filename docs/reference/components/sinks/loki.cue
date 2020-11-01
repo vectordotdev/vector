@@ -125,7 +125,18 @@ components: sinks: loki: {
 						"key":       "value"
 					},
 				]
-				options: {}
+				options: {
+					"*": {
+						common:      false
+						description: "Any Loki label"
+						required:    false
+						type: string: {
+							default: null
+							examples: ["vector", "{{ event_field }}"]
+							templateable: true
+						}
+					}
+				}
 			}
 		}
 		remove_label_fields: {

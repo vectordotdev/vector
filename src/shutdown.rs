@@ -1,7 +1,13 @@
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
-use futures01::{future, Async, Future};
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::stream::tripwire_handler;
+use futures::{future, ready, FutureExt, TryFutureExt};
+use futures01::Future as Future01;
+use std::{
+    collections::HashMap,
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{timeout_at, Instant};
 
@@ -23,11 +29,13 @@ impl ShutdownSignalToken {
 }
 
 /// Passed to each Source to coordinate the global shutdown process.
+#[pin_project::pin_project]
 #[derive(Clone, Debug)]
 pub struct ShutdownSignal {
     /// This will be triggered when global shutdown has begun, and is a sign to the Source to begin
     /// its shutdown process.
-    begin_shutdown: Tripwire,
+    #[pin]
+    begin_shutdown: Option<Tripwire>,
 
     /// When a Source allows this to go out of scope it informs the global shutdown coordinator that
     /// this Source's local shutdown process is complete.
@@ -36,22 +44,30 @@ pub struct ShutdownSignal {
 }
 
 impl Future for ShutdownSignal {
-    type Item = ShutdownSignalToken;
-    type Error = ();
-    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        match self.begin_shutdown.poll() {
-            Ok(Async::Ready(_)) => Ok(Async::Ready(self.shutdown_complete.take().unwrap())),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(_) => Err(()),
+    type Output = ShutdownSignalToken;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match self.as_mut().project().begin_shutdown.as_pin_mut() {
+            Some(fut) => {
+                let closed = ready!(fut.poll(cx));
+                let mut pinned = self.project();
+                pinned.begin_shutdown.set(None);
+                if closed {
+                    Poll::Ready(pinned.shutdown_complete.take().unwrap())
+                } else {
+                    Poll::Pending
+                }
+            }
+            None => Poll::Pending,
         }
     }
 }
 
 impl ShutdownSignal {
-    pub fn new(begin_shutdown: Tripwire, shutdown_complete: Trigger) -> Self {
+    pub fn new(tripwire: Tripwire, trigger: Trigger) -> Self {
         Self {
-            begin_shutdown,
-            shutdown_complete: Some(ShutdownSignalToken::new(shutdown_complete)),
+            begin_shutdown: Some(tripwire),
+            shutdown_complete: Some(ShutdownSignalToken::new(trigger)),
         }
     }
 
@@ -59,7 +75,7 @@ impl ShutdownSignal {
     pub fn noop() -> Self {
         let (trigger, tripwire) = Tripwire::new();
         Self {
-            begin_shutdown: tripwire,
+            begin_shutdown: Some(tripwire),
             shutdown_complete: Some(ShutdownSignalToken::new(trigger)),
         }
     }
@@ -85,10 +101,7 @@ impl SourceShutdownCoordinator {
     /// Creates the necessary Triggers and Tripwires for coordinating shutdown of this Source and
     /// stores them as needed.  Returns the ShutdownSignal for this Source as well as a Tripwire
     /// that will be notified if the Source should be forcibly shut down.
-    pub fn register_source(
-        &mut self,
-        name: &str,
-    ) -> (ShutdownSignal, impl Future<Item = (), Error = ()>) {
+    pub fn register_source(&mut self, name: &str) -> (ShutdownSignal, impl Future<Output = ()>) {
         let (shutdown_begun_trigger, shutdown_begun_tripwire) = Tripwire::new();
         let (force_shutdown_trigger, force_shutdown_tripwire) = Tripwire::new();
         let (shutdown_complete_trigger, shutdown_complete_tripwire) = Tripwire::new();
@@ -103,11 +116,9 @@ impl SourceShutdownCoordinator {
         let shutdown_signal =
             ShutdownSignal::new(shutdown_begun_tripwire, shutdown_complete_trigger);
 
-        // shutdown_source_end drops the force_shutdown_trigger even on success when we should *not*
-        // be shutting down.  Dropping the trigger will cause the Tripwire to resolve with an error,
-        // so we use or_else with future::empty() to make it so it never resolves if the Trigger is
-        // prematurely dropped instead.
-        let force_shutdown_tripwire = force_shutdown_tripwire.or_else(|_| future::empty());
+        // `force_shutdown_tripwire` resolves even if canceled when we should *not* be shutting down.
+        // `tripwire_handler` handles cancel by never resolving.
+        let force_shutdown_tripwire = force_shutdown_tripwire.then(tripwire_handler);
         (shutdown_signal, force_shutdown_tripwire)
     }
 
@@ -175,7 +186,7 @@ impl SourceShutdownCoordinator {
     /// resolves once all sources have either shut down completely, or have been sent the
     /// force shutdown signal.  The force shutdown signal will be sent to any sources that
     /// don't cleanly shut down before the given `deadline`.
-    pub fn shutdown_all(self, deadline: Instant) -> impl Future<Item = (), Error = ()> {
+    pub fn shutdown_all(self, deadline: Instant) -> impl Future01<Item = (), Error = ()> {
         let mut complete_futures = Vec::new();
 
         let shutdown_begun_triggers = self.shutdown_begun_triggers;
@@ -211,7 +222,7 @@ impl SourceShutdownCoordinator {
             complete_futures.push(source_complete);
         }
 
-        future::join_all(complete_futures)
+        futures01::future::join_all(complete_futures)
             .map(|_| ())
             .map_err(|_| ())
     }
@@ -225,7 +236,7 @@ impl SourceShutdownCoordinator {
         &mut self,
         name: &str,
         deadline: Instant,
-    ) -> impl Future<Item = bool, Error = ()> {
+    ) -> impl Future01<Item = bool, Error = ()> {
         let begin_shutdown_trigger =
             self.shutdown_begun_triggers
                 .remove(name)
@@ -265,14 +276,16 @@ impl SourceShutdownCoordinator {
     }
 
     /// Returned future will finish once all sources have finished.
-    pub fn shutdown_tripwire(&self) -> impl Future<Item = (), Error = ()> {
-        future::join_all(
-            self.shutdown_complete_tripwires
-                .values()
-                .cloned()
-                .collect::<Vec<_>>(),
-        )
-        .map(|_| info!("All sources have finished."))
+    pub fn shutdown_tripwire(&self) -> future::BoxFuture<'static, ()> {
+        let futures = self
+            .shutdown_complete_tripwires
+            .values()
+            .cloned()
+            .map(|tripwire| tripwire.then(tripwire_handler).boxed());
+
+        future::join_all(futures)
+            .map(|_| info!("All sources have finished."))
+            .boxed()
     }
 
     fn shutdown_source_complete(
@@ -280,18 +293,23 @@ impl SourceShutdownCoordinator {
         shutdown_force_trigger: Trigger,
         name: String,
         deadline: Instant,
-    ) -> impl Future<Item = bool, Error = ()> {
+    ) -> impl Future01<Item = bool, Error = ()> {
         async move {
-            let fut = shutdown_complete_tripwire.compat();
+            // Call `shutdown_force_trigger.disable()` on drop.
+            let shutdown_force_trigger = ShutdownForceTriggerStorage {
+                trigger: Some(shutdown_force_trigger),
+            };
+
+            let fut = shutdown_complete_tripwire.then(tripwire_handler);
             if timeout_at(deadline, fut).await.is_ok() {
-                shutdown_force_trigger.disable();
+                shutdown_force_trigger.into_inner().disable();
                 true
             } else {
                 error!(
                     "Source '{}' failed to shutdown before deadline. Forcing shutdown.",
                     name,
                 );
-                shutdown_force_trigger.cancel();
+                shutdown_force_trigger.into_inner().cancel();
                 false
             }
         }
@@ -301,11 +319,29 @@ impl SourceShutdownCoordinator {
     }
 }
 
+struct ShutdownForceTriggerStorage {
+    trigger: Option<Trigger>,
+}
+
+impl ShutdownForceTriggerStorage {
+    fn into_inner(mut self) -> Trigger {
+        self.trigger.take().unwrap()
+    }
+}
+
+impl Drop for ShutdownForceTriggerStorage {
+    fn drop(&mut self) {
+        if let Some(trigger) = self.trigger.take() {
+            trigger.disable();
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::shutdown::SourceShutdownCoordinator;
     use futures::compat::Future01CompatExt;
-    use futures01::future::Future;
     use tokio::time::{Duration, Instant};
 
     #[tokio::test]
@@ -338,6 +374,8 @@ mod test {
         // still running and must force shutdown.
         let success = shutdown_complete.compat().await.unwrap();
         assert_eq!(false, success);
-        assert!(force_shutdown_tripwire.wait().is_ok());
+
+        let finished = futures::poll!(force_shutdown_tripwire.boxed());
+        assert_eq!(finished, Poll::Ready(()));
     }
 }
