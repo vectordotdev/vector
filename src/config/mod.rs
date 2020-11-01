@@ -7,7 +7,9 @@ use component::ComponentDescription;
 use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to output errors in the same order they are present in the file
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
+use std::collections::{HashMap, HashSet};
 use std::fs::DirBuilder;
+use std::hash::Hash;
 use std::path::PathBuf;
 
 pub mod api;
@@ -187,6 +189,13 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     fn input_type(&self) -> DataType;
 
     fn sink_type(&self) -> &'static str;
+
+    /// Resources that the sink is using.
+    /// These resources shouldn't be used in the build method as that can result
+    /// in a build error. Only the sinks are constrained by this.
+    fn resources(&self) -> Vec<Resource> {
+        Vec::new()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -238,6 +247,35 @@ pub trait TransformConfig: core::fmt::Debug + Send + Sync {
 pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
+
+/// Unique thing, like port, of which only one owner can be.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum Resource {
+    Port(u16),
+}
+
+impl Resource {
+    /// From given components returns all that have a resource conflict with any other component.
+    pub fn conflicts<K: Eq + Hash + Clone>(
+        components: impl IntoIterator<Item = (K, Vec<Resource>)>,
+    ) -> HashSet<K> {
+        let mut resource_map = HashMap::<Resource, HashSet<K>>::new();
+        for (key, resources) in components {
+            for resource in resources {
+                resource_map
+                    .entry(resource)
+                    .or_default()
+                    .insert(key.clone());
+            }
+        }
+
+        resource_map
+            .into_iter()
+            .filter(|(_, componenets)| componenets.len() > 1)
+            .flat_map(|(_, componenets)| componenets)
+            .collect()
+    }
+}
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(deny_unknown_fields)]
@@ -487,6 +525,48 @@ mod test {
                 "duplicate source name found: in".into(),
                 "duplicate sink name found: out".into(),
             ])
+        );
+    }
+}
+
+#[cfg(test)]
+mod resource_tests {
+    use super::Resource;
+    use std::collections::HashSet;
+
+    #[test]
+    fn valid() {
+        let componenets = vec![
+            ("sink_0", vec![Resource::Port(0)]),
+            ("sink_1", vec![Resource::Port(1)]),
+            ("sink_2", vec![Resource::Port(2)]),
+        ];
+        let conflicting = Resource::conflicts(componenets);
+        assert_eq!(conflicting, HashSet::new());
+    }
+
+    #[test]
+    fn conflicting_pair() {
+        let componenets = vec![
+            ("sink_0", vec![Resource::Port(0)]),
+            ("sink_1", vec![Resource::Port(2)]),
+            ("sink_2", vec![Resource::Port(2)]),
+        ];
+        let conflicting = Resource::conflicts(componenets);
+        assert_eq!(conflicting, vec!["sink_1", "sink_2"].into_iter().collect());
+    }
+
+    #[test]
+    fn conflicting_multi() {
+        let componenets = vec![
+            ("sink_0", vec![Resource::Port(0)]),
+            ("sink_1", vec![Resource::Port(2), Resource::Port(0)]),
+            ("sink_2", vec![Resource::Port(2)]),
+        ];
+        let conflicting = Resource::conflicts(componenets);
+        assert_eq!(
+            conflicting,
+            vec!["sink_0", "sink_1", "sink_2"].into_iter().collect()
         );
     }
 }

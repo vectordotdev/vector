@@ -34,9 +34,9 @@ pub struct CounterConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GaugeConfig {
-    field: String,
-    name: Option<String>,
-    tags: Option<IndexMap<String, String>>,
+    pub field: String,
+    pub name: Option<String>,
+    pub tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
