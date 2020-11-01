@@ -79,4 +79,8 @@ impl Difference {
     pub fn changed_and_added(&self) -> impl Iterator<Item = &String> {
         self.to_change.iter().chain(self.to_add.iter())
     }
+
+    pub fn removed_and_changed(&self) -> impl Iterator<Item = &String> {
+        self.to_change.iter().chain(self.to_remove.iter())
+    }
 }
