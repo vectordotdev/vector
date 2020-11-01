@@ -27,6 +27,7 @@ pub struct LogToMetricConfig {
 pub struct CounterConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     #[serde(default = "default_increment_by_value")]
     increment_by_value: bool,
     tags: Option<IndexMap<String, String>>,
@@ -36,6 +37,7 @@ pub struct CounterConfig {
 pub struct GaugeConfig {
     pub field: String,
     pub name: Option<String>,
+    pub namespace: Option<String>,
     pub tags: Option<IndexMap<String, String>>,
 }
 
@@ -43,6 +45,7 @@ pub struct GaugeConfig {
 pub struct SetConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -50,6 +53,7 @@ pub struct SetConfig {
 pub struct HistogramConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -57,6 +61,7 @@ pub struct HistogramConfig {
 pub struct SummaryConfig {
     field: String,
     name: Option<String>,
+    namespace: Option<String>,
     tags: Option<IndexMap<String, String>>,
 }
 
@@ -88,6 +93,7 @@ impl GenerateConfig for LogToMetricConfig {
             metrics: vec![MetricConfig::Counter(CounterConfig {
                 field: "field_name".to_string(),
                 name: None,
+                namespace: None,
                 increment_by_value: false,
                 tags: None,
             })],
@@ -215,11 +221,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = counter.name.as_ref().unwrap_or(&counter.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = counter.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&counter.tags, &event)?;
 
             Ok(Metric {
                 name,
-                namespace: None,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -232,11 +243,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = hist.name.as_ref().unwrap_or(&hist.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = hist.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&hist.tags, &event)?;
 
             Ok(Metric {
                 name,
-                namespace: None,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -253,11 +269,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = summary.name.as_ref().unwrap_or(&summary.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = summary.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&summary.tags, &event)?;
 
             Ok(Metric {
                 name,
-                namespace: None,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -274,11 +295,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = gauge.name.as_ref().unwrap_or(&gauge.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = gauge.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&gauge.tags, &event)?;
 
             Ok(Metric {
                 name,
-                namespace: None,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Absolute,
@@ -296,11 +322,16 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             let name = set.name.as_ref().unwrap_or(&set.field);
             let name = render_template(&name, &event)?;
 
+            let namespace = set.namespace.as_ref();
+            let namespace = namespace
+                .map(|namespace| render_template(namespace, &event))
+                .transpose()?;
+
             let tags = render_tags(&set.tags, &event)?;
 
             Ok(Metric {
                 name,
-                namespace: None,
+                namespace,
                 timestamp,
                 tags,
                 kind: MetricKind::Incremental,
@@ -413,6 +444,7 @@ mod tests {
             type = "counter"
             field = "message"
             name = "http_requests_total"
+            namespace = "app"
             tags = {method = "{{method}}", code = "{{code}}", missing_tag = "{{unknown}}", host = "localhost"}
             "#,
         );
@@ -428,7 +460,7 @@ mod tests {
             metric.into_metric(),
             Metric {
                 name: "http_requests_total".into(),
-                namespace: None,
+                namespace: Some("app".into()),
                 timestamp: Some(ts()),
                 tags: Some(
                     vec![
@@ -646,6 +678,7 @@ mod tests {
             type = "counter"
             field = "backtrace"
             name = "{{service}}_exception_total"
+            namespace = "{{host}}"
             "#,
         );
 
@@ -668,7 +701,7 @@ mod tests {
             output.pop().unwrap().into_metric(),
             Metric {
                 name: "xyz_exception_total".into(),
-                namespace: None,
+                namespace: Some("local".into()),
                 timestamp: Some(ts()),
                 tags: None,
                 kind: MetricKind::Incremental,

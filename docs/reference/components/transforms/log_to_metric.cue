@@ -68,6 +68,17 @@ components: transforms: log_to_metric: {
 							templateable: true
 						}
 					}
+					namespace: {
+						description: "The namespace of the metric."
+						required:    false
+						common:      true
+						warnings: []
+						type: string: {
+							examples: ["service"]
+							default:      string
+							templateable: true
+						}
+					}
 					tags: {
 						description: "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 						required:    false
