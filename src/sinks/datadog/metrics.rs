@@ -40,6 +40,7 @@ struct DatadogState {
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct DatadogConfig {
+    pub default_namespace: Option<String>,
     // Deprecated name
     #[serde(alias = "host")]
     pub endpoint: Option<String>,
@@ -224,11 +225,16 @@ impl DatadogSink {
 
         let body = match endpoint {
             DatadogEndpoint::Series => {
-                let input = encode_events(events, interval);
+                let input =
+                    encode_events(events, self.config.default_namespace.as_deref(), interval);
                 serde_json::to_vec(&input).unwrap()
             }
             DatadogEndpoint::Distribution => {
-                let input = encode_distribution_events(events, interval);
+                let input = encode_distribution_events(
+                    events,
+                    self.config.default_namespace.as_deref(),
+                    interval,
+                );
                 serde_json::to_vec(&input).unwrap()
             }
         };
@@ -336,12 +342,20 @@ fn stats(values: &[f64], counts: &[u32]) -> Option<DatadogStats> {
     })
 }
 
-fn encode_events(events: Vec<Metric>, interval: i64) -> DatadogRequest<DatadogMetric> {
+fn encode_events(
+    events: Vec<Metric>,
+    default_namespace: Option<&str>,
+    interval: i64,
+) -> DatadogRequest<DatadogMetric> {
     debug!(message = "Series.", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(event.namespace.as_deref(), '.', &event.name);
+            let fullname = encode_namespace(
+                event.namespace.as_deref().or(default_namespace),
+                '.',
+                &event.name,
+            );
             let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone().map(encode_tags);
             match event.kind {
@@ -444,13 +458,18 @@ fn encode_events(events: Vec<Metric>, interval: i64) -> DatadogRequest<DatadogMe
 
 fn encode_distribution_events(
     events: Vec<Metric>,
+    default_namespace: Option<&str>,
     interval: i64,
 ) -> DatadogRequest<DatadogDistributionMetric> {
     debug!(message = "Distribution.", count = events.len());
     let series = events
         .into_iter()
         .filter_map(|event| {
-            let fullname = encode_namespace(event.namespace.as_deref(), '.', &event.name);
+            let fullname = encode_namespace(
+                event.namespace.as_deref().or(default_namespace),
+                '.',
+                &event.name,
+            );
             let ts = encode_timestamp(event.timestamp);
             let tags = event.tags.clone().map(encode_tags);
             match event.kind {
@@ -618,7 +637,7 @@ mod tests {
                 value: MetricValue::Counter { value: 1.0 },
             },
         ];
-        let input = encode_events(events, interval);
+        let input = encode_events(events, None, interval);
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -647,7 +666,7 @@ mod tests {
                 value: MetricValue::Gauge { value: -1.1 },
             },
         ];
-        let input = encode_events(events, 60);
+        let input = encode_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -668,12 +687,12 @@ mod tests {
                 values: vec!["alice".into(), "bob".into()].into_iter().collect(),
             },
         }];
-        let input = encode_events(events, 60);
+        let input = encode_events(events, Some("ns"), 60);
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
             json,
-            r#"{"series":[{"metric":"users","type":"gauge","interval":null,"points":[[1542182950,2.0]],"tags":null}]}"#
+            r#"{"series":[{"metric":"ns.users","type":"gauge","interval":null,"points":[[1542182950,2.0]],"tags":null}]}"#
         );
     }
 
@@ -777,7 +796,7 @@ mod tests {
                 statistic: StatisticKind::Histogram,
             },
         }];
-        let input = encode_events(events, 60);
+        let input = encode_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
@@ -801,7 +820,7 @@ mod tests {
                 statistic: StatisticKind::Summary,
             },
         }];
-        let input = encode_distribution_events(events, 60);
+        let input = encode_distribution_events(events, None, 60);
         let json = serde_json::to_string(&input).unwrap();
 
         assert_eq!(
