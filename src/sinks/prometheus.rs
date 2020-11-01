@@ -73,7 +73,7 @@ pub fn default_flush_period_secs() -> u64 {
 impl Default for PrometheusSinkConfig {
     fn default() -> Self {
         Self {
-            namespace: None,
+            default_namespace: None,
             address: default_address(),
             buckets: default_histogram_buckets(),
             quantiles: default_summary_quantiles(),
