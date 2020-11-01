@@ -46,7 +46,7 @@ const PROMETHEUS_SINK_CONFIG: &'static str = r#"
 
     [sinks.out]
         type = "prometheus"
-        namespace = "vector"
+        default_namespace = "vector"
         inputs = ["log_to_metric"]
         address = "${VECTOR_TEST_ADDRESS}"
         namespace = "service"
