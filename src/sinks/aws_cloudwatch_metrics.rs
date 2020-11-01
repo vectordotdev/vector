@@ -7,7 +7,8 @@ use crate::{
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
-        PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        PartitionBatchSinkOld as PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};

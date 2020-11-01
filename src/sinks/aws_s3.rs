@@ -7,8 +7,9 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
-        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit,
+        PartitionBatchSinkOld as PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
 };

@@ -7,17 +7,17 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
-        PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
+        BatchConfig, BatchSettings, Compression, EncodedLength,
+        PartitionBatchSinkOld as PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+        TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
 };
 use chrono::{Duration, Utc};
 use futures::{
-    future::{BoxFuture, FutureExt, TryFutureExt},
-    ready,
+    compat::Sink01CompatExt, future::BoxFuture, ready, stream, FutureExt, SinkExt, StreamExt,
+    TryFutureExt,
 };
-use futures01::{stream::iter_ok, Sink};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
@@ -195,19 +195,17 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             ));
 
         let encoding = self.encoding.clone();
-        let sink = {
-            let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
-            let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
-                .with_flat_map(move |event| {
-                    iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
-                });
-            Box::new(svc_sink)
-        };
+        let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_compat()
+            .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
+            .with_flat_map(move |event| {
+                stream::iter(partition_encode(event, &encoding, &log_group, &log_stream)).map(Ok)
+            });
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

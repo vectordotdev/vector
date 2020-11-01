@@ -8,8 +8,9 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit,
+            PartitionBatchSinkOld as PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
+            ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },

@@ -9,8 +9,8 @@ use crate::{
         util::{
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
-            BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
-            PartitionInnerBuffer, TowerRequestConfig,
+            BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSinkOld as PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
