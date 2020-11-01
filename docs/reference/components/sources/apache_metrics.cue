@@ -122,7 +122,7 @@ components: sources: apache_metrics: {
 			required:    true
 			examples: [_values.local_host]
 		}
-		apache_access_total: {
+		access_total: {
 			description:   "The total number of time the Apache server has been accessed."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -131,7 +131,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_connections: {
+		connections: {
 			description: "The total number of time the Apache server has been accessed."
 			type:        "gauge"
 			tags: {
@@ -144,7 +144,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_cpu_load: {
+		cpu_load: {
 			description:   "The current CPU of the Apache server."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "gauge"
@@ -153,7 +153,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_cpu_seconds_total: {
+		cpu_seconds_total: {
 			description:   "The CPU time of various Apache processes."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -167,7 +167,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_duration_seconds_total: {
+		duration_seconds_total: {
 			description:   "The amount of time the Apache server has been running."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -176,7 +176,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_scoreboard: {
+		scoreboard: {
 			description: "The amount of times various Apache server tasks have been run."
 			type:        "gauge"
 			tags: {
@@ -189,7 +189,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_sent_bytes_total: {
+		sent_bytes_total: {
 			description:   "The amount of bytes sent by the Apache server."
 			relevant_when: "`ExtendedStatus On`"
 			type:          "counter"
@@ -198,7 +198,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_uptime_seconds_total: {
+		uptime_seconds_total: {
 			description: "The amount of time the Apache server has been running."
 			type:        "counter"
 			tags: {
@@ -206,7 +206,7 @@ components: sources: apache_metrics: {
 				host:     _host
 			}
 		}
-		apache_workers: {
+		workers: {
 			description: "Apache worker statuses."
 			type:        "gauge"
 			tags: {
@@ -219,7 +219,7 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_up: {
+		up: {
 			description: "If the Apache server is up or not."
 			type:        "gauge"
 			tags: {
