@@ -192,7 +192,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
     /// Resources that the sink is using.
     /// These resources shouldn't be used in the build method as that can result
-    /// in a build error. Only the sinks are contrained by this.
+    /// in a build error. Only the sinks are constrained by this.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
@@ -271,7 +271,7 @@ pub type TransformDescription = ComponentDescription<Box<dyn TransformConfig>>;
 
 inventory::collect!(TransformDescription);
 
-/// Unique things, like port, of which only one owner can be.
+/// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Resource {
     Port(u16),
@@ -297,6 +297,28 @@ impl Resource {
             .filter(|(_, componenets)| componenets.len() > 1)
             .flat_map(|(_, componenets)| componenets)
             .collect()
+    }
+
+    /// From given components returns all that have a resource conflict with any other component.
+    pub fn conflicts_hashset<K: Eq + Hash + Clone>(
+        components: Vec<(K, HashSet<Resource>)>,
+    ) -> HashSet<K> {
+        let mut conflicted = HashSet::new();
+        for i in 0..componenets.len() {
+            for j in i + 1..components.len() {
+                if componenets[i]
+                    .1
+                    .intersection(&components[j].1)
+                    .next()
+                    .is_some()
+                {
+                    conflicted.insert(components[i].0.clone());
+                    conflicted.insert(components[j].0.clone());
+                }
+            }
+        }
+
+        conflicted
     }
 }
 

@@ -431,8 +431,8 @@ impl RunningTopology {
             self.setup_inputs(&name, new_pieces);
         }
 
-        // Since inputs of diff.sinks.to_change need to be replaced to avoid loosing events
-        // that requires for new pieces to be built, so waiting on changed sinks is done here
+        // Since inputs of diff.sinks.to_change need to be replaced to avoid losing events
+        // that requires for new_pieces to be built, so waiting on changed sinks is done here
         // instead of in fn shutdown_diff. A consequence of that is a strict requirement on
         // the sinks with resources to not use their resources in the build method, but only
         // once they have been run. Otherwise build will fail.
