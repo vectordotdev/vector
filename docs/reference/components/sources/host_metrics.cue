@@ -58,7 +58,7 @@ components: sources: host_metrics: {
 			}
 		}
 		namespace: {
-			description: "The namespace prefix that will be added to all metric names."
+			description: "The namespace of metrics."
 			common:      false
 			required:    false
 			type: string: default: "host"
