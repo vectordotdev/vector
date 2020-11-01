@@ -3,6 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{
+        encode_namespace,
         statistic::{validate_quantiles, DistributionStatistic},
         MetricEntry, StreamSink,
     },
@@ -38,7 +39,7 @@ enum BuildError {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusSinkConfig {
-    pub default_namespace: String,
+    pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default = "default_histogram_buckets")]
@@ -76,7 +77,7 @@ inventory::submit! {
 impl GenerateConfig for PrometheusSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
-            default_namespace: "vector".into(),
+            default_namespace: None,
             address: default_address(),
             buckets: default_histogram_buckets(),
             quantiles: default_summary_quantiles(),
@@ -156,11 +157,10 @@ fn encode_tags_with_extra(
     format!("{{{}}}", parts.join(","))
 }
 
-fn encode_metric_header(default_namespace: &str, metric: &Metric) -> String {
+fn encode_metric_header(default_namespace: Option<&str>, metric: &Metric) -> String {
     let mut s = String::new();
     let name = &metric.name;
-    let namespace = metric.namespace.as_deref().unwrap_or(default_namespace);
-    let fullname = format!("{}_{}", namespace, name);
+    let fullname = encode_namespace(metric.namespace.as_deref().or(default_namespace), '_', name);
 
     let r#type = match &metric.value {
         MetricValue::Counter { .. } => "counter",
@@ -184,15 +184,18 @@ fn encode_metric_header(default_namespace: &str, metric: &Metric) -> String {
 }
 
 fn encode_metric_datum(
-    default_namespace: &str,
+    default_namespace: Option<&str>,
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
     metric: &Metric,
 ) -> String {
     let mut s = String::new();
-    let namespace = metric.namespace.as_deref().unwrap_or(default_namespace);
-    let fullname = format!("{}_{}", namespace, metric.name);
+    let fullname = encode_namespace(
+        metric.namespace.as_deref().or(default_namespace),
+        '_',
+        &metric.name,
+    );
 
     if metric.kind.is_absolute() {
         let tags = &metric.tags;
@@ -329,7 +332,7 @@ fn encode_metric_datum(
 
 fn handle(
     req: Request<Body>,
-    default_namespace: &str,
+    default_namespace: Option<&str>,
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
@@ -424,7 +427,7 @@ impl PrometheusSink {
                     .in_scope(|| {
                         handle(
                             req,
-                            &default_namespace,
+                            default_namespace.as_deref(),
                             &buckets,
                             &quantiles,
                             expired,
@@ -517,8 +520,8 @@ mod tests {
             value: MetricValue::Counter { value: 10.0 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -538,8 +541,8 @@ mod tests {
             value: MetricValue::Gauge { value: -1.1 },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -561,8 +564,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -584,8 +587,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], &[], true, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], true, &metric);
 
         assert_eq!(
             header,
@@ -609,8 +612,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[0.0, 2.5, 5.0], &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[0.0, 2.5, 5.0], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -635,8 +638,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("vector", &metric);
-        let frame = encode_metric_datum("vector", &[], &[], false, &metric);
+        let header = encode_metric_header(Some("vector"), &metric);
+        let frame = encode_metric_datum(Some("vector"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -661,8 +664,8 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("ns", &metric);
-        let frame = encode_metric_datum("ns", &[], &[], false, &metric);
+        let header = encode_metric_header(Some("ns"), &metric);
+        let frame = encode_metric_datum(Some("ns"), &[], &[], false, &metric);
 
         assert_eq!(
             header,
@@ -686,8 +689,14 @@ mod tests {
             },
         };
 
-        let header = encode_metric_header("ns", &metric);
-        let frame = encode_metric_datum("ns", &[], &default_summary_quantiles(), false, &metric);
+        let header = encode_metric_header(Some("ns"), &metric);
+        let frame = encode_metric_datum(
+            Some("ns"),
+            &[],
+            &default_summary_quantiles(),
+            false,
+            &metric,
+        );
 
         assert_eq!(
             header,
