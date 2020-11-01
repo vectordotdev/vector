@@ -78,14 +78,4 @@ components: sinks: sematext_metrics: {
 			summary:      false
 		}
 	}
-
-	how_it_works: {
-		metric_types: {
-			title: "Metric Namespaces"
-			body: """
-				All metrics are sent with a namespace. If no namespace is included with the metric, the metric name becomes
-				the namespace and the metric is named `value`.
-				"""
-		}
-	}
 }
