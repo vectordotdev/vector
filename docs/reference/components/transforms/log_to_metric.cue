@@ -75,7 +75,7 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["service"]
-							default:      string
+							default:      null
 							templateable: true
 						}
 					}
@@ -143,9 +143,10 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type:  "counter"
-						field: "status"
-						name:  "response_total"
+						type:      "counter"
+						field:     "status"
+						name:      "response_total"
+						namespace: "service"
 						tags: {
 							status: "{{status}}"
 							host:   "{{host}}"
@@ -159,8 +160,9 @@ components: transforms: log_to_metric: {
 				status:  200
 			}
 			output: [{metric: {
-				kind: "incremental"
-				name: "response_total"
+				kind:      "incremental"
+				name:      "response_total"
+				namespace: "service"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -347,8 +349,9 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type:  "set"
-						field: "remote_addr"
+						type:      "set"
+						field:     "remote_addr"
+						namespace: "{{branch}}"
 						tags: {
 							host: "{{host}}"
 						}
@@ -359,10 +362,12 @@ components: transforms: log_to_metric: {
 				host:        "10.22.11.222"
 				message:     "Sent 200 in 54.2ms"
 				remote_addr: "233.221.232.22"
+				branch:      "dev"
 			}
 			output: [{metric: {
-				kind: "incremental"
-				name: "remote_addr"
+				kind:      "incremental"
+				name:      "remote_addr"
+				namespace: "dev"
 				tags: {
 					host: "10.22.11.222"
 				}
