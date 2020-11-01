@@ -100,6 +100,15 @@ components: sources: apache_metrics: {
 				unit:    "seconds"
 			}
 		}
+		namespace: {
+			description: "The namespace of the metric."
+			required:    false
+			common:      false
+			warnings: []
+			type: string: {
+				default: "apache"
+			}
+		}
 	}
 
 	output: metrics: {

@@ -13,7 +13,6 @@ use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, Try
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use hyper_openssl::HttpsConnector;
-use parser::encode_namespace;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::BTreeMap;
@@ -182,8 +181,8 @@ fn apache_metrics(
 
                             let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
                                 .chain(vec![Ok(Metric {
-                                    name: encode_namespace(&namespace, "up"),
-                                    namespace: None,
+                                    name: "up".into(),
+                                    namespace: Some(namespace.clone()),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -216,8 +215,8 @@ fn apache_metrics(
                             });
                             Some(
                                 stream::iter(vec![Metric {
-                                    name: encode_namespace(&namespace, "up"),
-                                    namespace: None,
+                                    name: "up".into(),
+                                    namespace: Some(namespace.clone()),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -234,8 +233,8 @@ fn apache_metrics(
                             });
                             Some(
                                 stream::iter(vec![Metric {
-                                    name: encode_namespace(&namespace, "up"),
-                                    namespace: None,
+                                    name: "up".into(),
+                                    namespace: Some(namespace.clone()),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -361,7 +360,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "custom_up") {
+        match metrics.iter().find(|m| m.name == "up") {
             Some(m) => {
                 assert_eq!(m.value, MetricValue::Gauge { value: 1.0 });
 
@@ -376,7 +375,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                     None => error!(message = "No tags for metric.", metric = ?m),
                 }
             }
-            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
+            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
 
@@ -429,12 +428,12 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        // we still publish `apache_up=1` for bad status codes following the pattern of the Prometheus exporter:
+        // we still publish `up=1` for bad status codes following the pattern of the Prometheus exporter:
         //
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
-        match metrics.iter().find(|m| m.name == "apache_up") {
+        match metrics.iter().find(|m| m.name == "up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
-            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
+            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
 
@@ -470,9 +469,9 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "custom_up") {
+        match metrics.iter().find(|m| m.name == "up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 0.0 }),
-            None => error!(message = "Could not find apache_up metric in.", metrics = ?metrics),
+            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
 }
