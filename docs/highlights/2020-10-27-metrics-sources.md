@@ -2,7 +2,7 @@
 last_modified_on: "2020-10-27"
 $schema: ".schema.json"
 title: "New `*_metrics` sources"
-description: "A foray into metrics collection."
+description: "A foray into collecting metrics."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1314]
 release: "0.11.0"https://github.com/Lusitaniae/apache_exporter

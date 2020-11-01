@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-10-27"
 $schema: ".schema.json"
-title: "Switching to the MPL 2.0 License"
-description: "The Vector project has switched to the Mozilla Public License 2.0"
+title: "First-class Kubernetes integration"
+description: "Vector officially support Kubernetes with a first-class integration."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [1314]
 release: "0.11.0"

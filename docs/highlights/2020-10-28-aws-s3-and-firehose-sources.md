@@ -2,7 +2,7 @@
 last_modified_on: "2020-10-27"
 $schema: ".schema.json"
 title: "New `aws_s3` and `aws_kinesis_firehose` sources"
-description: "Export observability data out of AWS."
+description: "Export observability data out of AWS with ease."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [4101]
 release: "0.11.0"

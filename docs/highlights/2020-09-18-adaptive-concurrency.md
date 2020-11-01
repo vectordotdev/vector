@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-09-18"
 $schema: ".schema.json"
-title: "Adaptive concurrency. So good you'll never notice it."
+title: "Adaptive concurrency. Optimizing performance & reliability."
 description: "How Vector optimizes performance and increases reliability of your entire observability infrastructure."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [3094]
