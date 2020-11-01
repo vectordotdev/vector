@@ -298,28 +298,6 @@ impl Resource {
             .flat_map(|(_, componenets)| componenets)
             .collect()
     }
-
-    /// From given components returns all that have a resource conflict with any other component.
-    pub fn conflicts_hashset<K: Eq + Hash + Clone>(
-        components: Vec<(K, HashSet<Resource>)>,
-    ) -> HashSet<K> {
-        let mut conflicted = HashSet::new();
-        for i in 0..componenets.len() {
-            for j in i + 1..components.len() {
-                if componenets[i]
-                    .1
-                    .intersection(&components[j].1)
-                    .next()
-                    .is_some()
-                {
-                    conflicted.insert(components[i].0.clone());
-                    conflicted.insert(components[j].0.clone());
-                }
-            }
-        }
-
-        conflicted
-    }
 }
 
 #[derive(Deserialize, Serialize, Debug)]
