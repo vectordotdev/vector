@@ -589,7 +589,7 @@ mod tests {
             },
         }];
 
-        let line_protocols = encode_events(ProtocolVersion::V2, None, events, None, &[]);
+        let line_protocols = encode_events(ProtocolVersion::V2, events, None, None, &[]);
         let line_protocols: Vec<&str> = line_protocols.split('\n').collect();
         assert_eq!(line_protocols.len(), 1);
 

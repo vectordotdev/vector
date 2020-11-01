@@ -442,6 +442,7 @@ mod integration_tests {
     };
     use chrono::offset::TimeZone;
     use futures::{stream, StreamExt};
+    use rand::seq::SliceRandom;
 
     fn config() -> CloudWatchMetricsSinkConfig {
         CloudWatchMetricsSinkConfig {
@@ -516,6 +517,35 @@ mod integration_tests {
             });
             events.push(event);
         }
+
+        let stream = stream::iter(events).map(Into::into);
+        sink.run(stream).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn cloudwatch_metrics_namespace_partitioning() {
+        let cx = SinkContext::new_test();
+        let config = config();
+        let client = config.create_client(cx.resolver()).unwrap();
+        let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
+
+        let mut events = Vec::new();
+
+        for namespace in ["ns1", "ns2", "ns3", "ns4"].iter() {
+            for _ in 0..100 {
+                let event = Event::Metric(Metric {
+                    name: "counter".to_string(),
+                    namespace: Some(namespace.to_string()),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Incremental,
+                    value: MetricValue::Counter { value: 1.0 },
+                });
+                events.push(event);
+            }
+        }
+
+        events.shuffle(&mut rand::thread_rng());
 
         let stream = stream::iter(events).map(Into::into);
         sink.run(stream).await.unwrap();
