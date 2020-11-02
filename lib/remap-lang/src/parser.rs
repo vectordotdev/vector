@@ -116,13 +116,45 @@ impl Parser<'_> {
 
     /// Parse if-statement expressions.
     fn if_statement_from_pairs(&self, mut pairs: Pairs<R>) -> Result<Expr> {
+        // if condition
         let conditional = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
         let true_expression = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
-        let false_expression = pairs
-            .next()
+
+        // else condition
+        let mut false_expression = pairs
+            .next_back()
             .map(|pair| self.expression_from_pair(pair))
             .transpose()?
             .unwrap_or_else(|| Expr::from(Noop));
+
+        let mut pairs = pairs.rev().peekable();
+
+        // optional if-else conditions
+        while let Some(pair) = pairs.next() {
+            let (conditional, true_expression) = match pairs.peek().map(Pair::as_rule) {
+                Some(R::block) | None => {
+                    let conditional = self.expression_from_pair(pair)?;
+                    let true_expression = false_expression;
+                    false_expression = Expr::from(Noop);
+
+                    (conditional, true_expression)
+                }
+                Some(R::boolean_expr) => {
+                    let next_pair = pairs.next().ok_or(e(R::if_statement))?;
+                    let conditional = self.expression_from_pair(next_pair)?;
+                    let true_expression = self.expression_from_pair(pair)?;
+
+                    (conditional, true_expression)
+                }
+                _ => return Err(e(R::if_statement)),
+            };
+
+            false_expression = Expr::from(IfStatement::new(
+                Box::new(conditional),
+                Box::new(true_expression),
+                Box::new(false_expression),
+            ));
+        }
 
         Ok(Expr::from(IfStatement::new(
             Box::new(conditional),

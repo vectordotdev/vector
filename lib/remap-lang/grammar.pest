@@ -6,7 +6,7 @@ expression = _{ assignment | if_statement | boolean_expr | block }
 // Statements ------------------------------------------------------------------
 
 assignment   = { target ~ "=" ~ expression }
-if_statement = { "if" ~ boolean_expr ~ block ~ ("else" ~ block)? }
+if_statement = { "if" ~ boolean_expr ~ block ~ ("else if" ~ boolean_expr ~ block)* ~ ("else" ~ block)? }
 
 // Primary ---------------------------------------------------------------------
 
