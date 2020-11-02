@@ -1,7 +1,5 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    event::Lookup,
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     transforms::{FunctionTransform, Transform},
     Event,
@@ -57,7 +55,7 @@ impl TransformConfig for RemoveFieldsConfig {
 }
 
 impl RemoveFields {
-    pub fn new(fields: Vec<Lookup>, drop_empty: bool) -> crate::Result<Self> {
+    pub fn new(fields: Vec<String>, drop_empty: bool) -> crate::Result<Self> {
         Ok(RemoveFields { fields, drop_empty })
     }
 }
