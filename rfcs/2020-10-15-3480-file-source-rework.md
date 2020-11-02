@@ -376,6 +376,12 @@ address all of the relevant issues. Some examples:
 * Logging when we see that a file is deleted but need to keep it open
 * Not logging noise around small or empty files
 * Optionally silencing errors due to dangling symlinks
+* Exposing which files are being read and our progress through them
+
+For the last item, it would be particularly helpful to evolve how we store
+checkpoints. Instead of the strange filename-based system we have now, we should
+migrate towards a JSON file-based approach as laid out in
+[#1779](https://github.com/timberio/vector/issues/1779).
 
 ## Doc-level Proposal
 
@@ -434,6 +440,8 @@ The work with the highest investment/payofff ratio is likely around
 checksumming, so I would suggest we attack that first:
 
 - [ ] Migrate `FileWatcher` to general purpose file wrapper with fingerprinting
+- [ ] Rework checkpoint persistence to allow differentiating and migrating
+    between types
 - [ ] Combine checksum and first line checksum fingerprinting strategies
 - [ ] Add path-based fingerprinting strategy
 - [ ] Deprecate device/inode fingerprinting strategy
