@@ -208,7 +208,9 @@ impl JournaldSource {
         ));
         future::select(run, shutdown).await;
 
-        on_stop.map(|stop| stop());
+        if let Some(stop) = on_stop {
+            stop();
+        }
 
         Self::save_checkpoint(&mut checkpointer, &cursor).await;
 
@@ -228,7 +230,9 @@ impl JournaldSource {
                 Ok((stream, stop)) => {
                     *on_stop = Some(stop);
                     let should_restart = self.run_stream(stream, checkpointer, cursor).await;
-                    on_stop.take().map(|stop| stop());
+                    if let Some(stop) = on_stop.take() {
+                        stop();
+                    }
                     if !should_restart {
                         return;
                     }
