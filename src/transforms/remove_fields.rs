@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     Event,
 };
@@ -35,7 +35,7 @@ impl GenerateConfig for RemoveFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(RemoveFields {
             fields: self.fields.clone(),
             drop_empty: self.drop_empty.unwrap_or(false),

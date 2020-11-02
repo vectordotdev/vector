@@ -24,9 +24,8 @@ fn batching(
             move || {
                 let input = random_lines(event_len)
                     .take(num_events)
-                    .map(|s| s.into_bytes())
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
+                    .map(|s| s.into_bytes());
+                futures01::stream::iter_ok::<_, ()>(input)
             },
             |input| {
                 let mut rt = runtime();
@@ -62,16 +61,14 @@ fn partitioned_batching(
     Benchmark::new(bench_name, move |b| {
         b.iter_with_setup(
             move || {
-                let key = Bytes::from("key");
                 let input = random_lines(event_len)
                     .take(num_events)
                     .map(|s| s.into_bytes())
                     .map(|b| InnerBuffer {
                         inner: b,
-                        key: key.clone(),
-                    })
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
+                        key: Bytes::from("key"),
+                    });
+                futures01::stream::iter_ok::<_, ()>(input)
             },
             |input| {
                 let mut rt = runtime();

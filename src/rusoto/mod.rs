@@ -1,4 +1,4 @@
-use crate::{dns::Resolver, tls::MaybeTlsSettings};
+use crate::tls::MaybeTlsSettings;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
@@ -33,9 +33,9 @@ pub use region::{region_from_endpoint, RegionOrEndpoint};
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
 
-pub fn client(resolver: Resolver) -> crate::Result<Client> {
+pub fn client() -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = super::http::HttpClient::new(resolver, settings)?;
+    let client = super::http::HttpClient::new(settings)?;
     Ok(HttpClient { client })
 }
 
@@ -279,11 +279,9 @@ where
                 })
                 .collect();
 
-            let body = response.into_body().map(|try_chunk| {
-                try_chunk
-                    .map(|c| c)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-            });
+            let body = response
+                .into_body()
+                .map(|try_chunk| try_chunk.map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
 
             Ok(HttpResponse {
                 status,

@@ -16,7 +16,7 @@ use vector::transforms::{
     Transform,
 };
 use vector::{
-    config::{self, log_schema, TransformConfig, TransformContext},
+    config::{self, log_schema, TransformConfig},
     event::{Event, Value},
     sinks, sources,
     test_util::{
@@ -435,7 +435,7 @@ fn benchmark_regex(c: &mut Criterion) {
                             drop_failed: true,
                             ..Default::default()
                         }
-                        .build(TransformContext::new_test())
+                        .build()
                         .await
                         .unwrap()
                     });
@@ -832,7 +832,7 @@ fn benchmark_remap(c: &mut Criterion) {
                    "#,
             )
             .unwrap()
-            .build(TransformContext::new_test())
+            .build()
             .await
             .unwrap()
         });

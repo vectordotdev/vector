@@ -1,8 +1,8 @@
 mod interop;
 
 use crate::{
+    config::DataType,
     config::CONFIG_PATHS,
-    config::{DataType, TransformContext},
     event::Event,
     internal_events::{LuaBuildError, LuaEventProcessed, LuaGcTriggered},
     transforms::{
@@ -88,7 +88,7 @@ struct TimerConfig {
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
-    pub fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    pub fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Lua::new(&self).map(|lua| Box::new(lua) as Box<dyn Transform>)
     }
 
@@ -245,7 +245,7 @@ where
 }
 
 impl RuntimeTransform for Lua {
-    fn hook_process<F>(self: &mut Self, event: Event, emit_fn: F)
+    fn hook_process<F>(&mut self, event: Event, emit_fn: F)
     where
         F: FnMut(Event),
     {
@@ -265,7 +265,7 @@ impl RuntimeTransform for Lua {
         self.attempt_gc();
     }
 
-    fn hook_init<F>(self: &mut Self, emit_fn: F)
+    fn hook_init<F>(&mut self, emit_fn: F)
     where
         F: FnMut(Event),
     {
@@ -285,7 +285,7 @@ impl RuntimeTransform for Lua {
         self.attempt_gc();
     }
 
-    fn hook_shutdown<F>(self: &mut Self, emit_fn: F)
+    fn hook_shutdown<F>(&mut self, emit_fn: F)
     where
         F: FnMut(Event),
     {
@@ -307,7 +307,7 @@ impl RuntimeTransform for Lua {
         self.attempt_gc();
     }
 
-    fn timer_handler<F>(self: &mut Self, timer: Timer, emit_fn: F)
+    fn timer_handler<F>(&mut self, timer: Timer, emit_fn: F)
     where
         F: FnMut(Event),
     {

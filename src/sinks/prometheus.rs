@@ -1,6 +1,6 @@
 use crate::{
     buffers::Acker,
-    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     sinks::util::{
         encode_namespace,
@@ -70,20 +70,25 @@ pub fn default_flush_period_secs() -> u64 {
     60
 }
 
+impl Default for PrometheusSinkConfig {
+    fn default() -> Self {
+        Self {
+            namespace: None,
+            address: default_address(),
+            buckets: default_histogram_buckets(),
+            quantiles: default_summary_quantiles(),
+            flush_period_secs: default_flush_period_secs(),
+        }
+    }
+}
+
 inventory::submit! {
     SinkDescription::new::<PrometheusSinkConfig>("prometheus")
 }
 
 impl GenerateConfig for PrometheusSinkConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(&Self {
-            namespace: None,
-            address: default_address(),
-            buckets: default_histogram_buckets(),
-            quantiles: default_summary_quantiles(),
-            flush_period_secs: default_flush_period_secs(),
-        })
-        .unwrap()
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
@@ -114,6 +119,10 @@ impl SinkConfig for PrometheusSinkConfig {
 
     fn sink_type(&self) -> &'static str {
         "prometheus"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![Resource::Port(self.address.port())]
     }
 }
 
@@ -214,10 +223,7 @@ fn encode_metric_datum(
                 statistic: StatisticKind::Histogram,
             } => {
                 // convert distributions into aggregated histograms
-                let mut counts = Vec::new();
-                for _ in buckets {
-                    counts.push(0);
-                }
+                let mut counts = vec![0; buckets.len()];
                 let mut sum = 0.0;
                 let mut count = 0;
                 for (v, c) in values.iter().zip(sample_rates.iter()) {

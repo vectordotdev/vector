@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
     event::Event,
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
@@ -88,7 +87,7 @@ impl SinkConfig for KinesisFirehoseSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisFirehoseService::new(self.clone(), client, cx)?;
         Ok((
@@ -129,10 +128,10 @@ impl KinesisFirehoseSinkConfig {
         }
     }
 
-    fn create_client(&self, resolver: Resolver) -> crate::Result<KinesisFirehoseClient> {
+    fn create_client(&self) -> crate::Result<KinesisFirehoseClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -354,7 +353,7 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client().unwrap();
         let sink = KinesisFirehoseService::new(config, client, cx).unwrap();
 
         let (input, events) = random_events_with_stream(100, 100);

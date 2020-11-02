@@ -1,4 +1,4 @@
-use super::{Config, DataType};
+use super::{Config, DataType, Resource};
 use std::collections::HashMap;
 
 pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
@@ -43,6 +43,28 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
         Ok(())
     } else {
         Err(errors)
+    }
+}
+
+pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
+    let conflicting_componenets = Resource::conflicts(
+        config
+            .sinks
+            .iter()
+            .map(|(name, config)| (name, config.inner.resources())),
+    );
+    if conflicting_componenets.is_empty() {
+        Ok(())
+    } else {
+        let conflicting_componenets = conflicting_componenets
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>();
+        let error = format!(
+            "Multiple sinks own the same resource. Conflicting sinks: {}.",
+            conflicting_componenets.join(", ")
+        );
+        Err(vec![error])
     }
 }
 

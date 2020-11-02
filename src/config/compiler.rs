@@ -31,6 +31,10 @@ pub fn compile(raw: ConfigBuilder) -> Result<Config, Vec<String>> {
         errors.extend(type_errors);
     }
 
+    if let Err(type_errors) = validation::check_resources(&config) {
+        errors.extend(type_errors);
+    }
+
     if errors.is_empty() {
         Ok(config)
     } else {

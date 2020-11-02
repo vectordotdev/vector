@@ -1,9 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
 };
@@ -38,7 +35,7 @@ impl GenerateConfig for SamplerConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(RegexSet::new(&self.pass_list)
             .map::<Box<dyn Transform>, _>(|regex_set| {
                 Box::new(Sampler::new(self.rate, self.key_field.clone(), regex_set))

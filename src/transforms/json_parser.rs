@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
 };
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(JsonParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "json_parser")]
 impl TransformConfig for JsonParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(JsonParser::from(self.clone())))
     }
 
