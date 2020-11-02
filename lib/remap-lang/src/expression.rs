@@ -17,6 +17,7 @@ pub(super) use block::Block;
 pub(super) use function::Function;
 pub(super) use if_statement::IfStatement;
 pub(super) use not::Not;
+pub(super) use variable::Variable;
 
 pub use literal::Literal;
 pub use noop::Noop;
@@ -95,4 +96,5 @@ expression_dispatch![
     Noop,
     Not,
     Path,
+    Variable,
 ];
