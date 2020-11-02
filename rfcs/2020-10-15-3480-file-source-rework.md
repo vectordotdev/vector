@@ -258,6 +258,12 @@ in place, the algorithm can look something like the following:
 1. Return no fingerprint if there is no newline in the returned bytes
 1. Otherwise, return the checksum of the bytes up to the first newline
 
+This should give a good balance between usability and flexibility for the
+default strategy. As we implement it, we should evolve the current
+representation of fingerprints to one that maintains information about how it
+was determined. This will allow us more flexibility to evolve and/or combine
+strategies in the future.
+
 #### File starting point
 
 This logic is one layer below what's represented in the pseudocode above, but
