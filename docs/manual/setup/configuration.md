@@ -3,9 +3,6 @@ title: Configuration
 description: Configuring Vector
 ---
 
-import Alert from '@site/src/components/Alert';
-import Jump from '@site/src/components/Jump';
-
 This section covers configuring Vector and creating pipelines like the
 [example below](#example). Vector's configuration uses the [TOML][urls.toml]
 syntax, and the configuration file must be passed via the
@@ -15,8 +12,6 @@ syntax, and the configuration file must be passed via the
 ```bash
 vector --config /etc/vector/vector.toml
 ```
-
-
 
 ## Example
 
@@ -179,16 +174,16 @@ Learn more in the [template reference][docs.reference.templates].
 
 All TOML values types are supported. For convenience this includes:
 
-* [Strings](https://github.com/toml-lang/toml#string)
-* [Integers](https://github.com/toml-lang/toml#integer)
-* [Floats](https://github.com/toml-lang/toml#float)
-* [Booleans](https://github.com/toml-lang/toml#boolean)
-* [Offset Date-Times](https://github.com/toml-lang/toml#offset-date-time)
-* [Local Date-Times](https://github.com/toml-lang/toml#local-date-time)
-* [Local Dates](https://github.com/toml-lang/toml#local-date)
-* [Local Times](https://github.com/toml-lang/toml#local-time)
-* [Arrays](https://github.com/toml-lang/toml#array)
-* [Tables](https://github.com/toml-lang/toml#table)
+- [Strings](https://github.com/toml-lang/toml#string)
+- [Integers](https://github.com/toml-lang/toml#integer)
+- [Floats](https://github.com/toml-lang/toml#float)
+- [Booleans](https://github.com/toml-lang/toml#boolean)
+- [Offset Date-Times](https://github.com/toml-lang/toml#offset-date-time)
+- [Local Date-Times](https://github.com/toml-lang/toml#local-date-time)
+- [Local Dates](https://github.com/toml-lang/toml#local-date)
+- [Local Times](https://github.com/toml-lang/toml#local-time)
+- [Arrays](https://github.com/toml-lang/toml#array)
+- [Tables](https://github.com/toml-lang/toml#table)
 
 [docs.data-model]: /docs/about/data-model/
 [docs.installation]: /docs/setup/installation/

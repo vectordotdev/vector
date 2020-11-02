@@ -4,10 +4,6 @@ description: The various strategies used to deploy Vector across your infrastruc
 sidebar_label: Strategies
 ---
 
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import ServiceDiagram from '@site/src/components/ServiceDiagram';
-import SidecarDiagram from '@site/src/components/SidecarDiagram';
-
 Vector is designed to be the single and only tool needed to get data from A to
 B. This means Vector can be deployed as a [daemon](#daemon),
 [sidecar](#sidecar), or a [service](#service). You combine these strategies to
@@ -15,10 +11,7 @@ form [topologies][docs.topologies] which are covered in the
 [next section][docs.topologies]. In this section we'll cover each strategy in
 detail and help you understand when to use each.
 
-
-
 ## Daemon
-
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
 collection on a single host. Vector runs in the background, in its own process,
@@ -35,23 +28,22 @@ The following diagram demonstrates how it works.
 
 ### When to use
 
-* You are responsible for the host machine and have the ability to install
+- You are responsible for the host machine and have the ability to install
   Vector directly on the host.
-* You are operationally proficient and understand how to reliably install,
+- You are operationally proficient and understand how to reliably install,
   manage, and configure software.
-* You want a single robust solution for collecting and shipping your
+- You want a single robust solution for collecting and shipping your
   observability data on each host.
 
 ### When NOT to use
 
-* You do not control the host machine or environment.
-* You do not feel comfortable installing, managing, and configuring host-level
+- You do not control the host machine or environment.
+- You do not feel comfortable installing, managing, and configuring host-level
   software.
-* You want to shift responsibility of collecting and shipping observability data
+- You want to shift responsibility of collecting and shipping observability data
   to each service owner.
 
 ## Sidecar
-
 
 The [sidecar deployment strategy][docs.strategies#sidecar] is designed to
 collect data from a _single_ service. Vector has a tight 1 to 1 coupling with
@@ -66,20 +58,19 @@ each service. Typically data is collected by tailing local files via Vector's
 
 ### When to use
 
-* You are not responsible for the host machine and do not have the ability to
+- You are not responsible for the host machine and do not have the ability to
   install Vector directly on the host.
-* You want to couple data collection with each service, shifting responsibility
+- You want to couple data collection with each service, shifting responsibility
   to the service owner.
-* You find it simpler for each service to have it own specific Vector
+- You find it simpler for each service to have it own specific Vector
   instance and configuration file.
 
 ### When NOT to use
 
-* You do not like the idea of having multiple Vector instances on a
+- You do not like the idea of having multiple Vector instances on a
   single host.
 
 ## Service
-
 
 The [service deployment strategy][docs.strategies#service] treats Vector like a
 separate service. It is designed to receive data from an upstream source and
@@ -96,20 +87,20 @@ The following diagram demonstrates how it works.
 
 ### When to use
 
-* You need to batch data to optimize throughput and reduce the downstream
+- You need to batch data to optimize throughput and reduce the downstream
   request rate.
-* You want to perform operations across multiple hosts, such as aggregating
+- You want to perform operations across multiple hosts, such as aggregating
   data in a global context.
-* Vector is a stream consumer, continually pulling data from services like
+- Vector is a stream consumer, continually pulling data from services like
   Kafka, Kinesis, or SQS.
-* You are receiving data from other upstream Vector instances via the
+- You are receiving data from other upstream Vector instances via the
   [`vector` sink][docs.sinks.vector].
 
 ### When NOT to use
 
-* Your downstream services support streaming where each individual host can
+- Your downstream services support streaming where each individual host can
   write data directly to the services.
-* You do not need to perform operations across multiple hosts.
+- You do not need to perform operations across multiple hosts.
 
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.file]: /docs/reference/sources/file/

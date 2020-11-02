@@ -4,24 +4,14 @@ sidebar_label: MacOS
 description: Install Vector on MacOS
 ---
 
-import CodeExplanation from '@site/src/components/CodeExplanation';
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import InstallationCommand from '@site/src/components/InstallationCommand';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 This document will cover installing Vector on MacOS.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -40,13 +30,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"homebrew"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"homebrew"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="homebrew">
 
 <Steps headingDepth={3}>
@@ -67,10 +57,10 @@ brew tap timberio/brew && brew install vector
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/usr/local/etc/vector/vector.toml"}
-  sourceName={"file"}
-  sinkName={null} />
+format="toml"
+path={"/usr/local/etc/vector/vector.toml"}
+sourceName={"file"}
+sinkName={null} />
 
 </li>
 <li>
@@ -104,10 +94,10 @@ Or choose your [preferred method][docs.installation].
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"vector.toml"}
-  sourceName={"file"}
-  sinkName={null} />
+format="toml"
+path={"vector.toml"}
+sourceName={"file"}
+sinkName={null} />
 
 </li>
 <li>
@@ -134,10 +124,10 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"file"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"file"}
+sinkName={null} />
 
 </li>
 <li>
@@ -153,9 +143,9 @@ docker run \
 
 <CodeExplanation>
 
-* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `-v /var/log:/var/log` flag ensures that Vector has access to the appropriate resources.
-* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+- The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+- The `-v /var/log:/var/log` flag ensures that Vector has access to the appropriate resources.
+- The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 

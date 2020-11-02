@@ -3,12 +3,8 @@ title: Updating
 description: How to update Vector to a newer version.
 ---
 
-import Jump from '@site/src/components/Jump';
-
 Updating Vector depends largely on your [installation][docs.installation]
 method. Each installation guide provides its own "Updating" section:
-
-
 
 ## Installation Method
 

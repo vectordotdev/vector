@@ -3,16 +3,11 @@ title: Concepts
 description: The fundamental Vector concepts. A great place to start learning about Vector.
 ---
 
-import Jump from '@site/src/components/Jump';
-import SVG from 'react-inlinesvg';
-
 <SVG src="/img/concepts.svg" />
 
 It's worth getting familiar with the basic concepts that comprise Vector as they
 are used throughout the documentation. This knowledge will be helpful as you
 proceed and is also cool to brag about amongst your friends.
-
-
 
 ## Components
 

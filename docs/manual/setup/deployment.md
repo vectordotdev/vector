@@ -5,10 +5,6 @@ description: How to deploy Vector into your own infrastructure
 hide_pagination: true
 ---
 
-
-
-import Jump from '@site/src/components/Jump';
-
 This section will cover deploying Vector. Vector is designed to be the single
 and only tool needed to get data from A to B, serving as a
 [daemon][docs.strategies#daemon], [sidecar][docs.strategies#sidecar], or

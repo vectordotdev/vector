@@ -4,9 +4,6 @@ sidebar_label: From Archives
 description: Install Vector from pre-compiled archives
 ---
 
-import Alert from '@site/src/components/Alert';
-import Steps from '@site/src/components/Steps';
-
 This page covers installing Vector from a pre-built archive. These archives
 contain the `vector` binary as well as supporting configuration files.
 
@@ -19,33 +16,26 @@ permissions, directory creation, and other intricacies covered in the
 
 </Alert>
 
-
-
 ## Installation
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 <Tabs
-  block={true}
-  defaultValue="aarch64-unknown-linux-musl-tar-gz"
-  urlKey="file_name"
-  values={[{"label":"Linux (ARM64)","value":"aarch64-unknown-linux-musl-tar-gz"},{"label":"MacOS (x86_64)","value":"x86_64-apple-darwin-tar-gz"},{"label":"Windows (x86_64, 7+)","value":"x86_64-pc-windows-msvc-zip"},{"label":"Linux (x86_64)","value":"x86_64-unknown-linux-musl-tar-gz"}]}>
-
+block={true}
+defaultValue="aarch64-unknown-linux-musl-tar-gz"
+urlKey="file_name"
+values={[{"label":"Linux (ARM64)","value":"aarch64-unknown-linux-musl-tar-gz"},{"label":"MacOS (x86_64)","value":"x86_64-apple-darwin-tar-gz"},{"label":"Windows (x86_64, 7+)","value":"x86_64-pc-windows-msvc-zip"},{"label":"Linux (x86_64)","value":"x86_64-unknown-linux-musl-tar-gz"}]}>
 
 <TabItem value="vector-aarch64-unknown-linux-musl-tar-gz">
 <Steps headingDepth={3}>
 
-
 1.  ### Download & unpack the archive
 
     <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (0.10.0)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
+    className="mini"
+    defaultValue="latest"
+    values={[
+    { label: 'Latest (0.10.0)', value: 'latest'},
+    { label: 'Nightly', value: 'nightly'},
+    ]}>
 
     <TabItem value="latest">
 
@@ -73,7 +63,7 @@ import TabItem from '@theme/TabItem';
     cd vector
     ```
 
-3.  ### Move `vector` into your $PATH
+3.  ### Move `vector` into your \$PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
@@ -94,16 +84,15 @@ import TabItem from '@theme/TabItem';
 <TabItem value="vector-x86_64-apple-darwin-tar-gz">
 <Steps headingDepth={3}>
 
-
 1.  ### Download & unpack the archive
 
     <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (0.10.0)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
+    className="mini"
+    defaultValue="latest"
+    values={[
+    { label: 'Latest (0.10.0)', value: 'latest'},
+    { label: 'Nightly', value: 'nightly'},
+    ]}>
 
     <TabItem value="latest">
 
@@ -131,7 +120,7 @@ import TabItem from '@theme/TabItem';
     cd vector
     ```
 
-3.  ### Move `vector` into your $PATH
+3.  ### Move `vector` into your \$PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
@@ -152,16 +141,15 @@ import TabItem from '@theme/TabItem';
 <TabItem value="vector-x86_64-pc-windows-msvc-zip">
 <Steps headingDepth={3}>
 
-
 1.  ### Download Vector release archive (latest)
 
     <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (0.10.0)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
+    className="mini"
+    defaultValue="latest"
+    values={[
+    { label: 'Latest (0.10.0)', value: 'latest'},
+    { label: 'Nightly', value: 'nightly'},
+    ]}>
 
     <TabItem value="latest">
 
@@ -203,16 +191,15 @@ import TabItem from '@theme/TabItem';
 <TabItem value="vector-x86_64-unknown-linux-musl-tar-gz">
 <Steps headingDepth={3}>
 
-
 1.  ### Download & unpack the archive
 
     <Tabs
-      className="mini"
-      defaultValue="latest"
-      values={[
-        { label: 'Latest (0.10.0)', value: 'latest'},
-        { label: 'Nightly', value: 'nightly'},
-      ]}>
+    className="mini"
+    defaultValue="latest"
+    values={[
+    { label: 'Latest (0.10.0)', value: 'latest'},
+    { label: 'Nightly', value: 'nightly'},
+    ]}>
 
     <TabItem value="latest">
 
@@ -240,7 +227,7 @@ import TabItem from '@theme/TabItem';
     cd vector
     ```
 
-3.  ### Move `vector` into your $PATH
+3.  ### Move `vector` into your \$PATH
 
     ```bash
     echo "export PATH=\"$(pwd)/vector/bin:\$PATH\"" >> $HOME/.profile
