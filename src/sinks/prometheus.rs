@@ -223,10 +223,7 @@ fn encode_metric_datum(
                 statistic: StatisticKind::Histogram,
             } => {
                 // convert distributions into aggregated histograms
-                let mut counts = Vec::new();
-                for _ in buckets {
-                    counts.push(0);
-                }
+                let mut counts = vec![0; buckets.len()];
                 let mut sum = 0.0;
                 let mut count = 0;
                 for (v, c) in values.iter().zip(sample_rates.iter()) {
