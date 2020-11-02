@@ -262,10 +262,10 @@ impl JournaldSource {
                         return true;
                     }
                     Some(Ok(text)) => text,
-                    Some(Err(err)) => {
+                    Some(Err(error)) => {
                         error!(
                             message = "Could not read from journald source.",
-                            error = %err,
+                            %error,
                         );
                         break;
                     }
