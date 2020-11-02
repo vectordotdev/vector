@@ -79,7 +79,7 @@ impl GenerateConfig for DedupeConfig {
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Dedupe::new(self.clone())))
+        Ok(Transform::task(Dedupe::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -191,7 +191,8 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
 impl TaskTransform for Dedupe {
     fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
         Self: 'static {
-        Box::new(task.map(self.tranform_one))
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
     }
 }
 

@@ -46,7 +46,7 @@ impl Function for OnlyFields {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OnlyFieldsFn {
     paths: Vec<Box<dyn Expression>>,
 }

@@ -37,8 +37,10 @@ impl TransformConfig for SwimlaneConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct Swimlane {
+    #[derivative(Debug="ignore")]
     condition: Box<dyn Condition>,
 }
 

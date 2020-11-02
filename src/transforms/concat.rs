@@ -66,7 +66,7 @@ impl TransformConfig for ConcatConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Substring {
     source: String,
     start: Option<i32>,

@@ -29,7 +29,7 @@ pub struct LuaConfig {
 // be exposed to users.
 impl LuaConfig {
     pub fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Lua::new(&self.source, self.search_dirs.clone()).map(Transform::function)
+        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::function)
     }
 
     pub fn input_type(&self) -> DataType {
@@ -53,10 +53,23 @@ impl LuaConfig {
 // after each transform would have significant footprint on the performance.
 const GC_INTERVAL: usize = 16;
 
-#[derive(Debug, Clone)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Lua {
+    #[derivative(Debug="ignore")]
+    source: String,
+    #[derivative(Debug="ignore")]
+    search_dirs: Vec<String>,
+    #[derivative(Debug="ignore")]
     lua: rlua::Lua,
     invocations_after_gc: usize,
+}
+
+impl Clone for Lua {
+    fn clone(&self) -> Self {
+        Lua::new(self.source.clone(), self.search_dirs.clone())
+            .expect("Tried to clone existing valid lua transform. This is an invariant.")
+    }
 }
 
 // This wrapping structure is added in order to make it possible to have independent implementations
@@ -67,11 +80,11 @@ struct LuaEvent {
 }
 
 impl Lua {
-    pub fn new(source: &str, search_dirs: Vec<String>) -> crate::Result<Self> {
+    pub fn new(source: String, search_dirs: Vec<String>) -> crate::Result<Self> {
         let lua = rlua::Lua::new();
 
         let additional_paths = search_dirs
-            .into_iter()
+            .iter()
             .map(|d| format!("{}/?.lua", d))
             .collect::<Vec<_>>()
             .join(";");
@@ -93,6 +106,8 @@ impl Lua {
         .context(InvalidLua)?;
 
         Ok(Self {
+            source,
+            search_dirs,
             lua,
             invocations_after_gc: 0,
         })
@@ -226,7 +241,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["hello"] = "goodbye"
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -245,7 +260,7 @@ mod tests {
             r#"
               _, _, name = string.find(event["message"], "Hello, my name is (%a+).")
               event["name"] = name
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -263,7 +278,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["name"] = nil
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -280,7 +295,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event = nil
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -302,7 +317,7 @@ mod tests {
               else
                 event["result"] = "found"
               end
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -319,7 +334,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["number"] = 3
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -334,7 +349,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["number"] = 3.14159
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -349,7 +364,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["bool"] = true
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -364,7 +379,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["junk"] = {"asdf"}
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -379,7 +394,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event[false] = "hello"
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -395,7 +410,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               print(event[false])
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -411,7 +426,7 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               error("this is an error")
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();
@@ -427,7 +442,7 @@ mod tests {
         let err = Lua::new(
             r#"
               1234 = sadf <>&*!#@
-            "#,
+            "#.to_string(),
             vec![],
         )
         .map(|_| ())
@@ -464,7 +479,7 @@ mod tests {
         let source = r#"
           local script2 = require("script2")
           script2.modify(event)
-        "#;
+        "#.to_string();
 
         let mut transform =
             Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
@@ -482,7 +497,7 @@ mod tests {
               for k,v in pairs(event) do
                 event[k] = k .. v
               end
-            "#,
+            "#.to_string(),
             vec![],
         )
         .unwrap();

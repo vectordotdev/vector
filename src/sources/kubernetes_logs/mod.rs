@@ -39,9 +39,8 @@ use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
 use futures01::Stream as Stream01;
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt, TryFutureExt, Stream, TryStream, TryStreamExt, compat::Stream01CompatExt};
-use async_graphql::static_assertions::_core::fmt::Formatter;
-use std::convert::Infallible;
+use futures::{future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt, compat::Stream01CompatExt};
+
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
@@ -181,8 +180,8 @@ impl Source {
 
     async fn run<O>(self, out: O, global_shutdown: ShutdownSignal) -> crate::Result<()>
     where
-        O: Sink<Event> + Send + 'static,
-        <O as Sink<Event>>::Error: Into<Box<dyn std::error::Error>>,
+        O: Sink<Event> + Send + 'static + Unpin,
+        <O as Sink<Event>>::Error: std::error::Error,
     {
         let Self {
             client,
@@ -273,7 +272,7 @@ impl Source {
             futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
         let mut parser = parser::build();
-        let mut partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
+        let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let events = file_source_rx.map(futures::stream::iter);
         let events = events.flatten();
@@ -297,7 +296,7 @@ impl Source {
 
         let event_processing_loop = partial_events_merger.transform(
             Box::new(events.map(Ok).compat())
-        ).compat().map_err(|_| Infallible).forward(out);
+        ).map_err(|_| unimplemented!("TODO")).compat().forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {

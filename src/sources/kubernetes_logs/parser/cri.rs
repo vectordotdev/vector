@@ -6,6 +6,7 @@ use crate::{
     },
 };
 use snafu::{OptionExt, Snafu};
+use derivative::Derivative;
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
 
@@ -19,8 +20,10 @@ pub const MULTILINE_TAG: &str = "multiline_tag";
 /// Normalizes parsed data for consistency.
 ///
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct Cri {
+    #[derivative(Debug="ignore")]
     regex_parser: Box<dyn FunctionTransform>,
 }
 

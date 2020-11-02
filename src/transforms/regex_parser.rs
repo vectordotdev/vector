@@ -71,6 +71,7 @@ pub struct RegexParser {
     overwrite_target: bool,
 }
 
+#[derive(Debug, Clone)]
 struct CompiledRegex {
     regex: Regex,
     capture_names: Vec<(usize, String, Conversion)>,

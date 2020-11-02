@@ -53,7 +53,8 @@ impl TransformConfig for GrokParserConfig {
         Ok(grok
             .compile(&self.pattern, true)
             .map(|p| GrokParser {
-                pattern: p,
+                pattern: self.pattern.clone(),
+                pattern_built: p,
                 field: field.clone(),
                 drop_field: self.drop_field,
                 types,
@@ -76,13 +77,30 @@ impl TransformConfig for GrokParserConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct GrokParser {
-    pattern: Pattern,
+    #[derivative(Debug="ignore")]
+    pattern_built: Pattern,
+    pattern: String,
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
     paths: HashMap<String, Vec<PathComponent>>,
+}
+
+impl Clone for GrokParser {
+    fn clone(&self) -> Self {
+        Self {
+            pattern_built: grok::Grok::with_patterns().compile(&self.pattern, true)
+                .expect("Panicked while cloning an already valid Grok parser. For some reason, the pattern could not be built again."),
+            pattern: self.pattern.clone(),
+            field: self.field.clone(),
+            drop_field: self.drop_field,
+            types: self.types.clone(),
+            paths: self.paths.clone(),
+        }
+    }
 }
 
 impl FunctionTransform for GrokParser {
@@ -92,7 +110,7 @@ impl FunctionTransform for GrokParser {
         emit!(GrokParserEventProcessed);
 
         if let Some(value) = value {
-            if let Some(matches) = self.pattern.match_against(&value) {
+            if let Some(matches) = self.pattern_built.match_against(&value) {
                 let drop_field = self.drop_field && matches.get(&self.field).is_none();
                 for (name, value) in matches.iter() {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);

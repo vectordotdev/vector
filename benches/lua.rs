@@ -47,7 +47,7 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let source = format!("event['{}'] = '{}'", key, value);
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(source, vec![]).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
@@ -134,7 +134,7 @@ fn field_filter(c: &mut Criterion) {
                         event = nil
                       end
                     "#;
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(source.to_string(), vec![]).unwrap()
                 },
                 |mut transform| {
                     let num = (0..num_events)

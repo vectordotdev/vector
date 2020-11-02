@@ -4,7 +4,7 @@ use crate::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
     },
-    transforms::{FunctionTransform, Transform},
+    transforms::{Transform},
     Event,
 };
 use bloom::{BloomFilter, ASMS};
@@ -13,6 +13,9 @@ use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
 };
+use async_graphql::static_assertions::_core::fmt::Formatter;
+use crate::transforms::TaskTransform;
+use futures01::Stream as Stream01;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -48,7 +51,7 @@ pub enum LimitExceededAction {
     DropEvent,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct TagCardinalityLimit {
     config: TagCardinalityLimitConfig,
     accepted_tags: HashMap<String, TagValueSet>,
@@ -85,7 +88,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(TagCardinalityLimit::new(self.clone())))
+        Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -102,6 +105,7 @@ impl TransformConfig for TagCardinalityLimitConfig {
 }
 
 /// Container for storing the set of accepted values for a given tag key.
+#[derive(Debug)]
 struct TagValueSet {
     storage: TagValueSetStorage,
     num_elements: usize,
@@ -110,6 +114,15 @@ struct TagValueSet {
 enum TagValueSetStorage {
     Set(HashSet<String>),
     Bloom(BloomFilter),
+}
+
+impl std::fmt::Debug for TagValueSetStorage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TagValueSetStorage::Set(set) => write!(f, "Set({:?})", set),
+            TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
+        }
+    }
 }
 
 impl TagValueSet {
@@ -200,10 +213,8 @@ impl TagCardinalityLimit {
             false
         }
     }
-}
 
-impl FunctionTransform for TagCardinalityLimit {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         emit!(TagCardinalityLimitEventProcessed);
         match event.as_mut_metric().tags {
             Some(ref mut tags_map) => {
@@ -215,7 +226,7 @@ impl FunctionTransform for TagCardinalityLimit {
                                     tag_key: &key,
                                     tag_value: &value,
                                 });
-                                return;
+                                return None;
                             }
                         }
                     }
@@ -235,10 +246,18 @@ impl FunctionTransform for TagCardinalityLimit {
                         }
                     }
                 }
-                output.push(event)
+                Some(event)
             }
-            None => output.push(event),
-        };
+            None => Some(event),
+        }
+    }
+}
+
+impl TaskTransform for TagCardinalityLimit {
+    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
+        Self: 'static {
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
     }
 }
 

@@ -168,6 +168,8 @@ pub trait FunctionTransform: Send + dyn_clone::DynClone {
     }
 }
 
+dyn_clone::clone_trait_object!(FunctionTransform);
+
 /// Transforms that tend to be more complicated runtime style components.
 ///
 /// These require coordination and map a stream of some `T` to some `U`.

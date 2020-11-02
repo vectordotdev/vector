@@ -52,7 +52,7 @@ impl Default for MergeConfig {
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
     async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Merge::from(self.clone())))
+        Ok(Transform::task(Merge::from(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -106,7 +106,7 @@ impl Merge {
             }
 
             // Do not emit the event yet.
-            return;
+            return None;
         }
 
         // We got non-partial event. Attempt to get a partial event merge
@@ -142,9 +142,12 @@ impl From<MergeConfig> for Merge {
 }
 
 impl TaskTransform for Merge {
-    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
-        Self: 'static {
-        Box::new(task.map(self.transform_one))
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item=Event, Error=()> + Send>
+    ) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where Self: 'static {
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
     }
 }
 

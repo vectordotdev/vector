@@ -26,9 +26,11 @@ pub enum CheckFieldsPredicateArg {
     Boolean(bool),
 }
 
-pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync {
+pub trait CheckFieldsPredicate: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
 }
+
+dyn_clone::clone_trait_object!(CheckFieldsPredicate);
 
 //------------------------------------------------------------------------------
 
@@ -370,7 +372,7 @@ impl CheckFieldsPredicate for IpCidrPredicate {
 
 //------------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct NegatePredicate {
     subpred: Box<dyn CheckFieldsPredicate>,
 }
@@ -540,6 +542,7 @@ impl ConditionConfig for CheckFieldsConfig {
 
 //------------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
 }

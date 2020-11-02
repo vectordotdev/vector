@@ -7,12 +7,12 @@ pub enum Error {
     PathInsertion(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Target {
     Path(Vec<Vec<String>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Assignment {
     target: Target,
     value: Box<Expr>,

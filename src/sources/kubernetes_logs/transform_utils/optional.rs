@@ -16,7 +16,7 @@ impl<T: TaskTransform> TaskTransform for Optional<T> {
     fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
         Self: 'static {
         match self.0 {
-            Some(val) => Box::new(task.map(val)),
+            Some(val) => Box::new(val).transform(task),
             None => task,
         }
     }

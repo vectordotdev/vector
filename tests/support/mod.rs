@@ -186,6 +186,7 @@ impl SourceConfig for MockSourceConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct MockTransform {
     suffix: String,
     increase: f64,

@@ -25,6 +25,7 @@ impl ConditionConfig for IsMetricConfig {
 
 //------------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct IsMetric {}
 
 impl Condition for IsMetric {

@@ -25,6 +25,7 @@ impl ConditionConfig for IsLogConfig {
 
 //------------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct IsLog {}
 
 impl Condition for IsLog {

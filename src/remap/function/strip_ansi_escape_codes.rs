@@ -24,7 +24,7 @@ impl Function for StripAnsiEscapeCodes {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StripAnsiEscapeCodesFn {
     value: Box<dyn Expression>,
 }
