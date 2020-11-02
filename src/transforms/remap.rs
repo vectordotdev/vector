@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
     transforms::{FunctionTransform, Transform},
@@ -25,7 +25,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self, _cx: TransformContext) -> Result<Transform> {
+    async fn build(&self) -> Result<Transform> {
         Remap::new(self.clone()).map(Transform::function)
     }
 

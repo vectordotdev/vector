@@ -100,6 +100,7 @@ impl fmt::Display for Rule {
             string_inner,
             target,
             value,
+            variable,
             WHITESPACE,
         ]
     }

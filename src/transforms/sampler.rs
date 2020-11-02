@@ -1,8 +1,5 @@
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
     transforms::{FunctionTransform, Transform},
@@ -38,7 +35,7 @@ impl GenerateConfig for SamplerConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "sampler")]
 impl TransformConfig for SamplerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+    async fn build(&self) -> crate::Result<Transform> {
         Ok(RegexSet::new(&self.pass_list)
             .map(|regex_set| Sampler::new(self.rate, self.key_field.clone(), regex_set))
             .map(Transform::function)

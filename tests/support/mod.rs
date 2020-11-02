@@ -22,7 +22,6 @@ use std::{
 use tracing::{error, info};
 use vector::config::{
     DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
-    TransformContext,
 };
 use vector::event::{metric::MetricValue, Event, Value};
 use vector::shutdown::ShutdownSignal;
@@ -258,7 +257,7 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self, _cx: TransformContext) -> Result<Transform, vector::Error> {
+    async fn build(&self) -> Result<Transform, vector::Error> {
         Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,

@@ -77,7 +77,7 @@ const EU_ENDPOINT: &str = "https://spm-receiver.eu.sematext.com";
 #[typetag::serde(name = "sematext_metrics")]
 impl SinkConfig for SematextMetricsConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(None)?;
 
         let endpoint = match (&self.endpoint, &self.region) {
             (Some(endpoint), None) => endpoint.clone(),

@@ -1,6 +1,6 @@
 use super::BuildError;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
@@ -36,7 +36,7 @@ impl GenerateConfig for ConcatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+    async fn build(&self) -> crate::Result<Transform> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var,

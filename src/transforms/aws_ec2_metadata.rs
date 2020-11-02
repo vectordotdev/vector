@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     http::HttpClient,
     transforms::{FunctionTransform, Transform},
@@ -103,7 +103,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self, cx: TransformContext) -> crate::Result<Transform> {
+    async fn build(&self) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -133,7 +133,7 @@ impl TransformConfig for Ec2Metadata {
             .clone()
             .unwrap_or_else(|| DEFAULT_FIELD_WHITELIST.clone());
 
-        let http_client = HttpClient::new(cx.resolver(), None)?;
+        let http_client = HttpClient::new(None)?;
 
         let mut client =
             MetadataClient::new(http_client, host, keys, write, refresh_interval, fields);
@@ -498,7 +498,7 @@ mod integration_tests {
             endpoint: Some(HOST.to_string()),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
         let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
@@ -533,7 +533,7 @@ mod integration_tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
         let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
@@ -562,7 +562,7 @@ mod integration_tests {
             namespace: Some("ec2.metadata".into()),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
         let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
@@ -588,7 +588,7 @@ mod integration_tests {
             namespace: Some("".into()),
             ..Default::default()
         };
-        let mut transform = config.build(TransformContext::new_test()).await.unwrap();
+        let mut transform = config.build().await.unwrap();
         let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.

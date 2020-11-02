@@ -1,7 +1,7 @@
 use super::{SinkBuildError, StreamSinkOld};
 use crate::{
     config::SinkContext,
-    dns::Resolver,
+    dns,
     internal_events::UdpSendIncomplete,
     sinks::{Healthcheck, VectorSink},
     Event,
@@ -42,13 +42,13 @@ impl UdpSinkConfig {
         Self { address }
     }
 
-    fn build_connector(&self, cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
+    fn build_connector(&self, _cx: SinkContext) -> crate::Result<(UdpConnector, Healthcheck)> {
         let uri = self.address.parse::<http::Uri>()?;
 
         let host = uri.host().ok_or(SinkBuildError::MissingHost)?.to_string();
         let port = uri.port_u16().ok_or(SinkBuildError::MissingPort)?;
 
-        let connector = UdpConnector::new(host, port, cx.resolver());
+        let connector = UdpConnector::new(host, port);
         let healthcheck = connector.healthcheck();
 
         Ok((connector, healthcheck))
@@ -80,21 +80,15 @@ impl UdpSinkConfig {
 struct UdpConnector {
     host: String,
     port: u16,
-    resolver: Resolver,
 }
 
 impl UdpConnector {
-    fn new(host: String, port: u16, resolver: Resolver) -> Self {
-        Self {
-            host,
-            port,
-            resolver,
-        }
+    fn new(host: String, port: u16) -> Self {
+        Self { host, port }
     }
 
     async fn connect(&self) -> Result<UdpSocket, UdpError> {
-        let ip = self
-            .resolver
+        let ip = dns::Resolver
             .lookup_ip(self.host.clone())
             .await
             .context(DnsError)?
@@ -137,7 +131,7 @@ impl UdpConnector {
 
 impl Into<UdpSink> for UdpConnector {
     fn into(self) -> UdpSink {
-        UdpSink::new(self.host, self.port, self.resolver)
+        UdpSink::new(self.host, self.port)
     }
 }
 
@@ -210,13 +204,9 @@ enum State {
 }
 
 impl UdpSink {
-    pub fn new(host: String, port: u16, resolver: Resolver) -> Self {
+    pub fn new(host: String, port: u16) -> Self {
         let span = info_span!("connection", %host, %port);
-        let connector = UdpConnector {
-            host,
-            port,
-            resolver,
-        };
+        let connector = UdpConnector { host, port };
         Self {
             connector,
             state: State::Initializing,

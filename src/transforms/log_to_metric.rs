@@ -1,8 +1,5 @@
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::LogEvent,
     event::Value,
@@ -37,9 +34,9 @@ pub struct CounterConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct GaugeConfig {
-    field: String,
-    name: Option<String>,
-    tags: Option<IndexMap<String, String>>,
+    pub field: String,
+    pub name: Option<String>,
+    pub tags: Option<IndexMap<String, String>>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -103,7 +100,7 @@ impl GenerateConfig for LogToMetricConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "log_to_metric")]
 impl TransformConfig for LogToMetricConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+    async fn build(&self) -> crate::Result<Transform> {
         Ok(Transform::function(LogToMetric::new(self.clone())))
     }
 

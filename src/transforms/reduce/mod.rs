@@ -1,6 +1,6 @@
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
     internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
@@ -52,7 +52,7 @@ impl_generate_config_from_default!(ReduceConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "reduce")]
 impl TransformConfig for ReduceConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+    async fn build(&self) -> crate::Result<Transform> {
         Reduce::new(self).map(Transform::task)
     }
 
@@ -296,11 +296,7 @@ impl TaskTransform for Reduce {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        event::Value,
-        Event,
-    };
+    use crate::{config::TransformConfig, event::Value, Event};
     use futures::compat::Stream01CompatExt;
     use serde_json::json;
 
@@ -320,7 +316,7 @@ group_by = [ "request_id" ]
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -377,7 +373,7 @@ merge_strategies.baz = "max"
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -426,7 +422,7 @@ group_by = [ "request_id" ]
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
         let reduce = reduce.into_task();
@@ -482,7 +478,7 @@ merge_strategies.bar = "concat"
 "#,
         )
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
         let reduce = reduce.into_task();

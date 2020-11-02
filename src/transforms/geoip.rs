@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     transforms::{FunctionTransform, Transform},
     Result,
@@ -60,7 +60,7 @@ impl GenerateConfig for GeoipConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "geoip")]
 impl TransformConfig for GeoipConfig {
-    async fn build(&self, _cx: TransformContext) -> Result<Transform> {
+    async fn build(&self) -> Result<Transform> {
         Ok(Transform::function(Geoip::new(
             self.database.clone(),
             self.source.clone(),

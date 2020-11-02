@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, TransformContext},
+    config::DataType,
     event::{Event, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
     transforms::{FunctionTransform, Transform},
@@ -28,7 +28,7 @@ pub struct LuaConfig {
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
-    pub fn build(&self, _cx: TransformContext) -> crate::Result<Transform> {
+    pub fn build(&self) -> crate::Result<Transform> {
         Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::function)
     }
 
