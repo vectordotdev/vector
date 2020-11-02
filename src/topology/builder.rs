@@ -221,13 +221,7 @@ where
 {
     match data_type {
         DataType::Any => Box::new(stream), // it's possible to not call any comparing function if any type is supported
-        DataType::Log => Box::new(stream.filter(|event| match event {
-            Event::Log(_) => true,
-            _ => false,
-        })),
-        DataType::Metric => Box::new(stream.filter(|event| match event {
-            Event::Metric(_) => true,
-            _ => false,
-        })),
+        DataType::Log => Box::new(stream.filter(|event| matches!(event, Event::Log(_)))),
+        DataType::Metric => Box::new(stream.filter(|event| matches!(event, Event::Metric(_)))),
     }
 }

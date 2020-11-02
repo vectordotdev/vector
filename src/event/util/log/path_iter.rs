@@ -52,10 +52,7 @@ enum PathIterState<'a> {
 
 impl PathIterState<'_> {
     fn is_start(&self) -> bool {
-        match self {
-            Self::Start => true,
-            _ => false,
-        }
+        matches!(self, Self::Start)
     }
 }
 
