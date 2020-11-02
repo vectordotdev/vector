@@ -5,11 +5,12 @@ use crate::{
     },
     event::{Event, Value},
     internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
-    transforms::{FunctionTransform, Transform},
+    transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
+use futures01::Stream as Stream01;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -144,6 +145,17 @@ impl Dedupe {
             cache: LruCache::new(num_entries),
         }
     }
+
+    fn transform_one(&mut self, event: Event) -> Option<Event> {
+        emit!(DedupeEventProcessed);
+        let cache_entry = build_cache_entry(&event, &self.fields);
+        if self.cache.put(cache_entry, true).is_some() {
+            emit!(DedupeEventDiscarded { event });
+            None
+        } else {
+            Some(event)
+        }
+    }
 }
 
 /// Takes in an Event and returns a CacheEntry to place into the LRU cache containing
@@ -176,15 +188,10 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     }
 }
 
-impl FunctionTransform for Dedupe {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        emit!(DedupeEventProcessed);
-        let cache_entry = build_cache_entry(&event, &self.fields);
-        if self.cache.put(cache_entry, true).is_some() {
-            emit!(DedupeEventDiscarded { event });
-        } else {
-            output.push(event)
-        }
+impl TaskTransform for Dedupe {
+    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
+        Self: 'static {
+        Box::new(task.map(self.tranform_one))
     }
 }
 

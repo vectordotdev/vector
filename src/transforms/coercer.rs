@@ -47,6 +47,7 @@ impl TransformConfig for CoercerConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Coercer {
     types: HashMap<String, Conversion>,
     drop_unspecified: bool,

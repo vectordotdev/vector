@@ -116,7 +116,7 @@ impl Substring {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Concat {
     target: String,
     joiner: String,

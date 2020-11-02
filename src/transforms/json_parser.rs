@@ -45,7 +45,7 @@ impl TransformConfig for JsonParserConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct JsonParser {
     field: String,
     drop_invalid: bool,

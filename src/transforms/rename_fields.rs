@@ -18,6 +18,7 @@ pub struct RenameFieldsConfig {
     drop_empty: Option<bool>,
 }
 
+#[derive(Debug, Clone)]
 pub struct RenameFields {
     fields: IndexMap<Lookup, Lookup>,
     drop_empty: bool,

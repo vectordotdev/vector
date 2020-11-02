@@ -77,6 +77,7 @@ fn default_increment_by_value() -> bool {
     false
 }
 
+#[derive(Debug, Clone)]
 pub struct LogToMetric {
     config: LogToMetricConfig,
 }

@@ -46,6 +46,7 @@ impl TransformConfig for FilterConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Filter {
     condition: Box<dyn Condition>,
 }

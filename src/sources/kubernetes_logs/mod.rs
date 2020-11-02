@@ -16,12 +16,11 @@ use crate::{
     dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
-    transforms::FunctionTransform,
+    transforms::{FunctionTransform, TaskTransform},
     Pipeline,
 };
 use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -39,7 +38,10 @@ mod util;
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
-
+use futures01::Stream as Stream01;
+use futures::{future::FutureExt, sink::Sink, stream::StreamExt, TryFutureExt, Stream, TryStream, TryStreamExt, compat::Stream01CompatExt};
+use async_graphql::static_assertions::_core::fmt::Formatter;
+use std::convert::Infallible;
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
 
@@ -180,7 +182,7 @@ impl Source {
     async fn run<O>(self, out: O, global_shutdown: ShutdownSignal) -> crate::Result<()>
     where
         O: Sink<Event> + Send + 'static,
-        <O as Sink<Event>>::Error: std::error::Error,
+        <O as Sink<Event>>::Error: Into<Box<dyn std::error::Error>>,
     {
         let Self {
             client,
@@ -271,36 +273,31 @@ impl Source {
             futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
         let mut parser = parser::build();
-        let mut partial_events_merger = partial_events_merger::build(auto_partial_merge);
+        let mut partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
-        let events =
-            file_source_rx
-                .map(futures::stream::iter)
-                .flatten()
-                .map(move |(bytes, file)| {
-                    emit!(KubernetesLogsEventReceived {
-                        file: &file,
-                        byte_size: bytes.len(),
-                    });
-                    let mut event = create_event(bytes, &file);
-                    if annotator.annotate(&mut event, &file).is_none() {
-                        emit!(KubernetesLogsEventAnnotationFailed { event: &event });
-                    }
-                    event
-                });
+        let events = file_source_rx.map(futures::stream::iter);
+        let events = events.flatten();
+        let events = events.map(move |(bytes, file)| {
+            emit!(KubernetesLogsEventReceived {
+                file: &file,
+                byte_size: bytes.len(),
+            });
+            let mut event = create_event(bytes, &file);
+            if annotator.annotate(&mut event, &file).is_none() {
+                emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+            }
+            event
+        });
         let events = events
             .flat_map(move |event| {
                 let mut buf = Vec::with_capacity(1);
                 parser.transform(&mut buf, event);
                 futures::stream::iter(buf)
-            })
-            .flat_map(move |event| {
-                let mut buf = Vec::with_capacity(1);
-                partial_events_merger.transform(&mut buf, event);
-                futures::stream::iter(buf)
             });
 
-        let event_processing_loop = events.map(Ok).forward(out);
+        let event_processing_loop = partial_events_merger.transform(
+            Box::new(events.map(Ok).compat())
+        ).compat().map_err(|_| Infallible).forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {

@@ -16,6 +16,7 @@ pub struct GeoipConfig {
     pub target: String,
 }
 
+#[derive(Clone, Debug)]
 pub struct Geoip {
     pub dbreader: maxminddb::Reader<Vec<u8>>,
     pub source: String,

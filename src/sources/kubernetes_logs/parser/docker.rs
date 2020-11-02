@@ -17,7 +17,7 @@ pub const LOG: &str = "log";
 /// contents specific to the implementation of the Docker `json` log driver.
 ///
 /// Normalizes parsed data for consistency.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Docker;
 
 impl FunctionTransform for Docker {

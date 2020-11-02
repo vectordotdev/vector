@@ -51,6 +51,7 @@ impl TransformConfig for MetricToLogConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct MetricToLog {
     timestamp_key: String,
     host_tag: String,

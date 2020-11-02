@@ -54,7 +54,7 @@ impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParser {
     field: String,
 }

@@ -53,6 +53,7 @@ impl TransformConfig for FieldFilterConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct FieldFilter {
     field_name: String,
     value: String,

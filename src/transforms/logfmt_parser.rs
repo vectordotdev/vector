@@ -55,6 +55,7 @@ impl TransformConfig for LogfmtConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Logfmt {
     field: String,
     drop_field: bool,

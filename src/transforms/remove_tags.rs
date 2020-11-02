@@ -12,6 +12,7 @@ pub struct RemoveTagsConfig {
     pub tags: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub struct RemoveTags {
     tags: Vec<String>,
 }

@@ -60,6 +60,7 @@ impl TransformConfig for TokenizerConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Tokenizer {
     field_names: Vec<(String, Vec<PathComponent>, Conversion)>,
     field: String,

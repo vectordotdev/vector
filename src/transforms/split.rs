@@ -62,6 +62,7 @@ impl TransformConfig for SplitConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Split {
     field_names: Vec<(String, Conversion)>,
     separator: Option<String>,

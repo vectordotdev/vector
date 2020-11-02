@@ -58,6 +58,7 @@ impl TransformConfig for SamplerConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Sampler {
     rate: u64,
     key_field: String,

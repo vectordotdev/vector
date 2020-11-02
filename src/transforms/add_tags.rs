@@ -16,6 +16,7 @@ pub struct AddTagsConfig {
     pub overwrite: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct AddTags {
     tags: IndexMap<String, String>,
     overwrite: bool,

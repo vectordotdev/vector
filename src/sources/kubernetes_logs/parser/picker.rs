@@ -4,6 +4,7 @@ use crate::{
     transforms::FunctionTransform,
 };
 
+#[derive(Clone, Debug)]
 pub enum Picker {
     Init,
     Docker(Docker),

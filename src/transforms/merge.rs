@@ -3,10 +3,11 @@ use crate::{
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
-    transforms::{FunctionTransform, Transform},
+    transforms::{TaskTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
+use futures01::Stream as Stream01;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -67,7 +68,6 @@ impl TransformConfig for MergeConfig {
     }
 }
 
-#[derive(Debug)]
 pub struct Merge {
     partial_event_marker_field: String,
     fields: Vec<String>,
@@ -75,19 +75,8 @@ pub struct Merge {
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
 
-impl From<MergeConfig> for Merge {
-    fn from(config: MergeConfig) -> Self {
-        Self {
-            partial_event_marker_field: config.partial_event_marker_field,
-            fields: config.fields,
-            stream_discriminant_fields: config.stream_discriminant_fields,
-            log_event_merge_states: HashMap::new(),
-        }
-    }
-}
-
-impl FunctionTransform for Merge {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+impl Merge {
+    fn transform_one(&mut self, event: Event) -> Option<Event> {
         let mut event = event.into_log();
 
         // Prepare an event's discriminant.
@@ -128,8 +117,7 @@ impl FunctionTransform for Merge {
         let log_event_merge_state = match self.log_event_merge_states.remove(&discriminant) {
             Some(log_event_merge_state) => log_event_merge_state,
             None => {
-                output.push(Event::Log(event));
-                return;
+                return Some(Event::Log(event));
             }
         };
 
@@ -138,7 +126,25 @@ impl FunctionTransform for Merge {
         let merged_event = log_event_merge_state.merge_in_final_event(event, &self.fields);
 
         // Return the merged event.
-        output.push(Event::Log(merged_event));
+        Some(Event::Log(merged_event))
+    }
+}
+
+impl From<MergeConfig> for Merge {
+    fn from(config: MergeConfig) -> Self {
+        Self {
+            partial_event_marker_field: config.partial_event_marker_field,
+            fields: config.fields,
+            stream_discriminant_fields: config.stream_discriminant_fields,
+            log_event_merge_states: HashMap::new(),
+        }
+    }
+}
+
+impl TaskTransform for Merge {
+    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
+        Self: 'static {
+        Box::new(task.map(self.transform_one))
     }
 }
 

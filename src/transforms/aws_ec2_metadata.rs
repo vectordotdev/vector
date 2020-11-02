@@ -73,6 +73,7 @@ pub struct Ec2Metadata {
     fields: Option<Vec<String>>,
 }
 
+#[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
     state: ReadHandle,
 }

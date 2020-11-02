@@ -42,7 +42,7 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Remap {
     program: Program,
     drop_on_err: bool,

@@ -76,6 +76,7 @@ impl TransformConfig for GrokParserConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct GrokParser {
     pattern: Pattern,
     field: String,

@@ -48,6 +48,7 @@ pub enum LimitExceededAction {
     DropEvent,
 }
 
+#[derive(Clone, Debug)]
 pub struct TagCardinalityLimit {
     config: TagCardinalityLimitConfig,
     accepted_tags: HashMap<String, TagValueSet>,

@@ -15,6 +15,7 @@ pub struct RemoveFieldsConfig {
     drop_empty: Option<bool>,
 }
 
+#[derive(Clone, Debug)]
 pub struct RemoveFields {
     fields: Vec<Lookup>,
     drop_empty: bool,

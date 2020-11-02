@@ -51,6 +51,7 @@ impl TransformConfig for AnsiStripperConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct AnsiStripper {
     field: String,
 }

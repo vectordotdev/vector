@@ -53,6 +53,7 @@ impl LuaConfig {
 // after each transform would have significant footprint on the performance.
 const GC_INTERVAL: usize = 16;
 
+#[derive(Debug, Clone)]
 pub struct Lua {
     lua: rlua::Lua,
     invocations_after_gc: usize,
