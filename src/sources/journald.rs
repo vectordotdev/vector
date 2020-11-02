@@ -147,6 +147,7 @@ impl SourceConfig for JournaldConfig {
                 out: out.sink_compat(),
             }
             .run_shutdown(shutdown)
+            .instrument(info_span!("journald-server"))
             .boxed()
             .compat(),
         ))
@@ -201,15 +202,7 @@ impl JournaldSource {
 
         on_stop.map(|stop| stop());
 
-        if let Some(cursor) = cursor {
-            if let Err(error) = checkpointer.set(&cursor).await {
-                error!(
-                    message = "Could not set journald checkpoint.",
-                    %error,
-                    filename = ?checkpointer.filename,
-                );
-            }
-        }
+        Self::save_checkpoint(&mut checkpointer, &cursor).await;
 
         Ok(())
     }
@@ -306,15 +299,19 @@ impl JournaldSource {
             }
 
             if saw_record {
-                if let Some(cursor) = cursor {
-                    if let Err(error) = checkpointer.set(cursor).await {
-                        error!(
-                            message = "Could not set journald checkpoint.",
-                            %error,
-                            filename = ?checkpointer.filename,
-                        );
-                    }
-                }
+                Self::save_checkpoint(checkpointer, &*cursor).await;
+            }
+        }
+    }
+
+    async fn save_checkpoint(checkpointer: &mut Checkpointer, cursor: &Option<String>) {
+        if let Some(cursor) = cursor {
+            if let Err(error) = checkpointer.set(cursor).await {
+                error!(
+                    message = "Could not set journald checkpoint.",
+                    %error,
+                    filename = ?checkpointer.filename,
+                );
             }
         }
     }
