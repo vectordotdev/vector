@@ -244,6 +244,8 @@ impl JournaldSource {
         }
     }
 
+    /// Process `journalctl` output until some error occurs.
+    /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
         mut stream: BoxStream<'static, io::Result<Bytes>>,
@@ -298,6 +300,7 @@ impl JournaldSource {
                     Ok(_) => {}
                     Err(error) => {
                         error!(message = "Could not send journald log", %error);
+                        // `out` channel is closed, don't restart journalctl.
                         return false;
                     }
                 }
