@@ -50,7 +50,7 @@ of the condition, which can be confusing to users.
 Remap is an expression-based language. Everything, including statements, is an
 expression. Meaning, everything can return a value.
 
-**expression examples**
+### expression examples
 
 For example, the program `.foo = "bar"` consists of two expressions:
 
@@ -72,7 +72,7 @@ Since the `floor` function is the final expression that runs in the program, the
 outcome of a _successful execution_ of the program is either an `Integer` or
 `Float`.
 
-**expression trait**
+### expression trait
 
 Expressions are implemented using the `Expression` trait:
 
@@ -85,7 +85,7 @@ pub trait Expression: Send + Sync {
 Expressions can be fallible (not covered in this RFC), can return `None` (not
 covered in-depth in this RFC), or return a resolved `Value`.
 
-**defining the expected resolved values**
+### defining the expected resolved values
 
 To allow the execution context of a program to determine the outcome of running
 the program, we extend the `Expression` trait as follows:
@@ -121,7 +121,25 @@ The `ResolveKind` enum allows us to determine if an expression resolves to a
 predefined list of values. It also defines if the expression can resolve to
 "nothing" (e.g. `None`).
 
-**transient expressions**
+`ValueKind` is defined as follows:
+
+```rust
+pub enum ValueKind {
+    String,
+    Integer,
+    Float,
+    Boolean,
+    Timestamp,
+    Map,
+    Array,
+}
+```
+
+As can be seen from the `ValueKind`, it is not possible to define the value
+kinds contained within a map or array, only the top-level value kind of an
+expression can be defined.
+
+### transient expressions
 
 Some expressions don't have their own return value, but instead resolve to the
 return value of an expression they themselves execute.
@@ -148,7 +166,7 @@ impl Expression for IfStatement {
 
 The same applies to other expressions, such as `Assignment`, `Block`, and more.
 
-**defining expected outcomes**
+### defining expected outcomes
 
 To allow a program to define the expected outcome, we expand the `Program`
 struct.
