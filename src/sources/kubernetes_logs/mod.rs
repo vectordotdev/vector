@@ -13,7 +13,6 @@ use crate::internal_events::{
 use crate::kubernetes as k8s;
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
-    dns::Resolver,
     shutdown::ShutdownSignal,
     sources,
     transforms::Transform,
@@ -119,7 +118,7 @@ impl SourceConfig for Config {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
-        let source = Source::new(self, Resolver, globals, name)?;
+        let source = Source::new(self, globals, name)?;
 
         // TODO: this is a workaround for the legacy futures 0.1.
         // When the core is updated to futures 0.3 this should be simplified
@@ -160,17 +159,12 @@ struct Source {
 }
 
 impl Source {
-    fn new(
-        config: &Config,
-        resolver: Resolver,
-        globals: &GlobalOptions,
-        name: &str,
-    ) -> crate::Result<Self> {
+    fn new(config: &Config, globals: &GlobalOptions, name: &str) -> crate::Result<Self> {
         let field_selector = prepare_field_selector(config)?;
         let label_selector = prepare_label_selector(config);
 
         let k8s_config = k8s::client::config::Config::in_cluster()?;
-        let client = k8s::client::Client::new(k8s_config, resolver)?;
+        let client = k8s::client::Client::new(k8s_config)?;
 
         let data_dir = globals.resolve_and_make_data_subdir(None, name)?;
 
@@ -281,6 +275,7 @@ impl Source {
                 // Max line length to expect during fingerprinting, see the
                 // explanation above.
                 max_line_length: max_line_bytes,
+                ignored_header_bytes: 0,
             },
             // We expect the files distribution to not be a concern because of
             // the way we pick files for gathering: for each container, only the

@@ -1,6 +1,5 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
     event::metric::{Metric, MetricKind, MetricValue},
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
@@ -64,7 +63,7 @@ impl SinkConfig for CloudWatchMetricsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = CloudWatchMetricsSvc::new(self.clone(), client, cx)?;
         Ok((sink, healthcheck))
@@ -94,7 +93,7 @@ impl CloudWatchMetricsSinkConfig {
         client.put_metric_data(request).await.map_err(Into::into)
     }
 
-    fn create_client(&self, resolver: Resolver) -> crate::Result<CloudWatchClient> {
+    fn create_client(&self) -> crate::Result<CloudWatchClient> {
         let region = (&self.region).try_into()?;
         let region = if cfg!(test) {
             // Moto (used for mocking AWS) doesn't recognize 'custom' as valid region name
@@ -109,7 +108,7 @@ impl CloudWatchMetricsSinkConfig {
             region
         };
 
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -265,7 +264,6 @@ fn tags_to_dimensions(tags: BTreeMap<String, String>) -> Vec<Dimension> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dns::Resolver;
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use chrono::offset::TimeZone;
     use pretty_assertions::assert_eq;
@@ -285,9 +283,8 @@ mod tests {
     }
 
     fn svc() -> CloudWatchMetricsSvc {
-        let resolver = Resolver;
         let config = config();
-        let client = config.create_client(resolver).unwrap();
+        let client = config.create_client().unwrap();
         CloudWatchMetricsSvc { client, config }
     }
 
@@ -459,7 +456,7 @@ mod integration_tests {
     #[tokio::test]
     async fn cloudwatch_metrics_healthchecks() {
         let config = config();
-        let client = config.create_client(Resolver).unwrap();
+        let client = config.create_client().unwrap();
         config.healthcheck(client).await.unwrap();
     }
 
@@ -467,7 +464,7 @@ mod integration_tests {
     async fn cloudwatch_metrics_put_data() {
         let cx = SinkContext::new_test();
         let config = config();
-        let client = config.create_client(cx.resolver()).unwrap();
+        let client = config.create_client().unwrap();
         let sink = CloudWatchMetricsSvc::new(config, client, cx).unwrap();
 
         let mut events = Vec::new();
