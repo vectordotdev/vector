@@ -51,7 +51,7 @@ type = "mongodb_metrics"
 Then connect it all to a sink:
 
 ```toml
-[source.prometheus]
+[sinks.prometheus]
 type = "prometheus"
 inputs = ["apache_metrics", "mongodb_metrics"]
 ```
