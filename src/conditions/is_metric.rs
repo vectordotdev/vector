@@ -29,10 +29,7 @@ pub struct IsMetric {}
 
 impl Condition for IsMetric {
     fn check(&self, e: &Event) -> bool {
-        match e {
-            Event::Metric(_) => true,
-            _ => false,
-        }
+        matches!(e, Event::Metric(_))
     }
 
     fn check_with_context(&self, e: &Event) -> Result<(), String> {

@@ -174,7 +174,7 @@ impl Source {
             .map(|pattern| {
                 let pattern = pattern
                     .to_str()
-                    .ok_or_else(|| "glob pattern is not a valid UTF-8 string")?;
+                    .ok_or("glob pattern is not a valid UTF-8 string")?;
                 Ok(glob::Pattern::new(pattern)?)
             })
             .collect::<crate::Result<Vec<_>>>()?;
