@@ -44,7 +44,7 @@ type = "host_metrics" # or apache_metrics, mongodb_metrics, or internal_metrics
 Then connect them to a sink:
 
 ```toml
-[source.prometheus]
+[sinks.prometheus]
 type = "prometheus"
 inputs = ["host_metrics"]
 ```
