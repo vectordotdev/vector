@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 
@@ -21,7 +21,7 @@ impl InternalEvent for SematextMetricsInvalidMetricReceived {
     fn emit_metrics(&self) {
         counter!(
             "processing_errors_total", 1,
-            "error_type" => "invalid_metric",
+            "error_type" => ErrorTypes::InvalidMetric.as_str(),
         );
     }
 }

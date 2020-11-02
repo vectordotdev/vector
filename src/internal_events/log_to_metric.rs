@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 use std::num::ParseFloatError;
 
@@ -29,7 +29,7 @@ impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-                 "error_type" => "field_not_found",
+                 "error_type" => ErrorTypes::FieldMissing.as_str(),
         );
     }
 }
@@ -51,7 +51,7 @@ impl<'a> InternalEvent for LogToMetricParseFloatError<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-                 "error_type" => "parse_error",
+                 "error_type" => ErrorTypes::ParseFailed.as_str(),
         );
     }
 }
@@ -72,7 +72,7 @@ impl InternalEvent for LogToMetricTemplateRenderError {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-                 "error_type" => "render_error",
+                 "error_type" => ErrorTypes::RenderError.as_str(),
         );
     }
 }
@@ -88,7 +88,7 @@ impl InternalEvent for LogToMetricTemplateParseError {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-                 "error_type" => "template_error",
+                 "error_type" => ErrorTypes::TemplateError.as_str(),
         );
     }
 }

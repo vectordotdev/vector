@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -27,6 +27,6 @@ impl<'a> InternalEvent for CoercerConversionFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "type_conversion_failed");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::TypeConversionFailed.as_str());
     }
 }

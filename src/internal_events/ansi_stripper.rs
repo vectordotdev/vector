@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl InternalEvent for ANSIStripperFieldMissing<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "field_missing");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::FieldMissing.as_str());
     }
 }
 
@@ -44,7 +44,7 @@ impl InternalEvent for ANSIStripperFieldInvalid<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "value_invalid");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::ValueInvalid.as_str());
     }
 }
 

@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ impl InternalEvent for RemapFailedMapping {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "failed_mapping");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::MappingFailed.as_str());
     }
 }
 

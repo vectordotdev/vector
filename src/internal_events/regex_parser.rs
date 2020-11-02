@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "failed_match");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::MatchFailed.as_str());
     }
 }
 
@@ -44,7 +44,7 @@ impl InternalEvent for RegexParserMissingField<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "missing_field");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::FieldMissing.as_str());
     }
 }
 
@@ -63,7 +63,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "target_field_exists");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::TargetFieldExists.as_str());
     }
 }
 
@@ -84,6 +84,6 @@ impl<'a> InternalEvent for RegexParserConversionFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "type_conversion_failed");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::TypeConversionFailed.as_str());
     }
 }

@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 use serde_json::Error;
 
@@ -35,7 +35,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "error_type" => "failed_parse",
+            "error_type" => ErrorTypes::ParseFailed.as_str(),
         );
     }
 }
@@ -56,7 +56,7 @@ impl<'a> InternalEvent for JsonParserTargetExists<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "error_type" => "target_field_exists",
+            "error_type" => ErrorTypes::TargetFieldExists.as_str(),
         );
     }
 }

@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -28,6 +28,6 @@ impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "field_not_found");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::FieldMissing.as_str());
     }
 }

@@ -1,4 +1,4 @@
-use super::InternalEvent;
+use super::{ErrorTypes, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "field_missing");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::FieldMissing.as_str());
     }
 }
 
@@ -46,6 +46,6 @@ impl<'a> InternalEvent for SplitConvertFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => "convert_failed");
+        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::TypeConversionFailed.as_str());
     }
 }
