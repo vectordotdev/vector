@@ -12,7 +12,7 @@ use futures::{
     compat::{Compat01As03Sink, Sink01CompatExt},
     future,
     stream::BoxStream,
-    FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
+    FutureExt, SinkExt, StreamExt, TryFutureExt,
 };
 use lazy_static::lazy_static;
 use nix::{
@@ -219,7 +219,7 @@ impl JournaldSource {
         checkpointer: &'a mut Checkpointer,
         cursor: &'a mut Option<String>,
         on_stop: &'a mut Option<StopJournalctlFn>,
-    ) -> Result<(), ()> {
+    ) {
         loop {
             info!("Starting journalctl.");
             match start_journalctl(
@@ -229,8 +229,11 @@ impl JournaldSource {
             ) {
                 Ok((stream, stop)) => {
                     *on_stop = Some(stop);
-                    self.run_stream(stream, checkpointer, cursor).await;
+                    let should_restart = self.run_stream(stream, checkpointer, cursor).await;
                     on_stop.take().map(|stop| stop());
+                    if !should_restart {
+                        return;
+                    }
                 }
                 Err(error) => {
                     error!(message = "Error starting journalctl process.", %error);
@@ -245,18 +248,18 @@ impl JournaldSource {
 
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: BoxStream<'static, io::Result<String>>,
+        mut stream: BoxStream<'static, io::Result<Bytes>>,
         checkpointer: &'a mut Checkpointer,
         cursor: &'a mut Option<String>,
-    ) {
+    ) -> bool {
         loop {
             let mut saw_record = false;
 
             for _ in 0..self.batch_size {
-                let text = match stream.next().await {
+                let line = match stream.next().await {
                     None => {
                         warn!("Journalctl process stopped.");
-                        return;
+                        return true;
                     }
                     Some(Ok(text)) => text,
                     Some(Err(err)) => {
@@ -264,14 +267,17 @@ impl JournaldSource {
                             message = "Could not read from journald source.",
                             error = %err,
                         );
-                        break;
+                        continue;
                     }
                 };
 
-                let mut record = match decode_record(&text, self.remap_priority) {
+                let mut record = match decode_record(&line, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
-                        emit!(JournaldInvalidRecord { error, text });
+                        emit!(JournaldInvalidRecord {
+                            error,
+                            text: String::from_utf8_lossy(&line).into_owned()
+                        });
                         continue;
                     }
                 };
@@ -287,14 +293,14 @@ impl JournaldSource {
                 }
 
                 emit!(JournaldEventReceived {
-                    byte_size: text.len()
+                    byte_size: line.len()
                 });
 
                 match self.out.send(create_event(record)).await {
                     Ok(_) => {}
                     Err(error) => {
                         error!(message = "Could not send journald log", %error);
-                        return;
+                        return false;
                     }
                 }
             }
@@ -320,7 +326,7 @@ fn start_journalctl(
     path: PathBuf,
     current_boot_only: bool,
     cursor: &Option<String>,
-) -> crate::Result<(BoxStream<'static, io::Result<String>>, StopJournalctlFn)> {
+) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
     let mut command = Command::new(path);
     command.stdout(Stdio::piped());
     command.arg("--follow");
@@ -345,7 +351,6 @@ fn start_journalctl(
         child.stdout.take().unwrap(),
         BytesDelimitedCodec::new(b'\n'),
     )
-    .and_then(|bytes| future::ok(String::from_utf8_lossy(&bytes).into_owned()))
     .boxed();
 
     let pid = Pid::from_raw(child.id() as i32);
@@ -396,8 +401,8 @@ fn fixup_unit(unit: &str) -> String {
     }
 }
 
-fn decode_record(text: &str, remap: bool) -> Result<Record, JsonError> {
-    let mut record = serde_json::from_str::<JsonValue>(&text)?;
+fn decode_record(line: &[u8], remap: bool) -> Result<Record, JsonError> {
+    let mut record = serde_json::from_str::<JsonValue>(&String::from_utf8_lossy(line))?;
     // journalctl will output non-ASCII values using an array
     // of integers. Look for those values and re-parse them.
     if let Some(record) = record.as_object_mut() {
