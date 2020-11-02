@@ -12,9 +12,9 @@ tags: ["type: announcement"]
 
 After eight months of development, [83 pull requests][kubernetes_pull_requests],
 and intensive QA in clusters producing over 50 terabytes per day, we’re pleased
-to announce Vector's first-class Kubernetes integration. We went deep on
-the quality. It is our intent for Vector to become the single, best pipeline for
-all Kubernetes observability data.
+to announce Vector's first-class Kubernetes integration. It is our intent for
+Vector to become the single, best pipeline for all Kubernetes observability
+data.
 
 For a deepdive into our Kubernetes integration, checkout the
 [announcement blog post][announcement_post].
@@ -24,7 +24,8 @@ that compliments our Kubernetes integration.
 
 ## Get Started
 
-We recommend installing Vector through our Helm charts:
+To cut straight to the chase, we recommend installing Vector using our Helm
+charts:
 
 1. Add our Helm repo:
 

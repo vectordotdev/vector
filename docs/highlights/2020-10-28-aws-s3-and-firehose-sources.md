@@ -11,7 +11,7 @@ tags: ["type: announcement", "domain: sources", "platform: aws"]
 ---
 
 Getting observability data out of AWS can sometimes feel like you're in a
-[Rube Goldberg comic][rube_goldberg], stitching together three or more tools
+[Rube Goldberg comic][rube_goldberg], stitching together umpteen tools
 and hoping it all works in the end. We want to make this easier with Vector,
 and 0.11 includes our initial efforts:
 
