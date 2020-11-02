@@ -10,8 +10,6 @@ use vector::{
 };
 
 fn add_fields(c: &mut Criterion) {
-    let num_events: usize = 10_000;
-
     let key = "the key";
     let value = "this is the value";
 
@@ -26,14 +24,14 @@ fn add_fields(c: &mut Criterion) {
                 || {
                     let mut map = IndexMap::new();
                     map.insert(String::from(key), String::from(value).into());
-                    transforms::add_fields::AddFields::new(map, true).unwrap()
+                    (
+                        Event::new_empty_log(),
+                        transforms::add_fields::AddFields::new(map, true).unwrap(),
+                    )
                 },
-                |mut transform| {
-                    for _ in 0..num_events {
-                        let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[key], value_bytes_native);
-                    }
+                |(event, mut transform)| {
+                    let event = transform.transform(event).unwrap();
+                    assert_eq!(event.as_log()[key], value_bytes_native);
                 },
             )
         })
@@ -41,14 +39,14 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let source = format!("event['{}'] = '{}'", key, value);
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    (
+                        Event::new_empty_log(),
+                        transforms::lua::v1::Lua::new(&source, vec![]).unwrap(),
+                    )
                 },
-                |mut transform| {
-                    for _ in 0..num_events {
-                        let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[key], value_bytes_v1);
-                    }
+                |(event, mut transform)| {
+                    let event = transform.transform(event).unwrap();
+                    assert_eq!(event.as_log()[key], value_bytes_v1);
                 },
             )
         })
@@ -67,32 +65,38 @@ fn add_fields(c: &mut Criterion) {
                         "#,
                         key, value
                     );
-                    transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
-                        .unwrap()
+                    (
+                        Event::new_empty_log(),
+                        transforms::lua::v2::Lua::new(
+                            &toml::from_str::<LuaConfig>(&config).unwrap(),
+                        )
+                        .unwrap(),
+                    )
                 },
-                |mut transform| {
-                    for _ in 0..num_events {
-                        let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[key], value_bytes_v2);
-                    }
+                |(event, mut transform)| {
+                    let event = transform.transform(event).unwrap();
+                    assert_eq!(event.as_log()[key], value_bytes_v2);
                 },
             )
         })
-        .throughput(Throughput::Elements(num_events as u64)),
+        .throughput(Throughput::Elements(1)),
     );
 }
 
 fn field_filter(c: &mut Criterion) {
-    let num_events: usize = 10_000;
-
+    let num_events = 10;
     c.bench(
         "lua_field_filter",
         Benchmark::new("native", move |b| {
             let mut rt = runtime();
             b.iter_with_setup(
                 || {
-                    rt.block_on(async move {
+                    let events = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
+                    let transform = rt.block_on(async move {
                         transforms::field_filter::FieldFilterConfig {
                             field: "the_field".to_string(),
                             value: "0".to_string(),
@@ -100,17 +104,12 @@ fn field_filter(c: &mut Criterion) {
                         .build()
                         .await
                         .unwrap()
-                    })
+                    });
+
+                    (events, transform)
                 },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                |(events, mut transform)| {
+                    let num = events.filter_map(|r| transform.transform(r)).count();
                     assert_eq!(num, num_events / 10);
                 },
             )
@@ -118,22 +117,24 @@ fn field_filter(c: &mut Criterion) {
         .with_function("v1", move |b| {
             b.iter_with_setup(
                 || {
+                    let events = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
+
                     let source = r#"
                       if event["the_field"] ~= "0" then
                         event = nil
                       end
                     "#;
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    (
+                        events,
+                        transforms::lua::v1::Lua::new(&source, vec![]).unwrap(),
+                    )
                 },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                |(events, mut transform)| {
+                    let num = events.filter_map(|r| transform.transform(r)).count();
                     assert_eq!(num, num_events / 10);
                 },
             )
@@ -141,6 +142,11 @@ fn field_filter(c: &mut Criterion) {
         .with_function("v2", move |b| {
             b.iter_with_setup(
                 || {
+                    let events = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
                     let config = r#"
                         hooks.process = """
                             function (event, emit)
@@ -151,17 +157,13 @@ fn field_filter(c: &mut Criterion) {
                             end
                         """
                     "#;
-                    transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap()
+                    (
+                        events,
+                        transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
+                    )
                 },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                |(events, mut transform)| {
+                    let num = events.filter_map(|r| transform.transform(r)).count();
                     assert_eq!(num, num_events / 10);
                 },
             )
