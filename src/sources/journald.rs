@@ -303,7 +303,7 @@ impl JournaldSource {
                 match self.out.send(create_event(record)).await {
                     Ok(_) => {}
                     Err(error) => {
-                        error!(message = "Could not send journald log", %error);
+                        error!(message = "Could not send journald log.", %error);
                         // `out` channel is closed, don't restart journalctl.
                         return false;
                     }
