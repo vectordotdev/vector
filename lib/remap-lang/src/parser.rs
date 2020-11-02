@@ -3,6 +3,7 @@
 use crate::{
     expression::{
         Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
+        Variable,
     },
     Argument, Error, Expr, Function as Fn, Operator, Result, Value,
 };
@@ -93,9 +94,17 @@ impl Parser<'_> {
 
     /// Return the target type to which a value is being assigned.
     ///
-    /// This returns a `target_path` target.
+    /// This can either return a `variable` or a `target_path` target, depending
+    /// on the parser rule being processed.
     fn target_from_pair(&self, pair: Pair<R>) -> Result<Target> {
         match pair.as_rule() {
+            R::variable => Ok(Target::Variable(
+                pair.into_inner()
+                    .next()
+                    .ok_or(e(R::variable))?
+                    .as_str()
+                    .to_owned(),
+            )),
             R::path => Ok(Target::Path(
                 self.path_segments_from_pairs(pair.into_inner())?,
             )),
@@ -190,6 +199,7 @@ impl Parser<'_> {
 
         match pair.as_rule() {
             R::value => self.value_from_pair(pair.into_inner().next().ok_or(e(R::value))?),
+            R::variable => self.variable_from_pair(pair),
             R::path => self.path_from_pair(pair),
             R::group => self.expression_from_pair(pair.into_inner().next().ok_or(e(R::group))?),
             _ => Err(e(R::primary)),
@@ -330,6 +340,13 @@ impl Parser<'_> {
             .collect::<Result<_>>()
     }
 
+    /// Parse a [`Variable`] value, e.g. "$foo"
+    fn variable_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+        let ident = pair.into_inner().next().ok_or(e(R::variable))?;
+
+        Ok(Expr::from(Variable::new(ident.as_str().to_owned())))
+    }
+
     fn escaped_string_from_pair(&self, pair: Pair<R>) -> Result<String> {
         // This is only executed once per string at parse time, and so I'm not
         // losing sleep over the reallocation. However, if we want to mutate the
@@ -413,18 +430,18 @@ mod tests {
             ),
             (
                 ".foo = to_string",
-                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 r#"foo = "bar""#,
                 vec![
                     " 1:1\n",
-                    "= expected EOI, if_statement, not, path, or block",
+                    "= expected EOI, assignment, if_statement, not, or block",
                 ],
             ),
             (
                 r#".foo.bar = "baz" and this"#,
-                vec![" 1:18\n", "= expected EOI, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, path, or block"],
+                vec![" 1:18\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
             ),
             (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected not"]),
             (
@@ -439,7 +456,7 @@ mod tests {
                 "if .foo { }",
                 vec![
                     " 1:11\n",
-                    "= expected if_statement, not, path, or block",
+                    "= expected assignment, if_statement, not, or block",
                 ],
             ),
             (
@@ -463,7 +480,7 @@ mod tests {
                 // Due to the explicit list of allowed escape chars our grammar
                 // doesn't actually recognize this as a string literal.
                 r#".foo = "invalid escape \k sequence""#,
-                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 // Same here as above.
@@ -478,12 +495,12 @@ mod tests {
             (
                 // We cannot assign a regular expression to a field.
                 r#".foo = /ab/i"#,
-                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 // We cannot assign to a regular expression.
                 r#"/ab/ = .foo"#,
-                vec![" 1:1\n", "= expected EOI, if_statement, not, path, or block"],
+                vec![" 1:1\n", "= expected EOI, assignment, if_statement, not, or block"],
             ),
         ];
 
