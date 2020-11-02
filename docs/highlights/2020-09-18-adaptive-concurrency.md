@@ -10,7 +10,7 @@ hide_on_release_notes: false
 tags: ["type: announcement", "domain: networking"]
 ---
 
-Vector 0.11 includes a new adaptive conccurrency feature designed to
+Vector 0.11 includes a new adaptive concurrency feature designed to
 automatically optimize network bandwidth, backoff when it senses trouble,
 and make your observability infrastructure significantly more performant and
 reliable.
