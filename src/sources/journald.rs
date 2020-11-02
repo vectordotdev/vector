@@ -267,7 +267,7 @@ impl JournaldSource {
                             message = "Could not read from journald source.",
                             error = %err,
                         );
-                        continue;
+                        break;
                     }
                 };
 
