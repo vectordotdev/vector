@@ -311,7 +311,7 @@ wasm = ["lucet-runtime", "lucet-wasi", "lucetc", "vector-wasm"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
-kubernetes = ["evmap", "k8s-openapi"]
+kubernetes = ["k8s-openapi", "serde_yaml", "evmap"]
 
 # API
 api = [
