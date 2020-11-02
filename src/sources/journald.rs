@@ -135,18 +135,19 @@ impl SourceConfig for JournaldConfig {
         let batch_size = self.batch_size.unwrap_or(DEFAULT_BATCH_SIZE);
         let current_boot_only = self.current_boot_only.unwrap_or(true);
 
+        let start: StartJournalctlFn =
+            Box::new(move |cursor| start_journalctl(&journalctl_path, current_boot_only, cursor));
+
         Ok(Box::new(
             JournaldSource {
-                journalctl_path,
                 include_units,
                 exclude_units,
-                current_boot_only,
                 checkpoint_path,
                 batch_size,
                 remap_priority: self.remap_priority,
                 out: out.sink_compat(),
             }
-            .run_shutdown(shutdown)
+            .run_shutdown(shutdown, start)
             .instrument(info_span!("journald-server"))
             .boxed()
             .compat(),
@@ -163,10 +164,8 @@ impl SourceConfig for JournaldConfig {
 }
 
 struct JournaldSource {
-    journalctl_path: PathBuf,
     include_units: HashSet<String>,
     exclude_units: HashSet<String>,
-    current_boot_only: bool,
     checkpoint_path: PathBuf,
     batch_size: usize,
     remap_priority: bool,
@@ -174,7 +173,11 @@ struct JournaldSource {
 }
 
 impl JournaldSource {
-    async fn run_shutdown(self, shutdown: ShutdownSignal) -> Result<(), ()> {
+    async fn run_shutdown(
+        self,
+        shutdown: ShutdownSignal,
+        start_journalctl: StartJournalctlFn,
+    ) -> Result<(), ()> {
         let mut checkpointer = Checkpointer::new(self.checkpoint_path.clone())
             .await
             .map_err(|error| {
@@ -197,7 +200,12 @@ impl JournaldSource {
         };
 
         let mut on_stop = None;
-        let run = Box::pin(self.run(&mut checkpointer, &mut cursor, &mut on_stop));
+        let run = Box::pin(self.run(
+            &mut checkpointer,
+            &mut cursor,
+            &mut on_stop,
+            start_journalctl,
+        ));
         future::select(run, shutdown).await;
 
         on_stop.map(|stop| stop());
@@ -212,14 +220,11 @@ impl JournaldSource {
         checkpointer: &'a mut Checkpointer,
         cursor: &'a mut Option<String>,
         on_stop: &'a mut Option<StopJournalctlFn>,
+        start_journalctl: StartJournalctlFn,
     ) {
         loop {
             info!("Starting journalctl.");
-            match start_journalctl(
-                self.journalctl_path.clone(),
-                self.current_boot_only,
-                &*cursor,
-            ) {
+            match start_journalctl(&*cursor) {
                 Ok((stream, stop)) => {
                     *on_stop = Some(stop);
                     let should_restart = self.run_stream(stream, checkpointer, cursor).await;
@@ -249,7 +254,7 @@ impl JournaldSource {
             let mut saw_record = false;
 
             for _ in 0..self.batch_size {
-                let line = match stream.next().await {
+                let bytes = match stream.next().await {
                     None => {
                         warn!("Journalctl process stopped.");
                         return true;
@@ -264,12 +269,12 @@ impl JournaldSource {
                     }
                 };
 
-                let mut record = match decode_record(&line, self.remap_priority) {
+                let mut record = match decode_record(&bytes, self.remap_priority) {
                     Ok(record) => record,
                     Err(error) => {
                         emit!(JournaldInvalidRecord {
                             error,
-                            text: String::from_utf8_lossy(&line).into_owned()
+                            text: String::from_utf8_lossy(&bytes).into_owned()
                         });
                         continue;
                     }
@@ -286,7 +291,7 @@ impl JournaldSource {
                 }
 
                 emit!(JournaldEventReceived {
-                    byte_size: line.len()
+                    byte_size: bytes.len()
                 });
 
                 match self.out.send(create_event(record)).await {
@@ -317,10 +322,18 @@ impl JournaldSource {
     }
 }
 
+type StartJournalctlFn = Box<
+    dyn Fn(
+            &Option<String>,
+        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)>
+        + Send
+        + Sync,
+>;
+
 type StopJournalctlFn = Box<dyn FnOnce() + Send>;
 
 fn start_journalctl(
-    path: PathBuf,
+    path: &PathBuf,
     current_boot_only: bool,
     cursor: &Option<String>,
 ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
@@ -552,10 +565,13 @@ mod checkpointer_tests {
 mod tests {
     use super::*;
     use futures::compat::Future01CompatExt;
-    use futures01::stream::Stream as _;
+    use futures::Stream;
+    use futures01::Stream as _;
+    use std::pin::Pin;
     use std::{
         io::{BufRead, BufReader, Cursor},
         iter::FromIterator,
+        task::{Context, Poll},
     };
     use tempfile::tempdir;
     use tokio::{
@@ -576,13 +592,13 @@ mod tests {
     }
 
     impl FakeJournal {
-        fn next(&mut self) -> Option<io::Result<String>> {
+        fn next(&mut self) -> Option<io::Result<Bytes>> {
             let mut line = String::new();
             match self.reader.read_line(&mut line) {
                 Ok(0) => None,
                 Ok(_) => {
                     line.pop();
-                    Some(Ok(line))
+                    Some(Ok(Bytes::from(line)))
                 }
                 Err(err) => Some(Err(err)),
             }
@@ -590,18 +606,17 @@ mod tests {
     }
 
     impl Stream for FakeJournal {
-        type Item = io::Result<String>;
+        type Item = io::Result<Bytes>;
 
         fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
             Poll::Ready(Pin::into_inner(self).next())
         }
     }
 
-    impl JournalStream for FakeJournal {
+    impl FakeJournal {
         fn new(
-            _: &JournaldConfig,
-            checkpoint: Option<String>,
-        ) -> crate::Result<(Self, Box<dyn FnOnce() + Send>)> {
+            checkpoint: &Option<String>,
+        ) -> crate::Result<(BoxStream<'static, io::Result<Bytes>>, StopJournalctlFn)> {
             let cursor = Cursor::new(FAKE_JOURNAL);
             let reader = BufReader::new(cursor);
             let mut journal = FakeJournal { reader };
@@ -614,21 +629,21 @@ mod tests {
                 }
             }
 
-            Ok((journal, Box::new(|| ())))
+            Ok((Box::pin(journal), Box::new(|| ())))
         }
     }
 
     async fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
         let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
+
         let tempdir = tempdir().unwrap();
-        let mut filename = tempdir.path().to_path_buf();
-        filename.push(CHECKPOINT_FILENAME);
-        let mut checkpointer = Checkpointer::new(filename)
+        let mut checkpoint_path = tempdir.path().to_path_buf();
+        checkpoint_path.push(CHECKPOINT_FILENAME);
+
+        let mut checkpointer = Checkpointer::new(checkpoint_path.clone())
             .await
             .expect("Creating checkpointer failed!");
-        let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
-        let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
 
         if let Some(cursor) = cursor {
             checkpointer
@@ -637,20 +652,19 @@ mod tests {
                 .expect("Could not set checkpoint");
         }
 
-        let config = JournaldConfig::default();
-        let source = journald_source::<FakeJournal>(
-            &config,
-            tx,
-            shutdown,
-            checkpointer,
+        let include_units = HashSet::<String>::from_iter(iunits.iter().map(|&s| s.into()));
+        let exclude_units = HashSet::<String>::from_iter(xunits.iter().map(|&s| s.into()));
+
+        let source = JournaldSource {
             include_units,
             exclude_units,
-            DEFAULT_BATCH_SIZE,
-            true,
-        )
-        .await
-        .expect("Creating journald source failed");
-        tokio::spawn(source.compat());
+            checkpoint_path,
+            batch_size: DEFAULT_BATCH_SIZE,
+            remap_priority: true,
+            out: tx.sink_compat(),
+        }
+        .run_shutdown(shutdown, Box::new(FakeJournal::new));
+        tokio::spawn(source);
 
         delay_for(Duration::from_millis(100)).await;
         drop(trigger);
