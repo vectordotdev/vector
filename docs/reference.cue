@@ -425,6 +425,7 @@ _values: {
 		enabled: bool
 
 		if enabled {
+			auto_concurrency:           bool | *true
 			in_flight_limit:            uint8 | *5
 			rate_limit_duration_secs:   uint8
 			rate_limit_num:             uint16

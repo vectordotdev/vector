@@ -204,9 +204,14 @@ components: sinks: [Name=string]: {
 						examples: []
 						options: {
 							in_flight_limit: {
-								common:      true
-								description: "The maximum number of in-flight requests allowed at any given time."
-								required:    false
+								common: true
+								if sinks[Name].features.send.request.auto_concurrency {
+									description: "The maximum number of in-flight requests allowed at any given time, or \"auto\" to allow Vector to automatically set the limit based on current network and service conditions."
+								}
+								if !sinks[Name].features.send.request.auto_concurrency {
+									description: "The maximum number of in-flight requests allowed at any given time."
+								}
+								required: false
 								type: uint: {
 									default: sinks[Name].features.send.request.in_flight_limit
 									unit:    "requests"
