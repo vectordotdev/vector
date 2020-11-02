@@ -346,13 +346,16 @@ to.
 
 ## Prior Art (TODO)
 
-## Drawbacks
+## Drawbacks (TODO)
 
 - added complexity to the language
 - "safe by default" might obscure errors
-- TODO
 
 ## Alternatives (TODO)
+
+- do nothing
+- try blocks
+- explicit unwrapping of function results
 
 ## Outstanding Questions
 
