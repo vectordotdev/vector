@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, Benchmark, Criterion};
+use criterion::{criterion_group, Benchmark, Criterion, Throughput};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
@@ -10,7 +10,7 @@ use vector::{
 };
 
 fn add_fields(c: &mut Criterion) {
-    let num_events: usize = 100_000;
+    let num_events: usize = 10_000;
 
     let key = "the key";
     let value = "this is the value";
@@ -79,12 +79,12 @@ fn add_fields(c: &mut Criterion) {
                 },
             )
         })
-        .sample_size(10),
+        .throughput(Throughput::Elements(num_events as u64)),
     );
 }
 
 fn field_filter(c: &mut Criterion) {
-    let num_events: usize = 100_000;
+    let num_events: usize = 10_000;
 
     c.bench(
         "lua_field_filter",
@@ -166,7 +166,7 @@ fn field_filter(c: &mut Criterion) {
                 },
             )
         })
-        .sample_size(10),
+        .throughput(Throughput::Elements(num_events as u64)),
     );
 }
 

@@ -28,16 +28,11 @@ impl Sink for NullSink {
 }
 
 fn benchmark_buffers(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
+    let num_lines: usize = 10_000;
     let line_size: usize = 200;
 
-    let data_dir = tempdir().unwrap();
-    let data_dir = data_dir.path().to_path_buf();
-    let data_dir2 = data_dir.clone();
-    let data_dir3 = data_dir.clone();
-
     c.bench(
-        "buffers",
+        "isolated_buffers",
         Benchmark::new("channels/futures01", move |b| {
             b.iter_with_setup(
                 || {
@@ -91,18 +86,16 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("leveldb/writing", move |b| {
             b.iter_with_setup(
                 || {
+                    let data_dir = tempdir().unwrap();
+
                     let rt = runtime();
 
-                    let path = data_dir.join("basic_sink");
-
-                    // Clear out any existing data
-                    if std::fs::metadata(&path).is_ok() {
-                        std::fs::remove_dir_all(&path).unwrap();
-                    }
-
                     let plenty_of_room = num_lines * line_size * 2;
-                    let (writer, _reader, _acker) =
-                        leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
+                    let (writer, _reader, _acker) = leveldb_buffer::Buffer::build(
+                        data_dir.path().to_path_buf(),
+                        plenty_of_room,
+                    )
+                    .unwrap();
 
                     (rt, writer)
                 },
@@ -116,18 +109,16 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("leveldb/reading", move |b| {
             b.iter_with_setup(
                 || {
+                    let data_dir = tempdir().unwrap();
+
                     let mut rt = runtime();
 
-                    let path = data_dir2.join("basic_sink");
-
-                    // Clear out any existing data
-                    if std::fs::metadata(&path).is_ok() {
-                        std::fs::remove_dir_all(&path).unwrap();
-                    }
-
                     let plenty_of_room = num_lines * line_size * 2;
-                    let (writer, reader, acker) =
-                        leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
+                    let (writer, reader, acker) = leveldb_buffer::Buffer::build(
+                        data_dir.path().to_path_buf(),
+                        plenty_of_room,
+                    )
+                    .unwrap();
 
                     let send = writer.send_all(random_events(line_size).take(num_lines as u64));
                     let write_handle = rt.spawn(send.compat());
@@ -147,18 +138,16 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("leveldb/both", move |b| {
             b.iter_with_setup(
                 || {
+                    let data_dir = tempdir().unwrap();
+
                     let rt = runtime();
 
-                    let path = data_dir3.join("basic_sink");
-
-                    // Clear out any existing data
-                    if std::fs::metadata(&path).is_ok() {
-                        std::fs::remove_dir_all(&path).unwrap();
-                    }
-
                     let plenty_of_room = num_lines * line_size * 2;
-                    let (writer, reader, acker) =
-                        leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
+                    let (writer, reader, acker) = leveldb_buffer::Buffer::build(
+                        data_dir.path().to_path_buf(),
+                        plenty_of_room,
+                    )
+                    .unwrap();
 
                     let read_loop = StreamSinkOld::new(NullSink, acker).send_all(reader);
 
@@ -175,8 +164,6 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(10)
-        .noise_threshold(0.05)
         .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }

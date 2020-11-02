@@ -12,7 +12,7 @@ use vector::{
 };
 
 fn benchmark_files_without_partitions(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
+    let num_lines: usize = 10_000;
     let line_size: usize = 100;
 
     let bench = Benchmark::new("files_without_partitions", move |b| {
@@ -83,8 +83,6 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
             },
         )
     })
-    .sample_size(10)
-    .noise_threshold(0.05)
     .throughput(Throughput::Bytes((num_lines * line_size) as u64));
 
     c.bench("files", bench);

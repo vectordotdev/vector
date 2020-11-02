@@ -8,15 +8,11 @@ use vector::test_util::{
 use vector::{buffers::BufferConfig, config, sinks, sources};
 
 fn benchmark_buffers(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
+    let num_lines: usize = 10_000;
     let line_size: usize = 100;
 
     let in_addr = next_addr();
     let out_addr = next_addr();
-
-    let data_dir = tempdir().unwrap();
-    let data_dir = data_dir.path().to_path_buf();
-    let data_dir2 = data_dir.clone();
 
     c.bench(
         "buffers",
@@ -48,6 +44,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         wait_for_tcp(in_addr).await;
                         (output_lines, topology)
                     });
+
                     (rt, topology, output_lines)
                 },
                 |(mut rt, topology, output_lines)| {
@@ -64,6 +61,8 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("on-disk", move |b| {
             b.iter_with_setup(
                 || {
+                    let data_dir = tempdir().unwrap();
+
                     let mut config = config::Config::builder();
                     config.add_source(
                         "in",
@@ -80,7 +79,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         max_size: 1_000_000,
                         when_full: Default::default(),
                     };
-                    config.global.data_dir = Some(data_dir.clone());
+                    config.global.data_dir = Some(data_dir.path().to_path_buf());
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
@@ -107,6 +106,8 @@ fn benchmark_buffers(c: &mut Criterion) {
         .with_function("low-limit-on-disk", move |b| {
             b.iter_with_setup(
                 || {
+                    let data_dir = tempdir().unwrap();
+
                     let mut config = config::Config::builder();
                     config.add_source(
                         "in",
@@ -123,7 +124,7 @@ fn benchmark_buffers(c: &mut Criterion) {
                         max_size: 10_000,
                         when_full: Default::default(),
                     };
-                    config.global.data_dir = Some(data_dir2.clone());
+                    config.global.data_dir = Some(data_dir.path().to_path_buf());
                     let mut rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
@@ -147,8 +148,6 @@ fn benchmark_buffers(c: &mut Criterion) {
                 },
             );
         })
-        .sample_size(10)
-        .noise_threshold(0.05)
         .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
     );
 }
