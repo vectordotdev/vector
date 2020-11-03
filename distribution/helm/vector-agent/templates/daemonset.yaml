@@ -61,6 +61,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           ports:
+            {{- include "libvector.metricsContainerPorts" . | nindent 12  }}
             {{- with .Values.extraContainersPorts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

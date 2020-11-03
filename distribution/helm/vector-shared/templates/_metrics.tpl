@@ -35,3 +35,17 @@ Internal metrics are common, so we share and reuse the definition.
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Common Vector container ports used by the built-in metrics pipeline.
+Internal metrics are common, so we share and reuse the definition.
+*/}}
+{{- define "libvector.metricsContainerPorts" -}}
+{{- with .Values.prometheusSink }}
+{{- if .enabled -}}
+- name: metrics
+  containerPort: {{ .listenPort }}
+  protocol: TCP
+{{- end }}
+{{- end }}
+{{- end }}
