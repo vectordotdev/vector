@@ -320,6 +320,7 @@ spec:
             - /etc/vector/*.toml
           env:
             
+          ports:
           resources:
             {}
           volumeMounts:
