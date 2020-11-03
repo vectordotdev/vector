@@ -22,7 +22,7 @@ pub enum Error {
     Value(&'static str, &'static str),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Function {
     function: Box<dyn Expression>,
 }
@@ -125,6 +125,7 @@ impl Expression for Function {
     }
 }
 
+#[derive(Clone)]
 struct ArgumentValidator {
     expression: Box<dyn Expression>,
     ident: &'static str,

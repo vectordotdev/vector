@@ -33,7 +33,7 @@ impl Function for FormatTimestamp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FormatTimestampFn {
     value: Box<dyn Expression>,
     format: Box<dyn Expression>,

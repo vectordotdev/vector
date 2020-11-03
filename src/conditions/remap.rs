@@ -28,6 +28,7 @@ impl ConditionConfig for RemapConfig {
 
 //------------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct Remap {
     program: remap::Program,
 }

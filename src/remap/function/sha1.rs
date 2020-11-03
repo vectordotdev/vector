@@ -23,7 +23,7 @@ impl Function for Sha1 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Sha1Fn {
     value: Box<dyn Expression>,
 }

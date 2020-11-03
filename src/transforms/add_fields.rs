@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::serde::Fields;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
@@ -8,13 +7,14 @@ use crate::{
         AddFieldsTemplateRenderingError,
     },
     template::Template,
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use toml::value::Value as TomlValue;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
     pub fields: Fields<TomlValue>,
@@ -59,13 +59,13 @@ impl GenerateConfig for AddFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {
             fields.insert(key, Value::try_from(value)?);
         }
-        Ok(Box::new(AddFields::new(fields, self.overwrite)?))
+        Ok(Transform::function(AddFields::new(fields, self.overwrite)?))
     }
 
     fn input_type(&self) -> DataType {
@@ -102,8 +102,8 @@ impl AddFields {
     }
 }
 
-impl Transform for AddFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for AddFields {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
@@ -130,7 +130,7 @@ impl Transform for AddFields {
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -151,7 +151,7 @@ mod tests {
         fields.insert("some_key".into(), "some_val".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let key = "some_key".to_string();
         let kv = new_event.as_log().get_flat(&key);
@@ -167,7 +167,7 @@ mod tests {
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
         let key = "some_key".to_string();
         let kv = new_event.as_log().get_flat(&key);
@@ -186,7 +186,7 @@ mod tests {
 
         let mut augment = AddFields::new(fields, false).unwrap();
 
-        let new_event = augment.transform(event.clone()).unwrap();
+        let new_event = augment.transform_one(event.clone()).unwrap();
 
         assert_eq!(new_event, event);
     }
@@ -210,7 +210,7 @@ mod tests {
 
         let mut transform = AddFields::new(fields, false).unwrap();
 
-        let event = transform.transform(event).unwrap().into_log();
+        let event = transform.transform_one(event).unwrap().into_log();
 
         tracing::error!(?event);
         assert_eq!(event["float"], 4.5.into());

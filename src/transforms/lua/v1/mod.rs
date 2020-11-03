@@ -2,7 +2,7 @@ use crate::{
     config::DataType,
     event::{Event, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
-    transforms::Transform,
+    transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -13,7 +13,7 @@ enum BuildError {
     InvalidLua { source: rlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
     source: String,
@@ -28,11 +28,8 @@ pub struct LuaConfig {
 // possible configuration options for `transforms` section, but such internal name should not
 // be exposed to users.
 impl LuaConfig {
-    pub fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Lua::new(&self.source, self.search_dirs.clone()).map(|l| {
-            let b: Box<dyn Transform> = Box::new(l);
-            b
-        })
+    pub fn build(&self) -> crate::Result<Transform> {
+        Lua::new(self.source.clone(), self.search_dirs.clone()).map(Transform::function)
     }
 
     pub fn input_type(&self) -> DataType {
@@ -56,9 +53,23 @@ impl LuaConfig {
 // after each transform would have significant footprint on the performance.
 const GC_INTERVAL: usize = 16;
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct Lua {
+    #[derivative(Debug = "ignore")]
+    source: String,
+    #[derivative(Debug = "ignore")]
+    search_dirs: Vec<String>,
+    #[derivative(Debug = "ignore")]
     lua: rlua::Lua,
     invocations_after_gc: usize,
+}
+
+impl Clone for Lua {
+    fn clone(&self) -> Self {
+        Lua::new(self.source.clone(), self.search_dirs.clone())
+            .expect("Tried to clone existing valid lua transform. This is an invariant.")
+    }
 }
 
 // This wrapping structure is added in order to make it possible to have independent implementations
@@ -69,11 +80,11 @@ struct LuaEvent {
 }
 
 impl Lua {
-    pub fn new(source: &str, search_dirs: Vec<String>) -> crate::Result<Self> {
+    pub fn new(source: String, search_dirs: Vec<String>) -> crate::Result<Self> {
         let lua = rlua::Lua::new();
 
         let additional_paths = search_dirs
-            .into_iter()
+            .iter()
             .map(|d| format!("{}/?.lua", d))
             .collect::<Vec<_>>()
             .join(";");
@@ -95,6 +106,8 @@ impl Lua {
         .context(InvalidLua)?;
 
         Ok(Self {
+            source,
+            search_dirs,
             lua,
             invocations_after_gc: 0,
         })
@@ -128,13 +141,12 @@ impl Lua {
     }
 }
 
-impl Transform for Lua {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Lua {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         match self.process(event) {
-            Ok(event) => event,
+            Ok(event) => output.extend(event.into_iter()),
             Err(error) => {
                 emit!(LuaScriptError { error });
-                None
             }
         }
     }
@@ -220,11 +232,8 @@ pub fn format_error(error: &rlua::Error) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_error, Lua};
-    use crate::{
-        event::{Event, Value},
-        transforms::Transform,
-    };
+    use super::*;
+    use crate::event::{Event, Value};
 
     #[test]
     fn lua_add_field() {
@@ -232,14 +241,15 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["hello"] = "goodbye"
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
         let event = Event::from("program me");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["hello"], "goodbye".into());
     }
@@ -251,14 +261,15 @@ mod tests {
             r#"
               _, _, name = string.find(event["message"], "Hello, my name is (%a+).")
               event["name"] = name
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
         let event = Event::from("Hello, my name is Bob.");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["name"], "Bob".into());
     }
@@ -269,14 +280,15 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["name"] = nil
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("name", "Bob");
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert!(event.as_log().get("name").is_none());
     }
@@ -286,14 +298,15 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event = nil
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("name", "Bob");
-        let event = transform.transform(event);
+        let event = transform.transform_one(event);
 
         assert!(event.is_none());
     }
@@ -308,13 +321,14 @@ mod tests {
               else
                 event["result"] = "found"
               end
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
         let event = Event::new_empty_log();
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["result"], "empty".into());
     }
@@ -325,12 +339,13 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["number"] = 3
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log()["number"], Value::Integer(3));
     }
 
@@ -340,12 +355,13 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["number"] = 3.14159
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log()["number"], Value::Float(3.14159));
     }
 
@@ -355,12 +371,13 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["bool"] = true
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log()["bool"], Value::Boolean(true));
     }
 
@@ -370,12 +387,13 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["junk"] = {"asdf"}
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
 
-        let event = transform.transform(Event::new_empty_log()).unwrap();
+        let event = transform.transform_one(Event::new_empty_log()).unwrap();
         assert_eq!(event.as_log().get("junk"), None);
     }
 
@@ -385,7 +403,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event[false] = "hello"
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -401,7 +420,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               print(event[false])
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -417,7 +437,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               error("this is an error")
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -433,7 +454,8 @@ mod tests {
         let err = Lua::new(
             r#"
               1234 = sadf <>&*!#@
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .map(|_| ())
@@ -470,12 +492,13 @@ mod tests {
         let source = r#"
           local script2 = require("script2")
           script2.modify(event)
-        "#;
+        "#
+        .to_string();
 
         let mut transform =
             Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
         let event = Event::new_empty_log();
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["new field"], "new value".into());
     }
@@ -488,7 +511,8 @@ mod tests {
               for k,v in pairs(event) do
                 event[k] = k .. v
               end
-            "#,
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -497,7 +521,7 @@ mod tests {
         event.as_mut_log().insert("name", "Bob");
         event.as_mut_log().insert("friend", "Alice");
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
 
         assert_eq!(event.as_log()["name"], "nameBob".into());
         assert_eq!(event.as_log()["friend"], "friendAlice".into());
