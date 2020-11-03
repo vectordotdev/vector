@@ -66,7 +66,8 @@ impl SinkConfig for RemoteWriteConfig {
         let endpoint = self.endpoint.parse::<Uri>().context(sinks::UriParseError)?;
         let tls_settings = TlsSettings::from_options(&self.tls)?;
         let batch = BatchSettings::default()
-            .events(1_000_000)
+            .events(1_000)
+            .timeout(1)
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let buckets = self.buckets.clone();
