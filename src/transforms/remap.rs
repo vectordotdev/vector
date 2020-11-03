@@ -58,7 +58,7 @@ impl Remap {
 }
 
 impl FunctionTransform for Remap {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemapEventProcessed);
 
         let mut runtime = Runtime::default();
@@ -107,7 +107,7 @@ mod tests {
             .to_string(),
             drop_on_err: true,
         };
-        let mut tform = Remap::new(conf).unwrap();
+        let tform = Remap::new(conf).unwrap();
 
         let result = tform.transform_one(event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");

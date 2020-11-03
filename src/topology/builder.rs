@@ -114,7 +114,7 @@ pub async fn build_pieces(
         let (output, control) = Fanout::new();
 
         let transform = match transform {
-            Transform::Function(mut t) => {
+            Transform::Function(t) => {
                 let filtered = filter_event_type(input_rx, input_type);
                 #[allow(deprecated)]
                 // `boxed()` here is deprecated, but the replacement won't work until we adopt futures 0.3 here.

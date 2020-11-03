@@ -685,7 +685,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
 
 fn benchmark_remap(c: &mut Criterion) {
     let mut rt = runtime();
-    let add_fields_runner = |mut tform: Box<dyn FunctionTransform>| {
+    let add_fields_runner = |tform: Box<dyn FunctionTransform>| {
         let event = {
             let mut event = Event::from("augment me");
             event.as_mut_log().insert("copy_from", "buz".to_owned());
@@ -725,7 +725,7 @@ fn benchmark_remap(c: &mut Criterion) {
         b.iter(add_fields_runner(Box::new(tform)))
     });
 
-    let json_parser_runner = |mut tform: Box<dyn FunctionTransform>| {
+    let json_parser_runner = |tform: Box<dyn FunctionTransform>| {
         let event = {
             let mut event = Event::from("parse me");
             event

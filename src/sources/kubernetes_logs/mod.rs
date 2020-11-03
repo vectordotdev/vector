@@ -296,7 +296,7 @@ impl Source {
         let (file_source_tx, file_source_rx) =
             futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
-        let mut parser = parser::build();
+        let parser = parser::build();
         let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
         let events = file_source_rx.map(futures::stream::iter);

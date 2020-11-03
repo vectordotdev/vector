@@ -103,7 +103,7 @@ impl AddFields {
 }
 
 impl FunctionTransform for AddFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
@@ -149,7 +149,7 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_val".into());
-        let mut augment = AddFields::new(fields, true).unwrap();
+        let augment = AddFields::new(fields, true).unwrap();
 
         let new_event = augment.transform_one(event).unwrap();
 
@@ -165,7 +165,7 @@ mod tests {
         let event = Event::from("augment me");
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
-        let mut augment = AddFields::new(fields, true).unwrap();
+        let augment = AddFields::new(fields, true).unwrap();
 
         let new_event = augment.transform_one(event).unwrap();
 
@@ -184,7 +184,7 @@ mod tests {
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_overwritten_message".into());
 
-        let mut augment = AddFields::new(fields, false).unwrap();
+        let augment = AddFields::new(fields, false).unwrap();
 
         let new_event = augment.transform_one(event.clone()).unwrap();
 
@@ -208,7 +208,7 @@ mod tests {
 
         fields.insert(String::from("table"), Value::from_iter(map));
 
-        let mut transform = AddFields::new(fields, false).unwrap();
+        let transform = AddFields::new(fields, false).unwrap();
 
         let event = transform.transform_one(event).unwrap().into_log();
 

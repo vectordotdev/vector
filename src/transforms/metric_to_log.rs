@@ -67,7 +67,7 @@ impl MetricToLog {
 }
 
 impl FunctionTransform for MetricToLog {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         let metric = event.into_metric();
         emit!(MetricToLogEventProcessed);
 
@@ -117,7 +117,7 @@ mod tests {
 
     fn do_transform(metric: Metric) -> Option<LogEvent> {
         let event = Event::Metric(metric);
-        let mut transformer = MetricToLog::new(Some("host".into()));
+        let transformer = MetricToLog::new(Some("host".into()));
 
         transformer
             .transform_one(event)

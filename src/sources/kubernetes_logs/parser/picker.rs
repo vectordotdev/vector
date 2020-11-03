@@ -3,9 +3,17 @@ use crate::{
     event::{Event, Value},
     transforms::FunctionTransform,
 };
+use std::cell::RefCell;
 
 #[derive(Clone, Debug)]
-pub enum Picker {
+pub struct Picker {
+    choice: RefCell<PickerChoice>,
+}
+
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
+pub enum PickerChoice {
+    #[derivative(Default)]
     Init,
     Docker(Docker),
     Cri(Cri),
@@ -13,14 +21,15 @@ pub enum Picker {
 
 impl Picker {
     pub fn new() -> Self {
-        Picker::Init
+        Self { choice: RefCell::new(PickerChoice::Init), }
     }
 }
 
 impl FunctionTransform for Picker {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        match self {
-            Picker::Init => {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
+        let mut choice = self.choice.borrow_mut();
+        match &*choice {
+            PickerChoice::Init => {
                 let message = event
                     .as_log()
                     .get(crate::config::log_schema().message_key())
@@ -31,14 +40,14 @@ impl FunctionTransform for Picker {
                     panic!("Message value must be in Bytes");
                 };
                 if bytes.len() > 1 && bytes[0] == b'{' {
-                    *self = Picker::Docker(Docker)
+                    *choice = PickerChoice::Docker(Docker);
                 } else {
-                    *self = Picker::Cri(Cri::new())
+                    *choice = PickerChoice::Cri(Cri::new());
                 }
                 self.transform(output, event)
             }
-            Picker::Docker(t) => t.transform(output, event),
-            Picker::Cri(t) => t.transform(output, event),
+            PickerChoice::Docker(t)  => t.transform(output, event),
+            PickerChoice::Cri(t)  => t.transform(output, event),
         }
     }
 }
@@ -68,7 +77,7 @@ mod tests {
 
         for message in cases {
             let input = Event::from(message);
-            let mut picker = Picker::new();
+            let picker = Picker::new();
             let output = picker.transform_one(input);
             assert!(output.is_none(), "Expected none: {:?}", output);
         }

@@ -134,7 +134,7 @@ impl Concat {
 }
 
 impl FunctionTransform for Concat {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         emit!(ConcatEventProcessed);
 
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
@@ -226,7 +226,7 @@ mod tests {
         event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
 
-        let mut transform = Concat::new(
+        let transform = Concat::new(
             "out".into(),
             " ".into(),
             vec![
@@ -245,7 +245,7 @@ mod tests {
         event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
 
-        let mut transform = Concat::new(
+        let transform = Concat::new(
             "out".into(),
             " ".into(),
             vec![
@@ -263,7 +263,7 @@ mod tests {
         event.as_mut_log().insert("first", "Hello vector users");
         event.as_mut_log().insert("second", "World");
 
-        let mut transform = Concat::new(
+        let transform = Concat::new(
             "out".into(),
             " ".into(),
             vec![
@@ -284,7 +284,7 @@ mod tests {
         let mut event = Event::from("message");
         event.as_mut_log().insert("only", "Hello vector users");
 
-        let mut transform = Concat::new(
+        let transform = Concat::new(
             "out".into(),
             " ".into(),
             vec![Substring::new("only[3..1]".to_string()).unwrap()],
@@ -298,7 +298,7 @@ mod tests {
         let mut event = Event::from("message");
         event.as_mut_log().insert("only", "World");
 
-        let mut transform = Concat::new(
+        let transform = Concat::new(
             "out".into(),
             " ".into(),
             vec![Substring::new("only[10..11]".to_string()).unwrap()],
@@ -312,7 +312,7 @@ mod tests {
         let mut event = Event::from("message");
         event.as_mut_log().insert("only", "World");
 
-        let mut transform = Concat::new(
+        let transform = Concat::new(
             "out".into(),
             " ".into(),
             vec![Substring::new("only[..11]".to_string()).unwrap()],

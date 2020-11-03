@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::HashMap;
 use std::str;
+use std::cell::RefCell;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -58,7 +59,7 @@ impl TransformConfig for GrokParserConfig {
                 field: field.clone(),
                 drop_field: self.drop_field,
                 types,
-                paths: HashMap::new(),
+                paths: RefCell::new(HashMap::new()),
             })
             .map(Transform::function)
             .context(InvalidGrok)?)
@@ -86,7 +87,8 @@ pub struct GrokParser {
     field: String,
     drop_field: bool,
     types: HashMap<String, Conversion>,
-    paths: HashMap<String, Vec<PathComponent>>,
+    #[derivative(Debug = "ignore")]
+    paths: RefCell<HashMap<String, Vec<PathComponent>>>,
 }
 
 impl Clone for GrokParser {
@@ -104,7 +106,7 @@ impl Clone for GrokParser {
 }
 
 impl FunctionTransform for GrokParser {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
         emit!(GrokParserEventProcessed);
@@ -116,11 +118,11 @@ impl FunctionTransform for GrokParser {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.to_string().into()) {
                         Ok(value) => {
-                            if let Some(path) = self.paths.get(name) {
+                            if let Some(path) = self.paths.borrow().get(name) {
                                 event.insert_path(path.to_vec(), value.clone());
                             } else {
                                 let path = PathIter::new(name).collect::<Vec<_>>();
-                                self.paths.insert(name.to_string(), path.clone());
+                                self.paths.borrow_mut().insert(name.to_string(), path.clone());
                                 event.insert_path(path, value);
                             }
                         }

@@ -95,7 +95,7 @@ impl Wasm {
 }
 
 impl Transform for Wasm {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         self.module
             .process(event)
             .map(|outputs| outputs.into_iter().next())

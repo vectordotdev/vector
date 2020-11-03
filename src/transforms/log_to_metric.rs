@@ -314,7 +314,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
 }
 
 impl FunctionTransform for LogToMetric {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         for config in self.config.metrics.iter() {
             match to_metric(&config, &event) {
                 Ok(metric) => {
@@ -382,7 +382,7 @@ mod tests {
         );
 
         let event = create_event("status", "42");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
@@ -414,7 +414,7 @@ mod tests {
         event.as_mut_log().insert("method", "post");
         event.as_mut_log().insert("code", "200");
 
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
@@ -450,7 +450,7 @@ mod tests {
         );
 
         let event = create_event("backtrace", "message");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
@@ -478,7 +478,7 @@ mod tests {
         );
 
         let event = create_event("success", "42");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
 
         assert_eq!(transform.transform_one(event), None);
     }
@@ -496,7 +496,7 @@ mod tests {
         );
 
         let event = create_event("amount", "33.99");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
@@ -524,7 +524,7 @@ mod tests {
         );
 
         let event = create_event("memory_rss", "123");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
@@ -553,7 +553,7 @@ mod tests {
         );
 
         let event = create_event("status", "not a number");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
 
         assert_eq!(transform.transform_one(event), None);
     }
@@ -570,7 +570,7 @@ mod tests {
         );
 
         let event = create_event("not foo", "not a number");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
 
         assert_eq!(transform.transform_one(event), None);
     }
@@ -597,7 +597,7 @@ mod tests {
         event.as_mut_log().insert("status", "42");
         event.as_mut_log().insert("backtrace", "message");
 
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
 
         let mut output = Vec::new();
         transform.transform(&mut output, event);
@@ -652,7 +652,7 @@ mod tests {
         event.as_mut_log().insert("worker", "abc");
         event.as_mut_log().insert("service", "xyz");
 
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
 
         let mut output = Vec::new();
         transform.transform(&mut output, event);
@@ -695,7 +695,7 @@ mod tests {
         );
 
         let event = create_event("user_ip", "1.2.3.4");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
@@ -724,7 +724,7 @@ mod tests {
         );
 
         let event = create_event("response_time", "2.5");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(
@@ -755,7 +755,7 @@ mod tests {
         );
 
         let event = create_event("response_time", "2.5");
-        let mut transform = LogToMetric::new(config);
+        let transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
 
         assert_eq!(

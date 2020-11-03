@@ -54,7 +54,7 @@ pub struct Coercer {
 }
 
 impl FunctionTransform for Coercer {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         let mut log = event.into_log();
         emit!(CoercerEventProcessed);
         if self.drop_unspecified {

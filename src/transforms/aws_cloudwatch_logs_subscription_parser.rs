@@ -69,7 +69,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
 }
 
 impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         let log = event.as_log();
 
         emit!(AwsCloudwatchLogsSubscriptionParserEventProcessed);
@@ -165,7 +165,7 @@ mod test {
 
     #[test]
     fn aws_cloudwatch_logs_subscription_parser_emits_events() {
-        let mut parser =
+        let parser =
             AwsCloudwatchLogsSubscriptionParser::from(AwsCloudwatchLogsSubscriptionParserConfig {
                 field: None,
             });
@@ -231,7 +231,7 @@ mod test {
 
     #[test]
     fn aws_cloudwatch_logs_subscription_parser_ignores_control_messages() {
-        let mut parser =
+        let parser =
             AwsCloudwatchLogsSubscriptionParser::from(AwsCloudwatchLogsSubscriptionParserConfig {
                 field: None,
             });

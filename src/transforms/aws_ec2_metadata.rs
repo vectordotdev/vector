@@ -171,7 +171,7 @@ impl TransformConfig for Ec2Metadata {
 }
 
 impl FunctionTransform for Ec2MetadataTransform {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
 
         if let Some(read_ref) = self.state.read() {

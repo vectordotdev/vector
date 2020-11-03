@@ -57,7 +57,7 @@ pub struct AnsiStripper {
 }
 
 impl FunctionTransform for AnsiStripper {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
@@ -93,7 +93,7 @@ mod tests {
     macro_rules! assert_foo_bar {
         ($($in:expr),* $(,)?) => {
             $(
-                let mut transform = AnsiStripper {
+                let transform = AnsiStripper {
                     field: "message".into(),
                 };
 

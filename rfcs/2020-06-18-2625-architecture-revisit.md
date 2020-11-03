@@ -172,7 +172,7 @@ enum Transform {
 }
 
 trait FunctionTransform {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event);
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event);
 }
 
 trait TaskTransform {

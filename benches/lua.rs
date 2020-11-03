@@ -31,7 +31,7 @@ fn add_fields(c: &mut Criterion) {
                     map.insert(String::from(key), String::from(value).into());
                     transforms::add_fields::AddFields::new(map, true).unwrap()
                 },
-                |mut transform| {
+                |transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
                         let mut output = vec![];
@@ -50,9 +50,8 @@ fn add_fields(c: &mut Criterion) {
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let mut output = Vec::with_capacity(1);
-                        transform.transform(&mut output, event);
-                        assert_eq!(output[0].as_log()[key], value_bytes_v1);
+                        let output = transform.transform_one(event).unwrap();
+                        assert_eq!(output.as_log()[key], value_bytes_v1);
                     }
                 },
             )
@@ -142,7 +141,8 @@ fn field_filter(c: &mut Criterion) {
                             event
                         })
                         .fold(Vec::new(), |mut acc, r| {
-                            transform.transform(&mut acc, r);
+                            let item = transform.transform_one(r);
+                            acc.push(item);
                             acc
                         })
                         .len();

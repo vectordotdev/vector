@@ -54,7 +54,7 @@ impl RemoveTags {
 }
 
 impl FunctionTransform for RemoveTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemoveTagsEventProcessed);
 
         let tags = &mut event.as_mut_metric().tags;
@@ -106,7 +106,7 @@ mod tests {
             value: MetricValue::Counter { value: 10.0 },
         });
 
-        let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
+        let transform = RemoveTags::new(vec!["region".into(), "host".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
@@ -131,7 +131,7 @@ mod tests {
             value: MetricValue::Counter { value: 10.0 },
         });
 
-        let mut transform = RemoveTags::new(vec!["env".into()]);
+        let transform = RemoveTags::new(vec!["env".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
 
         assert!(metric.tags.is_none());
@@ -150,7 +150,7 @@ mod tests {
             },
         });
 
-        let mut transform = RemoveTags::new(vec!["env".into()]);
+        let transform = RemoveTags::new(vec!["env".into()]);
         let metric = transform.transform_one(event).unwrap().into_metric();
 
         assert!(metric.tags.is_none());

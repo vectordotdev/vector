@@ -89,7 +89,7 @@ fn create_event(json: Value) -> LogEvent {
     let mut event = Event::new_empty_log();
     event.as_mut_log().insert(log_schema().message_key(), s);
 
-    let mut parser = JsonParser::from(JsonParserConfig::default());
+    let parser = JsonParser::from(JsonParserConfig::default());
     let mut output = Vec::with_capacity(1);
     parser.transform(&mut output, event);
     output.into_iter().next().unwrap().into_log()

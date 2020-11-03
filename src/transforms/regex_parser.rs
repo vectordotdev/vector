@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
+use std::cell::RefCell;
 
 #[derive(Debug, Derivative, Deserialize, Serialize, Clone)]
 #[derivative(Default)]
@@ -63,7 +64,7 @@ impl TransformConfig for RegexParserConfig {
 #[derive(Clone, Debug)]
 pub struct RegexParser {
     regexset: RegexSet,
-    patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
+    patterns: RefCell<Vec<CompiledRegex>>, // indexes correspend to RegexSet
     field: String,
     drop_field: bool,
     drop_failed: bool,
@@ -226,7 +227,7 @@ impl RegexParser {
 
         Self {
             regexset,
-            patterns,
+            patterns: RefCell::new(patterns),
             field,
             drop_field,
             drop_failed,
@@ -237,7 +238,7 @@ impl RegexParser {
 }
 
 impl FunctionTransform for RegexParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
         emit!(RegexParserEventProcessed);
@@ -259,8 +260,11 @@ impl FunctionTransform for RegexParser {
 
             let target_field = self.target_field.as_ref();
 
-            let pattern = self
+            let mut patterns = self
                 .patterns
+                .borrow_mut();
+
+            let pattern = patterns
                 .get_mut(id)
                 .expect("Mismatch between capture patterns and regexset");
 
@@ -289,7 +293,7 @@ impl FunctionTransform for RegexParser {
                 }
                 output.push(event);
                 return;
-            }
+            };
         } else {
             emit!(RegexParserMissingField { field: &self.field });
         }

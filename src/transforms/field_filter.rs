@@ -66,7 +66,7 @@ impl FieldFilter {
 }
 
 impl FunctionTransform for FieldFilter {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         if event
             .as_log()
             .get(&self.field_name)

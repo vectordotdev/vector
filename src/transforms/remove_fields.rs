@@ -61,7 +61,7 @@ impl RemoveFields {
 }
 
 impl FunctionTransform for RemoveFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemoveFieldsEventProcessed);
 
         let log = event.as_mut_log();
@@ -95,7 +95,7 @@ mod tests {
         event.as_mut_log().insert("to_remove", "some value");
         event.as_mut_log().insert("to_keep", "another value");
 
-        let mut transform =
+        let transform =
             RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
 
         let new_event = transform.transform_one(event).unwrap();

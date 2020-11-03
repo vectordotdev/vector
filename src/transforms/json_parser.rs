@@ -71,7 +71,7 @@ impl From<JsonParserConfig> for JsonParser {
 }
 
 impl FunctionTransform for JsonParser {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field);
 
@@ -144,7 +144,7 @@ mod test {
 
     #[test]
     fn json_parser_drop_field() {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let parser = JsonParser::from(JsonParserConfig::default());
 
         let event = Event::from(r#"{"greeting": "hello", "name": "bob"}"#);
 
@@ -155,7 +155,7 @@ mod test {
 
     #[test]
     fn json_parser_doesnt_drop_field() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -169,7 +169,7 @@ mod test {
 
     #[test]
     fn json_parser_parse_raw() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -190,7 +190,7 @@ mod test {
     // This is a regression test, see: https://github.com/timberio/vector/issues/2814
     #[test]
     fn json_parser_parse_periods() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -216,7 +216,7 @@ mod test {
 
     #[test]
     fn json_parser_parse_raw_with_whitespace() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -235,7 +235,7 @@ mod test {
 
     #[test]
     fn json_parser_parse_field() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),
             drop_field: false,
             ..Default::default()
@@ -267,11 +267,11 @@ mod test {
 
     #[test]
     fn json_parser_parse_inner_json() {
-        let mut parser_outer = JsonParser::from(JsonParserConfig {
+        let parser_outer = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
 
-        let mut parser_inner = JsonParser::from(JsonParserConfig {
+        let parser_inner = JsonParser::from(JsonParserConfig {
             field: Some("log".into()),
             ..Default::default()
         });
@@ -296,7 +296,7 @@ mod test {
         let invalid = r#"{"greeting": "hello","#;
 
         // Raw
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
         });
@@ -309,7 +309,7 @@ mod test {
         assert_eq!(event.as_log()[log_schema().message_key()], invalid.into());
 
         // Field
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),
             drop_field: false,
             ..Default::default()
@@ -331,7 +331,7 @@ mod test {
         let not_object = r#""hello""#;
 
         // Raw
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_invalid: true,
             ..Default::default()
         });
@@ -346,7 +346,7 @@ mod test {
         assert!(parser.transform_one(event).is_none());
 
         // Field
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),
             drop_invalid: true,
             ..Default::default()
@@ -371,10 +371,10 @@ mod test {
 
     #[test]
     fn json_parser_chained() {
-        let mut parser1 = JsonParser::from(JsonParserConfig {
+        let parser1 = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
-        let mut parser2 = JsonParser::from(JsonParserConfig {
+        let parser2 = JsonParser::from(JsonParserConfig {
             field: Some("nested".into()),
             ..Default::default()
         });
@@ -395,7 +395,7 @@ mod test {
 
     #[test]
     fn json_parser_types() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
 
@@ -429,7 +429,7 @@ mod test {
 
     #[test]
     fn drop_field_before_adding() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: true,
             ..Default::default()
         });
@@ -449,7 +449,7 @@ mod test {
 
     #[test]
     fn doesnt_drop_field_after_failed_parse() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: true,
             ..Default::default()
         });
@@ -463,7 +463,7 @@ mod test {
 
     #[test]
     fn target_field_works() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             target_field: Some("that".into()),
             ..Default::default()
@@ -479,7 +479,7 @@ mod test {
 
     #[test]
     fn target_field_preserves_existing() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             target_field: Some("message".into()),
             ..Default::default()
@@ -497,7 +497,7 @@ mod test {
 
     #[test]
     fn target_field_overwrites_existing() {
-        let mut parser = JsonParser::from(JsonParserConfig {
+        let parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             target_field: Some("message".into()),
             overwrite_target: Some(true),

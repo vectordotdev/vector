@@ -60,7 +60,7 @@ impl Filter {
 }
 
 impl FunctionTransform for Filter {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
             output.push(event);
         }

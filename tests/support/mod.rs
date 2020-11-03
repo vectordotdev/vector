@@ -195,7 +195,7 @@ pub struct MockTransform {
 }
 
 impl FunctionTransform for MockTransform {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log

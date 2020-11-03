@@ -150,7 +150,7 @@ impl Transform {
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a `TaskTransform` or vice versa.
 pub trait FunctionTransform: Send + dyn_clone::DynClone {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event);
+    fn transform(&self, output: &mut Vec<Event>, event: Event);
 
     /// A handy test function that inputs and outputs only one event.
     ///
@@ -161,7 +161,7 @@ pub trait FunctionTransform: Send + dyn_clone::DynClone {
         not(test),
         deprecated = "Use `transform` and `output.extend(events)` or `output.push(event)` instead."
     )]
-    fn transform_one(&mut self, event: Event) -> Option<Event> {
+    fn transform_one(&self, event: Event) -> Option<Event> {
         let mut buf = Vec::with_capacity(1);
         self.transform(&mut buf, event);
         buf.into_iter().next()

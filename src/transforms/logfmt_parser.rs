@@ -63,7 +63,7 @@ pub struct Logfmt {
 }
 
 impl FunctionTransform for Logfmt {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         let mut drop_field = self.drop_field;

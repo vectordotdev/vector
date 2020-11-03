@@ -67,7 +67,7 @@ impl RenameFields {
 }
 
 impl FunctionTransform for RenameFields {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
@@ -109,7 +109,7 @@ mod tests {
             String::from("should_not_exist"),
         );
 
-        let mut transform = RenameFields::new(fields, false).unwrap();
+        let transform = RenameFields::new(fields, false).unwrap();
 
         let new_event = transform.transform_one(event).unwrap();
 

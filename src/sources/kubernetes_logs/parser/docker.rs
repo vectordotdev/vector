@@ -21,7 +21,7 @@ pub const LOG: &str = "log";
 pub struct Docker;
 
 impl FunctionTransform for Docker {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         parse_json(log);
         normalize_event(log).ok();

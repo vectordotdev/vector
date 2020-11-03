@@ -51,7 +51,7 @@ impl Swimlane {
 }
 
 impl FunctionTransform for Swimlane {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
             emit!(SwimlanesEventProcessed);
             output.push(event);

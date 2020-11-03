@@ -66,7 +66,7 @@ impl AddTags {
 }
 
 impl FunctionTransform for AddTags {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddTagsEventProcessed);
 
         if !self.tags.is_empty() {
@@ -132,7 +132,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let mut transform = AddTags::new(map, true);
+        let transform = AddTags::new(map, true);
         let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
@@ -158,7 +158,7 @@ mod tests {
             .into_iter()
             .collect();
 
-        let mut transform = AddTags::new(map, false);
+        let transform = AddTags::new(map, false);
 
         let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();

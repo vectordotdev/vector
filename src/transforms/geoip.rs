@@ -123,7 +123,7 @@ struct City<'a> {
 }
 
 impl FunctionTransform for Geoip {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+    fn transform(&self, output: &mut Vec<Event>, mut event: Event) {
         let mut isp: ISP = Default::default();
         let mut city: City = Default::default();
         let target_field = self.target.clone();
@@ -222,11 +222,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_success() {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new(
+        let augment = Geoip::new(
             "tests/data/GeoIP2-City-Test.mmdb".to_string(),
             "remote_addr".into(),
             "geo".to_string(),
@@ -252,11 +252,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_partial_results() {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new(
+        let augment = Geoip::new(
             "tests/data/GeoIP2-City-Test.mmdb".to_string(),
             "remote_addr".into(),
             "geo".to_string(),
@@ -282,11 +282,11 @@ mod tests {
 
     #[test]
     fn geoip_city_lookup_no_results() {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new(
+        let augment = Geoip::new(
             "tests/data/GeoIP2-City-Test.mmdb".to_string(),
             "remote_addr".into(),
             "geo".to_string(),
@@ -312,11 +312,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_success() {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new(
+        let augment = Geoip::new(
             "tests/data/GeoIP2-ISP-Test.mmdb".to_string(),
             "remote_addr".to_string(),
             "geo".to_string(),
@@ -342,11 +342,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_partial_results() {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new(
+        let augment = Geoip::new(
             "tests/data/GeoLite2-ASN-Test.mmdb".to_string(),
             "remote_addr".to_string(),
             "geo".to_string(),
@@ -369,11 +369,11 @@ mod tests {
 
     #[test]
     fn geoip_isp_lookup_no_results() {
-        let mut parser = JsonParser::from(JsonParserConfig::default());
+        let parser = JsonParser::from(JsonParserConfig::default());
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new(
+        let augment = Geoip::new(
             "tests/data/GeoLite2-ASN-Test.mmdb".to_string(),
             "remote_addr".to_string(),
             "geo".to_string(),
