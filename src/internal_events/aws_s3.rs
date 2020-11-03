@@ -100,16 +100,16 @@ pub mod source {
     }
 
     #[derive(Debug)]
-    pub(crate) struct SqsS3EventRecordIgnoredInvalidEvent<'a> {
+    pub(crate) struct SqsS3EventRecordInvalidEventIgnored<'a> {
         pub bucket: &'a str,
         pub key: &'a str,
         pub kind: &'a str,
         pub name: &'a str,
     }
 
-    impl<'a> InternalEvent for SqsS3EventRecordIgnoredInvalidEvent<'a> {
+    impl<'a> InternalEvent for SqsS3EventRecordInvalidEventIgnored<'a> {
         fn emit_logs(&self) {
-            warn!(message = "Ignored S3 record as event kind that was not ObjectCreated.", %self.bucket, %self.key, %self.kind, %self.name);
+            warn!(message = "Ignored S3 record in SQS message for an event that was not ObjectCreated.", %self.bucket, %self.key, %self.kind, %self.name);
         }
 
         fn emit_metrics(&self) {

@@ -1,7 +1,6 @@
 use super::util::MultilineConfig;
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
-    dns::Resolver,
     line_agg,
     rusoto::{self, RegionOrEndpoint},
     shutdown::ShutdownSignal,
@@ -103,9 +102,8 @@ impl AwsS3Config {
         use std::sync::Arc;
 
         let region: Region = (&self.region).try_into().context(RegionParse {})?;
-        let resolver = Resolver;
 
-        let client = rusoto::client(resolver).with_context(|| Client {})?;
+        let client = rusoto::client().with_context(|| Client {})?;
         let creds: Arc<rusoto::AwsCredentialsProvider> =
             rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())
                 .context(Credentials {})?
@@ -199,20 +197,18 @@ fn determine_compression(
 }
 
 fn content_encoding_to_compression(content_encoding: &str) -> Option<Compression> {
-    use Compression::*;
     match content_encoding {
-        "gzip" => Some(Gzip),
-        "zstd" => Some(Zstd),
-        _ => Option::None,
+        "gzip" => Some(Compression::Gzip),
+        "zstd" => Some(Compression::Zstd),
+        _ => None,
     }
 }
 
 fn content_type_to_compression(content_type: &str) -> Option<Compression> {
-    use Compression::*;
     match content_type {
-        "application/gzip" | "application/x-gzip" => Some(Gzip),
-        "application/zstd" => Some(Zstd),
-        _ => Option::None,
+        "application/gzip" | "application/x-gzip" => Some(Compression::Gzip),
+        "application/zstd" => Some(Compression::Zstd),
+        _ => None,
     }
 }
 

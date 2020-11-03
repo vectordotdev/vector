@@ -59,7 +59,7 @@ components: sources: aws_s3: {
 
 	configuration: {
 		strategy: {
-			common:      true
+			common:      false
 			description: "The strategy to use to consume objects from AWS S3."
 			required:    false
 			type: string: {
@@ -103,7 +103,7 @@ components: sources: aws_s3: {
 					}
 					visibility_timeout_secs: {
 						common:      false
-						description: "The visibility timeout to use for messages in secords. This controls how long a message is left unavailable when a Vector receives it. If Vector does not delete the message before the timeout expires, it will be made reavailable for another consumer; this can happen if, for example, the `vector` process crashes."
+						description: "The visibility timeout to use for messages in secords. This controls how long a message is left unavailable when a Vector receives it. If a `vector` does not delete the message before the timeout expires, it will be made reavailable for another consumer; this can happen if, for example, the `vector` process crashes."
 						required:    false
 						warnings: ["Should be set higher than the length of time it takes to process an individual message to avoid that message being reprocessed."]
 						type: uint: {
@@ -202,7 +202,34 @@ components: sources: aws_s3: {
 				[transforms.elasticloadbalancing_fields_parsed]
 					type = "regex_parser"
 					inputs = ["s3"]
-					regex = '^(?P<type>[\\w]+) (?P<timestamp>[\\w:.-]+) (?P<elb>[^\\s]+) (?P<client_host>[\\d.:-]+) (?P<target_host>[\\d.:-]+) (?P<request_processing_time>[\\d.-]+) (?P<target_processing_time>[\\d.-]+) (?P<response_processing_time>[\\d.-]+) (?P<elb_status_code>[\\d-]+) (?P<target_status_code>[\\d-]+) (?P<received_bytes>[\\d-]+) (?P<sent_bytes>[\\d-]+) "(?P<request_method>[\\w-]+) (?P<request_url>[^\\s]+) (?P<request_protocol>[^"\\s]+)" "(?P<user_agent>[^"]+)" (?P<ssl_cipher>[^\\s]+) (?P<ssl_protocol>[^\\s]+) (?P<target_group_arn>[\\w.:/-]+) "(?P<trace_id>[^\\s"]+)" "(?P<domain_name>[^\\s"]+)" "(?P<chosen_cert_arn>[\\w:./-]+)" (?P<matched_rule_priority>[\\d-]+) (?P<request_creation_time>[\\w.:-]+) "(?P<actions_executed>[\\w,-]+)" "(?P<redirect_url>[^"]+)" "(?P<error_reason>[^"]+)"'
+					regex = '(?x)^
+							(?P<type>[\\w]+)[ ]
+							(?P<timestamp>[\\w:.-]+)[ ]
+							(?P<elb>[^\\s]+)[ ]
+							(?P<client_host>[\\d.:-]+)[ ]
+							(?P<target_host>[\\d.:-]+)[ ]
+							(?P<request_processing_time>[\\d.-]+)[ ]
+							(?P<target_processing_time>[\\d.-]+)[ ]
+							(?P<response_processing_time>[\\d.-]+)[ ]
+							(?P<elb_status_code>[\\d-]+)[ ]
+							(?P<target_status_code>[\\d-]+)[ ]
+							(?P<received_bytes>[\\d-]+)[ ]
+							(?P<sent_bytes>[\\d-]+)[ ]
+							"(?P<request_method>[\\w-]+)[ ]
+							(?P<request_url>[^\\s]+)[ ]
+							(?P<request_protocol>[^"\\s]+)"[ ]
+							"(?P<user_agent>[^"]+)"[ ]
+							(?P<ssl_cipher>[^\\s]+)[ ]
+							(?P<ssl_protocol>[^\\s]+)[ ]
+							(?P<target_group_arn>[\\w.:/-]+)[ ]
+							"(?P<trace_id>[^\\s"]+)"[ ]
+							"(?P<domain_name>[^\\s"]+)"[ ]
+							"(?P<chosen_cert_arn>[\\w:./-]+)"[ ]
+							(?P<matched_rule_priority>[\\d-]+)[ ]
+							(?P<request_creation_time>[\\w.:-]+)[ ]
+							"(?P<actions_executed>[\\w,-]+)"[ ]
+							"(?P<redirect_url>[^"]+)"[ ]
+							"(?P<error_reason>[^"]+)"'
 					field = "message"
 					drop_failed = false
 

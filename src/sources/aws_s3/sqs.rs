@@ -4,7 +4,7 @@ use crate::{
     internal_events::aws_s3::source::{
         SqsMessageDeleteFailed, SqsMessageDeleteSucceeded, SqsMessageProcessingFailed,
         SqsMessageProcessingSucceeded, SqsMessageReceiveFailed, SqsMessageReceiveSucceeded,
-        SqsS3EventRecordIgnoredInvalidEvent,
+        SqsS3EventRecordInvalidEventIgnored,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -28,7 +28,7 @@ use rusoto_sqs::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
-use std::{convert::TryInto, time::Duration};
+use std::time::Duration;
 use tokio::{select, time};
 use tokio_util::codec::FramedRead;
 
@@ -48,7 +48,8 @@ pub(super) struct Config {
     pub(super) poll_secs: u64,
     #[serde(default)]
     #[derivative(Default(value = "300"))]
-    pub(super) visibility_timeout_secs: u64,
+    // restricted to u32 for safe conversion to i64 later
+    pub(super) visibility_timeout_secs: u32,
     #[serde(default)]
     #[derivative(Default(value = "true"))]
     pub(super) delete_message: bool,
@@ -157,16 +158,7 @@ impl Ingestor {
                 owner: config.queue_owner.clone(),
             })?;
 
-        // This is a bit odd as AWS wants an i64 for this value, but also doesn't want negative
-        // values so I used u64 for the config deserialization and validate that there is no
-        // overflow here
-        let visibility_timeout_secs: i64 =
-            config
-                .visibility_timeout_secs
-                .try_into()
-                .context(InvalidVisibilityTimeout {
-                    timeout: config.visibility_timeout_secs,
-                })?;
+        let visibility_timeout_secs: i64 = config.visibility_timeout_secs.into();
 
         Ok(Ingestor {
             region,
@@ -292,7 +284,7 @@ impl Ingestor {
         }
 
         if s3_event.event_name.kind != "ObjectCreated" {
-            emit!(SqsS3EventRecordIgnoredInvalidEvent {
+            emit!(SqsS3EventRecordInvalidEventIgnored {
                 bucket: &s3_event.s3.bucket.name,
                 key: &s3_event.s3.object.key,
                 kind: &s3_event.event_name.kind,
@@ -302,7 +294,7 @@ impl Ingestor {
         }
 
         // S3 has to send notifications to a queue in the same region so I don't think this will
-        // actually ever be it unless messages are being forwarded from one queue to another
+        // actually ever be hit unless messages are being forwarded from one queue to another
         if self.region.name() != s3_event.aws_region {
             return Err(ProcessingError::WrongRegion {
                 bucket: s3_event.s3.bucket.name.clone(),
@@ -344,11 +336,10 @@ impl Ingestor {
                     body,
                 );
 
-                // Record the read error saw to propagate up later so we avoid ack'ing the SQS
+                // Record the read error seen to propagate up later so we avoid ack'ing the SQS
                 // message
                 //
-                // String is used as we cannot take clone std::io::Error to take ownership in
-                // closure
+                // String is used as we cannot clone std::io::Error to take ownership in closure
                 //
                 // FramedRead likely stops when it gets an i/o error but I found it more clear to
                 // show that we `take_while` there hasn't been an error
@@ -363,12 +354,11 @@ impl Ingestor {
                         .map(|res| {
                             res.map_err(|err| {
                                 read_error = Some(err);
-                                ()
                             })
                             .ok()
                         })
                         .take_while(|res| futures::future::ready(res.is_some()))
-                        .map(|r| r.unwrap()), // validated by take_while
+                        .map(|r| r.expect("validated by take_while")),
                 );
 
                 let lines = match &self.multiline {
@@ -406,7 +396,6 @@ impl Ingestor {
                     .await
                     .map_err(|err| {
                         send_error = Some(err);
-                        ()
                     })
                     .ok();
 
@@ -485,8 +474,8 @@ struct S3EventName {
 
 // https://docs.aws.amazon.com/AmazonS3/latest/dev/NotificationHowTo.html#supported-notification-event-types
 //
-// we could enums here, but that seems overly brittle as deserialization would  break if they add
-// new event types or names
+// we could use enums here, but that seems overly brittle as deserialization would break if they
+// add new event types or names
 impl<'de> Deserialize<'de> for S3EventName {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
