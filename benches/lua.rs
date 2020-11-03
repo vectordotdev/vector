@@ -51,10 +51,14 @@ fn bench_add_fields(c: &mut Criterion) {
 
     for (name, transform) in benchmarks.iter_mut() {
         group.bench_function(name.to_owned(), |b| {
-            b.iter(|| {
-                let event = black_box(transform.transform(event.clone()).unwrap());
-                debug_assert_eq!(event.as_log()[key], value.to_owned().into());
-            })
+            b.iter_batched(
+                || event.clone(),
+                |event| {
+                    let event = black_box(transform.transform(event).unwrap());
+                    debug_assert_eq!(event.as_log()[key], value.to_owned().into());
+                },
+                BatchSize::SmallInput,
+            )
         });
     }
 
