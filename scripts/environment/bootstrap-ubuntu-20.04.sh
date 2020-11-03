@@ -3,6 +3,8 @@ set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
 
+echo 'APT::Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
+
 apt update --yes
 
 apt install --yes \
