@@ -89,7 +89,7 @@ impl SinkConfig for RemoteWriteConfig {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|error| error!("Prometheus remote_write sink error: {}", error));
+            .sink_map_err(|error| error!(message = "Prometheus remote_write sink error.", %error));
 
         Ok((
             sinks::VectorSink::Futures01Sink(Box::new(sink)),
