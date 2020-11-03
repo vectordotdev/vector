@@ -1,11 +1,14 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion};
+use futures::{compat::Stream01CompatExt, StreamExt};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::TransformConfig,
     test_util::runtime,
-    transforms::{self, Transform},
+    transforms::{
+        self, util::runtime_transform::RuntimeTransform, FunctionTransform, TaskTransform,
+    },
     Event,
 };
 
@@ -31,8 +34,9 @@ fn add_fields(c: &mut Criterion) {
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[key], value_bytes_native);
+                        let mut output = vec![];
+                        transform.transform(&mut output, event);
+                        assert_eq!(output[0].as_log()[key], value_bytes_native);
                     }
                 },
             )
@@ -41,13 +45,14 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let source = format!("event['{}'] = '{}'", key, value);
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(source, vec![]).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[key], value_bytes_v1);
+                        let mut output = Vec::with_capacity(1);
+                        transform.transform(&mut output, event);
+                        assert_eq!(output[0].as_log()[key], value_bytes_v1);
                     }
                 },
             )
@@ -71,8 +76,9 @@ fn add_fields(c: &mut Criterion) {
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[key], value_bytes_v2);
+                        let mut output = Vec::with_capacity(1);
+                        transform.transform(&mut output, event);
+                        assert_eq!(output[0].as_log()[key], value_bytes_v2);
                     }
                 },
             )
@@ -100,15 +106,20 @@ fn field_filter(c: &mut Criterion) {
                         .unwrap()
                     })
                 },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                |transform| {
+                    let inputs = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
+                    let in_stream = futures01::stream::iter_ok(inputs);
+                    let out_stream = transform
+                        .into_task()
+                        .transform(Box::new(in_stream))
+                        .compat()
+                        .collect::<Vec<_>>();
+                    let blocked = futures::executor::block_on(out_stream);
+                    let num = blocked.len();
                     assert_eq!(num, num_events / 10);
                 },
             )
@@ -121,7 +132,7 @@ fn field_filter(c: &mut Criterion) {
                         event = nil
                       end
                     "#;
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(source.to_string(), vec![]).unwrap()
                 },
                 |mut transform| {
                     let num = (0..num_events)
@@ -130,8 +141,11 @@ fn field_filter(c: &mut Criterion) {
                             event.as_mut_log().insert("the_field", (i % 10).to_string());
                             event
                         })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                        .fold(Vec::new(), |mut acc, r| {
+                            transform.transform(&mut acc, r);
+                            acc
+                        })
+                        .len();
                     assert_eq!(num, num_events / 10);
                 },
             )
@@ -148,15 +162,19 @@ fn field_filter(c: &mut Criterion) {
                     "#;
                     transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap()
                 },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                |transform| {
+                    let inputs = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
+                    let in_stream = futures01::stream::iter_ok(inputs);
+                    let out_stream =
+                        TaskTransform::transform(Box::new(transform), Box::new(in_stream))
+                            .compat()
+                            .collect::<Vec<_>>();
+                    let blocked = futures::executor::block_on(out_stream);
+                    let num = blocked.len();
                     assert_eq!(num, num_events / 10);
                 },
             )

@@ -24,7 +24,7 @@ impl Function for Downcase {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct DowncaseFn {
     value: Box<dyn Expression>,
 }

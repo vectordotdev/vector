@@ -23,7 +23,7 @@ impl Function for StripWhitespace {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StripWhitespaceFn {
     value: Box<dyn Expression>,
 }

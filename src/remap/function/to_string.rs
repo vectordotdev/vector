@@ -31,7 +31,7 @@ impl Function for ToString {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToStringFn {
     value: Box<dyn Expression>,
     default: Option<Box<dyn Expression>>,

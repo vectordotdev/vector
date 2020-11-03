@@ -37,7 +37,7 @@ impl Function for Slice {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct SliceFn {
     value: Box<dyn Expression>,
     start: Box<dyn Expression>,

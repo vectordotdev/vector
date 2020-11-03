@@ -1,14 +1,14 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
     pub tags: IndexMap<String, String>,
@@ -16,6 +16,7 @@ pub struct AddTagsConfig {
     pub overwrite: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct AddTags {
     tags: IndexMap<String, String>,
     overwrite: bool,
@@ -38,8 +39,11 @@ impl GenerateConfig for AddTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(AddTags::new(
+            self.tags.clone(),
+            self.overwrite,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -61,8 +65,8 @@ impl AddTags {
     }
 }
 
-impl Transform for AddTags {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for AddTags {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddTagsEventProcessed);
 
         if !self.tags.is_empty() {
@@ -91,17 +95,16 @@ impl Transform for AddTags {
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AddTags, AddTagsConfig};
+    use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
-        transforms::Transform,
     };
     use indexmap::IndexMap;
     use std::collections::BTreeMap;
@@ -130,7 +133,7 @@ mod tests {
         .collect();
 
         let mut transform = AddTags::new(map, true);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 2);
@@ -157,7 +160,7 @@ mod tests {
 
         let mut transform = AddTags::new(map, false);
 
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));

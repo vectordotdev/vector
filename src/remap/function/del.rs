@@ -46,7 +46,7 @@ impl Function for Del {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DelFn {
     paths: Vec<Box<dyn Expression>>,
 }

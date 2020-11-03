@@ -1,10 +1,11 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
+    transforms::{TaskTransform, Transform},
 };
+use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
 
@@ -50,8 +51,8 @@ impl Default for MergeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Merge::from(self.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::task(Merge::from(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -67,7 +68,6 @@ impl TransformConfig for MergeConfig {
     }
 }
 
-#[derive(Debug)]
 pub struct Merge {
     partial_event_marker_field: String,
     fields: Vec<String>,
@@ -75,19 +75,8 @@ pub struct Merge {
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
 
-impl From<MergeConfig> for Merge {
-    fn from(config: MergeConfig) -> Self {
-        Self {
-            partial_event_marker_field: config.partial_event_marker_field,
-            fields: config.fields,
-            stream_discriminant_fields: config.stream_discriminant_fields,
-            log_event_merge_states: HashMap::new(),
-        }
-    }
-}
-
-impl Transform for Merge {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl Merge {
+    fn transform_one(&mut self, event: Event) -> Option<Event> {
         let mut event = event.into_log();
 
         // Prepare an event's discriminant.
@@ -127,7 +116,9 @@ impl Transform for Merge {
         // then return the merged event.
         let log_event_merge_state = match self.log_event_merge_states.remove(&discriminant) {
             Some(log_event_merge_state) => log_event_merge_state,
-            None => return Some(Event::Log(event)),
+            None => {
+                return Some(Event::Log(event));
+            }
         };
 
         // Merge in the final non-partial event and consume the merge state in
@@ -139,11 +130,34 @@ impl Transform for Merge {
     }
 }
 
+impl From<MergeConfig> for Merge {
+    fn from(config: MergeConfig) -> Self {
+        Self {
+            partial_event_marker_field: config.partial_event_marker_field,
+            fields: config.fields,
+            stream_discriminant_fields: config.stream_discriminant_fields,
+            log_event_merge_states: HashMap::new(),
+        }
+    }
+}
+
+impl TaskTransform for Merge {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::{Merge, MergeConfig};
+    use super::*;
     use crate::event::{self, Event};
-    use crate::transforms::Transform;
 
     #[test]
     fn generate_config() {
@@ -163,7 +177,7 @@ mod test {
         let sample_event = Event::from("hello world");
 
         // Once processed by the transform.
-        let merged_event = merge.transform(sample_event.clone()).unwrap();
+        let merged_event = merge.transform_one(sample_event.clone()).unwrap();
 
         // Should be returned as is.
         assert_eq!(merged_event, sample_event);
@@ -177,9 +191,9 @@ mod test {
         let partial_event_2 = make_partial(Event::from("lo "));
         let non_partial_event = Event::from("world");
 
-        assert!(merge.transform(partial_event_1).is_none());
-        assert!(merge.transform(partial_event_2).is_none());
-        let merged_event = merge.transform(non_partial_event).unwrap();
+        assert!(merge.transform_one(partial_event_1).is_none());
+        assert!(merge.transform_one(partial_event_2).is_none());
+        let merged_event = merge.transform_one(non_partial_event).unwrap();
 
         assert_eq!(
             merged_event
@@ -221,12 +235,12 @@ mod test {
         let s2_non_partial_event = make_event("sum", "s2");
 
         // Simulate events arriving in non-trivial order.
-        assert!(merge.transform(s1_partial_event_1).is_none());
-        assert!(merge.transform(s2_partial_event_1).is_none());
-        assert!(merge.transform(s1_partial_event_2).is_none());
-        let s1_merged_event = merge.transform(s1_non_partial_event).unwrap();
-        assert!(merge.transform(s2_partial_event_2).is_none());
-        let s2_merged_event = merge.transform(s2_non_partial_event).unwrap();
+        assert!(merge.transform_one(s1_partial_event_1).is_none());
+        assert!(merge.transform_one(s2_partial_event_1).is_none());
+        assert!(merge.transform_one(s1_partial_event_2).is_none());
+        let s1_merged_event = merge.transform_one(s1_non_partial_event).unwrap();
+        assert!(merge.transform_one(s2_partial_event_2).is_none());
+        let s2_merged_event = merge.transform_one(s2_non_partial_event).unwrap();
 
         assert_eq!(
             s1_merged_event

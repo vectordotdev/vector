@@ -14,7 +14,7 @@ impl Function for UuidV4 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
