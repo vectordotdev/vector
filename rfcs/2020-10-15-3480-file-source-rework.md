@@ -430,56 +430,56 @@ and do little for our ability to extend the source in the future.
 
 ## Outstanding Questions
 
-- Should we change the user-facing config at the same time at the implementation
+* Should we change the user-facing config at the same time at the implementation
     or split the two?
-- How to handle transitioning users to the new interface?
+* How to handle transitioning users to the new interface?
 
 ## Plan Of Attack
 
 The work with the highest investment/payofff ratio is likely around
 checksumming, so I would suggest we attack that first:
 
-- [ ] Migrate `FileWatcher` to general purpose file wrapper with fingerprinting
-- [ ] Rework checkpoint persistence to allow differentiating and migrating
+* [ ] Migrate `FileWatcher` to general purpose file wrapper with fingerprinting
+* [ ] Rework checkpoint persistence to allow differentiating and migrating
     between types
-- [ ] Combine checksum and first line checksum fingerprinting strategies
-- [ ] Add path-based fingerprinting strategy
-- [ ] Deprecate device/inode fingerprinting strategy
+* [ ] Combine checksum and first line checksum fingerprinting strategies
+* [ ] Add path-based fingerprinting strategy
+* [ ] Deprecate device/inode fingerprinting strategy
 
 The next most valuable is removing extraneous work from the read loop and
 hopefully improving performance in some edge cases considerably:
 
-- [ ] Move path discovery to its own task and interval
-- [ ] Move checkpoint persistence to its own task and interval
+* [ ] Move path discovery to its own task and interval
+* [ ] Move checkpoint persistence to its own task and interval
 
 With the relatively low hanging fruit taken care of, we can move on to the more
 general reorganization tasks that set the stage for configuration improvements:
 
-- [ ] Extract scheduler component
-- [ ] Extract file identity component (depends on `FileWatcher` work)
-- [ ] Extract file starting point component (depends on `FileWatcher` work)
+* [ ] Extract scheduler component
+* [ ] Extract file identity component (depends on `FileWatcher` work)
+* [ ] Extract file starting point component (depends on `FileWatcher` work)
 
 Followed by the new and improved configuration itself:
 
-- [ ] Implement `version = 2` of the file source config with deprecation warning
-- [ ] Rename `ignore_older` to `skip_older_than`
-- [ ] Replace `start_from_beginning` with `ignore_checkpoints` and `read_from`
-- [ ] Replace `oldest_first` with `mode = tail|tail_sequential`
-- [ ] Rename `glob_minimum_cooldown` to `discovery_interval`
+* [ ] Implement `version = 2` of the file source config with deprecation warning
+* [ ] Rename `ignore_older` to `skip_older_than`
+* [ ] Replace `start_from_beginning` with `ignore_checkpoints` and `read_from`
+* [ ] Replace `oldest_first` with `mode = tail|tail_sequential`
+* [ ] Rename `glob_minimum_cooldown` to `discovery_interval`
 
 Which in turn enable the new `batch` mode to be implemented and exposed:
 
-- [ ] Implement batch mode shutdown conditions and new config `mode`
+* [ ] Implement batch mode shutdown conditions and new config `mode`
 
 Any time after the new file wrapper work is done, we can improve it to stop
 holding unnecessary file handles:
 
-- [ ] Add state to file wrapper where file is tracked without an open handle for
+* [ ] Add state to file wrapper where file is tracked without an open handle for
     files that have been idle for a certain period of time
 
 And finally, or in parallel with any of the above, go through and do the work to
 smooth out observability warts:
 
-- [ ] Log when file is no longer findable but watcher isn't dead
-- [ ] Don't log on empty files
-- [ ] Add option to disable logging on dangling symlinks
+* [ ] Log when file is no longer findable but watcher isn't dead
+* [ ] Don't log on empty files
+* [ ] Add option to disable logging on dangling symlinks
