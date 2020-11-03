@@ -407,7 +407,7 @@ impl Ingestor {
                             key: s3_event.s3.object.key.clone(),
                         })
                     })
-                    .unwrap_or(
+                    .unwrap_or_else(|| {
                         send_error
                             .map(|error| {
                                 Err(ProcessingError::PipelineSend {
@@ -416,8 +416,8 @@ impl Ingestor {
                                     key: s3_event.s3.object.key.clone(),
                                 })
                             })
-                            .unwrap_or(Ok(())),
-                    )
+                            .unwrap_or(Ok(()))
+                    })
             }
             None => Ok(()),
         }
