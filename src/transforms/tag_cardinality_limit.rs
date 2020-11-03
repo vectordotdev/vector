@@ -8,10 +8,10 @@ use crate::{
     transforms::Transform,
     Event,
 };
-use std::fmt::Formatter;
 use bloom::{BloomFilter, ASMS};
 use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
