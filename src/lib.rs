@@ -55,6 +55,7 @@ pub mod serde;
 pub mod service;
 pub mod shutdown;
 pub mod signal;
+pub mod sink;
 pub mod sinks;
 pub mod sources;
 pub mod stream;

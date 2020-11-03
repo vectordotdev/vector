@@ -1,5 +1,5 @@
 use crate::{
-    internal_events::{ConnectionOpen, OpenGauge, TcpConnectionError},
+    internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     Event, Pipeline,
@@ -167,7 +167,7 @@ async fn handle_stream(
     tokio::select! {
         result = socket.handshake() => {
             if let Err(error) = result {
-                emit!(TcpConnectionError { error });
+                emit!(TcpSocketConnectionError { error });
                 return;
             }
         },

@@ -170,7 +170,7 @@ impl UnitTest {
         let mut inputs_by_target = HashMap::new();
         for (targets, event) in &self.inputs {
           for target in targets {
-              let entry = inputs_by_target.entry(target.clone()).or_insert(Vec::new());
+              let entry = inputs_by_target.entry(target.clone()).or_insert_with(Vec::new);
               entry.push(event.clone());
           }
         }
