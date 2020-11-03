@@ -167,15 +167,21 @@ impl UnitTest {
         let mut inspections = Vec::new();
         let mut results = HashMap::new();
 
-        for input in &self.inputs {
-            for target in &input.0 {
-                walk(
-                    target,
-                    vec![input.1.clone()],
-                    &mut self.transforms,
-                    &mut results,
-                );
-            }
+        let mut inputs_by_target = HashMap::new();
+        for (targets, event) in &self.inputs {
+          for target in targets {
+              let entry = inputs_by_target.entry(target.clone()).or_insert(Vec::new());
+              entry.push(event.clone());
+          }
+        }
+
+        for (target, inputs) in inputs_by_target {
+          walk(
+            &target,
+            inputs,
+            &mut self.transforms,
+            &mut results,
+          );
         }
 
         for check in &self.checks {
