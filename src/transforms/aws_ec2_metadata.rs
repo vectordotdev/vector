@@ -3,13 +3,19 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     http::HttpClient,
+    internal_events::{
+        AwsEc2MetadataEventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
+    },
 };
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
-use std::collections::{hash_map::RandomState, HashSet};
-
+use snafu::ResultExt as _;
+use std::{
+    collections::{hash_map::RandomState, HashSet},
+    error, fmt,
+};
 use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
 
@@ -175,6 +181,8 @@ impl Transform for Ec2MetadataTransform {
             });
         }
 
+        emit!(AwsEc2MetadataEventProcessed);
+
         Some(event)
     }
 }
@@ -224,10 +232,13 @@ impl MetadataClient {
 
     async fn run(&mut self) {
         loop {
-            if let Err(error) = self.refresh_metadata().await {
-                error!(message = "Unable to fetch EC2 metadata; Retrying.", %error);
-                delay_for(Duration::from_secs(1)).await;
-                continue;
+            match self.refresh_metadata().await {
+                Ok(_) => {
+                    emit!(AwsEc2MetadataRefreshSuccessful);
+                }
+                Err(error) => {
+                    emit!(AwsEc2MetadataRefreshFailed { error });
+                }
             }
 
             delay_for(self.refresh_interval).await;
@@ -252,11 +263,17 @@ impl MetadataClient {
             .header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
             .body(Body::empty())?;
 
-        let res = self.client.send(req).await?;
-
-        if res.status() != StatusCode::OK {
-            return Err(Ec2MetadataError::UnableToFetchToken.into());
-        }
+        let res = self
+            .client
+            .send(req)
+            .await
+            .and_then(|res| match res.status() {
+                StatusCode::OK => Ok(res),
+                status_code => Err(UnexpectedHTTPStatusError {
+                    status: status_code,
+                }
+                .into()),
+            })?;
 
         let token = body_to_bytes(res.into_body()).await?;
 
@@ -266,36 +283,122 @@ impl MetadataClient {
         Ok(token)
     }
 
-    pub async fn get_document(&mut self) -> Result<Option<IdentityDocument>, crate::Error> {
-        let token = self.get_token().await?;
-
-        let mut parts = self.host.clone().into_parts();
-        parts.path_and_query = Some(DYNAMIC_DOCUMENT.clone());
-        let uri = Uri::from_parts(parts)?;
-
-        let req = Request::get(uri)
-            .header(TOKEN_HEADER.as_ref(), token.as_ref())
-            .body(Body::empty())?;
-
-        let res = self.client.send(req).await?;
-
-        if res.status() != StatusCode::OK {
-            warn!(message="Identity document request failed.", status = %res.status());
-            return Ok(None);
-        }
-
-        let body = body_to_bytes(res.into_body()).await?;
+    pub async fn get_document(&mut self) -> Result<IdentityDocument, crate::Error> {
+        let body = self.get_metadata(&DYNAMIC_DOCUMENT).await?;
 
         serde_json::from_slice(&body[..])
+            .context(ParseIdentityDocument {})
             .map_err(Into::into)
-            .map(Some)
     }
 
-    pub async fn get_metadata(
-        &mut self,
-        path: &PathAndQuery,
-    ) -> Result<Option<Bytes>, crate::Error> {
-        let token = self.get_token().await?;
+    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
+        use std::collections::HashMap;
+
+        let mut state: HashMap<String, Bytes> = HashMap::new();
+
+        // Fetch all resources, _then_ add them to the state map.
+        let document = self.get_document().await?;
+
+        if self.fields.contains(AMI_ID_KEY) {
+            state.insert(self.keys.ami_id_key.clone(), document.image_id.into());
+        }
+
+        if self.fields.contains(INSTANCE_ID_KEY) {
+            state.insert(
+                self.keys.instance_id_key.clone(),
+                document.instance_id.into(),
+            );
+        }
+
+        if self.fields.contains(INSTANCE_TYPE_KEY) {
+            state.insert(
+                self.keys.instance_type_key.clone(),
+                document.instance_type.into(),
+            );
+        }
+
+        if self.fields.contains(REGION_KEY) {
+            state.insert(self.keys.region_key.clone(), document.region.into());
+        }
+
+        if self.fields.contains(AVAILABILITY_ZONE_KEY) {
+            let availability_zone = self.get_metadata(&AVAILABILITY_ZONE).await?;
+            state.insert(self.keys.availability_zone_key.clone(), availability_zone);
+        }
+
+        if self.fields.contains(LOCAL_HOSTNAME_KEY) {
+            let local_hostname = self.get_metadata(&LOCAL_HOSTNAME).await?;
+            state.insert(self.keys.local_hostname_key.clone(), local_hostname);
+        }
+
+        if self.fields.contains(LOCAL_IPV4_KEY) {
+            let local_ipv4 = self.get_metadata(&LOCAL_IPV4).await?;
+            state.insert(self.keys.local_ipv4_key.clone(), local_ipv4);
+        }
+
+        if self.fields.contains(PUBLIC_HOSTNAME_KEY) {
+            let public_hostname = self.get_metadata(&PUBLIC_HOSTNAME).await?;
+            state.insert(self.keys.public_hostname_key.clone(), public_hostname);
+        }
+
+        if self.fields.contains(PUBLIC_IPV4_KEY) {
+            let public_ipv4 = self.get_metadata(&PUBLIC_IPV4).await?;
+            state.insert(self.keys.public_ipv4_key.clone(), public_ipv4);
+        }
+
+        if self.fields.contains(SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
+            let mac = self.get_metadata(&MAC).await?;
+            let mac = String::from_utf8_lossy(&mac[..]);
+
+            if self.fields.contains(SUBNET_ID_KEY) {
+                let subnet_path = format!(
+                    "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
+                    mac
+                );
+
+                let subnet_path = subnet_path.parse().context(ParsePath {
+                    value: subnet_path.clone(),
+                })?;
+
+                let subnet_id = self.get_metadata(&subnet_path).await?;
+                state.insert(self.keys.subnet_id_key.clone(), subnet_id);
+            }
+
+            if self.fields.contains(VPC_ID_KEY) {
+                let vpc_path = format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac);
+
+                let vpc_path = vpc_path.parse().context(ParsePath {
+                    value: vpc_path.clone(),
+                })?;
+
+                let vpc_id = self.get_metadata(&vpc_path).await?;
+                state.insert(self.keys.vpc_id_key.clone(), vpc_id);
+            }
+        }
+
+        if self.fields.contains(ROLE_NAME_KEY) {
+            let role_names = self.get_metadata(&ROLE_NAME).await?;
+            let role_names = String::from_utf8_lossy(&role_names[..]);
+
+            for (i, role_name) in role_names.lines().enumerate() {
+                state.insert(
+                    format!("{}[{}]", self.keys.role_name_key, i),
+                    role_name.to_string().into(),
+                );
+            }
+        }
+
+        self.state.extend(state);
+
+        // Make changes viewable to the transform. This may block if
+        // readers are still reading.
+        self.state.refresh();
+
+        Ok(())
+    }
+
+    async fn get_metadata(&mut self, path: &PathAndQuery) -> Result<Bytes, crate::Error> {
+        let token = self.get_token().await.with_context(|| FetchToken {})?;
 
         let mut parts = self.host.clone().into_parts();
 
@@ -303,134 +406,27 @@ impl MetadataClient {
 
         let uri = Uri::from_parts(parts)?;
 
-        debug!(message = "Sending metadata request.", uri = %uri);
+        debug!(message = "Sending metadata request.", %uri);
 
         let req = Request::get(uri)
             .header(TOKEN_HEADER.as_ref(), token.as_ref())
             .body(Body::empty())?;
 
-        let res = self.client.send(req).await?;
-
-        if StatusCode::OK != res.status() {
-            warn!(message="Metadata request failed.", status = %res.status());
-            return Ok(None);
-        }
+        let res = self
+            .client
+            .send(req)
+            .await
+            .and_then(|res| match res.status() {
+                StatusCode::OK => Ok(res),
+                status_code => Err(UnexpectedHTTPStatusError {
+                    status: status_code,
+                }
+                .into()),
+            })?;
 
         let body = body_to_bytes(res.into_body()).await?;
 
-        Ok(Some(body))
-    }
-
-    pub async fn refresh_metadata(&mut self) -> Result<(), crate::Error> {
-        // Fetch all resources, _then_ add them to the state map.
-        let identity_document = self.get_document().await?;
-
-        if let Some(document) = identity_document {
-            if self.fields.contains(&*AMI_ID_KEY) {
-                self.state
-                    .update(self.keys.ami_id_key.clone(), document.image_id.into());
-            }
-
-            if self.fields.contains(&*INSTANCE_ID_KEY) {
-                self.state.update(
-                    self.keys.instance_id_key.clone(),
-                    document.instance_id.into(),
-                );
-            }
-
-            if self.fields.contains(&*INSTANCE_TYPE_KEY) {
-                self.state.update(
-                    self.keys.instance_type_key.clone(),
-                    document.instance_type.into(),
-                );
-            }
-
-            if self.fields.contains(&*REGION_KEY) {
-                self.state
-                    .update(self.keys.region_key.clone(), document.region.into());
-            }
-        }
-
-        if self.fields.contains(&*AVAILABILITY_ZONE_KEY) {
-            if let Some(availability_zone) = self.get_metadata(&AVAILABILITY_ZONE).await? {
-                self.state
-                    .update(self.keys.availability_zone_key.clone(), availability_zone);
-            }
-        }
-
-        if self.fields.contains(&*LOCAL_HOSTNAME_KEY) {
-            if let Some(local_hostname) = self.get_metadata(&LOCAL_HOSTNAME).await? {
-                self.state
-                    .update(self.keys.local_hostname_key.clone(), local_hostname);
-            }
-        }
-
-        if self.fields.contains(&*LOCAL_IPV4_KEY) {
-            if let Some(local_ipv4) = self.get_metadata(&LOCAL_IPV4).await? {
-                self.state
-                    .update(self.keys.local_ipv4_key.clone(), local_ipv4);
-            }
-        }
-
-        if self.fields.contains(&*PUBLIC_HOSTNAME_KEY) {
-            if let Some(public_hostname) = self.get_metadata(&PUBLIC_HOSTNAME).await? {
-                self.state
-                    .update(self.keys.public_hostname_key.clone(), public_hostname);
-            }
-        }
-
-        if self.fields.contains(&*PUBLIC_IPV4_KEY) {
-            if let Some(public_ipv4) = self.get_metadata(&PUBLIC_IPV4).await? {
-                self.state
-                    .update(self.keys.public_ipv4_key.clone(), public_ipv4);
-            }
-        }
-
-        if self.fields.contains(&*SUBNET_ID_KEY) || self.fields.contains(VPC_ID_KEY) {
-            if let Some(mac) = self.get_metadata(&MAC).await? {
-                let mac = String::from_utf8_lossy(&mac[..]);
-
-                let subnet_path = format!(
-                    "/latest/meta-data/network/interfaces/macs/{}/subnet-id",
-                    mac
-                )
-                .parse()?;
-                let vpc_path =
-                    format!("/latest/meta-data/network/interfaces/macs/{}/vpc-id", mac).parse()?;
-
-                if self.fields.contains(&*SUBNET_ID_KEY) {
-                    if let Some(subnet_id) = self.get_metadata(&subnet_path).await? {
-                        self.state
-                            .update(self.keys.subnet_id_key.clone(), subnet_id);
-                    }
-                }
-
-                if self.fields.contains(&*VPC_ID_KEY) {
-                    if let Some(vpc_id) = self.get_metadata(&vpc_path).await? {
-                        self.state.update(self.keys.vpc_id_key.clone(), vpc_id);
-                    }
-                }
-            }
-        }
-
-        if self.fields.contains(&*ROLE_NAME_KEY) {
-            if let Some(role_names) = self.get_metadata(&ROLE_NAME).await? {
-                let role_names = String::from_utf8_lossy(&role_names[..]);
-
-                for (i, role_name) in role_names.lines().enumerate() {
-                    self.state.update(
-                        format!("{}[{}]", self.keys.role_name_key, i),
-                        role_name.to_string().into(),
-                    );
-                }
-            }
-        }
-
-        // Make changes viewable to the transform. This may block if
-        // readers are still reading.
-        self.state.refresh();
-
-        Ok(())
+        Ok(body)
     }
 }
 
@@ -470,10 +466,30 @@ impl Keys {
     }
 }
 
+#[derive(Debug)]
+struct UnexpectedHTTPStatusError {
+    status: http::StatusCode,
+}
+
+impl fmt::Display for UnexpectedHTTPStatusError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "got unexpected status code: {}", self.status)
+    }
+}
+
+impl error::Error for UnexpectedHTTPStatusError {}
+
 #[derive(Debug, snafu::Snafu)]
 enum Ec2MetadataError {
-    #[snafu(display("Unable to fetch token."))]
-    UnableToFetchToken,
+    #[snafu(display("Unable to fetch metadata authentication token: {}.", source))]
+    FetchToken { source: crate::Error },
+    #[snafu(display("Unable to parse identity document: {}.", source))]
+    ParseIdentityDocument { source: serde_json::Error },
+    #[snafu(display("Unable to parse metadata path {}, {}.", value, source))]
+    ParsePath {
+        value: String,
+        source: http::uri::InvalidUri,
+    },
 }
 
 #[cfg(feature = "aws-ec2-metadata-integration-tests")]
