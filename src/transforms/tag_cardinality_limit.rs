@@ -8,7 +8,7 @@ use crate::{
     transforms::Transform,
     Event,
 };
-use async_graphql::static_assertions::_core::fmt::Formatter;
+use std::fmt::Formatter;
 use bloom::{BloomFilter, ASMS};
 use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
