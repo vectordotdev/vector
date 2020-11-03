@@ -177,6 +177,42 @@ vectorSource:
   # Raw TOML config to embed at the vector source.
   rawConfig: null
 
+# The "built-in" internal metrics source emitting Vector's internal opertaional
+# metrics.
+internalMetricsSource:
+  # Disable to omit the internal metrics source from being added.
+  enabled: true
+  # The name to use for the "built-in" internal metrics source.
+  sourceId: internal_metrics
+  # Raw TOML config to embed at the internal metrics source.
+  rawConfig: null
+
+# The "built-in" prometheus sink exposing metrics in the Prometheus scraping
+# format.
+# When using this "built-in" sink, we automatically configure container ports,
+# and ensure things are ready for discovery and scraping via Prometheus'
+# `kubernetes_sd_configs` jobs.
+prometheusSink:
+  # Disable to omit the prometheus sink from being added.
+  enabled: true
+  # The name to use for the "built-in" prometheus sink.
+  sinkId: prometheus_sink
+  # Inputs of the built-in prometheus sink.
+  # If you have built-in internal metrics source enabled, we'll add it as a
+  # input here under the hood, so you don't have to pass it here.
+  # Unless `excludeInternalMetrics` is set to `true`, in which case you're
+  # responsible of wiring up the internal metrics.
+  inputs: []
+  # Set this to `true` to opt-out from automatically adding the built-in
+  # internal metrics source to the inputs.
+  excludeInternalMetrics: false
+  # The address to listen at.
+  listenAddress: "0.0.0.0"
+  # The port to listen at.
+  listenPort: "8080"
+  # Raw TOML config to embed at the vector source.
+  rawConfig: null
+
 # Sources to add to the generated `vector` config
 sources: {}
   # source_name:
