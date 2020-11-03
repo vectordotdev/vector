@@ -1,17 +1,18 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::RemoveTagsEventProcessed,
+    transforms::{FunctionTransform, Transform},
     Event,
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveTagsConfig {
     pub tags: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub struct RemoveTags {
     tags: Vec<String>,
 }
@@ -29,8 +30,8 @@ impl GenerateConfig for RemoveTagsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_tags")]
 impl TransformConfig for RemoveTagsConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(RemoveTags::new(self.tags.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(RemoveTags::new(self.tags.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -52,8 +53,8 @@ impl RemoveTags {
     }
 }
 
-impl Transform for RemoveTags {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RemoveTags {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemoveTagsEventProcessed);
 
         let tags = &mut event.as_mut_metric().tags;
@@ -69,17 +70,16 @@ impl Transform for RemoveTags {
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{RemoveTags, RemoveTagsConfig};
+    use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
-        transforms::Transform,
     };
 
     #[test]
@@ -107,7 +107,7 @@ mod tests {
         });
 
         let mut transform = RemoveTags::new(vec!["region".into(), "host".into()]);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 1);
@@ -132,7 +132,7 @@ mod tests {
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
 
         assert!(metric.tags.is_none());
     }
@@ -151,7 +151,7 @@ mod tests {
         });
 
         let mut transform = RemoveTags::new(vec!["env".into()]);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
 
         assert!(metric.tags.is_none());
     }

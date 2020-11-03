@@ -1,8 +1,9 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
+    transforms::{FunctionTransform, Transform},
+    Result,
 };
 use remap::{Program, Runtime};
 use serde::{Deserialize, Serialize};
@@ -24,8 +25,8 @@ impl_generate_config_from_default!(RemapConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Remap::new(self.clone())?))
+    async fn build(&self) -> Result<Transform> {
+        Remap::new(self.clone()).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -41,7 +42,7 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Remap {
     program: Program,
     drop_on_err: bool,
@@ -56,8 +57,8 @@ impl Remap {
     }
 }
 
-impl Transform for Remap {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Remap {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemapEventProcessed);
 
         let mut runtime = Runtime::default();
@@ -69,11 +70,11 @@ impl Transform for Remap {
             });
 
             if self.drop_on_err {
-                return None;
+                return;
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -108,7 +109,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let result = tform.transform(event).unwrap();
+        let result = tform.transform_one(event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
         assert_eq!(get_field_string(&result, "copy_from"), "buz");
         assert_eq!(get_field_string(&result, "foo"), "bar");

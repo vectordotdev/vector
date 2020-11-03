@@ -1,17 +1,17 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
     },
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct LogfmtConfig {
     pub field: Option<String>,
@@ -28,14 +28,14 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
         let conversions = parse_conversion_map(&self.types)?;
 
-        Ok(Box::new(Logfmt {
+        Ok(Transform::function(Logfmt {
             field,
             drop_field: self.drop_field,
             conversions,
@@ -55,14 +55,15 @@ impl TransformConfig for LogfmtConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Logfmt {
     field: String,
     drop_field: bool,
     conversions: HashMap<String, Conversion>,
 }
 
-impl Transform for Logfmt {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Logfmt {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         let mut drop_field = self.drop_field;
@@ -103,7 +104,7 @@ impl Transform for Logfmt {
 
         emit!(LogfmtParserEventProcessed {});
 
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -132,8 +133,9 @@ mod tests {
         .build()
         .await
         .unwrap();
+        let parser = parser.as_function();
 
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

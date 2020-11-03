@@ -67,6 +67,10 @@ resources: {}
 nodeSelector: {}
 affinity: {}
 
+# Additional container ports to pass to the `vector` container of the `Pod`s
+# managed by `DaemonSet`.
+extraContainersPorts: []
+
 # Additional volumes to pass to the `Pod`s managed by `DaemonSet`.
 extraVolumes: []
 

@@ -167,17 +167,16 @@ trait TransformConfig {
 }
 
 enum Transform {
-    Fn(TransformFn),
-    StatefulFn(TransformFn),
-    Task(TransformTask),
+    Function(FunctionTransform),
+    Task(TaskTransform),
 }
 
-trait TransformFn {
-    fn transform(&mut self, event: Event) -> Option<Event>;
+trait FunctionTransform {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event);
 }
 
-trait TransformTask {
-    fn transform(self, stream: Stream<Event>) -> Stream<Event>;
+trait TaskTransform {
+    fn transform(self: Box<Self>, stream: Stream<Event>) -> Stream<Event>;
 }
 ```
 

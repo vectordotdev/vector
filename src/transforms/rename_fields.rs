@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
@@ -6,17 +5,19 @@ use crate::{
         RenameFieldsEventProcessed, RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
     },
     serde::Fields,
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::map::IndexMap;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RenameFieldsConfig {
     pub fields: Fields<String>,
     drop_empty: Option<bool>,
 }
 
+#[derive(Debug, Clone)]
 pub struct RenameFields {
     fields: IndexMap<String, String>,
     drop_empty: bool,
@@ -35,12 +36,12 @@ impl GenerateConfig for RenameFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "rename_fields")]
 impl TransformConfig for RenameFieldsConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let mut fields = IndexMap::default();
         for (key, value) in self.fields.clone().all_fields() {
             fields.insert(key.to_string(), value.to_string());
         }
-        Ok(Box::new(RenameFields::new(
+        Ok(Transform::function(RenameFields::new(
             fields,
             self.drop_empty.unwrap_or(false),
         )?))
@@ -65,8 +66,8 @@ impl RenameFields {
     }
 }
 
-impl Transform for RenameFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RenameFields {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RenameFieldsEventProcessed);
 
         for (old_key, new_key) in &self.fields {
@@ -83,7 +84,7 @@ impl Transform for RenameFields {
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -110,7 +111,7 @@ mod tests {
 
         let mut transform = RenameFields::new(fields, false).unwrap();
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
 
         assert!(new_event.as_log().get("to_move").is_none());
         assert_eq!(new_event.as_log()["moved"], "some value".into());

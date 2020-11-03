@@ -41,7 +41,7 @@ impl Function for Truncate {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TruncateFn {
     value: Box<dyn Expression>,
     limit: Box<dyn Expression>,

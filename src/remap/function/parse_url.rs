@@ -27,7 +27,7 @@ impl Function for ParseUrl {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseUrlFn {
     value: Box<dyn Expression>,
 }

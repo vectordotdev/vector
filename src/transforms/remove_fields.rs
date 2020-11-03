@@ -1,18 +1,19 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
+    transforms::{FunctionTransform, Transform},
     Event,
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveFieldsConfig {
     fields: Vec<String>,
     drop_empty: Option<bool>,
 }
 
+#[derive(Clone, Debug)]
 pub struct RemoveFields {
     fields: Vec<String>,
     drop_empty: bool,
@@ -35,11 +36,9 @@ impl GenerateConfig for RemoveFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(RemoveFields {
-            fields: self.fields.clone(),
-            drop_empty: self.drop_empty.unwrap_or(false),
-        }))
+    async fn build(&self) -> crate::Result<Transform> {
+        RemoveFields::new(self.fields.clone(), self.drop_empty.unwrap_or(false))
+            .map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -61,8 +60,8 @@ impl RemoveFields {
     }
 }
 
-impl Transform for RemoveFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RemoveFields {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemoveFieldsEventProcessed);
 
         let log = event.as_mut_log();
@@ -76,14 +75,14 @@ impl Transform for RemoveFields {
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{RemoveFields, RemoveFieldsConfig};
-    use crate::{event::Event, transforms::Transform};
+    use super::*;
+    use crate::event::Event;
 
     #[test]
     fn generate_config() {
@@ -99,7 +98,7 @@ mod tests {
         let mut transform =
             RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
 
         assert!(new_event.as_log().get("to_remove").is_none());
         assert!(new_event.as_log().get("unknown").is_none());

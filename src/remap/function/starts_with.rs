@@ -41,7 +41,7 @@ impl Function for StartsWith {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct StartsWithFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,

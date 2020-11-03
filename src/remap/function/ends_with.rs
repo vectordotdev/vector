@@ -41,7 +41,7 @@ impl Function for EndsWith {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct EndsWithFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,
