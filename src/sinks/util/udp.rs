@@ -18,7 +18,6 @@ use snafu::{ResultExt, Snafu};
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
@@ -210,7 +209,7 @@ impl tower::Service<Bytes> for UdpService {
 struct UdpSink {
     connector: UdpConnector,
     acker: Acker,
-    encode_event: Arc<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
+    encode_event: Box<dyn Fn(Event) -> Option<Bytes> + Send + Sync>,
 }
 
 impl UdpSink {
@@ -222,7 +221,7 @@ impl UdpSink {
         Self {
             connector,
             acker,
-            encode_event: Arc::new(encode_event),
+            encode_event: Box::new(encode_event),
         }
     }
 }
@@ -230,27 +229,19 @@ impl UdpSink {
 #[async_trait]
 impl StreamSink for UdpSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let encode_event = Arc::clone(&self.encode_event);
-        let mut input = input
-            // We send event empty events because we need `ack` and `emit!`.
-            .map(|event| match encode_event(event) {
-                Some(bytes) => bytes,
-                None => Bytes::new(),
-            })
-            .peekable();
+        let mut input = input.peekable();
 
         while Pin::new(&mut input).peek().await.is_some() {
             let mut socket = self.connector.connect_backoff().await;
-            while let Some(bytes) = input.next().await {
-                if bytes.is_empty() {
-                    self.acker.ack(1);
-                    continue;
-                }
-
-                let result = udp_send(&mut socket, &bytes).await;
+            while let Some(event) = input.next().await {
                 self.acker.ack(1);
 
-                match result {
+                let bytes = match (self.encode_event)(event) {
+                    Some(bytes) => bytes,
+                    None => continue,
+                };
+
+                match udp_send(&mut socket, &bytes).await {
                     Ok(()) => emit!(SocketEventsSent {
                         mode: SocketMode::Udp,
                         count: 1,
