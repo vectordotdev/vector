@@ -158,7 +158,7 @@ expressions they themselves hold:
 ```rust
 impl Expression for IfStatement {
     fn resolves_to(&self) -> ResolveKind {
-        let true_resolves = self.false_expression.resolves_to();
+        let true_resolves = self.true_expression.resolves_to();
         let false_resolves = self.false_expression.resolves_to();
 
         // return the combined set of true and false resolves.
