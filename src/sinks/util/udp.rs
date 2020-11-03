@@ -242,6 +242,11 @@ impl StreamSink for UdpSink {
         while Pin::new(&mut input).peek().await.is_some() {
             let mut socket = self.connector.connect_backoff().await;
             while let Some(bytes) = input.next().await {
+                if bytes.is_empty() {
+                    self.acker.ack(1);
+                    continue;
+                }
+
                 let result = udp_send(&mut socket, &bytes).await;
                 self.acker.ack(1);
 
