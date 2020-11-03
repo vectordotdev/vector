@@ -119,13 +119,14 @@ spec:
     - metadata:
         name: data-dir
         labels:
-        {{- include "libvector.labels" $ | nindent 10 }}
-        {{- with .labels }}
+          {{- include "libvector.labels" $ | nindent 10 }}
+          {{- with .labels }}
           {{- toYaml . | nindent 10 }}
-        {{- end }}
-      {{- with .annotations }}
-        annotations: {{- toYaml . | nindent 10 }}
-      {{- end }}
+          {{- end }}
+        annotations:
+          {{- with .annotations }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
       spec:
         accessModes: ["ReadWriteOnce"]
       {{- with .storageClass }}
