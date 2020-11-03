@@ -4,7 +4,7 @@ use crate::{
     event::Event,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
-use futures::{future::BoxFuture, ready, stream::FuturesOrdered, FutureExt, Sink, Stream};
+use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::{
     producer::SendFuture, proto::CommandSendReceipt, Authentication, Error as PulsarError,
     Producer, Pulsar, TokioExecutor,
@@ -12,6 +12,7 @@ use pulsar::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
+    collections::HashSet,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -50,8 +51,13 @@ pub enum Encoding {
 struct PulsarSink {
     encoding: EncodingConfig<Encoding>,
     state: PulsarSinkState,
-    in_flight: FuturesOrdered<BoxFuture<'static, Result<CommandSendReceipt, PulsarError>>>,
+    in_flight:
+        FuturesUnordered<BoxFuture<'static, (usize, Result<CommandSendReceipt, PulsarError>)>>,
+
     acker: Acker,
+    seq_head: usize,
+    seq_tail: usize,
+    pending_acks: HashSet<usize>,
 }
 
 enum PulsarSinkState {
@@ -134,8 +140,11 @@ impl PulsarSink {
         Self {
             encoding,
             state: PulsarSinkState::Ready(producer),
-            in_flight: FuturesOrdered::new(),
+            in_flight: FuturesUnordered::new(),
             acker,
+            seq_head: 0,
+            seq_tail: 0,
+            pending_acks: HashSet::new(),
         }
     }
 
@@ -143,12 +152,16 @@ impl PulsarSink {
         if let PulsarSinkState::Sending(fut) = &mut self.state {
             let (producer, result) = ready!(fut.as_mut().poll(cx));
 
+            let seqno = self.seq_head;
+            self.seq_head += 1;
+
             self.state = PulsarSinkState::Ready(producer);
             self.in_flight.push(Box::pin(async move {
-                match result {
+                let result = match result {
                     Ok(fut) => fut.await,
                     Err(error) => Err(error),
-                }
+                };
+                (seqno, result)
             }));
         }
 
@@ -194,7 +207,7 @@ impl Sink<Event> for PulsarSink {
         let this = Pin::into_inner(self);
         while !this.in_flight.is_empty() {
             match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                Some(Ok(result)) => {
+                Some((seqno, Ok(result))) => {
                     trace!(
                         message = "Pulsar sink produced message.",
                         message_id = ?result.message_id,
@@ -202,9 +215,16 @@ impl Sink<Event> for PulsarSink {
                         sequence_id = %result.sequence_id,
                     );
 
-                    this.acker.ack(1);
+                    this.pending_acks.insert(seqno);
+
+                    let mut num_to_ack = 0;
+                    while this.pending_acks.remove(&this.seq_tail) {
+                        num_to_ack += 1;
+                        this.seq_tail += 1
+                    }
+                    this.acker.ack(num_to_ack);
                 }
-                Some(Err(error)) => {
+                Some((_, Err(error))) => {
                     error!(message = "Pulsar sink generated an error.", %error);
                     return Poll::Ready(Err(()));
                 }
