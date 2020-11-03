@@ -5,8 +5,11 @@
 #![allow(dead_code)]
 
 use async_trait::async_trait;
-use futures::{future, FutureExt, TryFutureExt};
-use futures01::{sink::Sink, stream, sync::mpsc::Receiver, Async, Future, Stream};
+use futures::{
+    compat::Sink01CompatExt, future, stream::BoxStream, FutureExt, Sink, SinkExt, StreamExt,
+    TryFutureExt,
+};
+use futures01::{sink::Sink as Sink01, stream, sync::mpsc::Receiver, Async, Future, Stream};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -18,18 +21,18 @@ use std::{
         Arc, Mutex,
     },
 };
-
 use tracing::{error, info};
-use vector::config::{
-    DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig,
+use vector::{
+    buffers::Acker,
+    config::{DataType, GlobalOptions, SinkConfig, SinkContext, SourceConfig, TransformConfig},
+    event::{metric::MetricValue, Value},
+    shutdown::ShutdownSignal,
+    sinks::{util::StreamSink, Healthcheck, VectorSink},
+    sources::Source,
+    test_util::{temp_dir, temp_file},
+    transforms::Transform,
+    Event, Pipeline,
 };
-use vector::event::{metric::MetricValue, Event, Value};
-use vector::shutdown::ShutdownSignal;
-use vector::sinks::{util::StreamSinkOld, Healthcheck, VectorSink};
-use vector::sources::Source;
-use vector::test_util::{temp_dir, temp_file};
-use vector::transforms::Transform;
-use vector::Pipeline;
 
 pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
     let (tx, rx) = Pipeline::new_with_buffer(channel_size);
@@ -279,8 +282,8 @@ impl TransformConfig for MockTransformConfig {
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MockSinkConfig<T>
 where
-    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
-    <T as Sink>::SinkError: std::fmt::Debug,
+    T: Sink01<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
+    <T as Sink01>::SinkError: std::fmt::Debug,
 {
     #[serde(skip)]
     sink: Option<T>,
@@ -290,8 +293,8 @@ where
 
 impl<T> MockSinkConfig<T>
 where
-    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
-    <T as Sink>::SinkError: std::fmt::Debug,
+    T: Sink01<SinkItem = Event> + std::fmt::Debug + Clone + Send + 'static,
+    <T as Sink01>::SinkError: std::fmt::Debug,
 {
     pub fn new(sink: T, healthy: bool) -> Self {
         Self {
@@ -311,24 +314,22 @@ enum HealthcheckError {
 #[typetag::serialize(name = "mock")]
 impl<T> SinkConfig for MockSinkConfig<T>
 where
-    T: Sink<SinkItem = Event> + std::fmt::Debug + Clone + Send + Sync + 'static,
-    <T as Sink>::SinkError: std::fmt::Debug,
+    T: Sink01<SinkItem = Event> + std::fmt::Debug + Clone + Send + Sync + 'static,
+    <T as Sink01>::SinkError: std::fmt::Debug,
 {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
-        let sink = self.sink.clone().unwrap();
-        let sink = sink.sink_map_err(
-            |error| error!(message = "Ingesting an event failed at mock sink.", error = ?error),
-        );
-        let sink = StreamSinkOld::new(sink, cx.acker());
+        let sink = MockSink {
+            acker: cx.acker(),
+            sink: self.sink.clone().unwrap().sink_compat(),
+        };
+
         let healthcheck = if self.healthy {
             future::ok(())
         } else {
             future::err(HealthcheckError::Unhealthy.into())
         };
-        Ok((
-            VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck.boxed(),
-        ))
+
+        Ok((VectorSink::Stream(Box::new(sink)), healthcheck.boxed()))
     }
 
     fn input_type(&self) -> DataType {
@@ -344,6 +345,30 @@ where
     }
 }
 
+struct MockSink<S> {
+    acker: Acker,
+    sink: S,
+}
+
+#[async_trait]
+impl<S> StreamSink for MockSink<S>
+where
+    S: Sink<Event> + Send + std::marker::Unpin,
+    <S as Sink<Event>>::Error: std::fmt::Debug,
+{
+    async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
+        while let Some(event) = input.next().await {
+            if let Err(error) = self.sink.send(event).await {
+                error!(message = "Ingesting an event failed at mock sink.", ?error);
+            }
+
+            self.acker.ack(1);
+        }
+
+        Ok(())
+    }
+}
+
 /// Represents a sink that's never ready.
 /// Useful to simulate an upstream sink server that is down.
 #[derive(Debug, Clone)]
@@ -355,7 +380,7 @@ impl<T> DeadSink<T> {
     }
 }
 
-impl<T> Sink for DeadSink<T> {
+impl<T> Sink01 for DeadSink<T> {
     type SinkItem = T;
     type SinkError = &'static str;
 
