@@ -212,6 +212,100 @@ program, the program is considered valid, and no boot-time error occurs, or else
 we inform the user that they need to update their script to return a more
 precise value kind.
 
+### Variable and Path Value Kinds
+
+One more example we need to consider is variable or path assignments, and how
+those influence compile-time type checking.
+
+Given this example:
+
+```rust
+$foo = true
+$foo
+```
+
+This produces three expressions:
+
+1. The `Literal` expression `true`, which is of type `Boolean`.
+2. The `Assignment` expression `$foo = …` which returns a type `Boolean`.
+3. The `Variable` expression `$foo`, which returns type `Boolean`.
+
+Given the above expressions, it follows that this program will return a
+`Boolean` value.
+
+However, this is not the case.
+
+The current implementation of the `Assignment` expression stores the target
+identifier (`foo`), and the expression to store (`true`) at compile-time. At
+runtime, it resolves the expression, and stores the resulting value in a global
+runtime store, either as a variable or path with the identifier `foo`.
+
+The `Variable` expression _also_ stores the target identifier (`foo`) at
+compile-time. At runtime it queries the global runtime store for a variable
+named `foo`, and retrieves the value stored by the assignment expression.
+
+The problem here is that, at compile-time, since the variable expression at line
+2 only knows of the variable identifier, and the global runtime store is not
+available at compile-time, there is no way to infer what value kind the variable
+foo will resolve to at runtime.
+
+To solve this problem we'll introduce a **compile-time store** to keep track of
+resolve kinds for targets (variables and paths):
+
+```rust
+struct CompilerState {
+    variables: HashMap<String, ResolveKind>,
+
+    // …
+}
+```
+
+We'll also update the `resolves_to` function to take a reference to
+`CompilerState`.
+
+```rust
+pub trait Expression: Send + Sync {
+    fn resolves_to(&self, store: &CompilerState) -> ResolveKind;
+}
+```
+
+This allows (as an example) the `Variable` expression to fetch the resolve kind
+of a variable:
+
+```rust
+impl Expression for Variable {
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+        state.variable(&self.ident).unwrap_or(ResolveKind::Any)
+    }
+}
+```
+
+The `Assignment` expression will store the resolve kind of a variable on
+initialization:
+
+```rust
+impl Assignment {
+    fn new(ident: String, expression: Box<dyn Expression>, state: &mut CompilerState) -> Self {
+        let resolve = expression.resolves_to(&state);
+        state.variables_mut().insert(ident, resolve);
+
+        Self { ident, expression }
+    }
+}
+```
+
+The same principle applies to query paths.
+
+After this change, using the original example:
+
+```rust
+$foo = true
+$foo
+```
+
+The compiler now knows that the variable `$foo` always resolves to a `Boolean`
+kind.
+
 ## Doc-level Proposal
 
 If a script is used in a Remap function within a `Condition`, the Remap program
