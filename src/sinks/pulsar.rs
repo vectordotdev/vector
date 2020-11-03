@@ -49,11 +49,15 @@ pub enum Encoding {
 
 struct PulsarSink {
     encoding: EncodingConfig<Encoding>,
-    producer: Option<Producer<TokioExecutor>>,
-    in_flight_prepare:
-        Option<BoxFuture<'static, (Producer<TokioExecutor>, Result<SendFuture, PulsarError>)>>,
+    state: PulsarSinkState,
     in_flight: FuturesOrdered<BoxFuture<'static, Result<CommandSendReceipt, PulsarError>>>,
     acker: Acker,
+}
+
+enum PulsarSinkState {
+    None,
+    Ready(Producer<TokioExecutor>),
+    Sending(BoxFuture<'static, (Producer<TokioExecutor>, Result<SendFuture, PulsarError>)>),
 }
 
 inventory::submit! {
@@ -129,19 +133,17 @@ impl PulsarSink {
     ) -> Self {
         Self {
             encoding,
-            producer: Some(producer),
-            in_flight_prepare: None,
+            state: PulsarSinkState::Ready(producer),
             in_flight: FuturesOrdered::new(),
             acker,
         }
     }
 
     fn poll_in_flight_prepare(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        if let Some(fut) = self.in_flight_prepare.as_mut() {
+        if let PulsarSinkState::Sending(fut) = &mut self.state {
             let (producer, result) = ready!(fut.as_mut().poll(cx));
 
-            self.producer = Some(producer);
-            self.in_flight_prepare = None;
+            self.state = PulsarSinkState::Ready(producer);
             self.in_flight.push(Box::pin(async move {
                 match result {
                     Ok(fut) => fut.await,
@@ -164,17 +166,24 @@ impl Sink<Event> for PulsarSink {
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
         assert!(
-            self.producer.is_some() && self.in_flight_prepare.is_none(),
+            matches!(self.state, PulsarSinkState::Ready(_)),
             "Expected to `poll_ready` called first."
         );
 
         let message = encode_event(item, &self.encoding).map_err(|_| ())?;
 
-        let mut producer = self.producer.take().unwrap();
-        self.in_flight_prepare = Some(Box::pin(async move {
-            let result = producer.send(message).await;
-            (producer, result)
-        }));
+        let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
+            PulsarSinkState::Ready(producer) => producer,
+            _ => unreachable!(),
+        };
+
+        let _ = std::mem::replace(
+            &mut self.state,
+            PulsarSinkState::Sending(Box::pin(async move {
+                let result = producer.send(message).await;
+                (producer, result)
+            })),
+        );
 
         Ok(())
     }
