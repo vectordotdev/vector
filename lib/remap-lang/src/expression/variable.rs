@@ -12,6 +12,12 @@ pub(crate) struct Variable {
     ident: String,
 }
 
+impl Variable {
+    pub fn new(ident: String) -> Self {
+        Self { ident }
+    }
+}
+
 impl Expression for Variable {
     fn execute(&self, state: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
         state

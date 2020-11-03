@@ -98,7 +98,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls)?;
+        let client = HttpClient::new(tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -300,7 +300,7 @@ mod tests {
 
     #[tokio::test]
     async fn healthcheck_includes_auth() {
-        let (mut config, cx) = load_sink::<LokiConfig>(
+        let (mut config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
@@ -323,7 +323,7 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client = HttpClient::new(cx.resolver(), tls).expect("could not cerate HTTP client");
+        let client = HttpClient::new(tls).expect("could not cerate HTTP client");
 
         healthcheck(config.clone(), client)
             .await

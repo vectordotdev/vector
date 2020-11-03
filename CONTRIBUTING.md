@@ -7,7 +7,7 @@ expanding into more specifics.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Assumptions](#assumptions)
+1. [Introduction](#introduction)
 1. [Your First Contribution](#your-first-contribution)
    1. [New sources, sinks, and transforms](#new-sources-sinks-and-transforms)
 1. [Change Control](#change-control)
@@ -77,7 +77,7 @@ expanding into more specifics.
 
 <!-- /MarkdownTOC -->
 
-## Assumptions
+## Introduction
 
 1. **You're familiar with [Github](https://github.com) and the pull request
    workflow.**

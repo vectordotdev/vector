@@ -138,6 +138,7 @@ spec:
             
             - name: LOG
               value: info
+          ports:
           resources:
             {}
           volumeMounts:

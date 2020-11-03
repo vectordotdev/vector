@@ -29,10 +29,7 @@ pub struct IsLog {}
 
 impl Condition for IsLog {
     fn check(&self, e: &Event) -> bool {
-        match e {
-            Event::Log(_) => true,
-            _ => false,
-        }
+        matches!(e, Event::Log(_))
     }
 
     fn check_with_context(&self, e: &Event) -> Result<(), String> {
