@@ -62,8 +62,16 @@ struct PulsarSink {
 
 enum PulsarSinkState {
     None,
-    Ready(Producer<TokioExecutor>),
-    Sending(BoxFuture<'static, (Producer<TokioExecutor>, Result<SendFuture, PulsarError>)>),
+    Ready(Box<Producer<TokioExecutor>>),
+    Sending(
+        BoxFuture<
+            'static,
+            (
+                Box<Producer<TokioExecutor>>,
+                Result<SendFuture, PulsarError>,
+            ),
+        >,
+    ),
 }
 
 inventory::submit! {
@@ -139,7 +147,7 @@ impl PulsarSink {
     ) -> Self {
         Self {
             encoding,
-            state: PulsarSinkState::Ready(producer),
+            state: PulsarSinkState::Ready(Box::new(producer)),
             in_flight: FuturesUnordered::new(),
             acker,
             seq_head: 0,
