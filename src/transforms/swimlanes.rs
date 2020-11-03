@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 //------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
     #[serde(flatten)]
@@ -63,7 +63,7 @@ impl FunctionTransform for Swimlane {
 
 //------------------------------------------------------------------------------
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlanesConfig {
     lanes: IndexMap<String, AnyCondition>,

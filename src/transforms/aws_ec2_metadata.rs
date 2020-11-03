@@ -63,7 +63,7 @@ lazy_static::lazy_static! {
     static ref HOST: Uri = Uri::from_static("http://169.254.169.254");
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Ec2Metadata {
     // Deprecated name
     #[serde(alias = "host")]

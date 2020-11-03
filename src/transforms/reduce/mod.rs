@@ -22,7 +22,7 @@ use merge_strategy::*;
 
 //------------------------------------------------------------------------------
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct ReduceConfig {
     pub expire_after_ms: Option<u64>,

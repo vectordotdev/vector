@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use toml::value::Value as TomlValue;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
     pub fields: Fields<TomlValue>,

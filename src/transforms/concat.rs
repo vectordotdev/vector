@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use lazy_static::lazy_static;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ConcatConfig {
     pub target: String,

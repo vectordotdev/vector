@@ -15,7 +15,7 @@ use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derive(Debug, Derivative, Deserialize, Serialize, Clone)]
 #[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {

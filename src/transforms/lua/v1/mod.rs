@@ -13,7 +13,7 @@ enum BuildError {
     InvalidLua { source: rlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
     source: String,

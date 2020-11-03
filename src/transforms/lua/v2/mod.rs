@@ -43,7 +43,7 @@ pub enum BuildError {
     RuntimeErrorGC { source: rlua::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfig {
     #[serde(default = "default_config_paths")]
@@ -68,14 +68,14 @@ fn default_config_paths() -> Vec<PathBuf> {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 struct HooksConfig {
     init: Option<String>,
     process: String,
     shutdown: Option<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 struct TimerConfig {
     interval_seconds: u64,
     handler: String,

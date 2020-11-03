@@ -20,7 +20,7 @@ enum BuildError {
     InvalidGrok { source: grok::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct GrokParserConfig {

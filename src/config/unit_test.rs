@@ -6,6 +6,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
+use crate::config::TransformConfig;
 
 pub async fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
     let config = super::loading::load_builder_from_paths(&[path])?;
@@ -66,6 +67,7 @@ pub struct UnitTest {
 
 struct UnitTestTransform {
     transform: Transform,
+    config: Box<dyn TransformConfig>,
     next: Vec<String>,
 }
 
@@ -135,6 +137,14 @@ fn walk(
                 });
                 results.extend(out_iter_mapped);
                 targets = target.next.clone();
+                // TODO: This is a hack.
+                // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
+                transforms.insert(key, UnitTestTransform {
+                    transform:  futures::executor::block_on(target.config.clone().build())
+                        .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
+                    config: target.config,
+                    next: target.next
+                });
             }
         }
     }
@@ -444,6 +454,7 @@ async fn build_unit_test(
                         name.clone(),
                         UnitTestTransform {
                             transform,
+                            config: transform_config.inner.clone(),
                             next: outputs.into_iter().map(|(k, _)| k).collect(),
                         },
                     );

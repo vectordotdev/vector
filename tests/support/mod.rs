@@ -242,7 +242,7 @@ impl FunctionTransform for MockTransform {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MockTransformConfig {
     suffix: String,
     increase: f64,
