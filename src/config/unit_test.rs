@@ -1,4 +1,5 @@
 use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
+use crate::config::TransformConfig;
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
@@ -6,7 +7,6 @@ use crate::{
 };
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
-use crate::config::TransformConfig;
 
 pub async fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
     let config = super::loading::load_builder_from_paths(&[path])?;
@@ -169,19 +169,16 @@ impl UnitTest {
 
         let mut inputs_by_target = HashMap::new();
         for (targets, event) in &self.inputs {
-          for target in targets {
-              let entry = inputs_by_target.entry(target.clone()).or_insert_with(Vec::new);
-              entry.push(event.clone());
-          }
+            for target in targets {
+                let entry = inputs_by_target
+                    .entry(target.clone())
+                    .or_insert_with(Vec::new);
+                entry.push(event.clone());
+            }
         }
 
         for (target, inputs) in inputs_by_target {
-          walk(
-            &target,
-            inputs,
-            &mut self.transforms,
-            &mut results,
-          );
+            walk(&target, inputs, &mut self.transforms, &mut results);
         }
 
         for check in &self.checks {

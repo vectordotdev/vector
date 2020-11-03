@@ -30,7 +30,7 @@ use vector::{
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
     test_util::{temp_dir, temp_file},
-    transforms::{Transform, FunctionTransform},
+    transforms::{FunctionTransform, Transform},
     Event, Pipeline,
 };
 
