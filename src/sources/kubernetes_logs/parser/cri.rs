@@ -5,8 +5,8 @@ use crate::{
         FunctionTransform,
     },
 };
-use snafu::{OptionExt, Snafu};
 use derivative::Derivative;
+use snafu::{OptionExt, Snafu};
 
 pub const MULTILINE_TAG: &str = "multiline_tag";
 
@@ -23,7 +23,7 @@ pub const MULTILINE_TAG: &str = "multiline_tag";
 #[derive(Clone, Derivative)]
 #[derivative(Debug)]
 pub struct Cri {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     regex_parser: Box<dyn FunctionTransform>,
 }
 

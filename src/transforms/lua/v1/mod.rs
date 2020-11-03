@@ -56,11 +56,11 @@ const GC_INTERVAL: usize = 16;
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Lua {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     source: String,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     search_dirs: Vec<String>,
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     lua: rlua::Lua,
     invocations_after_gc: usize,
 }
@@ -241,7 +241,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["hello"] = "goodbye"
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -260,7 +261,8 @@ mod tests {
             r#"
               _, _, name = string.find(event["message"], "Hello, my name is (%a+).")
               event["name"] = name
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -278,7 +280,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["name"] = nil
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -295,7 +298,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event = nil
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -317,7 +321,8 @@ mod tests {
               else
                 event["result"] = "found"
               end
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -334,7 +339,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["number"] = 3
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -349,7 +355,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["number"] = 3.14159
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -364,7 +371,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["bool"] = true
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -379,7 +387,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event["junk"] = {"asdf"}
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -394,7 +403,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               event[false] = "hello"
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -410,7 +420,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               print(event[false])
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -426,7 +437,8 @@ mod tests {
         let mut transform = Lua::new(
             r#"
               error("this is an error")
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();
@@ -442,7 +454,8 @@ mod tests {
         let err = Lua::new(
             r#"
               1234 = sadf <>&*!#@
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .map(|_| ())
@@ -479,7 +492,8 @@ mod tests {
         let source = r#"
           local script2 = require("script2")
           script2.modify(event)
-        "#.to_string();
+        "#
+        .to_string();
 
         let mut transform =
             Lua::new(source, vec![dir.path().to_string_lossy().into_owned()]).unwrap();
@@ -497,7 +511,8 @@ mod tests {
               for k,v in pairs(event) do
                 event[k] = k .. v
               end
-            "#.to_string(),
+            "#
+            .to_string(),
             vec![],
         )
         .unwrap();

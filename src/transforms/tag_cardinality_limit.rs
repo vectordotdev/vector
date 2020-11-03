@@ -1,21 +1,21 @@
+use crate::transforms::TaskTransform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
     },
-    transforms::{Transform},
+    transforms::Transform,
     Event,
 };
+use async_graphql::static_assertions::_core::fmt::Formatter;
 use bloom::{BloomFilter, ASMS};
+use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
 };
-use async_graphql::static_assertions::_core::fmt::Formatter;
-use crate::transforms::TaskTransform;
-use futures01::Stream as Stream01;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 // TODO: add back when serde-rs/serde#1358 is addressed
@@ -254,8 +254,13 @@ impl TagCardinalityLimit {
 }
 
 impl TaskTransform for TagCardinalityLimit {
-    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
-        Self: 'static {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
         let mut inner = self;
         Box::new(task.filter_map(move |v| inner.transform_one(v)))
     }

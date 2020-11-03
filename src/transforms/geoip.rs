@@ -19,7 +19,7 @@ pub struct GeoipConfig {
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Geoip {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     pub dbreader: maxminddb::Reader<Vec<u8>>,
     pub database: String,
     pub source: String,
@@ -226,7 +226,12 @@ mod tests {
         let event = Event::from(r#"{"remote_addr": "2.125.160.216", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new("tests/data/GeoIP2-City-Test.mmdb".to_string(), "remote_addr".into(), "geo".to_string()).unwrap();
+        let mut augment = Geoip::new(
+            "tests/data/GeoIP2-City-Test.mmdb".to_string(),
+            "remote_addr".into(),
+            "geo".to_string(),
+        )
+        .unwrap();
         let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -251,7 +256,12 @@ mod tests {
         let event = Event::from(r#"{"remote_addr": "67.43.156.9", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new("tests/data/GeoIP2-City-Test.mmdb".to_string(), "remote_addr".into(), "geo".to_string()).unwrap();
+        let mut augment = Geoip::new(
+            "tests/data/GeoIP2-City-Test.mmdb".to_string(),
+            "remote_addr".into(),
+            "geo".to_string(),
+        )
+        .unwrap();
         let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -276,7 +286,12 @@ mod tests {
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new("tests/data/GeoIP2-City-Test.mmdb".to_string(), "remote_addr".into(), "geo".to_string()).unwrap();
+        let mut augment = Geoip::new(
+            "tests/data/GeoIP2-City-Test.mmdb".to_string(),
+            "remote_addr".into(),
+            "geo".to_string(),
+        )
+        .unwrap();
         let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -301,7 +316,12 @@ mod tests {
         let event = Event::from(r#"{"remote_addr": "208.192.1.2", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new("tests/data/GeoIP2-ISP-Test.mmdb".to_string(), "remote_addr".to_string(), "geo".to_string()).unwrap();
+        let mut augment = Geoip::new(
+            "tests/data/GeoIP2-ISP-Test.mmdb".to_string(),
+            "remote_addr".to_string(),
+            "geo".to_string(),
+        )
+        .unwrap();
         let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -326,7 +346,12 @@ mod tests {
         let event = Event::from(r#"{"remote_addr": "2600:7000::1", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new("tests/data/GeoLite2-ASN-Test.mmdb".to_string(), "remote_addr".to_string(), "geo".to_string()).unwrap();
+        let mut augment = Geoip::new(
+            "tests/data/GeoLite2-ASN-Test.mmdb".to_string(),
+            "remote_addr".to_string(),
+            "geo".to_string(),
+        )
+        .unwrap();
         let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();
@@ -348,7 +373,12 @@ mod tests {
         let event = Event::from(r#"{"remote_addr": "10.1.12.1", "request_path": "foo/bar"}"#);
         let event = parser.transform_one(event).unwrap();
 
-        let mut augment = Geoip::new("tests/data/GeoLite2-ASN-Test.mmdb".to_string(), "remote_addr".to_string(), "geo".to_string()).unwrap();
+        let mut augment = Geoip::new(
+            "tests/data/GeoLite2-ASN-Test.mmdb".to_string(),
+            "remote_addr".to_string(),
+            "geo".to_string(),
+        )
+        .unwrap();
         let new_event = augment.transform_one(event).unwrap();
 
         let mut exp_geoip_attr = HashMap::new();

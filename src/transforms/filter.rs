@@ -49,7 +49,7 @@ impl TransformConfig for FilterConfig {
 #[derive(Derivative, Clone)]
 #[derivative(Debug)]
 pub struct Filter {
-    #[derivative(Debug="ignore")]
+    #[derivative(Debug = "ignore")]
     condition: Box<dyn Condition>,
 }
 

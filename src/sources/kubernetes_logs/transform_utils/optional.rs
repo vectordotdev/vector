@@ -13,8 +13,13 @@ use futures01::Stream as Stream01;
 pub struct Optional<T: TaskTransform>(pub Option<T>);
 
 impl<T: TaskTransform> TaskTransform for Optional<T> {
-    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
-        Self: 'static {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
         match self.0 {
             Some(val) => Box::new(val).transform(task),
             None => task,

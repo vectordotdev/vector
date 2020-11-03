@@ -35,11 +35,13 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
+use futures::{
+    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
+};
+use futures01::Stream as Stream01;
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
-use futures01::Stream as Stream01;
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt, compat::Stream01CompatExt};
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -310,16 +312,15 @@ impl Source {
             }
             event
         });
-        let events = events
-            .flat_map(move |event| {
-                let mut buf = Vec::with_capacity(1);
-                parser.transform(&mut buf, event);
-                futures::stream::iter(buf)
-            });
+        let events = events.flat_map(move |event| {
+            let mut buf = Vec::with_capacity(1);
+            parser.transform(&mut buf, event);
+            futures::stream::iter(buf)
+        });
 
         let event_processing_loop = partial_events_merger.transform(
             Box::new(events.map(Ok).compat())
-        ).map_err(|_| unimplemented!("TODO")).compat().forward(out);
+        ).map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {
