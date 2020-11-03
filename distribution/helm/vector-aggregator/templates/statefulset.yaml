@@ -77,12 +77,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
+        {{- if ne .Values.storage.mode "managedPersistentVolumeClaim" }}
         # Vector will store it's data here.
         - name: data-dir
-        {{- if eq .Values.storage.mode "managedPersistentVolumeClaim" }}
-          persistentVolumeClaim:
-            claimName: {{ include "libvector.fullname" $ }}-data-dir
-        {{- else if eq .Values.storage.mode "existingPersistentVolumeClaim" }}
+        {{- if eq .Values.storage.mode "existingPersistentVolumeClaim" }}
           persistentVolumeClaim:
             claimName: {{ required "The value storage.existingPersistentVolumeClaim must be set" .Values.storage.existingPersistentVolumeClaim }}
         {{- else if eq .Values.storage.mode "hostPath" }}
@@ -92,6 +90,7 @@ spec:
           emptyDir: {}
         {{- else }}
         {{ fail "Please provide a valid storage.mode value" }}
+        {{- end }}
         {{- end }}
         # Vector config dir.
         - name: config-dir
@@ -113,11 +112,12 @@ spec:
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-{{- if eq .Values.storage.mode "managedPersistentVolumeClaim" }}
-{{- with .Values.storage.managedPersistentVolumeClaim }}
   volumeClaimTemplates:
+    {{- if eq .Values.storage.mode "managedPersistentVolumeClaim" }}
+    {{- with .Values.storage.managedPersistentVolumeClaim }}
+    # Vector will store it's data here.
     - metadata:
-        name: {{ include "libvector.fullname" $ }}-data-dir
+        name: data-dir
         labels:
         {{- include "libvector.labels" $ | nindent 10 }}
         {{- with .labels }}
@@ -138,5 +138,5 @@ spec:
         resources:
           requests:
             storage: {{ .size | quote }}
-{{- end }}
-{{- end }}
+    {{- end }}
+    {{- end }}
