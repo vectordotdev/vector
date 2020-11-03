@@ -25,7 +25,7 @@ pub enum ShutdownCheck {
 /// [FramedWrite](https://docs.rs/tokio-util/0.3.1/tokio_util/codec/struct.FramedWrite.html) wrapper.
 /// Wrapper acts like [Sink](https://docs.rs/futures/0.3.7/futures/sink/trait.Sink.html) forwarding all
 /// calls to `FramedWrite`, but in addition:
-/// - Call `shutdown_check` on each `poll_flush`, so we able stop data sending if other side disconnected.
+/// - Call `shutdown_check` on each `poll_flush`, so we can stop sending data if other side disconnected.
 /// - Flush all data on each `poll_ready` if total number of events in queue more than some limit.
 /// - Count event size on each `start_send`.
 /// - Ack all sent events on successful `poll_flush` and `poll_close` or on `Drop`.
