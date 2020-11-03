@@ -10,8 +10,12 @@ This RFC proposes extending the `Expression` trait. It also explains how we use
 these changes when using Remap in the context of a Vector `Condition`. It will
 hint at future uses, but does not consider them in-depth.
 
-The proposal does not consider fallible vs infallible expressions, those are
+The proposal does **not** consider fallible vs infallible expressions, those are
 left for a future RFC.
+
+It does also **not** consider using compile-time type checking for function
+arguments, although the plumbing introduced through this RFC will make such a
+thing possible in a follow-up RFC.
 
 ## Motivation
 
