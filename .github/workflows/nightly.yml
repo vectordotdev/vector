@@ -68,6 +68,32 @@ jobs:
           name: "vector-aarch64.rpm"
           path: "./target/artifacts/vector-aarch64.rpm"
 
+  build-armv7-unknown-linux-gnueabihf-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make ci-sweep
+      - env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-armv7-unknown-linux-gnueabihf
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7-unknown-linux-gnueabihf.tar.gz"
+          path: "./target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz"
+
+  build-armv7-unknown-linux-musleabihf-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make ci-sweep
+      - env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-armv7-unknown-linux-musleabihf
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
+          path: "./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz"
+
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:

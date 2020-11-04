@@ -187,6 +187,14 @@ build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector
 build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-armv7-unknown-linux-gnueabihf
+build-armv7-unknown-linux-gnueabihf: target/armv7-unknown-linux-gnueabihf/release/vector ## Build a release binary for the armv7-unknown-linux-gnueabihf triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-armv7-unknown-linux-musleabihf
+build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/release/vector ## Build a release binary for the armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}"
+
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
@@ -890,6 +898,14 @@ package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linu
 
 .PHONY: package-aarch64-unknown-linux-gnu
 package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-armv7-unknown-linux-gnueabihf
+package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-gnueabihf` triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-armv7-unknown-linux-musleabihf
+package-armv7-unknown-linux-musleabihf: target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
 	@echo "Output to ${<}."
 
 # debs
