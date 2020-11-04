@@ -92,9 +92,13 @@ components: sinks: prometheus: {
 				unit:    "seconds"
 			}
 		}
-		namespace: {
+		default_namespace: {
 			common:      true
-			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming))."
+			description: """
+				Used as a namespace for metrics that don't have it.
+				A namespace will be prefixed to a metric's name.
+				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -128,11 +132,14 @@ components: sinks: prometheus: {
 
 	examples: [
 		{
-			_host:  _values.local_host
-			_name:  "logins"
-			_value: 1.5
-			title:  "Counter"
-			configuration: {}
+			_host:      _values.local_host
+			_name:      "logins"
+			_namespace: "service"
+			_value:     1.5
+			title:      "Counter"
+			configuration: {
+				default_namespace: _namespace
+			}
 			input: metric: {
 				kind: "incremental"
 				name: _name
@@ -144,20 +151,22 @@ components: sinks: prometheus: {
 				}
 			}
 			output: """
-				# HELP \(_name) \(_name)
-				# TYPE \(_name) counter
-				\(_name){host="\(_host)"} \(_value)
+				# HELP \(_namespace)_\(_name) \(_name)
+				# TYPE \(_namespace)_\(_name) counter
+				\(_namespace)_\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
-			_host:  _values.local_host
-			_name:  "memory_rss"
-			_value: 1.5
-			title:  "Gauge"
+			_host:      _values.local_host
+			_name:      "memory_rss"
+			_namespace: "app"
+			_value:     1.5
+			title:      "Gauge"
 			configuration: {}
 			input: metric: {
-				kind: "absolute"
-				name: _name
+				kind:      "absolute"
+				name:      _name
+				namespace: _namespace
 				gauge: {
 					value: _value
 				}
@@ -166,16 +175,17 @@ components: sinks: prometheus: {
 				}
 			}
 			output: """
-				# HELP \(_name) \(_name)
-				# TYPE \(_name) gauge
-				\(_name){host="\(_host)"} \(_value)
+				# HELP \(_namespace)_\(_name) \(_name)
+				# TYPE \(_namespace)_\(_name) gauge
+				\(_namespace)_\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
 			_host: _values.local_host
 			_name: "response_time_s"
 			title: "Histogram"
-			configuration: {}
+			configuration: {
+			}
 			input: metric: {
 				kind: "absolute"
 				name: _name
