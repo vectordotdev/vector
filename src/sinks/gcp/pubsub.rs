@@ -126,7 +126,7 @@ impl PubsubSink {
         };
 
         let uri_base = match config.endpoint.as_ref() {
-            Some(host) => format!("{}", host),
+            Some(host) => host.to_string(),
             None => "https://pubsub.googleapis.com".into(),
         };
         let uri_base = format!(
