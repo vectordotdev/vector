@@ -5,7 +5,10 @@ use crate::{
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     event::Event,
     internal_events::StatsdInvalidMetricReceived,
-    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
+    sinks::util::{
+        encode_namespace, BatchConfig, BatchSettings, BatchSinkOld as BatchSink, Buffer,
+        Compression,
+    },
     sinks::util::{
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},

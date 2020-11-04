@@ -66,7 +66,7 @@ pub trait StreamSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
 }
 
-// === BatchSink ===
+// === BatchSinkOld ===
 
 /// A `Sink` interface that wraps a `Service` and a
 /// `Batch`.
@@ -82,7 +82,7 @@ pub trait StreamSink {
 /// batches have been acked. This means if sequential requests r1, r2,
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
-pub struct BatchSink<S, B, Request> {
+pub struct BatchSinkOld<S, B, Request> {
     service: ServiceSinkOld<S, Request>,
     batch: StatefulBatch<B>,
     timeout: Duration,
@@ -92,7 +92,7 @@ pub struct BatchSink<S, B, Request> {
     _pd: PhantomData<Request>,
 }
 
-impl<S, B, Request> BatchSink<S, B, Request>
+impl<S, B, Request> BatchSinkOld<S, B, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
@@ -126,7 +126,7 @@ where
     }
 }
 
-impl<S, B, R> BatchSink<S, B, R> {
+impl<S, B, R> BatchSinkOld<S, B, R> {
     pub fn get_ref(&self) -> &S {
         &self.service.service
     }
@@ -136,7 +136,7 @@ impl<S, B, R> BatchSink<S, B, R> {
     }
 }
 
-impl<S, B, Request> Sink01 for BatchSink<S, B, Request>
+impl<S, B, Request> Sink01 for BatchSinkOld<S, B, Request>
 where
     S: Service<Request>,
     S::Future: Send + 'static,
@@ -237,13 +237,13 @@ where
     }
 }
 
-impl<S, B, Request> fmt::Debug for BatchSink<S, B, Request>
+impl<S, B, Request> fmt::Debug for BatchSinkOld<S, B, Request>
 where
     S: fmt::Debug,
     B: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BatchSink")
+        f.debug_struct("BatchSinkOld")
             .field("service", &self.service)
             .field("batch", &self.batch)
             .field("timeout", &self.timeout)
@@ -579,7 +579,7 @@ where
     S: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PartitionedBatchSink")
+        f.debug_struct("PartitionedBatchSinkOld")
             .field("batch", &self.batch)
             .field("service", &self.service)
             .field("timeout", &self.timeout)
@@ -763,7 +763,7 @@ mod tests {
 
         let svc = tower::service_fn(|_| future::ok::<_, std::io::Error>(()));
         let batch = BatchSettings::default().events(10).bytes(9999);
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let buffered = BatchSinkOld::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         let _ = buffered
             .sink_map_err(drop)
@@ -802,7 +802,7 @@ mod tests {
 
             let batch = BatchSettings::default().bytes(9999).events(1);
 
-            let mut sink = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+            let mut sink = BatchSinkOld::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
             assert!(sink.start_send(0).unwrap().is_ready());
             assert!(sink.start_send(1).unwrap().is_ready());
@@ -862,7 +862,7 @@ mod tests {
             future::ok::<_, std::io::Error>(())
         });
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let buffered = BatchSinkOld::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         let _ = buffered
             .sink_map_err(drop)
@@ -894,7 +894,7 @@ mod tests {
         });
 
         let batch = BatchSettings::default().bytes(9999).events(10);
-        let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+        let mut buffered = BatchSinkOld::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
         assert!(buffered.start_send(0).unwrap().is_ready());
         assert!(buffered.start_send(1).unwrap().is_ready());
@@ -921,7 +921,7 @@ mod tests {
             });
 
             let batch = BatchSettings::default().bytes(9999).events(10);
-            let mut buffered = BatchSink::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
+            let mut buffered = BatchSinkOld::new(svc, VecBuffer::new(batch.size), TIMEOUT, acker);
 
             assert!(buffered.start_send(0).unwrap().is_ready());
             assert!(buffered.start_send(1).unwrap().is_ready());

@@ -7,7 +7,8 @@ use vector::{
     buffers::Acker,
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
-        BatchSink, Buffer, Compression, Partition, PartitionBatchSinkOld as PartitionBatchSink,
+        BatchSinkOld as BatchSink, Buffer, Compression, Partition,
+        PartitionBatchSinkOld as PartitionBatchSink,
     },
     test_util::{random_lines, runtime},
 };

@@ -127,8 +127,10 @@ impl Batch for Buffer {
 #[cfg(test)]
 mod test {
     use super::{Buffer, Compression};
-    use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSettings, BatchSink};
+    use crate::{
+        buffers::Acker,
+        sinks::util::{BatchSettings, BatchSinkOld as BatchSink},
+    };
     use futures::{compat::Future01CompatExt, future};
     use futures01::Sink;
     use std::{

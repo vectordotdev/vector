@@ -286,10 +286,10 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
         event::metric::{Metric, MetricValue, StatisticKind},
+        sinks::util::BatchSinkOld as BatchSink,
         Event,
     };
     use futures::{compat::Future01CompatExt, future};
