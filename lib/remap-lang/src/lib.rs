@@ -131,6 +131,34 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
+    #[derive(Debug, Clone)]
+    struct RegexPrinter;
+    impl Function for RegexPrinter {
+        fn identifier(&self) -> &'static str {
+            "regex_printer"
+        }
+
+        fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+            Ok(Box::new(RegexPrinterFn(arguments.required_regex("value")?)))
+        }
+
+        fn parameters(&self) -> &'static [Parameter] {
+            &[Parameter {
+                keyword: "value",
+                accepts: |_| true,
+                required: true,
+            }]
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct RegexPrinterFn(regex::Regex);
+    impl Expression for RegexPrinterFn {
+        fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
+            Ok(Some(format!("regex: {:?}", self.0).into()))
+        }
+    }
+
     #[test]
     fn it_works() {
         let cases: Vec<(&str, Result<Option<Value>>)> = vec![
@@ -199,10 +227,14 @@ mod tests {
                 r#"if false { 1 } else if false { 2 } else if false { 3 } else { 4 }"#,
                 Ok(Some(4.into())),
             ),
+            (
+                r#"regex_printer(/escaped\/forward slash/)"#,
+                Ok(Some("regex: escaped/forward slash".into())),
+            ),
         ];
 
         for (script, result) in cases {
-            let program = Program::new(script, &[])
+            let program = Program::new(script, &[Box::new(RegexPrinter)])
                 .map_err(|e| {
                     println!("{}", &e);
                     e
