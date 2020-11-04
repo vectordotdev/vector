@@ -33,6 +33,8 @@ enum Errors {
 struct RemoteWriteConfig {
     endpoint: String,
 
+    default_namespace: Option<String>,
+
     #[serde(default = "super::default_histogram_buckets")]
     buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
@@ -77,6 +79,7 @@ impl SinkConfig for RemoteWriteConfig {
         let healthcheck = healthcheck(endpoint.clone(), client.clone()).boxed();
         let service = RemoteWriteService {
             endpoint,
+            default_namespace: self.default_namespace.clone(),
             client,
             buckets,
             quantiles,
@@ -122,6 +125,7 @@ async fn healthcheck(endpoint: Uri, mut client: HttpClient) -> crate::Result<()>
 #[derive(Clone)]
 struct RemoteWriteService {
     endpoint: Uri,
+    default_namespace: Option<String>,
     client: HttpClient,
     buckets: Vec<f64>,
     quantiles: Vec<f64>,
@@ -131,7 +135,13 @@ impl RemoteWriteService {
     fn encode_events(&self, metrics: Vec<Metric>) -> Bytes {
         let mut time_series = collector::TimeSeries::new();
         for metric in metrics {
-            time_series.encode_metric(None, &self.buckets, &self.quantiles, false, &metric);
+            time_series.encode_metric(
+                self.default_namespace.as_deref(),
+                &self.buckets,
+                &self.quantiles,
+                false,
+                &metric,
+            );
         }
         let timeseries = time_series.finish();
 

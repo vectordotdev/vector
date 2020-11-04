@@ -95,6 +95,20 @@ components: sinks: prometheus_remote_write: {
 				examples: ["https://localhost:8087/"]
 			}
 		}
+		default_namespace: {
+			common:      true
+			description: """
+				Used as a namespace for metrics that don't have it.
+				A namespace will be prefixed to a metric's name.
+				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
+				"""
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["service"]
+			}
+		}
 		buckets: {
 			common:      false
 			description: "Default buckets to use for aggregating [distribution][docs.data-model.metric#distribution] metrics into histograms."
