@@ -516,24 +516,47 @@ disable-resolv-conf = []
 [[bench]]
 name = "bench"
 harness = false
+required-features = ["default"]
+
+[[bench]]
+name = "batch"
+harness = false
+required-features = ["default"]
 
 [[bench]]
 name = "buffering"
 harness = false
+required-features = ["default"]
+
+[[bench]]
+name = "event"
+harness = false
+required-features = ["default"]
+
+[[bench]]
+name = "files"
+harness = false
+required-features = ["default"]
+
+[[bench]]
+name = "http"
+harness = false
+required-features = ["default"]
 
 [[bench]]
 name = "isolated_buffering"
 harness = false
+required-features = ["default"]
 
 [[bench]]
 name = "lookup"
 harness = false
-
+required-features = ["default"]
 
 [[bench]]
 name = "wasm"
 harness = false
-required-features = ["transforms-wasm", "transforms-lua"]
+required-features = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
