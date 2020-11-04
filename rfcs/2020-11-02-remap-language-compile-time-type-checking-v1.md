@@ -1,4 +1,4 @@
-# RFC … - 2020-11-02 - Remap Language Strict Program Outcome
+# RFC 4862 - 2020-11-02 - Remap Language Compile-Time Type Checking v1
 
 We extend the Remap language to be able to determine at compile-time which value
 type(s) a program returns on completion, so that we have less runtime failure
