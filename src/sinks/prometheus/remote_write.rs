@@ -128,7 +128,7 @@ struct RemoteWriteService {
 }
 
 impl RemoteWriteService {
-    fn encode_events(&self, metrics: Vec<Metric>) -> crate::Result<Bytes> {
+    fn encode_events(&self, metrics: Vec<Metric>) -> Bytes {
         let mut time_series = collector::TimeSeries::new();
         for metric in metrics {
             time_series.encode_metric(None, &self.buckets, &self.quantiles, false, &metric);
@@ -137,10 +137,8 @@ impl RemoteWriteService {
 
         let request = proto::WriteRequest { timeseries };
         let mut out = BytesMut::with_capacity(request.encoded_len());
-        request
-            .encode(&mut out)
-            .map(move |_| out.freeze())
-            .map_err(Into::into)
+        request.encode(&mut out).expect("Out of memory");
+        out.freeze()
     }
 }
 
@@ -154,8 +152,8 @@ impl tower::Service<Vec<Metric>> for RemoteWriteService {
     }
 
     fn call(&mut self, events: Vec<Metric>) -> Self::Future {
-        let body = self.encode_events(events).unwrap();
-        let body = snap_block(body).unwrap();
+        let body = self.encode_events(events);
+        let body = snap_block(body);
 
         let request = http::Request::post(self.endpoint.clone())
             .header("X-Prometheus-Remote-Write-Version", "0.1.0")
@@ -174,10 +172,10 @@ impl tower::Service<Vec<Metric>> for RemoteWriteService {
     }
 }
 
-fn snap_block(data: Bytes) -> crate::Result<Vec<u8>> {
+fn snap_block(data: Bytes) -> Vec<u8> {
     snap::raw::Encoder::new()
         .compress_vec(&data)
-        .map_err(Into::into)
+        .expect("Out of memory")
 }
 
 #[cfg(test)]
