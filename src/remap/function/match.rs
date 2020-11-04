@@ -26,7 +26,7 @@ impl Function for Match {
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
-        let pattern = arguments.required_regex("pattern")?;
+        let pattern = arguments.required_regex("pattern")?.regex;
 
         Ok(Box::new(MatchFn { value, pattern }))
     }

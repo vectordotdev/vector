@@ -1,6 +1,7 @@
 use crate::{Expression, Result, Value};
 use core::convert::TryInto;
 use std::collections::HashMap;
+use std::ops::Deref;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -68,7 +69,7 @@ impl ArgumentList {
             .and_then(|v| v.try_into().map_err(Into::into))
     }
 
-    pub fn required_regex(&mut self, keyword: &str) -> Result<regex::Regex> {
+    pub fn required_regex(&mut self, keyword: &str) -> Result<RegexArgument> {
         self.required(keyword)
             .and_then(|v| v.try_into().map_err(Into::into))
     }
@@ -83,9 +84,23 @@ impl ArgumentList {
 }
 
 #[derive(Debug, Clone)]
+pub struct RegexArgument {
+    pub regex: regex::Regex,
+    pub global: bool,
+}
+
+impl Deref for RegexArgument {
+    type Target = regex::Regex;
+
+    fn deref(&self) -> &Self::Target {
+        &self.regex
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Argument {
     Expression(Box<dyn Expression>),
-    Regex(regex::Regex),
+    Regex(RegexArgument),
 }
 
 impl TryInto<Box<dyn Expression>> for Argument {
@@ -99,10 +114,10 @@ impl TryInto<Box<dyn Expression>> for Argument {
     }
 }
 
-impl TryInto<regex::Regex> for Argument {
+impl TryInto<RegexArgument> for Argument {
     type Error = Error;
 
-    fn try_into(self) -> std::result::Result<regex::Regex, Self::Error> {
+    fn try_into(self) -> std::result::Result<RegexArgument, Self::Error> {
         match self {
             Argument::Regex(regex) => Ok(regex),
             Argument::Expression(_) => Err(Error::ArgumentRegexExpr),

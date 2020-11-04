@@ -14,7 +14,7 @@ use operator::Operator;
 pub mod prelude;
 pub use error::Error;
 pub use expression::{Expression, Literal, Noop, Path};
-pub use function::{Argument, ArgumentList, Function, Parameter};
+pub use function::{Argument, ArgumentList, Function, Parameter, RegexArgument};
 pub use program::Program;
 pub use runtime::Runtime;
 pub use state::State;

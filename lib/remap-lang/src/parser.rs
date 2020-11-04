@@ -5,10 +5,10 @@ use crate::{
         Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
         Variable,
     },
-    Argument, Error, Expr, Function as Fn, Operator, Result, Value,
+    Argument, Error, Expr, Function as Fn, Operator, RegexArgument, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
-use regex::{Regex, RegexBuilder};
+use regex::RegexBuilder;
 use std::str::FromStr;
 
 #[derive(pest_derive::Parser)]
@@ -264,31 +264,35 @@ impl Parser<'_> {
     }
 
     /// Parse a [`Regex`] value
-    fn regex_from_pair(&self, pair: Pair<R>) -> Result<Regex> {
+    fn regex_from_pair(&self, pair: Pair<R>) -> Result<RegexArgument> {
         let mut inner = pair.into_inner();
 
         let pattern = inner.next().ok_or(e(R::regex_inner))?.as_str();
-        let (x, i, m) = inner
-            .next()
-            .map(|flags| {
-                flags
-                    .as_str()
-                    .chars()
-                    .fold((false, false, false), |(x, i, m), flag| match flag {
-                        'x' => (true, i, m),
-                        'i' => (x, true, m),
-                        'm' => (x, i, true),
-                        _ => (x, i, m),
-                    })
-            })
-            .unwrap_or_default();
+        let (g, x, i, m) =
+            inner
+                .next()
+                .map(|flags| {
+                    flags.as_str().chars().fold(
+                        (false, false, false, false),
+                        |(g, x, i, m), flag| match flag {
+                            'g' => (true, x, i, m),
+                            'x' => (g, true, i, m),
+                            'i' => (g, x, true, m),
+                            'm' => (g, x, i, true),
+                            _ => (g, x, i, m),
+                        },
+                    )
+                })
+                .unwrap_or_default();
 
-        RegexBuilder::new(pattern)
+        let regex = RegexBuilder::new(pattern)
             .case_insensitive(i)
             .multi_line(m)
             .ignore_whitespace(x)
             .build()
-            .map_err(Error::from)
+            .map_err(Error::from)?;
+
+        Ok(RegexArgument { regex, global: g })
     }
 
     /// Parse a [`Path`] value, e.g. ".foo.bar"

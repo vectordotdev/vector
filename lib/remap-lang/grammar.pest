@@ -62,7 +62,7 @@ float   = ${
 }
 
 regex       = ${ "/" ~ regex_inner ~ "/" ~ regex_flags }
-regex_flags =  { ("i" | "x" | "m")* }
+regex_flags =  { ("g" | "i" | "x" | "m")* }
 
 // Other ----------------------------------------------------------------------
 
