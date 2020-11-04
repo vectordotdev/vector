@@ -2,7 +2,7 @@ use super::{
     auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings},
     retries::{FixedRetryPolicy, RetryLogic},
     sink::Response,
-    Batch, BatchSinkOld as BatchSink, Partition, PartitionBatchSinkOld as PartitionBatchSink,
+    Batch, BatchSink, Partition, PartitionBatchSinkOld as PartitionBatchSink,
 };
 use crate::buffers::Acker;
 use futures::TryFutureExt;

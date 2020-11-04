@@ -1,14 +1,13 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures::{compat::Future01CompatExt, future};
+use futures::{compat::Future01CompatExt, future, stream, SinkExt, StreamExt};
 use futures01::{Sink, Stream};
 use std::{convert::Infallible, time::Duration};
 use vector::{
     buffers::Acker,
     sinks::util::{
         batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
-        BatchSinkOld as BatchSink, Buffer, Compression, Partition,
-        PartitionBatchSinkOld as PartitionBatchSink,
+        BatchSink, Buffer, Compression, Partition, PartitionBatchSinkOld as PartitionBatchSink,
     },
     test_util::{random_lines, runtime},
 };
@@ -26,7 +25,7 @@ fn batching(
                 let input = random_lines(event_len)
                     .take(num_events)
                     .map(|s| s.into_bytes());
-                futures01::stream::iter_ok::<_, ()>(input)
+                stream::iter(input).map(Ok)
             },
             |input| {
                 let mut rt = runtime();
@@ -43,7 +42,7 @@ fn batching(
                 )
                 .sink_map_err(|error| panic!(error));
 
-                let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
+                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
             },
         )
     })

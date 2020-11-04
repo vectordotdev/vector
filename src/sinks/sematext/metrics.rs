@@ -13,14 +13,15 @@ use crate::{
     vector_version, Result,
 };
 use futures::future::{ready, BoxFuture};
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
-use std::task::Poll;
+use std::{
+    collections::{BTreeMap, HashMap},
+    task::Poll,
+};
 use tower::Service;
 
 #[derive(Clone)]
@@ -155,7 +156,7 @@ impl SematextMetricsService {
             )
             .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
 
-        Ok(VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(VectorSink::Sink(Box::new(sink)))
     }
 }
 

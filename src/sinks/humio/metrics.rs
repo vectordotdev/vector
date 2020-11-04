@@ -4,7 +4,7 @@ use crate::{
     sinks::{Healthcheck, VectorSink},
     transforms::metric_to_log::MetricToLogConfig,
 };
-use futures01::Sink;
+use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -38,13 +38,13 @@ impl SinkConfig for HumioMetricsConfig {
         let mut transform = self.transform.clone().build().await?;
         let (sink, healthcheck) = self.sink.clone().build(cx).await?;
 
-        let sink = Box::new(sink.into_futures01sink().with_flat_map(move |e| {
+        let sink = Box::new(sink.into_sink().with_flat_map(move |e| {
             let mut buf = Vec::with_capacity(1);
             transform.as_function().transform(&mut buf, e);
-            futures01::stream::iter_ok(buf.into_iter())
+            stream::iter(buf.into_iter()).map(Ok)
         }));
 
-        Ok((VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((VectorSink::Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -59,14 +59,15 @@ impl SinkConfig for HumioMetricsConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue, StatisticKind},
-        Event, Metric,
+    use crate::{
+        event::{
+            metric::{MetricKind, MetricValue, StatisticKind},
+            Metric,
+        },
+        sinks::util::test::{build_test_server, load_sink},
+        test_util, Event,
     };
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
     use chrono::{offset::TimeZone, Utc};
-    use futures::{stream, StreamExt};
 
     #[test]
     fn generate_config() {

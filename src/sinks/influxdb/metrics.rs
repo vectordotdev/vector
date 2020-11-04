@@ -18,8 +18,10 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::future::{ready, BoxFuture};
-use futures01::Sink;
+use futures::{
+    future::{self, BoxFuture},
+    SinkExt,
+};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -142,7 +144,7 @@ impl InfluxDBSvc {
             )
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
-        Ok(VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(VectorSink::Sink(Box::new(sink)))
     }
 }
 
@@ -176,7 +178,7 @@ fn create_build_request(
 {
     let auth = format!("Token {}", token);
     move |body| {
-        Box::pin(ready(
+        Box::pin(future::ready(
             hyper::Request::post(uri.clone())
                 .header("Content-Type", "text/plain")
                 .header("Authorization", auth.clone())

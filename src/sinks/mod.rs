@@ -122,6 +122,13 @@ impl VectorSink {
             _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
         }
     }
+
+    pub fn into_sink(self) -> Box<dyn Sink<Event, Error = ()> + Send + Unpin> {
+        match self {
+            Self::Sink(sink) => sink,
+            _ => panic!("Failed type coercion, {:?} is not a Sink", self),
+        }
+    }
 }
 
 impl fmt::Debug for VectorSink {
