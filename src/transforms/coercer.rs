@@ -1,15 +1,15 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{CoercerConversionFailed, CoercerEventProcessed},
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Deserialize, Serialize, Debug, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct CoercerConfig {
@@ -26,9 +26,9 @@ impl_generate_config_from_default!(CoercerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "coercer")]
 impl TransformConfig for CoercerConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let types = parse_conversion_map(&self.types)?;
-        Ok(Box::new(Coercer {
+        Ok(Transform::function(Coercer {
             types,
             drop_unspecified: self.drop_unspecified,
         }))
@@ -47,13 +47,14 @@ impl TransformConfig for CoercerConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Coercer {
     types: HashMap<String, Conversion>,
     drop_unspecified: bool,
 }
 
-impl Transform for Coercer {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Coercer {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut log = event.into_log();
         emit!(CoercerEventProcessed);
         if self.drop_unspecified {
@@ -73,7 +74,8 @@ impl Transform for Coercer {
                     }
                 }
             }
-            return Some(new_event);
+            output.push(new_event);
+            return;
         } else {
             for (field, conv) in &self.types {
                 if let Some(value) = log.remove(field) {
@@ -86,7 +88,7 @@ impl Transform for Coercer {
                 }
             }
         }
-        Some(Event::Log(log))
+        output.push(Event::Log(log));
     }
 }
 
@@ -126,7 +128,8 @@ mod tests {
         .build()
         .await
         .unwrap();
-        coercer.transform(event).unwrap().into_log()
+        let coercer = coercer.as_function();
+        coercer.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

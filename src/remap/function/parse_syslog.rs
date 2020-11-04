@@ -26,7 +26,7 @@ impl Function for ParseSyslog {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseSyslogFn {
     value: Box<dyn Expression>,
 }

@@ -42,7 +42,7 @@ impl Function for ParseTimestamp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseTimestampFn {
     value: Box<dyn Expression>,
     format: Box<dyn Expression>,

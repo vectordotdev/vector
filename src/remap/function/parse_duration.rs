@@ -63,7 +63,7 @@ impl Function for ParseDuration {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseDurationFn {
     value: Box<dyn Expression>,
     output: Box<dyn Expression>,

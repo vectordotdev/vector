@@ -53,7 +53,7 @@ where
         for definition in inventory::iter::<ComponentDescription<T>> {
             types.push(definition.type_str);
         }
-        types.sort();
+        types.sort_unstable();
         types
     }
 }

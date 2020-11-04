@@ -7,13 +7,13 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum V1 {
     #[serde(rename = "1")]
     V1,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfigV1 {
     version: Option<V1>,
@@ -21,13 +21,13 @@ pub struct LuaConfigV1 {
     config: v1::LuaConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 enum V2 {
     #[serde(rename = "2")]
     V2,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct LuaConfigV2 {
     version: V2,
@@ -35,7 +35,7 @@ pub struct LuaConfigV2 {
     config: v2::LuaConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum LuaConfig {
     V1(LuaConfigV1),
@@ -59,7 +59,7 @@ impl GenerateConfig for LuaConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "lua")]
 impl TransformConfig for LuaConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         match self {
             LuaConfig::V1(v1) => v1.config.build(),
             LuaConfig::V2(v2) => v2.config.build(),

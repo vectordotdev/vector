@@ -1,4 +1,5 @@
 use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
+use crate::config::TransformConfig;
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
@@ -65,7 +66,8 @@ pub struct UnitTest {
 }
 
 struct UnitTestTransform {
-    transform: Box<dyn Transform>,
+    transform: Transform,
+    config: Box<dyn TransformConfig>,
     next: Vec<String>,
 }
 
@@ -109,11 +111,42 @@ fn walk(
     let mut results = Vec::new();
     let mut targets = Vec::new();
 
-    if let Some(target) = transforms.get_mut(node) {
-        for input in inputs.clone() {
-            target.transform.transform_into(&mut results, input);
+    // Use `remove` to take ownership.
+    if let Some((key, mut target)) = transforms.remove_entry(node) {
+        match target.transform {
+            Transform::Function(ref mut t) => {
+                for input in inputs.clone() {
+                    t.transform(&mut results, input)
+                }
+                targets = target.next.clone();
+                transforms.insert(key, target);
+            }
+            Transform::Task(t) => {
+                error!("Using a recently refactored `TaskTransform` in a unit test. You may experience limited support for multiple inputs.");
+                use futures::compat::Stream01CompatExt;
+                let in_stream = futures01::stream::iter_ok(inputs.clone());
+                let out_stream = t.transform(Box::new(in_stream)).compat();
+                // TODO(new-transform-enum): Handle Many
+                let out_iter = futures::executor::block_on_stream(out_stream);
+                let out_iter_mapped = out_iter.flat_map(|v| match v {
+                    Err(e) => {
+                        error!("Stream transform experienced error: {:?}", e);
+                        None
+                    }
+                    Ok(v) => Some(v),
+                });
+                results.extend(out_iter_mapped);
+                targets = target.next.clone();
+                // TODO: This is a hack.
+                // Our tasktransforms must consume the transform to attach it to an input stream, so we rebuild it between input streams.
+                transforms.insert(key, UnitTestTransform {
+                    transform:  futures::executor::block_on(target.config.clone().build())
+                        .expect("Failed to build a known valid transform config. Things may have changed during runtime."),
+                    config: target.config,
+                    next: target.next
+                });
+            }
         }
-        targets = target.next.clone();
     }
 
     for child in targets {
@@ -134,15 +167,18 @@ impl UnitTest {
         let mut inspections = Vec::new();
         let mut results = HashMap::new();
 
-        for input in &self.inputs {
-            for target in &input.0 {
-                walk(
-                    target,
-                    vec![input.1.clone()],
-                    &mut self.transforms,
-                    &mut results,
-                );
+        let mut inputs_by_target = HashMap::new();
+        for (targets, event) in &self.inputs {
+            for target in targets {
+                let entry = inputs_by_target
+                    .entry(target.clone())
+                    .or_insert_with(Vec::new);
+                entry.push(event.clone());
             }
+        }
+
+        for (target, inputs) in inputs_by_target {
+            walk(&target, inputs, &mut self.transforms, &mut results);
         }
 
         for check in &self.checks {
@@ -421,6 +457,7 @@ async fn build_unit_test(
                         name.clone(),
                         UnitTestTransform {
                             transform,
+                            config: transform_config.inner.clone(),
                             next: outputs.into_iter().map(|(k, _)| k).collect(),
                         },
                     );

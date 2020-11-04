@@ -32,7 +32,7 @@ impl Function for Floor {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FloorFn {
     value: Box<dyn Expression>,
     precision: Option<Box<dyn Expression>>,

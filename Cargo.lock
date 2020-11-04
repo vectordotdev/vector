@@ -538,7 +538,7 @@ dependencies = [
  "hyper-unix-connector",
  "log",
  "mio-named-pipes",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "rustls 0.18.1",
  "rustls-native-certs",
  "serde",
@@ -1429,6 +1429,12 @@ dependencies = [
  "os_pipe",
  "shared_child",
 ]
+
+[[package]]
+name = "dyn-clone"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d55796afa1b20c2945ca8eabfc421839f2b766619209f1ede813cf2484f31804"
 
 [[package]]
 name = "either"
@@ -2445,7 +2451,7 @@ dependencies = [
  "httparse",
  "httpdate",
  "itoa",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "socket2",
  "tokio",
  "tower-service",
@@ -2512,7 +2518,7 @@ dependencies = [
  "futures-util",
  "hex",
  "hyper",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tokio",
 ]
 
@@ -4019,11 +4025,11 @@ dependencies = [
 
 [[package]]
 name = "pin-project"
-version = "0.4.26"
+version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13fbdfd6bdee3dc9be46452f86af4a4072975899cf8592466668620bebfbcc17"
+checksum = "2ffbc8e94b38ea3d2d8ba92aea2983b503cd75d0888d75b86bb37970b5698e15"
 dependencies = [
- "pin-project-internal 0.4.26",
+ "pin-project-internal 0.4.27",
 ]
 
 [[package]]
@@ -4037,9 +4043,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-internal"
-version = "0.4.26"
+version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c82fb1329f632c3552cf352d14427d57a511b1cf41db93b3a7d77906a82dcc8e"
+checksum = "65ad2ae56b6abe3a1ee25f15ee605bacadb9a764edaba9c2bf4103800d4a1895"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.7",
@@ -4690,6 +4696,7 @@ version = "0.1.0"
 dependencies = [
  "bytes 0.5.6",
  "chrono",
+ "dyn-clone",
  "paste",
  "pest",
  "pest_derive",
@@ -4826,7 +4833,7 @@ dependencies = [
  "log",
  "md5",
  "percent-encoding",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "rusoto_credential",
  "rusoto_signature",
  "rustc_version",
@@ -4847,7 +4854,7 @@ dependencies = [
  "dirs 2.0.2",
  "futures 0.3.5",
  "hyper",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "regex",
  "serde",
  "serde_json",
@@ -4942,7 +4949,7 @@ dependencies = [
  "log",
  "md5",
  "percent-encoding",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "rusoto_credential",
  "rustc_version",
  "serde",
@@ -5508,7 +5515,7 @@ dependencies = [
  "doc-comment",
  "futures 0.1.29",
  "futures-core",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "snafu-derive",
 ]
 
@@ -5619,7 +5626,7 @@ checksum = "fcbeca004dfaec7b6fd818d8ae6359eaea21770d134f137c4cb8fb5fa92b5a33"
 dependencies = [
  "futures-core",
  "futures-util",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tokio",
 ]
 
@@ -6071,7 +6078,7 @@ checksum = "6d9e878ad426ca286e4dcae09cbd4e1973a7f8987d97570e2469703dd7f5720c"
 dependencies = [
  "futures-util",
  "log",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tokio",
  "tungstenite",
 ]
@@ -6126,7 +6133,7 @@ source = "git+https://github.com/tower-rs/tower?rev=43168944220ed32dab83cb4f11f7
 dependencies = [
  "futures-core",
  "futures-util",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tokio",
  "tower-layer",
  "tower-service",
@@ -6161,7 +6168,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ba4bbc2c1e4a8543c30d4c13a4c8314ed72d6e07581910f665aa13fde0153c8"
 dependencies = [
  "futures-util",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tokio",
  "tokio-test",
  "tower-layer",
@@ -6194,7 +6201,8 @@ dependencies = [
 [[package]]
 name = "tracing-attributes"
 version = "0.1.11"
-source = "git+https://github.com/tokio-rs/tracing?rev=f470db1b0354b368f62f9ee4d763595d16373231#f470db1b0354b368f62f9ee4d763595d16373231"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80e0ccfc3378da0cce270c946b676a376943f5cd16aeba64568e7939806f4ada"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.7",
@@ -6204,8 +6212,7 @@ dependencies = [
 [[package]]
 name = "tracing-attributes"
 version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80e0ccfc3378da0cce270c946b676a376943f5cd16aeba64568e7939806f4ada"
+source = "git+https://github.com/tokio-rs/tracing?rev=f470db1b0354b368f62f9ee4d763595d16373231#f470db1b0354b368f62f9ee4d763595d16373231"
 dependencies = [
  "proc-macro2 1.0.24",
  "quote 1.0.7",
@@ -6238,7 +6245,7 @@ dependencies = [
  "futures 0.1.29",
  "futures 0.3.5",
  "futures-task",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tracing 0.1.21",
 ]
 
@@ -6247,7 +6254,7 @@ name = "tracing-futures"
 version = "0.2.6"
 source = "git+https://github.com/tokio-rs/tracing?rev=f470db1b0354b368f62f9ee4d763595d16373231#f470db1b0354b368f62f9ee4d763595d16373231"
 dependencies = [
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tracing 0.1.19",
 ]
 
@@ -6312,7 +6319,7 @@ source = "git+https://github.com/tokio-rs/tracing?rev=f470db1b0354b368f62f9ee4d7
 dependencies = [
  "futures 0.3.5",
  "http",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "tower-layer",
  "tower-make",
  "tower-service",
@@ -6675,6 +6682,7 @@ dependencies = [
  "derivative 2.1.1",
  "derive_is_enum_variant",
  "dirs 3.0.1",
+ "dyn-clone",
  "evmap",
  "exitcode",
  "file-source",
@@ -6724,7 +6732,7 @@ dependencies = [
  "openssl-probe",
  "pest",
  "pest_derive",
- "pin-project 0.4.26",
+ "pin-project 1.0.1",
  "portpicker",
  "pretty_assertions",
  "prometheus-parser",
@@ -6940,7 +6948,7 @@ dependencies = [
  "log",
  "mime",
  "mime_guess",
- "pin-project 0.4.26",
+ "pin-project 0.4.27",
  "scoped-tls",
  "serde",
  "serde_json",

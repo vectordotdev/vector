@@ -6,6 +6,7 @@ pub mod http;
 pub mod retries;
 pub mod service;
 pub mod sink;
+pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
 #[cfg(test)]
@@ -32,7 +33,7 @@ pub use service::{
     InFlightLimit, ServiceBuilderExt, TowerBatchedSink, TowerRequestConfig, TowerRequestLayer,
     TowerRequestSettings,
 };
-pub use sink::{BatchSink, PartitionBatchSink, StreamSink, StreamSinkOld};
+pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 pub use uri::UriSerde;
 
 #[derive(Debug, Snafu)]

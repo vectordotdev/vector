@@ -125,7 +125,7 @@ impl UriExt for http::Uri {
         }
 
         if let Some(port) = self.port() {
-            s.push_str(":");
+            s.push(':');
             s.push_str(port.as_str());
         }
 

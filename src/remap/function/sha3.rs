@@ -25,7 +25,7 @@ impl Function for Sha3 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Sha3Fn {
     value: Box<dyn Expression>,
     variant: Option<Box<dyn Expression>>,

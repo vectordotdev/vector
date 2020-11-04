@@ -202,9 +202,7 @@ impl TlsOptions {
                     .with_context(|| X509ParseError { filename: crt_file })?
                     .into_iter();
 
-                let crt = crt_stack
-                    .next()
-                    .ok_or_else(|| TlsError::MissingCertificate)?;
+                let crt = crt_stack.next().ok_or(TlsError::MissingCertificate)?;
                 let key = load_key(&key_file, &self.key_pass)?;
 
                 let mut ca_stack = Stack::new().context(NewCaStack)?;

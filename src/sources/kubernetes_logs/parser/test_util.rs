@@ -31,16 +31,17 @@ pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: 
 /// Shared logic for testing parsers.
 ///
 /// Takes a parser builder and a list of test cases.
-pub fn test_parser<B, T>(builder: B, cases: Vec<(String, LogEvent)>)
+pub fn test_parser<B>(builder: B, cases: Vec<(String, LogEvent)>)
 where
-    B: Fn() -> T,
-    T: Transform,
+    B: Fn() -> Transform,
 {
     for (message, expected) in cases {
         let input = Event::from(message);
         let mut parser = (builder)();
+        let parser = parser.as_function();
+
         let output = parser
-            .transform(input)
+            .transform_one(input)
             .expect("parser failed to parse the event");
         assert_eq!(Event::Log(expected), output, "expected left, actual right");
     }
