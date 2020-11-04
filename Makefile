@@ -187,6 +187,14 @@ build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector
 build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-armv7-unknown-linux-gnueabihf
+build-armv7-unknown-linux-gnueabihf: target/armv7-unknown-linux-gnueabihf/release/vector ## Build a release binary for the armv7-unknown-linux-gnueabihf triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-armv7-unknown-linux-musleabihf
+build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/release/vector ## Build a release binary for the armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}"
+
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
@@ -876,6 +884,9 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
+.PHONY: package-armv7-unknown-linux-gnueabihf-all
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
@@ -892,6 +903,14 @@ package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linu
 package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
+.PHONY: package-armv7-unknown-linux-gnueabihf
+package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-gnueabihf` triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-armv7-unknown-linux-musleabihf
+package-armv7-unknown-linux-musleabihf: target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}."
+
 # debs
 
 .PHONY: package-deb-x86_64
@@ -902,6 +921,10 @@ package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb pac
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
+.PHONY: package-deb-armv7-gnu
+package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-deb.sh
+
 # rpms
 
 .PHONY: package-rpm-x86_64
@@ -911,6 +934,10 @@ package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm pac
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
+
+.PHONY: package-rpm-armv7-gnu
+package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-rpm.sh
 
 ##@ Releasing
 

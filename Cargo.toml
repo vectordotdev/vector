@@ -251,6 +251,9 @@ target-x86_64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms",
 target-aarch64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
 target-aarch64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
+# TODO: Enable leveldb here for armv7-unknown-linux-musleabihf
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "rdkafka-cmake"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]
