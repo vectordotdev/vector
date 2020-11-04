@@ -212,6 +212,10 @@ prometheusSink:
   listenPort: "8080"
   # Raw TOML config to embed at the vector source.
   rawConfig: null
+  # Add Prometheus annotations to Pod to opt-in for Prometheus scraping.
+  # To be used in clusters that rely on Pod annotations in the form of
+  # `prometheus.io/scrape` to discover scrape targets.
+  addPodAnnotations: false
 
 # Sources to add to the generated `vector` config
 sources: {}

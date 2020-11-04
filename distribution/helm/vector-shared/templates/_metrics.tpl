@@ -49,3 +49,17 @@ Internal metrics are common, so we share and reuse the definition.
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Common Vector Pod annotations to expose the built-in metrics pipeline for
+Prometheus scraping.
+Internal metrics are common, so we share and reuse the definition.
+*/}}
+{{- define "libvector.metricsPrometheusPodAnnotations" -}}
+{{- with .Values.prometheusSink }}
+{{- if and .enabled .addPodAnnotations -}}
+prometheus.io/scrape: "true"
+prometheus.io/port: "{{ .listenPort }}"
+{{- end }}
+{{- end }}
+{{- end }}
