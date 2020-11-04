@@ -36,9 +36,13 @@ elif [ -x "$(command -v i686-linux-musl-gcc)" ]; then
     LINKER=i686-linux-musl-gcc
 elif [ -x "$(command -v aarch64-linux-musl-gcc)" ]; then
     LINKER=aarch64-linux-musl-gcc
+elif [ -x "$(command -v arm-linux-musleabihf-gcc)" ]; then
+    LINKER=arm-linux-musleabihf-gcc
 else
     LINKER=${RUST_MUSL_LINKER}
 fi
+
+echo $LINKER
 
 args=("-l:$INJECT_BEGIN" "$@" "-l:$INJECT_END")
 
