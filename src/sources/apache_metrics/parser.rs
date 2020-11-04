@@ -110,7 +110,7 @@ impl<'a> StatusFieldStatistic<'a> {
 /// - `tags` - any base tags to apply to the metrics
 pub fn parse(
     payload: &str,
-    namespace: &str,
+    namespace: Option<&str>,
     now: DateTime<Utc>,
     tags: Option<&BTreeMap<String, String>>,
 ) -> impl Iterator<Item = Result<Metric, ParseError>> {
@@ -146,7 +146,7 @@ pub fn parse(
 fn line_to_metrics<'a>(
     key: &str,
     value: &str,
-    namespace: &'a str,
+    namespace: Option<&'a str>,
     now: DateTime<Utc>,
     tags: Option<&'a BTreeMap<String, String>>,
 ) -> Option<Result<Box<dyn Iterator<Item = Metric> + 'a>, ParseError>> {
@@ -154,7 +154,7 @@ fn line_to_metrics<'a>(
         result.map(move |statistic| match statistic {
             StatusFieldStatistic::ServerUptimeSeconds(value) => Box::new(iter::once(Metric {
                 name: "uptime_seconds_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -164,7 +164,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::TotalAccesses(value) => Box::new(iter::once(Metric {
                 name: "access_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -174,7 +174,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::TotalKBytes(value) => Box::new(iter::once(Metric {
                 name: "sent_bytes_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -184,7 +184,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::TotalDuration(value) => Box::new(iter::once(Metric {
                 name: "duration_seconds_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -194,7 +194,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::CPUUser(value) => Box::new(iter::once(Metric {
                 name: "cpu_seconds_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -207,7 +207,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPUSystem(value) => Box::new(iter::once(Metric {
                 name: "cpu_seconds_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -220,7 +220,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPUChildrenUser(value) => Box::new(iter::once(Metric {
                 name: "cpu_seconds_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -233,7 +233,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPUChildrenSystem(value) => Box::new(iter::once(Metric {
                 name: "cpu_seconds_total".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -246,7 +246,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::CPULoad(value) => Box::new(iter::once(Metric {
                 name: "cpu_load".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: tags.cloned(),
                 kind: MetricKind::Absolute,
@@ -255,7 +255,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::IdleWorkers(value) => Box::new(iter::once(Metric {
                 name: "workers".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -270,7 +270,7 @@ fn line_to_metrics<'a>(
                 as Box<dyn Iterator<Item = Metric>>,
             StatusFieldStatistic::BusyWorkers(value) => Box::new(iter::once(Metric {
                 name: "workers".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -284,7 +284,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsTotal(value) => Box::new(iter::once(Metric {
                 name: "connections".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -298,7 +298,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsAsyncWriting(value) => Box::new(iter::once(Metric {
                 name: "connections".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -312,7 +312,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsAsyncClosing(value) => Box::new(iter::once(Metric {
                 name: "connections".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -326,7 +326,7 @@ fn line_to_metrics<'a>(
             })),
             StatusFieldStatistic::ConnsAsyncKeepAlive(value) => Box::new(iter::once(Metric {
                 name: "connections".into(),
-                namespace: Some(namespace.into()),
+                namespace: namespace.map(str::to_string),
                 timestamp: Some(now),
                 tags: {
                     let mut tags = tags.cloned().unwrap_or_default();
@@ -369,7 +369,7 @@ where
 }
 
 fn score_to_metric(
-    namespace: &str,
+    namespace: Option<&str>,
     now: DateTime<Utc>,
     tags: Option<&BTreeMap<String, String>>,
     state: &str,
@@ -377,7 +377,7 @@ fn score_to_metric(
 ) -> Metric {
     Metric {
         name: "scoreboard".into(),
-        namespace: Some(namespace.into()),
+        namespace: namespace.map(str::to_string),
         timestamp: Some(now),
         tags: {
             let mut tags = tags.cloned().unwrap_or_default();

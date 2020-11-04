@@ -71,10 +71,12 @@ impl SourceConfig for ApacheMetricsConfig {
             .collect::<Result<Vec<_>, _>>()
             .context(super::UriParseError)?;
 
+        let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+
         Ok(apache_metrics(
             urls,
             self.scrape_interval_secs,
-            self.namespace.clone(),
+            namespace,
             shutdown,
             out,
         ))
@@ -134,7 +136,7 @@ impl UriExt for http::Uri {
 fn apache_metrics(
     urls: Vec<http::Uri>,
     interval: u64,
-    namespace: String,
+    namespace: Option<String>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
@@ -179,15 +181,16 @@ fn apache_metrics(
                             let byte_size = body.len();
                             let body = String::from_utf8_lossy(&body);
 
-                            let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
-                                .chain(vec![Ok(Metric {
-                                    name: "up".into(),
-                                    namespace: Some(namespace.clone()),
-                                    timestamp: Some(Utc::now()),
-                                    tags: Some(tags.clone()),
-                                    kind: MetricKind::Absolute,
-                                    value: MetricValue::Gauge { value: 1.0 },
-                                })]);
+                            let results =
+                                parser::parse(&body, namespace.as_deref(), Utc::now(), Some(&tags))
+                                    .chain(vec![Ok(Metric {
+                                        name: "up".into(),
+                                        namespace: namespace.clone(),
+                                        timestamp: Some(Utc::now()),
+                                        tags: Some(tags.clone()),
+                                        kind: MetricKind::Absolute,
+                                        value: MetricValue::Gauge { value: 1.0 },
+                                    })]);
 
                             let metrics = results
                                 .filter_map(|res| match res {
@@ -216,7 +219,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: "up".into(),
-                                    namespace: Some(namespace.clone()),
+                                    namespace: namespace.clone(),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -234,7 +237,7 @@ fn apache_metrics(
                             Some(
                                 stream::iter(vec![Metric {
                                     name: "up".into(),
-                                    namespace: Some(namespace.clone()),
+                                    namespace: namespace.clone(),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,

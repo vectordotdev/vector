@@ -101,7 +101,7 @@ components: sources: apache_metrics: {
 			}
 		}
 		namespace: {
-			description: "The namespace of the metric."
+			description: "The namespace of the metric. Disabled if empty."
 			required:    false
 			common:      false
 			warnings: []
