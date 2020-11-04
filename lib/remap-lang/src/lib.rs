@@ -12,7 +12,7 @@ use expression::Expr;
 use operator::Operator;
 
 pub mod prelude;
-pub use error::Error;
+pub use error::{Error, RemapError};
 pub use expression::{Expression, Literal, Noop, Path};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
@@ -233,17 +233,14 @@ mod tests {
             ),
         ];
 
-        for (script, result) in cases {
-            let program = Program::new(script, &[Box::new(RegexPrinter)])
-                .map_err(|e| {
-                    println!("{}", &e);
-                    e
-                })
-                .unwrap();
+        for (script, expectation) in cases {
+            let program = Program::new(script, &[Box::new(RegexPrinter)]).unwrap();
             let mut runtime = Runtime::new(State::default());
             let mut event = HashMap::default();
 
-            assert_eq!(runtime.execute(&mut event, &program), result);
+            let result = runtime.execute(&mut event, &program).map_err(|e| e.0);
+
+            assert_eq!(expectation, result);
         }
     }
 }
