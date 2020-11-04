@@ -900,28 +900,21 @@ mod tests {
 
     #[tokio::test]
     async fn uses_custom_namespace() {
-        let metrics = HostMetricsConfig {
+        let mut metrics = HostMetricsConfig {
             namespace: Namespace(Some("other".into())),
             ..Default::default()
         }
         .capture_metrics()
         .await;
 
-        assert!(metrics
-            .into_iter()
-            .all(|event| event.into_metric().namespace.as_deref() == Some("other")));
+        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("other")));
     }
 
     #[tokio::test]
     async fn uses_default_namespace() {
-        let metrics = HostMetricsConfig::default()
-            .capture_metrics()
-            .await
-            .collect::<Vec<_>>();
+        let mut metrics = HostMetricsConfig::default().capture_metrics().await;
 
-        assert!(metrics
-            .into_iter()
-            .all(|event| event.into_metric().namespace.as_deref() == Some("host")));
+        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("host")));
     }
 
     #[tokio::test]
