@@ -77,6 +77,10 @@ inventory::submit! {
     SinkDescription::new::<PrometheusExporterConfig>("prometheus")
 }
 
+inventory::submit! {
+    SinkDescription::new::<PrometheusExporterConfig>("prometheus_exporter")
+}
+
 impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self::default()).unwrap()
@@ -84,7 +88,7 @@ impl GenerateConfig for PrometheusExporterConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus")]
+#[typetag::serde(name = "prometheus_exporter")]
 impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
@@ -106,11 +110,39 @@ impl SinkConfig for PrometheusExporterConfig {
     }
 
     fn sink_type(&self) -> &'static str {
-        "prometheus"
+        "prometheus_exporter"
     }
 
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::Port(self.address.port())]
+    }
+}
+
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct PrometheusCompatConfig {
+    #[serde(flatten)]
+    config: PrometheusExporterConfig,
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "prometheus")]
+impl SinkConfig for PrometheusCompatConfig {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        self.config.build(cx).await
+    }
+
+    fn input_type(&self) -> DataType {
+        self.config.input_type()
+    }
+
+    fn sink_type(&self) -> &'static str {
+        "prometheus"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        self.config.resources()
     }
 }
 
