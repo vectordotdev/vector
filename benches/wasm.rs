@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Benchmark, BenchmarkId, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
 use serde_json::Value;
 use std::{collections::HashMap, fs, io::Read, path::Path};
 use vector::{
@@ -22,30 +22,24 @@ fn parse_event_artifact(path: impl AsRef<Path>) -> vector::Result<Event> {
 
 pub fn protobuf(c: &mut Criterion) {
     let input = parse_event_artifact("tests/data/wasm/protobuf/demo.json").unwrap();
-    let cloned_input = input.clone();
-    c.bench(
-        "wasm/protobuf",
-        Benchmark::new("wasm", move |b| {
-            let input = cloned_input.clone();
-            let mut transform = Wasm::new(
-                toml::from_str(
-                    r#"
+
+    c.bench_function("wasm/protobuf", |b| {
+        let mut transform = Wasm::new(
+            toml::from_str(
+                r#"
                 module = "target/wasm32-wasi/release/protobuf.wasm"
                 artifact_cache = "target/artifacts/"
                 "#,
-                )
-                .unwrap(),
             )
-            .unwrap();
-            b.iter_with_setup(
-                || input.clone(),
-                |input| {
-                    let output = transform.transform(input);
-                    black_box(output)
-                },
-            )
-        }),
-    );
+            .unwrap(),
+        )
+        .unwrap();
+        b.iter_batched(
+            || input.clone(),
+            |input| transform.transform(input),
+            BatchSize::SmallInput,
+        )
+    });
 }
 
 pub fn drop(criterion: &mut Criterion) {
@@ -169,12 +163,10 @@ fn bench_group_transforms_over_parameterized_event_sizes(
             let id = BenchmarkId::new(name.clone(), parameter);
 
             group.bench_with_input(id, &input, |bencher, input| {
-                bencher.iter_with_setup(
+                bencher.iter_batched(
                     || input.clone(),
-                    |input| {
-                        let output = transform.transform(input);
-                        black_box(output)
-                    },
+                    |input| transform.transform(input),
+                    BatchSize::SmallInput,
                 )
             });
         }

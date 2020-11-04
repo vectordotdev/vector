@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, BatchSize, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
@@ -17,17 +17,16 @@ fn bench_add_fields(c: &mut Criterion) {
     let mut group = c.benchmark_group("lua_add_fields");
     group.throughput(Throughput::Elements(1));
 
-    let mut benchmarks = [
+    let benchmarks: Vec<(&str, Box<dyn Transform>)> = vec![
         ("native", {
             let mut map = IndexMap::new();
             map.insert(String::from(key), value.to_owned().into());
             Box::new(transforms::add_fields::AddFields::new(map, true).unwrap())
-                as Box<dyn Transform>
         }),
         ("v1", {
             let source = format!("event['{}'] = '{}'", key, value);
 
-            Box::new(transforms::lua::v1::Lua::new(&source, vec![]).unwrap()) as Box<dyn Transform>
+            Box::new(transforms::lua::v1::Lua::new(&source, vec![]).unwrap())
         }),
         ("v2", {
             let config = format!(
@@ -45,17 +44,18 @@ fn bench_add_fields(c: &mut Criterion) {
             Box::new(
                 transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
                     .unwrap(),
-            ) as Box<dyn Transform>
+            )
         }),
     ];
 
-    for (name, transform) in benchmarks.iter_mut() {
+    for (name, mut transform) in benchmarks {
         group.bench_function(name.to_owned(), |b| {
             b.iter_batched(
                 || event.clone(),
                 |event| {
-                    let event = black_box(transform.transform(event).unwrap());
+                    let event = transform.transform(event).unwrap();
                     debug_assert_eq!(event.as_log()[key], value.to_owned().into());
+                    event
                 },
                 BatchSize::SmallInput,
             )
@@ -76,7 +76,7 @@ fn bench_field_filter(c: &mut Criterion) {
     let mut group = c.benchmark_group("lua_field_filter");
     group.throughput(Throughput::Elements(num_events));
 
-    let mut benchmarks = [
+    let benchmarks: Vec<(&str, Box<dyn Transform>)> = vec![
         ("native", {
             let mut rt = runtime();
             rt.block_on(async move {
@@ -113,13 +113,14 @@ fn bench_field_filter(c: &mut Criterion) {
         }),
     ];
 
-    for (name, transform) in benchmarks.iter_mut() {
+    for (name, mut transform) in benchmarks {
         group.bench_function(name.to_owned(), |b| {
             b.iter_batched(
                 || events.clone(),
                 |events| {
-                    let num = black_box(events.filter_map(|r| transform.transform(r)).count());
+                    let num = events.filter_map(|r| transform.transform(r)).count();
                     debug_assert_eq!(num as u64, num_events / 10);
+                    num
                 },
                 BatchSize::SmallInput,
             )
