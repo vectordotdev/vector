@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::{http::HttpClient, sinks::util::encode_namespace};
+use crate::http::HttpClient;
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
