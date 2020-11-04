@@ -98,7 +98,7 @@ struct MongoDBMetricsConfig {
 struct MongoDBMetrics {
     client: Client,
     endpoint: String,
-    namespace: String,
+    namespace: Option<String>,
     tags: BTreeMap<String, String>,
 }
 
@@ -128,10 +128,12 @@ impl SourceConfig for MongoDBMetricsConfig {
     ) -> crate::Result<super::Source> {
         let mut interval = interval(Duration::from_secs(self.scrape_interval_secs)).map(|_| ());
 
+        let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+
         let sources = try_join_all(
             self.endpoints
                 .iter()
-                .map(|endpoint| MongoDBMetrics::new(endpoint, &self.namespace)),
+                .map(|endpoint| MongoDBMetrics::new(endpoint, namespace.clone())),
         )
         .await?;
 
@@ -179,7 +181,7 @@ impl SourceConfig for MongoDBMetricsConfig {
 impl MongoDBMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
-    async fn new(endpoint: &str, namespace: &str) -> Result<MongoDBMetrics, BuildError> {
+    async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDBMetrics, BuildError> {
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
 
         let mut client_options = ClientOptions::parse(endpoint)
@@ -202,7 +204,7 @@ impl MongoDBMetrics {
         Ok(Self {
             client,
             endpoint,
-            namespace: namespace.to_owned(),
+            namespace,
             tags,
         })
     }
@@ -307,7 +309,7 @@ impl MongoDBMetrics {
     ) -> Metric {
         Metric {
             name: name.into(),
-            namespace: Some(self.namespace.clone()),
+            namespace: self.namespace.clone(),
             timestamp: Some(Utc::now()),
             tags: Some(tags),
             kind: MetricKind::Absolute,
