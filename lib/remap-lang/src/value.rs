@@ -84,7 +84,13 @@ impl From<Bytes> for Value {
 
 impl From<Vec<u8>> for Value {
     fn from(v: Vec<u8>) -> Self {
-        Value::String(v.into())
+        v.as_slice().into()
+    }
+}
+
+impl From<&[u8]> for Value {
+    fn from(v: &[u8]) -> Self {
+        Value::String(Bytes::copy_from_slice(v))
     }
 }
 
