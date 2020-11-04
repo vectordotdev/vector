@@ -1,7 +1,10 @@
 mod collector;
 pub mod exporter;
-mod proto;
 mod remote_write;
+
+mod proto {
+    include!(concat!(env!("OUT_DIR"), "/prometheus.rs"));
+}
 
 pub(self) fn default_histogram_buckets() -> Vec<f64> {
     vec![
