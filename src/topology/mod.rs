@@ -721,7 +721,7 @@ mod tests {
 mod reload_tests {
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-    use crate::sinks::prometheus::sink::PrometheusSinkConfig;
+    use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
     use crate::sources::generator::GeneratorConfig;
     use crate::sources::splunk_hec::SplunkConfig;
     use crate::test_util::{next_addr, start_topology, wait_for_tcp};
@@ -840,10 +840,10 @@ mod reload_tests {
         old_config.add_sink(
             "out1",
             &[&"trans"],
-            PrometheusSinkConfig {
+            PrometheusExporterConfig {
                 address,
                 flush_period_secs: 1,
-                ..PrometheusSinkConfig::default()
+                ..PrometheusExporterConfig::default()
             },
         );
 
@@ -853,10 +853,10 @@ mod reload_tests {
         new_config.add_sink(
             "out1",
             &[&"trans"],
-            PrometheusSinkConfig {
+            PrometheusExporterConfig {
                 address,
                 flush_period_secs: 2,
-                ..PrometheusSinkConfig::default()
+                ..PrometheusExporterConfig::default()
             },
         );
 

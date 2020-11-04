@@ -39,7 +39,7 @@ enum BuildError {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-pub struct PrometheusSinkConfig {
+pub struct PrometheusExporterConfig {
     pub namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
@@ -51,7 +51,7 @@ pub struct PrometheusSinkConfig {
     pub flush_period_secs: u64,
 }
 
-impl std::default::Default for PrometheusSinkConfig {
+impl std::default::Default for PrometheusExporterConfig {
     fn default() -> Self {
         Self {
             namespace: None,
@@ -74,10 +74,10 @@ fn default_flush_period_secs() -> u64 {
 }
 
 inventory::submit! {
-    SinkDescription::new::<PrometheusSinkConfig>("prometheus")
+    SinkDescription::new::<PrometheusExporterConfig>("prometheus")
 }
 
-impl GenerateConfig for PrometheusSinkConfig {
+impl GenerateConfig for PrometheusExporterConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self::default()).unwrap()
     }
@@ -85,7 +85,7 @@ impl GenerateConfig for PrometheusSinkConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus")]
-impl SinkConfig for PrometheusSinkConfig {
+impl SinkConfig for PrometheusExporterConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         if self.flush_period_secs < MIN_FLUSH_PERIOD_SECS {
             return Err(Box::new(BuildError::FlushPeriodTooShort {
@@ -95,7 +95,7 @@ impl SinkConfig for PrometheusSinkConfig {
 
         validate_quantiles(&self.quantiles)?;
 
-        let sink = PrometheusSink::new(self.clone(), cx.acker());
+        let sink = PrometheusExporter::new(self.clone(), cx.acker());
         let healthcheck = future::ok(()).boxed();
 
         Ok((VectorSink::Stream(Box::new(sink)), healthcheck))
@@ -114,9 +114,9 @@ impl SinkConfig for PrometheusSinkConfig {
     }
 }
 
-struct PrometheusSink {
+struct PrometheusExporter {
     server_shutdown_trigger: Option<Trigger>,
-    config: PrometheusSinkConfig,
+    config: PrometheusExporterConfig,
     metrics: Arc<RwLock<IndexSet<MetricEntry>>>,
     last_flush_timestamp: Arc<RwLock<i64>>,
     acker: Acker,
@@ -169,8 +169,8 @@ fn handle(
     response
 }
 
-impl PrometheusSink {
-    fn new(config: PrometheusSinkConfig, acker: Acker) -> Self {
+impl PrometheusExporter {
+    fn new(config: PrometheusExporterConfig, acker: Acker) -> Self {
         Self {
             server_shutdown_trigger: None,
             config,
@@ -241,7 +241,7 @@ impl PrometheusSink {
 }
 
 #[async_trait]
-impl StreamSink for PrometheusSink {
+impl StreamSink for PrometheusExporter {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed();
         while let Some(event) = input.next().await {
@@ -286,6 +286,6 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<PrometheusSinkConfig>();
+        crate::test_util::test_generate_config::<PrometheusExporterConfig>();
     }
 }

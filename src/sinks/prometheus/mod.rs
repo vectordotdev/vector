@@ -1,7 +1,7 @@
 mod collector;
+pub mod exporter;
 mod proto;
 mod remote_write;
-pub mod sink;
 
 pub(self) fn default_histogram_buckets() -> Vec<f64> {
     vec![
