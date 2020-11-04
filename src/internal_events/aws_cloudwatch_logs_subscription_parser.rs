@@ -1,4 +1,4 @@
-use super::{ErrorTypes, InternalEvent};
+use super::{ErrorType, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ impl InternalEvent for AwsCloudwatchLogsSubscriptionParserFailedParse {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "error_type" => ErrorTypes::ParseFailed.as_str(),
+            "error_type" => &ErrorType::ParseFailed,
         );
     }
 }

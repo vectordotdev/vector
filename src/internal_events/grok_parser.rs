@@ -1,4 +1,4 @@
-use super::{ErrorTypes, InternalEvent};
+use super::{ErrorType, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ impl InternalEvent for GrokParserFailedMatch<'_> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "error_type" => ErrorTypes::MatchFailed.as_str(),
+            "error_type" => &ErrorType::MatchFailed,
         );
     }
 }
@@ -47,7 +47,7 @@ impl InternalEvent for GrokParserMissingField<'_> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "error_type" => ErrorTypes::FieldMissing.as_str(),
+            "error_type" => &ErrorType::FieldMissing,
         );
     }
 }
@@ -70,7 +70,7 @@ impl<'a> InternalEvent for GrokParserConversionFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors_total", 1,
-            "error_type" => ErrorTypes::TypeConversionFailed.as_str(),
+            "error_type" => &ErrorType::TypeConversionFailed,
         );
     }
 }

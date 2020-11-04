@@ -211,7 +211,7 @@ pub fn emit(event: impl InternalEvent) {
 }
 
 // Possible values for the "error_type" tag
-pub enum ErrorTypes {
+pub enum ErrorType {
     FieldMissing,
     InvalidMetric,
     MappingFailed,
@@ -225,8 +225,10 @@ pub enum ErrorTypes {
     ValueInvalid,
 }
 
-impl ErrorTypes {
-    fn as_str(&self) -> &str {
+impl std::ops::Deref for ErrorType {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
         match self {
             Self::FieldMissing => "field_missing",
             Self::InvalidMetric => "invalid_metric",

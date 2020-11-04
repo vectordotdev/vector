@@ -1,4 +1,4 @@
-use super::{ErrorTypes, InternalEvent};
+use super::{ErrorType, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -26,7 +26,7 @@ impl InternalEvent for LogfmtParserMissingField<'_> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-            "error_type" => ErrorTypes::FieldMissing.as_str(),
+            "error_type" => &ErrorType::FieldMissing,
         );
     }
 }
@@ -49,7 +49,7 @@ impl<'a> InternalEvent for LogfmtParserConversionFailed<'a> {
 
     fn emit_metrics(&self) {
         counter!("processing_errors", 1,
-            "error_type" => ErrorTypes::TypeConversionFailed.as_str(),
+            "error_type" => &ErrorType::TypeConversionFailed,
         );
     }
 }

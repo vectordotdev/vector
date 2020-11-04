@@ -1,4 +1,4 @@
-use super::{ErrorTypes, InternalEvent};
+use super::{ErrorType, InternalEvent};
 use crate::event::metric::{MetricKind, MetricValue};
 use metrics::counter;
 
@@ -19,6 +19,6 @@ impl<'a> InternalEvent for StatsdInvalidMetricReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::InvalidMetric.as_str());
+        counter!("processing_errors_total", 1, "error_type" => &ErrorType::InvalidMetric);
     }
 }

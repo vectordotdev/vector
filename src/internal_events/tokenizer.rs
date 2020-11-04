@@ -1,4 +1,4 @@
-use super::{ErrorTypes, InternalEvent};
+use super::{ErrorType, InternalEvent};
 use metrics::counter;
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ impl<'a> InternalEvent for TokenizerFieldMissing<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::FieldMissing.as_str());
+        counter!("processing_errors_total", 1, "error_type" => &ErrorType::FieldMissing);
     }
 }
 
@@ -46,6 +46,6 @@ impl<'a> InternalEvent for TokenizerConvertFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors_total", 1, "error_type" => ErrorTypes::TypeConversionFailed.as_str());
+        counter!("processing_errors_total", 1, "error_type" => &ErrorType::TypeConversionFailed);
     }
 }
