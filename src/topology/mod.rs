@@ -830,6 +830,7 @@ mod reload_tests {
             metrics: vec![MetricConfig::Gauge(GaugeConfig {
                 field: "message".to_string(),
                 name: None,
+                namespace: None,
                 tags: None,
             })],
         };
