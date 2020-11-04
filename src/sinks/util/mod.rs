@@ -33,7 +33,7 @@ pub use service::{
     InFlightLimit, ServiceBuilderExt, TowerBatchedSink, TowerPartitionSink, TowerRequestConfig,
     TowerRequestLayer, TowerRequestSettings,
 };
-pub use sink::{BatchSinkOld, PartitionBatchSinkOld, StreamSink};
+pub use sink::{BatchSink, BatchSinkOld, PartitionBatchSinkOld, StreamSink};
 pub use uri::UriSerde;
 
 #[derive(Debug, Snafu)]

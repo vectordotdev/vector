@@ -40,22 +40,31 @@ use crate::{buffers::Acker, Event};
 use async_trait::async_trait;
 use futures::{
     compat::{Compat, Future01CompatExt},
-    stream::BoxStream,
-    FutureExt, TryFutureExt,
+    future::BoxFuture,
+    ready,
+    stream::{BoxStream, FuturesUnordered},
+    FutureExt, Sink, Stream, TryFutureExt,
 };
 use futures01::{
     future::Either, stream::FuturesUnordered as FuturesUnordered01, sync::oneshot as oneshot01,
     try_ready, Async, AsyncSink, Future as Future01, Poll as Poll01, Sink as Sink01, StartSend,
     Stream as Stream01,
 };
+use pin_project::pin_project;
 use std::{
     collections::{HashMap, VecDeque},
     convert::Infallible,
     fmt,
+    future::Future,
     hash::Hash,
     marker::PhantomData,
+    pin::Pin,
+    task::{Context, Poll},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::{
+    sync::oneshot,
+    time::{delay_for, Delay, Duration},
+};
 use tower::Service;
 use tracing_futures::Instrument;
 
@@ -64,6 +73,188 @@ use tracing_futures::Instrument;
 #[async_trait]
 pub trait StreamSink {
     async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()>;
+}
+
+// === BatchSink ===
+
+/// A `Sink` interface that wraps a `Service` and a
+/// `Batch`.
+///
+/// Provided a batching scheme, a service and batch settings
+/// this type will handle buffering events via the batching scheme
+/// and dispatching requests via the service based on either the size
+/// of the batch or a batch linger timeout.
+///
+/// # Acking
+///
+/// Service based acking will only ack events when all prior request
+/// batches have been acked. This means if sequential requests r1, r2,
+/// and r3 are dispatched and r2 and r3 complete, all events contained
+/// in all requests will not be acked until r1 has completed.
+#[pin_project]
+pub struct BatchSink<S, B, Request>
+where
+    B: Batch<Output = Request>,
+{
+    service: ServiceSink<S, Request>,
+    buffer: Option<B::Input>,
+    batch: StatefulBatch<B>,
+    timeout: Duration,
+    linger: Option<Delay>,
+    closing: bool,
+    _pd: PhantomData<Request>,
+}
+
+impl<S, B, Request> BatchSink<S, B, Request>
+where
+    S: Service<Request>,
+    S::Future: Send + 'static,
+    S::Error: Into<crate::Error> + Send + 'static,
+    S::Response: Response,
+    B: Batch<Output = Request>,
+{
+    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+        let service = ServiceSink::new(service, acker);
+
+        Self {
+            service,
+            buffer: None,
+            batch: batch.into(),
+            timeout,
+            linger: None,
+            closing: false,
+            _pd: PhantomData,
+        }
+    }
+
+    fn poll_should_send(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        if !self.closing && !self.batch.was_full() {
+            let linger = self
+                .linger
+                .as_mut()
+                .expect("linger should exists for should_send");
+            ready!(Pin::new(linger).poll(cx));
+        }
+
+        Poll::Ready(())
+    }
+}
+
+impl<S, B, Request> BatchSink<S, B, Request>
+where
+    B: Batch<Output = Request>,
+{
+    pub fn get_ref(&self) -> &S {
+        &self.service.service
+    }
+
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.service.service
+    }
+}
+
+impl<S, B, Request> Sink<B::Input> for BatchSink<S, B, Request>
+where
+    S: Service<Request>,
+    S::Future: Send + 'static,
+    S::Error: Into<crate::Error> + Send + 'static,
+    S::Response: Response,
+    B: Batch<Output = Request>,
+{
+    type Error = crate::Error;
+
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        while self.buffer.is_some() {
+            ready!(self.as_mut().poll_flush(cx))?;
+        }
+
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
+        if self.batch.is_empty() && self.linger.is_none() {
+            trace!("Starting new batch timer.");
+            // We just inserted the first item of a new batch, so set our delay to the longest time
+            // we want to allow that item to linger in the batch before being flushed.
+            self.linger = Some(delay_for(self.timeout));
+        }
+
+        if let PushResult::Overflow(item) = self.batch.push(item) {
+            self.buffer = Some(item);
+        }
+
+        Ok(())
+    }
+
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut last_round = false;
+        loop {
+            if self.batch.is_empty() {
+                // Send item from the buffer.
+                if let Some(item) = self.buffer.take() {
+                    self.as_mut().start_send(item)?;
+
+                    if self.buffer.is_some() {
+                        unreachable!("Empty buffer overflowed.");
+                    }
+                } else {
+                    // Poll inner service while not ready.
+                    ready!(self.service.poll_complete(cx));
+                    return Poll::Ready(Ok(()));
+                }
+            } else {
+                // We have data to send, so check if we should send it and either attempt the send
+                // or return that we're not ready to send. If we send and it works, loop to poll
+                // service instead of prematurely returning Ready.
+                if matches!(self.poll_should_send(cx), Poll::Ready(())) {
+                    last_round = false;
+
+                    ready!(self.service.poll_ready(cx))?;
+
+                    trace!("Service ready; Sending batch.");
+                    let batch = self.batch.fresh_replace();
+
+                    let batch_size = batch.num_items();
+                    let request = batch.finish();
+
+                    tokio::spawn(self.service.call(request, batch_size));
+
+                    // Remove the now-sent batch's linger timeout
+                    self.linger = None;
+                } else {
+                    // Result doesn't matter, our batch is not empty. Return Pending anyway, but
+                    // loop once more for `poll_should_send` check.
+                    ready!(self.service.poll_complete(cx));
+
+                    if last_round {
+                        return Poll::Pending;
+                    }
+
+                    last_round = true;
+                }
+            }
+        }
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        trace!("Closing batch sink.");
+        self.closing = true;
+        self.poll_flush(cx)
+    }
+}
+
+impl<S, B, Request> fmt::Debug for BatchSink<S, B, Request>
+where
+    S: fmt::Debug,
+    B: Batch<Output = Request> + fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BatchSink")
+            .field("service", &self.service)
+            .field("batch", &self.batch)
+            .field("timeout", &self.timeout)
+            .finish()
+    }
 }
 
 // === BatchSinkOld ===
@@ -583,6 +774,121 @@ where
             .field("batch", &self.batch)
             .field("service", &self.service)
             .field("timeout", &self.timeout)
+            .finish()
+    }
+}
+
+// === ServiceSink ===
+
+struct ServiceSink<S, Request> {
+    service: S,
+    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
+    acker: Acker,
+    seq_head: usize,
+    seq_tail: usize,
+    pending_acks: HashMap<usize, usize>,
+    next_request_id: usize,
+    _pd: PhantomData<Request>,
+}
+
+impl<S, Request> ServiceSink<S, Request>
+where
+    S: Service<Request>,
+    S::Future: Send + 'static,
+    S::Error: Into<crate::Error> + Send + 'static,
+    S::Response: Response,
+{
+    fn new(service: S, acker: Acker) -> Self {
+        Self {
+            service,
+            in_flight: FuturesUnordered::new(),
+            acker,
+            seq_head: 0,
+            seq_tail: 0,
+            pending_acks: HashMap::new(),
+            next_request_id: 0,
+            _pd: PhantomData,
+        }
+    }
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<crate::Result<()>> {
+        self.service.poll_ready(cx).map_err(Into::into)
+    }
+
+    fn call(&mut self, req: Request, batch_size: usize) -> BoxFuture<'static, ()> {
+        let seqno = self.seq_head;
+        self.seq_head += 1;
+
+        let (tx, rx) = oneshot::channel();
+
+        self.in_flight.push(rx);
+
+        let request_id = self.next_request_id;
+        self.next_request_id = request_id.wrapping_add(1);
+
+        trace!(
+            message = "Submitting service request.",
+            in_flight_requests = self.in_flight.len()
+        );
+        self.service
+            .call(req)
+            .err_into()
+            .map(move |result| {
+                match result {
+                    Ok(response) if response.is_successful() => {
+                        trace!(message = "Response successful.", ?response);
+                    }
+                    Ok(response) => {
+                        error!(message = "Response wasn't successful.", ?response);
+                    }
+                    Err(error) => {
+                        error!(message = "Request failed.", %error);
+                    }
+                }
+
+                // If the rx end is dropped we still completed
+                // the request so this is a weird case that we can
+                // ignore for now.
+                let _ = tx.send((seqno, batch_size));
+            })
+            .instrument(info_span!("request", %request_id))
+            .boxed()
+    }
+
+    fn poll_complete(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        while !self.in_flight.is_empty() {
+            match ready!(Pin::new(&mut self.in_flight).poll_next(cx)) {
+                Some(Ok((seqno, batch_size))) => {
+                    self.pending_acks.insert(seqno, batch_size);
+
+                    let mut num_to_ack = 0;
+                    while let Some(ack_size) = self.pending_acks.remove(&self.seq_tail) {
+                        num_to_ack += ack_size;
+                        self.seq_tail += 1
+                    }
+                    trace!(message = "Acking events.", acking_num = num_to_ack);
+                    self.acker.ack(num_to_ack);
+                }
+                Some(Err(_)) => panic!("ServiceSink service sender dropped."),
+                None => break,
+            }
+        }
+
+        Poll::Ready(())
+    }
+}
+
+impl<S, Request> fmt::Debug for ServiceSink<S, Request>
+where
+    S: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ServiceSink")
+            .field("service", &self.service)
+            .field("acker", &self.acker)
+            .field("seq_head", &self.seq_head)
+            .field("seq_tail", &self.seq_tail)
+            .field("pending_acks", &self.pending_acks)
             .finish()
     }
 }
