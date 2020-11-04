@@ -1,4 +1,4 @@
-use crate::{parser, Error, Expr, Function, Result};
+use crate::{parser, Error, Expr, Function, RemapError};
 use pest::Parser;
 
 /// The program to execute.
@@ -13,14 +13,18 @@ pub struct Program {
 }
 
 impl Program {
-    pub fn new(source: &str, function_definitions: &[Box<dyn Function>]) -> Result<Self> {
+    pub fn new(
+        source: &str,
+        function_definitions: &[Box<dyn Function>],
+    ) -> Result<Self, RemapError> {
         let pairs = parser::Parser::parse(parser::Rule::program, source)
-            .map_err(|s| Error::Parser(s.to_string()))?;
+            .map_err(|s| Error::Parser(s.to_string()))
+            .map_err(RemapError)?;
 
         let parser = parser::Parser {
             function_definitions,
         };
-        let expressions = parser.pairs_to_expressions(pairs)?;
+        let expressions = parser.pairs_to_expressions(pairs).map_err(RemapError)?;
 
         Ok(Self { expressions })
     }
