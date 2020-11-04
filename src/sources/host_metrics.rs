@@ -901,7 +901,7 @@ mod tests {
     #[tokio::test]
     async fn uses_custom_namespace() {
         let mut metrics = HostMetricsConfig {
-            namespace: Namespace("other".into()),
+            namespace: Namespace(Some("other".into())),
             ..Default::default()
         }
         .capture_metrics()

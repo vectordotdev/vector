@@ -498,7 +498,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let now: DateTime<Utc> = Utc::now();
 
-        let (mut metrics, errors) = parse(payload, "apache", now, None).fold(
+        let (mut metrics, errors) = parse(payload, Some("apache"), now, None).fold(
             (vec![], vec![]),
             |(mut metrics, mut errors), v| {
                 match v {
@@ -708,7 +708,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
         let now: DateTime<Utc> = Utc::now();
 
-        let (mut metrics, errors) = parse(payload, "apache", now, None).fold(
+        let (mut metrics, errors) = parse(payload, Some("apache"), now, None).fold(
             (vec![], vec![]),
             |(mut metrics, mut errors), v| {
                 match v {
@@ -945,7 +945,7 @@ ConnsTotal: 1
 
         let now: DateTime<Utc> = Utc::now();
 
-        let (mut metrics, errors) = parse(payload, "apache", now, None).fold(
+        let (mut metrics, errors) = parse(payload, Some("apache"), now, None).fold(
             (vec![], vec![]),
             |(mut metrics, mut errors), v| {
                 match v {
