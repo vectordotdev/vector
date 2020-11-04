@@ -42,8 +42,6 @@ else
     LINKER=${RUST_MUSL_LINKER}
 fi
 
-echo $LINKER
-
 args=("-l:$INJECT_BEGIN" "$@" "-l:$INJECT_END")
 
 echo invoking real linker: "${LINKER}" "${args[@]}" >&2
