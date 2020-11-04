@@ -58,7 +58,7 @@ components: sources: host_metrics: {
 			}
 		}
 		namespace: {
-			description: "The namespace of metrics."
+			description: "The namespace of metrics. Disabled if empty."
 			common:      false
 			required:    false
 			type: string: default: "host"

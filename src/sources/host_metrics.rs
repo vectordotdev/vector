@@ -82,11 +82,11 @@ struct NetworkConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Namespace(String);
+struct Namespace(Option<String>);
 
 impl Default for Namespace {
     fn default() -> Self {
-        Self("host".into())
+        Self(Some("host".into()))
     }
 }
 
@@ -127,7 +127,10 @@ impl SourceConfig for HostMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        Ok(Box::new(self.clone().run(out, shutdown).boxed().compat()))
+        let mut config = self.clone();
+        config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
+
+        Ok(Box::new(config.run(out, shutdown).boxed().compat()))
     }
 
     fn output_type(&self) -> DataType {
@@ -663,7 +666,7 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric {
             name: name.into(),
-            namespace: Some(self.namespace.0.clone()),
+            namespace: self.namespace.0.clone(),
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Counter { value },
@@ -680,7 +683,7 @@ impl HostMetricsConfig {
     ) -> Metric {
         Metric {
             name: name.into(),
-            namespace: Some(self.namespace.0.clone()),
+            namespace: self.namespace.0.clone(),
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value },
