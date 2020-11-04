@@ -215,6 +215,7 @@ spec:
     metadata:
       annotations:
         checksum/config: fdd2b5ef4c07a83ec219b783e458a2d8797ed9b71f18180c1e6e88d2e2edb680
+        
       labels:
         app.kubernetes.io/name: vector-agent
         app.kubernetes.io/instance: vector
@@ -323,6 +324,7 @@ spec:
     metadata:
       annotations:
         checksum/config: e7dd4b56dd953d2210fd1090cf4fadf27424977efb7c8cf0131cd32892761aa5
+        
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
