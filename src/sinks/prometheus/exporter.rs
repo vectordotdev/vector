@@ -40,7 +40,7 @@ enum BuildError {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
-    pub namespace: Option<String>,
+    pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
     #[serde(default = "super::default_histogram_buckets")]
@@ -54,7 +54,7 @@ pub struct PrometheusExporterConfig {
 impl std::default::Default for PrometheusExporterConfig {
     fn default() -> Self {
         Self {
-            namespace: None,
+            default_namespace: None,
             address: default_address(),
             buckets: super::default_histogram_buckets(),
             quantiles: super::default_summary_quantiles(),
@@ -124,7 +124,7 @@ struct PrometheusExporter {
 
 fn handle(
     req: Request<Body>,
-    namespace: Option<&str>,
+    default_namespace: Option<&str>,
     buckets: &[f64],
     quantiles: &[f64],
     expired: bool,
@@ -142,11 +142,11 @@ fn handle(
             for metric in metrics {
                 let name = &metric.0.name;
                 if !processed_headers.contains(&name) {
-                    s.encode_header(namespace, &metric.0);
+                    s.encode_header(default_namespace, &metric.0);
                     processed_headers.insert(name);
                 };
 
-                s.encode_metric(namespace, &buckets, quantiles, expired, &metric.0);
+                s.encode_metric(default_namespace, &buckets, quantiles, expired, &metric.0);
             }
 
             *response.body_mut() = s.result.into();
@@ -186,7 +186,7 @@ impl PrometheusExporter {
         }
 
         let metrics = Arc::clone(&self.metrics);
-        let namespace = self.config.namespace.clone();
+        let default_namespace = self.config.default_namespace.clone();
         let buckets = self.config.buckets.clone();
         let quantiles = self.config.quantiles.clone();
         let last_flush_timestamp = Arc::clone(&self.last_flush_timestamp);
@@ -194,7 +194,7 @@ impl PrometheusExporter {
 
         let new_service = make_service_fn(move |_| {
             let metrics = Arc::clone(&metrics);
-            let namespace = namespace.clone();
+            let default_namespace = default_namespace.clone();
             let buckets = buckets.clone();
             let quantiles = quantiles.clone();
             let last_flush_timestamp = Arc::clone(&last_flush_timestamp);
@@ -215,7 +215,7 @@ impl PrometheusExporter {
                     .in_scope(|| {
                         handle(
                             req,
-                            namespace.as_deref(),
+                            default_namespace.as_deref(),
                             &buckets,
                             &quantiles,
                             expired,
