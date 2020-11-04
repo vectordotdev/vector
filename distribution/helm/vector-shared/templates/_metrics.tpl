@@ -78,6 +78,8 @@ metadata:
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 spec:
+  jobLabel: app.kubernetes.io/name
+
   selector:
     matchLabels:
       {{- include "libvector.selectorLabels" . | nindent 6 }}
