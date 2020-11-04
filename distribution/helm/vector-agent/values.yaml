@@ -173,6 +173,17 @@ prometheusSink:
   # To be used in clusters that rely on Pod annotations in the form of
   # `prometheus.io/scrape` to discover scrape targets.
   addPodAnnotations: false
+  # Use prometheus-operator `PodMonitor` to opt-in for Prometheus scraping.
+  # To be used in clusters that rely on prometheus-operator to gether metrics.
+  # You might want to set `podMonitorSelectorNilUsesHelmValues=false` if you're
+  # using prometheus-operator Helm chart to allow `PodMonitor` resources
+  # dicovery in all namespaces.
+  podMonitor:
+    # Whether to add the `PodMonitor` resource or not.
+    # `prometheus-operator` CRDs are necessary, otherwise you'll get an error.
+    enabled: false
+    # Additional relabelings to include in the `PodMonitor`.
+    extraRelabelings: []
 
 # Sources to add to the generated `vector` config (besides "built-in" kubernetes
 # logs source).

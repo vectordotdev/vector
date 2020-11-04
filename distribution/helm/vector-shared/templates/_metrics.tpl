@@ -63,3 +63,41 @@ prometheus.io/port: "{{ .listenPort }}"
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Common Vector `PodMonitor` to expose the built-in metrics pipeline for
+`prometheus-operator`-powered scraping.
+Internal metrics are common, so we share and reuse the definition.
+*/}}
+{{- define "libvector.metricsPodMonitor" -}}
+{{- if and .Values.prometheusSink.enabled .Values.prometheusSink.podMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "libvector.fullname" . }}
+  labels:
+    {{- include "libvector.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "libvector.selectorLabels" . | nindent 6 }}
+
+  namespaceSelector:
+    matchNames:
+      - "{{ .Release.Namespace }}"
+
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      relabelings:
+        - action: labeldrop
+          regex: __meta_kubernetes_pod_label_skaffold_dev.*
+        - action: labeldrop
+          regex: __meta_kubernetes_pod_label_pod_template_hash.*
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+        {{- with .Values.prometheusSink.podMonitor.extraRelabelings }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+{{- end }}
+{{- end }}
