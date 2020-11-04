@@ -42,10 +42,6 @@ impl Regex {
         &self.compiled
     }
 
-    pub fn is_global(&self) -> bool {
-        self.global
-    }
-
     fn compile(pattern: &str, multiline: bool, insensitive: bool) -> Result<regex::Regex> {
         regex::RegexBuilder::new(pattern)
             .case_insensitive(insensitive)
