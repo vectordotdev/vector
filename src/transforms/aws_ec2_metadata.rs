@@ -1,3 +1,4 @@
+use crate::transforms::TaskTransform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
@@ -5,9 +6,10 @@ use crate::{
     internal_events::{
         AwsEc2MetadataEventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
     },
-    transforms::{Transform},
+    transforms::Transform,
 };
 use bytes::Bytes;
+use futures01::Stream as Stream01;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
@@ -18,8 +20,6 @@ use std::{
 };
 use tokio::time::{delay_for, Duration, Instant};
 use tracing_futures::Instrument;
-use crate::transforms::TaskTransform;
-use futures01::Stream as Stream01;
 
 type WriteHandle = evmap::WriteHandle<String, Bytes, (), RandomState>;
 type ReadHandle = evmap::ReadHandle<String, Bytes, (), RandomState>;
@@ -173,8 +173,13 @@ impl TransformConfig for Ec2Metadata {
 }
 
 impl TaskTransform for Ec2MetadataTransform {
-    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
-        Self: 'static {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
         let mut inner = self;
         Box::new(task.filter_map(move |event| inner.transform_one(event)))
     }

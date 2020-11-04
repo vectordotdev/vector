@@ -1,13 +1,13 @@
+use crate::transforms::TaskTransform;
 use crate::{
     config::DataType,
     event::{Event, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
-    transforms::{Transform},
+    transforms::Transform,
 };
+use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use crate::transforms::TaskTransform;
-use futures01::Stream as Stream01;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -144,35 +144,40 @@ impl Lua {
 
     pub fn transform_one(&mut self, event: Event) -> Option<Event> {
         match self.process(event) {
-            Ok(event) => {
-                event
-            },
+            Ok(event) => event,
             Err(error) => {
                 emit!(LuaScriptError { error });
                 None
             }
         }
     }
-
 }
 
 impl TaskTransform for Lua {
-    fn transform(self: Box<Self>, task: Box<dyn Stream01<Item=Event, Error=()> + Send>) -> Box<dyn Stream01<Item=Event, Error=()> + Send> where
-        Self: 'static {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
         let mut inner = self;
-        Box::new(task.filter_map(move |event| {
-            let mut output = Vec::with_capacity(1);
-            match inner.process(event) {
-                Ok(event) => {
-                    output.extend(event.into_iter());
-                    Some(futures01::stream::iter_ok(output))
-                },
-                Err(error) => {
-                    emit!(LuaScriptError { error });
-                    None
+        Box::new(
+            task.filter_map(move |event| {
+                let mut output = Vec::with_capacity(1);
+                match inner.process(event) {
+                    Ok(event) => {
+                        output.extend(event.into_iter());
+                        Some(futures01::stream::iter_ok(output))
+                    }
+                    Err(error) => {
+                        emit!(LuaScriptError { error });
+                        None
+                    }
                 }
-            }
-        }).flatten())
+            })
+            .flatten(),
+        )
     }
 }
 
