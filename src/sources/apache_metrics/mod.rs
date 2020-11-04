@@ -334,7 +334,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://foo:bar@{}/metrics", in_addr)],
@@ -402,7 +402,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
         wait_for_tcp(in_addr).await;
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],
@@ -443,7 +443,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         // will have nothing bound
         let in_addr = next_addr();
 
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
 
         let source = ApacheMetricsConfig {
             endpoints: vec![format!("http://{}", in_addr)],

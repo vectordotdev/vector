@@ -127,7 +127,7 @@ mod test {
     }
 
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
 
         let server = source
             .build(

@@ -216,7 +216,7 @@ mod tests {
         auth: Option<HttpSourceAuthConfig>,
         query_parameters: Vec<String>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test();
+        let (sender, recv) = Pipeline::new_test(vec![]);
         let address = next_addr();
         tokio::spawn(async move {
             LogplexConfig {

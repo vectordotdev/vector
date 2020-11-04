@@ -155,7 +155,7 @@ mod tests {
     async fn stdin_decodes_line() {
         trace_init();
 
-        let (tx, mut rx) = Pipeline::new_test();
+        let (tx, mut rx) = Pipeline::new_test(vec![]);
         let config = StdinConfig::default();
         let buf = Cursor::new("hello world\nhello world again");
 

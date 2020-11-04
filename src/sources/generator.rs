@@ -126,7 +126,7 @@ mod tests {
     }
 
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let config: GeneratorConfig = toml::from_str(config).unwrap();
         config
             .generator(ShutdownSignal::noop(), tx)

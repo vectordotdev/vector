@@ -186,7 +186,7 @@ mod test {
     //////// TCP TESTS ////////
     #[tokio::test]
     async fn tcp_it_includes_host() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
@@ -212,7 +212,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_it_includes_source_type() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
@@ -241,7 +241,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_continue_after_long_line() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let mut rx = rx.compat();
         let addr = next_addr();
 
@@ -281,7 +281,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let mut rx = rx.compat();
         let addr = next_addr();
 
@@ -331,7 +331,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls_intermediate_ca() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let mut rx = rx.compat();
         let addr = next_addr();
 
@@ -390,7 +390,7 @@ mod test {
     #[tokio::test]
     async fn tcp_shutdown_simple() {
         let source_name = "tcp_shutdown_simple";
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let addr = next_addr();
 
         let mut shutdown = SourceShutdownCoordinator::default();
@@ -428,7 +428,7 @@ mod test {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = Pipeline::new_with_buffer(10_000);
+        let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
@@ -552,7 +552,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_message() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test".to_string()]);
@@ -566,7 +566,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_multiple_messages() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test\ntest2".to_string()]);
@@ -584,7 +584,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_multiple_packets() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
@@ -602,7 +602,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_it_includes_host() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let address = init_udp(tx).await;
 
         let from = send_lines_udp(address, vec!["test".to_string()]);
@@ -616,7 +616,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_it_includes_source_type() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let address = init_udp(tx).await;
 
         let _ = send_lines_udp(address, vec!["test".to_string()]);
@@ -630,7 +630,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_shutdown_simple() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let source_name = "udp_shutdown_simple";
 
         let mut shutdown = SourceShutdownCoordinator::default();
@@ -656,7 +656,7 @@ mod test {
 
     #[tokio::test]
     async fn udp_shutdown_infinite_stream() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let source_name = "udp_shutdown_infinite_stream";
 
         let mut shutdown = SourceShutdownCoordinator::default();
@@ -734,7 +734,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_message() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test"]).await;
@@ -755,7 +755,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_multiple_messages() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test\ntest2"]).await;
@@ -775,7 +775,7 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_multiple_packets() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, rx) = Pipeline::new_test(vec![]);
         let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test", "test2"]).await;
