@@ -203,10 +203,43 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							in_flight_limit: {
-								common:      true
-								description: "The maximum number of in-flight requests allowed at any given time."
+							auto_concurrency: {
+								common:      false
+								description: "Configure the auto-concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
 								required:    false
+								type: object: {
+									examples: []
+									options: {
+										decrease_ratio: {
+											common:      false
+											description: "The fraction of the current value to set the new concurrency limit when decreasing the limit. Valid values are greater than 0 and less than 1. Smaller values cause the algorithm to scale back rapidly when latency increases. Note that the new limit is rounded down after applying this ratio."
+											required:    false
+											type: float: default: 0.9
+										}
+										ewma_alpha: {
+											common:      false
+											description: "The auto-concurrency algorithm uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with the current RTT. This value controls how heavily new measurements are weighted compared to older ones. Valid values are greater than 0 and less than 1. Smaller values cause this reference to adjust more slowly, which may be useful if a service has unusually high response variability."
+											required:    false
+											type: float: default: 0.7
+										}
+										rtt_threshold_ratio: {
+											common:      false
+											description: "When comparing the past RTT average to the current measurements, we ignore changes that are less than this ratio higher than the past RTT. Valid values are greater than or equal to 0. Larger values cause the algorithm to ignore larger increases in the RTT."
+											required:    false
+											type: float: default: 0.05
+										}
+									}
+								}
+							}
+							in_flight_limit: {
+								common: true
+								if sinks[Name].features.send.request.auto_concurrency {
+									description: "The maximum number of in-flight requests allowed at any given time, or \"auto\" to allow Vector to automatically set the limit based on current network and service conditions."
+								}
+								if !sinks[Name].features.send.request.auto_concurrency {
+									description: "The maximum number of in-flight requests allowed at any given time."
+								}
+								required: false
 								type: uint: {
 									default: sinks[Name].features.send.request.in_flight_limit
 									unit:    "requests"
