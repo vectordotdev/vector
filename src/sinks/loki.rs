@@ -344,8 +344,7 @@ mod integration_tests {
         test_util::random_lines, Event,
     };
     use bytes::Bytes;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
     use std::convert::TryFrom;
 
     #[tokio::test]
@@ -372,9 +371,8 @@ mod integration_tests {
 
         let events = lines.clone().into_iter().map(Event::from);
         let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
             .await
             .unwrap();
 
@@ -410,9 +408,8 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
         let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events.clone()))
-            .compat()
+            .into_sink()
+            .send_all(&mut stream::iter(events.clone()).map(Ok))
             .await
             .unwrap();
 
@@ -458,9 +455,8 @@ mod integration_tests {
         }
 
         let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
             .await
             .unwrap();
 

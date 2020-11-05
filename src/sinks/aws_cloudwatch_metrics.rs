@@ -12,17 +12,20 @@ use crate::{
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{future, future::BoxFuture, FutureExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{
+    compat::Sink01CompatExt, future, future::BoxFuture, stream, FutureExt, SinkExt, StreamExt,
+};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
 };
 use rusoto_core::{Region, RusotoError};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::task::{Context, Poll};
+use std::{
+    collections::BTreeMap,
+    convert::TryInto,
+    task::{Context, Poll},
+};
 use tower::Service;
 
 #[derive(Clone)]
@@ -140,6 +143,7 @@ impl CloudWatchMetricsSvc {
         let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_compat()
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |mut event: Event| {
                 let namespace = event
@@ -147,10 +151,10 @@ impl CloudWatchMetricsSvc {
                     .namespace
                     .take()
                     .unwrap_or_else(|| default_namespace.clone());
-                iter_ok(Some(PartitionInnerBuffer::new(event, namespace)))
+                stream::iter(Some(PartitionInnerBuffer::new(event, namespace))).map(Ok)
             });
 
-        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(super::VectorSink::Sink(Box::new(sink)))
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
@@ -432,14 +436,8 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{
-        config::SinkContext,
-        event::{metric::StatisticKind, Event},
-        rusoto::RegionOrEndpoint,
-        test_util::random_string,
-    };
+    use crate::{event::metric::StatisticKind, test_util::random_string, Event};
     use chrono::offset::TimeZone;
-    use futures::{stream, StreamExt};
     use rand::seq::SliceRandom;
 
     fn config() -> CloudWatchMetricsSinkConfig {
