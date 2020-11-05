@@ -5,12 +5,17 @@ on:
     branches:
       - master
     paths:
+      - '.github/workflows/install-sh.yml'
       - 'distribution/install.sh'
+  workflow_dispatch:
+
 
 jobs:
   sync-install:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v1
+      - run: pip3 install awscli --upgrade --user
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.CI_AWS_SECRET_ACCESS_KEY }}"
