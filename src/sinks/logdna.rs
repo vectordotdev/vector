@@ -371,58 +371,61 @@ mod tests {
 
         let lines = random_lines(100).take(10).collect::<Vec<_>>();
         let mut events = Vec::new();
+        let hosts = ["host0", "host1"];
 
+        let mut partitions = vec![Vec::new(), Vec::new()];
         // Create 10 events where the first one contains custom
         // fields that are not just `message`.
         for (i, line) in lines.iter().enumerate() {
-            let mut event = if i == 0 {
-                let mut event = Event::from(line.as_str());
-                event.as_mut_log().insert("key1", "value1");
-                event
-            } else {
-                Event::from(line.as_str())
-            };
-            // let hostname = if i % 2 == 0 { "host0" } else { "host1" };
-            // event.as_mut_log().insert("hostname", hostname);
+            let mut event = Event::from(line.as_str());
+            let p = i % 2;
+            event.as_mut_log().insert("hostname", hosts[p]);
 
-            events.push(event);
+            partitions[p].push(line);
+            events.push(event.clone());
         }
 
         sink.run(stream::iter(events)).await.unwrap();
 
-        let output = rx.next().await.unwrap();
+        for _ in 0..partitions.len() {
+            let output = rx.next().await.unwrap();
 
-        let request = &output.0;
-        let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
+            let request = &output.0;
+            let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
-        let query = request.uri.query().unwrap();
-        assert!(query.contains("hostname=host1") || query.contains("hostname=host2"));
-        assert!(query.contains("ip=127.0.0.1"));
-        assert!(query.contains("mac=some-mac-addr"));
-        assert!(query.contains("tags=test%2Cmaybeanothertest"));
+            let query = request.uri.query().unwrap();
 
-        let output = body
-            .as_object()
-            .unwrap()
-            .get("lines")
-            .unwrap()
-            .as_array()
-            .unwrap();
+            let (p, host) = hosts
+                .iter()
+                .enumerate()
+                .find(|(_, host)| query.contains(&format!("hostname={}", host)))
+                .expect("invalid hostname");
+            let lines = &partitions[p];
 
-        for (i, line) in output.iter().enumerate() {
-            // All lines are json objects
-            let line = line.as_object().unwrap();
+            assert!(query.contains("ip=127.0.0.1"));
+            assert!(query.contains("mac=some-mac-addr"));
+            assert!(query.contains("tags=test%2Cmaybeanothertest"));
 
-            assert_eq!(line.get("app").unwrap(), &json!("vector"));
-            assert_eq!(line.get("env").unwrap(), &json!("production"));
-            assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
+            let output = body
+                .as_object()
+                .unwrap()
+                .get("lines")
+                .unwrap()
+                .as_array()
+                .unwrap();
 
-            if i == 0 {
+            for (i, line) in output.iter().enumerate() {
+                // All lines are json objects
+                let line = line.as_object().unwrap();
+
+                assert_eq!(line.get("app").unwrap(), &json!("vector"));
+                assert_eq!(line.get("env").unwrap(), &json!("production"));
+                assert_eq!(line.get("line").unwrap(), &json!(lines[i]));
+
                 assert_eq!(
                     line.get("meta").unwrap(),
                     &json!({
-                        "key1": "value1",
-                        "hostname": "vector",
+                        "hostname": host,
                     })
                 );
             }
