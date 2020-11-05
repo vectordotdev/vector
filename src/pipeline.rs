@@ -1,15 +1,30 @@
 use crate::{transforms::FunctionTransform, Event};
 use futures01::{
     sync::mpsc::{channel, Receiver, SendError, Sender},
-    AsyncSink, Poll, Sink,
+    Async, AsyncSink, Poll, Sink,
 };
+use std::collections::VecDeque;
 
 #[derive(Derivative, Clone)]
 #[derivative(Debug)]
 pub struct Pipeline {
     inner: Sender<Event>,
+    // We really just keep this around in case we need to rebuild.
     #[derivative(Debug = "ignore")]
     inlines: Vec<Box<dyn FunctionTransform>>,
+    enqueued: VecDeque<Event>,
+}
+
+impl Pipeline {
+    fn try_empty_queue(&mut self) -> Poll<(), <Self as Sink>::SinkError> {
+        while let Some(event) = self.enqueued.pop_front() {
+            if let AsyncSink::NotReady(item) = self.inner.start_send(event)? {
+                self.enqueued.push_front(item);
+                return Ok(Async::NotReady);
+            }
+        }
+        Ok(Async::Ready(()))
+    }
 }
 
 impl Sink for Pipeline {
@@ -20,10 +35,25 @@ impl Sink for Pipeline {
         &mut self,
         item: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        self.inner.start_send(item)
+        // Note how this gets **swapped** with `new_working_set` in the loop.
+        // At the end of the loop, it will only contain finalized events.
+        let mut working_set = vec![item];
+        for inline in self.inlines.iter_mut() {
+            let mut new_working_set = Vec::with_capacity(working_set.len());
+            for event in working_set.drain(..) {
+                inline.transform(&mut new_working_set, event);
+            }
+            core::mem::swap(&mut new_working_set, &mut working_set);
+        }
+        self.enqueued.extend(working_set);
+
+        self.try_empty_queue()?;
+        Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+        futures01::try_ready!(self.try_empty_queue());
+        debug_assert!(self.enqueued.is_empty());
         self.inner.poll_complete()
     }
 }
@@ -43,10 +73,84 @@ impl Pipeline {
     }
 
     pub fn from_sender(inner: Sender<Event>, inlines: Vec<Box<dyn FunctionTransform>>) -> Self {
-        Self { inner, inlines }
+        Self {
+            inner,
+            inlines,
+            // We ensure the buffer is sufficient that it is unlikely to require reallocations.
+            // There is a possibility a component might blow this queue size.
+            enqueued: VecDeque::with_capacity(10),
+        }
     }
 
     pub fn poll_ready(&mut self) -> Poll<(), SendError<()>> {
         self.inner.poll_ready()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{transforms::add_fields::AddFields, Event, Value};
+    use futures::compat::Future01CompatExt;
+    use futures01::Stream;
+    use serde_json::json;
+    use std::convert::TryFrom;
+
+    const KEYS: [&str; 2] = ["booper", "swooper"];
+
+    const VALS: [&str; 2] = ["Pineapple", "Coconut"];
+
+    #[tokio::test]
+    async fn one_inline() -> Result<(), crate::Error> {
+        let transform_1 = AddFields::new(
+            indexmap::indexmap! {
+                KEYS[0].into() => Value::from(VALS[0]),
+            },
+            false,
+        )?;
+
+        let (pipeline, reciever) = Pipeline::new_test(vec![Box::new(transform_1)]);
+
+        let event = Event::try_from(json!({
+            "message": "MESSAGE_MARKER",
+        }))?;
+
+        pipeline.send(event).compat().await?;
+        let out = reciever.wait().next().unwrap().unwrap();
+
+        assert_eq!(out.as_log().get(KEYS[0]), Some(&Value::from(VALS[0])),);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn two_inline() -> Result<(), crate::Error> {
+        let transform_1 = AddFields::new(
+            indexmap::indexmap! {
+                KEYS[0].into() => Value::from(VALS[0]),
+            },
+            false,
+        )?;
+        let transform_2 = AddFields::new(
+            indexmap::indexmap! {
+                KEYS[1].into() => Value::from(VALS[1]),
+            },
+            false,
+        )?;
+
+        let (pipeline, reciever) =
+            Pipeline::new_test(vec![Box::new(transform_1), Box::new(transform_2)]);
+
+        let event = Event::try_from(json!({
+            "message": "MESSAGE_MARKER",
+        }))?;
+
+        pipeline.send(event).compat().await?;
+        let out = reciever.wait().next().unwrap().unwrap();
+
+        assert_eq!(out.as_log().get(KEYS[0]), Some(&Value::from(VALS[0])),);
+        assert_eq!(out.as_log().get(KEYS[1]), Some(&Value::from(VALS[1])),);
+
+        Ok(())
     }
 }
