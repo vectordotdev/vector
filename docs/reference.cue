@@ -496,8 +496,9 @@ _values: {
 }
 
 #MetricEvent: {
-	kind: "incremental" | "absolute"
-	name: string
+	kind:       "incremental" | "absolute"
+	name:       string
+	namespace?: string
 	tags: [Name=string]: string
 	timestamp?: string
 	close({counter: #MetricEventCounter}) |

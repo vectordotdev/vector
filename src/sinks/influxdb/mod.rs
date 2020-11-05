@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::{http::HttpClient, sinks::util::encode_namespace};
+use crate::http::HttpClient;
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
@@ -62,14 +62,14 @@ pub struct InfluxDB2Settings {
 }
 
 trait InfluxDBSettings: std::fmt::Debug {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn token(self: &Self) -> String;
-    fn protocol_version(self: &Self) -> ProtocolVersion;
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
+    fn token(&self) -> String;
+    fn protocol_version(&self) -> ProtocolVersion;
 }
 
 impl InfluxDBSettings for InfluxDB1Settings {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "write",
@@ -84,21 +84,21 @@ impl InfluxDBSettings for InfluxDB1Settings {
         )
     }
 
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(self: &Self) -> String {
+    fn token(&self) -> String {
         "".to_string()
     }
 
-    fn protocol_version(self: &Self) -> ProtocolVersion {
+    fn protocol_version(&self) -> ProtocolVersion {
         ProtocolVersion::V1
     }
 }
 
 impl InfluxDBSettings for InfluxDB2Settings {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "api/v2/write",
@@ -110,15 +110,15 @@ impl InfluxDBSettings for InfluxDB2Settings {
         )
     }
 
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(&endpoint, "health", &[])
     }
 
-    fn token(self: &Self) -> String {
+    fn token(&self) -> String {
         self.token.clone()
     }
 
-    fn protocol_version(self: &Self) -> ProtocolVersion {
+    fn protocol_version(&self) -> ProtocolVersion {
         ProtocolVersion::V2
     }
 }
@@ -755,7 +755,6 @@ mod tests {
 #[cfg(test)]
 mod integration_tests {
     use crate::{
-        config::SinkContext,
         http::HttpClient,
         sinks::influxdb::{
             healthcheck,
@@ -768,7 +767,6 @@ mod integration_tests {
     async fn influxdb2_healthchecks_ok() {
         onboarding_v2().await;
 
-        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -776,7 +774,7 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -788,7 +786,6 @@ mod integration_tests {
     async fn influxdb2_healthchecks_fail() {
         onboarding_v2().await;
 
-        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:9999".to_string();
         let influxdb1_settings = None;
         let influxdb2_settings = Some(InfluxDB2Settings {
@@ -796,7 +793,7 @@ mod integration_tests {
             bucket: BUCKET.to_string(),
             token: TOKEN.to_string(),
         });
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -806,7 +803,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn influxdb1_healthchecks_ok() {
-        let cx = SinkContext::new_test();
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -816,7 +812,7 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()
@@ -826,7 +822,6 @@ mod integration_tests {
 
     #[tokio::test]
     async fn influxdb1_healthchecks_fail() {
-        let cx = SinkContext::new_test();
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
             database: DATABASE.to_string(),
@@ -836,7 +831,7 @@ mod integration_tests {
             password: None,
         });
         let influxdb2_settings = None;
-        let client = HttpClient::new(cx.resolver(), None).unwrap();
+        let client = HttpClient::new(None).unwrap();
 
         healthcheck(endpoint, influxdb1_settings, influxdb2_settings, client)
             .unwrap()

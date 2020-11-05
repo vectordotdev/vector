@@ -64,15 +64,6 @@ components: sinks: _influxdb: {
 				examples: ["http://localhost:8086/", "https://us-west-2-1.aws.cloud1.influxdata.com", "https://us-west-2-1.aws.cloud2.influxdata.com"]
 			}
 		}
-		namespace: {
-			description: "A prefix that will be added to all metric names."
-			groups: ["v1", "v2"]
-			required: true
-			warnings: []
-			type: string: {
-				examples: ["service"]
-			}
-		}
 		org: {
 			category:    "Auth"
 			description: "Specifies the destination organization for writes into InfluxDB 2."

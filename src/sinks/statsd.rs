@@ -29,7 +29,7 @@ pub struct StatsdSvc {
 // TODO: add back when serde-rs/serde#1358 is addressed
 // #[serde(deny_unknown_fields)]
 pub struct StatsdSinkConfig {
-    pub namespace: Option<String>,
+    pub default_namespace: Option<String>,
     #[serde(flatten)]
     pub mode: Mode,
 }
@@ -63,7 +63,7 @@ fn default_address() -> SocketAddr {
 impl GenerateConfig for StatsdSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
-            namespace: None,
+            default_namespace: None,
             mode: Mode::Udp(StatsdUdpConfig {
                 batch: Default::default(),
                 udp: UdpSinkConfig {
@@ -82,12 +82,11 @@ impl SinkConfig for StatsdSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let namespace = self.namespace.clone();
-
+        let default_namespace = self.default_namespace.clone();
         match &self.mode {
             Mode::Tcp(config) => {
                 let encode_event =
-                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                    move |event| encode_event(event, default_namespace.as_deref()).map(Into::into);
                 config.build(cx, encode_event)
             }
             Mode::Udp(config) => {
@@ -111,7 +110,7 @@ impl SinkConfig for StatsdSinkConfig {
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
                 .with_flat_map(move |event| {
-                    stream::iter_ok(encode_event(event, namespace.as_deref()))
+                    stream::iter_ok(encode_event(event, default_namespace.as_deref()))
                 });
 
                 Ok((
@@ -122,7 +121,7 @@ impl SinkConfig for StatsdSinkConfig {
             #[cfg(unix)]
             Mode::Unix(config) => {
                 let encode_event =
-                    move |event| encode_event(event, namespace.as_deref()).map(Into::into);
+                    move |event| encode_event(event, default_namespace.as_deref()).map(Into::into);
                 config.build(cx, encode_event)
             }
         }
@@ -172,7 +171,7 @@ fn push_event<V: Display>(
     };
 }
 
-fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
+fn encode_event(event: Event, default_namespace: Option<&str>) -> Option<Vec<u8>> {
     let mut buf = Vec::new();
 
     let metric = event.as_metric();
@@ -216,7 +215,11 @@ fn encode_event(event: Event, namespace: Option<&str>) -> Option<Vec<u8>> {
         }
     };
 
-    let message = encode_namespace(namespace, '.', buf.join("|"));
+    let message = encode_namespace(
+        metric.namespace.as_deref().or(default_namespace),
+        '.',
+        buf.join("|"),
+    );
 
     let mut body: Vec<u8> = message.into_bytes();
     body.push(b'\n');
@@ -394,7 +397,7 @@ mod test {
         let addr = next_addr();
 
         let config = StatsdSinkConfig {
-            namespace: Some("vector".into()),
+            default_namespace: Some("ns".into()),
             mode: Mode::Udp(StatsdUdpConfig {
                 batch: BatchConfig {
                     max_bytes: Some(512),
@@ -413,7 +416,7 @@ mod test {
         let events = vec![
             Event::Metric(Metric {
                 name: "counter".to_owned(),
-                namespace: None,
+                namespace: Some("vector".into()),
                 timestamp: None,
                 tags: Some(tags()),
                 kind: MetricKind::Incremental,
@@ -421,7 +424,7 @@ mod test {
             }),
             Event::Metric(Metric {
                 name: "histogram".to_owned(),
-                namespace: None,
+                namespace: Some("vector".into()),
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,

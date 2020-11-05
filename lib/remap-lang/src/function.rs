@@ -82,7 +82,7 @@ impl ArgumentList {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Argument {
     Expression(Box<dyn Expression>),
     Regex(regex::Regex),

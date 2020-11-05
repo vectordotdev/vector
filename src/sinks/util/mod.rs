@@ -6,6 +6,7 @@ pub mod http;
 pub mod retries;
 pub mod service;
 pub mod sink;
+pub mod socket_bytes_sink;
 pub mod statistic;
 pub mod tcp;
 #[cfg(test)]
@@ -32,7 +33,7 @@ pub use service::{
     InFlightLimit, ServiceBuilderExt, TowerBatchedSink, TowerRequestConfig, TowerRequestLayer,
     TowerRequestSettings,
 };
-pub use sink::{BatchSink, PartitionBatchSink, StreamSink, StreamSinkOld};
+pub use sink::{BatchSink, PartitionBatchSink, StreamSink};
 pub use uri::UriSerde;
 
 #[derive(Debug, Snafu)]
@@ -81,19 +82,14 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
     .ok()
 }
 
-/// Joins namespace with name via delimiter if namespace is present and not empty.
+/// Joins namespace with name via delimiter if namespace is present.
 pub fn encode_namespace<'a>(
     namespace: Option<&str>,
     delimiter: char,
     name: impl Into<Cow<'a, str>>,
 ) -> String {
     let name = name.into();
-    match namespace {
-        Some(namespace) if namespace.is_empty() => {
-            warn!("Dropping empty namespace. This feature has been deprecated, and could be removed in the future.");
-            name.into_owned()
-        }
-        Some(namespace) => format!("{}{}{}", namespace, delimiter, name),
-        _ => name.into_owned(),
-    }
+    namespace
+        .map(|namespace| format!("{}{}{}", namespace, delimiter, name))
+        .unwrap_or_else(|| name.into_owned())
 }

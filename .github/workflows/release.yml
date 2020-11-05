@@ -69,6 +69,40 @@ jobs:
           name: "vector-aarch64.rpm"
           path: "./target/artifacts/vector-aarch64.rpm"
 
+  build-armv7-unknown-linux-gnueabihf-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make ci-sweep
+      - env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-armv7-unknown-linux-gnueabihf-all
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7-unknown-linux-gnueabihf.tar.gz"
+          path: "./target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armhf.deb"
+          path: "./target/artifacts/vector-armhf.deb"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7.rpm"
+          path: "./target/artifacts/vector-armv7.rpm"
+
+  build-armv7-unknown-linux-musleabihf-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - run: make ci-sweep
+      - env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-armv7-unknown-linux-musleabihf
+      - uses: actions/upload-artifact@v1
+        with:
+          name: "vector-armv7-unknown-linux-musleabihf.tar.gz"
+          path: "./target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz"
+
   build-x86_64-apple-darwin-packages:
     runs-on: macos-10.15
     steps:
@@ -158,6 +192,8 @@ jobs:
       - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
+      - build-armv7-unknown-linux-musleabihf-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
@@ -171,6 +207,14 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armv7-unknown-linux-gnueabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -199,6 +243,14 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armv7.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armhf.deb
           path: target/artifacts
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
@@ -213,6 +265,8 @@ jobs:
       - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-apple-darwin-packages
       - build-x86_64-pc-windows-msvc-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
+      - build-armv7-unknown-linux-musleabihf-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
@@ -226,6 +280,14 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64-unknown-linux-musl.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armv7-unknown-linux-gnueabihf.tar.gz
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armv7-unknown-linux-musleabihf.tar.gz
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -254,6 +316,14 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armv7.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armhf.deb
           path: target/artifacts
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -266,52 +336,12 @@ jobs:
   release-homebrew:
     runs-on: ubuntu-20.04
     needs:
-      - build-x86_64-unknown-linux-gnu-packages
-      - build-x86_64-unknown-linux-musl-packages
-      - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-apple-darwin-packages
-      - build-x86_64-pc-windows-msvc-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
         with:
-          name: vector-x86_64-unknown-linux-gnu.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-x86_64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-aarch64-unknown-linux-musl.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-amd64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-arm64.deb
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
           name: vector-x86_64-apple-darwin.tar.gz
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-x86_64-pc-windows-msvc.zip
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-x64.msi
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-x86_64.rpm
-          path: target/artifacts
-      - uses: actions/download-artifact@v2
-        with:
-          name: vector-aarch64.rpm
           path: target/artifacts
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -325,6 +355,7 @@ jobs:
     needs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-armv7-unknown-linux-gnueabihf-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
@@ -395,6 +426,32 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-aarch64.rpm"
+      - name: Push armhf deb
+        id: push-deb-armhf
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "deb"
+          owner: "timber"
+          repo: "vector-nightly"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-armhf.deb"
+      - name: Push armv7-gnu RPM
+        id: push-rpm-armv7-gnu
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "rpm"
+          owner: "timber"
+          repo: "vector-nightly"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-armv7.rpm"
 
   release-helm:
     runs-on: ubuntu-latest

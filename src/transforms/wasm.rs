@@ -1,6 +1,6 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     wasm::WasmModule,
 };
@@ -64,7 +64,7 @@ impl GenerateConfig for WasmConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
         Ok(Box::new(Wasm::new(self.clone())?))
     }
 
@@ -95,7 +95,7 @@ impl Wasm {
 }
 
 impl Transform for Wasm {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         self.module
             .process(event)
             .map(|outputs| outputs.into_iter().next())

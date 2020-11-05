@@ -1,9 +1,10 @@
 use super::{cri::Cri, docker::Docker};
 use crate::{
     event::{Event, Value},
-    transforms::Transform,
+    transforms::FunctionTransform,
 };
 
+#[derive(Clone, Debug)]
 pub enum Picker {
     Init,
     Docker(Docker),
@@ -16,8 +17,8 @@ impl Picker {
     }
 }
 
-impl Transform for Picker {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Picker {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         match self {
             Picker::Init => {
                 let message = event
@@ -34,10 +35,10 @@ impl Transform for Picker {
                 } else {
                     *self = Picker::Cri(Cri::new())
                 }
-                self.transform(event)
+                self.transform(output, event)
             }
-            Picker::Docker(t) => t.transform(event),
-            Picker::Cri(t) => t.transform(event),
+            Picker::Docker(t) => t.transform(output, event),
+            Picker::Cri(t) => t.transform(output, event),
         }
     }
 }
@@ -45,8 +46,8 @@ impl Transform for Picker {
 #[cfg(test)]
 mod tests {
     use super::super::{cri, docker, test_util};
-    use super::{Picker, Transform};
-    use crate::{event::LogEvent, Event};
+    use super::*;
+    use crate::{event::LogEvent, transforms::Transform, Event};
 
     /// Picker has to work for all test cases for underlying parsers.
     fn cases() -> Vec<(String, LogEvent)> {
@@ -58,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_parsing() {
-        test_util::test_parser(Picker::new, cases());
+        test_util::test_parser(|| Transform::function(Picker::new()), cases());
     }
 
     #[test]
@@ -68,8 +69,8 @@ mod tests {
         for message in cases {
             let input = Event::from(message);
             let mut picker = Picker::new();
-            let output = picker.transform(input);
-            assert!(output.is_none());
+            let output = picker.transform_one(input);
+            assert!(output.is_none(), "Expected none: {:?}", output);
         }
     }
 }

@@ -12,99 +12,30 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("connections_established_total", 1, "mode" => "unix");
+        counter!("connection_established_total", 1, "mode" => "unix");
     }
 }
 
 #[derive(Debug)]
-pub struct UnixSocketConnectionFailure<'a, E> {
+pub struct UnixSocketConnectionFailed<'a, E> {
     pub error: E,
     pub path: &'a std::path::Path,
 }
 
-impl<E: std::error::Error> InternalEvent for UnixSocketConnectionFailure<'_, E> {
+impl<E> InternalEvent for UnixSocketConnectionFailed<'_, E>
+where
+    E: std::error::Error,
+{
     fn emit_logs(&self) {
         error!(
-            message = "Unix socket connection failure.",
-            error = ?self.error,
+            message = "Unable to connect.",
+            error = %self.error,
             path = ?self.path,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("connection_failures_total", 1, "mode" => "unix");
-    }
-}
-
-#[derive(Debug)]
-pub struct UnixSocketSendFailed<'a, E> {
-    pub error: E,
-    pub path: &'a std::path::Path,
-}
-
-impl<E: std::error::Error> InternalEvent for UnixSocketSendFailed<'_, E> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Unix socket send failed.",
-            error = ?self.error,
-            path = ?self.path,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("connection_send_errors_total", 1, "mode" => "unix");
-    }
-}
-
-#[derive(Debug)]
-pub struct UnixSocketFlushFailed<'a, E> {
-    pub error: E,
-    pub path: &'a std::path::Path,
-}
-
-impl<E: std::error::Error> InternalEvent for UnixSocketFlushFailed<'_, E> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Flush failed.",
-            error = ?self.error,
-            path = ?self.path,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("connection_flush_errors_total", 1, "mode" => "unix");
-    }
-}
-
-#[derive(Debug)]
-pub struct UnixSocketEventSent {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for UnixSocketEventSent {
-    fn emit_metrics(&self) {
-        counter!("events_processed_total", 1, "mode" => "unix");
-        counter!("processed_bytes_total", self.byte_size as u64, "mode" => "unix");
-    }
-}
-
-#[derive(Debug)]
-pub struct UnixSocketReceiveFailed<'a, E> {
-    pub error: E,
-    pub path: &'a std::path::Path,
-}
-
-impl<E: std::error::Error> InternalEvent for UnixSocketReceiveFailed<'_, E> {
-    fn emit_logs(&self) {
-        error!(
-            message = "Error receiving data.",
-            error = ?self.error,
-            path = ?self.path,
-        );
-    }
-
-    fn emit_metrics(&self) {
-        counter!("connection_errors_total", 1, "mode" => "unix");
+        counter!("connection_failed_total", 1, "mode" => "unix");
     }
 }
 
@@ -114,13 +45,14 @@ pub struct UnixSocketError<'a, E> {
     pub path: &'a std::path::Path,
 }
 
-impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEvent
-    for UnixSocketError<'_, E>
+impl<E> InternalEvent for UnixSocketError<'_, E>
+where
+    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
     fn emit_logs(&self) {
         debug!(
             message = "Unix socket error.",
-            error = ?self.error,
+            error = %self.error,
             path = ?self.path,
         );
     }

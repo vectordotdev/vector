@@ -32,7 +32,7 @@ impl Function for Round {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct RoundFn {
     value: Box<dyn Expression>,
     precision: Option<Box<dyn Expression>>,

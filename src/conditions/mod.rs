@@ -9,7 +9,7 @@ pub mod remap;
 
 pub use check_fields::CheckFieldsConfig;
 
-pub trait Condition: Send + Sync {
+pub trait Condition: Send + Sync + dyn_clone::DynClone {
     fn check(&self, e: &Event) -> bool;
 
     /// Provides context for a failure. This is potentially mildly expensive if
@@ -23,16 +23,20 @@ pub trait Condition: Send + Sync {
     }
 }
 
+dyn_clone::clone_trait_object!(Condition);
+
 #[typetag::serde(tag = "type")]
-pub trait ConditionConfig: std::fmt::Debug + Send + Sync {
+pub trait ConditionConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone {
     fn build(&self) -> crate::Result<Box<dyn Condition>>;
 }
+
+dyn_clone::clone_trait_object!(ConditionConfig);
 
 pub type ConditionDescription = ComponentDescription<Box<dyn ConditionConfig>>;
 
 inventory::collect!(ConditionDescription);
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(untagged)]
 pub enum AnyCondition {
     FromType(Box<dyn ConditionConfig>),

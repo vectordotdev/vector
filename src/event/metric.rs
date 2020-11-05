@@ -233,7 +233,7 @@ impl Metric {
 
         Self {
             name: key.name().to_string(),
-            namespace: None,
+            namespace: Some("vector".to_string()),
             timestamp: Some(Utc::now()),
             tags: if labels.is_empty() {
                 None

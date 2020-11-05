@@ -10,6 +10,8 @@ mod api;
 mod auto_concurrency;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 mod aws_cloudwatch_logs_subscription_parser;
+#[cfg(feature = "transforms-aws_ec2_metadata")]
+mod aws_ec2_metadata;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
@@ -71,11 +73,6 @@ mod rename_fields;
 mod sampler;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
-#[cfg(any(
-    feature = "sources-socket",
-    feature = "sources-syslog",
-    feature = "sources-vector"
-))]
 mod socket;
 mod split;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]
@@ -111,6 +108,8 @@ pub use self::api::*;
 pub use self::auto_concurrency::*;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
+#[cfg(feature = "transforms-aws_ec2_metadata")]
+pub use self::aws_ec2_metadata::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
@@ -172,7 +171,6 @@ pub use self::rename_fields::*;
 pub use self::sampler::*;
 #[cfg(feature = "sinks-sematext")]
 pub use self::sematext_metrics::*;
-#[cfg(feature = "sources-socket")]
 pub(crate) use self::socket::*;
 pub use self::split::*;
 #[cfg(any(feature = "sources-splunk_hec", feature = "sinks-splunk_hec"))]

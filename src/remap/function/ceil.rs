@@ -32,7 +32,7 @@ impl Function for Ceil {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CeilFn {
     value: Box<dyn Expression>,
     precision: Option<Box<dyn Expression>>,
