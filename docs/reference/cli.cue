@@ -59,13 +59,16 @@ _default_flags: {
 	}
 }
 
-vector: cli: #CommandLineTool & {
+cli: #CommandLineTool & {
 	name: "vector"
 
 	flags: _default_flags & {
 		"quiet": {
-			_short:      "q"
-			description: "Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`"
+			_short: "q"
+			description: """
+				Reduce detail of internal logging. Repeat to reduce further. Overrides
+				`--verbose`
+				"""
 		}
 		"require-healthy": {
 			_short:      "r"
@@ -202,7 +205,10 @@ vector: cli: #CommandLineTool & {
 					description: "Disables topology check"
 				}
 				"no-environment": {
-					description: "Disables environment checks. That includes component checks and health checks"
+					description: """
+						Disables environment checks. That includes component
+						checks and health checks
+						"""
 				}
 				"deny-warnings": {
 					description: "Fail validation on warnings"
@@ -212,7 +218,11 @@ vector: cli: #CommandLineTool & {
 			options: {
 				n: {
 					description: """
-						Shorthand for the `--no-topology` and `--no-environment` flags. Just `-n` won't disable anything, it needs to be used with `t` for `--no-topology`, and or `e` for `--no-environment` in any order. Example: `-nte` and `net` both mean `--no-topology` and `--no-environment`
+						Shorthand for the `--no-topology` and `--no-environment` flags. Just
+						`-n` won't disable anything, it needs to be used with `t` for
+						`--no-topology`, and or `e` for `--no-environment` in any order.
+						Example: `-nte` and `net` both mean `--no-topology` and
+						`--no-environment`
 						"""
 					enum: ["e", "t", "et", "te"]
 				}
@@ -220,9 +230,12 @@ vector: cli: #CommandLineTool & {
 
 			args: {
 				paths: {
-					description: "Any number of Vector config files to validate. If none are specified the default config path `/etc/vector/vector.toml` will be targeted"
-					type:        "list"
-					default:     "/etc/vector/vector.toml"
+					description: """
+						Any number of Vector config files to validate. If none are specified
+						the default config path `/etc/vector/vector.toml` will be targeted
+						"""
+					type:    "list"
+					default: "/etc/vector/vector.toml"
 				}
 			}
 		}
