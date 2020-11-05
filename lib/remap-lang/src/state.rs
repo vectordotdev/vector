@@ -1,4 +1,4 @@
-use crate::Value;
+use crate::{ResolveKind, Value};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]

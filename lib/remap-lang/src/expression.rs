@@ -1,4 +1,4 @@
-use crate::{Object, Result, State, Value};
+use crate::{Object, Result, State, Value, ValueKind};
 
 pub(super) mod arithmetic;
 pub(super) mod assignment;
@@ -45,6 +45,34 @@ pub enum Error {
 
     #[error("variable error")]
     Variable(#[from] variable::Error),
+}
+
+/// What kind of value an expression is going to resolve to.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ResolveKind {
+    /// The expression can resolve to any value at runtime.
+    ///
+    /// This applies to any [`Object`] value that hasn't been coerced yet.
+    Any,
+
+    /// The expressions resolves to one of the defined [`ValueKind`]s.
+    OneOf(Vec<ValueKind>),
+
+    /// The expression resolves to an exact value.
+    Exact(ValueKind),
+
+    /// If the expression succeeds, it might resolve to a value, but doesn't
+    /// have to.
+    ///
+    /// For example, and if-statement without an else-condition can resolve to
+    /// nothing if the if-condition does not match.
+    Maybe(Box<ResolveKind>),
+}
+
+impl ResolveKind {
+    pub fn is_exact(&self) -> bool {
+        matches!(self, ResolveKind::Exact(_))
+    }
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
