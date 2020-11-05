@@ -7,16 +7,20 @@ pub async fn load(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     Ok(body)
 }
 
-/// This helper function extracts the sum of `events_processed`-ish metrics
-/// across all labels.
-pub fn extract_events_poccessed_sum(metrics: &str) -> Result<u64, Box<dyn std::error::Error>> {
-    let re = regex::RegexBuilder::new(
+fn metrics_regex() -> regex::Regex {
+    regex::RegexBuilder::new(
         r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\{(?P<labels>[^}]*)\} (?P<value>.+)$",
     )
     .multi_line(true)
     .build()
-    .expect("invalid regex");
-    re.captures_iter(&metrics)
+    .expect("invalid regex")
+}
+
+/// This helper function extracts the sum of `events_processed`-ish metrics
+/// across all labels.
+pub fn extract_events_poccessed_sum(metrics: &str) -> Result<u64, Box<dyn std::error::Error>> {
+    metrics_regex()
+        .captures_iter(&metrics)
         .filter_map(|captures| {
             let metric_name = &captures["name"];
             let value = &captures["value"];
@@ -32,11 +36,30 @@ pub fn extract_events_poccessed_sum(metrics: &str) -> Result<u64, Box<dyn std::e
         })
 }
 
+/// This helper function validates the presence of `vector_started`-ish metric.
+pub fn extract_vector_started(metrics: &str) -> bool {
+    metrics_regex().captures_iter(&metrics).any(|captures| {
+        let metric_name = &captures["name"];
+        let value = &captures["value"];
+        metric_name.contains("vector_started") && value == "1"
+    })
+}
+
 /// This helper function performs an HTTP request to the specified URL and
 /// extracts the sum of `events_processed`-ish metrics across all labels.
 pub async fn get_events_processed(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
     extract_events_poccessed_sum(&metrics)
+}
+
+/// This helper function performs an HTTP request to the specified URL and
+/// validates the presence of `vector_started`-ish metric.
+pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let metrics = load(url).await?;
+    if !extract_vector_started(&metrics) {
+        return Err(format!("vector_started metric was not found:\n{}", metrics).into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -70,6 +93,21 @@ mod tests {
             let input = input.join("\n");
             let actual_value = extract_events_poccessed_sum(&input).unwrap();
             assert_eq!(expected_value, actual_value);
+        }
+    }
+
+    #[test]
+    fn test_extract_vector_started() {
+        let cases = vec![
+            (vec![r#"vector_started{} 1"#], true),
+            (vec![r#""#], false),
+            (vec![r#"other{} 1"#], false),
+        ];
+
+        for (input, expected_value) in cases {
+            let input = input.join("\n");
+            let actual_value = extract_vector_started(&input);
+            assert_eq!(expected_value, actual_value, "input: {}", input);
         }
     }
 }
