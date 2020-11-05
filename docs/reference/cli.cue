@@ -1,0 +1,243 @@
+package metadata
+
+// These sources produce JSON providing a structured representation of the
+// Vector CLI (commands, flags, etc.)
+
+#Args: [Arg=string]: {
+	description: !=""
+	type:        "string" | "list" | *"string"
+	default?:    string | [...string]
+}
+
+#CommandLineTool: {
+	name:     !=""
+	flags:    #Flags
+	options:  #Options
+	commands: #Commands
+}
+
+#Commands: [Command=string]: {
+	description: !=""
+	flags?:      #Flags
+	options?:    #Options
+	args?:       #Args
+}
+
+#Flags: [Flag=string]: {
+	flag:        "--\(Flag)"
+	description: !=""
+	default:     bool | *false
+
+	if _short != _|_ {
+		short: "-\(_short)"
+	}
+
+	_short: !=""
+}
+
+#Options: [Option=string]: {
+	option:      "--\(Option)"
+	description: !=""
+	default?:    string
+	enum?: [...string]
+
+	if _short != _|_ {
+		short: "-\(_short)"
+	}
+
+	_short: !=""
+}
+
+_default_flags: {
+	"help": {
+		_short:      "h"
+		description: "Prints help information"
+	}
+	"version": {
+		_short:      "V"
+		description: "Prints version information"
+	}
+}
+
+cli: #CommandLineTool & {
+	name: "vector"
+
+	flags: _default_flags & {
+		"quiet": {
+			_short: "q"
+			description: """
+				Reduce detail of internal logging. Repeat to reduce further. Overrides
+				`--verbose`
+				"""
+		}
+		"require-healthy": {
+			_short:      "r"
+			description: "Exit on startup if any sinks fail healthchecks"
+		}
+		"verbose": {
+			_short:      "v"
+			description: "Enable more detailed logging. Repeat to reduce further. Overrides `--verbose`"
+		}
+		"watch-config": {
+			_short:      "w"
+			description: "Watch for changes in the configuration file, and reload accordingly"
+		}
+	}
+
+	options: {
+		"color": {
+			description: """
+				Control when ANSI terminal formatting is used.
+
+				By default `vector` will try and detect if `stdout` is a terminal,
+				if it is ANSI will be enabled. Otherwise it will be disabled. By
+				providing this flag with the `--color always` option will always
+				enable ANSI terminal formatting. `--color never` will disable all
+				ANSI terminal formatting. `--color auto` will attempt to detect it
+				automatically.
+				"""
+			default: "auto"
+			enum: ["always", "auto", "never"]
+		}
+		"config": {
+			_short: "c"
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. If zero files are specified the default config path
+				`/etc/vector/vector.toml` will be targeted
+				"""
+			default: "/etc/vector/vector.toml"
+		}
+		"threads": {
+			_short: "t"
+			description: """
+				Number of threads to use for processing (default is number of
+				available cores)
+				"""
+		}
+		"log-format": {
+			description: "Set the logging format [default: text]"
+			default:     "text"
+			enum: ["json", "text"]
+		}
+	}
+
+	commands: {
+		"generate": {
+			description: "Generate a Vector configuration containing a list of components"
+
+			flags: _default_flags & {
+				"fragment": {
+					_short:      "f"
+					description: "Whether to skip the generation of global fields"
+				}
+			}
+
+			args: {
+				expression: {
+					description: """
+						Generate expression, e.g. `stdin/json_parser,add_fields/console`
+
+						Three comma-separated lists of sources, transforms and sinks, divided
+						by forward slashes. If subsequent component types are not needed then
+						their dividers can be omitted from the expression.
+
+						For example:
+
+						`/json_parser` prints a `json_parser` transform.
+
+						`//file,http` prints a `file` and `http` sink.
+
+						`stdin//http` prints a `stdin` source an an `http` sink.
+
+						Generated components are given incremental names (`source1`,
+						`source2`, etc) which should be replaced in order to provide better
+						context. You can optionally specify the names of components by
+						prefixing them with `<name>:`, e.g.:
+
+						`foo:stdin/bar:regex_parser/baz:http` prints a `stdin` source called
+						`foo`, a `regex_parser` transform called `bar`, and an `http` sink
+						called `baz`.
+
+						Vector makes a best attempt at constructing a sensible topology. The
+						first transform generated will consume from all sources and subsequent
+						transforms will consume from their predecessor. All sinks will consume
+						from the last transform or, if none are specified, from all sources.
+						It is then up to you to restructure the `inputs` of each component to
+						build the topology you need.
+						"""
+					type: "string"
+				}
+			}
+		}
+
+		"help": {
+			description: "Prints this message or the help of the given subcommand(s)"
+		}
+
+		"list": {
+			description: "List available components, then exit"
+
+			flags: _default_flags
+
+			options: {
+				"format": {
+					description: "Format the list in an encoding schema"
+					default:     "text"
+					enum: ["json", "text"]
+				}
+			}
+		}
+
+		"test": {
+			description: """
+				Run Vector config unit tests, then exit. This command is experimental and
+				therefore subject to change. For guidance on how to write unit tests check
+				out: https://vector.dev/docs/setup/guides/unit-testing/
+				"""
+		}
+
+		"validate": {
+			description: "Validate the target config, then exit"
+
+			flags: _default_flags & {
+				"no-topology": {
+					description: "Disables topology check"
+				}
+				"no-environment": {
+					description: """
+						Disables environment checks. That includes component
+						checks and health checks
+						"""
+				}
+				"deny-warnings": {
+					description: "Fail validation on warnings"
+				}
+			}
+
+			options: {
+				n: {
+					description: """
+						Shorthand for the `--no-topology` and `--no-environment` flags. Just
+						`-n` won't disable anything, it needs to be used with `t` for
+						`--no-topology`, and or `e` for `--no-environment` in any order.
+						Example: `-nte` and `net` both mean `--no-topology` and
+						`--no-environment`
+						"""
+					enum: ["e", "t", "et", "te"]
+				}
+			}
+
+			args: {
+				paths: {
+					description: """
+						Any number of Vector config files to validate. If none are specified
+						the default config path `/etc/vector/vector.toml` will be targeted
+						"""
+					type:    "list"
+					default: "/etc/vector/vector.toml"
+				}
+			}
+		}
+	}
+}
