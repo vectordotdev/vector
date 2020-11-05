@@ -1,11 +1,10 @@
-use criterion::{criterion_group, BatchSize, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 
 use futures::{compat::Future01CompatExt, future, stream, StreamExt};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 use vector::{
-    config::{self},
-    sinks, sources,
+    config, sinks, sources,
     test_util::{
         next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
     },
@@ -17,6 +16,7 @@ fn benchmark_simple_pipes(c: &mut Criterion) {
     let out_addr = next_addr();
 
     let mut group = c.benchmark_group("pipe");
+    group.sampling_mode(SamplingMode::Flat);
 
     let benchmarks = [
         ("simple", 10_000, 100, 1),
@@ -92,6 +92,7 @@ fn benchmark_interconnected(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("interconnected");
     group.throughput(Throughput::Bytes((num_lines * line_size * 2) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("interconnected", |b| {
         b.iter_batched(
@@ -163,6 +164,7 @@ fn benchmark_transforms(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(
         (num_lines * (line_size + "status=404".len())) as u64,
     ));
+    group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("transforms", |b| {
         b.iter_batched(
@@ -239,7 +241,10 @@ fn benchmark_complex(c: &mut Criterion) {
     let out_addr_404 = next_addr();
     let out_addr_500 = next_addr();
 
-    c.bench_function("complex", |b| {
+    let mut group = c.benchmark_group("complex");
+    group.sampling_mode(SamplingMode::Flat);
+
+    group.bench_function("complex", |b| {
         b.iter_batched(
             || {
                 let mut config = config::Config::builder();
@@ -426,6 +431,8 @@ fn benchmark_complex(c: &mut Criterion) {
             BatchSize::PerIteration,
         );
     });
+
+    group.finish();
 }
 
 criterion_group!(

@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, BatchSize, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
 use std::convert::TryInto;
 use std::path::PathBuf;
@@ -17,6 +17,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("files");
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("files_without_partitions", |b| {
         b.iter_batched(

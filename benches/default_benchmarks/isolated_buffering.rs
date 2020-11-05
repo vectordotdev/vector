@@ -1,4 +1,4 @@
-use criterion::{criterion_group, BatchSize, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     stream::StreamExt,
@@ -33,6 +33,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("isolated_buffers");
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("channels/futures01", |b| {
         b.iter_batched(

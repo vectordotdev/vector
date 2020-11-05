@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, BatchSize, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 
 use futures::compat::Future01CompatExt;
 use tempfile::tempdir;
@@ -16,6 +16,7 @@ fn benchmark_buffers(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("buffers");
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
     group.bench_function("in-memory", |b| {
         b.iter_batched(
@@ -52,8 +53,11 @@ fn benchmark_buffers(c: &mut Criterion) {
 
                     topology.stop().compat().await.unwrap();
 
-                    let output_lines = black_box(output_lines.await);
+                    let output_lines = output_lines.await;
+
                     debug_assert_eq!(num_lines, output_lines.len());
+
+                    output_lines
                 });
             },
             BatchSize::PerIteration,

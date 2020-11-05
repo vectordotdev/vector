@@ -1,4 +1,4 @@
-use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use futures::{compat::Future01CompatExt, TryFutureExt};
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -25,6 +25,7 @@ fn benchmark_http(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("http");
     group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
     for compression in [Compression::None, Compression::gzip_default()].iter() {
         group.bench_with_input(

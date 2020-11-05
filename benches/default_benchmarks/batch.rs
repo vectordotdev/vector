@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, Criterion, Throughput};
+use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
 use futures::{compat::Future01CompatExt, future};
 use futures01::{Sink, Stream};
 use std::{convert::Infallible, time::Duration};
@@ -18,6 +18,7 @@ fn benchmark_batching(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("partitioned_batching");
     group.throughput(Throughput::Bytes((event_len * num_events) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
     let cases = [
         (Compression::None, bytesize::mib(2u64)),
