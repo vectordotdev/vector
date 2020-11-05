@@ -1325,6 +1325,9 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         vector_metrics_port_forward.local_addr_ipv4()
     );
 
+    // Assert that `vector_started`-ish metric is present.
+    metrics::assert_vector_started(&vector_metrics_url).await?;
+
     // Capture events processed before deploying the test pod.
     let events_processed_before = metrics::get_events_processed(&vector_metrics_url).await?;
 
