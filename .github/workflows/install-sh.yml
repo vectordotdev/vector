@@ -5,6 +5,7 @@ on:
     branches:
       - master
     paths:
+      - '.github/workflows/install-sh.yml'
       - 'distribution/install.sh'
   workflow_dispatch:
 
