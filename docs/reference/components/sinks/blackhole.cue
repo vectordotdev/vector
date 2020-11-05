@@ -40,9 +40,10 @@ components: sinks: blackhole: {
 	configuration: {
 		print_amount: {
 			description: "The number of events that must be received in order to print a summary of activity."
-			required:    true
+			required:    false
 			warnings: []
 			type: uint: {
+				default: 1000
 				examples: [1000]
 				unit: null
 			}
