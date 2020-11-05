@@ -128,8 +128,12 @@ impl HttpSink for LogdnaConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         let key = self
             .render_key(&event)
-            .map_err(|error| {
-                error!(message = "Error rendering template.", ?error);
+            .map_err(|missing| {
+                error!(
+                    message = "Error rendering template.",
+                    ?missing,
+                    rate_limit_secs = 30
+                );
             })
             .ok()?;
 
@@ -345,7 +349,7 @@ mod tests {
             api_key = "mylogtoken"
             ip = "127.0.0.1"
             mac = "some-mac-addr"
-            hostname = "vector"
+            hostname = "{{ hostname }}"
             tags = ["test","maybeanothertest"]
         "#,
         )
@@ -371,13 +375,15 @@ mod tests {
         // Create 10 events where the first one contains custom
         // fields that are not just `message`.
         for (i, line) in lines.iter().enumerate() {
-            let event = if i == 0 {
+            let mut event = if i == 0 {
                 let mut event = Event::from(line.as_str());
                 event.as_mut_log().insert("key1", "value1");
                 event
             } else {
                 Event::from(line.as_str())
             };
+            // let hostname = if i % 2 == 0 { "host0" } else { "host1" };
+            // event.as_mut_log().insert("hostname", hostname);
 
             events.push(event);
         }
@@ -390,7 +396,7 @@ mod tests {
         let body: serde_json::Value = serde_json::from_slice(&output.1[..]).unwrap();
 
         let query = request.uri.query().unwrap();
-        assert!(query.contains("hostname=vector"));
+        assert!(query.contains("hostname=host1") || query.contains("hostname=host2"));
         assert!(query.contains("ip=127.0.0.1"));
         assert!(query.contains("mac=some-mac-addr"));
         assert!(query.contains("tags=test%2Cmaybeanothertest"));
@@ -415,7 +421,8 @@ mod tests {
                 assert_eq!(
                     line.get("meta").unwrap(),
                     &json!({
-                        "key1": "value1"
+                        "key1": "value1",
+                        "hostname": "vector",
                     })
                 );
             }
