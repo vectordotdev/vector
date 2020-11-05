@@ -102,7 +102,7 @@ fn benchmark_batching(c: &mut Criterion) {
     }
 }
 
-criterion_group!(batch, benchmark_batching);
+criterion_group!(benches, benchmark_batching);
 
 pub struct PartitionedBuffer {
     inner: Buffer,

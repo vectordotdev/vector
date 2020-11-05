@@ -513,50 +513,18 @@ splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
 disable-resolv-conf = []
 
-[[bench]]
-name = "bench"
-harness = false
-required-features = ["default"]
+# grouping together features for benchmarks
+wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 
 [[bench]]
-name = "batch"
-harness = false
-required-features = ["default"]
-
-[[bench]]
-name = "buffering"
-harness = false
-required-features = ["default"]
-
-[[bench]]
-name = "event"
-harness = false
-required-features = ["default"]
-
-[[bench]]
-name = "files"
-harness = false
-required-features = ["default"]
-
-[[bench]]
-name = "http"
-harness = false
-required-features = ["default"]
-
-[[bench]]
-name = "isolated_buffering"
-harness = false
-required-features = ["default"]
-
-[[bench]]
-name = "lookup"
+name = "default"
 harness = false
 required-features = ["default"]
 
 [[bench]]
 name = "wasm"
 harness = false
-required-features = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+required-features = ["wasm-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"

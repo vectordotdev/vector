@@ -788,7 +788,7 @@ bench: ## Run benchmarks in /benches
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} transforms-wasm transforms-lua" --bench wasm wasm
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm
 
 ##@ Checking
 

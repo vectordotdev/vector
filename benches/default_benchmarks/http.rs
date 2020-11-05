@@ -100,4 +100,4 @@ fn serve(addr: SocketAddr) -> Runtime {
     rt
 }
 
-criterion_group!(http, benchmark_http);
+criterion_group!(benches, benchmark_http);

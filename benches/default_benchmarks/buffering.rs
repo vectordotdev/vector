@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion, Throughput};
+use criterion::{black_box, criterion_group, BatchSize, Criterion, Throughput};
 
 use futures::compat::Future01CompatExt;
 use tempfile::tempdir;
@@ -149,5 +149,4 @@ fn benchmark_buffers(c: &mut Criterion) {
     });
 }
 
-criterion_group!(buffers, benchmark_buffers);
-criterion_main!(buffers);
+criterion_group!(benches, benchmark_buffers);

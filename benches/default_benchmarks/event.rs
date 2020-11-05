@@ -96,4 +96,4 @@ fn create_event(json: Value) -> LogEvent {
     parser.transform(event).unwrap().into_log()
 }
 
-criterion_group!(event, benchmark_event);
+criterion_group!(benches, benchmark_event);

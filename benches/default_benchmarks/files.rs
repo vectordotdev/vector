@@ -91,4 +91,4 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(files, benchmark_files_without_partitions);
+criterion_group!(benches, benchmark_files_without_partitions);

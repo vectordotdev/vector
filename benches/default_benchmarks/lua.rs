@@ -130,4 +130,4 @@ fn bench_field_filter(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(lua, bench_add_fields, bench_field_filter);
+criterion_group!(benches, bench_add_fields, bench_field_filter);

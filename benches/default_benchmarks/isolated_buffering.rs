@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, Throughput};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     stream::StreamExt,
@@ -171,9 +171,8 @@ fn benchmark_buffers(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(buffers, benchmark_buffers);
-criterion_main!(buffers);
-
 fn random_events(size: usize) -> impl Stream<Item = Event, Error = ()> {
     stream::iter_ok(random_lines(size)).map(Event::from)
 }
+
+criterion_group!(benches, benchmark_buffers);
