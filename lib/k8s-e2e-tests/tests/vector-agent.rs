@@ -1328,6 +1328,17 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     // Assert that `vector_started`-ish metric is present.
     metrics::assert_vector_started(&vector_metrics_url).await?;
 
+    // We want to capture the initial value for the `events_processed` metric,
+    // but until the `kubernetes_logs` source loads the `Pod`s list, it's
+    // internal file server discovers the log files, and some events get
+    // a chance to be processed - we don't have a reason to beleive that
+    // the `events_processed` is even defined.
+    // We give Vector some reasonable time to perform this initial bootstrap,
+    // and capture the `events_processed` value afterwards.
+    println!("Waiting for Vector bootstrap");
+    tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+    println!("Done waiting for Vector bootstrap");
+
     // Capture events processed before deploying the test pod.
     let events_processed_before = metrics::get_events_processed(&vector_metrics_url).await?;
 
@@ -1381,6 +1392,12 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     .await?;
 
     assert!(got_marker);
+
+    // Due to how `internal_metrics` are implemented, we have to wait for it's
+    // scraping period to pass before we can observe the updates.
+    println!("Waiting for `internal_metrics` to update");
+    tokio::time::delay_for(std::time::Duration::from_secs(6)).await;
+    println!("Done waiting for `internal_metrics` to update");
 
     // Capture events processed after the test pod has finished.
     let events_processed_after = metrics::get_events_processed(&vector_metrics_url).await?;
