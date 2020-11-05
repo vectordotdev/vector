@@ -22,15 +22,14 @@
 //! # Driving to completetion
 //!
 //! Each sink utility provided here strictly follows the patterns described in
-//! the `futures01::Sink` docs. Each sink utility must be polled from a valid
-//! tokio context whether that may be an actual runtime or using any of the
-//! `tokio01-test` utilities.
+//! the `futures::Sink` docs. Each sink utility must be polled from a valid
+//! tokio context.
 //!
 //! For service based sinks like `BatchSink` and `PartitionBatchSink` they also
-//! must be polled within a valid tokio executor context or passed a valid executor.
-//! This is due to the fact that they will spawn service requests to allow them to be
-//! driven independently from the sink. A oneshot channel is used to tie them back into
-//! the sink to allow it to notify the consumer that the request has succeeded.
+//! must be polled within a valid tokio executor context. This is due to the fact
+//! that they will spawn service requests to allow them to be driven independently
+//! from the sink. A oneshot channel is used to tie them back into the sink to allow
+//! it to notify the consumer that the request has succeeded.
 
 use super::{
     batch::{Batch, PushResult, StatefulBatch},
