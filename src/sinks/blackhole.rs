@@ -17,14 +17,12 @@ pub struct BlackholeSink {
     acker: Acker,
 }
 
+#[derivative(Default)]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct BlackholeConfig {
-    #[serde(default = "default_print_amount")]
+    #[derivative(Default(value = "1000"))]
+    #[serde(default)]
     pub print_amount: usize,
-}
-
-const fn default_print_amount() -> usize {
-    1000
 }
 
 inventory::submit! {
