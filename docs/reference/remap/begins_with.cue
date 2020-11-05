@@ -38,8 +38,8 @@ remap: functions: starts_with: {
 				.contains = begins_with(.message, "the needle", case_sensitive = false)
 				"""#
 			output: {
- 				message: #"The Needle In The Haystack"#,
- 				contains: true
+				message:  #"The Needle In The Haystack"#
+				contains: true
 			}
 		},
 		{
