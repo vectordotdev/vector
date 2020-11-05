@@ -37,6 +37,12 @@ impl fmt::Display for ValueKind {
 }
 
 impl ValueKind {
+    pub fn all() -> Vec<Self> {
+        use ValueKind::*;
+
+        vec![String, Integer, Float, Boolean, Map, Array, Timestamp, Null]
+    }
+
     pub fn as_str(&self) -> &'static str {
         use ValueKind::*;
 

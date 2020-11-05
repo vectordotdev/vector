@@ -1,4 +1,4 @@
-use crate::{Expr, Expression, Object, Result, State, Value};
+use crate::{CompilerState, Expr, Expression, Object, ResolveKind, Result, State, Value};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Block {
@@ -20,5 +20,12 @@ impl Expression for Block {
         }
 
         Ok(value)
+    }
+
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+        self.expressions
+            .last()
+            .map(|e| e.resolves_to(state))
+            .unwrap_or(ResolveKind::Any)
     }
 }

@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{Expression, Object, Result, State, Value};
+use crate::{CompilerState, Expression, Object, ResolveKind, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -25,5 +25,12 @@ impl Expression for Variable {
             .cloned()
             .ok_or_else(|| E::from(Error::Undefined(self.ident.to_owned())).into())
             .map(Some)
+    }
+
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+        state
+            .variable_kind(&self.ident)
+            .cloned()
+            .unwrap_or(ResolveKind::Any)
     }
 }

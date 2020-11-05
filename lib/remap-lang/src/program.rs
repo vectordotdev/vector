@@ -1,4 +1,4 @@
-use crate::{parser, Error, Expr, Function, RemapError};
+use crate::{parser, CompilerState, Error, Expr, Function, RemapError};
 use pest::Parser;
 
 /// The program to execute.
@@ -21,9 +21,13 @@ impl Program {
             .map_err(|s| Error::Parser(s.to_string()))
             .map_err(RemapError)?;
 
-        let parser = parser::Parser {
+        let compiler_state = CompilerState::default();
+
+        let mut parser = parser::Parser {
             function_definitions,
+            compiler_state,
         };
+
         let expressions = parser.pairs_to_expressions(pairs).map_err(RemapError)?;
 
         Ok(Self { expressions })

@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{Expression, Object, Result, State, Value};
+use crate::{CompilerState, Expression, Object, ResolveKind, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -38,9 +38,19 @@ impl Expression for Path {
             .ok_or_else(|| E::from(Error::Missing(segments_to_path(&self.segments))).into())
             .map(Some)
     }
+
+    /// A path resolves to `Any` by default, but the script might assign
+    /// specific values to paths during its execution, which increases our exact
+    /// understanding of the value kind the path contains.
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+        state
+            .path_query_kind(&segments_to_path(&self.segments))
+            .cloned()
+            .unwrap_or(ResolveKind::Any)
+    }
 }
 
-fn segments_to_path(segments: &[Vec<String>]) -> String {
+pub(crate) fn segments_to_path(segments: &[Vec<String>]) -> String {
     segments
         .iter()
         .map(|c| {

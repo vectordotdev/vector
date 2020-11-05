@@ -1,6 +1,7 @@
 use super::Error as E;
 use crate::{
-    Argument, ArgumentList, Expression, Function as Fn, Object, Result, State, Value, ValueKind,
+    Argument, ArgumentList, CompilerState, Expression, Function as Fn, Object, ResolveKind, Result,
+    State, Value, ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -125,6 +126,10 @@ impl Expression for Function {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
         self.function.execute(state, object)
     }
+
+    fn resolves_to(&self, state: &crate::CompilerState) -> ResolveKind {
+        self.function.resolves_to(state)
+    }
 }
 
 #[derive(Clone)]
@@ -178,5 +183,9 @@ impl Expression for ArgumentValidator {
         }
 
         Ok(Some(value))
+    }
+
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+        self.expression.resolves_to(state)
     }
 }

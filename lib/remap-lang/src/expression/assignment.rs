@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{Expr, Expression, Object, Result, State, Value};
+use crate::{CompilerState, Expr, Expression, Object, ResolveKind, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -20,7 +20,19 @@ pub(crate) struct Assignment {
 }
 
 impl Assignment {
-    pub fn new(target: Target, value: Box<Expr>) -> Self {
+    pub fn new(target: Target, value: Box<Expr>, state: &mut CompilerState) -> Self {
+        let resolve_kind = value.resolves_to(state);
+
+        match &target {
+            Target::Variable(ident) => state
+                .variable_kinds_mut()
+                .insert(ident.clone(), resolve_kind),
+            Target::Path(segments) => {
+                let path = crate::expression::path::segments_to_path(segments);
+                state.variable_kinds_mut().insert(path, resolve_kind)
+            }
+        };
+
         Self { target, value }
     }
 }
@@ -42,6 +54,22 @@ impl Expression for Assignment {
                 }
 
                 Ok(Some(value))
+            }
+        }
+    }
+
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+        match &self.target {
+            Target::Variable(ident) => state
+                .variable_kind(ident.clone())
+                .cloned()
+                .unwrap_or(ResolveKind::Any),
+            Target::Path(segments) => {
+                let path = crate::expression::path::segments_to_path(segments);
+                state
+                    .variable_kind(&path)
+                    .cloned()
+                    .unwrap_or(ResolveKind::Any)
             }
         }
     }

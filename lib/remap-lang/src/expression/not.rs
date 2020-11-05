@@ -1,5 +1,7 @@
 use super::Error as E;
-use crate::{value, Expr, Expression, Object, Result, State, Value, ValueKind};
+use crate::{
+    value, CompilerState, Expr, Expression, Object, ResolveKind, Result, State, Value, ValueKind,
+};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -31,6 +33,10 @@ impl Expression for Not {
             })
             .transpose()
         })
+    }
+
+    fn resolves_to(&self, _: &CompilerState) -> ResolveKind {
+        ResolveKind::Exact(ValueKind::Boolean)
     }
 }
 

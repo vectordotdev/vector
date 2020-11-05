@@ -5,7 +5,7 @@ use crate::{
         Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
         Variable,
     },
-    Argument, Error, Expr, Function as Fn, Operator, Result, Value,
+    Argument, CompilerState, Error, Expr, Function as Fn, Operator, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
@@ -15,6 +15,7 @@ use std::str::FromStr;
 #[grammar = "../grammar.pest"]
 pub(super) struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
+    pub compiler_state: CompilerState,
 }
 
 type R = Rule;
@@ -24,7 +25,7 @@ macro_rules! operation_fns {
     (@impl $($rule:tt => { op: [$head_op:path, $($tail_op:path),+ $(,)?], next: $next:tt, })+) => (
         $(
             paste::paste! {
-                fn [<$rule _from_pairs>](&self, mut pairs: Pairs<R>) -> Result<Expr> {
+                fn [<$rule _from_pairs>](&mut self, mut pairs: Pairs<R>) -> Result<Expr> {
                     let inner = pairs.next().ok_or(e(R::$rule))?.into_inner();
                     let mut lhs = self.[<$next _from_pairs>](inner)?;
                     let mut op = Operator::$head_op;
@@ -58,7 +59,7 @@ macro_rules! operation_fns {
 impl Parser<'_> {
     /// Converts the set of known "root" rules into boxed [`Expression`] trait
     /// objects.
-    pub(crate) fn pairs_to_expressions(&self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
+    pub(crate) fn pairs_to_expressions(&mut self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
         let mut expressions = vec![];
 
         for pair in pairs {
@@ -75,7 +76,7 @@ impl Parser<'_> {
     }
 
     /// Given a `Pair`, build a boxed [`Expression`] trait object from it.
-    fn expression_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+    fn expression_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         match pair.as_rule() {
             R::assignment => {
                 let mut inner = pair.into_inner();
@@ -83,7 +84,11 @@ impl Parser<'_> {
                 let expression =
                     self.expression_from_pair(inner.next().ok_or(e(R::expression))?)?;
 
-                Ok(Expr::from(Assignment::new(target, Box::new(expression))))
+                Ok(Expr::from(Assignment::new(
+                    target,
+                    Box::new(expression),
+                    &mut self.compiler_state,
+                )))
             }
             R::boolean_expr => self.boolean_expr_from_pairs(pair.into_inner()),
             R::block => self.block_from_pairs(pair.into_inner()),
@@ -96,7 +101,7 @@ impl Parser<'_> {
     ///
     /// This can either return a `variable` or a `target_path` target, depending
     /// on the parser rule being processed.
-    fn target_from_pair(&self, pair: Pair<R>) -> Result<Target> {
+    fn target_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
         match pair.as_rule() {
             R::variable => Ok(Target::Variable(
                 pair.into_inner()
@@ -113,7 +118,7 @@ impl Parser<'_> {
     }
 
     /// Parse block expressions.
-    fn block_from_pairs(&self, pairs: Pairs<R>) -> Result<Expr> {
+    fn block_from_pairs(&mut self, pairs: Pairs<R>) -> Result<Expr> {
         let mut expressions = vec![];
 
         for pair in pairs {
@@ -124,7 +129,7 @@ impl Parser<'_> {
     }
 
     /// Parse if-statement expressions.
-    fn if_statement_from_pairs(&self, mut pairs: Pairs<R>) -> Result<Expr> {
+    fn if_statement_from_pairs(&mut self, mut pairs: Pairs<R>) -> Result<Expr> {
         // if condition
         let conditional = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
         let true_expression = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
@@ -173,7 +178,7 @@ impl Parser<'_> {
     }
 
     /// Parse not operator, or fall-through to primary values or function calls.
-    fn not_from_pairs(&self, pairs: Pairs<R>) -> Result<Expr> {
+    fn not_from_pairs(&mut self, pairs: Pairs<R>) -> Result<Expr> {
         let mut count = 0;
         let mut expression = Expr::from(Noop);
 
@@ -194,7 +199,7 @@ impl Parser<'_> {
     }
 
     /// Parse one of possible primary expressions.
-    fn primary_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+    fn primary_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         let pair = pair.into_inner().next().ok_or(e(R::primary))?;
 
         match pair.as_rule() {
@@ -222,7 +227,7 @@ impl Parser<'_> {
     }
 
     /// Parse function call expressions.
-    fn call_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+    fn call_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         let mut inner = pair.into_inner();
 
         let ident = inner.next().ok_or(e(R::call))?.as_str().to_owned();
@@ -236,14 +241,14 @@ impl Parser<'_> {
     }
 
     /// Parse into a vector of argument properties.
-    fn arguments_from_pair(&self, pair: Pair<R>) -> Result<Vec<(Option<String>, Argument)>> {
+    fn arguments_from_pair(&mut self, pair: Pair<R>) -> Result<Vec<(Option<String>, Argument)>> {
         pair.into_inner()
             .map(|pair| self.argument_from_pair(pair))
             .collect::<Result<_>>()
     }
 
     /// Parse optional argument keyword and [`Argument`] value.
-    fn argument_from_pair(&self, pair: Pair<R>) -> Result<(Option<String>, Argument)> {
+    fn argument_from_pair(&mut self, pair: Pair<R>) -> Result<(Option<String>, Argument)> {
         let mut ident = None;
 
         for pair in pair.into_inner() {

@@ -1,4 +1,6 @@
-use super::{Expr, Expression, Object, Result, State, Value};
+use super::{
+    CompilerState, Expr, Expression, Object, ResolveKind, Result, State, Value, ValueKind,
+};
 use crate::Operator;
 
 #[derive(Debug, Clone)]
@@ -44,5 +46,23 @@ impl Expression for Arithmetic {
         };
 
         result.map(Some).map_err(Into::into)
+    }
+
+    fn resolves_to(&self, _: &CompilerState) -> ResolveKind {
+        use Operator::*;
+        match self.op {
+            Or => ResolveKind::Any,
+            Multiply | Add => ResolveKind::OneOf(vec![
+                ValueKind::String,
+                ValueKind::Integer,
+                ValueKind::Float,
+            ]),
+            Remainder | Subtract | Divide => {
+                ResolveKind::OneOf(vec![ValueKind::Integer, ValueKind::Float])
+            }
+            And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => {
+                ResolveKind::Exact(ValueKind::Boolean)
+            }
+        }
     }
 }

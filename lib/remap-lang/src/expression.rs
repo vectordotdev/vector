@@ -1,4 +1,4 @@
-use crate::{Object, Result, State, Value, ValueKind};
+use crate::{CompilerState, Object, Result, State, Value, ValueKind};
 
 pub(super) mod arithmetic;
 pub(super) mod assignment;
@@ -73,10 +73,30 @@ impl ResolveKind {
     pub fn is_exact(&self) -> bool {
         matches!(self, ResolveKind::Exact(_))
     }
+
+    pub fn is_any(&self) -> bool {
+        matches!(self, ResolveKind::Any)
+    }
+
+    pub fn is_maybe(&self) -> bool {
+        matches!(self, ResolveKind::Maybe(_))
+    }
+
+    pub fn value_kinds(&self) -> Vec<ValueKind> {
+        use ResolveKind::*;
+
+        match self {
+            Any => ValueKind::all(),
+            OneOf(v) => v.clone(),
+            Exact(v) => vec![*v],
+            Maybe(v) => v.value_kinds(),
+        }
+    }
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind;
 }
 
 dyn_clone::clone_trait_object!(Expression);
@@ -102,6 +122,12 @@ macro_rules! expression_dispatch {
             fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
                 match self {
                     $(Expr::$expr(expression) => expression.execute(state, object)),+
+                }
+            }
+
+            fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+                match self {
+                    $(Expr::$expr(expression) => expression.resolves_to(state)),+
                 }
             }
         }
