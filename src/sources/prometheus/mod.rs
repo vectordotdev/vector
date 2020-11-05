@@ -1,6 +1,7 @@
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     dns::Resolver,
+    http::Auth,
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
@@ -28,6 +29,8 @@ struct PrometheusConfig {
     scrape_interval_secs: u64,
 
     tls: Option<TlsOptions>,
+
+    auth: Option<Auth>,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -44,6 +47,7 @@ impl GenerateConfig for PrometheusConfig {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             scrape_interval_secs: default_scrape_interval_secs(),
             tls: None,
+            auth: None,
         })
         .unwrap()
     }
@@ -68,6 +72,7 @@ impl SourceConfig for PrometheusConfig {
         Ok(prometheus(
             urls,
             tls,
+            self.auth.clone(),
             self.scrape_interval_secs,
             shutdown,
             out,
@@ -86,6 +91,7 @@ impl SourceConfig for PrometheusConfig {
 fn prometheus(
     urls: Vec<http::Uri>,
     tls: TlsSettings,
+    auth: Option<Auth>,
     interval: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -105,9 +111,12 @@ fn prometheus(
             let https = HttpsConnector::with_connector(http, tls).expect("TLS initialization failed");
             let client = Client::builder().build(https);
 
-            let request = Request::get(&url)
+            let mut request = Request::get(&url)
                 .body(Body::empty())
                 .expect("error creating request");
+            if let Some(auth) = &auth {
+                auth.apply(&mut request);
+            }
 
             let start = Instant::now();
             client
@@ -262,6 +271,7 @@ mod test {
                 endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
                 tls: None,
+                auth: None,
             },
         );
         config.add_sink(
