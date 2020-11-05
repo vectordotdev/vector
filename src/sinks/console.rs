@@ -191,7 +191,7 @@ mod test {
     fn encodes_counter() {
         let event = Event::Metric(Metric {
             name: "foos".into(),
-            namespace: None,
+            namespace: Some("vector".into()),
             timestamp: Some(Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)),
             tags: Some(
                 vec![
@@ -206,7 +206,7 @@ mod test {
             value: MetricValue::Counter { value: 100.0 },
         });
         assert_eq!(
-            r#"{"name":"foos","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","counter":{"value":100.0}}"#,
+            r#"{"name":"foos","namespace":"vector","timestamp":"2018-11-14T08:09:10.000000011Z","tags":{"Key3":"Value3","key1":"value1","key2":"value2"},"kind":"incremental","counter":{"value":100.0}}"#,
             encode_event(event, &EncodingConfig::from(Encoding::Json)).unwrap()
         );
     }

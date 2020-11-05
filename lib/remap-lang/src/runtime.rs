@@ -1,4 +1,4 @@
-use crate::{Expression, Object, Program, Result, State, Value};
+use crate::{Expression, Object, Program, RemapError, State, Value};
 
 #[derive(Debug, Default)]
 pub struct Runtime {
@@ -16,12 +16,13 @@ impl Runtime {
         &mut self,
         object: &mut impl Object,
         program: &Program,
-    ) -> Result<Option<Value>> {
+    ) -> Result<Option<Value>, RemapError> {
         let mut values = program
             .expressions
             .iter()
             .map(|expression| expression.execute(&mut self.state, object))
-            .collect::<Result<Vec<Option<Value>>>>()?;
+            .collect::<crate::Result<Vec<Option<Value>>>>()
+            .map_err(RemapError)?;
 
         Ok(values.pop().flatten())
     }

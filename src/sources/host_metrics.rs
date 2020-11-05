@@ -82,21 +82,11 @@ struct NetworkConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Namespace(String);
+struct Namespace(Option<String>);
 
 impl Default for Namespace {
     fn default() -> Self {
-        Self("host".into())
-    }
-}
-
-impl Namespace {
-    fn encode(&self, word: &str) -> String {
-        if self.0.is_empty() {
-            word.into()
-        } else {
-            [self.0.as_str(), word].join("_")
-        }
+        Self(Some("host".into()))
     }
 }
 
@@ -137,7 +127,10 @@ impl SourceConfig for HostMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        Ok(Box::new(self.clone().run(out, shutdown).boxed().compat()))
+        let mut config = self.clone();
+        config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
+
+        Ok(Box::new(config.run(out, shutdown).boxed().compat()))
     }
 
     fn output_type(&self) -> DataType {
@@ -672,8 +665,8 @@ impl HostMetricsConfig {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric {
-            name: self.namespace.encode(name),
-            namespace: None,
+            name: name.into(),
+            namespace: self.namespace.0.clone(),
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Counter { value },
@@ -689,8 +682,8 @@ impl HostMetricsConfig {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric {
-            name: self.namespace.encode(name),
-            namespace: None,
+            name: name.into(),
+            namespace: self.namespace.0.clone(),
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value },
@@ -908,13 +901,20 @@ mod tests {
     #[tokio::test]
     async fn uses_custom_namespace() {
         let mut metrics = HostMetricsConfig {
-            namespace: Namespace("other".into()),
+            namespace: Namespace(Some("other".into())),
             ..Default::default()
         }
         .capture_metrics()
         .await;
 
-        assert!(!metrics.any(|event| !event.into_metric().name.starts_with("other_")));
+        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("other")));
+    }
+
+    #[tokio::test]
+    async fn uses_default_namespace() {
+        let mut metrics = HostMetricsConfig::default().capture_metrics().await;
+
+        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("host")));
     }
 
     #[tokio::test]
@@ -924,10 +924,7 @@ mod tests {
         assert!(all_counters(&metrics));
 
         // They should all be named cpu_seconds_total
-        assert_eq!(
-            metrics.len(),
-            count_name(&metrics, "host_cpu_seconds_total")
-        );
+        assert_eq!(metrics.len(), count_name(&metrics, "cpu_seconds_total"));
 
         // They should all have a "mode" tag
         assert_eq!(count_tag(&metrics, "mode"), metrics.len());
@@ -942,10 +939,10 @@ mod tests {
 
         // There are exactly four disk_* names
         for name in &[
-            "host_disk_read_bytes_total",
-            "host_disk_reads_completed_total",
-            "host_disk_written_bytes_total",
-            "host_disk_writes_completed_total",
+            "disk_read_bytes_total",
+            "disk_reads_completed_total",
+            "disk_written_bytes_total",
+            "disk_writes_completed_total",
         ] {
             assert_eq!(
                 count_name(&metrics, name),
@@ -981,9 +978,9 @@ mod tests {
 
         // There are exactly three filesystem_* names
         for name in &[
-            "host_filesystem_free_bytes",
-            "host_filesystem_total_bytes",
-            "host_filesystem_used_bytes",
+            "filesystem_free_bytes",
+            "filesystem_total_bytes",
+            "filesystem_used_bytes",
         ] {
             assert_eq!(
                 count_name(&metrics, name),
@@ -1058,7 +1055,7 @@ mod tests {
         // All metrics are named network_*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("host_network_")));
+            .any(|metric| !metric.name.starts_with("network_")));
 
         // They should all have a "device" tag
         assert_eq!(count_tag(&metrics, "device"), metrics.len());
@@ -1091,7 +1088,7 @@ mod tests {
         // All metrics are named load*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("host_load")));
+            .any(|metric| !metric.name.starts_with("load")));
     }
 
     fn all_counters(metrics: &[Metric]) -> bool {
