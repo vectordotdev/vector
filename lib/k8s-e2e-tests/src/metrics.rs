@@ -9,7 +9,7 @@ pub async fn load(url: &str) -> Result<String, Box<dyn std::error::Error>> {
 
 fn metrics_regex() -> regex::Regex {
     regex::RegexBuilder::new(
-        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)\{(?P<labels>[^}]*)\} (?P<value>.+)$",
+        r"^(?P<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?P<labels>\{[^}]*\})? (?P<value>.+)$",
     )
     .multi_line(true)
     .build()
@@ -69,11 +69,14 @@ mod tests {
     #[test]
     fn test_extract_events_poccessed_sum() {
         let cases = vec![
+            (vec![r#""#], 0),
+            (vec![r#"events_processed 123"#], 123),
             (vec![r#"events_processed{} 123"#], 123),
             (vec![r#"events_processed{method="POST"} 456"#], 456),
+            (vec![r#"events_processed{a="b",c="d"} 456"#], 456),
             (
                 vec![
-                    r#"events_processed{} 123"#,
+                    r#"events_processed 123"#,
                     r#"events_processed{method="POST"} 456"#,
                 ],
                 123 + 456,
@@ -87,6 +90,16 @@ mod tests {
                 ],
                 123 + 456,
             ),
+            // Prefixes and suffixes
+            (
+                vec![
+                    r#"events_processed 1"#,
+                    r#"events_processed_total 2"#,
+                    r#"vector_events_processed 3"#,
+                    r#"vector_events_processed_total 4"#,
+                ],
+                1 + 2 + 3 + 4,
+            ),
         ];
 
         for (input, expected_value) in cases {
@@ -99,9 +112,20 @@ mod tests {
     #[test]
     fn test_extract_vector_started() {
         let cases = vec![
-            (vec![r#"vector_started{} 1"#], true),
+            (vec![r#"vector_started 1"#], true),
+            (vec![r#"vector_started_total 1"#], true),
+            (vec![r#"vector_vector_started_total 1"#], true),
             (vec![r#""#], false),
             (vec![r#"other{} 1"#], false),
+            // Real-world example.
+            (
+                vec![
+                    r#"# HELP vector_started_total vector_started_total"#,
+                    r#"# TYPE vector_started_total counter"#,
+                    r#"vector_started_total 1"#,
+                ],
+                true,
+            ),
         ];
 
         for (input, expected_value) in cases {
