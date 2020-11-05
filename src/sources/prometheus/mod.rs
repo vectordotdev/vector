@@ -261,6 +261,7 @@ mod test {
             PrometheusConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
+                tls: None,
             },
         );
         config.add_sink(
