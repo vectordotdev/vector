@@ -1,0 +1,15 @@
+{
+  "name": "Vector API",
+  "schemaPath": "lib/vector-api-client/graphql/schema.json",
+  "extensions": {
+    "endpoints": {
+      "Default GraphQL Endpoint": {
+        "url": "http://localhost:8686/graphql",
+        "headers": {
+          "user-agent": "Headless GraphQL"
+        },
+        "introspect": false
+      }
+    }
+  }
+}

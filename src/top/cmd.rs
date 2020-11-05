@@ -37,7 +37,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Create a metrics state updater
-    let (tx, rx) = tokio::sync::mpsc::channel(10);
+    let (tx, rx) = tokio::sync::mpsc::channel(100);
 
     // Get the initial component state
     let sender = match metrics::init_components(&client).await {
@@ -57,7 +57,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         })
         .expect("Couldn't build WebSocket URL. Please report.");
 
-    let subscription_client = match connect_subscription_client(&ws_url).await {
+    let subscription_client = match connect_subscription_client(ws_url).await {
         Ok(c) => c,
         _ => {
             eprintln!("Couldn't connect to Vector API via WebSockets");

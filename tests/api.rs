@@ -24,6 +24,7 @@ mod tests {
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
+    use vector_api_client::gql::ComponentsSubscriptionExt;
     use vector_api_client::{
         connect_subscription_client,
         gql::{HealthQueryExt, HealthSubscriptionExt, MetricsSubscriptionExt},
@@ -121,7 +122,7 @@ mod tests {
         let url = Url::parse(&*format!("ws://{}/graphql", addr)).unwrap();
 
         retry_until(
-            || connect_subscription_client(&url),
+            || connect_subscription_client(url.clone()),
             Duration::from_millis(50),
             Duration::from_secs(10),
         )
@@ -152,7 +153,7 @@ mod tests {
         num_results: usize,
         interval: i64,
     ) {
-        let subscription = client.heartbeat_subscription(interval).await.unwrap();
+        let subscription = client.heartbeat_subscription(interval);
 
         tokio::pin! {
             let heartbeats = subscription.stream().take(num_results);
@@ -182,7 +183,7 @@ mod tests {
     }
 
     async fn new_uptime_subscription(client: &SubscriptionClient) {
-        let subscription = client.uptime_subscription().await.unwrap();
+        let subscription = client.uptime_subscription();
 
         tokio::pin! {
             let uptime = subscription.stream().skip(1);
@@ -212,10 +213,7 @@ mod tests {
         // Emit events for the duration of the test
         let _shutdown = emit_fake_generator_events();
 
-        let subscription = client
-            .events_processed_total_subscription(interval)
-            .await
-            .unwrap();
+        let subscription = client.events_processed_total_subscription(interval);
 
         tokio::pin! {
             let events_processed_total = subscription.stream().take(num_results);
@@ -360,10 +358,7 @@ mod tests {
 
         let client = new_subscription_client(server.addr()).await;
 
-        let subscription = client
-            .component_events_processed_total_subscription(500)
-            .await
-            .unwrap();
+        let subscription = client.component_events_processed_total_subscription(500);
 
         tokio::pin! {
             let component_events_processed_total = subscription.stream();
@@ -394,5 +389,175 @@ mod tests {
             map[&0].metric.events_processed_total,
             map[&1].metric.events_processed_total
         );
+    }
+
+    #[tokio::test]
+    /// Tests componentAdded receives an added component
+    async fn api_graphql_component_added_subscription() {
+        init_metrics();
+
+        // Initial topology
+        let mut topology = from_str_config(
+            r#"
+            [api]
+              enabled = true
+
+            [sources.gen1]
+              type = "generator"
+              lines = ["Random line", "And another"]
+              batch_interval = 0.1
+
+            [sinks.out]
+              # General
+              type = "blackhole"
+              inputs = ["gen1"]
+              print_amount = 100000
+        "#,
+        )
+        .await;
+
+        let server = api::Server::start(topology.config());
+        let client = new_subscription_client(server.addr()).await;
+
+        // Spawn a handler for listening to changes
+        let handle = tokio::spawn(async move {
+            let subscription = client.component_added();
+
+            tokio::pin! {
+                let component_added = subscription.stream();
+            }
+
+            // The component added should be `gen2`
+            assert_eq!(
+                "gen2",
+                component_added
+                    .next()
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .data
+                    .unwrap()
+                    .component_added
+                    .name,
+            );
+        });
+
+        // After a short delay, update the config to include `gen2`
+        tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
+
+        let c = config::load_from_str(
+            r#"
+            [api]
+              enabled = true
+
+            [sources.gen1]
+              type = "generator"
+              lines = ["Random line", "And another"]
+              batch_interval = 0.1
+              
+            [sources.gen2]
+              type = "generator"
+              lines = ["3rd line", "4th line"]
+              batch_interval = 0.1
+
+            [sinks.out]
+              # General
+              type = "blackhole"
+              inputs = ["gen1", "gen2"]
+              print_amount = 100000
+        "#,
+        )
+        .unwrap();
+
+        topology.reload_config_and_respawn(c, false).await.unwrap();
+        server.update_config(topology.config());
+
+        // Await the join handle
+        handle.await.unwrap();
+    }
+
+    #[tokio::test]
+    /// Tests componentRemoves detects when a component has been removed
+    async fn api_graphql_component_removed_subscription() {
+        init_metrics();
+
+        // Initial topology
+        let mut topology = from_str_config(
+            r#"
+            [api]
+              enabled = true
+
+            [sources.gen1]
+              type = "generator"
+              lines = ["Random line", "And another"]
+              batch_interval = 0.1
+
+            [sources.gen2]
+              type = "generator"
+              lines = ["3rd line", "4th line"]
+              batch_interval = 0.1
+
+            [sinks.out]
+              # General
+              type = "blackhole"
+              inputs = ["gen1", "gen2"]
+              print_amount = 100000
+        "#,
+        )
+        .await;
+
+        let server = api::Server::start(topology.config());
+        let client = new_subscription_client(server.addr()).await;
+
+        // Spawn a handler for listening to changes
+        let handle = tokio::spawn(async move {
+            let subscription = client.component_removed();
+
+            tokio::pin! {
+                let component_removed = subscription.stream();
+            }
+
+            // The component added should be `gen2`
+            assert_eq!(
+                "gen2",
+                component_removed
+                    .next()
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .data
+                    .unwrap()
+                    .component_removed
+                    .name,
+            );
+        });
+
+        // After a short delay, update the config to remove `gen2`
+        tokio::time::delay_for(tokio::time::Duration::from_millis(200)).await;
+
+        let c = config::load_from_str(
+            r#"
+            [api]
+              enabled = true
+
+            [sources.gen1]
+              type = "generator"
+              lines = ["Random line", "And another"]
+              batch_interval = 0.1
+              
+            [sinks.out]
+              # General
+              type = "blackhole"
+              inputs = ["gen1"]
+              print_amount = 100000
+        "#,
+        )
+        .unwrap();
+
+        topology.reload_config_and_respawn(c, false).await.unwrap();
+        server.update_config(topology.config());
+
+        // Await the join handle
+        handle.await.unwrap();
     }
 }

@@ -1,25 +1,16 @@
-use futures::{SinkExt, Stream};
+use futures::SinkExt;
 use graphql_client::GraphQLQuery;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
-    boxed::Box,
     pin::Pin,
     sync::{Arc, RwLock, Weak},
 };
 use tokio::{
-    select,
-    stream::StreamExt,
-    sync::{
-        broadcast::{self, SendError},
-        oneshot,
-    },
+    stream::{Stream, StreamExt},
+    sync::{broadcast, mpsc, oneshot},
 };
-use tokio_tungstenite::{
-    connect_async,
-    tungstenite::{self, Message},
-    WebSocketStream,
-};
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
 use uuid::Uuid;
 use weak_table::WeakValueHashMap;
@@ -47,7 +38,7 @@ pub struct Payload {
 
 impl Payload {
     /// Returns a "start" payload necessary for starting a new subscription
-    fn start<T: GraphQLQuery + Send + Sync>(
+    pub fn start<T: GraphQLQuery + Send + Sync>(
         id: Uuid,
         payload: &graphql_client::QueryBody<T::Variables>,
     ) -> Self {
@@ -84,8 +75,8 @@ pub trait Receiver<T: GraphQLQuery + Send + Sync> {
     fn stream(&self) -> StreamResponse<T>;
 }
 
-/// SubscriptionResult<T> returns an `anyhow`-wrapped `Result`, containing a boxed `Receiver<T>`
-pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T> + Send + Sync>>>;
+/// BoxedSubscription<T> returns a thread-safe, boxed `Receiver<T>`
+pub type BoxedSubscription<T> = Box<Arc<dyn Receiver<T> + Send + Sync>>;
 
 /// A Subscription is associated with a single GraphQL subscription query. Its methods
 /// allow transmitting `Payload`s upstream to the API server, via its `Receiver<T: GraphQLQuery`
@@ -95,26 +86,35 @@ pub type SubscriptionResult<T> = anyhow::Result<Box<Arc<dyn Receiver<T> + Send +
 pub struct Subscription {
     id: Uuid,
     tx: broadcast::Sender<Payload>,
-    client_tx: broadcast::Sender<Payload>,
+    client_tx: tokio::sync::mpsc::UnboundedSender<Payload>,
 }
 
 impl Subscription {
     /// Returns a new Subscription, that is associated with a particular GraphQL query
-    pub fn new(id: Uuid, client_tx: broadcast::Sender<Payload>) -> Self {
-        let (tx, _) = broadcast::channel(10);
+    pub fn new(id: Uuid, client_tx: tokio::sync::mpsc::UnboundedSender<Payload>) -> Self {
+        let (tx, _) = broadcast::channel(100);
         Self { id, tx, client_tx }
     }
 
     /// Send a payload down the channel. This is synchronous because broadcast::Sender::send
     /// is also synchronous
-    fn transmit(&self, payload: Payload) -> Result<usize, SendError<Payload>> {
+    fn receive(&self, payload: Payload) -> Result<usize, broadcast::SendError<Payload>> {
         self.tx.send(payload)
+    }
+
+    /// Start a subscription. Fires a request to the upstream GraphQL
+    fn start<T: GraphQLQuery + Send + Sync>(
+        &self,
+        request_body: &graphql_client::QueryBody<T::Variables>,
+    ) -> Result<(), tokio::sync::mpsc::error::SendError<Payload>> {
+        self.client_tx
+            .send(Payload::start::<T>(self.id, request_body))
     }
 
     /// Stop a subscription. This has no return value since it'll be typically used by
     /// the Drop implementation
-    fn stop(&self) -> Result<usize, SendError<Payload>> {
-        self.tx.send(Payload::stop(self.id))
+    fn stop(&self) -> Result<(), tokio::sync::mpsc::error::SendError<Payload>> {
+        self.client_tx.send(Payload::stop(self.id))
     }
 }
 
@@ -139,90 +139,57 @@ impl<T: GraphQLQuery + Send + Sync> Receiver<T> for Subscription {
     }
 }
 
-/// SubscriptionClient is a GraphQL client specifically for long-lived `subscription`
-/// connections and queries, that return streaming responses. A client can be multiplexed
-/// via its `start` method to run multiple subscription queries in parallel, and pass
-/// many `Payload`s back to the `Receiver` that is returned when invoking `start()`.
+/// A single `SubscriptionClient` enables subscription multiplexing
 #[derive(Debug)]
 pub struct SubscriptionClient {
-    tx: broadcast::Sender<Payload>,
+    tx: mpsc::UnboundedSender<Payload>,
     subscriptions: Arc<RwLock<WeakValueHashMap<Uuid, Weak<Subscription>>>>,
     _shutdown_tx: oneshot::Sender<()>,
 }
 
 impl SubscriptionClient {
-    /// Takes a tokio_tungstenite WebSocketStream, and returns a new subscription client.
-    /// Typically the stream would be TcpStream, but any protocol that matches `TStream`
-    /// can be used, making this a flexible client for passing messages via WebSockets.
-    pub fn new<
-        TStream: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send + Sync + Unpin + 'static,
-    >(
-        ws: WebSocketStream<TStream>,
-    ) -> Self {
+    /// Create a new subscription client. `tx` is a channel for sending `Payload`s to the
+    /// GraphQL server; `rx` is a channel for `Payload` back
+    fn new(tx: mpsc::UnboundedSender<Payload>, mut rx: mpsc::UnboundedReceiver<Payload>) -> Self {
         // Oneshot channel for cancelling the listener if SubscriptionClient is dropped
         let (_shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
 
-        // Create a hashmap to store subscriptions. This needs to be thread safe and behind
-        // a RWLock, to handle looking up by subscription ID when receiving 'global' payloads.
         let subscriptions = Arc::new(RwLock::new(WeakValueHashMap::new()));
+        let subscriptions_clone = Arc::clone(&subscriptions);
 
-        // Split the WebSocket channels
-        let (mut ws_tx, mut ws_rx) = futures::StreamExt::split(ws);
-
-        // Create a multi producer channel for sending messages back upstream
-        let (tx, mut rx) = broadcast::channel::<Payload>(20);
-
-        // Spawn a handler for receiving payloads back from the client.
-        let spawned_subscriptions = Arc::clone(&subscriptions);
+        // Spawn a handler for shutdown, and relaying received `Payload`s back to the relevant
+        // subscription
         tokio::spawn(async move {
             loop {
-                select! {
+                tokio::select! {
                     // Break the loop if shutdown is triggered. This happens implicitly once
                     // the client goes out of scope
                     _ = &mut shutdown_rx => break,
 
-                    // Handle received payloads back _from_ the server
-                    res = &mut ws_rx.next() => {
-                        // Attempt to both deserialize the payload, and obtain a subscription
-                        // with a matching ID. Rust cannot infer the Arc type, so being explicit here
-                        let sp: Option<(Option<Arc<Subscription>>, Payload)> = res
-                            .and_then(|r| r.ok())
-                            .and_then(|r| {
-                                r.to_text()
-                                    .ok()
-                                    .and_then(|t| serde_json::from_str::<Payload>(t).ok())
-                            }).map(|p| (spawned_subscriptions.read().unwrap().get::<Uuid>(&p.id), p));
-
-                        // If we have a payload and a valid Subscription that matches the returned
-                        // id, send the payload into the subscription to be picked up by its .stream()
-                        if let Some((Some(s), p)) = sp {
-                            let _ = s.transmit(p);
+                    // Handle receiving payloads back _from_ the server
+                    Some(p) = rx.next() => {
+                        if let Some(s) = subscriptions_clone.read().unwrap().get::<Uuid>(&p.id)
+                            as Option<Arc<Subscription>>
+                        {
+                            let _ = s.receive(p);
                         }
-                    },
-
-                    // Handle payloads to be sent _to_ the GraphQL server
-                    payload = &mut rx.next() => {
-                        if let Some(p) = payload.and_then(|p| p.ok()) {
-                            let _ = ws_tx.send(Message::Text(serde_json::to_string(&p).unwrap())).await;
-                        }
-                    },
+                    }
                 }
             }
         });
 
-        // Return a new client
         Self {
             tx,
+            subscriptions,
             _shutdown_tx,
-            subscriptions: Arc::clone(&subscriptions),
         }
     }
 
     /// Start a new subscription request
-    pub async fn start<T: GraphQLQuery + Send + Sync>(
+    pub fn start<T: GraphQLQuery + Send + Sync>(
         &self,
         request_body: &graphql_client::QueryBody<T::Variables>,
-    ) -> SubscriptionResult<T> {
+    ) -> BoxedSubscription<T> {
         // Generate a unique ID for the subscription. Subscriptions can be multiplexed
         // over a single connection, so we'll keep a copy of this against the client to
         // handling routing responses back to the relevant subscriber.
@@ -240,22 +207,42 @@ impl SubscriptionClient {
             .insert(id, Arc::clone(&subscription));
 
         // Start the subscription by sending a { type: "start" } payload upstream
-        let _ = self.tx.send(Payload::start::<T>(id, request_body));
+        let _ = subscription.start::<T>(request_body);
 
         // The caller gets back a Box<dyn Receiver<T>>, to consume subscription payloads
-        Ok(Box::new(
-            Arc::clone(&subscription) as Arc<dyn Receiver<T> + Send + Sync>
-        ))
+        Box::new(Arc::clone(&subscription) as Arc<dyn Receiver<T> + Send + Sync>)
     }
 }
 
-/// Connect to a GraphQL subscription endpoint and return an active client. Can be used for
-/// multiple subscriptions
+/// Connect to a new WebSocket GraphQL server endpoint, and return a `SubscriptionClient`.
+/// This method will a) connect to a ws(s):// endpoint, and perform the initial handshake, and b)
+/// set up channel forwarding to expose just the returned `Payload`s to the client.
 pub async fn connect_subscription_client(
-    url: &Url,
-) -> Result<SubscriptionClient, tungstenite::error::Error> {
-    let (tx, _) = connect_async(url).await?;
-    let client = SubscriptionClient::new(tx);
+    url: Url,
+) -> Result<SubscriptionClient, tokio_tungstenite::tungstenite::Error> {
+    let (ws, _) = connect_async(url).await?;
+    let (mut ws_tx, mut ws_rx) = futures::StreamExt::split(ws);
 
-    Ok(client)
+    let (send_tx, mut send_rx) = mpsc::unbounded_channel::<Payload>();
+    let (recv_tx, recv_rx) = mpsc::unbounded_channel::<Payload>();
+
+    // Forwarded received messages back upstream to the GraphQL server
+    tokio::spawn(async move {
+        while let Some(p) = send_rx.next().await {
+            let _ = ws_tx
+                .send(Message::Text(serde_json::to_string(&p).unwrap()))
+                .await;
+        }
+    });
+
+    // Forward received messages to the receiver channel
+    tokio::spawn(async move {
+        while let Some(Ok(Message::Text(m))) = ws_rx.next().await {
+            if let Ok(p) = serde_json::from_str::<Payload>(&m) {
+                let _ = recv_tx.send(p);
+            }
+        }
+    });
+
+    Ok(SubscriptionClient::new(send_tx, recv_rx))
 }

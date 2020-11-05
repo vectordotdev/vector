@@ -54,7 +54,7 @@ impl<'a> Widgets<'a> {
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
     fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
-        let items = state.into_iter().map(|(_, r)| {
+        let items = state.iter().map(|(_, r)| {
             Row::StyledData(
                 vec![
                     r.name.clone(),
@@ -119,8 +119,8 @@ pub fn is_tty() -> bool {
 /// stdout. We're using 'direct' drawing mode to control the full output of the dashboard,
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
-pub async fn init_dashboard<'a>(
-    url: &'a str,
+pub async fn init_dashboard(
+    url: &str,
     mut state_rx: state::StateRx,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit

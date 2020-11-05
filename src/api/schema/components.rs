@@ -1,4 +1,4 @@
-use super::{broker::Broker, metrics};
+use super::metrics;
 use crate::config::{Config, DataType};
 use async_graphql::{Enum, Interface, Object, Subscription};
 use lazy_static::lazy_static;
@@ -232,6 +232,19 @@ impl ComponentsQuery {
     }
 }
 
+#[derive(Clone)]
+enum ComponentChanged {
+    Added(Component),
+    Removed(Component),
+}
+
+lazy_static! {
+    static ref COMPONENT_CHANGED: tokio::sync::broadcast::Sender<ComponentChanged> = {
+        let (tx, _) = tokio::sync::broadcast::channel(10);
+        tx
+    };
+}
+
 #[derive(Default)]
 pub struct ComponentsSubscription;
 
@@ -239,15 +252,30 @@ pub struct ComponentsSubscription;
 impl ComponentsSubscription {
     /// Subscribes to all newly added components
     async fn component_added(&self) -> impl Stream<Item = Component> {
-        Broker::<ComponentAdded>::subscribe().map(|t| t.0)
+        COMPONENT_CHANGED
+            .subscribe()
+            .into_stream()
+            .filter(Result::is_ok)
+            .filter_map(|c| match c.unwrap() {
+                ComponentChanged::Added(c) => Some(c),
+                _ => None,
+            })
     }
 
     /// Subscribes to all removed components
     async fn component_removed(&self) -> impl Stream<Item = Component> {
-        Broker::<ComponentRemoved>::subscribe().map(|t| t.0)
+        COMPONENT_CHANGED
+            .subscribe()
+            .into_stream()
+            .filter(Result::is_ok)
+            .filter_map(|c| match c.unwrap() {
+                ComponentChanged::Removed(c) => Some(c),
+                _ => None,
+            })
     }
 }
 
+/// Filter components with the provided `map_func`
 fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T>) -> Vec<T> {
     COMPONENTS
         .read()
@@ -257,6 +285,7 @@ fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T>) -
         .collect()
 }
 
+/// Filters components, and returns a clone of sources
 fn get_sources() -> Vec<Source> {
     filter_components(|(_, components)| match components {
         Component::Source(s) => Some(s.clone()),
@@ -264,6 +293,7 @@ fn get_sources() -> Vec<Source> {
     })
 }
 
+/// Filters components, and returns a clone of transforms
 fn get_transforms() -> Vec<Transform> {
     filter_components(|(_, components)| match components {
         Component::Transform(t) => Some(t.clone()),
@@ -271,6 +301,7 @@ fn get_transforms() -> Vec<Transform> {
     })
 }
 
+/// Filters components, and returns a clone of sinks
 fn get_sinks() -> Vec<Sink> {
     filter_components(|(_, components)| match components {
         Component::Sink(s) => Some(s.clone()),
@@ -336,23 +367,25 @@ pub fn update_config(config: &Config) {
     existing_component_names
         .difference(&new_component_names)
         .for_each(|name| {
-            Broker::publish(ComponentRemoved(
+            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
                 COMPONENTS
                     .read()
                     .expect(INVARIANT)
                     .get(name)
                     .expect(INVARIANT)
                     .clone(),
-            ))
+            ));
         });
 
     // Publish all components that have been added
     new_component_names
         .difference(&existing_component_names)
         .for_each(|name| {
-            Broker::publish(ComponentAdded(new_components.get(name).unwrap().clone()));
+            let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
+                new_components.get(name).unwrap().clone(),
+            ));
         });
 
-    // override the old hashmap
+    // Override the old hashmap
     *COMPONENTS.write().expect(INVARIANT) = new_components;
 }
