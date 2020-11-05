@@ -17,12 +17,17 @@ pub struct BlackholeSink {
     acker: Acker,
 }
 
-#[derivative(Default)]
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[serde(deny_unknown_fields, default)]
+#[derivative(Default)]
 pub struct BlackholeConfig {
     #[derivative(Default(value = "1000"))]
-    #[serde(default)]
+    #[serde(default = "default_print_amount")]
     pub print_amount: usize,
+}
+
+fn default_print_amount() -> usize {
+  1000
 }
 
 inventory::submit! {
@@ -31,7 +36,7 @@ inventory::submit! {
 
 impl GenerateConfig for BlackholeConfig {
     fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self { print_amount: 1000 }).unwrap()
+      toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
