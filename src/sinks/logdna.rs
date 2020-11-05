@@ -254,7 +254,7 @@ impl LogdnaConfig {
             .tags
             .as_ref()
             .map(|tags| -> Result<Option<Vec<String>>, Vec<String>> {
-                let mut vec = Vec::new();
+                let mut vec = Vec::with_capacity(tags.len());
                 for tag in tags {
                     vec.push(tag.render_string(event)?);
                 }
