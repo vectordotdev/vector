@@ -7,7 +7,7 @@ use vector_api_client::{
 };
 
 /// Components that have been added
-async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx) {
+async fn component_added(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     let res = client.component_added();
 
     tokio::pin! {
@@ -17,24 +17,22 @@ async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_added;
-            let _ = tx
-                .send((
-                    c.name.clone(),
-                    state::EventType::ComponentAdded(state::ComponentRow {
-                        name: c.name,
-                        component_type: c.on.to_string(),
-                        events_processed_total: 0,
-                        bytes_processed_total: 0,
-                        errors: 0,
-                    }),
-                ))
-                .await;
+            let _ = tx.send((
+                c.name.clone(),
+                state::EventType::ComponentAdded(state::ComponentRow {
+                    name: c.name,
+                    component_type: c.on.to_string(),
+                    events_processed_total: 0,
+                    bytes_processed_total: 0,
+                    errors: 0,
+                }),
+            ));
         }
     }
 }
 
 /// Components that have been removed
-async fn component_removed(client: Arc<SubscriptionClient>, mut tx: state::EventTx) {
+async fn component_removed(client: Arc<SubscriptionClient>, tx: state::EventTx) {
     let res = client.component_removed();
 
     tokio::pin! {
@@ -44,15 +42,13 @@ async fn component_removed(client: Arc<SubscriptionClient>, mut tx: state::Event
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_removed;
-            let _ = tx
-                .send((c.name.clone(), state::EventType::ComponentRemoved(c.name)))
-                .await;
+            let _ = tx.send((c.name.clone(), state::EventType::ComponentRemoved(c.name)));
         }
     }
 }
 
 /// Events processed metrics
-async fn events_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx, interval: i64) {
+async fn events_processed(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
     let res = client.component_events_processed_total_subscription(interval);
 
     tokio::pin! {
@@ -62,18 +58,16 @@ async fn events_processed(client: Arc<SubscriptionClient>, mut tx: state::EventT
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_events_processed_total;
-            let _ = tx
-                .send((
-                    c.name,
-                    state::EventType::EventsProcessedTotal(c.metric.events_processed_total as i64),
-                ))
-                .await;
+            let _ = tx.send((
+                c.name,
+                state::EventType::EventsProcessedTotal(c.metric.events_processed_total as i64),
+            ));
         }
     }
 }
 
 /// Bytes processed metrics
-async fn bytes_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx, interval: i64) {
+async fn bytes_processed(client: Arc<SubscriptionClient>, tx: state::EventTx, interval: i64) {
     let res = client.component_bytes_processed_total_subscription(interval);
 
     tokio::pin! {
@@ -83,12 +77,10 @@ async fn bytes_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_bytes_processed_total;
-            let _ = tx
-                .send((
-                    c.name,
-                    state::EventType::BytesProcessedTotal(c.metric.bytes_processed_total as i64),
-                ))
-                .await;
+            let _ = tx.send((
+                c.name,
+                state::EventType::BytesProcessedTotal(c.metric.bytes_processed_total as i64),
+            ));
         }
     }
 }
@@ -96,10 +88,10 @@ async fn bytes_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx
 pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) {
     let client = Arc::new(client);
 
-    tokio::spawn(component_added(Arc::clone(&client), tx.clone()));
-    tokio::spawn(component_removed(Arc::clone(&client), tx.clone()));
     tokio::spawn(events_processed(Arc::clone(&client), tx.clone(), interval));
-    tokio::spawn(bytes_processed(Arc::clone(&client), tx, interval));
+    tokio::spawn(bytes_processed(Arc::clone(&client), tx.clone(), interval));
+    tokio::spawn(component_added(Arc::clone(&client), tx.clone()));
+    tokio::spawn(component_removed(Arc::clone(&client), tx));
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics

@@ -1,13 +1,13 @@
 use num_format::{Locale, ToFormattedString};
 use std::collections::btree_map::BTreeMap;
+use tokio::sync::mpsc;
 
 pub static COMPONENT_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Bytes", "Errors"];
 
 pub type State = BTreeMap<String, ComponentRow>;
-pub type EventTx = tokio::sync::mpsc::Sender<(String, EventType)>;
-pub type EventRx = tokio::sync::mpsc::Receiver<(String, EventType)>;
-pub type StateTx = tokio::sync::broadcast::Sender<State>;
-pub type StateRx = tokio::sync::broadcast::Receiver<State>;
+pub type EventTx = mpsc::UnboundedSender<(String, EventType)>;
+pub type EventRx = mpsc::UnboundedReceiver<(String, EventType)>;
+pub type StateRx = mpsc::UnboundedReceiver<State>;
 
 #[derive(Debug)]
 pub enum EventType {
@@ -54,15 +54,15 @@ impl ComponentRow {
 /// Takes the receiver `EventRx` channel, and returns a `StateTx` state transmitter. This
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
-pub fn updater(mut state: State, mut rx: EventRx) -> StateTx {
-    let (tx, _) = tokio::sync::broadcast::channel(10);
+pub fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
+    let (tx, rx) = mpsc::unbounded_channel();
 
-    // Local sender clone
-    let sender = tx.clone();
+    // Prime the receiver with the initial state
+    let _ = tx.send(state.clone());
 
     tokio::spawn(async move {
         loop {
-            if let Some((name, event_type)) = rx.recv().await {
+            if let Some((name, event_type)) = event_rx.recv().await {
                 match event_type {
                     EventType::EventsProcessedTotal(v) => {
                         if let Some(r) = state.get_mut(&name) {
@@ -83,10 +83,10 @@ pub fn updater(mut state: State, mut rx: EventRx) -> StateTx {
                 }
 
                 // Send updated map to listeners
-                let _ = sender.send(state.clone());
+                let _ = tx.send(state.clone());
             }
         }
     });
 
-    tx
+    rx
 }

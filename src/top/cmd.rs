@@ -37,7 +37,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Create a metrics state updater
-    let (tx, rx) = tokio::sync::mpsc::channel(100);
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
     // Get the initial component state
     let sender = match metrics::init_components(&client).await {
@@ -69,7 +69,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     metrics::subscribe(subscription_client, tx, opts.refresh_interval as i64);
 
     // Initialize the dashboard
-    match init_dashboard(url.as_str(), sender.subscribe()).await {
+    match init_dashboard(url.as_str(), sender).await {
         Ok(_) => exitcode::OK,
         _ => {
             eprintln!("Your terminal doesn't support building a dashboard. Exiting.");

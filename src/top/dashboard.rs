@@ -146,7 +146,7 @@ pub async fn init_dashboard(
 
     loop {
         tokio::select! {
-            Ok(state) = state_rx.recv() => {
+            Some(state) = state_rx.recv() => {
                 terminal.draw(|f| widgets.draw(f, state))?;
             },
             k = key_press_rx.recv() => {
