@@ -15,7 +15,7 @@ use vector::{
 };
 
 fn benchmark_http(c: &mut Criterion) {
-    let num_lines: usize = 10_000;
+    let num_lines: usize = 1_000;
     let line_size: usize = 100;
 
     let in_addr = next_addr();
