@@ -4,13 +4,13 @@ remap: functions: starts_with: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text to search."
+			description: "The string to search."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "substring"
-			description: "The substring to search for in `value`."
+			description: "The substring `value` must start with."
 			required:    true
 			type: ["string"]
 		},
@@ -42,11 +42,11 @@ remap: functions: starts_with: {
 			}
 		},
 		{
-			title: "Error"
+			title: "Invalid \"substring\" argument type"
 			input: {
 				message: "A string with 42"
 			}
-			source: ".contains = contains(.message, 42)"
+			source: ".contains = begins_with(.message, 42)"
 			output: {
 				error: remap.errors.ArgumentError
 			}
