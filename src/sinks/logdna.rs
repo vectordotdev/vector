@@ -4,9 +4,11 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
+        http::{HttpSink, PartitionHttpSink},
+        BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
+        PartitionInnerBuffer, TowerRequestConfig, UriSerde,
     },
+    template::Template,
 };
 use futures::FutureExt;
 use futures01::Sink;
@@ -28,10 +30,10 @@ pub struct LogdnaConfig {
     #[serde(alias = "host")]
     endpoint: Option<UriSerde>,
 
-    hostname: String,
+    hostname: Template,
     mac: Option<String>,
     ip: Option<String>,
-    tags: Option<Vec<String>>,
+    tags: Option<Vec<Template>>,
 
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
@@ -85,9 +87,9 @@ impl SinkConfig for LogdnaConfig {
             .parse_config(self.batch)?;
         let client = HttpClient::new(None)?;
 
-        let sink = BatchedHttpSink::new(
+        let sink = PartitionHttpSink::new(
             self.clone(),
-            JsonArrayBuffer::new(batch_settings.size),
+            PartitionBuffer::new(JsonArrayBuffer::new(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -112,12 +114,25 @@ impl SinkConfig for LogdnaConfig {
     }
 }
 
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub struct PartitionKey {
+    hostname: String,
+    tags: Option<Vec<String>>,
+}
+
 #[async_trait::async_trait]
 impl HttpSink for LogdnaConfig {
-    type Input = serde_json::Value;
-    type Output = Vec<BoxedRawValue>;
+    type Input = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
+    type Output = PartitionInnerBuffer<Vec<BoxedRawValue>, PartitionKey>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        let key = self
+            .render_key(&event)
+            .map_err(|error| {
+                error!(message = "Error rendering template.", ?error);
+            })
+            .ok()?;
+
         self.encoding.apply_rules(&mut event);
         let mut log = event.into_log();
 
@@ -164,10 +179,11 @@ impl HttpSink for LogdnaConfig {
             map.insert("meta".into(), json!(&log));
         }
 
-        Some(map.into())
+        Some(PartitionInnerBuffer::new(map.into(), key))
     }
 
-    async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+        let (events, key) = output.into_parts();
         let mut query = url::form_urlencoded::Serializer::new(String::new());
 
         let now = SystemTime::now()
@@ -175,7 +191,7 @@ impl HttpSink for LogdnaConfig {
             .expect("Time can't drift behind the epoch!")
             .as_millis();
 
-        query.append_pair("hostname", &self.hostname);
+        query.append_pair("hostname", &key.hostname);
         query.append_pair("now", &format!("{}", now));
 
         if let Some(mac) = &self.mac {
@@ -186,7 +202,7 @@ impl HttpSink for LogdnaConfig {
             query.append_pair("ip", ip);
         }
 
-        if let Some(tags) = &self.tags {
+        if let Some(tags) = &key.tags {
             let tags = tags.join(",");
             query.append_pair("tags", &tags);
         }
@@ -226,6 +242,22 @@ impl LogdnaConfig {
 
         uri.parse::<http::Uri>()
             .expect("This should be a valid uri")
+    }
+
+    fn render_key(&self, event: &Event) -> Result<PartitionKey, Vec<String>> {
+        let hostname = self.hostname.render_string(&event)?;
+        let tags = self
+            .tags
+            .as_ref()
+            .map(|tags| -> Result<Option<Vec<String>>, Vec<String>> {
+                let mut vec = Vec::new();
+                for tag in tags {
+                    vec.push(tag.render_string(event)?);
+                }
+                Ok(Some(vec))
+            })
+            .unwrap_or(Ok(None))?;
+        Ok(PartitionKey { hostname, tags })
     }
 }
 
@@ -288,13 +320,13 @@ mod tests {
         let mut event4 = Event::from("hello world");
         event4.as_mut_log().insert("env", "staging");
 
-        let event1_out = config.encode_event(event1).unwrap();
+        let event1_out = config.encode_event(event1).unwrap().into_parts().0;
         let event1_out = event1_out.as_object().unwrap();
-        let event2_out = config.encode_event(event2).unwrap();
+        let event2_out = config.encode_event(event2).unwrap().into_parts().0;
         let event2_out = event2_out.as_object().unwrap();
-        let event3_out = config.encode_event(event3).unwrap();
+        let event3_out = config.encode_event(event3).unwrap().into_parts().0;
         let event3_out = event3_out.as_object().unwrap();
-        let event4_out = config.encode_event(event4).unwrap();
+        let event4_out = config.encode_event(event4).unwrap().into_parts().0;
         let event4_out = event4_out.as_object().unwrap();
 
         assert_eq!(event1_out.get("app").unwrap(), &json!("notvector"));

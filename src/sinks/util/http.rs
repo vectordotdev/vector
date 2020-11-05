@@ -1,6 +1,6 @@
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, TowerBatchedSink, TowerRequestSettings,
+    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestSettings,
 };
 use crate::{buffers::Acker, event::Event, http::HttpClient};
 use bytes::{Buf, Bytes};
@@ -11,6 +11,7 @@ use hyper::body::{self, Body};
 use std::{
     fmt,
     future::Future,
+    hash::Hash,
     sync::Arc,
     task::{Context, Poll},
     time::Duration,
@@ -24,6 +25,130 @@ pub trait HttpSink: Send + Sync + 'static {
 
     fn encode_event(&self, event: Event) -> Option<Self::Input>;
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>>;
+}
+
+pub struct PartitionHttpSink<T, B, K, L = HttpRetryLogic>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    sink: Arc<T>,
+    inner: TowerPartitionSink<
+        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
+        B,
+        L,
+        K,
+        B::Output,
+    >,
+    slot: Option<B::Input>,
+}
+
+impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn new(
+        sink: T,
+        batch: B,
+        request_settings: TowerRequestSettings,
+        batch_timeout: Duration,
+        client: HttpClient,
+        acker: Acker,
+    ) -> Self {
+        Self::with_retry_logic(
+            sink,
+            batch,
+            HttpRetryLogic,
+            request_settings,
+            batch_timeout,
+            client,
+            acker,
+        )
+    }
+}
+
+impl<T, B, K, L> PartitionHttpSink<T, B, K, L>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn with_retry_logic(
+        sink: T,
+        batch: B,
+        logic: L,
+        request_settings: TowerRequestSettings,
+        batch_timeout: Duration,
+        client: HttpClient,
+        acker: Acker,
+    ) -> Self {
+        let sink = Arc::new(sink);
+
+        let sink1 = Arc::clone(&sink);
+        let request_builder =
+            move |b| -> BoxFuture<'static, crate::Result<http::Request<Vec<u8>>>> {
+                let sink = Arc::clone(&sink1);
+                Box::pin(async move { sink.build_request(b).await })
+            };
+
+        let svc = HttpBatchService::new(client, request_builder);
+        let inner = request_settings.partition_sink(logic, svc, batch, batch_timeout, acker);
+
+        Self {
+            sink,
+            inner,
+            slot: None,
+        }
+    }
+}
+
+impl<T, B, K, L> Sink for PartitionHttpSink<T, B, K, L>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+{
+    type SinkItem = crate::Event;
+    type SinkError = crate::Error;
+
+    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+        if self.slot.is_some() && self.poll_complete()?.is_not_ready() {
+            return Ok(AsyncSink::NotReady(item));
+        }
+        assert!(self.slot.is_none(), "poll_complete did not clear slot");
+
+        if let Some(item) = self.sink.encode_event(item) {
+            self.slot = Some(item);
+            self.poll_complete()?;
+        }
+
+        Ok(AsyncSink::Ready)
+    }
+
+    fn poll_complete(&mut self) -> Poll01<(), Self::SinkError> {
+        if let Some(item) = self.slot.take() {
+            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
+                self.slot = Some(item);
+                return Ok(Async::NotReady);
+            }
+        }
+
+        self.inner.poll_complete()
+    }
 }
 
 /// Provides a simple wrapper around internal tower and
