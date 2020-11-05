@@ -186,8 +186,7 @@ mod test {
     fn metric_eq(lines: &[&str], name: &str, tag: &str, value: u64) -> bool {
         lines
             .iter()
-            .find(|s| s.starts_with(name) && s.contains(tag) && s.ends_with(&value.to_string()))
-            .is_some()
+            .any(|s| s.starts_with(name) && s.contains(tag) && s.ends_with(&value.to_string()))
     }
 
     #[tokio::test]

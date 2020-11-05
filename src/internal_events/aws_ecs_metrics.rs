@@ -15,16 +15,8 @@ impl InternalEvent for AwsEcsMetricsReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", self.count as u64,
-            "component_kind" => "source",
-            "component_type" => "aws_ecs_metrics",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "aws_ecs_metrics",
-        );
+        counter!("events_processed_total", self.count as u64);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -40,10 +32,7 @@ impl InternalEvent for AwsEcsMetricsRequestCompleted {
     }
 
     fn emit_metrics(&self) {
-        counter!("requests_completed", 1,
-            "component_kind" => "source",
-            "component_type" => "aws_ecs_metrics",
-        );
+        counter!("requests_completed_total", 1);
         histogram!("request_duration_nanoseconds", self.end - self.start,
             "component_kind" => "source",
             "component_type" => "aws_ecs_metrics",
@@ -88,10 +77,7 @@ impl InternalEvent for AwsEcsMetricsErrorResponse {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_error_response", 1,
-            "component_kind" => "source",
-            "component_type" => "aws_ecs_metrics",
-        );
+        counter!("http_error_response_total", 1);
     }
 }
 
@@ -107,9 +93,6 @@ impl InternalEvent for AwsEcsMetricsHttpError {
     }
 
     fn emit_metrics(&self) {
-        counter!("http_request_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "aws_ecs_metrics",
-        );
+        counter!("http_request_errors_total", 1);
     }
 }
