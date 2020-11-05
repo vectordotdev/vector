@@ -1383,7 +1383,12 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     let events_processed_after = metrics::get_events_processed(&vector_metrics_url).await?;
 
     // Ensure we did get at least one event since before deployed the test pod.
-    assert!(events_processed_after >= events_processed_before + 1);
+    assert!(
+        events_processed_after >= events_processed_before + 1,
+        "before: {}, after: {}",
+        events_processed_before,
+        events_processed_after
+    );
 
     drop(test_pod);
     drop(test_namespace);
