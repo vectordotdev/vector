@@ -27,7 +27,7 @@ remap: functions: slice: {
 	description: #"""
 		Returns a slice of the provided string or array between the `start` and `end` positions specified.
 
-		If the `start` and `end` parameters are negative, they refer to positions counting from the right of the 
+		If the `start` and `end` parameters are negative, they refer to positions counting from the right of the
 		string or array. Both `start` and `end` must refer to positions that are not greater than the length of
 		the string or array.
 		"""#
