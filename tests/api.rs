@@ -454,7 +454,7 @@ mod tests {
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
-              
+
             [sources.gen2]
               type = "generator"
               lines = ["3rd line", "4th line"]
@@ -544,7 +544,7 @@ mod tests {
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
-              
+
             [sinks.out]
               # General
               type = "blackhole"
