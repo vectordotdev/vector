@@ -1317,11 +1317,12 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-    let vector_metrics_port_forward =
+    let mut vector_metrics_port_forward =
         framework.port_forward("test-vector", "daemonset/vector-agent", 8080, 8080)?;
+    vector_metrics_port_forward.wait_until_ready().await?;
     let vector_metrics_url = format!(
-        "http://localhost:{}/metrics",
-        vector_metrics_port_forward.local_port()
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
     );
 
     // Capture events processed before deploying the test pod.
