@@ -178,7 +178,7 @@ pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runti
 task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "1.0.1"
-k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
+k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
 portpicker = "0.1.0"
 sha-1 = "0.9"
 sha2 = "0.9"
