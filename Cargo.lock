@@ -2967,6 +2967,8 @@ dependencies = [
  "futures 0.3.5",
  "k8s-openapi",
  "k8s-test-framework",
+ "regex",
+ "reqwest",
  "serde_json",
  "tokio",
 ]
