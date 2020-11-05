@@ -18,7 +18,7 @@ pub struct BlackholeSink {
 }
 
 #[derivative(Default)]
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Derivative, Deserialize, Serialize)]
 pub struct BlackholeConfig {
     #[derivative(Default(value = "1000"))]
     #[serde(default)]
