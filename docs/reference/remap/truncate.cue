@@ -50,7 +50,7 @@ remap: functions: truncate: {
 				text: 42
 			}
 			source: #"""
-				.truncated = truncate(.text, limit=11, ellipsis=true)
+				.truncated = truncate(.text, limit =11, ellipsis = true)
 				"""#
 			output: {
 				error: remap.errors.ArgumentError

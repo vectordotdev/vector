@@ -25,8 +25,7 @@ remap: functions: parse_json: {
 				message: #"{"key": "val"}"#
 			}
 			source: #"""
-				message = del(.message)
-				. = parse_json(message)
+				. = parse_json(.message)
 				"""#
 			output: {
 				key: "val"

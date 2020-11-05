@@ -23,7 +23,7 @@ remap: functions: parse_duration: {
 		Available units:
 		- **ns** - nanoseconds (1 billion nanoseconds in a second)
 		- **us** - microseconds (1 million microseconds in a second)
-		- **µs** - microseconds  (1 million microseconds in a second)
+		- **µs** - microseconds (1 million microseconds in a second)
 		- **ms** - milliseconds (1 thousand microseconds in a second)
 		- **cs** - centisecond (100 centiseconds in a second)
 		- **ds** - decisecond (10 deciseconds in a second)

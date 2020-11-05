@@ -4,7 +4,7 @@ remap: functions: format_number: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The number to convert to text."
+			description: "The number to format as a string."
 			required:    true
 			type: ["integer", "float"]
 		},
@@ -19,14 +19,14 @@ remap: functions: format_number: {
 			description: "The character to use between the whole and decimal parts of the number."
 			required:    false
 			type: ["string"]
-			default: true
+			default: "."
 		},
 		{
 			name:        "grouping_separator"
 			description: "The character to use between each thousands part of the number."
 			required:    false
 			type: ["string"]
-			default: true
+			default: ","
 		},
 	]
 	return: ["string"]

@@ -38,7 +38,7 @@ remap: functions: flatten: {
 				}
 			}
 			source: #"""
-				.flattened = flatten(object)
+				.flattened = flatten(.object)
 				"""#
 			output: {
 				flattened: {"grandparent.parent1.child1": 1

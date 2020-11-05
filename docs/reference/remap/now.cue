@@ -12,7 +12,7 @@ remap: functions: now: {
 			title: "Success"
 			input: {}
 			source: #"""
-				.timestamp = format_timestamp(now(), format = "%v %R")
+				.timestamp = now()
 				"""#
 			output: {
 				timestamp: "21-Oct-2020 20:53"

@@ -12,13 +12,13 @@ remap: functions: strip_ansi_escape_codes: {
 	return: ["string"]
 	category: "text"
 	description: #"""
-			Removes the any ansi escape codes from the provided string.
+			Removes the any ANSI escape codes from the provided string.
 		"""#
 	examples: [
 		{
 			title: "Success"
 			input: {
-				text: #"\x1b[46mfoo\x1b[0m bar"#
+				text: #"\e[46mfoo\e[0m bar"#
 			}
 			source: #"""
 				.text = strip_ansi_escape_codes(.text)

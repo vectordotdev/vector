@@ -1,16 +1,16 @@
 package metadata
 
-remap: functions: begins_with: {
+remap: functions: starts_with: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text to search."
+			description: "The string to search."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "substring"
-			description: "The substring to search for in `value`."
+			description: "The substring `value` must start with."
 			required:    true
 			type: ["string"]
 		},
@@ -38,11 +38,12 @@ remap: functions: begins_with: {
 				.contains = begins_with(.message, "the needle", case_sensitive = false)
 				"""#
 			output: {
-				contains: true
+ 				message: #"The Needle In The Haystack"#,
+ 				contains: true
 			}
 		},
 		{
-			title: "Error"
+			title: "Invalid \"substring\" argument type"
 			input: {
 				message: "A string with 42"
 			}
