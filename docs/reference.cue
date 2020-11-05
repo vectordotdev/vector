@@ -13,6 +13,7 @@ _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 	local_host:        "my-host.local"
 	remote_host:       "34.33.222.212"
+	instance:          "vector:9598"
 }
 
 // `#Any` allows for any value.
@@ -154,6 +155,9 @@ _values: {
 	//
 	// For example, the `http` sink has a `HTTP` title.
 	title: string
+
+	// Telemetry produced by the component
+	telemetry: metrics: #MetricOutput
 }
 
 // `#CompressionAlgorithm` specified data compression algorithm.
@@ -551,10 +555,12 @@ _values: {
 })
 
 #MetricTags: [Name=string]: close({
+	name:        Name
 	description: string
-	examples: [...string]
+	examples?: [...string]
 	required: bool
-	name:     Name
+	options?: [string]: string
+	default?: string
 })
 
 #MetricType: "counter" | "distribution" | "gauge" | "histogram" | "summary"

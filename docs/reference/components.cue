@@ -442,5 +442,9 @@ components: {
 				}
 			}
 		}
+
+		telemetry: metrics: {
+			vector_events_processed_total: _metrics.vector_events_processed_total
+		}
 	}}
 }

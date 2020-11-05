@@ -79,4 +79,8 @@ components: sinks: console: {
 			summary:      true
 		}
 	}
+
+	telemetry: metrics: {
+		vector_processed_bytes_total: _metrics.vector_processed_bytes_total
+	}
 }
