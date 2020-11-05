@@ -142,10 +142,6 @@ pub async fn init_dashboard(
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    // Throttle widgets changes to 250ms, to space out re-draws
-    // let widget_listener =
-    //     tokio::time::throttle(tokio::time::Duration::from_millis(250), widgets.listen());
-
     let widgets = Widgets::new(url);
 
     loop {
