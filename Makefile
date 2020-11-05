@@ -266,6 +266,12 @@ cross-image-%:
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --workspace --features ${DEFAULT_FEATURES} ${SCOPE} --all-targets -- --nocapture
 
+.PHONY: test-all-components
+test-all-components: ## Test with all components enabled
+test-all-components: $(WASM_MODULE_OUTPUTS)
+test-all-components: export DEFAULT_FEATURES:="$(DEFAULT_FEATURES) wasm-benches"
+test-all-components: test
+
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
 
@@ -785,6 +791,11 @@ test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
 bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}"
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
+.PHONY: bench-all
+bench-all: $(WASM_MODULE_OUTPUTS)  ### Run default and WASM benches
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm-benches"
+
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
