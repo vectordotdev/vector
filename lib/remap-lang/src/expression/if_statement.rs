@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{value, Expr, Expression, Object, Result, State, Value};
+use crate::{value, Expr, Expression, Object, Result, State, Value, ValueKind};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -34,7 +34,7 @@ impl Expression for IfStatement {
             Some(Value::Boolean(true)) => self.true_expression.execute(state, object),
             Some(Value::Boolean(false)) | None => self.false_expression.execute(state, object),
             Some(v) => Err(E::from(Error::from(value::Error::Expected(
-                Value::Boolean(true).kind(),
+                ValueKind::Boolean,
                 v.kind(),
             )))
             .into()),

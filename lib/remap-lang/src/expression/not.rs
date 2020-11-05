@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{value, Expr, Expression, Object, Result, State, Value};
+use crate::{value, Expr, Expression, Object, Result, State, Value, ValueKind};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -24,7 +24,7 @@ impl Expression for Not {
             opt.map(|v| match v {
                 Value::Boolean(b) => Ok(Value::Boolean(!b)),
                 _ => Err(E::from(Error::from(value::Error::Expected(
-                    Value::Boolean(true).kind(),
+                    ValueKind::Boolean,
                     v.kind(),
                 )))
                 .into()),

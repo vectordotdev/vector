@@ -18,7 +18,7 @@ pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
 pub use state::State;
-pub use value::Value;
+pub use value::{Value, ValueKind};
 
 pub type Result<T> = std::result::Result<T, Error>;
 

@@ -2,6 +2,8 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::ops::Deref;
 use std::string::String as StdString;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -16,46 +18,106 @@ pub enum Value {
     Null,
 }
 
+#[derive(Eq, PartialEq, Debug, Clone, Copy)]
+pub enum ValueKind {
+    String,
+    Integer,
+    Float,
+    Boolean,
+    Map,
+    Array,
+    Timestamp,
+    Null,
+}
+
+impl fmt::Display for ValueKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self)
+    }
+}
+
+impl ValueKind {
+    pub fn as_str(&self) -> &'static str {
+        use ValueKind::*;
+
+        match self {
+            String => "string",
+            Integer => "integer",
+            Float => "float",
+            Boolean => "boolean",
+            Map => "map",
+            Array => "array",
+            Timestamp => "timestamp",
+            Null => "null",
+        }
+    }
+}
+
+impl Deref for ValueKind {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
+    }
+}
+
+impl From<&Value> for ValueKind {
+    fn from(value: &Value) -> Self {
+        use ValueKind::*;
+
+        match value {
+            Value::String(_) => String,
+            Value::Integer(_) => Integer,
+            Value::Float(_) => Float,
+            Value::Boolean(_) => Boolean,
+            Value::Map(_) => Map,
+            Value::Array(_) => Array,
+            Value::Timestamp(_) => Timestamp,
+            Value::Null => Null,
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
     #[error(r#"expected "{0}", got "{1}""#)]
-    Expected(&'static str, &'static str),
+    Expected(ValueKind, ValueKind),
 
     #[error(r#"unable to coerce "{0}" into "{1}""#)]
-    Coerce(&'static str, &'static str),
+    Coerce(ValueKind, ValueKind),
 
     #[error("unable to calculate remainder of values type {0} and {1}")]
-    Rem(&'static str, &'static str),
+    Rem(ValueKind, ValueKind),
 
     #[error("unable to multiply value type {0} by {1}")]
-    Mul(&'static str, &'static str),
+    Mul(ValueKind, ValueKind),
 
     #[error("unable to divide value type {0} by {1}")]
-    Div(&'static str, &'static str),
+    Div(ValueKind, ValueKind),
 
     #[error("unable to add value type {1} to {0}")]
-    Add(&'static str, &'static str),
+    Add(ValueKind, ValueKind),
 
     #[error("unable to subtract value type {1} from {0}")]
-    Sub(&'static str, &'static str),
+    Sub(ValueKind, ValueKind),
 
     #[error("unable to OR value type {0} with {1}")]
-    Or(&'static str, &'static str),
+    Or(ValueKind, ValueKind),
 
     #[error("unable to AND value type {0} with {1}")]
-    And(&'static str, &'static str),
+    And(ValueKind, ValueKind),
 
     #[error("unable to compare {0} > {1}")]
-    Gt(&'static str, &'static str),
+    Gt(ValueKind, ValueKind),
 
     #[error("unable to compare {0} >= {1}")]
-    Ge(&'static str, &'static str),
+    Ge(ValueKind, ValueKind),
 
     #[error("unable to compare {0} < {1}")]
-    Lt(&'static str, &'static str),
+    Lt(ValueKind, ValueKind),
 
     #[error("unable to compare {0} <= {1}")]
-    Le(&'static str, &'static str),
+    Le(ValueKind, ValueKind),
 }
 
 impl From<i32> for Value {
@@ -137,7 +199,7 @@ impl TryFrom<&Value> for f64 {
         match value {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(*v),
-            _ => Err(Error::Coerce(value.kind(), Value::Float(0.0).kind())),
+            _ => Err(Error::Coerce(value.kind(), ValueKind::Float)),
         }
     }
 }
@@ -149,7 +211,7 @@ impl TryFrom<&Value> for i64 {
         match value {
             Value::Integer(v) => Ok(*v),
             Value::Float(v) => Ok(*v as i64),
-            _ => Err(Error::Coerce(value.kind(), Value::Integer(0).kind())),
+            _ => Err(Error::Coerce(value.kind(), ValueKind::Integer)),
         }
     }
 }
@@ -166,7 +228,7 @@ impl TryFrom<&Value> for String {
             Float(v) => Ok(format!("{}", v)),
             Boolean(v) => Ok(format!("{}", v)),
             Null => Ok("".to_owned()),
-            _ => Err(Error::Coerce(value.kind(), Value::String("".into()).kind())),
+            _ => Err(Error::Coerce(value.kind(), ValueKind::String)),
         }
     }
 }
@@ -188,19 +250,8 @@ impl TryFrom<Value> for i64 {
 }
 
 impl Value {
-    pub fn kind(&self) -> &'static str {
-        use Value::*;
-
-        match self {
-            String(_) => "string",
-            Integer(_) => "integer",
-            Float(_) => "float",
-            Boolean(_) => "boolean",
-            Map(_) => "map",
-            Array(_) => "array",
-            Timestamp(_) => "timestamp",
-            Null => "null",
-        }
+    pub fn kind(&self) -> ValueKind {
+        self.into()
     }
 
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).

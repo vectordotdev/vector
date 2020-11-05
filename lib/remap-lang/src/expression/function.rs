@@ -1,5 +1,7 @@
 use super::Error as E;
-use crate::{Argument, ArgumentList, Expression, Function as Fn, Object, Result, State, Value};
+use crate::{
+    Argument, ArgumentList, Expression, Function as Fn, Object, Result, State, Value, ValueKind,
+};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -19,7 +21,7 @@ pub enum Error {
     Expression(&'static str),
 
     #[error(r#"incorrect value type for argument "{0}" (got "{0}")"#)]
-    Value(&'static str, &'static str),
+    Value(&'static str, ValueKind),
 }
 
 #[derive(Debug, Clone)]
