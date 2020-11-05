@@ -559,7 +559,7 @@ _values: {
 	description: string
 	examples?: [...string]
 	required: bool
-	options?: [string]: string
+	options?: [string]: string | [string]
 	default?: string
 })
 
