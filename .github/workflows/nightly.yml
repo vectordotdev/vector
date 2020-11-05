@@ -308,11 +308,19 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-armhf.deb
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-x86_64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
           name: vector-aarch64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
+          name: vector-armv7.rpm
           path: target/artifacts
       - name: Push amd64 deb
         id: push-deb-amd64
