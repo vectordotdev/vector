@@ -27,7 +27,7 @@ pub struct BlackholeConfig {
 }
 
 fn default_print_amount() -> usize {
-  1000
+    1000
 }
 
 inventory::submit! {
@@ -36,7 +36,7 @@ inventory::submit! {
 
 impl GenerateConfig for BlackholeConfig {
     fn generate_config() -> toml::Value {
-      toml::Value::try_from(&Self::default()).unwrap()
+        toml::Value::try_from(&Self::default()).unwrap()
     }
 }
 
