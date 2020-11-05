@@ -15,3 +15,24 @@ impl State {
         &mut self.variables
     }
 }
+
+/// State held by the compiler as it parses the program source.
+#[derive(Debug, Default)]
+pub struct CompilerState {
+    /// The [`ResolveKind`] each variable is expected to have.
+    ///
+    /// This allows assignment operations to tell the compiler what kinds each
+    /// variable will have at runtime, so that the compiler can then check the
+    /// variable kinds at compile-time when a variable is called.
+    variable_kinds: HashMap<String, ResolveKind>,
+}
+
+impl CompilerState {
+    pub fn variable_kind(&self, key: impl AsRef<str>) -> Option<&ResolveKind> {
+        self.variable_kinds.get(key.as_ref())
+    }
+
+    pub fn variable_kinds_mut(&mut self) -> &mut HashMap<String, ResolveKind> {
+        &mut self.variable_kinds
+    }
+}
