@@ -4,7 +4,7 @@ use super::{
 };
 use crate::config;
 use url::Url;
-use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
+use vector_api_client::{gql::HealthQueryExt, Client};
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
@@ -37,11 +37,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     // Create a metrics state updater
-    let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, rx) = tokio::sync::mpsc::channel(20);
 
     // Get the initial component state
     let sender = match metrics::init_components(&client).await {
-        Ok(state) => state::updater(state, rx),
+        Ok(state) => state::updater(state, rx).await,
         _ => {
             eprintln!("Couldn't query Vector components");
             return exitcode::UNAVAILABLE;
@@ -57,16 +57,8 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         })
         .expect("Couldn't build WebSocket URL. Please report.");
 
-    let subscription_client = match connect_subscription_client(ws_url).await {
-        Ok(c) => c,
-        _ => {
-            eprintln!("Couldn't connect to Vector API via WebSockets");
-            return exitcode::UNAVAILABLE;
-        }
-    };
-
     // Subscribe to updated metrics
-    metrics::subscribe(subscription_client, tx, opts.refresh_interval as i64);
+    metrics::subscribe(ws_url, tx.clone(), opts.refresh_interval as i64);
 
     // Initialize the dashboard
     match init_dashboard(url.as_str(), sender).await {

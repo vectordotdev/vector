@@ -255,9 +255,8 @@ impl ComponentsSubscription {
         COMPONENT_CHANGED
             .subscribe()
             .into_stream()
-            .filter(Result::is_ok)
-            .filter_map(|c| match c.unwrap() {
-                ComponentChanged::Added(c) => Some(c),
+            .filter_map(|c| match c {
+                Ok(ComponentChanged::Added(c)) => Some(c),
                 _ => None,
             })
     }
@@ -267,9 +266,8 @@ impl ComponentsSubscription {
         COMPONENT_CHANGED
             .subscribe()
             .into_stream()
-            .filter(Result::is_ok)
-            .filter_map(|c| match c.unwrap() {
-                ComponentChanged::Removed(c) => Some(c),
+            .filter_map(|c| match c {
+                Ok(ComponentChanged::Removed(c)) => Some(c),
                 _ => None,
             })
     }

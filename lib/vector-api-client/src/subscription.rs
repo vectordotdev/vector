@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     pin::Pin,
-    sync::{Arc, RwLock, Weak},
+    sync::{Arc, Mutex, Weak},
 };
 use tokio::{
     stream::{Stream, StreamExt},
@@ -133,8 +133,7 @@ impl<T: GraphQLQuery + Send + Sync> Receiver<T> for Subscription {
                 .subscribe()
                 .into_stream()
                 .filter(Result::is_ok)
-                .map(Result::unwrap)
-                .map(|p| p.response::<T>()),
+                .map(|p| p.unwrap().response::<T>()),
         )
     }
 }
@@ -143,7 +142,7 @@ impl<T: GraphQLQuery + Send + Sync> Receiver<T> for Subscription {
 #[derive(Debug)]
 pub struct SubscriptionClient {
     tx: mpsc::UnboundedSender<Payload>,
-    subscriptions: Arc<RwLock<WeakValueHashMap<Uuid, Weak<Subscription>>>>,
+    subscriptions: Arc<Mutex<WeakValueHashMap<Uuid, Weak<Subscription>>>>,
     _shutdown_tx: oneshot::Sender<()>,
 }
 
@@ -154,7 +153,7 @@ impl SubscriptionClient {
         // Oneshot channel for cancelling the listener if SubscriptionClient is dropped
         let (_shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
 
-        let subscriptions = Arc::new(RwLock::new(WeakValueHashMap::new()));
+        let subscriptions = Arc::new(Mutex::new(WeakValueHashMap::new()));
         let subscriptions_clone = Arc::clone(&subscriptions);
 
         // Spawn a handler for shutdown, and relaying received `Payload`s back to the relevant
@@ -168,7 +167,8 @@ impl SubscriptionClient {
 
                     // Handle receiving payloads back _from_ the server
                     Some(p) = rx.next() => {
-                        if let Some(s) = subscriptions_clone.read().unwrap().get::<Uuid>(&p.id)
+                        let s = subscriptions_clone.lock().unwrap().get::<Uuid>(&p.id);
+                        if let Some(s) = s
                             as Option<Arc<Subscription>>
                         {
                             let _ = s.receive(p);
@@ -202,7 +202,7 @@ impl SubscriptionClient {
         // Store the subscription in the WeakValueHashMap. This is converted internally into
         // a weak reference, to prevent dropped subscriptions lingering in memory
         self.subscriptions
-            .write()
+            .lock()
             .unwrap()
             .insert(id, Arc::clone(&subscription));
 
@@ -228,18 +228,22 @@ pub async fn connect_subscription_client(
 
     // Forwarded received messages back upstream to the GraphQL server
     tokio::spawn(async move {
-        while let Some(p) = send_rx.next().await {
-            let _ = ws_tx
-                .send(Message::Text(serde_json::to_string(&p).unwrap()))
-                .await;
+        loop {
+            if let Some(p) = send_rx.next().await {
+                let _ = ws_tx
+                    .send(Message::Text(serde_json::to_string(&p).unwrap()))
+                    .await;
+            }
         }
     });
 
     // Forward received messages to the receiver channel
     tokio::spawn(async move {
-        while let Some(Ok(Message::Text(m))) = ws_rx.next().await {
-            if let Ok(p) = serde_json::from_str::<Payload>(&m) {
-                let _ = recv_tx.send(p);
+        loop {
+            if let Some(Ok(Message::Text(m))) = ws_rx.next().await {
+                if let Ok(p) = serde_json::from_str::<Payload>(&m) {
+                    let _ = recv_tx.send(p);
+                }
             }
         }
     });

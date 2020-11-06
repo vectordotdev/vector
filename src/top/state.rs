@@ -5,9 +5,9 @@ use tokio::sync::mpsc;
 pub static COMPONENT_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Bytes", "Errors"];
 
 pub type State = BTreeMap<String, ComponentRow>;
-pub type EventTx = mpsc::UnboundedSender<(String, EventType)>;
-pub type EventRx = mpsc::UnboundedReceiver<(String, EventType)>;
-pub type StateRx = mpsc::UnboundedReceiver<State>;
+pub type EventTx = mpsc::Sender<(String, EventType)>;
+pub type EventRx = mpsc::Receiver<(String, EventType)>;
+pub type StateRx = mpsc::Receiver<State>;
 
 #[derive(Debug)]
 pub enum EventType {
@@ -54,11 +54,11 @@ impl ComponentRow {
 /// Takes the receiver `EventRx` channel, and returns a `StateTx` state transmitter. This
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
-pub fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
-    let (tx, rx) = mpsc::unbounded_channel();
+pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
+    let (mut tx, rx) = mpsc::channel(20);
 
     // Prime the receiver with the initial state
-    let _ = tx.send(state.clone());
+    let _ = tx.send(state.clone()).await;
 
     tokio::spawn(async move {
         loop {
@@ -83,7 +83,7 @@ pub fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                 }
 
                 // Send updated map to listeners
-                let _ = tx.send(state.clone());
+                let _ = tx.send(state.clone()).await;
             }
         }
     });
