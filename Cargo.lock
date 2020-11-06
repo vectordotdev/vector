@@ -1603,6 +1603,8 @@ dependencies = [
  "quickcheck",
  "rand 0.7.3",
  "scan_fmt",
+ "serde",
+ "serde_json",
  "tempfile",
  "tokio",
  "tracing 0.1.21",
