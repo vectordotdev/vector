@@ -276,8 +276,9 @@ test: ## Run the unit test suite
 
 .PHONY: test-all-components
 test-all-components: ## Test with all components enabled
-test-all-components: $(WASM_MODULE_OUTPUTS)
-test-all-components: export DEFAULT_FEATURES:="$(DEFAULT_FEATURES) wasm-benches"
+# TODO(jesse): renable after the wasm transform builds again
+#test-all-components: $(WASM_MODULE_OUTPUTS)
+#test-all-components: export DEFAULT_FEATURES:="$(DEFAULT_FEATURES) wasm-benches"
 test-all-components: test
 
 .PHONY: test-all
@@ -801,8 +802,10 @@ bench: ## Run benchmarks in /benches
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-all
-bench-all: $(WASM_MODULE_OUTPUTS)  ### Run default and WASM benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm-benches"
+bench-all: ### Run default and WASM benches
+	# bench-all: $(WASM_MODULE_OUTPUTS) # TODO(jesse): renable after wasm transform builds again
+	# ${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm-benches"
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}"
 
 
 .PHONY: bench-wasm
