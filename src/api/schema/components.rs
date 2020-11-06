@@ -359,16 +359,14 @@ pub fn update_config(config: &Config) {
     existing_component_names
         .difference(&new_component_names)
         .for_each(|name| {
-            let _ = COMPONENT_CHANGED
-                .send(ComponentChanged::Removed(
-                    COMPONENTS
-                        .read()
-                        .expect(INVARIANT)
-                        .get(name)
-                        .expect(INVARIANT)
-                        .clone(),
-                ))
-                .unwrap();
+            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
+                COMPONENTS
+                    .read()
+                    .expect(INVARIANT)
+                    .get(name)
+                    .expect(INVARIANT)
+                    .clone(),
+            ));
         });
 
     // Publish all components that have been added
