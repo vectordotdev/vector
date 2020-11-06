@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
     transforms::{FunctionTransform, Transform},
@@ -8,6 +8,13 @@ use regex::RegexSet; // TODO: use regex::bytes
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "snake_case")]
+pub enum SampleMode {
+    Hash,
+    Count,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
@@ -15,6 +22,8 @@ pub struct SamplerConfig {
     pub key_field: Option<String>,
     #[serde(default)]
     pub pass_list: Vec<String>,
+    #[serde(default = "default_mode")]
+    pub mode: SampleMode,
 }
 
 inventory::submit! {
@@ -27,9 +36,14 @@ impl GenerateConfig for SamplerConfig {
             rate: 10,
             key_field: None,
             pass_list: Vec::new(),
+            mode: default_mode(),
         })
         .unwrap()
     }
+}
+
+fn default_mode() -> SampleMode {
+    SampleMode::Count
 }
 
 #[async_trait::async_trait]
@@ -37,7 +51,7 @@ impl GenerateConfig for SamplerConfig {
 impl TransformConfig for SamplerConfig {
     async fn build(&self) -> crate::Result<Transform> {
         Ok(RegexSet::new(&self.pass_list)
-            .map(|regex_set| Sampler::new(self.rate, self.key_field.clone(), regex_set))
+            .map(|regex_set| Sampler::new(self.rate, self.key_field.clone(), regex_set, self.mode))
             .map(Transform::function)
             .context(super::InvalidRegex)?)
     }
@@ -58,39 +72,62 @@ impl TransformConfig for SamplerConfig {
 #[derive(Clone, Debug)]
 pub struct Sampler {
     rate: u64,
-    key_field: String,
+    key_field: Option<String>,
     pass_list: RegexSet,
+    mode: SampleMode,
+    count: u64,
 }
 
 impl Sampler {
-    pub fn new(rate: u64, key_field: Option<String>, pass_list: RegexSet) -> Self {
-        let key_field = key_field.unwrap_or_else(|| log_schema().message_key().to_string());
+    pub fn new(
+        rate: u64,
+        key_field: Option<String>,
+        pass_list: RegexSet,
+        mode: SampleMode,
+    ) -> Self {
         Self {
             rate,
             key_field,
             pass_list,
+            mode,
+            count: 0,
         }
+    }
+
+    fn increment(&mut self) -> bool {
+        self.count = self.count % self.rate;
+        let pass = self.count == 0;
+        self.count += 1;
+        pass
     }
 }
 
 impl FunctionTransform for Sampler {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        let message = event
-            .as_log()
-            .get(&self.key_field)
-            .map(|v| v.to_string_lossy())
-            .unwrap_or_else(|| "".into());
+        let message = self
+            .key_field
+            .as_ref()
+            .and_then(|key_field| event.as_log().get(key_field))
+            .map(|v| v.to_string_lossy());
+
+        let (pass, sampled) = match (self.mode, message) {
+            (_, Some(ref message)) if self.pass_list.is_match(message) => (true, false),
+            (SampleMode::Count, _) | (_, None) => (self.increment(), true),
+            (SampleMode::Hash, Some(message)) => {
+                (seahash::hash(message.as_bytes()) % self.rate == 0, true)
+            }
+        };
 
         emit!(SamplerEventProcessed);
 
-        if self.pass_list.is_match(&message) {
-            output.push(event);
-        } else if seahash::hash(message.as_bytes()) % self.rate == 0 {
-            event
-                .as_mut_log()
-                .insert("sample_rate", self.rate.to_string());
+        if pass {
+            if sampled {
+                event
+                    .as_mut_log()
+                    .insert("sample_rate", self.rate.to_string());
+            }
 
-            output.push(event)
+            output.push(event);
         } else {
             emit!(SamplerEventDiscarded);
         }
