@@ -382,7 +382,7 @@ mod tests {
             event.as_mut_log().insert("hostname", hosts[p]);
 
             partitions[p].push(line);
-            events.push(event.clone());
+            events.push(event);
         }
 
         sink.run(stream::iter(events)).await.unwrap();
