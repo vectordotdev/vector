@@ -8,7 +8,7 @@ use vector::transforms::{
     coercer::CoercerConfig,
     json_parser::{JsonParser, JsonParserConfig},
     remap::{Remap, RemapConfig},
-    Transform,
+    FunctionTransform,
 };
 use vector::{
     config::TransformConfig,
@@ -18,21 +18,20 @@ use vector::{
 
 fn benchmark_remap(c: &mut Criterion) {
     let mut rt = runtime();
-    let add_fields_runner = |tform: &mut Box<dyn Transform>, event: Event| {
-        let result = tform.transform(event).unwrap();
+    let add_fields_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
+        let mut result = Vec::with_capacity(1);
+        tform.transform(&mut result, event.clone());
+        let output_1 = result[0].as_log();
 
-        debug_assert_eq!(result.as_log().get("foo").unwrap().to_string_lossy(), "bar");
-        debug_assert_eq!(result.as_log().get("bar").unwrap().to_string_lossy(), "baz");
-        debug_assert_eq!(
-            result.as_log().get("copy").unwrap().to_string_lossy(),
-            "buz"
-        );
+        debug_assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
+        debug_assert_eq!(output_1.get("bar").unwrap().to_string_lossy(), "baz");
+        debug_assert_eq!(output_1.get("copy").unwrap().to_string_lossy(), "buz");
 
         result
     };
 
     c.bench_function("remap: add fields with remap", |b| {
-        let mut tform: Box<dyn Transform> = Box::new(
+        let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: r#".foo = "bar"
             .bar = "baz"
@@ -62,7 +61,7 @@ fn benchmark_remap(c: &mut Criterion) {
         fields.insert("bar".into(), String::from("baz").into());
         fields.insert("copy".into(), String::from("{{ copy_from }}").into());
 
-        let mut tform: Box<dyn Transform> = Box::new(AddFields::new(fields, true).unwrap());
+        let mut tform: Box<dyn FunctionTransform> = Box::new(AddFields::new(fields, true).unwrap());
 
         let event = {
             let mut event = Event::from("augment me");
@@ -77,15 +76,17 @@ fn benchmark_remap(c: &mut Criterion) {
         );
     });
 
-    let json_parser_runner = |tform: &mut Box<dyn Transform>, event: Event| {
-        let result = tform.transform(event).unwrap();
+    let json_parser_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
+        let mut result = Vec::with_capacity(1);
+        tform.transform(&mut result, event.clone());
+        let output_1 = result[0].as_log();
 
         debug_assert_eq!(
-            result.as_log().get("foo").unwrap().to_string_lossy(),
+            output_1.get("foo").unwrap().to_string_lossy(),
             r#"{"key": "value"}"#
         );
         debug_assert_eq!(
-            result.as_log().get("bar").unwrap().to_string_lossy(),
+            output_1.get("bar").unwrap().to_string_lossy(),
             r#"{"key":"value"}"#
         );
 
@@ -93,7 +94,7 @@ fn benchmark_remap(c: &mut Criterion) {
     };
 
     c.bench_function("remap: parse JSON with remap", |b| {
-        let mut tform: Box<dyn Transform> = Box::new(
+        let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: ".bar = parse_json(.foo)".to_owned(),
                 drop_on_err: false,
@@ -117,7 +118,7 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     c.bench_function("remap: parse JSON with json_parser", |b| {
-        let mut tform: Box<dyn Transform> = Box::new(JsonParser::from(JsonParserConfig {
+        let mut tform: Box<dyn FunctionTransform> = Box::new(JsonParser::from(JsonParserConfig {
             field: Some("foo".to_string()),
             target_field: Some("bar".to_owned()),
             drop_field: false,
@@ -140,24 +141,24 @@ fn benchmark_remap(c: &mut Criterion) {
         );
     });
 
-    let coerce_runner = |tform: &mut Box<dyn Transform>, event: Event, timestamp: DateTime<Utc>| {
-        let result = tform.transform(event).unwrap();
+    let coerce_runner =
+        |tform: &mut Box<dyn FunctionTransform>, event: Event, timestamp: DateTime<Utc>| {
+            let mut result = Vec::with_capacity(1);
+            tform.transform(&mut result, event.clone());
+            let output_1 = result[0].as_log();
 
-        debug_assert_eq!(
-            result.as_log().get("number").unwrap(),
-            &Value::Integer(1234)
-        );
-        debug_assert_eq!(result.as_log().get("bool").unwrap(), &Value::Boolean(true));
-        debug_assert_eq!(
-            result.as_log().get("timestamp").unwrap(),
-            &Value::Timestamp(timestamp),
-        );
+            debug_assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
+            debug_assert_eq!(output_1.get("bool").unwrap(), &Value::Boolean(true));
+            debug_assert_eq!(
+                output_1.get("timestamp").unwrap(),
+                &Value::Timestamp(timestamp),
+            );
 
-        result
-    };
+            result
+        };
 
     c.bench_function("remap: coerce with remap", |b| {
-        let mut tform: Box<dyn Transform> = Box::new(
+        let mut tform: Box<dyn FunctionTransform> = Box::new(
             Remap::new(RemapConfig {
                 source: r#".number = to_int(.number)
                 .bool = to_bool(.bool)
@@ -191,21 +192,23 @@ fn benchmark_remap(c: &mut Criterion) {
     });
 
     c.bench_function("remap: coerce with coercer", |b| {
-        let mut tform: Box<dyn Transform> = rt.block_on(async move {
-            toml::from_str::<CoercerConfig>(
-                r#"drop_unspecified = false
+        let mut tform: Box<dyn FunctionTransform> = rt
+            .block_on(async move {
+                toml::from_str::<CoercerConfig>(
+                    r#"drop_unspecified = false
 
                    [types]
                    number = "int"
                    bool = "bool"
                    timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
                    "#,
-            )
-            .unwrap()
-            .build()
-            .await
-            .unwrap()
-        });
+                )
+                .unwrap()
+                .build()
+                .await
+                .unwrap()
+            })
+            .into_function();
 
         let mut event = Event::from("coerce me");
         for &(key, value) in &[

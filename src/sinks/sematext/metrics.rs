@@ -31,6 +31,7 @@ struct SematextMetricsService {
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 struct SematextMetricsConfig {
+    pub default_namespace: String,
     pub region: Option<Region>,
     pub endpoint: Option<String>,
     pub token: String,
@@ -48,6 +49,7 @@ impl GenerateConfig for SematextMetricsConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"region = "us"
+            default_namespace = "vector"
             token = "${SEMATEXT_TOKEN}""#,
         )
         .unwrap()
@@ -170,7 +172,7 @@ impl Service<Vec<Metric>> for SematextMetricsService {
     }
 
     fn call(&mut self, items: Vec<Metric>) -> Self::Future {
-        let input = encode_events(&self.config.token, items);
+        let input = encode_events(&self.config.token, &self.config.default_namespace, items);
         let body: Vec<u8> = input.into_bytes();
 
         self.inner.call(body)
@@ -190,22 +192,13 @@ fn create_build_request(
     }
 }
 
-/// Sematext takes the first part of the name as the namespace for the event.
-/// The rest of the name is the value label.
-/// If the name is not a '.' separated string, it will take the whole name as the
-/// namespace, and set the label value to 'value'.
-/// This probably should not happen if you want meaningful metrics in Sematext.
-fn split_event_name(name: &str) -> (String, String) {
-    match name.find('.') {
-        None => (name.into(), "value".into()),
-        Some(pos) => (name[0..pos].into(), name[pos + 1..].into()),
-    }
-}
-
-fn encode_events(token: &str, events: Vec<Metric>) -> String {
+fn encode_events(token: &str, default_namespace: &str, events: Vec<Metric>) -> String {
     let mut output = String::new();
     for event in events.into_iter() {
-        let (namespace, label) = split_event_name(&event.name);
+        let namespace = event
+            .namespace
+            .unwrap_or_else(|| default_namespace.to_string());
+        let label = event.name;
         let ts = encode_timestamp(event.timestamp);
 
         // Authentication in Sematext is by inserting the token as a tag.
@@ -266,8 +259,8 @@ mod tests {
     #[test]
     fn test_encode_counter_event() {
         let events = vec![Metric {
-            name: "jvm.pool.used".into(),
-            namespace: None,
+            name: "pool.used".into(),
+            namespace: Some("jvm".into()),
             timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
             tags: None,
             kind: MetricKind::Incremental,
@@ -276,7 +269,7 @@ mod tests {
 
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000",
-            encode_events("aaa", events)
+            encode_events("aaa", "ns", events)
         );
     }
 
@@ -292,8 +285,8 @@ mod tests {
         }];
 
         assert_eq!(
-            "used,metric_type=counter,token=aaa value=42 1597784400000000000",
-            encode_events("aaa", events)
+            "ns,metric_type=counter,token=aaa used=42 1597784400000000000",
+            encode_events("aaa", "ns", events)
         );
     }
 
@@ -301,16 +294,16 @@ mod tests {
     fn test_encode_counter_multiple_events() {
         let events = vec![
             Metric {
-                name: "jvm.pool.used".into(),
-                namespace: None,
+                name: "pool.used".into(),
+                namespace: Some("jvm".into()),
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 0)),
                 tags: None,
                 kind: MetricKind::Incremental,
                 value: MetricValue::Counter { value: 42.0 },
             },
             Metric {
-                name: "jvm.pool.committed".into(),
-                namespace: None,
+                name: "pool.committed".into(),
+                namespace: Some("jvm".into()),
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, 1)),
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -321,7 +314,7 @@ mod tests {
         assert_eq!(
             "jvm,metric_type=counter,token=aaa pool.used=42 1597784400000000000\n\
              jvm,metric_type=counter,token=aaa pool.committed=18874368 1597784400000000001",
-            encode_events("aaa", events)
+            encode_events("aaa", "ns", events)
         );
     }
 
@@ -330,6 +323,7 @@ mod tests {
         let (mut config, cx) = load_sink::<SematextMetricsConfig>(
             r#"
             region = "eu"
+            default_namespace = "ns"
             token = "atoken"
             batch.max_events = 1
             "#,
@@ -350,22 +344,22 @@ mod tests {
 
         // Make our test metrics.
         let metrics = vec![
-            ("os.swap.size", 324292.0),
-            ("os.network.tx", 42000.0),
-            ("os.network.rx", 54293.0),
-            ("process.count", 12.0),
-            ("process.uptime", 32423.0),
-            ("process.rss", 2342333.0),
-            ("jvm.pool.used", 18874368.0),
-            ("jvm.pool.committed", 18868584.0),
-            ("jvm.pool.max", 18874368.0),
+            ("os", "swap.size", 324292.0),
+            ("os", "network.tx", 42000.0),
+            ("os", "network.rx", 54293.0),
+            ("process", "count", 12.0),
+            ("process", "uptime", 32423.0),
+            ("process", "rss", 2342333.0),
+            ("jvm", "pool.used", 18874368.0),
+            ("jvm", "pool.committed", 18868584.0),
+            ("jvm", "pool.max", 18874368.0),
         ];
 
         let mut events = Vec::new();
-        for (i, (metric, val)) in metrics.iter().enumerate() {
+        for (i, (namespace, metric, val)) in metrics.iter().enumerate() {
             let event = Event::from(Metric {
                 name: metric.to_string(),
-                namespace: None,
+                namespace: Some(namespace.to_string()),
                 timestamp: Some(Utc.ymd(2020, 8, 18).and_hms_nano(21, 0, 0, i as u32)),
                 tags: Some(
                     vec![("os.host".to_owned(), "somehost".to_owned())]

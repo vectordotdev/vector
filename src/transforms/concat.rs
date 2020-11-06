@@ -1,15 +1,16 @@
-use super::{BuildError, Transform};
+use super::BuildError;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
+    transforms::{FunctionTransform, Transform},
 };
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 
 use lazy_static::lazy_static;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ConcatConfig {
     pub target: String,
@@ -35,7 +36,7 @@ impl GenerateConfig for ConcatConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "concat")]
 impl TransformConfig for ConcatConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let joiner: String = match self.joiner.clone() {
             None => " ".into(),
             Some(var) => var,
@@ -45,7 +46,11 @@ impl TransformConfig for ConcatConfig {
             .iter()
             .map(|item| Substring::new(item.to_owned()))
             .collect::<Result<Vec<Substring>, BuildError>>()?;
-        Ok(Box::new(Concat::new(self.target.clone(), joiner, items)))
+        Ok(Transform::function(Concat::new(
+            self.target.clone(),
+            joiner,
+            items,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -61,7 +66,7 @@ impl TransformConfig for ConcatConfig {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Substring {
     source: String,
     start: Option<i32>,
@@ -111,7 +116,7 @@ impl Substring {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Concat {
     target: String,
     joiner: String,
@@ -128,8 +133,8 @@ impl Concat {
     }
 }
 
-impl Transform for Concat {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Concat {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(ConcatEventProcessed);
 
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
@@ -165,7 +170,7 @@ impl Transform for Concat {
                         end,
                         length: b.len()
                     });
-                    return None;
+                    return;
                 }
                 if start > b.len() {
                     emit!(ConcatSubstringError {
@@ -175,7 +180,7 @@ impl Transform for Concat {
                         end,
                         length: b.len()
                     });
-                    return None;
+                    return;
                 }
                 if end > b.len() {
                     emit!(ConcatSubstringError {
@@ -185,7 +190,7 @@ impl Transform for Concat {
                         end,
                         length: b.len()
                     });
-                    return None;
+                    return;
                 }
                 content_vec.push(b.slice(start..end));
             } else {
@@ -201,14 +206,14 @@ impl Transform for Concat {
             Value::from(String::from_utf8_lossy(&content).to_string()),
         );
 
-        Some(event)
+        output.push(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Concat, ConcatConfig, Substring};
-    use crate::{event::Event, transforms::Transform};
+    use super::*;
+    use crate::event::Event;
 
     #[test]
     fn generate_config() {
@@ -230,7 +235,7 @@ mod tests {
             ],
         );
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
         assert_eq!(new_event.as_log()["out"], "Hello users".into());
     }
 
@@ -249,7 +254,7 @@ mod tests {
             ],
         );
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
         assert_eq!(new_event.as_log()["out"], "Hello World".into());
     }
     #[test]
@@ -270,7 +275,7 @@ mod tests {
             ],
         );
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
         assert_eq!(new_event.as_log()["out"], "W o r l d".into());
     }
 
@@ -285,7 +290,7 @@ mod tests {
             vec![Substring::new("only[3..1]".to_string()).unwrap()],
         );
 
-        assert!(transform.transform(event).is_none());
+        assert!(transform.transform_one(event).is_none());
     }
 
     #[test]
@@ -299,7 +304,7 @@ mod tests {
             vec![Substring::new("only[10..11]".to_string()).unwrap()],
         );
 
-        assert!(transform.transform(event).is_none());
+        assert!(transform.transform_one(event).is_none());
     }
 
     #[test]
@@ -313,6 +318,6 @@ mod tests {
             vec![Substring::new("only[..11]".to_string()).unwrap()],
         );
 
-        assert!(transform.transform(event).is_none());
+        assert!(transform.transform_one(event).is_none());
     }
 }

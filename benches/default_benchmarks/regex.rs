@@ -20,30 +20,29 @@ fn benchmark_regex(c: &mut Criterion) {
 
         let mut parser = rt.block_on(async move {
             transforms::regex_parser::RegexParserConfig {
-                // Many captures to stress the regex parser
+                // many captures to stress the regex parser
                 patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
                 field: None,
                 drop_failed: true,
                 ..Default::default()
             }
             .build()
-                .await
-                .unwrap()
+            .await
+            .unwrap().into_function()
         });
 
         b.iter_batched(
             || {
-                input.clone()
+                (input.clone(), Vec::with_capacity(input.len()))
             },
-            |events| {
-                let event_count= events.len();
-                let out_lines =events.into_iter()
-                    .filter_map(|event| parser.transform(event))
-                    .fold(0, |accum, _| accum + 1);
+            |(events, mut output)| {
+                let event_count = events.len();
 
-                debug_assert_eq!(out_lines,event_count);
+                events.into_iter().for_each(|event| parser.transform(&mut output, event));
 
-                out_lines
+                debug_assert_eq!(output.len(), event_count);
+
+                output
             },
             BatchSize::SmallInput,
         );

@@ -1,16 +1,16 @@
-use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{SwimlanesEventDiscarded, SwimlanesEventProcessed},
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 //------------------------------------------------------------------------------
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlaneConfig {
     #[serde(flatten)]
@@ -20,8 +20,8 @@ pub struct SwimlaneConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlane")]
 impl TransformConfig for SwimlaneConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Swimlane::new(self.condition.build()?)))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(Swimlane::new(self.condition.build()?)))
     }
 
     fn input_type(&self) -> DataType {
@@ -37,7 +37,10 @@ impl TransformConfig for SwimlaneConfig {
     }
 }
 
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct Swimlane {
+    #[derivative(Debug = "ignore")]
     condition: Box<dyn Condition>,
 }
 
@@ -47,21 +50,20 @@ impl Swimlane {
     }
 }
 
-impl Transform for Swimlane {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Swimlane {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
             emit!(SwimlanesEventProcessed);
-            Some(event)
+            output.push(event);
         } else {
             emit!(SwimlanesEventDiscarded);
-            None
         }
     }
 }
 
 //------------------------------------------------------------------------------
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct SwimlanesConfig {
     lanes: IndexMap<String, AnyCondition>,
@@ -83,7 +85,7 @@ impl GenerateConfig for SwimlanesConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "swimlanes")]
 impl TransformConfig for SwimlanesConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         Err("this transform must be expanded".into())
     }
 

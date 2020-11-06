@@ -215,7 +215,7 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {

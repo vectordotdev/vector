@@ -7,7 +7,7 @@ pub enum Error {
     Value(#[from] value::Error),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Not {
     expression: Box<Expr>,
 }

@@ -23,7 +23,7 @@ impl Function for Md5 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Md5Fn {
     value: Box<dyn Expression>,
 }

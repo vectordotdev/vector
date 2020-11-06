@@ -50,7 +50,7 @@ impl Function for FormatNumber {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct FormatNumberFn {
     value: Box<dyn Expression>,
     scale: Option<Box<dyn Expression>>,

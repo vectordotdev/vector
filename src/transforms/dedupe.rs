@@ -1,10 +1,11 @@
-use super::Transform;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
+    transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
+use futures01::Stream as Stream01;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 
@@ -74,8 +75,8 @@ impl GenerateConfig for DedupeConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "dedupe")]
 impl TransformConfig for DedupeConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Dedupe::new(self.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::task(Dedupe::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -141,6 +142,17 @@ impl Dedupe {
             cache: LruCache::new(num_entries),
         }
     }
+
+    fn transform_one(&mut self, event: Event) -> Option<Event> {
+        emit!(DedupeEventProcessed);
+        let cache_entry = build_cache_entry(&event, &self.fields);
+        if self.cache.put(cache_entry, true).is_some() {
+            emit!(DedupeEventDiscarded { event });
+            None
+        } else {
+            Some(event)
+        }
+    }
 }
 
 /// Takes in an Event and returns a CacheEntry to place into the LRU cache containing
@@ -173,24 +185,24 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     }
 }
 
-impl Transform for Dedupe {
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        emit!(DedupeEventProcessed);
-        let cache_entry = build_cache_entry(&event, &self.fields);
-        if self.cache.put(cache_entry, true).is_some() {
-            emit!(DedupeEventDiscarded { event });
-            None
-        } else {
-            Some(event)
-        }
+impl TaskTransform for Dedupe {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Dedupe;
+    use super::*;
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
-    use crate::{event::Event, event::Value, transforms::Transform};
+    use crate::{event::Event, event::Value};
     use std::collections::BTreeMap;
 
     #[test]
@@ -244,16 +256,16 @@ mod tests {
         event3.as_mut_log().insert("unmatched", "another value2");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform(event1).unwrap();
+        let new_event = transform.transform_one(event1).unwrap();
         assert_eq!(new_event.as_log()["matched"], "some value".into());
 
         // Second event differs in matched field so should be outputted even though it
         // has the same value for unmatched field.
-        let new_event = transform.transform(event2).unwrap();
+        let new_event = transform.transform_one(event2).unwrap();
         assert_eq!(new_event.as_log()["matched"], "some value2".into());
 
         // Third event has the same value for "matched" as first event, so it should be dropped.
-        assert_eq!(None, transform.transform(event3));
+        assert_eq!(None, transform.transform_one(event3));
     }
 
     #[test]
@@ -276,12 +288,12 @@ mod tests {
         event2.as_mut_log().insert("matched2", "some value");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform(event1).unwrap();
+        let new_event = transform.transform_one(event1).unwrap();
         assert_eq!(new_event.as_log()["matched1"], "some value".into());
 
         // Second event has a different matched field name with the same value, so it should not be
         // considered a dupe
-        let new_event = transform.transform(event2).unwrap();
+        let new_event = transform.transform_one(event2).unwrap();
         assert_eq!(new_event.as_log()["matched2"], "some value".into());
     }
 
@@ -310,12 +322,12 @@ mod tests {
         event2.as_mut_log().insert("matched1", "value1");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform(event1).unwrap();
+        let new_event = transform.transform_one(event1).unwrap();
         assert_eq!(new_event.as_log()["matched1"], "value1".into());
         assert_eq!(new_event.as_log()["matched2"], "value2".into());
 
         // Second event is the same just with different field order, so it shouldn't be outputted.
-        assert_eq!(None, transform.transform(event2));
+        assert_eq!(None, transform.transform_one(event2));
     }
 
     #[test]
@@ -344,17 +356,17 @@ mod tests {
         let event3 = event1.clone();
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform(event1).unwrap();
+        let new_event = transform.transform_one(event1).unwrap();
         assert_eq!(new_event.as_log()["matched"], "some value".into());
 
         // Second event gets outputted because it's not a dupe.  This causes the first
         // Event to be evicted from the cache.
-        let new_event = transform.transform(event2).unwrap();
+        let new_event = transform.transform_one(event2).unwrap();
         assert_eq!(new_event.as_log()["matched"], "some value2".into());
 
         // Third event is a dupe but gets outputted anyway because the first event has aged
         // out of the cache.
-        let new_event = transform.transform(event3).unwrap();
+        let new_event = transform.transform_one(event3).unwrap();
         assert_eq!(new_event.as_log()["matched"], "some value".into());
     }
 
@@ -380,12 +392,12 @@ mod tests {
         event2.as_mut_log().insert("matched", 123);
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform(event1).unwrap();
+        let new_event = transform.transform_one(event1).unwrap();
         assert_eq!(new_event.as_log()["matched"], "123".into());
 
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
-        let new_event = transform.transform(event2).unwrap();
+        let new_event = transform.transform_one(event2).unwrap();
         assert_eq!(new_event.as_log()["matched"], 123.into());
     }
 
@@ -415,7 +427,7 @@ mod tests {
         event2.as_mut_log().insert("matched", map2);
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform(event1).unwrap();
+        let new_event = transform.transform_one(event1).unwrap();
         let res_value = new_event.as_log()["matched"].clone();
         if let Value::Map(map) = res_value {
             assert_eq!(map.get("key").unwrap(), &Value::from("123"));
@@ -423,7 +435,7 @@ mod tests {
 
         // Second event should also get passed through even though the string representations of
         // "matched" are the same.
-        let new_event = transform.transform(event2).unwrap();
+        let new_event = transform.transform_one(event2).unwrap();
         let res_value = new_event.as_log()["matched"].clone();
         if let Value::Map(map) = res_value {
             assert_eq!(map.get("key").unwrap(), &Value::from(123));
@@ -450,11 +462,11 @@ mod tests {
         let event2 = Event::from("message");
 
         // First event should always be passed through as-is.
-        let new_event = transform.transform(event1).unwrap();
+        let new_event = transform.transform_one(event1).unwrap();
         assert_eq!(new_event.as_log()["matched"], Value::Null);
 
         // Second event should also get passed through as null is different than missing
-        let new_event = transform.transform(event2).unwrap();
+        let new_event = transform.transform_one(event2).unwrap();
         assert_eq!(false, new_event.as_log().contains("matched"));
     }
 }

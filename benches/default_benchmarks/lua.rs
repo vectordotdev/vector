@@ -1,4 +1,5 @@
 use criterion::{criterion_group, BatchSize, Criterion, Throughput};
+use futures::{compat::Stream01CompatExt, StreamExt};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
@@ -17,16 +18,16 @@ fn bench_add_fields(c: &mut Criterion) {
     let mut group = c.benchmark_group("lua_add_fields");
     group.throughput(Throughput::Elements(1));
 
-    let benchmarks: Vec<(&str, Box<dyn Transform>)> = vec![
+    let benchmarks: Vec<(&str, Transform)> = vec![
         ("native", {
             let mut map = IndexMap::new();
             map.insert(String::from(key), value.to_owned().into());
-            Box::new(transforms::add_fields::AddFields::new(map, true).unwrap())
+            Transform::function(transforms::add_fields::AddFields::new(map, true).unwrap())
         }),
         ("v1", {
             let source = format!("event['{}'] = '{}'", key, value);
 
-            Box::new(transforms::lua::v1::Lua::new(&source, vec![]).unwrap())
+            Transform::function(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = format!(
@@ -41,7 +42,7 @@ fn bench_add_fields(c: &mut Criterion) {
     "#,
                 key, value
             );
-            Box::new(
+            Transform::task(
                 transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
                     .unwrap(),
             )
@@ -53,9 +54,27 @@ fn bench_add_fields(c: &mut Criterion) {
             b.iter_batched(
                 || event.clone(),
                 |event| {
-                    let event = transform.transform(event).unwrap();
-                    debug_assert_eq!(event.as_log()[key], value.to_owned().into());
-                    event
+                    let output = match transform {
+                        Transform::Function(mut t) => {
+                            let mut output = Vec::with_capacity(1);
+                            t.transform(&mut output, event);
+                            output
+                        }
+                        Transform::Task(t) => {
+                            let output = t
+                                .transform(Box::new(futures01::stream::iter_ok(vec![event])))
+                                .compat()
+                                .collect::<Vec<_>>();
+                            futures::executor::block_on(output)
+                                .into_iter()
+                                .collect::<Result<Vec<_>, _>>()
+                                .unwrap()
+                        }
+                    };
+
+                    debug_assert_eq!(output[0].as_log()[key], value.to_owned().into());
+
+                    output
                 },
                 BatchSize::SmallInput,
             )
@@ -67,16 +86,18 @@ fn bench_add_fields(c: &mut Criterion) {
 
 fn bench_field_filter(c: &mut Criterion) {
     let num_events = 10;
-    let events = (0..num_events).map(|i| {
-        let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("the_field", (i % 10).to_string());
-        event
-    });
+    let events = (0..num_events)
+        .map(|i| {
+            let mut event = Event::new_empty_log();
+            event.as_mut_log().insert("the_field", (i % 10).to_string());
+            event
+        })
+        .collect::<Vec<_>>();
 
     let mut group = c.benchmark_group("lua_field_filter");
     group.throughput(Throughput::Elements(num_events));
 
-    let benchmarks: Vec<(&str, Box<dyn Transform>)> = vec![
+    let benchmarks: Vec<(&str, Transform)> = vec![
         ("native", {
             let mut rt = runtime();
             rt.block_on(async move {
@@ -90,12 +111,14 @@ fn bench_field_filter(c: &mut Criterion) {
             })
         }),
         ("v1", {
-            let source = r#"
+            let source = String::from(
+                r#"
     if event["the_field"] ~= "0" then
         event = nil
     end
-    "#;
-            Box::new(transforms::lua::v1::Lua::new(&source, vec![]).unwrap()) as Box<dyn Transform>
+    "#,
+            );
+            Transform::function(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
         }),
         ("v2", {
             let config = r#"
@@ -108,8 +131,9 @@ fn bench_field_filter(c: &mut Criterion) {
         end
     """
     "#;
-            Box::new(transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap())
-                as Box<dyn Transform>
+            Transform::task(
+                transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
+            )
         }),
     ];
 
@@ -118,8 +142,30 @@ fn bench_field_filter(c: &mut Criterion) {
             b.iter_batched(
                 || events.clone(),
                 |events| {
-                    let num = events.filter_map(|r| transform.transform(r)).count();
+                    let output = match transform {
+                        Transform::Function(mut t) => events.into_iter().fold(
+                            Vec::with_capacity(num_events as usize),
+                            |mut acc, event| {
+                                t.transform(&mut acc, event);
+                                acc
+                            },
+                        ),
+                        Transform::Task(t) => {
+                            let output = t
+                                .transform(Box::new(futures01::stream::iter_ok(events)))
+                                .compat()
+                                .collect::<Vec<_>>();
+                            futures::executor::block_on(output)
+                                .into_iter()
+                                .collect::<Result<Vec<_>, _>>()
+                                .unwrap()
+                        }
+                    };
+
+                    let num = output.len();
+
                     debug_assert_eq!(num as u64, num_events / 10);
+
                     num
                 },
                 BatchSize::SmallInput,

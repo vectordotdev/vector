@@ -32,7 +32,7 @@ impl Function for Match {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct MatchFn {
     value: Box<dyn Expression>,
     pattern: Regex,
