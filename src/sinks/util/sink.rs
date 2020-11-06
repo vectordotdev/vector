@@ -53,7 +53,6 @@ use pin_project::pin_project;
 use std::{
     collections::{HashMap, VecDeque},
     fmt,
-    future::Future,
     hash::Hash,
     marker::PhantomData,
     pin::Pin,
@@ -124,18 +123,6 @@ where
             _pd: PhantomData,
         }
     }
-
-    fn poll_should_send(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        if !self.closing && !self.batch.was_full() {
-            let linger = self
-                .linger
-                .as_mut()
-                .expect("linger should exists for should_send");
-            ready!(Pin::new(linger).poll(cx));
-        }
-
-        Poll::Ready(())
-    }
 }
 
 impl<S, B, Request> BatchSink<S, B, Request>
@@ -158,7 +145,7 @@ where
     type Error = crate::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        while self.buffer.is_some() || self.batch.was_full() {
+        while self.buffer.is_some() {
             match self.as_mut().poll_flush(cx) {
                 Poll::Ready(Ok(())) => {}
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
@@ -170,7 +157,7 @@ where
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: B::Input) -> Result<(), Self::Error> {
-        if self.batch.is_empty() && self.linger.is_none() {
+        if self.linger.is_none() {
             trace!("Starting new batch timer.");
             // We just inserted the first item of a new batch, so set our delay to the longest time
             // we want to allow that item to linger in the batch before being flushed.
@@ -204,7 +191,19 @@ where
                 // We have data to send, so check if we should send it and either attempt the send
                 // or return that we're not ready to send. If we send and it works, loop to poll
                 // service instead of prematurely returning Ready.
-                if matches!(self.poll_should_send(cx), Poll::Ready(())) {
+                let should_send = {
+                    if self.closing || self.batch.was_full() {
+                        true
+                    } else {
+                        let linger = self
+                            .linger
+                            .as_mut()
+                            .expect("linger should exists for should_send");
+                        matches!(linger.poll_unpin(cx), Poll::Ready(()))
+                    }
+                };
+
+                if should_send {
                     last_round = false;
 
                     ready!(self.service.poll_ready(cx))?;
@@ -823,6 +822,7 @@ mod tests {
     use futures01::future as future01;
     use std::{
         convert::Infallible,
+        future::Future,
         sync::{atomic::Ordering::Relaxed, Arc, Mutex},
     };
     use tokio::{task::yield_now, time::Instant};
