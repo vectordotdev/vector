@@ -1,6 +1,6 @@
 use super::Error as E;
 use crate::{
-    value, CompilerState, Expr, Expression, Object, ResolveKind, Result, State, Value, ValueKind,
+    value, CompilerState, Expr, Expression, Object, ValueConstraint, Result, State, Value, ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -35,8 +35,8 @@ impl Expression for Not {
         })
     }
 
-    fn resolves_to(&self, _: &CompilerState) -> ResolveKind {
-        ResolveKind::Exact(ValueKind::Boolean)
+    fn resolves_to(&self, _: &CompilerState) -> ValueConstraint {
+        ValueConstraint::Exact(ValueKind::Boolean)
     }
 }
 

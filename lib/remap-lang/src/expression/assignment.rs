@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expr, Expression, Object, ResolveKind, Result, State, Value};
+use crate::{CompilerState, Expr, Expression, Object, ValueConstraint, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -58,18 +58,18 @@ impl Expression for Assignment {
         }
     }
 
-    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
         match &self.target {
             Target::Variable(ident) => state
                 .variable_kind(ident.clone())
                 .cloned()
-                .unwrap_or(ResolveKind::Any),
+                .unwrap_or(ValueConstraint::Any),
             Target::Path(segments) => {
                 let path = crate::expression::path::segments_to_path(segments);
                 state
                     .variable_kind(&path)
                     .cloned()
-                    .unwrap_or(ResolveKind::Any)
+                    .unwrap_or(ValueConstraint::Any)
             }
         }
     }

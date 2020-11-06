@@ -1,12 +1,12 @@
 use crate::{
-    parser, CompilerState, Error as E, Expr, Expression, Function, RemapError, ResolveKind,
+    parser, CompilerState, Error as E, Expr, Expression, Function, RemapError, ValueConstraint,
 };
 use pest::Parser;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
     #[error("program is expected to resolve to {0}, but instead resolves to {1}")]
-    ResolvesTo(ResolveKind, ResolveKind),
+    ResolvesTo(ValueConstraint, ValueConstraint),
 }
 
 /// The program to execute.
@@ -24,7 +24,7 @@ impl Program {
     pub fn new(
         source: &str,
         function_definitions: &[Box<dyn Function>],
-        must_resolve_to: ResolveKind,
+        value_constraint: ValueConstraint,
     ) -> Result<Self, RemapError> {
         let pairs = parser::Parser::parse(parser::Rule::program, source)
             .map_err(|s| E::Parser(s.to_string()))
@@ -39,15 +39,15 @@ impl Program {
 
         let expressions = parser.pairs_to_expressions(pairs).map_err(RemapError)?;
 
-        let will_resolve_to = expressions
+        let expected_value_constraint = expressions
             .last()
             .map(|e| e.resolves_to(&parser.compiler_state))
-            .unwrap_or_else(|| ResolveKind::Maybe(Box::new(ResolveKind::Any)));
+            .unwrap_or_else(|| ValueConstraint::Maybe(Box::new(ValueConstraint::Any)));
 
-        if !must_resolve_to.contains(&will_resolve_to) {
+        if !value_constraint.contains(&expected_value_constraint) {
             return Err(RemapError::from(E::from(Error::ResolvesTo(
-                must_resolve_to,
-                will_resolve_to,
+                value_constraint,
+                expected_value_constraint,
             ))));
         }
 
@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn program_test() {
-        use ResolveKind::*;
+        use ValueConstraint::*;
 
         let cases = vec![
             (".foo", Any, Ok(())),

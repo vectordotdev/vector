@@ -1,4 +1,4 @@
-use crate::{ResolveKind, Value};
+use crate::{ValueConstraint, Value};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -19,14 +19,14 @@ impl State {
 /// State held by the compiler as it parses the program source.
 #[derive(Debug, Default)]
 pub struct CompilerState {
-    /// The [`ResolveKind`] each variable is expected to have.
+    /// The [`ValueConstraint`] each variable is expected to have.
     ///
     /// This allows assignment operations to tell the compiler what kinds each
     /// variable will have at runtime, so that the compiler can then check the
     /// variable kinds at compile-time when a variable is called.
-    variable_kinds: HashMap<String, ResolveKind>,
+    variable_kinds: HashMap<String, ValueConstraint>,
 
-    /// The [`ResolveKind`] each path query is expected to have.
+    /// The [`ValueConstraint`] each path query is expected to have.
     ///
     /// By default, the first time a path is queried, it resolves to `Any`, but
     /// when a path is used to assign a value to, we can potentially narrow down
@@ -36,23 +36,23 @@ pub struct CompilerState {
     /// disallow those in assignments, which makes this easier to fix, or we're
     /// going to always return `Any` for coalesced paths. Either way, this is a
     /// known bug that we need to fix soon.
-    path_query_kinds: HashMap<String, ResolveKind>,
+    path_query_kinds: HashMap<String, ValueConstraint>,
 }
 
 impl CompilerState {
-    pub fn variable_kind(&self, key: impl AsRef<str>) -> Option<&ResolveKind> {
+    pub fn variable_kind(&self, key: impl AsRef<str>) -> Option<&ValueConstraint> {
         self.variable_kinds.get(key.as_ref())
     }
 
-    pub fn variable_kinds_mut(&mut self) -> &mut HashMap<String, ResolveKind> {
+    pub fn variable_kinds_mut(&mut self) -> &mut HashMap<String, ValueConstraint> {
         &mut self.variable_kinds
     }
 
-    pub fn path_query_kind(&self, key: impl AsRef<str>) -> Option<&ResolveKind> {
+    pub fn path_query_kind(&self, key: impl AsRef<str>) -> Option<&ValueConstraint> {
         self.path_query_kinds.get(key.as_ref())
     }
 
-    pub fn path_query_kinds_mut(&mut self) -> &mut HashMap<String, ResolveKind> {
+    pub fn path_query_kinds_mut(&mut self) -> &mut HashMap<String, ValueConstraint> {
         &mut self.path_query_kinds
     }
 }

@@ -1,6 +1,6 @@
 use super::Error as E;
 use crate::{
-    Argument, ArgumentList, CompilerState, Expression, Function as Fn, Object, ResolveKind, Result,
+    Argument, ArgumentList, CompilerState, Expression, Function as Fn, Object, ValueConstraint, Result,
     State, Value, ValueKind,
 };
 
@@ -127,7 +127,7 @@ impl Expression for Function {
         self.function.execute(state, object)
     }
 
-    fn resolves_to(&self, state: &crate::CompilerState) -> ResolveKind {
+    fn resolves_to(&self, state: &crate::CompilerState) -> ValueConstraint {
         self.function.resolves_to(state)
     }
 }
@@ -185,7 +185,7 @@ impl Expression for ArgumentValidator {
         Ok(Some(value))
     }
 
-    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
         self.expression.resolves_to(state)
     }
 }

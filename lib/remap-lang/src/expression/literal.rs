@@ -1,4 +1,4 @@
-use crate::{CompilerState, Expression, Object, ResolveKind, Result, State, Value};
+use crate::{CompilerState, Expression, Object, ValueConstraint, Result, State, Value};
 
 #[derive(Debug, Clone)]
 pub struct Literal(Value);
@@ -14,7 +14,7 @@ impl Expression for Literal {
         Ok(Some(self.0.clone()))
     }
 
-    fn resolves_to(&self, _: &CompilerState) -> ResolveKind {
-        ResolveKind::Exact(self.0.kind())
+    fn resolves_to(&self, _: &CompilerState) -> ValueConstraint {
+        ValueConstraint::Exact(self.0.kind())
     }
 }

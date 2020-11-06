@@ -7,18 +7,20 @@ mod program;
 mod runtime;
 mod state;
 mod value;
+mod value_constraint;
 
 use expression::Expr;
 use operator::Operator;
 
 pub mod prelude;
 pub use error::{Error, RemapError};
-pub use expression::{Expression, Literal, Noop, Path, ResolveKind};
+pub use expression::{Expression, Literal, Noop, Path};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
 pub use state::{CompilerState, State};
 pub use value::{Value, ValueKind};
+pub use value_constraint::ValueConstraint;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -158,8 +160,8 @@ mod tests {
             Ok(Some(format!("regex: {:?}", self.0).into()))
         }
 
-        fn resolves_to(&self, _: &CompilerState) -> ResolveKind {
-            ResolveKind::Any
+        fn resolves_to(&self, _: &CompilerState) -> ValueConstraint {
+            ValueConstraint::Any
         }
     }
 
@@ -238,7 +240,7 @@ mod tests {
         ];
 
         for (script, expectation) in cases {
-            let accept = ResolveKind::Maybe(Box::new(ResolveKind::Any));
+            let accept = ValueConstraint::Maybe(Box::new(ValueConstraint::Any));
             let program = Program::new(script, &[Box::new(RegexPrinter)], accept).unwrap();
             let mut runtime = Runtime::new(State::default());
             let mut event = HashMap::default();

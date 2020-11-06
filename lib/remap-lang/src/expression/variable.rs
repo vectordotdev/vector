@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, ResolveKind, Result, State, Value};
+use crate::{CompilerState, Expression, Object, ValueConstraint, Result, State, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -27,10 +27,10 @@ impl Expression for Variable {
             .map(Some)
     }
 
-    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
         state
             .variable_kind(&self.ident)
             .cloned()
-            .unwrap_or(ResolveKind::Any)
+            .unwrap_or(ValueConstraint::Any)
     }
 }
