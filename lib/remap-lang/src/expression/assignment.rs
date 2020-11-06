@@ -27,7 +27,7 @@ impl Assignment {
             Target::Variable(ident) => state.variable_types_mut().insert(ident.clone(), type_check),
             Target::Path(segments) => {
                 let path = crate::expression::path::segments_to_path(segments);
-                state.variable_types_mut().insert(path, type_check)
+                state.path_query_types_mut().insert(path, type_check)
             }
         };
 
@@ -66,7 +66,7 @@ impl Expression for Assignment {
                 .unwrap_or_default(),
             Target::Path(segments) => {
                 let path = crate::expression::path::segments_to_path(segments);
-                state.variable_type(&path).cloned().unwrap_or_default()
+                state.path_query_type(&path).cloned().unwrap_or_default()
             }
         }
     }
