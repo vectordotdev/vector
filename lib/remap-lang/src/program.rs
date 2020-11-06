@@ -4,14 +4,20 @@ use std::fmt;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
-    ResolvesTo(TypeCheck, TypeCheck),
+    #[error(transparent)]
+    ResolvesTo(#[from] ResolvesToError),
+
+    #[error("expected to be infallible, but is not")]
+    Fallible,
 }
 
-impl fmt::Display for Error {
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub struct ResolvesToError(TypeCheck, TypeCheck);
+
+impl fmt::Display for ResolvesToError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (want, got) = match self {
-            Error::ResolvesTo(want, got) => (want, got),
-        };
+        let want = &self.0;
+        let got = &self.1;
 
         let fallible_diff = want.is_fallible() != got.is_fallible();
         let optional_diff = want.is_optional() != got.is_optional();
@@ -94,20 +100,25 @@ impl Program {
 
         let expressions = parser.pairs_to_expressions(pairs).map_err(RemapError)?;
 
-        let computed_result = expressions
-            .last()
+        let mut type_checks = expressions
+            .iter()
             .map(|e| e.type_check(&parser.compiler_state))
-            .unwrap_or(TypeCheck {
-                optional: true,
-                fallible: true,
-                ..Default::default()
-            });
+            .collect::<Vec<_>>();
+
+        let computed_result = type_checks.pop().unwrap_or(TypeCheck {
+            optional: true,
+            fallible: true,
+            ..Default::default()
+        });
 
         if !expected_result.contains(&computed_result) {
             return Err(RemapError::from(E::from(Error::ResolvesTo(
-                expected_result,
-                computed_result,
+                ResolvesToError(expected_result, computed_result),
             ))));
+        }
+
+        if !expected_result.is_fallible() && type_checks.iter().any(TypeCheck::is_fallible) {
+            return Err(RemapError::from(E::from(Error::Fallible)));
         }
 
         Ok(Self { expressions })
@@ -127,6 +138,14 @@ mod tests {
 
         let cases = vec![
             (".foo", TypeCheck { fallible: true, ..Default::default()}, Ok(())),
+
+            // The final expression is infallible, but the first one isn't, so
+            // this isn't allowed.
+            (
+                ".foo\ntrue",
+                TypeCheck { fallible: false, ..Default::default()},
+                Err("expected to be infallible, but is not".to_owned()),
+            ),
             (
                 ".foo",
                 TypeCheck::default(),
