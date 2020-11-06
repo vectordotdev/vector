@@ -35,7 +35,7 @@ remap: functions: starts_with: {
 				message: #"The Needle In The Haystack"#
 			}
 			source: #"""
-				.contains = begins_with(.message, "the needle", case_sensitive = false)
+				.contains = starts_with(.message, "the needle", case_sensitive = false)
 				"""#
 			output: {
 				message:  #"The Needle In The Haystack"#
@@ -47,7 +47,7 @@ remap: functions: starts_with: {
 			input: {
 				message: "A string with 42"
 			}
-			source: ".contains = begins_with(.message, 42)"
+			source: ".contains = starts_with(.message, 42)"
 			output: {
 				error: remap.errors.ArgumentError
 			}

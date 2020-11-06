@@ -35,7 +35,7 @@ remap: functions: starts_with: {
 				message: #"The Needle In The Haystack"#
 			}
 			source: #"""
-				.contains = contains(.message, "the needle", case_sensitive = false)
+				.contains = begins_with(.message, \"the needle\", case_sensitive = false)
 				"""#
 			output: {
 				contains: true
