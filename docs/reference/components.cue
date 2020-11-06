@@ -901,6 +901,7 @@ components: {
 		telemetry: metrics: {
 			// Default metrics for each component
 			vector_events_processed_total: _vector_events_processed_total
+			vector_processed_bytes_total:  _vector_processed_bytes_total
 		}
 	}}
 }
