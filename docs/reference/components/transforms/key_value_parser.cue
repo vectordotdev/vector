@@ -32,14 +32,14 @@ components: transforms: key_value_parser: {
 		requirements: []
 		warnings: [
 			"""
-				Performance characteristics of the `key_value` transform have not been benchmarked.
-			""",
+					Performance characteristics of the `key_value` transform have not been benchmarked.
+				""",
 		]
 		notices: [
 			"""
-				It is likely that the `key_value` transform will replace the `logfmt` transform in the future since
-				it offers a more flexible super-set of that transform.
-			""",
+					It is likely that the `key_value` transform will replace the `logfmt` transform in the future since
+					it offers a more flexible super-set of that transform.
+				""",
 		]
 	}
 
@@ -64,7 +64,7 @@ components: transforms: key_value_parser: {
 		}
 
 		field_split: {
-			common: 	 false
+			common:      false
 			description: "The character(s) to split a key/value pair on which results in a new field with an associated value. Must be a `string` value."
 			required:    false
 			type: string: {
@@ -74,58 +74,58 @@ components: transforms: key_value_parser: {
 		}
 
 		overwrite_target: {
-			common:		false
+			common: false
 			description: """
-				If `target_field` is set and the log contains a field of the same name
-				as the target, it will only be overwritten if this is set to `true`.
-			"""
-			required: 	false
+					If `target_field` is set and the log contains a field of the same name
+					as the target, it will only be overwritten if this is set to `true`.
+				"""
+			required: false
 			type: bool: default: false
 		}
 
 		separator: {
-			common:		false
+			common:      false
 			description: "The character(s) that separate key/value pairs. Must be a `string` value."
-			required: 	false
+			required:    false
 			type: string: {
 				default: "[whitespace]"
 				examples: [",", ";", "|"]
 			}
 		}
 
-		target_field {
-			common:		false
+		target_field: {
+			common: false
 			description: """
-				If this setting is present, the parsed JSON will be inserted into the
-				log as a sub-object with this name.
-				If a field with the same name already exists, the parser will fail and
-				produce an error.
-			"""
-			required:	false
+					If this setting is present, the parsed JSON will be inserted into the
+					log as a sub-object with this name.
+					If a field with the same name already exists, the parser will fail and
+					produce an error.
+				"""
+			required: false
 			type: string: {
 				examples: ["root_field", "parent.child"]
 			}
 		}
 
-		trim_key {
-			common:		false
+		trim_key: {
+			common: false
 			description: """
-				Removes characters from the beginning and end of a key until a character that is not listed.
-				ex: `<key>=value` would result in `key: value` with this option set to `<>`.
-			"""
+					Removes characters from the beginning and end of a key until a character that is not listed.
+					ex: `<key>=value` would result in `key: value` with this option set to `<>`.
+				"""
 			required: false
 			type: string: {
 				examples: ["<>", "{}"]
 			}
 		}
 
-		trim_value {
-			common:		false
+		trim_value: {
+			common: false
 			description: """
-				Removes characters from the beginning and end of a value until a character that is not listed.\
-				ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.\
-			"""
-			required:	false
+					Removes characters from the beginning and end of a value until a character that is not listed.
+					ex: `key=<<>value>>` would result in `key: value` with this option set to `<>`.
+				"""
+			required: false
 			type: string: {
 				examples: ["<>", "{}"]
 			}
@@ -141,38 +141,38 @@ components: transforms: key_value_parser: {
 
 	how_it_works: {
 		stuff: """
-			The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
-			json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
-			splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
-		"""
+				The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
+				json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
+				splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
+			"""
 	}
 
 	examples: [
 		{
-			title: "Firewall log message",
+			title: "Firewall log message"
 			configuration: {
-				field: "message",
-				field_split: ":",
-				separator: ";",
-				target_field: "data",
-				trim_key: "\"",
-				trim_value: "\"",
-				type: "key_value_parser"
-			},
+				field:        "message"
+				field_split:  ":"
+				separator:    ";"
+				target_field: "data"
+				trim_key:     "\""
+				trim_value:   "\""
+				type:         "key_value_parser"
+			}
 			input: log: {
-				"message": #"action:\"Accept\"; flags:\"802832\"; ifdir:\"inbound\"; ifname:\"eth2-05\"; logid:\"6\"; loguid:\"{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}\";"
-			},
-			output: log {
-				"message": #"action:\"Accept\"; flags:\"802832\"; ifdir:\"inbound\"; ifname:\"eth2-05\"; logid:\"6\"; loguid:\"{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}\";"
+				"message": "action:\"Accept\"; flags:\"802832\"; ifdir:\"inbound\"; ifname:\"eth2-05\"; logid:\"6\"; loguid:\"{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}\";"
+			}
+			output: log: {
+				"message": "action:\"Accept\"; flags:\"802832\"; ifdir:\"inbound\"; ifname:\"eth2-05\"; logid:\"6\"; loguid:\"{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}\";"
 				"data": {
-					"action": "Accept",
-					"flags": "802832",
-					"ifdir": "inbound",
-					"ifname": "eth2-05",
-					"logid": "6",
+					"action": "Accept"
+					"flags":  "802832"
+					"ifdir":  "inbound"
+					"ifname": "eth2-05"
+					"logid":  "6"
 					"loguid": "{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}"
 				}
 			}
-		}
+		},
 	]
 }

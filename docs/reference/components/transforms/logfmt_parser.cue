@@ -33,10 +33,10 @@ components: transforms: logfmt_parser: {
 		warnings: []
 		notices: [
 			"""
-				It is likely that the [`key_value` transform][docs.transforms.key_value_parser] will replace the `logfmt` transform in the future
-				since it offers a more flexible super-set of this transform. However, the `key_value` transform does not yet account for syslog
-				prefix or value quoting.
-			""",
+					It is likely that the [`key_value` transform][docs.transforms.key_value_parser] will replace the `logfmt` transform in the future
+					since it offers a more flexible super-set of this transform. However, the `key_value` transform does not yet account for syslog
+					prefix or value quoting.
+				""",
 		]
 	}
 
