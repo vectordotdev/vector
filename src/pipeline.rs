@@ -90,7 +90,7 @@ impl Pipeline {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{transforms::add_fields::AddFields, Event, Value};
+    use crate::{transforms::{add_fields::AddFields, filter::Filter}, Event, Value};
     use futures::compat::Future01CompatExt;
     use futures01::Stream;
     use serde_json::json;
@@ -101,30 +101,7 @@ mod test {
     const VALS: [&str; 2] = ["Pineapple", "Coconut"];
 
     #[tokio::test]
-    async fn one_inline() -> Result<(), crate::Error> {
-        let transform_1 = AddFields::new(
-            indexmap::indexmap! {
-                KEYS[0].into() => Value::from(VALS[0]),
-            },
-            false,
-        )?;
-
-        let (pipeline, reciever) = Pipeline::new_test(vec![Box::new(transform_1)]);
-
-        let event = Event::try_from(json!({
-            "message": "MESSAGE_MARKER",
-        }))?;
-
-        pipeline.send(event).compat().await?;
-        let out = reciever.wait().next().unwrap().unwrap();
-
-        assert_eq!(out.as_log().get(KEYS[0]), Some(&Value::from(VALS[0])),);
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn two_inline() -> Result<(), crate::Error> {
+    async fn multiple_transforms() -> Result<(), crate::Error> {
         let transform_1 = AddFields::new(
             indexmap::indexmap! {
                 KEYS[0].into() => Value::from(VALS[0]),
@@ -146,10 +123,38 @@ mod test {
         }))?;
 
         pipeline.send(event).compat().await?;
-        let out = reciever.wait().next().unwrap().unwrap();
+        let out = reciever.wait().collect::<Result<Vec<_>, ()>>().unwrap();
 
-        assert_eq!(out.as_log().get(KEYS[0]), Some(&Value::from(VALS[0])),);
-        assert_eq!(out.as_log().get(KEYS[1]), Some(&Value::from(VALS[1])),);
+        assert_eq!(out[0].as_log().get(KEYS[0]), Some(&Value::from(VALS[0])));
+        assert_eq!(out[0].as_log().get(KEYS[1]), Some(&Value::from(VALS[1])));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn filtered_output() -> Result<(), crate::Error> {
+        let transform_1 = Filter::new(
+            Box::new(crate::conditions::check_fields::CheckFields::new(
+                indexmap::indexmap! {
+                    KEYS[1].into() => crate::conditions::check_fields::EqualsPredicate::new(
+                        "message".into(),
+                        &crate::conditions::check_fields::CheckFieldsPredicateArg::String("NOT".into()),
+                    )?,
+                },
+            ))
+        );
+
+        let (pipeline, reciever) =
+            Pipeline::new_test(vec![Box::new(transform_1)]);
+
+        let event = Event::try_from(json!({
+            "message": "MESSAGE_MARKER",
+        }))?;
+
+        pipeline.send(event).compat().await?;
+        let out = reciever.wait().collect::<Result<Vec<_>, ()>>().unwrap();
+
+        assert_eq!(out, vec![]);
 
         Ok(())
     }
