@@ -62,7 +62,7 @@ impl Checkpointer {
             }
             'i' => {
                 let (dev, ino, pos) =
-                    scan_fmt!(file_name, "i{x}.{y}.{}", [hex u64], [hex u64], FilePosition)
+                    scan_fmt!(file_name, "i{x}.{x}.{}", [hex u64], [hex u64], FilePosition)
                         .unwrap();
                 (DevInode(dev, ino), pos)
             }
@@ -126,16 +126,23 @@ mod test {
 
     #[test]
     fn test_checkpointer_basics() {
-        let fingerprint: FileFingerprint = 0x1234567890abcdef.into();
-        let position: FilePosition = 1234;
-        let data_dir = tempdir().unwrap();
-        let mut chkptr = Checkpointer::new(&data_dir.path());
-        assert_eq!(
-            chkptr.decode(&chkptr.encode(fingerprint, position)),
-            (fingerprint, position)
-        );
-        chkptr.set_checkpoint(fingerprint, position);
-        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        let fingerprints = vec![
+            FileFingerprint::DevInode(1, 2),
+            FileFingerprint::Checksum(3456),
+            FileFingerprint::FirstLineChecksum(78910),
+            FileFingerprint::Unknown(1337),
+        ];
+        for fingerprint in fingerprints {
+            let position: FilePosition = 1234;
+            let data_dir = tempdir().unwrap();
+            let mut chkptr = Checkpointer::new(&data_dir.path());
+            assert_eq!(
+                chkptr.decode(&chkptr.encode(fingerprint, position)),
+                (fingerprint, position)
+            );
+            chkptr.set_checkpoint(fingerprint, position);
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        }
     }
 
     #[test]
