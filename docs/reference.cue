@@ -491,6 +491,8 @@ _values: {
 	fields:      #Schema
 })
 
+#Map: [string]: string
+
 #MetricInput: {
 	counter:      bool
 	distribution: bool
@@ -559,7 +561,7 @@ _values: {
 	description: string
 	examples?: [...string]
 	required: bool
-	options?: [string]: string | [string]
+	options?: [...string] | #Map
 	default?: string
 })
 

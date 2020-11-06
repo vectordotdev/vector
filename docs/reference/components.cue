@@ -461,7 +461,9 @@ components: {
 			_vector_processing_errors_total: {
 				description: "The total number of processing errors encountered by the component."
 				type:        "counter"
-				tags:        _component_tags & _error_type
+				tags:        _component_tags & {
+					error_type: _error_type
+				}
 			}
 
 			// Convenient groupings of tags
