@@ -31,6 +31,13 @@ components: sources: prometheus: {
 					ssl: "optional"
 				}
 			}
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 		}
 		multiline: enabled: false
 	}
@@ -67,6 +74,52 @@ components: sources: prometheus: {
 			type: uint: {
 				default: 15
 				unit:    "seconds"
+			}
+		}
+		auth: {
+			common:      false
+			description: "Options for the authentication strategy."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: []
+				options: {
+					password: {
+						description: "The basic authentication password."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${PROMETHEUS_PASSWORD}", "password"]
+						}
+					}
+					strategy: {
+						description: "The authentication strategy to use."
+						required:    true
+						warnings: []
+						type: string: {
+							enum: {
+								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
+								bearer: "The bearer token authentication strategy."
+							}
+						}
+					}
+					token: {
+						description: "The token to use for bearer authentication"
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${API_TOKEN}", "xyz123"]
+						}
+					}
+					user: {
+						description: "The basic authentication user name."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${PROMETHEUS_USERNAME}", "username"]
+						}
+					}
+				}
 			}
 		}
 	}
