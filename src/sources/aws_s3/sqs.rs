@@ -43,16 +43,27 @@ pub(super) struct Config {
     pub(super) queue_name: String,
     pub(super) queue_owner: Option<String>,
 
-    #[serde(default)]
-    #[derivative(Default(value = "15"))]
+    #[serde(default = "default_poll_interval_secs")]
+    #[derivative(Default(value = "default_poll_interval_secs()"))]
     pub(super) poll_secs: u64,
-    #[serde(default)]
-    #[derivative(Default(value = "300"))]
+    #[serde(default = "default_visibility_timeout_secs")]
+    #[derivative(Default(value = "default_visibility_timeout_secs()"))]
     // restricted to u32 for safe conversion to i64 later
     pub(super) visibility_timeout_secs: u32,
-    #[serde(default)]
-    #[derivative(Default(value = "true"))]
+    #[serde(default = "default_true")]
+    #[derivative(Default(value = "default_true()"))]
     pub(super) delete_message: bool,
+}
+
+const fn default_poll_interval_secs() -> u64 {
+    15
+}
+
+const fn default_visibility_timeout_secs() -> u32 {
+    300
+}
+const fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Snafu)]
