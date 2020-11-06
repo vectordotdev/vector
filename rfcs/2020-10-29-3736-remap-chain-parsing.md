@@ -60,10 +60,19 @@ code blocks are run.
 ## Condition
 
 It is possible to have multiple statements within the condition. The statements
-must be surrounded with parentheses and separated by a semicolon.
+must be surrounded with parentheses and separated by either a semicolon or a
+new line.
 
 ```
 (statement1; statement2; statement3)
+```
+
+or
+
+```
+(statement1
+ statement2
+ statement3)
 ```
 
 This allows you to, for example, assign the results of a regular expression
@@ -73,12 +82,12 @@ you have the results to work with.
 The following code will be possible:
 
 ```coffee
-if ($match = matches(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\s]*)/);
+if ($match = matches(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\s]*)/)
     !is_empty($match)) {
   .method = $match.method
   .remote_addr = $match.remote_addr
   .source = "nginx"
-} else if ($match = matches(.message, /^(?P<remote_addr>[^\s]*).*"(?P<method>[^\s]*).*"$/);
+} else if ($match = matches(.message, /^(?P<remote_addr>[^\s]*).*"(?P<method>[^\s]*).*"$/)
            !is_empty($match)) {
   .method = $match.method
   .remote_addr = $match.remote_addr
@@ -90,7 +99,7 @@ if ($match = matches(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>
 
 The final statement must evaluate to a Boolean.
 
-If there is only a single predicate evaluated in the condition, the parentheses 
+If there is only a single predicate evaluated in the condition, the parentheses
 are not required.
 
 Assigning values to variables is only permitted if the condition is wrapped
@@ -103,7 +112,7 @@ the script. The variable is modified even if the condition fails.
 
 *Note, `matches` is currently unimplemented, but in this example it is
 intended as a function that would match a regular expression and return any
-matching groups in a `Value::map`. If there were no match, it returns an 
+matching groups in a `Value::map`. If there were no match, it returns an
 empty map.*
 
 ## Rationale
