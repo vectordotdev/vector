@@ -194,6 +194,7 @@ anyhow = { version = "1.0.28" }
 snap = { version = "1.0.1", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
+fakedata_generator = "0.2.4"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
