@@ -129,19 +129,25 @@ KUBE_TEST_DEPLOY_COMMAND="$(pwd)/scripts/deploy-kubernetes-test.sh"
 export KUBE_TEST_DEPLOY_COMMAND
 
 # Prepare args.
-CARGO_TEST_ARGS=()
+CARGO_TEST_ARGS_CARGO=()
+CARGO_TEST_ARGS_PASSED=()
 if [[ -n "${SCOPE:-}" && "$SCOPE" != '""' ]]; then
-  CARGO_TEST_ARGS+=("$SCOPE")
+  CARGO_TEST_ARGS_PASSED+=("$SCOPE")
+fi
+if [[ -n "${TEST:-}" && "$TEST" != '""' ]]; then
+  CARGO_TEST_ARGS_CARGO+=(--test "$TEST")
+else
+  CARGO_TEST_ARGS_CARGO+=(--tests)
 fi
 
 # Run the tests.
 cd lib/k8s-e2e-tests
 cargo test \
-  --tests \
   --no-fail-fast \
   --no-default-features \
   --features all \
+  "${CARGO_TEST_ARGS_CARGO[@]}" \
   -- \
   --nocapture \
   --test-threads 1 \
-  "${CARGO_TEST_ARGS[@]}"
+  "${CARGO_TEST_ARGS_PASSED[@]}"
