@@ -87,10 +87,13 @@ impl Pipeline {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "transforms-add-fields"))]
 mod test {
     use super::*;
-    use crate::{transforms::{add_fields::AddFields, filter::Filter}, Event, Value};
+    use crate::{
+        transforms::{add_fields::AddFields, filter::Filter},
+        Event, Value,
+    };
     use futures::compat::Future01CompatExt;
     use futures01::Stream;
     use serde_json::json;
@@ -133,19 +136,16 @@ mod test {
 
     #[tokio::test]
     async fn filtered_output() -> Result<(), crate::Error> {
-        let transform_1 = Filter::new(
-            Box::new(crate::conditions::check_fields::CheckFields::new(
-                indexmap::indexmap! {
-                    KEYS[1].into() => crate::conditions::check_fields::EqualsPredicate::new(
-                        "message".into(),
-                        &crate::conditions::check_fields::CheckFieldsPredicateArg::String("NOT".into()),
-                    )?,
-                },
-            ))
-        );
+        let transform_1 = Filter::new(Box::new(crate::conditions::check_fields::CheckFields::new(
+            indexmap::indexmap! {
+                KEYS[1].into() => crate::conditions::check_fields::EqualsPredicate::new(
+                    "message".into(),
+                    &crate::conditions::check_fields::CheckFieldsPredicateArg::String("NOT".into()),
+                )?,
+            },
+        )));
 
-        let (pipeline, reciever) =
-            Pipeline::new_test(vec![Box::new(transform_1)]);
+        let (pipeline, reciever) = Pipeline::new_test(vec![Box::new(transform_1)]);
 
         let event = Event::try_from(json!({
             "message": "MESSAGE_MARKER",
