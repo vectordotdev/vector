@@ -4,7 +4,7 @@ use super::{
 };
 use crate::config;
 use url::Url;
-use vector_api_client::{gql::HealthQueryExt, Client};
+use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
@@ -57,8 +57,20 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         })
         .expect("Couldn't build WebSocket URL. Please report.");
 
+    let subscription_client = match connect_subscription_client(ws_url).await {
+        Ok(c) => c,
+        _ => {
+            eprintln!("Couldn't connect to Vector API via WebSockets");
+            return exitcode::UNAVAILABLE;
+        }
+    };
+
     // Subscribe to updated metrics
-    metrics::subscribe(ws_url, tx.clone(), opts.refresh_interval as i64);
+    metrics::subscribe(
+        subscription_client,
+        tx.clone(),
+        opts.refresh_interval as i64,
+    );
 
     // Initialize the dashboard
     match init_dashboard(url.as_str(), sender).await {
