@@ -7,9 +7,8 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit,
-            PartitionBatchSinkOld as PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-            ServiceBuilderExt, TowerRequestConfig,
+            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+            PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
@@ -19,7 +18,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{compat::Sink01CompatExt, stream, FutureExt, SinkExt, StreamExt};
+use futures::{stream, FutureExt, SinkExt, StreamExt};
 use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -228,7 +227,6 @@ impl GcsSink {
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_compat()
             .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))
             .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok));
 

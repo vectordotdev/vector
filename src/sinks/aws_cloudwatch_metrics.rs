@@ -7,14 +7,11 @@ use crate::{
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         retries::RetryLogic, BatchConfig, BatchSettings, Compression, MetricBuffer,
-        PartitionBatchSinkOld as PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        TowerRequestConfig,
+        PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
     },
 };
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::{
-    compat::Sink01CompatExt, future, future::BoxFuture, stream, FutureExt, SinkExt, StreamExt,
-};
+use futures::{future, future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use lazy_static::lazy_static;
 use rusoto_cloudwatch::{
     CloudWatch, CloudWatchClient, Dimension, MetricDatum, PutMetricDataError, PutMetricDataInput,
@@ -143,7 +140,6 @@ impl CloudWatchMetricsSvc {
         let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_compat()
             .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
             .with_flat_map(move |mut event: Event| {
                 let namespace = event

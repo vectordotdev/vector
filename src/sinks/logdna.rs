@@ -10,7 +10,7 @@ use crate::{
     },
     template::Template,
 };
-use futures::{compat::Sink01CompatExt, FutureExt, SinkExt};
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -94,7 +94,6 @@ impl SinkConfig for LogdnaConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_compat()
         .sink_map_err(|error| error!(message = "Fatal logdna sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();

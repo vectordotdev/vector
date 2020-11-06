@@ -6,16 +6,15 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit,
-        PartitionBatchSinkOld as PartitionBatchSink, PartitionBuffer, PartitionInnerBuffer,
-        ServiceBuilderExt, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+        PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
     Event,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{compat::Sink01CompatExt, future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::StatusCode;
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
@@ -214,7 +213,6 @@ impl S3SinkConfig {
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, self.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_compat()
             .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok))
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 

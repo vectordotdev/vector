@@ -6,15 +6,15 @@ use crate::{
         util::{
             encode_namespace,
             http::{HttpBatchService, HttpRetryLogic},
-            BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSinkOld as PartitionBatchSink,
-            PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+            BatchConfig, BatchSettings, MetricBuffer, PartitionBatchSink, PartitionBuffer,
+            PartitionInnerBuffer, TowerRequestConfig,
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
     Event,
 };
 use chrono::{DateTime, Utc};
-use futures::{compat::Sink01CompatExt, future, stream, FutureExt, SinkExt, StreamExt};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -189,7 +189,6 @@ impl SinkConfig for DatadogConfig {
         let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));
 
         let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_compat()
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
             .with_flat_map(move |event: Event| {
                 let ep = DatadogEndpoint::from_metric(&event);

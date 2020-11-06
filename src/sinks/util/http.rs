@@ -5,7 +5,6 @@ use super::{
 use crate::{buffers::Acker, http::HttpClient, Event};
 use bytes::{Buf, Bytes};
 use futures::{future::BoxFuture, ready, Sink};
-use futures01::{Async, AsyncSink, Poll as Poll01, Sink as Sink01, StartSend};
 use http::StatusCode;
 use hyper::{body, Body};
 use pin_project::pin_project;
@@ -170,6 +169,7 @@ where
     }
 }
 
+#[pin_project]
 pub struct PartitionHttpSink<T, B, K, L = HttpRetryLogic>
 where
     B: Batch,
@@ -180,6 +180,7 @@ where
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     sink: Arc<T>,
+    #[pin]
     inner: TowerPartitionSink<
         HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
         B,
@@ -256,7 +257,7 @@ where
     }
 }
 
-impl<T, B, K, L> Sink01 for PartitionHttpSink<T, B, K, L>
+impl<T, B, K, L> Sink<Event> for PartitionHttpSink<T, B, K, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
@@ -265,32 +266,41 @@ where
     T: HttpSink<Input = B::Input, Output = B::Output>,
     L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
-    type SinkItem = crate::Event;
-    type SinkError = crate::Error;
+    type Error = crate::Error;
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.slot.is_some() && self.poll_complete()?.is_not_ready() {
-            return Ok(AsyncSink::NotReady(item));
-        }
-        assert!(self.slot.is_none(), "poll_complete did not clear slot");
-
-        if let Some(item) = self.sink.encode_event(item) {
-            self.slot = Some(item);
-            self.poll_complete()?;
-        }
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll01<(), Self::SinkError> {
-        if let Some(item) = self.slot.take() {
-            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
-                self.slot = Some(item);
-                return Ok(Async::NotReady);
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        while self.slot.is_some() {
+            match self.as_mut().poll_flush(cx) {
+                Poll::Ready(Ok(())) => {}
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => {}
             }
         }
 
-        self.inner.poll_complete()
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        if let Some(item) = self.sink.encode_event(item) {
+            *self.project().slot = Some(item);
+        }
+
+        Ok(())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut this = self.project();
+        if this.slot.is_some() {
+            ready!(this.inner.as_mut().poll_ready(cx))?;
+            this.inner.as_mut().start_send(this.slot.take().unwrap())?;
+        }
+
+        this.inner.poll_flush(cx)
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        ready!(self.as_mut().poll_flush(cx))?;
+        self.poll_close(cx)
     }
 }
 
