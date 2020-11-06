@@ -23,12 +23,23 @@ impl Expression for Block {
     }
 
     fn type_check(&self, state: &CompilerState) -> TypeCheck {
-        self.expressions
-            .last()
+        let mut type_checks = self
+            .expressions
+            .iter()
             .map(|e| e.type_check(state))
-            .unwrap_or(TypeCheck {
-                optional: true,
-                ..Default::default()
-            })
+            .collect::<Vec<_>>();
+
+        // If any of the stored expressions is fallible, the entire block is
+        // fallible.
+        let fallible = type_checks.iter().any(TypeCheck::is_fallible);
+
+        // The last expression determines the resulting value of the block.
+        let mut type_check = type_checks.pop().unwrap_or(TypeCheck {
+            optional: true,
+            ..Default::default()
+        });
+
+        type_check.fallible = fallible;
+        type_check
     }
 }
