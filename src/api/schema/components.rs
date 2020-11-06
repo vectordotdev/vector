@@ -28,13 +28,13 @@ impl From<DataType> for SourceOutputType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SourceData {
     name: String,
     output_type: DataType,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Source(SourceData);
 
 #[Object]
@@ -76,13 +76,13 @@ impl Source {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InputsData {
     name: String,
     inputs: Vec<String>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Transform(InputsData);
 
 #[Object]
@@ -126,7 +126,7 @@ impl Transform {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Sink(InputsData);
 
 #[Object]
@@ -177,7 +177,7 @@ impl Sink {
     }
 }
 
-#[derive(Clone, Interface)]
+#[derive(Debug, Clone, Interface)]
 #[graphql(
     field(name = "name", type = "String"),
     field(
@@ -194,12 +194,6 @@ pub enum Component {
     Transform(Transform),
     Sink(Sink),
 }
-
-#[derive(Clone)]
-pub struct ComponentAdded(Component);
-
-#[derive(Clone)]
-pub struct ComponentRemoved(Component);
 
 lazy_static! {
     pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
@@ -232,7 +226,7 @@ impl ComponentsQuery {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum ComponentChanged {
     Added(Component),
     Removed(Component),
@@ -245,7 +239,7 @@ lazy_static! {
     };
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ComponentsSubscription;
 
 #[Subscription]
@@ -365,14 +359,16 @@ pub fn update_config(config: &Config) {
     existing_component_names
         .difference(&new_component_names)
         .for_each(|name| {
-            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
-                COMPONENTS
-                    .read()
-                    .expect(INVARIANT)
-                    .get(name)
-                    .expect(INVARIANT)
-                    .clone(),
-            ));
+            let _ = COMPONENT_CHANGED
+                .send(ComponentChanged::Removed(
+                    COMPONENTS
+                        .read()
+                        .expect(INVARIANT)
+                        .get(name)
+                        .expect(INVARIANT)
+                        .clone(),
+                ))
+                .unwrap();
         });
 
     // Publish all components that have been added
