@@ -145,10 +145,6 @@ where
     pub fn get_ref(&self) -> &S {
         &self.service.service
     }
-
-    pub fn get_mut(&mut self) -> &mut S {
-        &mut self.service.service
-    }
 }
 
 impl<S, B, Request> Sink<B::Input> for BatchSink<S, B, Request>
@@ -225,7 +221,7 @@ where
                     self.linger = None;
                 } else {
                     // Result doesn't matter, our batch is not empty. Return Pending anyway, but
-                    // loop once more for `poll_should_send` check.
+                    // loop once more for additional `poll_should_send` check.
                     ready!(self.service.poll_complete(cx));
 
                     if last_round {
