@@ -12,11 +12,3 @@ k8s-openapi = { version = "0.9", default-features = false, features = ["v1_16"] 
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 serde_json = "1"
 tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
-
-[features]
-all = ["agent"]
-agent = []
-
-[[test]]
-name = "vector-agent"
-required-features = ["agent"]
