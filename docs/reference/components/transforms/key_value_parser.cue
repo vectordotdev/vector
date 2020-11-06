@@ -140,11 +140,14 @@ components: transforms: key_value_parser: {
 	}
 
 	how_it_works: {
-		stuff: """
-				The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
-				json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
-				splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
-			"""
+		description: {
+			title: "Description"
+			body: """
+					The Key Value Parser accepts structured data that can be split on a character, or group of characters, and extracts it into a
+					json object (dictionary) of key/value pairs. The `separator` option allows you to define the character(s) to perform the initial
+					splitting of the message into pairs. The `field_split` option allows you to define the character(s) which split the key from the value.
+				"""
+		}
 	}
 
 	examples: [
