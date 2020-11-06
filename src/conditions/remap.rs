@@ -1,7 +1,7 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
-    internal_events::{RemapConditionExecutionFailed, RemapConditionNonBooleanReturned},
+    internal_events::RemapConditionExecutionFailed,
     Event,
 };
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,13 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let program = remap::Program::new(&self.source, &crate::remap::FUNCTIONS)?;
+        let expected_result = remap::TypeCheck {
+            fallible: true,
+            optional: false,
+            constraint: remap::ValueConstraint::Exact(remap::ValueKind::Boolean),
+        };
+
+        let program = remap::Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -54,19 +60,16 @@ impl Remap {
 impl Condition for Remap {
     fn check(&self, event: &Event) -> bool {
         self.execute(&event)
-            .unwrap_or_else(|_| {
-                emit!(RemapConditionExecutionFailed);
-                None
+            .map(|opt| match opt {
+                Some(value) => value,
+                None => unreachable!("non-optional constraint set"),
             })
             .map(|value| match value {
                 remap::Value::Boolean(boolean) => boolean,
-                _ => {
-                    emit!(RemapConditionNonBooleanReturned);
-                    false
-                }
+                _ => unreachable!("boolean type constraint set"),
             })
-            .unwrap_or_else(|| {
-                emit!(RemapConditionNonBooleanReturned);
+            .unwrap_or_else(|_| {
+                emit!(RemapConditionExecutionFailed);
                 false
             })
     }
