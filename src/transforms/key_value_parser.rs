@@ -1,18 +1,18 @@
-use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{
         KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueParseFailed,
         KeyValueTargetExists,
     },
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 #[derivative(Default)]
 pub struct KeyValueConfig {
@@ -38,7 +38,7 @@ impl_generate_config_from_default!(KeyValueConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "key_value_parser")]
 impl TransformConfig for KeyValueConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let conversions = parse_conversion_map(&self.types)?;
         let field = self
             .field
@@ -64,7 +64,7 @@ impl TransformConfig for KeyValueConfig {
             field_split = "=".to_string();
         }
 
-        Ok(Box::new(KeyValue {
+        Ok(Transform::function(KeyValue {
             conversions,
             drop_field,
             field,
@@ -90,6 +90,7 @@ impl TransformConfig for KeyValueConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct KeyValue {
     conversions: HashMap<String, Conversion>,
     drop_field: bool,
@@ -128,8 +129,8 @@ impl KeyValue {
     }
 }
 
-impl Transform for KeyValue {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for KeyValue {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.to_string_lossy());
 
@@ -144,7 +145,7 @@ impl Transform for KeyValue {
                         log.remove(target_field);
                     } else {
                         emit!(KeyValueTargetExists { target_field });
-                        return Some(event);
+                        return output.push(event);
                     }
                 }
             }
@@ -179,7 +180,7 @@ impl Transform for KeyValue {
             });
         };
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -187,7 +188,7 @@ impl Transform for KeyValue {
 mod tests {
     use super::KeyValueConfig;
     use crate::{
-        config::{TransformConfig, TransformContext},
+        config::TransformConfig,
         event::{LogEvent, Value},
         Event,
     };
@@ -215,11 +216,13 @@ mod tests {
             trim_key,
             trim_value,
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
 
-        parser.transform(event).unwrap().into_log()
+        let parser = parser.as_function();
+
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]
