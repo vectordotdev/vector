@@ -137,6 +137,7 @@ impl FunctionTransform for Sampler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::log_schema;
     use crate::event::Event;
     use approx::assert_relative_eq;
     use regex::RegexSet;
@@ -147,11 +148,16 @@ mod tests {
     }
 
     #[test]
-    fn samples_at_roughly_the_configured_rate() {
+    fn hash_samples_at_roughly_the_configured_rate() {
         let num_events = 10000;
 
         let events = random_events(num_events);
-        let mut sampler = Sampler::new(2, None, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(
+            2,
+            Some(log_schema().message_key().into()),
+            RegexSet::new(&["na"]).unwrap(),
+            SampleMode::Hash,
+        );
         let total_passed = events
             .into_iter()
             .filter_map(|event| sampler.transform_one(event))
@@ -161,7 +167,12 @@ mod tests {
         assert_relative_eq!(ideal, actual, epsilon = ideal * 0.5);
 
         let events = random_events(num_events);
-        let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(
+            25,
+            Some(log_schema().message_key().into()),
+            RegexSet::new(&["na"]).unwrap(),
+            SampleMode::Hash,
+        );
         let total_passed = events
             .into_iter()
             .filter_map(|event| sampler.transform_one(event))
@@ -172,9 +183,14 @@ mod tests {
     }
 
     #[test]
-    fn consistently_samples_the_same_events() {
+    fn hash_consistently_samples_the_same_events() {
         let events = random_events(1000);
-        let mut sampler = Sampler::new(2, None, RegexSet::new(&["na"]).unwrap());
+        let mut sampler = Sampler::new(
+            2,
+            Some(log_schema().message_key().into()),
+            RegexSet::new(&["na"]).unwrap(),
+            SampleMode::Hash,
+        );
 
         let first_run = events
             .clone()
@@ -191,59 +207,90 @@ mod tests {
 
     #[test]
     fn always_passes_events_matching_pass_list() {
-        let event = Event::from("i am important");
-        let mut sampler = Sampler::new(0, None, RegexSet::new(&["important"]).unwrap());
-        let iterations = 0..1000;
-        let total_passed = iterations
-            .filter_map(|_| sampler.transform_one(event.clone()))
-            .count();
-        assert_eq!(total_passed, 1000);
+        for mode in vec![SampleMode::Count, SampleMode::Hash] {
+            let event = Event::from("i am important");
+            let mut sampler = Sampler::new(
+                0,
+                Some(log_schema().message_key().into()),
+                RegexSet::new(&["important"]).unwrap(),
+                mode,
+            );
+            let iterations = 0..1000;
+            let total_passed = iterations
+                .filter_map(|_| sampler.transform_one(event.clone()))
+                .count();
+            assert_eq!(total_passed, 1000);
+        }
     }
 
     #[test]
     fn handles_key_field() {
-        let event = Event::from("nananana");
-        let mut sampler = Sampler::new(0, Some("timestamp".into()), RegexSet::new(&[":"]).unwrap());
-        let iterations = 0..1000;
-        let total_passed = iterations
-            .filter_map(|_| sampler.transform_one(event.clone()))
-            .count();
-        assert_eq!(total_passed, 1000);
+        for mode in vec![SampleMode::Count, SampleMode::Hash] {
+            let event = Event::from("nananana");
+            let mut sampler = Sampler::new(
+                0,
+                Some("timestamp".into()),
+                RegexSet::new(&[":"]).unwrap(),
+                mode,
+            );
+            let iterations = 0..1000;
+            let total_passed = iterations
+                .filter_map(|_| sampler.transform_one(event.clone()))
+                .count();
+            assert_eq!(total_passed, 1000);
+        }
     }
 
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
-        let events = random_events(10000);
-        let mut sampler = Sampler::new(10, None, RegexSet::new(&["na"]).unwrap());
-        let passing = events
-            .into_iter()
-            .filter(|s| {
-                !s.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .contains("na")
-            })
-            .find_map(|event| sampler.transform_one(event))
-            .unwrap();
-        assert_eq!(passing.as_log()["sample_rate"], "10".into());
+        for mode in vec![SampleMode::Count, SampleMode::Hash] {
+            let events = random_events(10000);
+            let mut sampler = Sampler::new(
+                10,
+                Some(log_schema().message_key().into()),
+                RegexSet::new(&["na"]).unwrap(),
+                mode,
+            );
+            let passing = events
+                .into_iter()
+                .filter(|s| {
+                    !s.as_log()[log_schema().message_key()]
+                        .to_string_lossy()
+                        .contains("na")
+                })
+                .find_map(|event| sampler.transform_one(event))
+                .unwrap();
+            assert_eq!(passing.as_log()["sample_rate"], "10".into());
 
-        let events = random_events(10000);
-        let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
-        let passing = events
-            .into_iter()
-            .filter(|s| {
-                !s.as_log()[log_schema().message_key()]
-                    .to_string_lossy()
-                    .contains("na")
-            })
-            .find_map(|event| sampler.transform_one(event))
-            .unwrap();
-        assert_eq!(passing.as_log()["sample_rate"], "25".into());
+            let events = random_events(10000);
+            let mut sampler = Sampler::new(
+                25,
+                Some(log_schema().message_key().into()),
+                RegexSet::new(&["na"]).unwrap(),
+                mode,
+            );
+            let passing = events
+                .into_iter()
+                .filter(|s| {
+                    !s.as_log()[log_schema().message_key()]
+                        .to_string_lossy()
+                        .contains("na")
+                })
+                .find_map(|event| sampler.transform_one(event))
+                .unwrap();
+            assert_eq!(passing.as_log()["sample_rate"], "25".into());
 
-        // If the event passed the regex check, don't include the sampling rate
-        let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
-        let event = Event::from("nananana");
-        let passing = sampler.transform_one(event).unwrap();
-        assert!(passing.as_log().get("sample_rate").is_none());
+            // If the event passed the regex check, don't include the sampling rate
+            let mut sampler = Sampler::new(
+                25,
+                Some(log_schema().message_key().into()),
+                RegexSet::new(&["na"]).unwrap(),
+                mode,
+            );
+            let event = Event::from("nananana");
+            let passing = sampler.transform_one(event).unwrap();
+            assert!(passing.as_log().get("sample_rate").is_none());
+        }
     }
 
     fn random_events(n: usize) -> Vec<Event> {
