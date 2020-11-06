@@ -1,5 +1,6 @@
 use super::{
-    CompilerState, Expr, Expression, Object, ValueConstraint, Result, State, Value, ValueKind,
+    CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value, ValueConstraint,
+    ValueKind,
 };
 use crate::Operator;
 
@@ -48,13 +49,14 @@ impl Expression for Arithmetic {
         result.map(Some).map_err(Into::into)
     }
 
-    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
-        let lhs_kind = self.lhs.resolves_to(state);
-        let rhs_kind = self.rhs.resolves_to(state);
-
+    fn type_check(&self, state: &CompilerState) -> TypeCheck {
         use Operator::*;
-        match self.op {
-            Or => lhs_kind.merge(&rhs_kind),
+        let constraint = match self.op {
+            Or => self
+                .lhs
+                .type_check(state)
+                .constraint
+                .merge(&self.rhs.type_check(state).constraint),
             Multiply | Add => ValueConstraint::OneOf(vec![
                 ValueKind::String,
                 ValueKind::Integer,
@@ -66,6 +68,12 @@ impl Expression for Arithmetic {
             And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => {
                 ValueConstraint::Exact(ValueKind::Boolean)
             }
+        };
+
+        TypeCheck {
+            fallible: true,
+            optional: false,
+            constraint,
         }
     }
 }

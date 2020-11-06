@@ -12,9 +12,16 @@ mod value_constraint;
 use expression::Expr;
 use operator::Operator;
 
+// TODO: update fmt::Display, move to the error, and properly print details about optional and fallible...
+//
+// "expected to resolve to (infallible)? optional/concrete type(s) string(, integer, float)"
+//
+// Only show details of "fallible/infallible" and "optional/concrete" when they
+// differ between the two, otherwise just show the type differences.
+
 pub mod prelude;
 pub use error::{Error, RemapError};
-pub use expression::{Expression, Literal, Noop, Path};
+pub use expression::{Expression, Literal, Noop, Path, TypeCheck};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
@@ -160,8 +167,8 @@ mod tests {
             Ok(Some(format!("regex: {:?}", self.0).into()))
         }
 
-        fn resolves_to(&self, _: &CompilerState) -> ValueConstraint {
-            ValueConstraint::Any
+        fn type_check(&self, _: &CompilerState) -> TypeCheck {
+            TypeCheck::default()
         }
     }
 
@@ -240,7 +247,12 @@ mod tests {
         ];
 
         for (script, expectation) in cases {
-            let accept = ValueConstraint::Maybe(Box::new(ValueConstraint::Any));
+            let accept = TypeCheck {
+                fallible: true,
+                optional: true,
+                constraint: ValueConstraint::Any,
+            };
+
             let program = Program::new(script, &[Box::new(RegexPrinter)], accept).unwrap();
             let mut runtime = Runtime::new(State::default());
             let mut event = HashMap::default();

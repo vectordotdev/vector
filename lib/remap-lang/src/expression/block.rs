@@ -1,4 +1,4 @@
-use crate::{CompilerState, Expr, Expression, Object, ValueConstraint, Result, State, Value};
+use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Block {
@@ -22,10 +22,13 @@ impl Expression for Block {
         Ok(value)
     }
 
-    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
+    fn type_check(&self, state: &CompilerState) -> TypeCheck {
         self.expressions
             .last()
-            .map(|e| e.resolves_to(state))
-            .unwrap_or(ValueConstraint::Any)
+            .map(|e| e.type_check(state))
+            .unwrap_or(TypeCheck {
+                optional: true,
+                ..Default::default()
+            })
     }
 }

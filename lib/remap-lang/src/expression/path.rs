@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, ValueConstraint, Result, State, Value};
+use crate::{CompilerState, Expression, Object, Result, State, TypeCheck, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -42,11 +42,14 @@ impl Expression for Path {
     /// A path resolves to `Any` by default, but the script might assign
     /// specific values to paths during its execution, which increases our exact
     /// understanding of the value kind the path contains.
-    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
+    fn type_check(&self, state: &CompilerState) -> TypeCheck {
         state
-            .path_query_kind(&segments_to_path(&self.segments))
+            .path_query_type(&segments_to_path(&self.segments))
             .cloned()
-            .unwrap_or(ValueConstraint::Any)
+            .unwrap_or(TypeCheck {
+                fallible: true,
+                ..Default::default()
+            })
     }
 }
 

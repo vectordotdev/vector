@@ -7,17 +7,17 @@ pub enum ValueConstraint {
     /// Any value kind is accepted.
     Any,
 
-    /// A subset of value kinds is accepted.
-    OneOf(Vec<ValueKind>),
-
     /// Exactly one value kind is accepted
     Exact(ValueKind),
 
-    /// Either none, or a value kind constraint is accepted.
-    ///
-    /// For example, and if-statement without an else-condition can resolve to
-    /// nothing if the if-condition does not match.
-    Maybe(Box<ValueConstraint>),
+    /// A subset of value kinds is accepted.
+    OneOf(Vec<ValueKind>),
+}
+
+impl Default for ValueConstraint {
+    fn default() -> Self {
+        ValueConstraint::Any
+    }
 }
 
 impl ValueConstraint {
@@ -31,11 +31,6 @@ impl ValueConstraint {
         matches!(self, Self::Any)
     }
 
-    /// Returns `true` if this is a [`ValueConstraint::Maybe`].
-    pub fn is_maybe(&self) -> bool {
-        matches!(self, Self::Maybe(_))
-    }
-
     /// Get a collection of [`ValueKind`]s accepted by this [`ValueConstraint`].
     pub fn value_kinds(&self) -> Vec<ValueKind> {
         use ValueConstraint::*;
@@ -44,7 +39,6 @@ impl ValueConstraint {
             Any => ValueKind::all(),
             OneOf(v) => v.clone(),
             Exact(v) => vec![*v],
-            Maybe(v) => v.value_kinds(),
         }
     }
 
@@ -52,19 +46,6 @@ impl ValueConstraint {
     /// provides the most constraint possible value constraint.
     pub fn merge(&self, other: &Self) -> Self {
         use ValueConstraint::*;
-
-        if let Maybe(kind) = self {
-            let other = match other {
-                Maybe(v) => v,
-                _ => other,
-            };
-
-            return Maybe(Box::new(kind.merge(other)));
-        }
-
-        if let Maybe(kind) = other {
-            return Maybe(Box::new(self.merge(kind)));
-        }
 
         if self.is_any() || other.is_any() {
             return Any;
@@ -92,12 +73,6 @@ impl ValueConstraint {
     /// That is to say, its constraints must be more strict or equal to the
     /// constraints of the current one.
     pub fn contains(&self, other: &Self) -> bool {
-        // If we don't expect none, but the other does, the other's requirement
-        // is less strict than ours.
-        if !self.is_maybe() && other.is_maybe() {
-            return false;
-        }
-
         let self_kinds = self.value_kinds();
         let other_kinds = other.value_kinds();
 
@@ -117,16 +92,24 @@ impl fmt::Display for ValueConstraint {
         use ValueConstraint::*;
 
         match self {
-            Any => f.write_str("any value"),
+            Any => f.write_str("any"),
             OneOf(v) => {
-                f.write_str("any of ")?;
-                f.write_str(&v.iter().map(|v| v.as_str()).collect::<Vec<_>>().join(", "))
+                let mut kinds = v.iter().map(|v| v.as_str()).collect::<Vec<_>>();
+
+                let last = kinds.pop();
+                let mut string = kinds.join(", ");
+
+                if let Some(last) = last {
+                    if !string.is_empty() {
+                        string.push_str(" or ")
+                    }
+
+                    string.push_str(last);
+                }
+
+                f.write_str(&string)
             }
             Exact(v) => f.write_str(&v),
-            Maybe(v) => {
-                f.write_str("none or ")?;
-                f.write_str(&v.to_string())
-            }
         }
     }
 }

@@ -1,12 +1,67 @@
-use crate::{
-    parser, CompilerState, Error as E, Expr, Expression, Function, RemapError, ValueConstraint,
-};
+use crate::{parser, CompilerState, Error as E, Expr, Expression, Function, RemapError, TypeCheck};
 use pest::Parser;
+use std::fmt;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
-    #[error("program is expected to resolve to {0}, but instead resolves to {1}")]
-    ResolvesTo(ValueConstraint, ValueConstraint),
+    ResolvesTo(TypeCheck, TypeCheck),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (want, got) = match self {
+            Error::ResolvesTo(want, got) => (want, got),
+        };
+
+        let fallible_diff = want.is_fallible() != got.is_fallible();
+        let optional_diff = want.is_optional() != got.is_optional();
+
+        let mut want_str = "".to_owned();
+        let mut got_str = "".to_owned();
+
+        if fallible_diff {
+            if want.is_fallible() {
+                want_str.push_str("an error, or ");
+            }
+
+            if got.is_fallible() {
+                got_str.push_str("an error, or ");
+            }
+        }
+
+        want_str.push_str(&want.constraint.to_string());
+        got_str.push_str(&got.constraint.to_string());
+
+        if optional_diff {
+            if want.is_optional() {
+                want_str.push_str(" optional");
+            }
+
+            if got.is_optional() {
+                got_str.push_str(" optional");
+            }
+        } else {
+            want_str.push_str(" value");
+            got_str.push_str(" value");
+        }
+
+        let want_kinds = want.constraint.value_kinds();
+        let got_kinds = got.constraint.value_kinds();
+
+        if !want.constraint.is_any() && want_kinds.len() > 1 {
+            want_str.push('s');
+        }
+
+        if !got.constraint.is_any() && got_kinds.len() > 1 {
+            got_str.push('s');
+        }
+
+        write!(
+            f,
+            "expected to resolve to {}, but instead resolves to {}",
+            want_str, got_str
+        )
+    }
 }
 
 /// The program to execute.
@@ -24,7 +79,7 @@ impl Program {
     pub fn new(
         source: &str,
         function_definitions: &[Box<dyn Function>],
-        value_constraint: ValueConstraint,
+        expected_result: TypeCheck,
     ) -> Result<Self, RemapError> {
         let pairs = parser::Parser::parse(parser::Rule::program, source)
             .map_err(|s| E::Parser(s.to_string()))
@@ -39,15 +94,19 @@ impl Program {
 
         let expressions = parser.pairs_to_expressions(pairs).map_err(RemapError)?;
 
-        let expected_value_constraint = expressions
+        let computed_result = expressions
             .last()
-            .map(|e| e.resolves_to(&parser.compiler_state))
-            .unwrap_or_else(|| ValueConstraint::Maybe(Box::new(ValueConstraint::Any)));
+            .map(|e| e.type_check(&parser.compiler_state))
+            .unwrap_or(TypeCheck {
+                optional: true,
+                fallible: true,
+                ..Default::default()
+            });
 
-        if !value_constraint.contains(&expected_value_constraint) {
+        if !expected_result.contains(&computed_result) {
             return Err(RemapError::from(E::from(Error::ResolvesTo(
-                value_constraint,
-                expected_value_constraint,
+                expected_result,
+                computed_result,
             ))));
         }
 
@@ -58,30 +117,50 @@ impl Program {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ValueKind;
+    use crate::{ValueConstraint, ValueKind};
+    use std::error::Error;
 
     #[test]
     fn program_test() {
         use ValueConstraint::*;
+        use ValueKind::*;
 
         let cases = vec![
-            (".foo", Any, Ok(())),
+            (".foo", TypeCheck { fallible: true, ..Default::default()}, Ok(())),
             (
                 ".foo",
-                Exact(ValueKind::String),
-                Err("remap error: program error: program is expected to resolve to string, but instead resolves to any value".to_owned()),
+                TypeCheck::default(),
+                Err("expected to resolve to any value, but instead resolves to an error, or any value".to_owned()),
+            ),
+            (
+                ".foo",
+                TypeCheck {
+                    fallible: false,
+                    optional: false,
+                    constraint: Exact(String),
+                },
+                Err("expected to resolve to string value, but instead resolves to an error, or any value".to_owned()),
             ),
             (
                 "false || 2",
-                OneOf(vec![ValueKind::String, ValueKind::Float]),
-                Err("remap error: program error: program is expected to resolve to any of string, float, but instead resolves to any of integer, boolean".to_owned()),
+
+                TypeCheck {
+                    fallible: false,
+                    optional: false,
+                    constraint: OneOf(vec![String, Float]),
+                },
+                Err("expected to resolve to string or float values, but instead resolves to an error, or integer or boolean values".to_owned()),
             ),
         ];
 
-        for (source, must_resolve_to, expect) in cases {
-            let program = Program::new(source, &[], must_resolve_to)
+        for (source, expected_result, expect) in cases {
+            let program = Program::new(source, &[], expected_result)
                 .map(|_| ())
-                .map_err(|e| e.to_string());
+                .map_err(|e| {
+                    e.source()
+                        .and_then(|e| e.source().map(|e| e.to_string()))
+                        .unwrap()
+                });
 
             assert_eq!(program, expect);
         }

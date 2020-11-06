@@ -47,9 +47,79 @@ pub enum Error {
     Variable(#[from] variable::Error),
 }
 
+/// Properties for a given expression that express the expected outcome of the
+/// expression.
+///
+/// This includes whether the expression is fallible, whether it can return
+/// "nothing", and a list of values the expression can resolve to.
+#[derive(Debug, Clone, Eq, PartialEq, Default)]
+pub struct TypeCheck {
+    /// True, if an expression can return an error.
+    ///
+    /// Some expressions are infallible (e.g. the [`Literal`] expression, or any
+    /// custom function designed to be infallible).
+    pub fallible: bool,
+
+    /// True, if an expression can resolve to "nothing".
+    ///
+    /// For example, and if-statement without an else-condition can resolve to
+    /// nothing if the if-condition does not match.
+    pub optional: bool,
+
+    /// The [`ValueConstraint`] applied to this type check.
+    ///
+    /// This resolves to a list of [`ValueKind`]s the expression is expected to
+    /// return.
+    pub constraint: ValueConstraint,
+}
+
+impl TypeCheck {
+    pub fn is_fallible(&self) -> bool {
+        self.fallible
+    }
+
+    pub fn is_optional(&self) -> bool {
+        self.optional
+    }
+
+    /// Merge two [`TypeCheck`]s, such that the new `TypeCheck` provides the
+    /// strictest type check possible.
+    pub fn merge(&self, other: &Self) -> Self {
+        let fallible = self.is_fallible() || other.is_fallible();
+        let optional = self.is_optional() || other.is_optional();
+        let constraint = self.constraint.merge(&other.constraint);
+
+        Self {
+            fallible,
+            optional,
+            constraint,
+        }
+    }
+
+    /// Returns `true` if the _other_ [`TypeCheck`] is contained within the
+    /// current one.
+    ///
+    /// That is to say, its constraints must be more strict or equal to the
+    /// constraints of the current one.
+    pub fn contains(&self, other: &Self) -> bool {
+        // If we don't expect none, but the other does, the other's requirement
+        // is less strict than ours.
+        if !self.is_optional() && other.is_optional() {
+            return false;
+        }
+
+        // The same applies to fallible checks.
+        if !self.is_fallible() && other.is_fallible() {
+            return false;
+        }
+
+        self.constraint.contains(&other.constraint)
+    }
+}
+
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
-    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint;
+    fn type_check(&self, state: &CompilerState) -> TypeCheck;
 }
 
 dyn_clone::clone_trait_object!(Expression);
@@ -78,9 +148,9 @@ macro_rules! expression_dispatch {
                 }
             }
 
-            fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
+            fn type_check(&self, state: &CompilerState) -> TypeCheck {
                 match self {
-                    $(Expr::$expr(expression) => expression.resolves_to(state)),+
+                    $(Expr::$expr(expression) => expression.type_check(state)),+
                 }
             }
         }
@@ -123,13 +193,11 @@ mod tests {
             (true, Any, Exact(Integer)),
             (true, Any, OneOf(vec![Float, Boolean])),
             (true, Any, OneOf(vec![Map])),
-            (false, Any, Maybe(Box::new(Any))),
             (true, Exact(String), Exact(String)),
             (true, Exact(String), OneOf(vec![String])),
             (false, Exact(String), Exact(Array)),
             (false, Exact(String), OneOf(vec![Integer])),
             (false, Exact(String), OneOf(vec![Integer, Float])),
-            (false, Exact(String), Maybe(Box::new(Any))),
         ];
 
         for (expect, this, other) in cases {
@@ -144,16 +212,9 @@ mod tests {
 
         let cases = vec![
             (Any, Any, Any),
-            (Maybe(Box::new(Any)), Maybe(Box::new(Any)), Any),
-            (Maybe(Box::new(Any)), Any, Maybe(Box::new(Any))),
             (Any, OneOf(vec![Integer, String]), Any),
             (OneOf(vec![Integer, Float]), Exact(Integer), Exact(Float)),
             (Exact(Integer), Exact(Integer), Exact(Integer)),
-            (
-                Maybe(Box::new(Exact(Integer))),
-                Maybe(Box::new(Exact(Integer))),
-                Exact(Integer),
-            ),
             (
                 OneOf(vec![String, Integer, Float, Boolean]),
                 OneOf(vec![Integer, String]),

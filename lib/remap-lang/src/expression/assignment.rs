@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expr, Expression, Object, ValueConstraint, Result, State, Value};
+use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -21,15 +21,13 @@ pub(crate) struct Assignment {
 
 impl Assignment {
     pub fn new(target: Target, value: Box<Expr>, state: &mut CompilerState) -> Self {
-        let resolve_kind = value.resolves_to(state);
+        let type_check = value.type_check(state);
 
         match &target {
-            Target::Variable(ident) => state
-                .variable_kinds_mut()
-                .insert(ident.clone(), resolve_kind),
+            Target::Variable(ident) => state.variable_types_mut().insert(ident.clone(), type_check),
             Target::Path(segments) => {
                 let path = crate::expression::path::segments_to_path(segments);
-                state.variable_kinds_mut().insert(path, resolve_kind)
+                state.variable_types_mut().insert(path, type_check)
             }
         };
 
@@ -58,18 +56,17 @@ impl Expression for Assignment {
         }
     }
 
-    fn resolves_to(&self, state: &CompilerState) -> ValueConstraint {
+    fn type_check(&self, state: &CompilerState) -> TypeCheck {
         match &self.target {
             Target::Variable(ident) => state
-                .variable_kind(ident.clone())
+                .variable_type(ident.clone())
                 .cloned()
-                .unwrap_or(ValueConstraint::Any),
+                // TODO: we can make it so this can never happen, by making it a
+                // compile-time error to reference a variable before it is assigned.
+                .unwrap_or_default(),
             Target::Path(segments) => {
                 let path = crate::expression::path::segments_to_path(segments);
-                state
-                    .variable_kind(&path)
-                    .cloned()
-                    .unwrap_or(ValueConstraint::Any)
+                state.variable_type(&path).cloned().unwrap_or_default()
             }
         }
     }

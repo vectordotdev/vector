@@ -1,4 +1,4 @@
-use crate::{CompilerState, Expression, Object, ValueConstraint, Result, State, Value};
+use crate::{CompilerState, Expression, Object, Result, State, TypeCheck, Value, ValueConstraint};
 
 #[derive(Debug, Clone)]
 pub struct Literal(Value);
@@ -14,7 +14,10 @@ impl Expression for Literal {
         Ok(Some(self.0.clone()))
     }
 
-    fn resolves_to(&self, _: &CompilerState) -> ValueConstraint {
-        ValueConstraint::Exact(self.0.kind())
+    fn type_check(&self, _: &CompilerState) -> TypeCheck {
+        TypeCheck {
+            constraint: ValueConstraint::Exact(self.0.kind()),
+            ..Default::default()
+        }
     }
 }

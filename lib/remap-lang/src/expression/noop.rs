@@ -1,4 +1,4 @@
-use crate::{CompilerState, Expression, Object, ValueConstraint, Result, State, Value};
+use crate::{CompilerState, Expression, Object, Result, State, TypeCheck, Value};
 
 #[derive(Debug, Clone)]
 pub struct Noop;
@@ -8,7 +8,10 @@ impl Expression for Noop {
         Ok(None)
     }
 
-    fn resolves_to(&self, _: &CompilerState) -> ValueConstraint {
-        ValueConstraint::Maybe(Box::new(ValueConstraint::Any))
+    fn type_check(&self, _: &CompilerState) -> TypeCheck {
+        TypeCheck {
+            optional: true,
+            ..Default::default()
+        }
     }
 }
