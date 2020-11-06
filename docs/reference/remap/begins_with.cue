@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: ends_with: {
+remap: functions: starts_with: {
 	arguments: [
 		{
 			name:        "value"
@@ -10,7 +10,7 @@ remap: functions: ends_with: {
 		},
 		{
 			name:        "substring"
-			description: "The substring `value` must end with."
+			description: "The substring `value` must start with."
 			required:    true
 			type: ["string"]
 		},
@@ -25,7 +25,7 @@ remap: functions: ends_with: {
 	return: ["boolean"]
 	category: "text"
 	description: #"""
-			Determines if a given string ends with a given `substring`.
+			Determines if a given string begins with a given `substring`.
 			The search can be optionally case insensitive.
 		"""#
 	examples: [
@@ -35,7 +35,7 @@ remap: functions: ends_with: {
 				message: #"The Needle In The Haystack"#
 			}
 			source: #"""
-				.contains = ends_with(.message, "the haystack", case_sensitive = false)
+				.contains = begins_with(.message, "the needle", case_sensitive = false)
 				"""#
 			output: {
 				message:  #"The Needle In The Haystack"#
@@ -43,11 +43,11 @@ remap: functions: ends_with: {
 			}
 		},
 		{
-			title: "Error"
+			title: "Invalid \"substring\" argument type"
 			input: {
 				message: "A string with 42"
 			}
-			source: ".contains = ends_with(.message, 42)"
+			source: ".contains = begins_with(.message, 42)"
 			output: {
 				error: remap.errors.ArgumentError
 			}
