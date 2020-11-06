@@ -29,7 +29,7 @@ remap: functions: replace: {
 			Regular expressions take the form `/<regex>/<flags> where flags are one of the following:
 
 			- *i* perform a case insensitive match.
-			- *g* global. If specified all occurrences of the pattern are replaced. 
+			- *g* global. If specified all occurrences of the pattern are replaced.
 			- *m* multiline. When enabled `^` and `$` match the beginning and end of multiline strings.
 		"""#
 	examples: [
