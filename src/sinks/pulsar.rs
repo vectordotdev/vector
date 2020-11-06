@@ -48,6 +48,15 @@ pub enum Encoding {
     Json,
 }
 
+type PulsarProducer = Producer<TokioExecutor>;
+type BoxedPulsarProducer = Box<PulsarProducer>;
+
+enum PulsarSinkState {
+    None,
+    Ready(BoxedPulsarProducer),
+    Sending(BoxFuture<'static, (BoxedPulsarProducer, Result<SendFuture, PulsarError>)>),
+}
+
 struct PulsarSink {
     encoding: EncodingConfig<Encoding>,
     state: PulsarSinkState,
@@ -58,20 +67,6 @@ struct PulsarSink {
     seq_head: usize,
     seq_tail: usize,
     pending_acks: HashSet<usize>,
-}
-
-enum PulsarSinkState {
-    None,
-    Ready(Box<Producer<TokioExecutor>>),
-    Sending(
-        BoxFuture<
-            'static,
-            (
-                Box<Producer<TokioExecutor>>,
-                Result<SendFuture, PulsarError>,
-            ),
-        >,
-    ),
 }
 
 inventory::submit! {
@@ -122,7 +117,7 @@ impl SinkConfig for PulsarSinkConfig {
 }
 
 impl PulsarSinkConfig {
-    async fn create_pulsar_producer(&self) -> Result<Producer<TokioExecutor>, PulsarError> {
+    async fn create_pulsar_producer(&self) -> Result<PulsarProducer, PulsarError> {
         let mut builder = Pulsar::builder(&self.endpoint, TokioExecutor);
         if let Some(auth) = &self.auth {
             builder = builder.with_auth(Authentication {
@@ -135,16 +130,12 @@ impl PulsarSinkConfig {
     }
 }
 
-async fn healthcheck(producer: Producer<TokioExecutor>) -> crate::Result<()> {
+async fn healthcheck(producer: PulsarProducer) -> crate::Result<()> {
     producer.check_connection().await.map_err(Into::into)
 }
 
 impl PulsarSink {
-    fn new(
-        producer: Producer<TokioExecutor>,
-        encoding: EncodingConfig<Encoding>,
-        acker: Acker,
-    ) -> Self {
+    fn new(producer: PulsarProducer, encoding: EncodingConfig<Encoding>, acker: Acker) -> Self {
         Self {
             encoding,
             state: PulsarSinkState::Ready(Box::new(producer)),
