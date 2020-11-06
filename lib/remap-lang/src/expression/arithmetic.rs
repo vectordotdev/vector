@@ -48,10 +48,13 @@ impl Expression for Arithmetic {
         result.map(Some).map_err(Into::into)
     }
 
-    fn resolves_to(&self, _: &CompilerState) -> ResolveKind {
+    fn resolves_to(&self, state: &CompilerState) -> ResolveKind {
+        let lhs_kind = self.lhs.resolves_to(state);
+        let rhs_kind = self.rhs.resolves_to(state);
+
         use Operator::*;
         match self.op {
-            Or => ResolveKind::Any,
+            Or => lhs_kind.merge(&rhs_kind),
             Multiply | Add => ResolveKind::OneOf(vec![
                 ValueKind::String,
                 ValueKind::Integer,

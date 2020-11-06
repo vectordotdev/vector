@@ -18,7 +18,7 @@ pub enum Value {
     Null,
 }
 
-#[derive(Eq, PartialEq, Debug, Clone, Copy)]
+#[derive(Eq, PartialEq, Hash, Debug, Clone, Copy, Ord, PartialOrd)]
 pub enum ValueKind {
     String,
     Integer,

@@ -157,6 +157,10 @@ mod tests {
         fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
             Ok(Some(format!("regex: {:?}", self.0).into()))
         }
+
+        fn resolves_to(&self, _: &CompilerState) -> ResolveKind {
+            ResolveKind::Any
+        }
     }
 
     #[test]
@@ -234,7 +238,8 @@ mod tests {
         ];
 
         for (script, expectation) in cases {
-            let program = Program::new(script, &[Box::new(RegexPrinter)]).unwrap();
+            let accept = ResolveKind::Maybe(Box::new(ResolveKind::Any));
+            let program = Program::new(script, &[Box::new(RegexPrinter)], accept).unwrap();
             let mut runtime = Runtime::new(State::default());
             let mut event = HashMap::default();
 
