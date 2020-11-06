@@ -20,7 +20,7 @@ fn benchmark_remap(c: &mut Criterion) {
     let mut rt = runtime();
     let add_fields_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
         let mut result = Vec::with_capacity(1);
-        tform.transform(&mut result, event.clone());
+        tform.transform(&mut result, event);
         let output_1 = result[0].as_log();
 
         debug_assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
@@ -78,7 +78,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let json_parser_runner = |tform: &mut Box<dyn FunctionTransform>, event: Event| {
         let mut result = Vec::with_capacity(1);
-        tform.transform(&mut result, event.clone());
+        tform.transform(&mut result, event);
         let output_1 = result[0].as_log();
 
         debug_assert_eq!(
@@ -144,7 +144,7 @@ fn benchmark_remap(c: &mut Criterion) {
     let coerce_runner =
         |tform: &mut Box<dyn FunctionTransform>, event: Event, timestamp: DateTime<Utc>| {
             let mut result = Vec::with_capacity(1);
-            tform.transform(&mut result, event.clone());
+            tform.transform(&mut result, event);
             let output_1 = result[0].as_log();
 
             debug_assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
