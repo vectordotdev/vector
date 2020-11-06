@@ -1,4 +1,5 @@
 [transforms.key_value_parser]
+  inputs = []
   drop_field = false
   field = "message"
   field_split = ":"
@@ -23,6 +24,7 @@
         "data.ifdir.equals" = "inbound"
 
 [transforms.key_value_parser_defaults]
+  inputs = []
   type = "key_value_parser"
 [[tests]]
   name = "test key value parser defaults"
