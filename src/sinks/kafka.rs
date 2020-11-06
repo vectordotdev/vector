@@ -189,19 +189,16 @@ impl Sink<Event> for KafkaSink {
     type Error = ();
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if matches!(self.poll_delivery_fut(cx), Poll::Pending)
-            && self.delivery_fut.len() >= SEND_RESULT_LIMIT
-        {
-            Poll::Pending
-        } else {
-            Poll::Ready(Ok(()))
+        match self.poll_delivery_fut(cx) {
+            Poll::Pending if self.delivery_fut.len() >= SEND_RESULT_LIMIT => Poll::Pending,
+            _ => Poll::Ready(Ok(())),
         }
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
         assert!(
             self.delivery_fut.len() < SEND_RESULT_LIMIT,
-            "Expected to `poll_ready` called first."
+            "Expected `poll_ready` to be called first."
         );
 
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {

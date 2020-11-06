@@ -188,7 +188,7 @@ impl Sink<Event> for PulsarSink {
     fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
         assert!(
             matches!(self.state, PulsarSinkState::Ready(_)),
-            "Expected to `poll_ready` called first."
+            "Expected `poll_ready` to be called first."
         );
 
         let message = encode_event(item, &self.encoding).map_err(|_| ())?;
