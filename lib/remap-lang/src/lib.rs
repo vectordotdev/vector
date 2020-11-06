@@ -12,13 +12,6 @@ mod value_constraint;
 use expression::Expr;
 use operator::Operator;
 
-// TODO: update fmt::Display, move to the error, and properly print details about optional and fallible...
-//
-// "expected to resolve to (infallible)? optional/concrete type(s) string(, integer, float)"
-//
-// Only show details of "fallible/infallible" and "optional/concrete" when they
-// differ between the two, otherwise just show the type differences.
-
 pub mod prelude;
 pub use error::{Error, RemapError};
 pub use expression::{Expression, Literal, Noop, Path, TypeCheck};
