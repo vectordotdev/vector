@@ -2,7 +2,6 @@
   drop_field = false
   field = "message"
   field_split = ":"
-  inputs = ["prod_logstash"]
   separator = ";"
   target_field = "data"
   trim_key = "\""
@@ -25,7 +24,6 @@
 
 [transforms.key_value_parser_defaults]
   type = "key_value_parser"
-  inputs = ["prod_logstash"]
 [[tests]]
   name = "test key value parser defaults"
   [[tests.inputs]]
