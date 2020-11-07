@@ -19,7 +19,7 @@ pub use expression::{Expression, Literal, Noop, Path, TypeDef};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
-pub use state::{CompilerState, State};
+pub use state::{CompilerState, ProgramState};
 pub use value::{Value, ValueKind};
 pub use value_constraint::ValueConstraint;
 
@@ -157,7 +157,7 @@ mod tests {
     #[derive(Debug, Clone)]
     struct RegexPrinterFn(regex::Regex);
     impl Expression for RegexPrinterFn {
-        fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
+        fn execute(&self, _: &mut ProgramState, _: &mut dyn Object) -> Result<Option<Value>> {
             Ok(Some(format!("regex: {:?}", self.0).into()))
         }
 
@@ -248,7 +248,7 @@ mod tests {
             };
 
             let program = Program::new(script, &[Box::new(RegexPrinter)], accept).unwrap();
-            let mut runtime = Runtime::new(State::default());
+            let mut runtime = Runtime::new(ProgramState::default());
             let mut event = HashMap::default();
 
             let result = runtime.execute(&mut event, &program).map_err(|e| e.0);

@@ -1,6 +1,6 @@
 use super::Error as E;
 use crate::{
-    value, CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value, ValueKind,
+    value, CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value, ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -31,7 +31,7 @@ impl IfStatement {
 }
 
 impl Expression for IfStatement {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         match self.conditional.execute(state, object)? {
             Some(Value::Boolean(true)) => self.true_expression.execute(state, object),
             Some(Value::Boolean(false)) | None => self.false_expression.execute(state, object),

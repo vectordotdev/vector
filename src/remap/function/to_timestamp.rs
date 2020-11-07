@@ -64,7 +64,7 @@ impl ToTimestampFn {
 }
 
 impl Expression for ToTimestampFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         use Value::*;
 
         let to_timestamp = |value| match value {
@@ -124,7 +124,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

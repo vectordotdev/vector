@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, Result, State, TypeDef, Value};
+use crate::{CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -31,7 +31,7 @@ impl Path {
 }
 
 impl Expression for Path {
-    fn execute(&self, _: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         object
             .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?

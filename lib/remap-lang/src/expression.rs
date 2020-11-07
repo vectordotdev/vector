@@ -1,4 +1,4 @@
-use crate::{CompilerState, Object, Result, State, Value, ValueConstraint, ValueKind};
+use crate::{CompilerState, Object, ProgramState, Result, Value, ValueConstraint, ValueKind};
 
 pub(super) mod arithmetic;
 pub(super) mod assignment;
@@ -118,7 +118,7 @@ impl TypeDef {
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>>;
     fn type_def(&self, state: &CompilerState) -> TypeDef;
 }
 
@@ -142,7 +142,7 @@ macro_rules! expression_dispatch {
         }
 
         impl Expression for Expr {
-            fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+            fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
                 match self {
                     $(Expr::$expr(expression) => expression.execute(state, object)),+
                 }

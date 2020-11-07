@@ -80,7 +80,7 @@ impl FormatNumberFn {
 }
 
 impl Expression for FormatNumberFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let value = required!(state, object, self.value,
             Value::Integer(v) => Decimal::from_i64(v),
             Value::Float(v) => Decimal::from_f64(v),
@@ -221,7 +221,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

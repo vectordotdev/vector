@@ -72,7 +72,7 @@ impl ReplaceFn {
 }
 
 impl Expression for ReplaceFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let with = required!(state, object, self.with, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let count = optional!(state, object, self.count, Value::Integer(v) => v).unwrap_or(-1);
@@ -164,7 +164,7 @@ mod test {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -230,7 +230,7 @@ mod test {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -276,7 +276,7 @@ mod test {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

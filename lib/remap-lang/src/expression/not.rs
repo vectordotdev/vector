@@ -1,7 +1,7 @@
 use super::Error as E;
 use crate::{
-    value, CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value, ValueConstraint,
-    ValueKind,
+    value, CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value,
+    ValueConstraint, ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -22,7 +22,7 @@ impl Not {
 }
 
 impl Expression for Not {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         self.expression.execute(state, object).and_then(|opt| {
             opt.map(|v| match v {
                 Value::Boolean(b) => Ok(Value::Boolean(!b)),
@@ -71,7 +71,7 @@ mod tests {
             ),
         ];
 
-        let mut state = crate::State::default();
+        let mut state = crate::ProgramState::default();
         let mut object = std::collections::HashMap::default();
 
         for (exp, func) in cases {

@@ -52,7 +52,7 @@ pub struct OnlyFieldsFn {
 }
 
 impl Expression for OnlyFieldsFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let paths = self
             .paths
             .iter()

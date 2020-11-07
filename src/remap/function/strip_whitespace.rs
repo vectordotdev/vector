@@ -36,7 +36,7 @@ impl StripWhitespaceFn {
 }
 
 impl Expression for StripWhitespaceFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
 
         Ok(Some(value.trim().into()))
@@ -83,7 +83,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

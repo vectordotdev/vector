@@ -46,7 +46,7 @@ impl RoundFn {
 }
 
 impl Expression for RoundFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let precision =
             optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(state, object, self.value,
@@ -118,7 +118,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

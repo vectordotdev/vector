@@ -40,7 +40,7 @@ impl ParseUrlFn {
 }
 
 impl Expression for ParseUrlFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let bytes = required!(state, object, self.value, Value::String(v) => v);
 
         Url::parse(&String::from_utf8_lossy(&bytes))
@@ -132,7 +132,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

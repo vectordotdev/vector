@@ -37,7 +37,7 @@ impl DowncaseFn {
 }
 
 impl Expression for DowncaseFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         self.value
             .execute(state, object)?
             .map(String::try_from)
@@ -69,7 +69,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

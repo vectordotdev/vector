@@ -1,4 +1,4 @@
-use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value};
+use crate::{CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Block {
@@ -12,7 +12,7 @@ impl Block {
 }
 
 impl Expression for Block {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let mut value = None;
 
         for expr in &self.expressions {

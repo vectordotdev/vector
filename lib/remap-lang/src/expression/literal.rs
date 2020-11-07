@@ -1,4 +1,6 @@
-use crate::{CompilerState, Expression, Object, Result, State, TypeDef, Value, ValueConstraint};
+use crate::{
+    CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value, ValueConstraint,
+};
 
 #[derive(Debug, Clone)]
 pub struct Literal(Value);
@@ -10,7 +12,7 @@ impl<T: Into<Value>> From<T> for Literal {
 }
 
 impl Expression for Literal {
-    fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut ProgramState, _: &mut dyn Object) -> Result<Option<Value>> {
         Ok(Some(self.0.clone()))
     }
 

@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value};
+use crate::{CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -36,7 +36,7 @@ impl Assignment {
 }
 
 impl Expression for Assignment {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let value = self.value.execute(state, object)?;
 
         match value {

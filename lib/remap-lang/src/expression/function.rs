@@ -1,7 +1,7 @@
 use super::Error as E;
 use crate::{
-    Argument, ArgumentList, CompilerState, Expression, Function as Fn, Object, Result, State,
-    TypeDef, Value, ValueKind,
+    Argument, ArgumentList, CompilerState, Expression, Function as Fn, Object, ProgramState,
+    Result, TypeDef, Value, ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -123,7 +123,7 @@ impl Function {
 }
 
 impl Expression for Function {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         self.function.execute(state, object)
     }
 
@@ -168,7 +168,7 @@ impl ArgumentValidator {
 }
 
 impl Expression for ArgumentValidator {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let value = self
             .expression
             .execute(state, object)?

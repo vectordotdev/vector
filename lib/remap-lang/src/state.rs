@@ -2,11 +2,11 @@ use crate::{TypeDef, Value};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
-pub struct State {
+pub struct ProgramState {
     variables: HashMap<String, Value>,
 }
 
-impl State {
+impl ProgramState {
     pub fn variable(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.variables.get(key.as_ref())
     }

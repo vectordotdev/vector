@@ -36,7 +36,7 @@ impl Md5Fn {
 }
 
 impl Expression for Md5Fn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         use md5::{Digest, Md5};
 
         self.value.execute(state, object).map(|r| {
@@ -68,7 +68,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = remap::ProgramState::default();
 
         for (mut object, exp, func) in cases {
             let got = func

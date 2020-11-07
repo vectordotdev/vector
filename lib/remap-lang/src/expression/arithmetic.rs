@@ -1,5 +1,5 @@
 use super::{
-    CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value, ValueConstraint,
+    CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value, ValueConstraint,
     ValueKind,
 };
 use crate::Operator;
@@ -18,7 +18,7 @@ impl Arithmetic {
 }
 
 impl Expression for Arithmetic {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
         let lhs = self
             .lhs
             .execute(state, object)?

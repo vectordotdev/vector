@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, Result, State, TypeDef, Value};
+use crate::{CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -19,7 +19,7 @@ impl Variable {
 }
 
 impl Expression for Variable {
-    fn execute(&self, state: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut ProgramState, _: &mut dyn Object) -> Result<Option<Value>> {
         state
             .variable(&self.ident)
             .cloned()
