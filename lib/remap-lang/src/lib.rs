@@ -6,6 +6,7 @@ mod parser;
 mod program;
 mod runtime;
 mod state;
+mod test_util;
 mod value;
 mod value_constraint;
 

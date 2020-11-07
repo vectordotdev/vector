@@ -35,6 +35,9 @@ impl Expression for Arithmetic {
             Divide => lhs.try_div(rhs),
             Add => lhs.try_add(rhs),
             Subtract => lhs.try_sub(rhs),
+
+            // TODO: make `Or` infallible, `Null`, `false` and `None` resolve to
+            // rhs, everything else resolves to lhs
             Or => lhs.try_or(rhs),
             And => lhs.try_and(rhs),
             Remainder => lhs.try_rem(rhs),
@@ -76,4 +79,194 @@ impl Expression for Arithmetic {
             constraint,
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_type_check, Literal, Noop, ValueConstraint::*, ValueKind::*};
+
+    test_type_check![
+        or_exact {
+            expr: |_| Arithmetic::new(
+                Box::new(Literal::from("foo").into()),
+                Box::new(Literal::from(true).into()),
+                Operator::Or,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![String, Boolean])
+            },
+        }
+
+        or_any {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Literal::from(true).into()),
+                Operator::Or,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Any,
+            },
+        }
+
+        multiply {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Multiply,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![String, Integer, Float]),
+            },
+        }
+
+        add {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Add,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![String, Integer, Float]),
+            },
+        }
+
+        remainder {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Remainder,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![Integer, Float]),
+            },
+        }
+
+        subtract {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Subtract,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![Integer, Float]),
+            },
+        }
+
+        divide {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Divide,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![Integer, Float]),
+            },
+        }
+
+        and {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::And,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Equal,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        not_equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::NotEqual,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        greater {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Greater,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        greater_or_equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::GreaterOrEqual,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        less {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Less,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        less_or_equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::LessOrEqual,
+            ),
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+    ];
 }

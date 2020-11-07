@@ -61,13 +61,48 @@ impl Expression for Assignment {
             Target::Variable(ident) => state
                 .variable_type(ident.clone())
                 .cloned()
-                // TODO: we can make it so this can never happen, by making it a
-                // compile-time error to reference a variable before it is assigned.
-                .unwrap_or_default(),
+                .expect("variable must be assigned via Assignment::new"),
             Target::Path(segments) => {
                 let path = crate::expression::path::segments_to_path(segments);
-                state.path_query_type(&path).cloned().unwrap_or_default()
+                state
+                    .path_query_type(&path)
+                    .cloned()
+                    .expect("variable must be assigned via Assignment::new")
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_type_check, Literal, ValueConstraint::*, ValueKind::*};
+
+    test_type_check![
+        variable {
+            expr: |state: &mut CompilerState| {
+                let target = Target::Variable("foo".to_owned());
+                let value = Box::new(Literal::from(true).into());
+
+                Assignment::new(target, value, state)
+            },
+            def: TypeCheck {
+                constraint: Exact(Boolean),
+                ..Default::default()
+            },
+        }
+
+        path {
+            expr: |state: &mut CompilerState| {
+                let target = Target::Path(vec![vec!["foo".to_owned()]]);
+                let value = Box::new(Literal::from("foo").into());
+
+                Assignment::new(target, value, state)
+            },
+            def: TypeCheck {
+                constraint: Exact(String),
+                ..Default::default()
+            },
+        }
+    ];
 }

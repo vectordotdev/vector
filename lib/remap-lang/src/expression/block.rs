@@ -43,3 +43,66 @@ impl Expression for Block {
         type_check
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        expression::Arithmetic, test_type_check, Literal, Operator, ValueConstraint::*,
+        ValueKind::*,
+    };
+
+    test_type_check![
+        no_expression {
+            expr: |_| Block::new(vec![]),
+            def: TypeCheck { optional: true, ..Default::default() },
+        }
+
+        one_expression {
+            expr: |_| Block::new(vec![Literal::from(true).into()]),
+            def: TypeCheck { constraint: Exact(Boolean), ..Default::default() },
+        }
+
+        multiple_expressions {
+            expr: |_| Block::new(vec![
+                        Literal::from("foo").into(),
+                        Literal::from(true).into(),
+                        Literal::from(1234).into(),
+            ]),
+            def: TypeCheck { constraint: Exact(Integer), ..Default::default() },
+        }
+
+        last_one_fallible {
+            expr: |_| Block::new(vec![
+                        Literal::from(true).into(),
+                        Arithmetic::new(
+                          Box::new(Literal::from(12).into()),
+                          Box::new(Literal::from(true).into()),
+                          Operator::Multiply,
+                        ).into(),
+            ]),
+            def: TypeCheck {
+                fallible: true,
+                constraint: OneOf(vec![String, Integer, Float]),
+                ..Default::default()
+            },
+        }
+
+        any_fallible {
+            expr: |_| Block::new(vec![
+                        Literal::from(true).into(),
+                        Arithmetic::new(
+                          Box::new(Literal::from(12).into()),
+                          Box::new(Literal::from(true).into()),
+                          Operator::Multiply,
+                        ).into(),
+                        Literal::from(vec![1]).into(),
+            ]),
+            def: TypeCheck {
+                fallible: true,
+                constraint: Exact(Array),
+                ..Default::default()
+            },
+        }
+    ];
+}

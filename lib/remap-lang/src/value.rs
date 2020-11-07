@@ -186,6 +186,12 @@ impl From<&str> for Value {
     }
 }
 
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Value::Null
+    }
+}
+
 impl From<BTreeMap<String, Value>> for Value {
     fn from(value: BTreeMap<String, Value>) -> Self {
         Value::Map(value)

@@ -48,6 +48,7 @@ impl Expression for Not {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{test_type_check, Noop, ValueConstraint::*, ValueKind::*};
 
     #[test]
     fn not() {
@@ -81,4 +82,13 @@ mod tests {
             assert_eq!(got, exp);
         }
     }
+
+    test_type_check![boolean {
+        expr: |_| Not::new(Box::new(Noop.into())),
+        def: TypeCheck {
+            fallible: true,
+            optional: true,
+            constraint: Exact(Boolean),
+        },
+    }];
 }

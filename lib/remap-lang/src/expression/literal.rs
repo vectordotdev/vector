@@ -21,3 +21,52 @@ impl Expression for Literal {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_type_check, Literal, ValueConstraint::*, ValueKind::*};
+    use std::collections::BTreeMap;
+
+    test_type_check![
+        boolean {
+            expr: |_| Literal::from(true),
+            def: TypeCheck { constraint: Exact(Boolean), ..Default::default() },
+        }
+
+        string {
+            expr: |_| Literal::from("foo"),
+            def: TypeCheck { constraint: Exact(String), ..Default::default() },
+        }
+
+        integer {
+            expr: |_| Literal::from(123),
+            def: TypeCheck { constraint: Exact(Integer), ..Default::default() },
+        }
+
+        float {
+            expr: |_| Literal::from(123.456),
+            def: TypeCheck { constraint: Exact(Float), ..Default::default() },
+        }
+
+        array {
+            expr: |_| Literal::from(vec!["foo"]),
+            def: TypeCheck { constraint: Exact(Array), ..Default::default() },
+        }
+
+        map {
+            expr: |_| Literal::from(BTreeMap::default()),
+            def: TypeCheck { constraint: Exact(Map), ..Default::default() },
+        }
+
+        timestamp {
+            expr: |_| Literal::from(chrono::Utc::now()),
+            def: TypeCheck { constraint: Exact(Timestamp), ..Default::default() },
+        }
+
+        null {
+            expr: |_| Literal::from(()),
+            def: TypeCheck { constraint: Exact(Null), ..Default::default() },
+        }
+    ];
+}

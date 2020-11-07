@@ -189,3 +189,21 @@ impl Expression for ArgumentValidator {
         self.expression.type_check(state)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_type_check, Noop, ValueConstraint::*};
+
+    test_type_check![pass_through {
+        expr: |_| {
+            let function = Box::new(Noop);
+            Function { function }
+        },
+        def: TypeCheck {
+            fallible: false,
+            optional: true,
+            constraint: Any
+        },
+    }];
+}

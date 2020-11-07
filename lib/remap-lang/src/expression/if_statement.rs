@@ -50,3 +50,41 @@ impl Expression for IfStatement {
         true_type_check.merge(&false_type_check)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_type_check, Literal, Noop, ValueConstraint::*, ValueKind::*};
+
+    test_type_check![
+        concrete_type_def {
+            expr: |_| {
+                let conditional = Box::new(Literal::from(true).into());
+                let true_expression = Box::new(Literal::from(true).into());
+                let false_expression = Box::new(Literal::from(true).into());
+
+                IfStatement::new(conditional, true_expression, false_expression)
+            },
+            def: TypeCheck {
+                fallible: false,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        optional_any {
+            expr: |_| {
+                let conditional = Box::new(Literal::from(true).into());
+                let true_expression = Box::new(Literal::from(true).into());
+                let false_expression = Box::new(Noop.into());
+
+                IfStatement::new(conditional, true_expression, false_expression)
+            },
+            def: TypeCheck {
+                fallible: false,
+                optional: true,
+                constraint: Any,
+            },
+        }
+    ];
+}

@@ -65,3 +65,59 @@ pub(crate) fn segments_to_path(segments: &[Vec<String>]) -> String {
         .collect::<Vec<_>>()
         .join(".")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_type_check, ValueConstraint::*, ValueKind::*};
+
+    test_type_check![
+        ident_match {
+            expr: |state: &mut CompilerState| {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeCheck::default());
+                Path::from("foo")
+            },
+            def: TypeCheck::default(),
+        }
+
+        exact_match {
+            expr: |state: &mut CompilerState| {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeCheck {
+                    fallible: true,
+                    optional: false,
+                    constraint: Exact(String)
+                });
+
+                Path::from("foo")
+            },
+            def: TypeCheck {
+                fallible: true,
+                optional: false,
+                constraint: Exact(String),
+            },
+        }
+
+        ident_mismatch {
+            expr: |state: &mut CompilerState| {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeCheck {
+                    fallible: true,
+                    ..Default::default()
+                });
+
+                Path::from("bar")
+            },
+            def: TypeCheck {
+                fallible: true,
+                ..Default::default()
+            },
+        }
+
+        empty_state {
+            expr: |_| Path::from("foo"),
+            def: TypeCheck {
+                fallible: true,
+                ..Default::default()
+            },
+        }
+    ];
+}

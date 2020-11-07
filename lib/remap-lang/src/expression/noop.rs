@@ -15,3 +15,17 @@ impl Expression for Noop {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_type_check;
+
+    test_type_check![noop {
+        expr: |_| Noop,
+        def: TypeCheck {
+            optional: true,
+            ..Default::default()
+        },
+    }];
+}
