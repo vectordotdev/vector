@@ -6559,9 +6559,9 @@ dependencies = [
 
 [[package]]
 name = "uom"
-version = "0.29.0"
+version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bb593f5252356bfb829112f8fca2d0982d48588d2d6bb5a92553b0dfc4c9aba"
+checksum = "e76503e636584f1e10b9b3b9498538279561adcef5412927ba00c2b32c4ce5ed"
 dependencies = [
  "num-traits",
  "typenum",
@@ -6794,7 +6794,7 @@ dependencies = [
  "tracing-tower",
  "tui",
  "typetag",
- "uom 0.29.0",
+ "uom 0.30.0",
  "url",
  "uuid 0.8.1",
  "vector-api-client",
