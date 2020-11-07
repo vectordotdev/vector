@@ -147,6 +147,7 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
             }
         })
         .collect();
+    // `parts` is already sorted by key because of BTreeMap
     parts.join(",")
 }
 
