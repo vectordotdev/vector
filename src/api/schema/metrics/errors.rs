@@ -52,8 +52,8 @@ impl ComponentErrorsTotal {
 #[Object]
 impl ComponentErrorsTotal {
     /// Component name
-    async fn name(&self) -> String {
-        self.name.clone()
+    async fn name(&self) -> &str {
+        &self.name
     }
 
     /// Errors processed metric

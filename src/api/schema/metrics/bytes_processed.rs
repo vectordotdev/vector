@@ -52,8 +52,8 @@ impl ComponentBytesProcessedTotal {
 #[Object]
 impl ComponentBytesProcessedTotal {
     /// Component name
-    async fn name(&self) -> String {
-        self.name.clone()
+    async fn name(&self) -> &str {
+        &self.name
     }
 
     /// Bytes processed total metric

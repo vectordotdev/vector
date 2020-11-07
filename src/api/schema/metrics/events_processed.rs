@@ -52,8 +52,8 @@ impl ComponentEventsProcessedTotal {
 #[Object]
 impl ComponentEventsProcessedTotal {
     /// Component name
-    async fn name(&self) -> String {
-        self.name.clone()
+    async fn name(&self) -> &str {
+        &self.name
     }
 
     /// Events processed total metric

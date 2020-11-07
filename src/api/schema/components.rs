@@ -8,8 +8,7 @@ use std::{
 };
 use tokio::stream::{Stream, StreamExt};
 
-pub const INVARIANT: &str =
-    "It is an invariant for the API to be active but not have COMPONENTS. Please report this.";
+pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 
 #[derive(Enum, Eq, PartialEq, Copy, Clone)]
 pub enum SourceOutputType {
@@ -40,8 +39,8 @@ pub struct Source(SourceData);
 #[Object]
 impl Source {
     /// Source name
-    async fn name(&self) -> String {
-        self.0.name.clone()
+    async fn name(&self) -> &str {
+        &*self.0.name
     }
 
     /// Source output type
@@ -67,12 +66,12 @@ impl Source {
 
     /// Metric indicating events processed for the current source
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(&self.0.name)
     }
 
     /// Metric indicating bytes processed for the current source
     async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
-        metrics::component_bytes_processed_total(self.0.name.clone())
+        metrics::component_bytes_processed_total(&self.0.name)
     }
 }
 
@@ -88,8 +87,8 @@ pub struct Transform(InputsData);
 #[Object]
 impl Transform {
     /// Transform name
-    async fn name(&self) -> String {
-        self.0.name.clone()
+    async fn name(&self) -> &str {
+        &self.0.name
     }
 
     /// Source inputs
@@ -117,12 +116,12 @@ impl Transform {
 
     /// Metric indicating events processed for the current transform
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(&self.0.name)
     }
 
     /// Metric indicating bytes processed for the current transform
     async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
-        metrics::component_bytes_processed_total(self.0.name.clone())
+        metrics::component_bytes_processed_total(&self.0.name)
     }
 }
 
@@ -132,8 +131,8 @@ pub struct Sink(InputsData);
 #[Object]
 impl Sink {
     /// Sink name
-    async fn name(&self) -> String {
-        self.0.name.clone()
+    async fn name(&self) -> &str {
+        &self.0.name
     }
 
     /// Source inputs
@@ -168,12 +167,12 @@ impl Sink {
 
     /// Metric indicating events processed for the current sink
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(&self.0.name)
     }
 
     /// Metric indicating bytes processed for the current sink
     async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
-        metrics::component_bytes_processed_total(self.0.name.clone())
+        metrics::component_bytes_processed_total(&self.0.name)
     }
 }
 
