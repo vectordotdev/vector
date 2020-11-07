@@ -1,16 +1,5 @@
 package metadata
 
-// Helpful metrics groupings
-_prometheus_metrics: {
-	vector_events_processed_total:       _vector_events_processed_total
-	vector_http_error_response_total:    _vector_http_error_response_total
-	vector_http_request_errors_total:    _vector_http_request_errors_total
-	vector_parse_errors_total:           _vector_parse_errors_total
-	vector_processed_bytes_total:        _vector_processed_bytes_total
-	vector_request_duration_nanoseconds: _vector_request_duration_nanoseconds
-	vector_requests_completed_total:     _vector_requests_completed_total
-}
-
 // Apache metrics
 _apache_access_total: {
 	description:   "The total number of time the Apache server has been accessed."
@@ -93,37 +82,37 @@ _apache_workers: {
 }
 
 // Container metrics
-_communication_errors_total: {
+_vector_communication_errors_total: {
 	description: "The total number of errors stemming from communication with the Docker daemon."
 	type:        "counter"
 	tags:        _component_tags
 }
 
-_container_events_processed_total: {
+_vector_container_events_processed_total: {
 	description: "The total number of container events processed."
 	type:        "counter"
 	tags:        _component_tags
 }
 
-_container_metadata_fetch_errors_total: {
+_vector_container_metadata_fetch_errors_total: {
 	description: "The total number of errors caused by failure to fetch container metadata."
 	type:        "counter"
 	tags:        _component_tags
 }
 
-_containers_unwatched_total: {
+_vector_containers_unwatched_total: {
 	description: "The total number of times Vector stopped watching for container logs."
-	counter:     "counter"
+	type:        "counter"
 	tags:        _component_tags
 }
 
-_containers_watched_total: {
+_vector_containers_watched_total: {
 	description: "The total number of times Vector started watching for container logs."
-	counter:     "counter"
+	type:        "counter"
 	tags:        _component_tags
 }
 
-_logging_driver_errors_total: {
+_vector_logging_driver_errors_total: {
 	description: "The total number of logging driver errors encountered caused by not using either the `jsonfile` or `journald` driver."
 	type:        "counter"
 	tags:        _component_tags
@@ -196,25 +185,19 @@ _host_network_transmit_packets_drop_total: _network_nomac & {description: "The n
 _host_network_transmit_packets_total:      _network_nomac & {description: "The number of packets transmitted on this interface."}
 
 // Kubernetes metrics
-_k8s_docker_format_parse_failures_total: {
+_vector_k8s_docker_format_parse_failures_total: {
 	description: "The total number of failures to parse a message as a JSON object."
 	type:        "counter"
 	tags:        _component_tags
 }
 
-_k8s_event_annotation_failures_total: {
+_vector_k8s_event_annotation_failures_total: {
 	description: "The total number of failures to annotate Vector events with Kubernetes Pod metadata."
 	type:        "counter"
 	tags:        _component_tags
 }
 
 // MongoDB metrics
-_mongodb_bson_parse_error_total: {
-	description: "The total number of BSON parsing errors."
-	type:        "counter"
-	tags:        _mongodb_metrics_tags
-}
-
 _mongodb_assets_total: {
 	description: "Number of assertions raised since the MongoDB process started."
 	type:        "counter"
@@ -225,6 +208,11 @@ _mongodb_assets_total: {
 			examples: ["regular", "warning", "msg", "user", "rollovers"]
 		}
 	}
+}
+_mongodb_bson_parse_error_total: {
+	description: "The total number of BSON parsing errors."
+	type:        "counter"
+	tags:        _mongodb_metrics_tags
 }
 _mongodb_connections: {
 	description: "Number of connections in some state."
@@ -829,8 +817,8 @@ _vector_collect_completed_total: {
 }
 _vector_encode_errors_total: {
 	description: "TODO"
-	type: "counter"
-	tags: _internal_metrics_tags
+	type:        "counter"
+	tags:        _internal_metrics_tags
 }
 _vector_events_discarded_total: {
 	description: "The total number of events discarded by this component."
@@ -947,8 +935,8 @@ _vector_processing_errors_total: {
 }
 _vector_protobuf_decode_errors_total: {
 	description: "TODO"
-	type: "counter"
-	tags: _component_tags
+	type:        "counter"
+	tags:        _component_tags
 }
 _vector_request_duration_nanoseconds: {
 	description: "TODO"
@@ -965,6 +953,11 @@ _vector_requests_completed_total: {
 	type:        "counter"
 	tags:        _component_tags
 }
+_vector_requests_received_total: {
+	description: "TODO"
+	type:        "counter"
+	tags:        _component_tags
+}
 _vector_timestamp_parse_errors_total: {
 	description: "The total number of errors encountered RFC3339 parsing timestamps."
 	type:        "counter"
@@ -976,47 +969,14 @@ _vector_uptime_seconds: {
 	tags:        _component_tags
 }
 
-// Convenient groupings of tags
-_component_tags: _internal_metrics_tags & {
-	component_kind: _component_kind
-	component_name: _component_name
-	component_type: _component_type
-	instance:       _instance
-	job:            _job
-}
-
-_apache_metrics_tags: {
-	endpoint: _endpoint
-	host: {
-		description: "The hostname of the Apache HTTP server."
-		required:    true
-		examples: [_values.local_host]
-	}
-}
-_host_metrics_tags: {
-	collector: _collector
-	host:      _host
-}
-_internal_metrics_tags: {
-	instance: _instance
-	job:      _job
-}
-_mongodb_metrics_tags: {
-	endpoint: {
-		description: "The absolute path of the originating file."
-		required:    true
-		examples: ["mongodb://localhost:27017"]
-	}
-	host: {
-		description: "The hostname of the MongoDB server."
-		required:    true
-		examples: [_values.local_host]
-	}
-}
-
 // Vector instance metrics
 _vector_config_load_errors_total: {
 	description: "The total number of errors loading the Vector configuration."
+	type:        "counter"
+	tags:        _internal_metrics_tags
+}
+_vector_connection_errors_total: {
+	description: "TODO"
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
@@ -1040,15 +1000,20 @@ _vector_reloaded_total: {
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
+_vector_request_error_total: {
+	description: "TODO"
+	type:        "counter"
+	tags:        _internal_metrics_tags
+}
 _vector_source_missing_keys_total: {
 	description: "TODO"
-	type: "counter"
-	tags: _internal_metrics_tags
+	type:        "counter"
+	tags:        _internal_metrics_tags
 }
 _vector_sourcetype_missing_keys_total: {
 	description: "TODO"
-	type: "counter"
-	tags: _internal_metrics_tags
+	type:        "counter"
+	tags:        _internal_metrics_tags
 }
 _vector_started_total: {
 	description: "The total number of times the Vector instance has been started."
@@ -1165,6 +1130,44 @@ _job: {
 	default:     "vector"
 }
 
+// Convenient groupings of tags
+_component_tags: _internal_metrics_tags & {
+	component_kind: _component_kind
+	component_name: _component_name
+	component_type: _component_type
+	instance:       _instance
+	job:            _job
+}
+
+_apache_metrics_tags: {
+	endpoint: _endpoint
+	host: {
+		description: "The hostname of the Apache HTTP server."
+		required:    true
+		examples: [_values.local_host]
+	}
+}
+_host_metrics_tags: {
+	collector: _collector
+	host:      _host
+}
+_internal_metrics_tags: {
+	instance: _instance
+	job:      _job
+}
+_mongodb_metrics_tags: {
+	endpoint: {
+		description: "The absolute path of the originating file."
+		required:    true
+		examples: ["mongodb://localhost:27017"]
+	}
+	host: {
+		description: "The hostname of the MongoDB server."
+		required:    true
+		examples: [_values.local_host]
+	}
+}
+
 // Other helpers
 _disk_device: {
 	description: "The disk device name."
@@ -1224,3 +1227,133 @@ _network_gauge: {
 	}
 }
 _network_nomac: _network_gauge & {relevant_when: "OS is not MacOS"}
+
+// Helpful metrics groupings
+_apache_metrics: {
+	apache_access_total:           _apache_access_total
+	apache_connections:            _apache_connections
+	apache_cpu_load:               _apache_cpu_load
+	apache_cpu_seconds_total:      _apache_cpu_seconds_total
+	apache_duration_seconds_total: _apache_duration_seconds_total
+	apache_scoreboard:             _apache_scoreboard
+	apache_sent_bytes_total:       _apache_sent_bytes_total
+	apache_sent_bytes_total:       _apache_sent_bytes_total
+	apache_up:                     _apache_up
+	apache_uptime_seconds_total:   _apache_uptime_seconds_total
+	apache_workers:                _apache_workers
+}
+
+_host_metrics: {
+	host_cpu_seconds_total:                   _host_cpu_seconds_total
+	host_disk_read_bytes_total:               _host_disk_read_bytes_total
+	host_disk_reads_completed_total:          _host_disk_reads_completed_total
+	host_disk_written_bytes_total:            _host_disk_written_bytes_total
+	host_disk_writes_completed_total:         _host_disk_writes_completed_total
+	host_filesystem_free_bytes:               _host_filesystem_free_bytes
+	host_filesystem_total_bytes:              _host_filesystem_total_bytes
+	host_filesystem_used_bytes:               _host_filesystem_used_bytes
+	host_load1:                               _host_load1
+	host_load5:                               _host_load5
+	host_load15:                              _host_load15
+	host_memory_active_bytes:                 _host_memory_active_bytes
+	host_memory_available_bytes:              _host_memory_available_bytes
+	host_memory_buffers_bytes:                _host_memory_buffers_bytes
+	host_memory_cached_bytes:                 _host_memory_cached_bytes
+	host_memory_free_bytes:                   _host_memory_free_bytes
+	host_memory_inactive_bytes:               _host_memory_inactive_bytes
+	host_memory_shared_bytes:                 _host_memory_shared_bytes
+	host_memory_swap_free_bytes:              _host_memory_swap_free_bytes
+	host_memory_swapped_in_bytes_total:       _host_memory_swapped_in_bytes_total
+	host_memory_swapped_out_bytes_total:      _host_memory_swapped_out_bytes_total
+	host_memory_swap_total_bytes:             _host_memory_swap_total_bytes
+	host_memory_swap_used_bytes:              _host_memory_swap_used_bytes
+	host_memory_total_bytes:                  _host_memory_total_bytes
+	host_memory_used_bytes:                   _host_memory_used_bytes
+	host_memory_wired_bytes:                  _host_memory_wired_bytes
+	host_network_receive_bytes_total:         _host_network_receive_bytes_total
+	host_network_receive_errs_total:          _host_network_receive_errs_total
+	host_network_receive_packets_total:       _host_network_receive_packets_total
+	host_network_transmit_bytes_total:        _host_network_transmit_bytes_total
+	host_network_transmit_errs_total:         _host_network_transmit_errs_total
+	host_network_transmit_packets_drop_total: _host_network_transmit_packets_drop_total
+	host_network_transmit_packets_total:      _host_network_transmit_packets_total
+}
+
+_mongodb_metrics: {
+	mongodb_assets_total:                                                _mongodb_assets_total
+	mongodb_bson_parse_error_total:                                      _mongodb_bson_parse_error_total
+	mongodb_connections:                                                 _mongodb_connections
+	mongodb_extra_info_heap_usage_bytes:                                 _mongodb_extra_info_heap_usage_bytes
+	mongodb_extra_info_page_faults:                                      _mongodb_extra_info_page_faults
+	mongodb_instance_local_time:                                         _mongodb_instance_local_time
+	mongodb_instance_uptime_estimate_seconds_total:                      _mongodb_instance_uptime_estimate_seconds_total
+	mongodb_instance_uptime_seconds_total:                               _mongodb_instance_uptime_seconds_total
+	mongodb_memory:                                                      _mongodb_memory
+	mongodb_mongod_global_lock_active_clients:                           _mongodb_mongod_global_lock_active_clients
+	mongodb_mongod_global_lock_current_queue:                            _mongodb_mongod_global_lock_current_queue
+	mongodb_mongod_locks_time_acquiring_global_seconds_total:            _mongodb_mongod_locks_time_acquiring_global_seconds_total
+	mongodb_mongod_metrics_cursor_open:                                  _mongodb_mongod_metrics_cursor_open
+	mongodb_mongod_metrics_cursor_timed_out_total:                       _mongodb_mongod_metrics_cursor_timed_out_total
+	mongodb_mongod_metrics_document_total:                               _mongodb_mongod_metrics_document_total
+	mongodb_mongod_metrics_get_last_error_wtime_num:                     _mongodb_mongod_metrics_get_last_error_wtime_num
+	mongodb_mongod_metrics_get_last_error_wtime_seconds_total:           _mongodb_mongod_metrics_get_last_error_wtime_seconds_total
+	mongodb_mongod_metrics_get_last_error_wtimeouts_total:               _mongodb_mongod_metrics_get_last_error_wtimeouts_total
+	mongodb_mongod_metrics_operation_total:                              _mongodb_mongod_metrics_operation_total
+	mongodb_mongod_metrics_query_executor_total:                         _mongodb_mongod_metrics_query_executor_total
+	mongodb_mongod_metrics_record_moves_total:                           _mongodb_mongod_metrics_record_moves_total
+	mongodb_mongod_metrics_repl_apply_batches_num_total:                 _mongodb_mongod_metrics_repl_apply_batches_num_total
+	mongodb_mongod_metrics_repl_apply_batches_seconds_total:             _mongodb_mongod_metrics_repl_apply_batches_seconds_total
+	mongodb_mongod_metrics_repl_apply_ops_total:                         _mongodb_mongod_metrics_repl_apply_ops_total
+	mongodb_mongod_metrics_repl_buffer_count:                            _mongodb_mongod_metrics_repl_buffer_count
+	mongodb_mongod_metrics_repl_buffer_max_size_bytes_total:             _mongodb_mongod_metrics_repl_buffer_max_size_bytes_total
+	mongodb_mongod_metrics_repl_buffer_size_bytes:                       _mongodb_mongod_metrics_repl_buffer_size_bytes
+	mongodb_mongod_metrics_repl_executor_queue:                          _mongodb_mongod_metrics_repl_executor_queue
+	mongodb_mongod_metrics_repl_executor_unsignaled_events:              _mongodb_mongod_metrics_repl_executor_unsignaled_events
+	mongodb_mongod_metrics_repl_network_bytes_total:                     _mongodb_mongod_metrics_repl_network_bytes_total
+	mongodb_mongod_metrics_repl_network_getmores_num_total:              _mongodb_mongod_metrics_repl_network_getmores_num_total
+	mongodb_mongod_metrics_repl_network_getmores_seconds_total:          _mongodb_mongod_metrics_repl_network_getmores_seconds_total
+	mongodb_mongod_metrics_repl_network_ops_total:                       _mongodb_mongod_metrics_repl_network_ops_total
+	mongodb_mongod_metrics_repl_network_readers_created_total:           _mongodb_mongod_metrics_repl_network_readers_created_total
+	mongodb_mongod_metrics_ttl_deleted_documents_total:                  _mongodb_mongod_metrics_ttl_deleted_documents_total
+	mongodb_mongod_metrics_ttl_passes_total:                             _mongodb_mongod_metrics_ttl_passes_total
+	mongodb_mongod_op_latencies_histogram:                               _mongodb_mongod_op_latencies_histogram
+	mongodb_mongod_op_latencies_latency:                                 _mongodb_mongod_op_latencies_latency
+	mongodb_mongod_op_latencies_ops_total:                               _mongodb_mongod_op_latencies_ops_total
+	mongodb_mongod_storage_engine:                                       _mongodb_mongod_storage_engine
+	mongodb_mongod_wiredtiger_blockmanager_blocks_total:                 _mongodb_mongod_wiredtiger_blockmanager_blocks_total
+	mongodb_mongod_wiredtiger_blockmanager_bytes_total:                  _mongodb_mongod_wiredtiger_blockmanager_bytes_total
+	mongodb_mongod_wiredtiger_cache_bytes:                               _mongodb_mongod_wiredtiger_cache_bytes
+	mongodb_mongod_wiredtiger_cache_bytes_total:                         _mongodb_mongod_wiredtiger_cache_bytes_total
+	mongodb_mongod_wiredtiger_cache_evicted_total:                       _mongodb_mongod_wiredtiger_cache_evicted_total
+	mongodb_mongod_wiredtiger_cache_max_bytes:                           _mongodb_mongod_wiredtiger_cache_max_bytes
+	mongodb_mongod_wiredtiger_cache_overhead_percent:                    _mongodb_mongod_wiredtiger_cache_overhead_percent
+	mongodb_mongod_wiredtiger_cache_pages:                               _mongodb_mongod_wiredtiger_cache_pages
+	mongodb_mongod_wiredtiger_cache_pages_total:                         _mongodb_mongod_wiredtiger_cache_pages_total
+	mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets: _mongodb_mongod_wiredtiger_concurrent_transactions_available_tickets
+	mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets:       _mongodb_mongod_wiredtiger_concurrent_transactions_out_tickets
+	mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets:     _mongodb_mongod_wiredtiger_concurrent_transactions_total_tickets
+	mongodb_mongod_wiredtiger_log_bytes_total:                           _mongodb_mongod_wiredtiger_log_bytes_total
+	mongodb_mongod_wiredtiger_log_operations_total:                      _mongodb_mongod_wiredtiger_log_operations_total
+	mongodb_mongod_wiredtiger_log_records_scanned_total:                 _mongodb_mongod_wiredtiger_log_records_scanned_total
+	mongodb_mongod_wiredtiger_log_records_total:                         _mongodb_mongod_wiredtiger_log_records_total
+	mongodb_mongod_wiredtiger_session_open_sessions:                     _mongodb_mongod_wiredtiger_session_open_sessions
+	mongodb_mongod_wiredtiger_transactions_checkpoint_seconds:           _mongodb_mongod_wiredtiger_transactions_checkpoint_seconds
+	mongodb_mongod_wiredtiger_transactions_checkpoint_seconds_total:     _mongodb_mongod_wiredtiger_transactions_checkpoint_seconds_total
+	mongodb_mongod_wiredtiger_transactions_running_checkpoints:          _mongodb_mongod_wiredtiger_transactions_running_checkpoints
+	mongodb_mongod_wiredtiger_transactions_total:                        _mongodb_mongod_wiredtiger_transactions_total
+	mongodb_network_bytes_total:                                         _mongodb_network_bytes_total
+	mongodb_network_metrics_num_requests_total:                          _mongodb_network_metrics_num_requests_total
+	mongodb_op_counters_repl_total:                                      _mongodb_op_counters_repl_total
+	mongodb_op_counters_total:                                           _mongodb_op_counters_total
+	mongodb_up:                                                          _mongodb_up
+}
+
+_prometheus_metrics: {
+	vector_events_processed_total:       _vector_events_processed_total
+	vector_http_error_response_total:    _vector_http_error_response_total
+	vector_http_request_errors_total:    _vector_http_request_errors_total
+	vector_parse_errors_total:           _vector_parse_errors_total
+	vector_processed_bytes_total:        _vector_processed_bytes_total
+	vector_request_duration_nanoseconds: _vector_request_duration_nanoseconds
+	vector_requests_completed_total:     _vector_requests_completed_total
+}

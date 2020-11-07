@@ -147,5 +147,10 @@ components: sources: socket: {
 				message:   _line
 				host:      _values.local_host
 			}
-		}]
+		},
+	]
+
+	telemetry: metrics: {
+		vector_connection_errors_total: _vector_connection_errors_total
+	}
 }

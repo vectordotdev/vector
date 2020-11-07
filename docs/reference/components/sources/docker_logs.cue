@@ -265,4 +265,12 @@ components: sources: docker_logs: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		vector_communication_errors_total:            _vector_communication_errors_total
+		vector_container_events_processed_total:      _vector_container_events_processed_total
+		vector_container_metadata_fetch_errors_total: _vector_container_metadata_fetch_errors_total
+		vector_containers_watched_total:              _vector_containers_watched_total
+		vector_logging_driver_errors_total:           _vector_logging_driver_errors_total
+	}
 }

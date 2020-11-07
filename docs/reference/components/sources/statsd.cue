@@ -120,4 +120,18 @@ components: sources: statsd: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		vector_connection_errors_total: _vector_connection_errors_total
+		vector_invalid_record_total: {
+			description: "The total number of invalid StatsD records discarded."
+			type:        "counter"
+			tags: _component_tags
+		}
+		vector_invalid_record_bytes_total: {
+			description: "The total number of bytes from StatsD journald records."
+			type:        "counter"
+			tags: _component_tags
+		}
+	}
 }

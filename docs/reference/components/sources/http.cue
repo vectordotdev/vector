@@ -206,4 +206,8 @@ components: sources: http: {
 			}]
 		},
 	]
+
+	telemetry: metrics: {
+		vector_http_bad_requests_total: _vector_http_bad_requests_total
+	}
 }

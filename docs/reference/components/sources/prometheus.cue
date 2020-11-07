@@ -88,4 +88,6 @@ components: sources: prometheus: {
 		histogram: output._passthrough_histogram
 		summary:   output._passthrough_summary
 	}
+
+	telemetry: metrics: _prometheus_metrics
 }

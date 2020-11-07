@@ -97,4 +97,9 @@ components: sources: logplex: {
 			timestamp: fields._current_timestamp
 		}
 	}
+
+	telemetry: metrics: {
+		vector_request_read_errors_total: _vector_request_read_errors_total
+		vector_requests_received_total:   _vector_requests_received_total
+	}
 }

@@ -182,4 +182,33 @@ components: sources: syslog: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		vector_connection_read_errors_total: {
+			description: "TODO"
+			type:        "counter"
+			tags:        _component_tags & {
+				mode: {
+					description: ""
+					required:    true
+					options: {
+						udp: "User Datagram Protocol"
+					}
+				}
+			}
+		}
+		vector_utf8_convert_errors_total: {
+			description: "TODO"
+			type:        "counter"
+			tags:        _component_tags & {
+				mode: {
+					description: ""
+					required:    true
+					options: {
+						udp: "User Datagram Protocol"
+					}
+				}
+			}
+		}
+	}
 }

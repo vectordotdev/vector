@@ -92,4 +92,12 @@ components: sources: splunk_hec: {
 			timestamp: fields._current_timestamp
 		}
 	}
+
+	telemetry: metrics: {
+		vector_encode_errors_total:           _vector_encode_errors_total
+		vector_http_request_errors_total:     _vector_http_request_errors_total
+		vector_requests_received_total:       _vector_requests_received_total
+		vector_source_missing_keys_total:     _vector_source_missing_keys_total
+		vector_sourcetype_missing_keys_total: _vector_sourcetype_missing_keys_total
+	}
 }
