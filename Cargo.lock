@@ -7245,9 +7245,9 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows-service"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec02723e93664f41cc0540260697352a5efcddd837900d7ef208dc16674d5717"
+checksum = "fdfb0437cd780b66551aa81b466470f1159b1878ed45438b738de8bc6e5012b6"
 dependencies = [
  "bitflags",
  "err-derive",
