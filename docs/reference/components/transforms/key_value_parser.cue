@@ -12,8 +12,8 @@ components: transforms: key_value_parser: {
 	features: {
 		parse: {
 			format: {
-				name:     "Key Value"
-				url:      urls.key_value
+				name:     "KeyValue"
+				url:      urls.keyvalue
 				versions: null
 			}
 		}
@@ -103,6 +103,7 @@ components: transforms: key_value_parser: {
 				"""
 			required: false
 			type: string: {
+				default: null
 				examples: ["root_field", "parent.child"]
 			}
 		}
@@ -115,6 +116,7 @@ components: transforms: key_value_parser: {
 				"""
 			required: false
 			type: string: {
+				default: null
 				examples: ["<>", "{}"]
 			}
 		}
@@ -127,6 +129,7 @@ components: transforms: key_value_parser: {
 				"""
 			required: false
 			type: string: {
+				default: null
 				examples: ["<>", "{}"]
 			}
 		}
@@ -176,6 +179,6 @@ components: transforms: key_value_parser: {
 					"loguid": "{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}"
 				}
 			}
-		},
+		}
 	]
 }
