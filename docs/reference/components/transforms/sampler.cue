@@ -31,7 +31,7 @@ components: transforms: sampler: {
 	configuration: {
 		key_field: {
 			common:      false
-			description: "The name of the log field to use to determine if the event should be passed. This defaults to the [global `message_key` option][docs.reference.global-options#message_key]."
+			description: "The name of the log field to use to determine if the event should be passed. An event without this field will always be index rated."
 			required:    false
 			warnings: []
 			type: string: {
@@ -56,6 +56,27 @@ components: transforms: sampler: {
 			type: uint: {
 				examples: [10]
 				unit: null
+			}
+		}
+		property: {
+			description: "The property of event being rated."
+			required:    false
+			common:      true
+			warnings: []
+			type: string: {
+				default: "index"
+				enum: {
+					"index": """
+						Index of event determined by enumeration in the transform.
+						Has a consistent, configured rate of sampling.
+						"""
+					"hash": """
+						Hash of key field defined by `key_field` option. 
+						Consistently samples the same events.
+						Values in the field should be uniformly distributed, otherwise 
+						actual rate of sampling may differ from the configured one.  
+						"""
+				}
 			}
 		}
 	}

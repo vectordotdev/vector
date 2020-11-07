@@ -10,9 +10,9 @@ use snafu::ResultExt;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
-pub enum SampleMode {
+pub enum SampleProperty {
     Hash,
-    Count,
+    Index,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -22,8 +22,8 @@ pub struct SamplerConfig {
     pub key_field: Option<String>,
     #[serde(default)]
     pub pass_list: Vec<String>,
-    #[serde(default = "default_mode")]
-    pub mode: SampleMode,
+    #[serde(default = "default_property")]
+    pub property: SampleProperty,
 }
 
 inventory::submit! {
@@ -36,14 +36,14 @@ impl GenerateConfig for SamplerConfig {
             rate: 10,
             key_field: None,
             pass_list: Vec::new(),
-            mode: default_mode(),
+            property: default_property(),
         })
         .unwrap()
     }
 }
 
-fn default_mode() -> SampleMode {
-    SampleMode::Count
+fn default_property() -> SampleProperty {
+    SampleProperty::Index
 }
 
 #[async_trait::async_trait]
@@ -51,7 +51,9 @@ fn default_mode() -> SampleMode {
 impl TransformConfig for SamplerConfig {
     async fn build(&self) -> crate::Result<Transform> {
         Ok(RegexSet::new(&self.pass_list)
-            .map(|regex_set| Sampler::new(self.rate, self.key_field.clone(), regex_set, self.mode))
+            .map(|regex_set| {
+                Sampler::new(self.rate, self.key_field.clone(), regex_set, self.property)
+            })
             .map(Transform::function)
             .context(super::InvalidRegex)?)
     }
@@ -74,7 +76,7 @@ pub struct Sampler {
     rate: u64,
     key_field: Option<String>,
     pass_list: RegexSet,
-    mode: SampleMode,
+    property: SampleProperty,
     count: u64,
 }
 
@@ -83,22 +85,21 @@ impl Sampler {
         rate: u64,
         key_field: Option<String>,
         pass_list: RegexSet,
-        mode: SampleMode,
+        property: SampleProperty,
     ) -> Self {
         Self {
             rate,
             key_field,
             pass_list,
-            mode,
+            property,
             count: 0,
         }
     }
 
-    fn increment(&mut self) -> bool {
-        self.count = self.count % self.rate;
-        let pass = self.count == 0;
-        self.count += 1;
-        pass
+    fn fetch_and_increment(&mut self) -> u64 {
+        let value = self.count;
+        self.count = (value + 1) % self.rate;
+        value
     }
 }
 
@@ -110,26 +111,23 @@ impl FunctionTransform for Sampler {
             .and_then(|key_field| event.as_log().get(key_field))
             .map(|v| v.to_string_lossy());
 
-        let (pass, sampled) = match (self.mode, message) {
-            (_, Some(ref message)) if self.pass_list.is_match(message) => (true, false),
-            (SampleMode::Count, _) | (_, None) => (self.increment(), true),
-            (SampleMode::Hash, Some(message)) => {
-                (seahash::hash(message.as_bytes()) % self.rate == 0, true)
-            }
-        };
-
         emit!(SamplerEventProcessed);
 
-        if pass {
-            if sampled {
+        let num = match (self.property, message) {
+            (_, Some(ref message)) if self.pass_list.is_match(message) => None,
+            (SampleProperty::Index, _) | (_, None) => Some(self.fetch_and_increment()),
+            (SampleProperty::Hash, Some(message)) => Some(seahash::hash(message.as_bytes())),
+        };
+
+        match num {
+            None => output.push(event),
+            Some(num) if num % self.rate == 0 => {
                 event
                     .as_mut_log()
                     .insert("sample_rate", self.rate.to_string());
+                output.push(event);
             }
-
-            output.push(event);
-        } else {
-            emit!(SamplerEventDiscarded);
+            _ => emit!(SamplerEventDiscarded),
         }
     }
 }
@@ -156,7 +154,7 @@ mod tests {
             2,
             Some(log_schema().message_key().into()),
             RegexSet::new(&["na"]).unwrap(),
-            SampleMode::Hash,
+            SampleProperty::Hash,
         );
         let total_passed = events
             .into_iter()
@@ -171,7 +169,7 @@ mod tests {
             25,
             Some(log_schema().message_key().into()),
             RegexSet::new(&["na"]).unwrap(),
-            SampleMode::Hash,
+            SampleProperty::Hash,
         );
         let total_passed = events
             .into_iter()
@@ -189,7 +187,7 @@ mod tests {
             2,
             Some(log_schema().message_key().into()),
             RegexSet::new(&["na"]).unwrap(),
-            SampleMode::Hash,
+            SampleProperty::Hash,
         );
 
         let first_run = events
@@ -207,7 +205,7 @@ mod tests {
 
     #[test]
     fn always_passes_events_matching_pass_list() {
-        for mode in vec![SampleMode::Count, SampleMode::Hash] {
+        for mode in vec![SampleProperty::Index, SampleProperty::Hash] {
             let event = Event::from("i am important");
             let mut sampler = Sampler::new(
                 0,
@@ -225,7 +223,7 @@ mod tests {
 
     #[test]
     fn handles_key_field() {
-        for mode in vec![SampleMode::Count, SampleMode::Hash] {
+        for mode in vec![SampleProperty::Index, SampleProperty::Hash] {
             let event = Event::from("nananana");
             let mut sampler = Sampler::new(
                 0,
@@ -243,7 +241,7 @@ mod tests {
 
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
-        for mode in vec![SampleMode::Count, SampleMode::Hash] {
+        for mode in vec![SampleProperty::Index, SampleProperty::Hash] {
             let events = random_events(10000);
             let mut sampler = Sampler::new(
                 10,
