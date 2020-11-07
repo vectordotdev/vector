@@ -84,4 +84,8 @@ components: sinks: vector: {
 	}
 
 	how_it_works: components.sources.vector.how_it_works
+
+	telemetry: metrics: {
+		vector_protobuf_decode_errors_total: _vector_protobuf_decode_errors_total
+	}
 }

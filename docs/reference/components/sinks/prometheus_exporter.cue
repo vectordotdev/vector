@@ -342,4 +342,6 @@ components: sinks: prometheus_exporter: {
 				"""
 		}
 	}
+
+	telemetry: metrics: _prometheus_metrics
 }

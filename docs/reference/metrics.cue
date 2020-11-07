@@ -1,5 +1,16 @@
 package metadata
 
+// Helpful metrics groupings
+_prometheus_metrics: {
+	vector_events_processed_total:       _vector_events_processed_total
+	vector_http_error_response_total:    _vector_http_error_response_total
+	vector_http_request_errors_total:    _vector_http_request_errors_total
+	vector_parse_errors_total:           _vector_parse_errors_total
+	vector_processed_bytes_total:        _vector_processed_bytes_total
+	vector_request_duration_nanoseconds: _vector_request_duration_nanoseconds
+	vector_requests_completed_total:     _vector_requests_completed_total
+}
+
 // Apache metrics
 _apache_access_total: {
 	description:   "The total number of time the Apache server has been accessed."
@@ -816,6 +827,11 @@ _vector_collect_completed_total: {
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
+_vector_encode_errors_total: {
+	description: "TODO"
+	type: "counter"
+	tags: _internal_metrics_tags
+}
 _vector_events_discarded_total: {
 	description: "The total number of events discarded by this component."
 	type:        "counter"
@@ -892,6 +908,11 @@ _vector_http_request_errors_total: {
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
+_vector_http_requests_total: {
+	description: "TODO"
+	type:        "counter"
+	tags:        _component_tags
+}
 _vector_memory_used: {
 	description: "The total memory currently being used by Vector (in bytes)."
 	type:        "gauge"
@@ -924,6 +945,11 @@ _vector_processing_errors_total: {
 		error_type: _error_type
 	}
 }
+_vector_protobuf_decode_errors_total: {
+	description: "TODO"
+	type: "counter"
+	tags: _component_tags
+}
 _vector_request_duration_nanoseconds: {
 	description: "TODO"
 	type:        "histogram"
@@ -935,11 +961,6 @@ _vector_request_read_errors_total: {
 	tags:        _component_tags
 }
 _vector_requests_completed_total: {
-	description: "TODO"
-	type:        "counter"
-	tags:        _component_tags
-}
-_vector_requests_received_total: {
 	description: "TODO"
 	type:        "counter"
 	tags:        _component_tags
@@ -1018,6 +1039,16 @@ _vector_reloaded_total: {
 	description: "The total number of times the Vector instance has been reloaded."
 	type:        "counter"
 	tags:        _internal_metrics_tags
+}
+_vector_source_missing_keys_total: {
+	description: "TODO"
+	type: "counter"
+	tags: _internal_metrics_tags
+}
+_vector_sourcetype_missing_keys_total: {
+	description: "TODO"
+	type: "counter"
+	tags: _internal_metrics_tags
 }
 _vector_started_total: {
 	description: "The total number of times the Vector instance has been started."

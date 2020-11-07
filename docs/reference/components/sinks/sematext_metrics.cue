@@ -78,4 +78,8 @@ components: sinks: sematext_metrics: {
 			summary:      false
 		}
 	}
+
+	telemetry: metrics: {
+		vector_processing_errors_total: _vector_processing_errors_total
+	}
 }

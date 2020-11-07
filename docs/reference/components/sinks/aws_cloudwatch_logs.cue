@@ -119,4 +119,8 @@ components: sinks: aws_cloudwatch_logs: {
 		logs:    true
 		metrics: null
 	}
+
+	telemetry: metrics: {
+		processing_errors_total: _vector_processing_errors_total
+	}
 }
