@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, Result, State, TypeCheck, Value};
+use crate::{CompilerState, Expression, Object, Result, State, TypeDef, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -27,13 +27,13 @@ impl Expression for Variable {
             .map(Some)
     }
 
-    fn type_check(&self, state: &CompilerState) -> TypeCheck {
+    fn type_def(&self, state: &CompilerState) -> TypeDef {
         state
             .variable_type(&self.ident)
             .cloned()
             // TODO: we can make it so this can never happen, by making it a
             // compile-time error to reference a variable before it is assigned.
-            .unwrap_or(TypeCheck {
+            .unwrap_or(TypeDef {
                 fallible: true,
                 ..Default::default()
             })
@@ -43,20 +43,20 @@ impl Expression for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_check, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, ValueConstraint::*, ValueKind::*};
 
-    test_type_check![
+    test_type_def![
         ident_match {
             expr: |state: &mut CompilerState| {
-                state.variable_types_mut().insert("foo".to_owned(), TypeCheck::default());
+                state.variable_types_mut().insert("foo".to_owned(), TypeDef::default());
                 Variable::new("foo".to_owned())
             },
-            def: TypeCheck::default(),
+            def: TypeDef::default(),
         }
 
         exact_match {
             expr: |state: &mut CompilerState| {
-                state.variable_types_mut().insert("foo".to_owned(), TypeCheck {
+                state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
                     constraint: Exact(String)
@@ -64,7 +64,7 @@ mod tests {
 
                 Variable::new("foo".to_owned())
             },
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(String),
@@ -73,14 +73,14 @@ mod tests {
 
         ident_mismatch {
             expr: |state: &mut CompilerState| {
-                state.variable_types_mut().insert("foo".to_owned(), TypeCheck {
+                state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     ..Default::default()
                 });
 
                 Variable::new("bar".to_owned())
             },
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 ..Default::default()
             },
@@ -88,7 +88,7 @@ mod tests {
 
         empty_state {
             expr: |_| Variable::new("foo".to_owned()),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 ..Default::default()
             },

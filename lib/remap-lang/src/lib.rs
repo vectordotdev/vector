@@ -15,7 +15,7 @@ use operator::Operator;
 
 pub mod prelude;
 pub use error::{Error, RemapError};
-pub use expression::{Expression, Literal, Noop, Path, TypeCheck};
+pub use expression::{Expression, Literal, Noop, Path, TypeDef};
 pub use function::{Argument, ArgumentList, Function, Parameter};
 pub use program::Program;
 pub use runtime::Runtime;
@@ -161,8 +161,8 @@ mod tests {
             Ok(Some(format!("regex: {:?}", self.0).into()))
         }
 
-        fn type_check(&self, _: &CompilerState) -> TypeCheck {
-            TypeCheck::default()
+        fn type_def(&self, _: &CompilerState) -> TypeDef {
+            TypeDef::default()
         }
     }
 
@@ -241,7 +241,7 @@ mod tests {
         ];
 
         for (script, expectation) in cases {
-            let accept = TypeCheck {
+            let accept = TypeDef {
                 fallible: true,
                 optional: true,
                 constraint: ValueConstraint::Any,

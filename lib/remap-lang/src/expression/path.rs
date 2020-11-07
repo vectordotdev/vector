@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, Result, State, TypeCheck, Value};
+use crate::{CompilerState, Expression, Object, Result, State, TypeDef, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -42,11 +42,11 @@ impl Expression for Path {
     /// A path resolves to `Any` by default, but the script might assign
     /// specific values to paths during its execution, which increases our exact
     /// understanding of the value kind the path contains.
-    fn type_check(&self, state: &CompilerState) -> TypeCheck {
+    fn type_def(&self, state: &CompilerState) -> TypeDef {
         state
             .path_query_type(&segments_to_path(&self.segments))
             .cloned()
-            .unwrap_or(TypeCheck {
+            .unwrap_or(TypeDef {
                 fallible: true,
                 ..Default::default()
             })
@@ -69,20 +69,20 @@ pub(crate) fn segments_to_path(segments: &[Vec<String>]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_check, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, ValueConstraint::*, ValueKind::*};
 
-    test_type_check![
+    test_type_def![
         ident_match {
             expr: |state: &mut CompilerState| {
-                state.path_query_types_mut().insert("foo".to_owned(), TypeCheck::default());
+                state.path_query_types_mut().insert("foo".to_owned(), TypeDef::default());
                 Path::from("foo")
             },
-            def: TypeCheck::default(),
+            def: TypeDef::default(),
         }
 
         exact_match {
             expr: |state: &mut CompilerState| {
-                state.path_query_types_mut().insert("foo".to_owned(), TypeCheck {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
                     constraint: Exact(String)
@@ -90,7 +90,7 @@ mod tests {
 
                 Path::from("foo")
             },
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(String),
@@ -99,14 +99,14 @@ mod tests {
 
         ident_mismatch {
             expr: |state: &mut CompilerState| {
-                state.path_query_types_mut().insert("foo".to_owned(), TypeCheck {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     ..Default::default()
                 });
 
                 Path::from("bar")
             },
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 ..Default::default()
             },
@@ -114,7 +114,7 @@ mod tests {
 
         empty_state {
             expr: |_| Path::from("foo"),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 ..Default::default()
             },

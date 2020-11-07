@@ -1,4 +1,4 @@
-use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value};
+use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Block {
@@ -22,25 +22,25 @@ impl Expression for Block {
         Ok(value)
     }
 
-    fn type_check(&self, state: &CompilerState) -> TypeCheck {
-        let mut type_checks = self
+    fn type_def(&self, state: &CompilerState) -> TypeDef {
+        let mut type_defs = self
             .expressions
             .iter()
-            .map(|e| e.type_check(state))
+            .map(|e| e.type_def(state))
             .collect::<Vec<_>>();
 
         // If any of the stored expressions is fallible, the entire block is
         // fallible.
-        let fallible = type_checks.iter().any(TypeCheck::is_fallible);
+        let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the block.
-        let mut type_check = type_checks.pop().unwrap_or(TypeCheck {
+        let mut type_def = type_defs.pop().unwrap_or(TypeDef {
             optional: true,
             ..Default::default()
         });
 
-        type_check.fallible = fallible;
-        type_check
+        type_def.fallible = fallible;
+        type_def
     }
 }
 
@@ -48,19 +48,18 @@ impl Expression for Block {
 mod tests {
     use super::*;
     use crate::{
-        expression::Arithmetic, test_type_check, Literal, Operator, ValueConstraint::*,
-        ValueKind::*,
+        expression::Arithmetic, test_type_def, Literal, Operator, ValueConstraint::*, ValueKind::*,
     };
 
-    test_type_check![
+    test_type_def![
         no_expression {
             expr: |_| Block::new(vec![]),
-            def: TypeCheck { optional: true, ..Default::default() },
+            def: TypeDef { optional: true, ..Default::default() },
         }
 
         one_expression {
             expr: |_| Block::new(vec![Literal::from(true).into()]),
-            def: TypeCheck { constraint: Exact(Boolean), ..Default::default() },
+            def: TypeDef { constraint: Exact(Boolean), ..Default::default() },
         }
 
         multiple_expressions {
@@ -69,7 +68,7 @@ mod tests {
                         Literal::from(true).into(),
                         Literal::from(1234).into(),
             ]),
-            def: TypeCheck { constraint: Exact(Integer), ..Default::default() },
+            def: TypeDef { constraint: Exact(Integer), ..Default::default() },
         }
 
         last_one_fallible {
@@ -81,7 +80,7 @@ mod tests {
                           Operator::Multiply,
                         ).into(),
             ]),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 constraint: OneOf(vec![String, Integer, Float]),
                 ..Default::default()
@@ -98,7 +97,7 @@ mod tests {
                         ).into(),
                         Literal::from(vec![1]).into(),
             ]),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 constraint: Exact(Array),
                 ..Default::default()

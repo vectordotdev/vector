@@ -1,7 +1,7 @@
 use super::Error as E;
 use crate::{
-    value, CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value,
-    ValueConstraint, ValueKind,
+    value, CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value, ValueConstraint,
+    ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -36,8 +36,8 @@ impl Expression for Not {
         })
     }
 
-    fn type_check(&self, _: &CompilerState) -> TypeCheck {
-        TypeCheck {
+    fn type_def(&self, _: &CompilerState) -> TypeDef {
+        TypeDef {
             fallible: true,
             optional: true,
             constraint: ValueConstraint::Exact(ValueKind::Boolean),
@@ -48,7 +48,7 @@ impl Expression for Not {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_check, Noop, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, Noop, ValueConstraint::*, ValueKind::*};
 
     #[test]
     fn not() {
@@ -83,9 +83,9 @@ mod tests {
         }
     }
 
-    test_type_check![boolean {
+    test_type_def![boolean {
         expr: |_| Not::new(Box::new(Noop.into())),
-        def: TypeCheck {
+        def: TypeDef {
             fallible: true,
             optional: true,
             constraint: Exact(Boolean),

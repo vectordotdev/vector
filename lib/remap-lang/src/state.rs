@@ -1,4 +1,4 @@
-use crate::{TypeCheck, Value};
+use crate::{TypeDef, Value};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
@@ -24,7 +24,7 @@ pub struct CompilerState {
     /// This allows assignment operations to tell the compiler what kinds each
     /// variable will have at runtime, so that the compiler can then check the
     /// variable kinds at compile-time when a variable is called.
-    variable_types: HashMap<String, TypeCheck>,
+    variable_types: HashMap<String, TypeDef>,
 
     /// The [`ValueConstraint`] each path query is expected to have.
     ///
@@ -36,23 +36,23 @@ pub struct CompilerState {
     /// disallow those in assignments, which makes this easier to fix, or we're
     /// going to always return `Any` for coalesced paths. Either way, this is a
     /// known bug that we need to fix soon.
-    path_query_types: HashMap<String, TypeCheck>,
+    path_query_types: HashMap<String, TypeDef>,
 }
 
 impl CompilerState {
-    pub fn variable_type(&self, key: impl AsRef<str>) -> Option<&TypeCheck> {
+    pub fn variable_type(&self, key: impl AsRef<str>) -> Option<&TypeDef> {
         self.variable_types.get(key.as_ref())
     }
 
-    pub fn variable_types_mut(&mut self) -> &mut HashMap<String, TypeCheck> {
+    pub fn variable_types_mut(&mut self) -> &mut HashMap<String, TypeDef> {
         &mut self.variable_types
     }
 
-    pub fn path_query_type(&self, key: impl AsRef<str>) -> Option<&TypeCheck> {
+    pub fn path_query_type(&self, key: impl AsRef<str>) -> Option<&TypeDef> {
         self.path_query_types.get(key.as_ref())
     }
 
-    pub fn path_query_types_mut(&mut self) -> &mut HashMap<String, TypeCheck> {
+    pub fn path_query_types_mut(&mut self) -> &mut HashMap<String, TypeDef> {
         &mut self.path_query_types
     }
 }

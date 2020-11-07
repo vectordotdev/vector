@@ -1,7 +1,7 @@
 use super::Error as E;
 use crate::{
     Argument, ArgumentList, CompilerState, Expression, Function as Fn, Object, Result, State,
-    TypeCheck, Value, ValueKind,
+    TypeDef, Value, ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -127,8 +127,8 @@ impl Expression for Function {
         self.function.execute(state, object)
     }
 
-    fn type_check(&self, state: &crate::CompilerState) -> TypeCheck {
-        self.function.type_check(state)
+    fn type_def(&self, state: &crate::CompilerState) -> TypeDef {
+        self.function.type_def(state)
     }
 }
 
@@ -185,22 +185,22 @@ impl Expression for ArgumentValidator {
         Ok(Some(value))
     }
 
-    fn type_check(&self, state: &CompilerState) -> TypeCheck {
-        self.expression.type_check(state)
+    fn type_def(&self, state: &CompilerState) -> TypeDef {
+        self.expression.type_def(state)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_check, Noop, ValueConstraint::*};
+    use crate::{test_type_def, Noop, ValueConstraint::*};
 
-    test_type_check![pass_through {
+    test_type_def![pass_through {
         expr: |_| {
             let function = Box::new(Noop);
             Function { function }
         },
-        def: TypeCheck {
+        def: TypeDef {
             fallible: false,
             optional: true,
             constraint: Any

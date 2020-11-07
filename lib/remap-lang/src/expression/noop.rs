@@ -1,4 +1,4 @@
-use crate::{CompilerState, Expression, Object, Result, State, TypeCheck, Value};
+use crate::{CompilerState, Expression, Object, Result, State, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub struct Noop;
@@ -8,8 +8,8 @@ impl Expression for Noop {
         Ok(None)
     }
 
-    fn type_check(&self, _: &CompilerState) -> TypeCheck {
-        TypeCheck {
+    fn type_def(&self, _: &CompilerState) -> TypeDef {
+        TypeDef {
             optional: true,
             ..Default::default()
         }
@@ -19,11 +19,11 @@ impl Expression for Noop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_type_check;
+    use crate::test_type_def;
 
-    test_type_check![noop {
+    test_type_def![noop {
         expr: |_| Noop,
-        def: TypeCheck {
+        def: TypeDef {
             optional: true,
             ..Default::default()
         },

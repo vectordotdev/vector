@@ -1,6 +1,6 @@
 use super::Error as E;
 use crate::{
-    value, CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value, ValueKind,
+    value, CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value, ValueKind,
 };
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -43,20 +43,20 @@ impl Expression for IfStatement {
         }
     }
 
-    fn type_check(&self, state: &CompilerState) -> TypeCheck {
-        let true_type_check = self.true_expression.type_check(state);
-        let false_type_check = self.false_expression.type_check(state);
+    fn type_def(&self, state: &CompilerState) -> TypeDef {
+        let true_type_def = self.true_expression.type_def(state);
+        let false_type_def = self.false_expression.type_def(state);
 
-        true_type_check.merge(&false_type_check)
+        true_type_def.merge(&false_type_def)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_check, Literal, Noop, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, Literal, Noop, ValueConstraint::*, ValueKind::*};
 
-    test_type_check![
+    test_type_def![
         concrete_type_def {
             expr: |_| {
                 let conditional = Box::new(Literal::from(true).into());
@@ -65,7 +65,7 @@ mod tests {
 
                 IfStatement::new(conditional, true_expression, false_expression)
             },
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: false,
                 optional: false,
                 constraint: Exact(Boolean),
@@ -80,7 +80,7 @@ mod tests {
 
                 IfStatement::new(conditional, true_expression, false_expression)
             },
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: false,
                 optional: true,
                 constraint: Any,

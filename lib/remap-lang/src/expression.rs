@@ -53,7 +53,7 @@ pub enum Error {
 /// This includes whether the expression is fallible, whether it can return
 /// "nothing", and a list of values the expression can resolve to.
 #[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub struct TypeCheck {
+pub struct TypeDef {
     /// True, if an expression can return an error.
     ///
     /// Some expressions are infallible (e.g. the [`Literal`] expression, or any
@@ -73,7 +73,7 @@ pub struct TypeCheck {
     pub constraint: ValueConstraint,
 }
 
-impl TypeCheck {
+impl TypeDef {
     pub fn is_fallible(&self) -> bool {
         self.fallible
     }
@@ -82,7 +82,7 @@ impl TypeCheck {
         self.optional
     }
 
-    /// Merge two [`TypeCheck`]s, such that the new `TypeCheck` provides the
+    /// Merge two [`TypeDef`]s, such that the new `TypeDef` provides the
     /// strictest type check possible.
     pub fn merge(&self, other: &Self) -> Self {
         let fallible = self.is_fallible() || other.is_fallible();
@@ -96,7 +96,7 @@ impl TypeCheck {
         }
     }
 
-    /// Returns `true` if the _other_ [`TypeCheck`] is contained within the
+    /// Returns `true` if the _other_ [`TypeDef`] is contained within the
     /// current one.
     ///
     /// That is to say, its constraints must be more strict or equal to the
@@ -119,7 +119,7 @@ impl TypeCheck {
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
-    fn type_check(&self, state: &CompilerState) -> TypeCheck;
+    fn type_def(&self, state: &CompilerState) -> TypeDef;
 }
 
 dyn_clone::clone_trait_object!(Expression);
@@ -148,9 +148,9 @@ macro_rules! expression_dispatch {
                 }
             }
 
-            fn type_check(&self, state: &CompilerState) -> TypeCheck {
+            fn type_def(&self, state: &CompilerState) -> TypeDef {
                 match self {
-                    $(Expr::$expr(expression) => expression.type_check(state)),+
+                    $(Expr::$expr(expression) => expression.type_def(state)),+
                 }
             }
         }

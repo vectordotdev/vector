@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value};
+use crate::{CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value};
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -21,13 +21,13 @@ pub(crate) struct Assignment {
 
 impl Assignment {
     pub fn new(target: Target, value: Box<Expr>, state: &mut CompilerState) -> Self {
-        let type_check = value.type_check(state);
+        let type_def = value.type_def(state);
 
         match &target {
-            Target::Variable(ident) => state.variable_types_mut().insert(ident.clone(), type_check),
+            Target::Variable(ident) => state.variable_types_mut().insert(ident.clone(), type_def),
             Target::Path(segments) => {
                 let path = crate::expression::path::segments_to_path(segments);
-                state.path_query_types_mut().insert(path, type_check)
+                state.path_query_types_mut().insert(path, type_def)
             }
         };
 
@@ -56,7 +56,7 @@ impl Expression for Assignment {
         }
     }
 
-    fn type_check(&self, state: &CompilerState) -> TypeCheck {
+    fn type_def(&self, state: &CompilerState) -> TypeDef {
         match &self.target {
             Target::Variable(ident) => state
                 .variable_type(ident.clone())
@@ -76,9 +76,9 @@ impl Expression for Assignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_check, Literal, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, Literal, ValueConstraint::*, ValueKind::*};
 
-    test_type_check![
+    test_type_def![
         variable {
             expr: |state: &mut CompilerState| {
                 let target = Target::Variable("foo".to_owned());
@@ -86,7 +86,7 @@ mod tests {
 
                 Assignment::new(target, value, state)
             },
-            def: TypeCheck {
+            def: TypeDef {
                 constraint: Exact(Boolean),
                 ..Default::default()
             },
@@ -99,7 +99,7 @@ mod tests {
 
                 Assignment::new(target, value, state)
             },
-            def: TypeCheck {
+            def: TypeDef {
                 constraint: Exact(String),
                 ..Default::default()
             },

@@ -1,4 +1,4 @@
-use crate::{parser, CompilerState, Error as E, Expr, Expression, Function, RemapError, TypeCheck};
+use crate::{parser, CompilerState, Error as E, Expr, Expression, Function, RemapError, TypeDef};
 use pest::Parser;
 use std::fmt;
 
@@ -12,7 +12,7 @@ pub enum Error {
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
-pub struct ResolvesToError(TypeCheck, TypeCheck);
+pub struct ResolvesToError(TypeDef, TypeDef);
 
 impl fmt::Display for ResolvesToError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -85,7 +85,7 @@ impl Program {
     pub fn new(
         source: &str,
         function_definitions: &[Box<dyn Function>],
-        expected_result: TypeCheck,
+        expected_result: TypeDef,
     ) -> Result<Self, RemapError> {
         let pairs = parser::Parser::parse(parser::Rule::program, source)
             .map_err(|s| E::Parser(s.to_string()))
@@ -100,12 +100,12 @@ impl Program {
 
         let expressions = parser.pairs_to_expressions(pairs).map_err(RemapError)?;
 
-        let mut type_checks = expressions
+        let mut type_defs = expressions
             .iter()
-            .map(|e| e.type_check(&parser.compiler_state))
+            .map(|e| e.type_def(&parser.compiler_state))
             .collect::<Vec<_>>();
 
-        let computed_result = type_checks.pop().unwrap_or(TypeCheck {
+        let computed_result = type_defs.pop().unwrap_or(TypeDef {
             optional: true,
             fallible: true,
             ..Default::default()
@@ -117,7 +117,7 @@ impl Program {
             ))));
         }
 
-        if !expected_result.is_fallible() && type_checks.iter().any(TypeCheck::is_fallible) {
+        if !expected_result.is_fallible() && type_defs.iter().any(TypeDef::is_fallible) {
             return Err(RemapError::from(E::from(Error::Fallible)));
         }
 
@@ -137,23 +137,23 @@ mod tests {
         use ValueKind::*;
 
         let cases = vec![
-            (".foo", TypeCheck { fallible: true, ..Default::default()}, Ok(())),
+            (".foo", TypeDef { fallible: true, ..Default::default()}, Ok(())),
 
             // The final expression is infallible, but the first one isn't, so
             // this isn't allowed.
             (
                 ".foo\ntrue",
-                TypeCheck { fallible: false, ..Default::default()},
+                TypeDef { fallible: false, ..Default::default()},
                 Err("expected to be infallible, but is not".to_owned()),
             ),
             (
                 ".foo",
-                TypeCheck::default(),
+                TypeDef::default(),
                 Err("expected to resolve to any value, but instead resolves to an error, or any value".to_owned()),
             ),
             (
                 ".foo",
-                TypeCheck {
+                TypeDef {
                     fallible: false,
                     optional: false,
                     constraint: Exact(String),
@@ -163,7 +163,7 @@ mod tests {
             (
                 "false || 2",
 
-                TypeCheck {
+                TypeDef {
                     fallible: false,
                     optional: false,
                     constraint: OneOf(vec![String, Float]),

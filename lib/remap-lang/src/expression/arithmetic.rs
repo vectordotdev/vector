@@ -1,5 +1,5 @@
 use super::{
-    CompilerState, Expr, Expression, Object, Result, State, TypeCheck, Value, ValueConstraint,
+    CompilerState, Expr, Expression, Object, Result, State, TypeDef, Value, ValueConstraint,
     ValueKind,
 };
 use crate::Operator;
@@ -52,14 +52,14 @@ impl Expression for Arithmetic {
         result.map(Some).map_err(Into::into)
     }
 
-    fn type_check(&self, state: &CompilerState) -> TypeCheck {
+    fn type_def(&self, state: &CompilerState) -> TypeDef {
         use Operator::*;
         let constraint = match self.op {
             Or => self
                 .lhs
-                .type_check(state)
+                .type_def(state)
                 .constraint
-                .merge(&self.rhs.type_check(state).constraint),
+                .merge(&self.rhs.type_def(state).constraint),
             Multiply | Add => ValueConstraint::OneOf(vec![
                 ValueKind::String,
                 ValueKind::Integer,
@@ -73,7 +73,7 @@ impl Expression for Arithmetic {
             }
         };
 
-        TypeCheck {
+        TypeDef {
             fallible: true,
             optional: false,
             constraint,
@@ -84,16 +84,16 @@ impl Expression for Arithmetic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_check, Literal, Noop, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, Literal, Noop, ValueConstraint::*, ValueKind::*};
 
-    test_type_check![
+    test_type_def![
         or_exact {
             expr: |_| Arithmetic::new(
                 Box::new(Literal::from("foo").into()),
                 Box::new(Literal::from(true).into()),
                 Operator::Or,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: OneOf(vec![String, Boolean])
@@ -106,7 +106,7 @@ mod tests {
                 Box::new(Literal::from(true).into()),
                 Operator::Or,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Any,
@@ -119,7 +119,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Multiply,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: OneOf(vec![String, Integer, Float]),
@@ -132,7 +132,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Add,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: OneOf(vec![String, Integer, Float]),
@@ -145,7 +145,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Remainder,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: OneOf(vec![Integer, Float]),
@@ -158,7 +158,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Subtract,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: OneOf(vec![Integer, Float]),
@@ -171,7 +171,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Divide,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: OneOf(vec![Integer, Float]),
@@ -184,7 +184,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::And,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(Boolean),
@@ -197,7 +197,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Equal,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(Boolean),
@@ -210,7 +210,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::NotEqual,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(Boolean),
@@ -223,7 +223,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Greater,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(Boolean),
@@ -236,7 +236,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::GreaterOrEqual,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(Boolean),
@@ -249,7 +249,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::Less,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(Boolean),
@@ -262,7 +262,7 @@ mod tests {
                 Box::new(Noop.into()),
                 Operator::LessOrEqual,
             ),
-            def: TypeCheck {
+            def: TypeDef {
                 fallible: true,
                 optional: false,
                 constraint: Exact(Boolean),
