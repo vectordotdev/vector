@@ -203,12 +203,8 @@ pub(in crate::sinks) fn influx_line_protocol(
 }
 
 fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
-    let sorted = tags
-        // sort by key
-        .iter()
-        .collect::<BTreeMap<_, _>>();
-
-    for (key, value) in sorted {
+    // `tags` is already sorted
+    for (key, value) in tags {
         if key.is_empty() || value.is_empty() {
             continue;
         }
