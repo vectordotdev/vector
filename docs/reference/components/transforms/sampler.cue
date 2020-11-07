@@ -64,4 +64,8 @@ components: transforms: sampler: {
 		logs:    true
 		metrics: null
 	}
+
+	telemetry: metrics: {
+		vector_events_discarded_total: _vector_events_discarded_total
+	}
 }

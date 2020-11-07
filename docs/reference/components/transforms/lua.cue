@@ -470,4 +470,9 @@ components: transforms: lua: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		vector_memory_used:             _vector_memory_used
+		vector_processing_errors_total: _vector_processing_errors_total
+	}
 }

@@ -142,4 +142,8 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			body:  "Note that the events themselves are not parsed. If they are structured data, you will typically want to pass them through a [parsing transform](\(urls.vector_parsing_transforms))."
 		}
 	}
+
+	telemetry: metrics: {
+		vector_processing_errors_total: _vector_processing_errors_total
+	}
 }

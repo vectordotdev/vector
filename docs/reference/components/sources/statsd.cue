@@ -126,12 +126,12 @@ components: sources: statsd: {
 		vector_invalid_record_total: {
 			description: "The total number of invalid StatsD records discarded."
 			type:        "counter"
-			tags: _component_tags
+			tags:        _component_tags
 		}
 		vector_invalid_record_bytes_total: {
 			description: "The total number of bytes from StatsD journald records."
 			type:        "counter"
-			tags: _component_tags
+			tags:        _component_tags
 		}
 	}
 }

@@ -178,4 +178,8 @@ components: transforms: regex_parser: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		vector_processing_errors_total: _vector_processing_errors_total
+	}
 }

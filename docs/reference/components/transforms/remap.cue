@@ -130,4 +130,8 @@ components: transforms: remap: {
 				"""#
 		}
 	}
+
+	telemetry: metrics: {
+		vector_processing_errors_total: _vector_processing_errors_total
+	}
 }

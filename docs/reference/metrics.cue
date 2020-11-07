@@ -906,6 +906,16 @@ _vector_memory_used: {
 	type:        "gauge"
 	tags:        _internal_metrics_tags
 }
+_vector_metadata_refresh_failed_total: {
+	description: "TODO"
+	type:        "counter"
+	tags:        _component_tags
+}
+_vector_metadata_refresh_successful_total: {
+	description: "TODO"
+	type:        "counter"
+	tags:        _component_tags
+}
 _vector_missing_keys_total: {
 	description: "The total number of events dropped due to keys missing from the event."
 	type:        "counter"

@@ -170,4 +170,9 @@ components: transforms: aws_ec2_metadata: {
 			}
 		}
 	}
+
+	telemetry: metrics: {
+		vector_metadata_refresh_successful_total: _vector_metadata_refresh_successful_total
+		vector_metadata_refresh_failed_total:     _vector_metadata_refresh_failed_total
+	}
 }

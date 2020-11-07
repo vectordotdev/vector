@@ -93,4 +93,8 @@ components: transforms: metric_to_log: {
 	]
 
 	how_it_works: {}
+
+	telemetry: metrics: {
+		vector_processing_errors_total: _vector_processing_errors_total
+	}
 }

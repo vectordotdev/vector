@@ -70,4 +70,8 @@ components: transforms: swimlanes: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		vector_events_discarded_total: _vector_events_discarded_total
+	}
 }
