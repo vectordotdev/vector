@@ -523,8 +523,9 @@ fn benchmark_complex(c: &mut Criterion) {
                         &["parser"],
                         transforms::sampler::SamplerConfig {
                             rate: 10,
-                            key_field: None,
+                            key_field: Some(config::log_schema().message_key().into()),
                             pass_list: vec![],
+                            property: transforms::sampler::SampleProperty::Hash,
                         },
                     );
                     config.add_sink(
