@@ -71,10 +71,10 @@ components: transforms: sampler: {
 						Has a consistent, configured rate of sampling.
 						"""
 					"hash": """
-						Hash of key field defined by `key_field` option. 
+						Hash of key field defined by `key_field` option.
 						Consistently samples the same events.
-						Values in the field should be uniformly distributed, otherwise 
-						actual rate of sampling may differ from the configured one.  
+						Values in the field should be uniformly distributed, otherwise
+						actual rate of sampling may differ from the configured one.
 						"""
 				}
 			}
