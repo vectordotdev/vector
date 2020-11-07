@@ -137,7 +137,7 @@ impl SinkConfig for StatsdSinkConfig {
 }
 
 fn encode_tags(tags: &BTreeMap<String, String>) -> String {
-    let mut parts: Vec<_> = tags
+    let parts: Vec<_> = tags
         .iter()
         .map(|(name, value)| {
             if value == "true" {
