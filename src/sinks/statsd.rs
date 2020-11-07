@@ -147,7 +147,6 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
             }
         })
         .collect();
-    parts.sort();
     parts.join(",")
 }
 
