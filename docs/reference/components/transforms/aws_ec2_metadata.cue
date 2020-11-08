@@ -172,7 +172,15 @@ components: transforms: aws_ec2_metadata: {
 	}
 
 	telemetry: metrics: {
-		vector_metadata_refresh_successful_total: _vector_metadata_refresh_successful_total
-		vector_metadata_refresh_failed_total:     _vector_metadata_refresh_failed_total
+		vector_metadata_refresh_failed_total: {
+			description: "The total number of failed efforts to refresh AWS EC2 metadata."
+			type:        "counter"
+			tags:        _component_tags
+		}
+		vector_metadata_refresh_successful_total: {
+			description: "The total number of AWS EC2 metadata refreshes."
+			type:        "counter"
+			tags:        _component_tags
+		}
 	}
 }

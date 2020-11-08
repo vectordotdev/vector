@@ -769,7 +769,7 @@ _vector_api_started_total: {
 	tags:        _internal_metrics_tags
 }
 _vector_auto_concurrency_averaged_rtt: {
-	description: "TODO"
+	description: "The average round-trip time (RTT) from the HTTP sink across the current window."
 	type:        "histogram"
 	tags:        _internal_metrics_tags
 }
@@ -779,12 +779,12 @@ _vector_auto_concurrency_in_flight: {
 	tags:        _internal_metrics_tags
 }
 _vector_auto_concurrency_limit: {
-	description: "TODO"
+	description: "The concurrency limit that the auto-concurrency feature has decided on for this current window."
 	type:        "histogram"
 	tags:        _internal_metrics_tags
 }
 _vector_auto_concurrency_observed_rtt: {
-	description: "TODO"
+	description: "The observed round-trip time (RTT) for requests from this HTTP sink."
 	type:        "histogram"
 	tags:        _internal_metrics_tags
 }
@@ -799,26 +799,11 @@ _vector_checkpoints_total: {
 	tags:        _internal_metrics_tags
 }
 _vector_checksum_errors: {
-	description: "TODO"
+	description: "The total number of errors identifying files via checksum."
 	type:        "counter"
 	tags:        _internal_metrics_tags & {
 		file: _file
 	}
-}
-_vector_collect_duration_nanoseconds: {
-	description: "TODO"
-	type:        "histogram"
-	tags:        _internal_metrics_tags
-}
-_vector_collect_completed_total: {
-	description: "TODO"
-	type:        "counter"
-	tags:        _internal_metrics_tags
-}
-_vector_encode_errors_total: {
-	description: "TODO"
-	type:        "counter"
-	tags:        _internal_metrics_tags
 }
 _vector_events_discarded_total: {
 	description: "The total number of events discarded by this component."
@@ -887,17 +872,17 @@ _vector_http_bad_requests_total: {
 	tags:        _internal_metrics_tags
 }
 _vector_http_error_response_total: {
-	description: "TODO"
+	description: "The total number of HTTP error responses for this component."
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
 _vector_http_request_errors_total: {
-	description: "TODO"
+	description: "The total number of HTTP request errors for this component."
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
 _vector_http_requests_total: {
-	description: "TODO"
+	description: "The total number of HTTP requests issued by this component."
 	type:        "counter"
 	tags:        _component_tags
 }
@@ -905,16 +890,6 @@ _vector_memory_used: {
 	description: "The total memory currently being used by Vector (in bytes)."
 	type:        "gauge"
 	tags:        _internal_metrics_tags
-}
-_vector_metadata_refresh_failed_total: {
-	description: "TODO"
-	type:        "counter"
-	tags:        _component_tags
-}
-_vector_metadata_refresh_successful_total: {
-	description: "TODO"
-	type:        "counter"
-	tags:        _component_tags
 }
 _vector_missing_keys_total: {
 	description: "The total number of events dropped due to keys missing from the event."
@@ -927,7 +902,7 @@ _vector_open_connections: {
 	tags:        _internal_metrics_tags
 }
 _vector_parse_errors_total: {
-	description: "TODO"
+	description: "The total number of errors parsing Prometheus metrics."
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
@@ -937,45 +912,62 @@ _vector_processed_bytes_total: {
 	tags:        _component_tags
 }
 _vector_processing_errors_total: {
-	description: "The total number of processing errors encountered by the component."
+	description: "The total number of processing errors encountered by this component."
 	type:        "counter"
 	tags:        _component_tags & {
 		error_type: _error_type
 	}
 }
 _vector_protobuf_decode_errors_total: {
-	description: "TODO"
+	description: "The total number of [Protocol Buffers](\(urls.protobuf)) errors thrown during communication between Vector instances."
 	type:        "counter"
 	tags:        _component_tags
 }
 _vector_request_duration_nanoseconds: {
-	description: "TODO"
+	description: "The request duration for this component (in nanoseconds)."
 	type:        "histogram"
 	tags:        _component_tags
 }
 _vector_request_read_errors_total: {
-	description: "TODO"
+	description: "The total number of request read errors for this component."
 	type:        "counter"
 	tags:        _component_tags
 }
 _vector_requests_completed_total: {
-	description: "TODO"
+	description: "The total number of requests completed by this component."
 	type:        "counter"
 	tags:        _component_tags
 }
 _vector_requests_received_total: {
-	description: "TODO"
+	description: "The total number of requests received by this component."
 	type:        "counter"
 	tags:        _component_tags
 }
 _vector_timestamp_parse_errors_total: {
-	description: "The total number of errors encountered RFC3339 parsing timestamps."
+	description: "The total number of errors encountered parsing [RFC3339](\(urls.rfc_3339)) timestamps."
 	type:        "counter"
 	tags:        _component_tags
 }
 _vector_uptime_seconds: {
 	description: "The total number of seconds the Vector instance has been up."
 	type:        "gauge"
+	tags:        _component_tags
+}
+
+// Splunk
+_vector_encode_errors_total: {
+	description: "The total number of errors encoding [Splunk HEC](\(urls.splunk_hec_protocol)) events to JSON for this `splunk_hec` sink."
+	type:        "counter"
+	tags:        _component_tags
+}
+_vector_source_missing_keys_total: {
+	description: "The total number of errors rendering the template for this source."
+	type:        "counter"
+	tags:        _component_tags
+}
+_vector_sourcetype_missing_keys_total: {
+	description: "The total number of errors rendering the template for this sourcetype."
+	type:        "counter"
 	tags:        _component_tags
 }
 
@@ -986,7 +978,7 @@ _vector_config_load_errors_total: {
 	tags:        _internal_metrics_tags
 }
 _vector_connection_errors_total: {
-	description: "TODO"
+	description: "The total number of connection errors for this Vector instance."
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
@@ -1007,21 +999,6 @@ _vector_reload_errors_total: {
 }
 _vector_reloaded_total: {
 	description: "The total number of times the Vector instance has been reloaded."
-	type:        "counter"
-	tags:        _internal_metrics_tags
-}
-_vector_request_error_total: {
-	description: "TODO"
-	type:        "counter"
-	tags:        _internal_metrics_tags
-}
-_vector_source_missing_keys_total: {
-	description: "TODO"
-	type:        "counter"
-	tags:        _internal_metrics_tags
-}
-_vector_sourcetype_missing_keys_total: {
-	description: "TODO"
 	type:        "counter"
 	tags:        _internal_metrics_tags
 }
