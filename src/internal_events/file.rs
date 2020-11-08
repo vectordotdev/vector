@@ -1,6 +1,6 @@
 use super::InternalEvent;
 use file_source::FileSourceInternalEvents;
-use metrics::counter;
+use metrics::{counter, gauge};
 use std::io::Error;
 use std::path::Path;
 
@@ -238,6 +238,17 @@ impl InternalEvent for FileCheckpointWriteFailed {
     }
 }
 
+#[derive(Debug)]
+pub struct FileOpen {
+    pub count: usize,
+}
+
+impl InternalEvent for FileOpen {
+    fn emit_metrics(&self) {
+        gauge!("open_files", self.count as f64);
+    }
+}
+
 pub struct FileSourceInternalEventsEmitter;
 
 impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
@@ -282,5 +293,9 @@ impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {
 
     fn emit_file_checkpoint_write_failed(&self, error: Error) {
         emit!(FileCheckpointWriteFailed { error });
+    }
+
+    fn emit_files_open(&self, count: usize) {
+        emit!(FileOpen { count });
     }
 }
