@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn always_passes_events_matching_pass_list() {
-        for mode in &[SampleProperty::Index, SampleProperty::Hash] {
+        for &mode in &[SampleProperty::Index, SampleProperty::Hash] {
             let event = Event::from("i am important");
             let mut sampler = Sampler::new(
                 0,
