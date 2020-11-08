@@ -6,7 +6,8 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
@@ -135,6 +136,15 @@ impl SourceConfig for SocketConfig {
 
     fn source_type(&self) -> &'static str {
         "socket"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self.mode.clone() {
+            Mode::Tcp(tcp) => vec![tcp.address.into()],
+            Mode::Udp(udp) => vec![udp.address.into()],
+            #[cfg(unix)]
+            Mode::Unix(_) => vec![],
+        }
     }
 }
 
