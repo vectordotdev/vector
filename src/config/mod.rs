@@ -10,6 +10,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::fs::DirBuilder;
 use std::hash::Hash;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 pub mod api;
@@ -260,6 +261,7 @@ inventory::collect!(TransformDescription);
 pub enum Resource {
     Port(u16),
     SystemFdOffset(usize),
+    Stdin,
 }
 
 impl Resource {
@@ -282,6 +284,12 @@ impl Resource {
             .filter(|(_, componenets)| componenets.len() > 1)
             .flat_map(|(_, componenets)| componenets)
             .collect()
+    }
+}
+
+impl From<SocketAddr> for Resource {
+    fn from(addr: SocketAddr) -> Self {
+        Self::Port(addr.port())
     }
 }
 
