@@ -33,6 +33,7 @@ pub struct PubsubConfig {
     pub project: String,
     pub topic: String,
     pub endpoint: Option<String>,
+    pub skip_authentication: bool,
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
@@ -115,13 +116,11 @@ struct PubsubSink {
     encoding: EncodingConfigWithDefault<Encoding>,
 }
 
-const EMULATOR_HOST: &str = "http://localhost:8681";
-
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let creds = match &config.endpoint {
-            Some(ref host) if host == EMULATOR_HOST => None,
+        let creds = match &config.skip_authentication {
+            true => None,
             _ => config.auth.make_credentials(Scope::PubSub).await?,
         };
 
@@ -228,11 +227,13 @@ mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
+    const EMULATOR_HOST: &str = "http://localhost:8681";
     const PROJECT: &str = "testproject";
 
     fn config(topic: &str) -> PubsubConfig {
         PubsubConfig {
             endpoint: Some(EMULATOR_HOST.into()),
+            skip_authentication: true,
             project: PROJECT.into(),
             topic: topic.into(),
             ..Default::default()
