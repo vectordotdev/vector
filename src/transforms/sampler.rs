@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn handles_key_field() {
-        for mode in vec![SampleProperty::Index, SampleProperty::Hash] {
+        for &mode in &[SampleProperty::Index, SampleProperty::Hash] {
             let event = Event::from("nananana");
             let mut sampler = Sampler::new(
                 0,
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
-        for mode in vec![SampleProperty::Index, SampleProperty::Hash] {
+        for &mode in &[SampleProperty::Index, SampleProperty::Hash] {
             let events = random_events(10000);
             let mut sampler = Sampler::new(
                 10,
