@@ -66,15 +66,12 @@ components: transforms: sampler: {
 			type: string: {
 				default: "index"
 				enum: {
-					"index": """
-						Index of event determined by enumeration in the transform.
-						Has a consistent, configured rate of sampling.
-						"""
+					"index": "Index of event. Has a consistent, configured rate of sampling."
 					"hash": """
 						Hash of key field defined by `key_field` option.
 						Consistently samples the same events.
-						Values in the field should be uniformly distributed, otherwise
-						actual rate of sampling may differ from the configured one.
+						Actual rate of sampling may differ from the configured one if 
+						values in the field are not uniformly distributed.
 						"""
 				}
 			}
