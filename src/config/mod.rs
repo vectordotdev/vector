@@ -259,6 +259,7 @@ inventory::collect!(TransformDescription);
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Resource {
     Port(u16),
+    SystemFdOffset(usize),
 }
 
 impl Resource {
