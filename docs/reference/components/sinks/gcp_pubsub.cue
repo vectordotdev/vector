@@ -85,7 +85,7 @@ components: sinks: gcp_pubsub: {
 		}
 		endpoint: {
 			common:      false
-			description: "Then endpoint to which to send data."
+			description: "The endpoint to which to send data."
 			required:    false
 			warnings: []
 			type: string: {
