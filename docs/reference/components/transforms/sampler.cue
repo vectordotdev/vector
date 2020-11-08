@@ -70,7 +70,7 @@ components: transforms: sampler: {
 					"hash": """
 						Hash of key field defined by `key_field` option.
 						Consistently samples the same events.
-						Actual rate of sampling may differ from the configured one if 
+						Actual rate of sampling may differ from the configured one if
 						values in the field are not uniformly distributed.
 						"""
 				}
