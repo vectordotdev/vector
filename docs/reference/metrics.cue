@@ -1266,6 +1266,16 @@ _host_metrics: {
 	host_network_transmit_packets_total:      _host_network_transmit_packets_total
 }
 
+_internal_metrics: {
+	vector_config_load_errors_total: _vector_config_load_errors_total
+	vector_quit_total:               _vector_quit_total
+	vector_recover_errors_total:     _vector_recover_errors_total
+	vector_reload_errors_total:      _vector_reload_errors_total
+	vector_reloaded_total:           _vector_reloaded_total
+	vector_started_total:            _vector_started_total
+	vector_stopped_total:            _vector_stopped_total
+}
+
 _mongodb_metrics: {
 	mongodb_assets_total:                                                _mongodb_assets_total
 	mongodb_bson_parse_error_total:                                      _mongodb_bson_parse_error_total
