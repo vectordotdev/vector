@@ -1,7 +1,11 @@
-use super::logs::HumioLogsConfig;
+use super::{default_host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
+    sinks::util::{
+        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
+    },
     sinks::{Healthcheck, VectorSink},
+    template::Template,
     transforms::metric_to_log::MetricToLogConfig,
 };
 use futures01::Sink;
@@ -12,8 +16,38 @@ pub struct HumioMetricsConfig {
     #[serde(flatten)]
     transform: MetricToLogConfig,
 
-    #[serde(flatten)]
-    sink: HumioLogsConfig,
+    token: String,
+    // Deprecated name
+    #[serde(alias = "host")]
+    pub(in crate::sinks::humio) endpoint: Option<String>,
+    source: Option<Template>,
+    #[serde(
+        skip_serializing_if = "crate::serde::skip_serializing_if_default",
+        default
+    )]
+    encoding: EncodingConfigWithDefault<Encoding>,
+
+    event_type: Option<Template>,
+
+    #[serde(default = "default_host_key")]
+    host_key: String,
+
+    #[serde(default)]
+    compression: Compression,
+
+    #[serde(default)]
+    request: TowerRequestConfig,
+
+    #[serde(default)]
+    batch: BatchConfig,
+    // The obove settings are copied from HumioLogsConfig. In theory we should do below:
+    //
+    // #[serde(flatten)]
+    // sink: HumioLogsConfig,
+    //
+    // However there is an issue in serde (https://github.com/serde-rs/serde/issues/1504) with aliased
+    // fields in flattened structs which interferes with the host field alias.
+    // Until that issue is fixed, we will have to just copy the fields instead.
 }
 
 inventory::submit! {
@@ -36,7 +70,19 @@ impl GenerateConfig for HumioMetricsConfig {
 impl SinkConfig for HumioMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let mut transform = self.transform.clone().build().await?;
-        let (sink, healthcheck) = self.sink.clone().build(cx).await?;
+        let sink = HumioLogsConfig {
+            token: self.token.clone(),
+            endpoint: self.endpoint.clone(),
+            source: self.source.clone(),
+            encoding: self.encoding.clone(),
+            event_type: self.event_type.clone(),
+            host_key: self.host_key.clone(),
+            compression: self.compression,
+            request: self.request,
+            batch: self.batch,
+        };
+
+        let (sink, healthcheck) = sink.clone().build(cx).await?;
 
         let sink = Box::new(sink.into_futures01sink().with_flat_map(move |e| {
             let mut buf = Vec::with_capacity(1);
@@ -73,6 +119,30 @@ mod tests {
         crate::test_util::test_generate_config::<HumioMetricsConfig>();
     }
 
+    #[test]
+    fn test_endpoint_field() {
+        let (config, _) = load_sink::<HumioMetricsConfig>(
+            r#"
+            token = "atoken"
+            batch.max_events = 1
+            endpoint = "https://localhost:9200/"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
+        let (config, _) = load_sink::<HumioMetricsConfig>(
+            r#"
+            token = "atoken"
+            batch.max_events = 1
+            host = "https://localhost:9200/"
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(Some("https://localhost:9200/".to_string()), config.endpoint);
+    }
+
     #[tokio::test]
     async fn smoke_json() {
         let (mut config, cx) = load_sink::<HumioMetricsConfig>(
@@ -87,7 +157,7 @@ mod tests {
         // Swap out the endpoint so we can force send it
         // to our local server
         let endpoint = format!("http://{}", addr);
-        config.sink.endpoint = Some(endpoint.clone());
+        config.endpoint = Some(endpoint.clone());
 
         let (sink, _) = config.build(cx).await.unwrap();
 
