@@ -161,6 +161,11 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn output_type(&self) -> DataType;
 
     fn source_type(&self) -> &'static str;
+
+    /// Resources that the source is using.
+    fn resources(&self) -> Vec<Resource> {
+        Vec::new()
+    }
 }
 
 pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
@@ -192,7 +197,7 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
 
     /// Resources that the sink is using.
     /// These resources shouldn't be used in the build method as that can result
-    /// in a build error. Only the sinks are constrained by this.
+    /// in a build error. Only sinks are constrained by this.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }

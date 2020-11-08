@@ -220,19 +220,29 @@ impl RunningTopology {
         // conflicts in their resource usage. So if we combine their
         // resources, all found conflicts are between
         // to be removed and to be added components.
-        let remove = diff.sinks.removed_and_changed().map(|name| {
-            let value = self.config.sinks[name].inner.resources();
-            ((true, name.clone()), value)
-        });
-        let add = diff.sinks.changed_and_added().map(|name| {
-            let value = new_config.sinks[name].inner.resources();
-            ((false, name.clone()), value)
-        });
-        let conflicts = Resource::conflicts(remove.chain(add));
+        let remove_sink = diff
+            .sinks
+            .removed_and_changed()
+            .map(|name| (name, self.config.sinks[name].inner.resources()));
+        let add_source = diff
+            .sources
+            .changed_and_added()
+            .map(|name| (name, new_config.sources[name].resources()));
+        let add_sink = diff
+            .sinks
+            .changed_and_added()
+            .map(|name| (name, new_config.sinks[name].inner.resources()));
+        let conflicts = Resource::conflicts(
+            remove_sink.map(|(key, value)| ((true, key), value)).chain(
+                add_sink
+                    .chain(add_source)
+                    .map(|(key, value)| ((false, key), value)),
+            ),
+        );
         let wait_for_sinks = conflicts
             .into_iter()
-            .filter(|&(exist, _)| exist)
-            .map(|(_, name)| name)
+            .filter(|&(existing_sink, _)| existing_sink)
+            .map(|(_, name)| name.clone())
             .collect();
 
         // Checks passed so let's shutdown the difference.
