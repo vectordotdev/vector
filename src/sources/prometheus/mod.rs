@@ -201,7 +201,7 @@ mod test {
     use super::*;
     use crate::{
         config,
-        sinks::prometheus::PrometheusSinkConfig,
+        sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
         Error,
     };
@@ -277,7 +277,7 @@ mod test {
         config.add_sink(
             "out",
             &["in"],
-            PrometheusSinkConfig {
+            PrometheusExporterConfig {
                 address: out_addr,
                 default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],

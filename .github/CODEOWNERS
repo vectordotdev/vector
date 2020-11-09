@@ -20,7 +20,7 @@
 /docs/reference/components/sinks/humio_logs.cue @jszwedko
 /docs/reference/components/sinks/splunk_hec.cue @ktff
 /docs/reference/components/sinks/kafka.cue @lukesteensen
-/docs/reference/components/sinks/prometheus.cue @lukesteensen
+/docs/reference/components/sinks/prometheus_exporter.cue @lukesteensen
 /docs/reference/components/sinks/splunk_hec.cue @lukesteensen
 /docs/reference/components/sinks/statsd.cue @lukesteensen
 /docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
@@ -121,7 +121,9 @@
 /src/sinks/humio_logs.rs @jszwedko
 /src/sinks/splunk_hec.rs @ktff
 /src/sinks/kafka.rs @lukesteensen
-/src/sinks/prometheus.rs @lukesteensen
+/src/sinks/prometheus/collector.rs @bruceg
+/src/sinks/prometheus/remote_write.rs @bruceg
+/src/sinks/prometheus/exporter.rs @lukesteensen
 /src/sinks/splunk_hec.rs @lukesteensen
 /src/sinks/statsd.rs @lukesteensen
 /src/sinks/tcp.rs @bruceg
