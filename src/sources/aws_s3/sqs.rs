@@ -288,9 +288,10 @@ impl Ingestor {
         s3_event: S3EventRecord,
         out: Pipeline,
     ) -> Result<(), ProcessingError> {
-        if !SUPPORTED_S3S_EVENT_VERSION.matches(&s3_event.event_version) {
+        let event_version: semver::Version = s3_event.event_version.clone().into();
+        if !SUPPORTED_S3S_EVENT_VERSION.matches(&event_version) {
             return Err(ProcessingError::UnsupportedS3EventVersion {
-                version: s3_event.event_version.clone(),
+                version: event_version.clone(),
             });
         }
 
@@ -469,12 +470,62 @@ struct S3Event {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct S3EventRecord {
-    event_version: semver::Version,
+    event_version: S3EventVersion,
     event_source: String,
     aws_region: String,
     event_name: S3EventName,
 
     s3: S3Message,
+}
+
+#[derive(Clone, Debug)]
+struct S3EventVersion {
+    major: u64,
+    minor: u64,
+}
+
+impl From<S3EventVersion> for semver::Version {
+    fn from(v: S3EventVersion) -> semver::Version {
+        semver::Version::new(v.major, v.minor, 0)
+    }
+}
+
+// https://docs.aws.amazon.com/AmazonS3/latest/dev/notification-content-structure.html
+// <major>.<minor>
+impl<'de> Deserialize<'de> for S3EventVersion {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let s = String::deserialize(deserializer)?;
+
+        let mut parts = s.splitn(2, '.');
+
+        let major = parts
+            .next()
+            .ok_or_else(|| D::Error::custom("Missing major version number"))?
+            .parse::<u64>()
+            .map_err(D::Error::custom)?;
+
+        let minor = parts
+            .next()
+            .ok_or_else(|| D::Error::custom("Missing minor version number"))?
+            .parse::<u64>()
+            .map_err(D::Error::custom)?;
+
+        Ok(S3EventVersion { major, minor })
+    }
+}
+
+impl Serialize for S3EventVersion {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&format!("{}.{}", self.major, self.minor))
+    }
 }
 
 #[derive(Clone, Debug)]
