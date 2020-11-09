@@ -50,7 +50,7 @@ _values: {
 		// For example, "AWS" is a service provider for many services, and
 		// a user on AWS can use this to filter for AWS supported
 		// components.
-		service_providers: [...string] | *[]
+		service_providers: [string, ...string] | *[]
 	}
 }
 
@@ -63,7 +63,7 @@ _values: {
 	files_count:      uint
 	insertions_count: uint
 	pr_number:        uint | null
-	scopes:           [...string] | *[]
+	scopes:           [string, ...string] | *[]
 	sha:              #CommitSha
 	type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status" | null
 }
@@ -95,35 +95,35 @@ _values: {
 
 	// `examples` demonstrates various ways to use the component using an
 	// input, output, and example configuration.
-	examples: [
-		...close({
-			title:    string
-			context?: string
-			"configuration": {
-				for k, v in configuration {
-					"\( k )"?: _ | *null
-				}
+	#ExampleConfig: close({
+		title:    string
+		context?: string
+		"configuration": {
+			for k, v in configuration {
+				"\( k )"?: _ | *null
 			}
+		}
 
-			if Kind == "source" {
-				input: string
-			}
+		if Kind == "source" {
+			input: string
+		}
 
-			if Kind != "source" {
-				input: #Event | [...#Event]
-			}
+		if Kind != "source" {
+			input: #Event | [#Event, ...#Event]
+		}
 
-			if Kind == "sink" {
-				output: string
-			}
+		if Kind == "sink" {
+			output: string
+		}
 
-			if Kind != "sink" {
-				output: #Event | [...#Event] | null
-			}
+		if Kind != "sink" {
+			output: #Event | [#Event, ...#Event] | null
+		}
 
-			notes?: string
-		}),
-	]
+		notes?: string
+	})
+
+	examples?: [#ExampleConfig, ...#ExampleConfig]
 
 	// `features` describes the various supported features of the component.
 	// Setting these helps to reduce boilerplate.
@@ -265,7 +265,7 @@ _values: {
 		port: uint16
 	}
 
-	protocols: [...#Protocol]
+	protocols: [#Protocol, ...#Protocol]
 	socket?: string
 	ssl:     "disabled" | "required" | "optional"
 }
@@ -402,8 +402,8 @@ _values: {
 
 		if enabled == true {
 			default: #CompressionAlgorithm
-			algorithms: [...#CompressionAlgorithm]
-			levels: [...#CompressionLevel]
+			algorithms: [#CompressionAlgorithm, ...#CompressionAlgorithm]
+			levels: [#CompressionLevel, ...#CompressionLevel]
 		}
 	}
 
@@ -417,7 +417,7 @@ _values: {
 
 				if enabled {
 					default: #EncodingCodec | null
-					enum:    [...#EncodingCodec] | null
+					enum:    [#EncodingCodec, ...#EncodingCodec] | null
 				}
 			}
 		}
@@ -464,13 +464,15 @@ _values: {
 }
 
 #HowItWorks: [Name=string]: close({
+	#Subsection: {
+		title: string
+		body:  string
+	}
+
 	name:  Name
 	title: string
 	body:  string
-	sub_sections?: [...{
-		title: string
-		body:  string
-	}]
+	sub_sections?: [#Subsection, ...#Subsection]
 })
 
 #Input: {
@@ -521,8 +523,8 @@ _values: {
 }
 
 #MetricEventDistribution: {
-	values: [...float]
-	sample_rates: [...uint]
+	values: [float, ...float]
+	sample_rates: [uint, ...uint]
 	statistic: "histogram" | "summary"
 }
 
@@ -531,19 +533,19 @@ _values: {
 }
 
 #MetricEventHistogram: {
-	buckets: [...float]
-	counts: [...int]
+	buckets: [float, ...float]
+	counts: [int, ...int]
 	count: int
 	sum:   float
 }
 
 #MetricEventSet: {
-	values: [...string]
+	values: [string, ...string]
 }
 
 #MetricEventSummary: {
-	quantiles: [...float]
-	values: [...float]
+	quantiles: [float, ...float]
+	values: [float, ...float]
 	count: int
 	sum:   float
 }
@@ -559,9 +561,9 @@ _values: {
 #MetricTags: [Name=string]: close({
 	name:        Name
 	description: string
-	examples?: [...string]
+	examples?: [string, ...string]
 	required: bool
-	options?: [...string] | #Map
+	options?: [string, ...string] | #Map
 	default?: string
 })
 
@@ -595,7 +597,7 @@ _values: {
 	codename: string
 	date:     string
 
-	commits: [...#Commit]
+	commits: [#Commit, ...#Commit]
 	whats_next: #Any
 }
 
@@ -613,7 +615,7 @@ _values: {
 
 	interface?: #Interface
 
-	setup: [...string]
+	setup?: [string, ...string]
 }
 
 #Schema: [Name=string]: {
@@ -636,7 +638,7 @@ _values: {
 	//
 	// For example, the `influxdb_logs` sink supports both v1 and v2 of Influxdb
 	// and relevant options are placed in those groups.
-	groups?: [...string]
+	groups?: [string, ...string]
 
 	// `name` sets the name for this option. It is automatically set for you
 	// via the key you use.
@@ -690,21 +692,21 @@ _values: {
 	//
 	// For example, the `journald` source requires the presence of the
 	// `journalctl` binary.
-	requirements: [...string] | null
+	requirements: [...string] | null // Allow for empty list
 
 	// `warnings` describes any warnings the user should know about the
 	// component.
 	//
 	// For example, the `grok_parser` might offer a performance warning
 	// since the `regex_parser` and other transforms are faster.
-	warnings: [...string] | null
+	warnings: [...string] | null // Allow for empty list
 
 	// `notices` communicates useful information to the user that is neither
 	// a requirement or a warning.
 	//
 	// For example, the `lua` transform offers a Lua version notice that
 	// communicate which version of Lua is embedded.
-	notices: [...string] | null
+	notices: [...string] | null // Allow for empty list
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
@@ -780,7 +782,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples?: [...float]
+	examples?: [float, ...float]
 }
 
 #TypeObject: {
@@ -805,15 +807,15 @@ _values: {
 	// `enum` restricts the value to a set of values.
 	//
 	//      enum: {
-	//       json: "Encodes the data via application/json"
-	//       text: "Encodes the data via text/plain"
+	//        json: "Encodes the data via application/json"
+	//        text: "Encodes the data via text/plain"
 	//      }
 	enum?: #Enum
 
 	if enum == _|_ {
 		// `examples` demonstrates example values. This should be used when
 		// examples cannot be derived from the `default` or `enum` options.
-		examples: [...string] | *[
+		examples: [string, ...string] | *[
 				for k, v in enum {
 				k
 			},
@@ -852,7 +854,7 @@ _values: {
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
-	examples?: [...uint]
+	examples?: [uint, ...uint]
 
 	// `unit` clarifies the value's unit. While this should be included
 	// as the suffix in the name, this helps to explicitly clarify that.
@@ -884,31 +886,27 @@ remap: {
 	}
 
 	functions: [Name=string]: {
-		arguments: [
-			...{
-				required: bool
+		#Argument: {
+			name:        string
+			description: string
+			required:    bool
+			multiple:    bool | *false
+			default?:    bool | string
+			type: [#RemapParameterTypes, ...#RemapParameterTypes]
+		}
+		#RemapExample: {
+			title: string
+			configuration?: [string]: string
+			input:  #Fields
+			source: string
+			output: #Fields
+		}
 
-				if !required {
-					name: string
-				}
-
-				multiple: bool | *false
-
-				type: [#RemapParameterTypes, ...]
-			},
-		]
-		return: [#RemapReturnTypes, ...]
+		arguments: [...#Argument] // Allow for empty list
+		return: [#RemapReturnTypes, ...#RemapReturnTypes]
 		category:    "coerce" | "parse" | "text" | "hash" | "event"
 		description: string
-		examples: [
-			...{
-				title: string
-				configuration?: [string]: string
-				input:  #Fields
-				source: string
-				output: #Fields
-			},
-		]
+		examples: [#RemapExample, ...#RemapExample]
 		name: Name
 	}
 }
