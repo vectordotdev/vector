@@ -880,9 +880,7 @@ mod integration_tests {
         http::HttpClient,
         sinks::influxdb::{
             metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
-            test_util::{
-                cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, DATABASE, ORG, TOKEN,
-            },
+            test_util::{cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG, TOKEN},
             InfluxDB1Settings, InfluxDB2Settings,
         },
         tls::TlsOptions,
@@ -893,7 +891,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn insert_metrics_over_https() {
-        onboarding_v1("https://localhost:8087").await;
+        let database = onboarding_v1("https://localhost:8087").await;
 
         let cx = SinkContext::new_test();
 
@@ -901,7 +899,7 @@ mod integration_tests {
             endpoint: "https://localhost:8087".to_string(),
             influxdb1_settings: Some(InfluxDB1Settings {
                 consistency: None,
-                database: DATABASE.to_string(),
+                database: database.clone(),
                 retention_policy_name: Some("autogen".to_string()),
                 username: None,
                 password: None,
@@ -924,7 +922,7 @@ mod integration_tests {
 
         let res = query_v1(
             "https://localhost:8087",
-            &format!("show series on {}", DATABASE),
+            &format!("show series on {}", database),
         )
         .await;
         let string = res.text().await.unwrap();
@@ -955,7 +953,7 @@ mod integration_tests {
             10
         );
 
-        cleanup_v1("https://localhost:8087").await;
+        cleanup_v1("https://localhost:8087", &database).await;
     }
 
     #[tokio::test]

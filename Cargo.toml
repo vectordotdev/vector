@@ -191,6 +191,7 @@ uom = { version = "0.30.0", optional = true }
 rust_decimal = "1.8.1"
 mongodb = { version = "1.1.1", optional = true }
 anyhow = { version = "1.0.28" }
+snap = { version = "1.0.1", optional = true }
 dyn-clone = "1.0.3"
 
 # For WASM
@@ -456,7 +457,7 @@ sinks-kafka = []
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
-sinks-prometheus = []
+sinks-prometheus = ["snap"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = []
 sinks-papertrail = []
@@ -482,6 +483,7 @@ all-integration-tests = [
   "kafka-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
+  "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
 ]
@@ -511,6 +513,7 @@ influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
+prometheus-integration-tests = ["sinks-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 
