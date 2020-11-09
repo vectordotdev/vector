@@ -62,6 +62,32 @@ pub async fn assert_vector_started(url: &str) -> Result<(), Box<dyn std::error::
     Ok(())
 }
 
+/// This helper function performs HTTP requests to the specified URL and
+/// waits for the presence of `vector_started`-ish metric until the deadline
+/// with even dealys between attempts.
+pub async fn wait_for_vector_started(
+    url: &str,
+    next_attempt_delay: std::time::Duration,
+    deadline: std::time::Instant,
+) -> Result<(), Box<dyn std::error::Error>> {
+    loop {
+        let err = match assert_vector_started(url).await {
+            Ok(()) => break,
+            Err(err) => err,
+        };
+        if std::time::Instant::now() >= deadline {
+            return Err(err);
+        }
+
+        eprintln!(
+            "Waiting for vector_started metrics to be available, next poll in {} sec, deadline at {:?}",
+            next_attempt_delay.as_secs_f64(), deadline,
+        );
+        tokio::time::delay_for(next_attempt_delay).await;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

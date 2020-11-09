@@ -80,7 +80,12 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Assert that `vector_started`-ish metric is present.
-    metrics::assert_vector_started(&vector_metrics_url).await?;
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
 
     drop(vector_metrics_port_forward);
     drop(vector);

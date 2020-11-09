@@ -1325,8 +1325,13 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         vector_metrics_port_forward.local_addr_ipv4()
     );
 
-    // Assert that `vector_started`-ish metric is present.
-    metrics::assert_vector_started(&vector_metrics_url).await?;
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
 
     // We want to capture the initial value for the `events_processed` metric,
     // but until the `kubernetes_logs` source loads the `Pod`s list, it's
