@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    internal_events::{EventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
     transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
@@ -67,7 +67,7 @@ impl AddTags {
 
 impl FunctionTransform for AddTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(AddTagsEventProcessed);
+        emit!(EventProcessed);
 
         if !self.tags.is_empty() {
             let tags = &mut event.as_mut_metric().tags;

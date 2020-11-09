@@ -2,19 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct LogfmtParserEventProcessed;
-
-impl InternalEvent for LogfmtParserEventProcessed {
-    fn emit_logs(&self) {
-        trace!(message = "Processed one event.");
-    }
-
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct LogfmtParserMissingField<'a> {
     pub field: &'a str,
 }

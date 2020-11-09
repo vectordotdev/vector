@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
+        EventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
         AddFieldsTemplateRenderingError,
     },
     template::Template,
@@ -104,7 +104,7 @@ impl AddFields {
 
 impl FunctionTransform for AddFields {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(AddFieldsEventProcessed);
+        emit!(EventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
             let key_string = key.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.

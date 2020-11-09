@@ -2,7 +2,7 @@ use super::BuildError;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
-    internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
+    internal_events::{EventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
 };
 use regex::bytes::Regex;
@@ -135,7 +135,7 @@ impl Concat {
 
 impl FunctionTransform for Concat {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(ConcatEventProcessed);
+        emit!(EventProcessed);
 
         let mut content_vec: Vec<bytes::Bytes> = Vec::new();
 

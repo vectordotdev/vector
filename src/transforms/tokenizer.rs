@@ -2,7 +2,7 @@ use super::util::tokenize::parse;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter, Value},
-    internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
+    internal_events::{TokenizerConvertFailed, EventProcessed, TokenizerFieldMissing},
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
@@ -115,7 +115,7 @@ impl FunctionTransform for Tokenizer {
             emit!(TokenizerFieldMissing { field: &self.field });
         };
 
-        emit!(TokenizerEventProcessed);
+        emit!(EventProcessed);
 
         output.push(event)
     }

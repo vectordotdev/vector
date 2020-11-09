@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct SplitEventProcessed;
-
-impl InternalEvent for SplitEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct SplitFieldMissing<'a> {
     pub field: &'a str,
 }

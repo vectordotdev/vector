@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::{counter, gauge};
 
 #[derive(Debug)]
-pub struct LuaEventProcessed;
-
-impl InternalEvent for LuaEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct LuaGcTriggered {
     pub used_memory: usize,
 }

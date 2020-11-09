@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct ConcatEventProcessed;
-
-impl InternalEvent for ConcatEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct ConcatSubstringError<'a> {
     pub source: &'a str,
     pub condition: &'a str,

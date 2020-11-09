@@ -3,7 +3,7 @@ use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{
-        AwsCloudwatchLogsSubscriptionParserEventProcessed,
+        EventProcessed,
         AwsCloudwatchLogsSubscriptionParserFailedParse,
     },
     transforms::FunctionTransform,
@@ -72,7 +72,7 @@ impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let log = event.as_log();
 
-        emit!(AwsCloudwatchLogsSubscriptionParserEventProcessed);
+        emit!(EventProcessed);
 
         let message = log
             .get(&self.field)

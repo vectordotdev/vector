@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    internal_events::RemoveTagsEventProcessed,
+    internal_events::EventProcessed,
     transforms::{FunctionTransform, Transform},
     Event,
 };
@@ -55,7 +55,7 @@ impl RemoveTags {
 
 impl FunctionTransform for RemoveTags {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
-        emit!(RemoveTagsEventProcessed);
+        emit!(EventProcessed);
 
         let tags = &mut event.as_mut_metric().tags;
 

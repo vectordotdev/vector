@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Value,
     internal_events::{
-        ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
+        EventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
         ANSIStripperFieldMissing,
     },
     transforms::{FunctionTransform, Transform},
@@ -74,7 +74,7 @@ impl FunctionTransform for AnsiStripper {
             _ => emit!(ANSIStripperFieldInvalid { field: &self.field }),
         }
 
-        emit!(ANSIStripperEventProcessed);
+        emit!(EventProcessed);
 
         output.push(event);
     }

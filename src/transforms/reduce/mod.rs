@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
-    internal_events::{ReduceEventProcessed, ReduceStaleEventFlushed},
+    internal_events::{EventProcessed, ReduceStaleEventFlushed},
     transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
@@ -237,7 +237,7 @@ impl Reduce {
             self.push_or_new_reduce_state(event, discriminant)
         }
 
-        emit!(ReduceEventProcessed);
+        emit!(EventProcessed);
 
         self.flush_into(output);
     }

@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
+    internal_events::{EventProcessed, JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -75,7 +75,7 @@ impl FunctionTransform for JsonParser {
         let log = event.as_mut_log();
         let value = log.get(&self.field);
 
-        emit!(JsonParserEventProcessed);
+        emit!(EventProcessed);
 
         let parsed = value
             .and_then(|value| {

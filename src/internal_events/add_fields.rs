@@ -2,15 +2,6 @@ use super::InternalEvent;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct AddFieldsEventProcessed;
-
-impl InternalEvent for AddFieldsEventProcessed {
-    fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-    }
-}
-
-#[derive(Debug)]
 pub struct AddFieldsTemplateRenderingError<'a> {
     pub field: &'a str,
 }

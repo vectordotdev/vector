@@ -20,7 +20,7 @@ mod tests {
         self,
         api::{self, Server},
         config::Config,
-        internal_events::{emit, GeneratorEventProcessed, Heartbeat},
+        internal_events::{emit, EventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
     use vector_api_client::{
@@ -121,7 +121,7 @@ mod tests {
                 select! {
                     _ = &mut shutdown_rx => break,
                     _ = timer.tick() => {
-                        emit(GeneratorEventProcessed);
+                        emit(EventProcessed);
                     }
                 }
             }

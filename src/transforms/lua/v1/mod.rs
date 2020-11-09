@@ -2,7 +2,7 @@ use crate::transforms::TaskTransform;
 use crate::{
     config::DataType,
     event::{Event, Value},
-    internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
+    internal_events::{EventProcessed, LuaGcTriggered, LuaScriptError},
     transforms::Transform,
 };
 use futures01::Stream as Stream01;
@@ -137,7 +137,7 @@ impl Lua {
             self.invocations_after_gc = 0;
         }
 
-        emit!(LuaEventProcessed);
+        emit!(EventProcessed);
 
         result
     }

@@ -2,7 +2,7 @@ use crate::transforms::TaskTransform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::{
-        TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
+        EventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
     },
     transforms::Transform,
@@ -215,7 +215,7 @@ impl TagCardinalityLimit {
     }
 
     fn transform_one(&mut self, mut event: Event) -> Option<Event> {
-        emit!(TagCardinalityLimitEventProcessed);
+        emit!(EventProcessed);
         match event.as_mut_metric().tags {
             Some(ref mut tags_map) => {
                 match self.config.limit_exceeded_action {

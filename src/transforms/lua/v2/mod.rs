@@ -4,7 +4,7 @@ use crate::{
     config::DataType,
     config::CONFIG_PATHS,
     event::Event,
-    internal_events::{LuaBuildError, LuaEventProcessed, LuaGcTriggered},
+    internal_events::{LuaBuildError, EventProcessed, LuaGcTriggered},
     transforms::{
         util::runtime_transform::{RuntimeTransform, Timer},
         Transform,
@@ -249,7 +249,7 @@ impl RuntimeTransform for Lua {
     where
         F: FnMut(Event),
     {
-        emit!(LuaEventProcessed);
+        emit!(EventProcessed);
         let _ = self
             .lua
             .context(|ctx: rlua::Context<'_>| {

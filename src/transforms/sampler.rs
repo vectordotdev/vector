@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{SamplerEventDiscarded, SamplerEventProcessed},
+    internal_events::{SamplerEventDiscarded, EventProcessed},
     transforms::{FunctionTransform, Transform},
 };
 use regex::RegexSet; // TODO: use regex::bytes
@@ -81,7 +81,7 @@ impl FunctionTransform for Sampler {
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into());
 
-        emit!(SamplerEventProcessed);
+        emit!(EventProcessed);
 
         if self.pass_list.is_match(&message) {
             output.push(event);

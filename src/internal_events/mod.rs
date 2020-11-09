@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+mod events_processed;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
@@ -66,8 +67,6 @@ mod regex_parser;
 mod remap;
 #[cfg(feature = "transforms-remove_fields")]
 mod remove_fields;
-#[cfg(feature = "transforms-remove_tags")]
-mod remove_tags;
 #[cfg(feature = "transforms-rename_fields")]
 mod rename_fields;
 mod sampler;
@@ -98,6 +97,7 @@ mod wasm;
 
 pub mod kubernetes;
 
+pub use self::events_processed::EventProcessed;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
@@ -164,8 +164,6 @@ pub(crate) use self::regex_parser::*;
 pub use self::remap::*;
 #[cfg(feature = "transforms-remove_fields")]
 pub use self::remove_fields::*;
-#[cfg(feature = "transforms-remove_tags")]
-pub use self::remove_tags::*;
 #[cfg(feature = "transforms-rename_fields")]
 pub use self::rename_fields::*;
 pub use self::sampler::*;
