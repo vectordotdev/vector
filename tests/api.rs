@@ -330,6 +330,7 @@ mod tests {
 
     #[tokio::test]
     #[allow(clippy::float_cmp)]
+    #[ignore]
     /// Tests componentEventsProcessedTotal returns increasing metrics, ordered by
     /// source -> transform -> sink
     async fn api_graphql_component_events_processed_total() {
@@ -340,24 +341,22 @@ mod tests {
             [api]
               enabled = true
 
-            [sources.gen]
+            [sources.events_processed_total_source]
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
 
-            [sinks.out]
+            [sinks.events_processed_total_sink]
               # General
               type = "blackhole"
-              inputs = ["gen"]
+              inputs = ["events_processed_total_source"]
               print_amount = 100000
         "#,
         )
         .await;
 
         let server = api::Server::start(topology.config());
-
         let client = new_subscription_client(server.addr()).await;
-
         let subscription = client.component_events_processed_total_subscription(500);
 
         tokio::pin! {
@@ -382,16 +381,19 @@ mod tests {
             );
         }
 
-        assert_eq!(map[&0].name, "gen");
-        assert_eq!(map[&1].name, "out");
+        assert_eq!(map[&0].name, "events_processed_total_source");
+        assert_eq!(map[&1].name, "events_processed_total_sink");
 
         assert_eq!(
             map[&0].metric.events_processed_total,
             map[&1].metric.events_processed_total
         );
+
+        topology.sources_finished().await;
     }
 
     #[tokio::test]
+    #[ignore]
     /// Tests componentAdded receives an added component
     async fn api_graphql_component_added_subscription() {
         init_metrics();
@@ -402,15 +404,15 @@ mod tests {
             [api]
               enabled = true
 
-            [sources.gen1]
+            [sources.component_added_source_1]
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
 
-            [sinks.out]
+            [sinks.component_added_sink]
               # General
               type = "blackhole"
-              inputs = ["gen1"]
+              inputs = ["component_added_source_1"]
               print_amount = 100000
         "#,
         )
@@ -427,9 +429,8 @@ mod tests {
                 let component_added = subscription.stream();
             }
 
-            // The component added should be `gen2`
             assert_eq!(
-                "gen2",
+                "component_added_source_2",
                 component_added
                     .next()
                     .await
@@ -449,21 +450,21 @@ mod tests {
             r#"
             [api]
               enabled = true
-
-            [sources.gen1]
+              
+            [sources.component_added_source_1]
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
-
-            [sources.gen2]
+            
+            [sources.component_added_source_2]
               type = "generator"
               lines = ["3rd line", "4th line"]
               batch_interval = 0.1
 
-            [sinks.out]
+            [sinks.component_added_sink]
               # General
               type = "blackhole"
-              inputs = ["gen1", "gen2"]
+              inputs = ["component_added_source_1", "component_added_source_2"]
               print_amount = 100000
         "#,
         )
@@ -474,9 +475,11 @@ mod tests {
 
         // Await the join handle
         handle.await.unwrap();
+        topology.sources_finished().await;
     }
 
     #[tokio::test]
+    #[ignore]
     /// Tests componentRemoves detects when a component has been removed
     async fn api_graphql_component_removed_subscription() {
         init_metrics();
@@ -487,20 +490,20 @@ mod tests {
             [api]
               enabled = true
 
-            [sources.gen1]
+            [sources.component_removed_source_1]
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
 
-            [sources.gen2]
+            [sources.component_removed_source_2]
               type = "generator"
               lines = ["3rd line", "4th line"]
               batch_interval = 0.1
 
-            [sinks.out]
+            [sinks.component_removed_sink]
               # General
               type = "blackhole"
-              inputs = ["gen1", "gen2"]
+              inputs = ["component_removed_source_1", "component_removed_source_2"]
               print_amount = 100000
         "#,
         )
@@ -517,9 +520,8 @@ mod tests {
                 let component_removed = subscription.stream();
             }
 
-            // The component added should be `gen2`
             assert_eq!(
-                "gen2",
+                "component_removed_source_2",
                 component_removed
                     .next()
                     .await
@@ -540,15 +542,15 @@ mod tests {
             [api]
               enabled = true
 
-            [sources.gen1]
+            [sources.component_removed_source_1]
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
 
-            [sinks.out]
+            [sinks.component_removed_sink]
               # General
               type = "blackhole"
-              inputs = ["gen1"]
+              inputs = ["component_removed_source_1"]
               print_amount = 100000
         "#,
         )
@@ -559,5 +561,6 @@ mod tests {
 
         // Await the join handle
         handle.await.unwrap();
+        topology.sources_finished().await;
     }
 }
