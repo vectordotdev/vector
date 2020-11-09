@@ -159,8 +159,9 @@ impl Checkpointer {
         f.sync_all()?;
 
         // Once the temp file is fully flushed, rename the tmp file to replace the previous stable
-        // file. This is (almost?) always an atomic operation, which should prevent scenarios where
-        // we don't have at least one full valid file to recover from.
+        // file. This is an atomic operation on POSIX systems (and the stdlib claims to provide
+        // equivalent behavior on Windows), which should prevent scenarios where we don't have at
+        // least one full valid file to recover from.
         fs::rename(&self.tmp_file_path, &self.stable_file_path)?;
 
         Ok(self.checkpoints.len())
