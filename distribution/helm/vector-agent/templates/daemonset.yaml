@@ -112,20 +112,8 @@ spec:
             path: /var/lib/vector/
         # Vector config dir.
         - name: config-dir
-          projected:
-            sources:
-              # Managed `ConfigMap`.
-              - configMap:
-                  name: {{ include "libvector.configMapName" . }}
-                  optional: true
-              # Custom `ConfigMap`.
-              - configMap:
-                  name: vector-agent-config
-                  optional: true
-              # Custom `Secret`.
-              - secret:
-                  name: vector-agent-config
-                  optional: true
+          configMap:
+            name: {{ include "libvector.configMapName" . }}
         {{- with .Values.extraVolumes }}
         # Extra volumes.
         {{- toYaml . | nindent 8 }}
