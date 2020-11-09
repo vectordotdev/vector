@@ -83,12 +83,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b602bfe940d21c130f3895acd65221e8a61270debe89d628b9cb4e3ccb8569b"
 
 [[package]]
-name = "anymap"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33954243bd79057c2de7338850b85983a44588021f8a5fee574a8888c6de4344"
-
-[[package]]
 name = "approx"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -169,9 +163,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.0.8"
+version = "2.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aacd1f33609c3f37792005ddfd9dd40891c6c4553a1d22cc290b3dc664c3ade"
+checksum = "8df38118e1831c8ffbccdde6dc6e4d4a81f681b89404fcb0ac08637474e62dbf"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -196,6 +190,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "sha2 0.9.1",
  "spin 0.6.0",
  "static_assertions",
  "tempfile",
@@ -207,9 +202,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.0.8"
+version = "2.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4865ce6f7993b9e06f8cab15ee16e083b7802fb681771510b6d18cc9eb70412c"
+checksum = "4579232b7e214887e8114e66c5983996de2c510068dba577ee4f72e3446f94d6"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -246,9 +241,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-warp"
-version = "2.0.8"
+version = "2.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0340e72876a920a08b123c2f3ebb4f8852bebf98dff4fe4b314800db82a3ab39"
+checksum = "48b7f40d2b30d9215c51738fdcefc5d958280149ad00e348da2450676498d1e7"
 dependencies = [
  "async-graphql",
  "futures-util",
@@ -308,6 +303,12 @@ dependencies = [
  "quote 1.0.7",
  "syn 1.0.48",
 ]
+
+[[package]]
+name = "atomic-option"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0db678acb667b525ac40a324fc5f7d3390e29239b31c7327bb8157f5b4fff593"
 
 [[package]]
 name = "atomic-waker"
@@ -614,6 +615,18 @@ name = "bumpalo"
 version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2e8c087f005730276d1096a652e92a8bacee2e2472bcc9715a74d2bec38b5820"
+
+[[package]]
+name = "bus"
+version = "2.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f1e66e1779f5b1440f1a58220ba3b3ded4427175f0a9fb8d7066521f8b4e8f2b"
+dependencies = [
+ "atomic-option",
+ "crossbeam-channel",
+ "num_cpus",
+ "parking_lot_core 0.7.2",
+]
 
 [[package]]
 name = "byte-tools"
@@ -6675,7 +6688,6 @@ name = "vector"
 version = "0.11.0"
 dependencies = [
  "anyhow",
- "anymap",
  "approx",
  "assert_cmd",
  "async-compression",
@@ -6688,6 +6700,7 @@ dependencies = [
  "bloom",
  "bollard",
  "built",
+ "bus",
  "bytes 0.5.6",
  "bytesize",
  "chrono",
@@ -6722,6 +6735,7 @@ dependencies = [
  "hyper-openssl",
  "indexmap",
  "inventory",
+ "itertools 0.9.0",
  "jemallocator",
  "k8s-openapi",
  "lazy_static",
@@ -6786,7 +6800,6 @@ dependencies = [
  "sha-1 0.9.1",
  "sha2 0.9.1",
  "sha3",
- "slab",
  "smpl_jwt",
  "snafu",
  "snap",

@@ -1,7 +1,4 @@
-use super::{
-    events::capture_key_press,
-    state::{WidgetsState, COMPONENT_HEADERS},
-};
+use super::{events::capture_key_press, state};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
@@ -9,11 +6,7 @@ use crossterm::{
     tty::IsTty,
     ExecutableCommand,
 };
-use std::{
-    io::{stdout, Write},
-    sync::Arc,
-};
-use tokio::stream::StreamExt;
+use std::io::{stdout, Write};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
@@ -23,26 +16,29 @@ use tui::{
     Frame, Terminal,
 };
 
-pub struct Widgets {
+struct Widgets<'a> {
     constraints: Vec<Constraint>,
-    state: Arc<WidgetsState>,
+    url_string: &'a str,
 }
 
-impl Widgets {
+impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(state: Arc<WidgetsState>) -> Self {
+    pub fn new(url_string: &'a str) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
             Constraint::Length(3),
         ];
 
-        Self { constraints, state }
+        Self {
+            constraints,
+            url_string,
+        }
     }
 
     /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
-    fn title<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![Spans::from(self.state.url())];
+    fn title<B: Backend>(&'a self, f: &mut Frame<B>, area: Rect) {
+        let text = vec![Spans::from(self.url_string)];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
             "Vector",
@@ -57,23 +53,22 @@ impl Widgets {
 
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
-    fn components_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let components = self.state.components();
-        let items = components.rows().into_iter().map(|r| {
+    fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
+        let items = state.iter().map(|(_, r)| {
             Row::StyledData(
                 vec![
                     r.name.clone(),
                     r.component_type.clone(),
                     r.format_events_processed_total(),
+                    r.format_bytes_processed_total(),
                     r.format_errors(),
-                    r.format_throughput(),
                 ]
                 .into_iter(),
                 Style::default().fg(Color::White),
             )
         });
 
-        let w = Table::new(COMPONENT_HEADERS.iter(), items)
+        let w = Table::new(state::COMPONENT_HEADERS.iter(), items)
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .header_gap(1)
             .column_spacing(2)
@@ -104,19 +99,14 @@ impl Widgets {
     }
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
-    fn draw<B: Backend>(&self, f: &mut Frame<B>) {
+    fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
         let rects = Layout::default()
             .constraints(self.constraints.as_ref())
             .split(f.size());
 
         self.title(f, rects[0]);
-        self.components_table(f, rects[1]);
+        self.components_table(f, &state, rects[1]);
         self.quit_box(f, rects[2]);
-    }
-
-    /// Listen for state updates. Used to determine when to redraw.
-    fn listen(&self) -> tokio::sync::watch::Receiver<()> {
-        self.state.listen()
     }
 }
 
@@ -129,7 +119,10 @@ pub fn is_tty() -> bool {
 /// stdout. We're using 'direct' drawing mode to control the full output of the dashboard,
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
-pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn init_dashboard(
+    url: &str,
+    mut state_rx: state::StateRx,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
     let (mut key_press_rx, key_press_kill_tx) = capture_key_press();
 
@@ -149,16 +142,12 @@ pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error:
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    // Throttle widgets changes to 250ms, to space out re-draws
-    let widget_listener =
-        tokio::time::throttle(tokio::time::Duration::from_millis(250), widgets.listen());
-
-    tokio::pin!(widget_listener);
+    let widgets = Widgets::new(url);
 
     loop {
         tokio::select! {
-            _ = widget_listener.next() => {
-                terminal.draw(|f| widgets.draw(f))?;
+            Some(state) = state_rx.recv() => {
+                terminal.draw(|f| widgets.draw(f, state))?;
             },
             k = key_press_rx.recv() => {
                 if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
