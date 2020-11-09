@@ -450,12 +450,12 @@ mod tests {
             r#"
             [api]
               enabled = true
-              
+
             [sources.component_added_source_1]
               type = "generator"
               lines = ["Random line", "And another"]
               batch_interval = 0.1
-            
+
             [sources.component_added_source_2]
               type = "generator"
               lines = ["3rd line", "4th line"]
