@@ -12,8 +12,10 @@ use crate::{
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
 };
-use futures::future::{ready, BoxFuture};
-use futures::{FutureExt, SinkExt};
+use futures::{
+    future::{ready, BoxFuture},
+    FutureExt, SinkExt,
+};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
@@ -243,18 +245,17 @@ fn to_fields(label: String, value: f64) -> HashMap<String, Field> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{
-        metric::{MetricKind, MetricValue},
-        Event, Metric,
+    use crate::{
+        event::{metric::MetricKind, Event},
+        sinks::util::test::{build_test_server, load_sink},
+        test_util::{next_addr, test_generate_config, trace_init},
     };
-    use crate::sinks::util::test::{build_test_server, load_sink};
-    use crate::test_util;
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<SematextMetricsConfig>();
+        test_generate_config::<SematextMetricsConfig>();
     }
 
     #[test]
@@ -321,6 +322,8 @@ mod tests {
 
     #[tokio::test]
     async fn smoke() {
+        trace_init();
+
         let (mut config, cx) = load_sink::<SematextMetricsConfig>(
             r#"
             region = "eu"
@@ -331,7 +334,7 @@ mod tests {
         )
         .unwrap();
 
-        let addr = test_util::next_addr();
+        let addr = next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
         let endpoint = format!("http://{}", addr);

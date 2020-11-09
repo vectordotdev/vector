@@ -177,7 +177,7 @@ where
 
             // Try send batch.
             let should_send = {
-                if self.closing || self.batch.was_full() {
+                if (self.closing && !self.batch.is_empty()) || self.batch.was_full() {
                     true
                 } else {
                     self.linger
@@ -363,7 +363,7 @@ where
             let mut partitions_ready = vec![];
             for (partition, batch) in this.partitions.iter() {
                 let should_send = {
-                    if *this.closing || batch.was_full() {
+                    if (*this.closing && !batch.is_empty()) || batch.was_full() {
                         true
                     } else {
                         let linger = this
