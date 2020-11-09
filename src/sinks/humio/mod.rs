@@ -1,7 +1,6 @@
 pub mod logs;
 pub mod metrics;
 
-
 use crate::sinks::splunk_hec;
 use serde::{Deserialize, Serialize};
 
