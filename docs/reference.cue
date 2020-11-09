@@ -95,35 +95,35 @@ _values: {
 
 	// `examples` demonstrates various ways to use the component using an
 	// input, output, and example configuration.
-	examples: [
-		...close({
-			title:    string
-			context?: string
-			"configuration": {
-				for k, v in configuration {
-					"\( k )"?: _ | *null
-				}
+	#ExampleConfig: close({
+		title:    string
+		context?: string
+		"configuration": {
+			for k, v in configuration {
+				"\( k )"?: _ | *null
 			}
+		}
 
-			if Kind == "source" {
-				input: string
-			}
+		if Kind == "source" {
+			input: string
+		}
 
-			if Kind != "source" {
-				input: #Event | [#Event, ...#Event]
-			}
+		if Kind != "source" {
+			input: #Event | [#Event, ...#Event]
+		}
 
-			if Kind == "sink" {
-				output: string
-			}
+		if Kind == "sink" {
+			output: string
+		}
 
-			if Kind != "sink" {
-				output: #Event | [#Event, ...#Event] | null
-			}
+		if Kind != "sink" {
+			output: #Event | [#Event, ...#Event] | null
+		}
 
-			notes?: string
-		}),
-	]
+		notes?: string
+	})
+
+	examples?: [#ExampleConfig, ...#ExampleConfig]
 
 	// `features` describes the various supported features of the component.
 	// Setting these helps to reduce boilerplate.
@@ -894,7 +894,7 @@ remap: {
 			default?:    bool | string
 			type: [#RemapParameterTypes, ...#RemapParameterTypes]
 		}
-		#Example: {
+		#RemapExample: {
 			title: string
 			configuration?: [string]: string
 			input:  #Fields
@@ -906,7 +906,7 @@ remap: {
 		return: [#RemapReturnTypes, ...#RemapReturnTypes]
 		category:    "coerce" | "parse" | "text" | "hash" | "event"
 		description: string
-		examples: [#Example, ...#Example]
+		examples: [#RemapExample, ...#RemapExample]
 		name: Name
 	}
 }
