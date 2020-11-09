@@ -137,7 +137,7 @@ impl SinkConfig for StatsdSinkConfig {
 }
 
 fn encode_tags(tags: &BTreeMap<String, String>) -> String {
-    let mut parts: Vec<_> = tags
+    let parts: Vec<_> = tags
         .iter()
         .map(|(name, value)| {
             if value == "true" {
@@ -147,7 +147,7 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
             }
         })
         .collect();
-    parts.sort();
+    // `parts` is already sorted by key because of BTreeMap
     parts.join(",")
 }
 
@@ -278,6 +278,25 @@ mod test {
         assert_eq!(
             &encode_tags(&tags()),
             "empty_tag:,normal_tag:value,true_tag"
+        );
+    }
+
+    #[test]
+    fn tags_order() {
+        assert_eq!(
+            &encode_tags(
+                &vec![
+                    ("a", "value"),
+                    ("b", "value"),
+                    ("c", "value"),
+                    ("d", "value"),
+                    ("e", "value"),
+                ]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect()
+            ),
+            "a:value,b:value,c:value,d:value,e:value"
         );
     }
 

@@ -13,6 +13,7 @@ _values: {
 	current_timestamp: "2020-10-10T17:07:36.452332Z"
 	local_host:        "my-host.local"
 	remote_host:       "34.33.222.212"
+	instance:          "vector:9598"
 }
 
 // `#Any` allows for any value.
@@ -35,7 +36,7 @@ _values: {
 	if Args.kind == "source" {
 		// `deployment_roles` clarify when the component should be used under
 		// different deployment contexts.
-		deployment_roles: [#DeploymentRole, ...]
+		deployment_roles: [...#DeploymentRole]
 	}
 	development: #DevelopmentStatus
 
@@ -55,16 +56,16 @@ _values: {
 
 #Commit: {
 	author:           string
-	breaking_change:  bool
+	breaking_change:  bool | null
 	date:             #Date
 	description:      string
 	deletions_count:  uint
 	files_count:      uint
 	insertions_count: uint
 	pr_number:        uint | null
-	scopes:           [string, ...] | []
+	scopes:           [...string] | *[]
 	sha:              #CommitSha
-	type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status"
+	type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status" | null
 }
 
 #CommitSha: =~"^[a-z0-9]{40}$"
@@ -109,7 +110,7 @@ _values: {
 			}
 
 			if Kind != "source" {
-				input: #Event | [#Event, ...]
+				input: #Event | [...#Event]
 			}
 
 			if Kind == "sink" {
@@ -117,7 +118,7 @@ _values: {
 			}
 
 			if Kind != "sink" {
-				output: #Event | [#Event, ...] | null
+				output: #Event | [...#Event] | null
 			}
 
 			notes?: string
@@ -154,13 +155,16 @@ _values: {
 	//
 	// For example, the `http` sink has a `HTTP` title.
 	title: string
+
+	// Telemetry produced by the component
+	telemetry: metrics: #MetricOutput
 }
 
 // `#CompressionAlgorithm` specified data compression algorithm.
 //
 // * `none` - compression is not applied
 // * `gzip` - gzip compression applied
-#CompressionAlgorithm: "none" | "gzip"
+#CompressionAlgorithm: "none" | "gzip" | "lz4" | "snappy" | "zstd"
 
 #CompressionLevel: "none" | "fast" | "default" | "best" | >=0 & <=9
 
@@ -261,7 +265,7 @@ _values: {
 		port: uint16
 	}
 
-	protocols: [#Protocol, ...]
+	protocols: [...#Protocol]
 	socket?: string
 	ssl:     "disabled" | "required" | "optional"
 }
@@ -398,8 +402,8 @@ _values: {
 
 		if enabled == true {
 			default: #CompressionAlgorithm
-			algorithms: [#CompressionAlgorithm, ...]
-			levels: [#CompressionLevel, ...]
+			algorithms: [...#CompressionAlgorithm]
+			levels: [...#CompressionLevel]
 		}
 	}
 
@@ -413,7 +417,7 @@ _values: {
 
 				if enabled {
 					default: #EncodingCodec | null
-					enum:    [#EncodingCodec, ...] | null
+					enum:    [...#EncodingCodec] | null
 				}
 			}
 		}
@@ -425,6 +429,7 @@ _values: {
 		enabled: bool
 
 		if enabled {
+			auto_concurrency:           bool | *true
 			in_flight_limit:            uint8 | *5
 			rate_limit_duration_secs:   uint8
 			rate_limit_num:             uint16
@@ -486,6 +491,8 @@ _values: {
 	fields:      #Schema
 })
 
+#Map: [string]: string
+
 #MetricInput: {
 	counter:      bool
 	distribution: bool
@@ -514,8 +521,8 @@ _values: {
 }
 
 #MetricEventDistribution: {
-	values: [float, ...]
-	sample_rates: [uint, ...]
+	values: [...float]
+	sample_rates: [...uint]
 	statistic: "histogram" | "summary"
 }
 
@@ -524,19 +531,19 @@ _values: {
 }
 
 #MetricEventHistogram: {
-	buckets: [float, ...]
-	counts: [int, ...]
+	buckets: [...float]
+	counts: [...int]
 	count: int
 	sum:   float
 }
 
 #MetricEventSet: {
-	values: [string, ...]
+	values: [...string]
 }
 
 #MetricEventSummary: {
-	quantiles: [float, ...]
-	values: [float, ...]
+	quantiles: [...float]
+	values: [...float]
 	count: int
 	sum:   float
 }
@@ -550,10 +557,12 @@ _values: {
 })
 
 #MetricTags: [Name=string]: close({
+	name:        Name
 	description: string
-	examples: [string, ...]
+	examples?: [...string]
 	required: bool
-	name:     Name
+	options?: [...string] | #Map
+	default?: string
 })
 
 #MetricType: "counter" | "distribution" | "gauge" | "histogram" | "summary"
@@ -586,7 +595,7 @@ _values: {
 	codename: string
 	date:     string
 
-	commits: [#Commit, ...]
+	commits: [...#Commit]
 	whats_next: #Any
 }
 
@@ -864,6 +873,10 @@ data_model: close({
 
 releases: #Releases
 
+#RemapParameterTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
+
+#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
+
 remap: {
 	errors: [Name=string]: {
 		description: string
@@ -879,19 +892,22 @@ remap: {
 					name: string
 				}
 
-				type: "float" | "int" | "string"
+				multiple: bool | *false
+
+				type: [#RemapParameterTypes, ...]
 			},
 		]
-		category:    "coerce" | "parse"
+		return: [#RemapReturnTypes, ...]
+		category:    "coerce" | "parse" | "text" | "hash" | "event"
 		description: string
 		examples: [
-			{
-				title:  string
+			...{
+				title: string
+				configuration?: [string]: string
 				input:  #Fields
 				source: string
 				output: #Fields
 			},
-			...,
 		]
 		name: Name
 	}

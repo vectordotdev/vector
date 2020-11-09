@@ -1,15 +1,18 @@
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    dns::Resolver,
+    http::Auth,
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
+    tls::{tls_connector_builder, TlsOptions, TlsSettings},
     Event, Pipeline,
 };
 use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
-use hyper::{Body, Client, Request};
+use hyper::{client::HttpConnector, Body, Client, Request};
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
@@ -24,6 +27,10 @@ struct PrometheusConfig {
     endpoints: Vec<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+
+    tls: Option<TlsOptions>,
+
+    auth: Option<Auth>,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -39,6 +46,8 @@ impl GenerateConfig for PrometheusConfig {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
             scrape_interval_secs: default_scrape_interval_secs(),
+            tls: None,
+            auth: None,
         })
         .unwrap()
     }
@@ -59,7 +68,15 @@ impl SourceConfig for PrometheusConfig {
             .iter()
             .map(|s| s.parse::<http::Uri>().context(super::UriParseError))
             .collect::<Result<Vec<http::Uri>, super::BuildError>>()?;
-        Ok(prometheus(urls, self.scrape_interval_secs, shutdown, out))
+        let tls = TlsSettings::from_options(&self.tls)?;
+        Ok(prometheus(
+            urls,
+            tls,
+            self.auth.clone(),
+            self.scrape_interval_secs,
+            shutdown,
+            out,
+        ))
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -73,6 +90,8 @@ impl SourceConfig for PrometheusConfig {
 
 fn prometheus(
     urls: Vec<http::Uri>,
+    tls: TlsSettings,
+    auth: Option<Auth>,
     interval: u64,
     shutdown: ShutdownSignal,
     out: Pipeline,
@@ -85,12 +104,19 @@ fn prometheus(
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
-            let https = HttpsConnector::new().expect("TLS initialization failed");
+            let mut http = HttpConnector::new_with_resolver(Resolver);
+            http.enforce_http(false);
+
+            let tls = tls_connector_builder(&tls.clone().into()).expect("Building TLS connector failed");
+            let https = HttpsConnector::with_connector(http, tls).expect("TLS initialization failed");
             let client = Client::builder().build(https);
 
-            let request = Request::get(&url)
+            let mut request = Request::get(&url)
                 .body(Body::empty())
                 .expect("error creating request");
+            if let Some(auth) = &auth {
+                auth.apply(&mut request);
+            }
 
             let start = Instant::now();
             client
@@ -244,6 +270,8 @@ mod test {
             PrometheusConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
+                tls: None,
+                auth: None,
             },
         );
         config.add_sink(
