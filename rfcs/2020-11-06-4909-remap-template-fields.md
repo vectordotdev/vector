@@ -12,10 +12,46 @@ method of templating fields.
 
 ## Motivation
 
+Using the Remap language rather than simple template fields provides much greater
+power in how these fields are defined. A difficulty does arise in that the 
+templatie fields did provide a list of fields that were used in the template. 
+This was straightforward as the template fields were very simply defined. With
+Remap it is much harder to come up with this list.
+
 The Loki sink wants a list of the fields that were used in the template. It
-uses this list to remove these fields from the event sent to Loki. With Remap
-this list becomes dynamic. So the script `if .foo { .bar } else { .baz }` 
-means sometimes .bar is used and other times .baz is used.
+uses this list to remove these fields from the event sent to Loki. 
+
+As an example if you had this sink:
+
+```toml
+[sinks.loki]
+  type = "loki"
+  inputs = ["json"]
+  endpoint = "http://localhost:3100"
+  remove_label_fields = true
+  labels.key = "{{foo}}-{{buzz}}"
+```
+
+And this event was sent to it:
+
+```json
+{"foo": "bar", "buzz": "zab", "message1": "thing", "message2": "thong"}
+```
+
+The actual message sent to Loki would be:
+
+```
+{"message1": "thing", "message2": "thong"}
+```
+
+With the label `key = bar-zab` attached to the message. The fields `foo` and 
+`buzz` that were used in defining the label have been removed from the message.
+
+With Remap this list becomes dynamic. So the script `if .foo { .bar } else 
+{ .baz }` means sometimes `.bar` is used and other times `.baz` is used. It is 
+not clear how we should proceed to determine which fields need to be removed
+from the message.
+
 
 ## Internal Proposal
 
@@ -28,19 +64,11 @@ fields from the message in the Loki sink.
 
 ## Rationale
 
-The benefits of using Remap are:
+The benefits of using Remap in the template fields are:
 
  - One familiar syntax and function reference for Vector.
  - Access to all of remap's functions for templating.
  - Less code to manage (once the old template fields are deprecated).
-
-
-## Prior Art
-
-[Handlebars JS](https://handlebarsjs.com/guide/#html-escaping) treats double
-brackets (`{{..}}`) as one form of templating for most of it's language features,
-but if you want special treatment (not escaping html) you can surround your
-template fields with three brackets (`{{{..}}}`).
 
 
 ## Drawbacks
