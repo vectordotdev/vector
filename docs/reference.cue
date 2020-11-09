@@ -884,31 +884,27 @@ remap: {
 	}
 
 	functions: [Name=string]: {
-		arguments: [
-			...{
-				required: bool
+		#Argument: {
+			name:        string
+			description: string
+			required:    bool
+			multiple:    bool | *false
+			default?:    bool | string
+			type: [#RemapParameterTypes, ...#RemapParameterTypes]
+		}
+		#Example: {
+			title: string
+			configuration?: [string]: string
+			input:  #Fields
+			source: string
+			output: #Fields
+		}
 
-				if !required {
-					name: string
-				}
-
-				multiple: bool | *false
-
-				type: [#RemapParameterTypes, ...]
-			},
-		]
-		return: [#RemapReturnTypes, ...]
+		arguments: [...#Argument] // Empty arguments list allowed
+		return: [#RemapReturnTypes, ...#RemapReturnTypes]
 		category:    "coerce" | "parse" | "text" | "hash" | "event"
 		description: string
-		examples: [
-			...{
-				title: string
-				configuration?: [string]: string
-				input:  #Fields
-				source: string
-				output: #Fields
-			},
-		]
+		examples: [#Example, ...#Example]
 		name: Name
 	}
 }
