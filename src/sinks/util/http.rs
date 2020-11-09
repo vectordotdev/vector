@@ -169,7 +169,7 @@ where
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.as_mut().poll_flush(cx))?;
-        self.poll_flush(cx)
+        self.project().inner.poll_close(cx)
     }
 }
 
@@ -308,7 +308,7 @@ where
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.as_mut().poll_flush(cx))?;
-        self.poll_flush(cx)
+        self.project().inner.poll_close(cx)
     }
 }
 
