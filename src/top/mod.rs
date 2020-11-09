@@ -20,5 +20,5 @@ pub struct Opts {
     url: Option<Url>,
 
     #[structopt(short, long)]
-    human: bool,
+    human_metrics: bool,
 }

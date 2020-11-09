@@ -6,6 +6,8 @@ use crossterm::{
     tty::IsTty,
     ExecutableCommand,
 };
+use human_format::{Formatter, Scales};
+use num_format::{Locale, ToFormattedString};
 use std::io::{stdout, Write};
 use tui::{
     backend::{Backend, CrosstermBackend},
@@ -16,14 +18,57 @@ use tui::{
     Frame, Terminal,
 };
 
+/// Format metrics, with thousands separation
+trait ThousandsFormatter {
+    fn format_thousands(&self) -> String;
+}
+
+impl ThousandsFormatter for i64 {
+    fn format_thousands(&self) -> String {
+        match self {
+            0 => "--".into(),
+            _ => self.to_formatted_string(&Locale::en),
+        }
+    }
+}
+
+/// Format metrics, using the 'humanized' format, abbreviating with suffixes
+trait HumanFormatter {
+    fn format_human(&self) -> String;
+    fn format_human_bytes(&self) -> String;
+}
+
+impl HumanFormatter for i64 {
+    /// Format an i64 as a string, returning `--` if zero, the value as a string if < 1000, or
+    /// the value abbreviated with 'k' if at least 1,000
+    fn format_human(&self) -> String {
+        match self {
+            0 => "--".into(),
+            1..=999 => self.to_string(),
+            _ => Formatter::new().with_decimals(2).format(*self as f64),
+        }
+    }
+
+    /// Format an i64 as a string that represents a binary size
+    fn format_human_bytes(&self) -> String {
+        match self {
+            0 => "--".into(),
+            _ => Formatter::new()
+                .with_scales(Scales::SI())
+                .format(*self as f64),
+        }
+    }
+}
+
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
+    human_metrics: bool,
 }
 
 impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(url_string: &'a str) -> Self {
+    pub fn new(url_string: &'a str, human_metrics: bool) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
@@ -33,6 +78,7 @@ impl<'a> Widgets<'a> {
         Self {
             constraints,
             url_string,
+            human_metrics,
         }
     }
 
@@ -55,18 +101,25 @@ impl<'a> Widgets<'a> {
     /// statistics pulled from `ComponentsState`,
     fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
         let items = state.iter().map(|(_, r)| {
-            Row::StyledData(
-                vec![
-                    r.name.clone(),
-                    r.kind.clone(),
-                    r.component_type.clone(),
-                    r.format_events_processed_total(),
-                    r.format_bytes_processed_total(),
-                    r.format_errors(),
+            let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
+
+            // Build metric stats
+            let formatted_metrics = if self.human_metrics {
+                [
+                    r.events_processed_total.format_human(),
+                    r.bytes_processed_total.format_human_bytes(),
+                    r.errors.format_human(),
                 ]
-                .into_iter(),
-                Style::default().fg(Color::White),
-            )
+            } else {
+                [
+                    r.events_processed_total.format_thousands(),
+                    r.bytes_processed_total.format_thousands(),
+                    r.errors.format_thousands(),
+                ]
+            };
+
+            data.extend_from_slice(&formatted_metrics);
+            Row::StyledData(data.into_iter(), Style::default().fg(Color::White))
         });
 
         let w = Table::new(state::COMPONENT_HEADERS.iter(), items)
@@ -123,6 +176,7 @@ pub fn is_tty() -> bool {
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
 pub async fn init_dashboard(
     url: &str,
+    human_metrics: bool,
     mut state_rx: state::StateRx,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
@@ -144,7 +198,7 @@ pub async fn init_dashboard(
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    let widgets = Widgets::new(url);
+    let widgets = Widgets::new(url, human_metrics);
 
     loop {
         tokio::select! {
