@@ -313,8 +313,8 @@ mod integration_tests {
             None,
             Some(MultilineConfig {
                 start_pattern: "abc".to_owned(),
-                mode: line_agg::Mode::ContinueThrough,
-                condition_pattern: "def".to_owned(),
+                mode: line_agg::Mode::HaltWith,
+                condition_pattern: "geh".to_owned(),
                 timeout_ms: 1000,
             }),
             logs.join("\n").into_bytes(),
