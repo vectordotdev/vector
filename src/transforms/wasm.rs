@@ -1,9 +1,10 @@
-use super::Transform;
+use super::{TaskTransform, Transform};
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     wasm::WasmModule,
 };
+use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -64,8 +65,8 @@ impl GenerateConfig for WasmConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "wasm")]
 impl TransformConfig for WasmConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Wasm::new(self.clone())?))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::task(Wasm::new(self.clone())?))
     }
 
     fn input_type(&self) -> DataType {
@@ -94,19 +95,31 @@ impl Wasm {
     }
 }
 
-impl Transform for Wasm {
-    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
-        self.module
-            .process(event)
-            .map(|outputs| outputs.into_iter().next())
-            .unwrap_or(None)
+impl TaskTransform for Wasm {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send> {
+        let mut inner = self;
+
+        Box::new(
+            task.filter_map(move |event| {
+                inner
+                    .module
+                    .process(event)
+                    .map(|events| futures01::stream::iter_ok(events))
+                    .ok()
+            })
+            .flatten(),
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Wasm, WasmConfig};
-    use crate::{event::Event, transforms::Transform};
+    use crate::{event::Event, transforms::TaskTransform};
+    use futures::{compat::Stream01CompatExt, StreamExt};
     use serde_json::Value;
     use std::{collections::HashMap, fs, io::Read, path::Path};
 
@@ -115,8 +128,8 @@ mod tests {
         crate::test_util::test_generate_config::<WasmConfig>();
     }
 
-    fn parse_config(s: &str) -> crate::Result<Wasm> {
-        Wasm::new(toml::from_str(s).unwrap())
+    fn parse_config(s: &str) -> crate::Result<Box<Wasm>> {
+        Wasm::new(toml::from_str(s).unwrap()).map(Box::new)
     }
 
     fn parse_event_artifact(path: impl AsRef<Path>) -> crate::Result<Option<Event>> {
@@ -137,157 +150,148 @@ mod tests {
         Ok(Some(event))
     }
 
-    #[test]
-    fn protobuf_happy() -> crate::Result<()> {
+    async fn test_config(config: &str, input: &str, output: &str) {
+        let transform = parse_config(config).expect("could not init transform");
+
+        let input = vec![parse_event_artifact(input)
+            .expect("could not load input")
+            .expect("input cannot be empty")];
+        let expected: Vec<_> =
+            std::iter::once(parse_event_artifact(output).expect("could not load output"))
+                .filter_map(|e| e)
+                .collect();
+
+        let actual = transform
+            .transform(Box::new(futures01::stream::iter_ok(input)))
+            .compat()
+            .collect::<Vec<_>>()
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+
+        assert_eq!(actual, expected);
+    }
+
+    #[tokio::test]
+    async fn protobuf_happy() {
         crate::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::protobuf::happy");
         let _enter = span.enter();
 
-        let mut transform = parse_config(
-            r#"
+        let config = r#"
             module = "target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
-            "#,
-        )?;
+            "#;
 
-        let input =
-            parse_event_artifact("tests/data/wasm/protobuf/fixtures/happy/input.json")?.unwrap();
-
-        let output = transform.transform(input);
-
-        let expected =
-            parse_event_artifact("tests/data/wasm/protobuf/fixtures/happy/expected.json")?;
-        assert_eq!(output, expected);
-        Ok(())
+        test_config(
+            config,
+            "tests/data/wasm/protobuf/fixtures/happy/input.json",
+            "tests/data/wasm/protobuf/fixtures/happy/expected.json",
+        )
+        .await;
     }
 
-    #[test]
-    fn protobuf_sad() -> crate::Result<()> {
+    #[tokio::test]
+    async fn protobuf_sad() {
         crate::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::protobuf::sad");
         let _enter = span.enter();
 
-        let mut transform = parse_config(
-            r#"
+        let config = r#"
             module = "target/wasm32-wasi/release/protobuf.wasm"
             artifact_cache = "target/artifacts"
-            "#,
-        )?;
+            "#;
 
-        let input =
-            parse_event_artifact("tests/data/wasm/protobuf/fixtures/sad/input.json")?.unwrap();
-
-        let output = transform.transform(input);
-
-        let expected = parse_event_artifact("tests/data/wasm/protobuf/fixtures/sad/expected.json")?;
-        assert_eq!(output, expected);
-        Ok(())
+        test_config(
+            config,
+            "tests/data/wasm/protobuf/fixtures/sad/input.json",
+            "tests/data/wasm/protobuf/fixtures/sad/expected.json",
+        )
+        .await;
     }
 
-    #[test]
-    fn add_fields() -> crate::Result<()> {
+    #[tokio::test]
+    async fn add_fields() {
         crate::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::add_fields");
         let _enter = span.enter();
 
-        let mut transform = parse_config(
-            r#"
-            module = "target/wasm32-wasi/release/add_fields.wasm"
-            artifact_cache = "target/artifacts"
-            options.new_field = "new_value"
-            options.new_field_2 = "new_value_2"
-            "#,
-        )?;
+        let config = r#"
+    module = "target/wasm32-wasi/release/add_fields.wasm"
+    artifact_cache = "target/artifacts"
+    options.new_field = "new_value"
+    options.new_field_2 = "new_value_2"
+            "#;
 
-        let input =
-            parse_event_artifact("tests/data/wasm/add_fields/fixtures/a/input.json")?.unwrap();
-
-        let output = transform.transform(input);
-
-        let expected = parse_event_artifact("tests/data/wasm/add_fields/fixtures/a/expected.json")?;
-        assert_eq!(output, expected);
-        Ok(())
+        test_config(
+            config,
+            "tests/data/wasm/add_fields/fixtures/a/input.json",
+            "tests/data/wasm/add_fields/fixtures/a/expected.json",
+        )
+        .await;
     }
 
-    #[test]
-    fn drop() -> crate::Result<()> {
+    #[tokio::test]
+    async fn drop() {
         crate::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::drop");
         let _enter = span.enter();
 
-        let mut transform = parse_config(
-            r#"
-            module = "target/wasm32-wasi/release/drop.wasm"
-            artifact_cache = "target/artifacts"
-            "#,
-        )?;
+        let config = r#"
+    module = "target/wasm32-wasi/release/drop.wasm"
+    artifact_cache = "target/artifacts"
+            "#;
 
-        let input = parse_event_artifact("tests/data/wasm/drop/fixtures/a/input.json")?.unwrap();
-
-        let output = transform.transform(input);
-
-        let expected = parse_event_artifact("tests/data/wasm/drop/fixtures/a/expected.json")?;
-        assert_eq!(output, expected);
-        Ok(())
+        test_config(
+            config,
+            "tests/data/wasm/drop/fixtures/a/input.json",
+            "tests/data/wasm/drop/fixtures/a/expected.json",
+        )
+        .await;
     }
 
-    #[test]
-    fn panic() -> crate::Result<()> {
+    #[tokio::test]
+    async fn panic() {
         crate::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::panic");
         let _enter = span.enter();
 
-        let mut transform = parse_config(
-            r#"
-            module = "target/wasm32-wasi/release/panic.wasm"
-            artifact_cache = "target/artifacts"
-            "#,
-        )?;
+        let config = r#"
+    module = "target/wasm32-wasi/release/panic.wasm"
+    artifact_cache = "target/artifacts"
+            "#;
 
-        let input = parse_event_artifact("tests/data/wasm/panic/fixtures/a/input.json")?.unwrap();
-
-        let output = transform.transform(input.clone());
-
-        let expected = parse_event_artifact("tests/data/wasm/panic/fixtures/a/expected.json")?;
-        assert_eq!(output, expected);
-
-        // Important to try again. :)
-        let output = transform.transform(input);
-
-        let expected = parse_event_artifact("tests/data/wasm/panic/fixtures/a/expected.json")?;
-        assert_eq!(output, expected);
-
-        Ok(())
+        test_config(
+            config,
+            "tests/data/wasm/panic/fixtures/a/input.json",
+            "tests/data/wasm/panic/fixtures/a/expected.json",
+        )
+        .await;
     }
 
-    #[test]
-    fn assert_config() -> crate::Result<()> {
+    #[tokio::test]
+    async fn assert_config() {
         crate::test_util::trace_init();
         let span = span!(tracing::Level::TRACE, "transforms::wasm::assert_config");
         let _enter = span.enter();
 
-        let mut transform = parse_config(
-            r#"
-            module = "target/wasm32-wasi/release/assert_config.wasm"
-            artifact_cache = "target/artifacts"
-            options.takes_string = "test"
-            options.takes_number = 123
-            options.takes_bool = true
-            options.takes_array = [1, 2, 3]
-            options.takes_map.one = "a"
-            options.takes_map.two = "b"
-            "#,
-        )?;
+        let config = r#"
+    module = "target/wasm32-wasi/release/assert_config.wasm"
+    artifact_cache = "target/artifacts"
+    options.takes_string = "test"
+    options.takes_number = 123
+    options.takes_bool = true
+    options.takes_array = [1, 2, 3]
+    options.takes_map.one = "a"
+    options.takes_map.two = "b"
+            "#;
 
-        let input =
-            parse_event_artifact("tests/data/wasm/assert_config/fixtures/a/input.json")?.unwrap();
-
-        let output = transform.transform(input.clone());
-
-        let expected =
-            parse_event_artifact("tests/data/wasm/assert_config/fixtures/a/expected.json")?;
-        assert_eq!(output, expected);
-
-        Ok(())
+        test_config(
+            config,
+            "tests/data/wasm/assert_config/fixtures/a/input.json",
+            "tests/data/wasm/assert_config/fixtures/a/expected.json",
+        )
+        .await;
     }
 }
