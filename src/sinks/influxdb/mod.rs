@@ -203,12 +203,8 @@ pub(in crate::sinks) fn influx_line_protocol(
 }
 
 fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
-    let sorted = tags
-        // sort by key
-        .iter()
-        .collect::<BTreeMap<_, _>>();
-
-    for (key, value) in sorted {
+    // `tags` is already sorted
+    for (key, value) in tags {
         if key.is_empty() || value.is_empty() {
             continue;
         }
@@ -584,6 +580,25 @@ mod tests {
             value,
             "a_first_place=10,name\\ escape=true,tag=val\\=ue,value_escape=value\\ escape"
         );
+    }
+
+    #[test]
+    fn tags_order() {
+        let mut value = String::new();
+        encode_tags(
+            vec![
+                ("a", "value"),
+                ("b", "value"),
+                ("c", "value"),
+                ("d", "value"),
+                ("e", "value"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
+            &mut value,
+        );
+        assert_eq!(value, "a=value,b=value,c=value,d=value,e=value");
     }
 
     #[test]

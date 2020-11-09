@@ -13,7 +13,7 @@ glob = "0.3.0"
 scan_fmt = "0.2.5"
 tracing = "0.1.15"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
-flate2 = "1.0.6"
+flate2 = "1.0.19"
 winapi = { version = "0.3", features = ["winioctl"] }
 libc =  "0.2"
 tokio = { version = "0.2.13", features = ["time"] }
