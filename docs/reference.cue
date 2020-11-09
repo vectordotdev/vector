@@ -692,21 +692,21 @@ _values: {
 	//
 	// For example, the `journald` source requires the presence of the
 	// `journalctl` binary.
-	requirements: [...string] | null
+	requirements: [...string] | null // Allow for empty list
 
 	// `warnings` describes any warnings the user should know about the
 	// component.
 	//
 	// For example, the `grok_parser` might offer a performance warning
 	// since the `regex_parser` and other transforms are faster.
-	warnings: [...string] | null
+	warnings: [...string] | null // Allow for empty list
 
 	// `notices` communicates useful information to the user that is neither
 	// a requirement or a warning.
 	//
 	// For example, the `lua` transform offers a Lua version notice that
 	// communicate which version of Lua is embedded.
-	notices: [...string] | null
+	notices: [...string] | null // Allow for empty list
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
@@ -902,7 +902,7 @@ remap: {
 			output: #Fields
 		}
 
-		arguments: [...#Argument] // Empty arguments list allowed
+		arguments: [...#Argument] // Allow for empty list
 		return: [#RemapReturnTypes, ...#RemapReturnTypes]
 		category:    "coerce" | "parse" | "text" | "hash" | "event"
 		description: string
