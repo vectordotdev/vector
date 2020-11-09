@@ -2,5 +2,14 @@ subscription ComponentAddedSubscription {
   componentAdded {
     __typename
     name
+    ... on Source {
+      sourceType
+    }
+    ... on Transform {
+      transformType
+    }
+    ... on Sink {
+      sinkType
+    }
   }
 }

@@ -1269,6 +1269,22 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Sink type",
+              "isDeprecated": false,
+              "name": "sinkType",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Source inputs",
               "isDeprecated": false,
               "name": "sources",
@@ -1361,6 +1377,22 @@
               "description": "Source name",
               "isDeprecated": false,
               "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Source type",
+              "isDeprecated": false,
+              "name": "sourceType",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1581,7 +1613,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1612,7 +1644,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1674,7 +1706,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1705,7 +1737,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1736,7 +1768,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1926,6 +1958,22 @@
               "description": "Transform name",
               "isDeprecated": false,
               "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Transform type",
+              "isDeprecated": false,
+              "name": "transformType",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,

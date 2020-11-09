@@ -30,6 +30,7 @@ impl From<DataType> for SourceOutputType {
 #[derive(Debug, Clone)]
 pub struct SourceData {
     name: String,
+    source_type: String,
     output_type: DataType,
 }
 
@@ -41,6 +42,11 @@ impl Source {
     /// Source name
     async fn name(&self) -> &str {
         &*self.0.name
+    }
+
+    /// Source type
+    async fn source_type(&self) -> &str {
+        &*self.0.source_type
     }
 
     /// Source output type
@@ -76,19 +82,25 @@ impl Source {
 }
 
 #[derive(Debug, Clone)]
-pub struct InputsData {
+pub struct TransformData {
     name: String,
+    transform_type: String,
     inputs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Transform(InputsData);
+pub struct Transform(TransformData);
 
 #[Object]
 impl Transform {
     /// Transform name
     async fn name(&self) -> &str {
         &self.0.name
+    }
+
+    /// Transform type
+    async fn transform_type(&self) -> &str {
+        &*self.0.transform_type
     }
 
     /// Source inputs
@@ -126,13 +138,25 @@ impl Transform {
 }
 
 #[derive(Debug, Clone)]
-pub struct Sink(InputsData);
+pub struct SinkData {
+    name: String,
+    sink_type: String,
+    inputs: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Sink(SinkData);
 
 #[Object]
 impl Sink {
     /// Sink name
     async fn name(&self) -> &str {
         &self.0.name
+    }
+
+    /// Sink type
+    async fn sink_type(&self) -> &str {
+        &*self.0.sink_type
     }
 
     /// Source inputs
@@ -320,6 +344,7 @@ pub fn update_config(config: &Config) {
             name.to_owned(),
             Component::Source(Source(SourceData {
                 name: name.to_owned(),
+                source_type: source.source_type().to_string(),
                 output_type: source.output_type(),
             })),
         );
@@ -329,8 +354,9 @@ pub fn update_config(config: &Config) {
     for (name, transform) in config.transforms.iter() {
         new_components.insert(
             name.to_string(),
-            Component::Transform(Transform(InputsData {
+            Component::Transform(Transform(TransformData {
                 name: name.to_owned(),
+                transform_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
             })),
         );
@@ -340,8 +366,9 @@ pub fn update_config(config: &Config) {
     for (name, sink) in config.sinks.iter() {
         new_components.insert(
             name.to_string(),
-            Component::Sink(Sink(InputsData {
+            Component::Sink(Sink(SinkData {
                 name: name.to_owned(),
+                sink_type: sink.inner.sink_type().to_string(),
                 inputs: sink.inputs.clone(),
             })),
         );

@@ -70,9 +70,9 @@ impl ComponentsSubscriptionExt for crate::SubscriptionClient {
 impl std::fmt::Display for components_query::ComponentsQueryComponentsOn {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let res = match self {
-            components_query::ComponentsQueryComponentsOn::Source => "source",
-            components_query::ComponentsQueryComponentsOn::Transform => "transform",
-            components_query::ComponentsQueryComponentsOn::Sink => "sink",
+            components_query::ComponentsQueryComponentsOn::Source(_) => "source",
+            components_query::ComponentsQueryComponentsOn::Transform(_) => "transform",
+            components_query::ComponentsQueryComponentsOn::Sink(_) => "sink",
         };
 
         write!(f, "{}", res)
@@ -84,13 +84,13 @@ impl std::fmt::Display
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let res = match self {
-            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Source => {
+            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Source(_) => {
                 "source"
             }
-            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Transform => {
-                "transform"
-            }
-            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Sink => {
+            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Transform(
+                _,
+            ) => "transform",
+            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Sink(_) => {
                 "sink"
             }
         };
