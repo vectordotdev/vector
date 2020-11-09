@@ -281,6 +281,25 @@ mod test {
         );
     }
 
+    #[test]
+    fn tags_order() {
+        assert_eq!(
+            &encode_tags(
+                &vec![
+                    ("a", "value"),
+                    ("b", "value"),
+                    ("c", "value"),
+                    ("d", "value"),
+                    ("e", "value"),
+                ]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect()
+            ),
+            "a:value,b:value,c:value,d:value,e:value"
+        );
+    }
+
     #[cfg(feature = "sources-statsd")]
     #[test]
     fn test_encode_counter() {

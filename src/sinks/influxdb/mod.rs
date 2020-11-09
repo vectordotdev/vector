@@ -583,6 +583,25 @@ mod tests {
     }
 
     #[test]
+    fn tags_order() {
+        let mut value = String::new();
+        encode_tags(
+            vec![
+                ("a", "value"),
+                ("b", "value"),
+                ("c", "value"),
+                ("d", "value"),
+                ("e", "value"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
+            &mut value,
+        );
+        assert_eq!(value, "a=value,b=value,c=value,d=value,e=value");
+    }
+
+    #[test]
     fn test_encode_fields_v1() {
         let fields = vec![
             (
