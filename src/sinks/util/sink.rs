@@ -168,7 +168,6 @@ where
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let mut last_round = false;
         loop {
             // Poll inner service while not ready, if we don't have buffer or any batch.
             if self.buffer.is_none() && self.batch.is_empty() {
@@ -181,30 +180,35 @@ where
                 if self.closing || self.batch.was_full() {
                     true
                 } else {
-                    let linger = self
-                        .linger
+                    self.linger
                         .as_mut()
-                        .expect("linger should exists for should_send");
-                    matches!(linger.poll_unpin(cx), Poll::Ready(()))
+                        .map(|linger| matches!(linger.poll_unpin(cx), Poll::Ready(())))
+                        .unwrap_or(false)
                 }
             };
             if should_send {
-                ready!(self.service.poll_ready(cx))?;
-                trace!("Service ready; Sending batch.");
+                let service_ready = match self.service.poll_ready(cx) {
+                    Poll::Ready(Ok(())) => true,
+                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                    Poll::Pending => false,
+                };
+                if service_ready {
+                    trace!("Service ready; Sending batch.");
 
-                let batch = self.batch.fresh_replace();
-                self.linger = None;
+                    let batch = self.batch.fresh_replace();
+                    self.linger = None;
 
-                let batch_size = batch.num_items();
-                let request = batch.finish();
-                tokio::spawn(self.service.call(request, batch_size));
+                    let batch_size = batch.num_items();
+                    let request = batch.finish();
+                    tokio::spawn(self.service.call(request, batch_size));
 
-                last_round = false;
-                continue;
+                    continue;
+                }
             }
 
             // Try move buffer to batch.
-            if let Some(item) = self.buffer.take() {
+            if self.buffer.is_some() && self.batch.is_empty() {
+                let item = self.buffer.take().unwrap();
                 self.as_mut().start_send(item)?;
 
                 if self.buffer.is_some() {
@@ -214,15 +218,9 @@ where
                 continue;
             }
 
-            // Result doesn't matter for us, we have buffer or at least one batch.
-            // Return Pending anyway, but loop once more for additional `lingers` check.
+            // Only poll inner service and return `Poll::Pending` anyway.
             ready!(self.service.poll_complete(cx));
-
-            if last_round {
-                return Poll::Pending;
-            }
-
-            last_round = true;
+            return Poll::Pending;
         }
     }
 
@@ -353,7 +351,6 @@ where
     }
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let mut last_round = false;
         loop {
             // Poll inner service while not ready, if we don't have buffer or any batch.
             if self.buffer.is_none() && self.partitions.is_empty() {
@@ -372,7 +369,7 @@ where
                         let linger = this
                             .lingers
                             .get_mut(&partition)
-                            .expect("linger should exists for should_send");
+                            .expect("linger should exists for poll_flush");
                         matches!(linger.poll_unpin(cx), Poll::Ready(()))
                     }
                 };
@@ -381,19 +378,29 @@ where
                     partitions_ready.push(partition.clone());
                 }
             }
+            let mut batch_consumed = false;
             for partition in partitions_ready.iter() {
-                ready!(self.service.poll_ready(cx))?;
-                trace!("Service ready; Sending batch.");
+                let service_ready = match self.service.poll_ready(cx) {
+                    Poll::Ready(Ok(())) => true,
+                    Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                    Poll::Pending => false,
+                };
+                if service_ready {
+                    trace!("Service ready; Sending batch.");
 
-                let batch = self.partitions.remove(&partition).unwrap();
-                self.lingers.remove(&partition);
+                    let batch = self.partitions.remove(&partition).unwrap();
+                    self.lingers.remove(&partition);
 
-                let batch_size = batch.num_items();
-                let request = batch.finish();
-                tokio::spawn(self.service.call(request, batch_size));
+                    let batch_size = batch.num_items();
+                    let request = batch.finish();
+                    tokio::spawn(self.service.call(request, batch_size));
+
+                    batch_consumed = true;
+                } else {
+                    break;
+                }
             }
-            if !partitions_ready.is_empty() {
-                last_round = false;
+            if batch_consumed {
                 continue;
             }
 
@@ -412,15 +419,9 @@ where
                 }
             }
 
-            // Result doesn't matter for us, we have buffer or at least one batch.
-            // Return Pending anyway, but loop once more for additional `lingers` check.
+            // Only poll inner service and return `Poll::Pending` anyway.
             ready!(self.service.poll_complete(cx));
-
-            if last_round {
-                return Poll::Pending;
-            }
-
-            last_round = true;
+            return Poll::Pending;
         }
     }
 
