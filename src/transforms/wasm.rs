@@ -154,10 +154,10 @@ mod tests {
         let transform = parse_config(config).expect("could not init transform");
 
         let input = vec![parse_event_artifact(input)
-            .expect("could not load input protobuf")
-            .expect("input protobuf cannot be empty")];
+            .expect("could not load input")
+            .expect("input cannot be empty")];
         let expected: Vec<_> =
-            std::iter::once(parse_event_artifact(output).expect("could not load output protobuf"))
+            std::iter::once(parse_event_artifact(output).expect("could not load output"))
                 .filter_map(|e| e)
                 .collect();
 
