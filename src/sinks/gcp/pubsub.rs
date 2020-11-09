@@ -121,9 +121,10 @@ struct PubsubSink {
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let creds = match &config.skip_authentication {
-            true => None,
-            _ => config.auth.make_credentials(Scope::PubSub).await?,
+        let creds = if config.skip_authentication {
+            None
+        } else {
+            config.auth.make_credentials(Scope::PubSub).await?
         };
 
         let uri_base = match config.endpoint.as_ref() {
