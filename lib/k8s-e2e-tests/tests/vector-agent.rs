@@ -17,6 +17,12 @@ sinks:
       encoding = "json"
 "#;
 
+const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = r#"
+extraConfigDirSources:
+- configMap:
+    name: vector-agent-config
+"#;
+
 const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = r#"
 apiVersion: v1
 kind: ConfigMap
@@ -1203,6 +1209,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector",
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
+                custom_helm_values: HELM_VALUES_ADDITIONAL_CONFIGMAP,
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
                 ..Default::default()
             },
