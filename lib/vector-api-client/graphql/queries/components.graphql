@@ -2,15 +2,7 @@ query ComponentsQuery {
   components {
     __typename
     name
-    ... on Source {
-      sourceType
-    }
-    ... on Transform {
-      transformType
-    }
-    ... on Sink {
-      sinkType
-    }
+    componentType
     eventsProcessedTotal {
       eventsProcessedTotal
     }

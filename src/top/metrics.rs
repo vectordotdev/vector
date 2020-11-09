@@ -2,7 +2,7 @@ use super::state;
 use std::sync::Arc;
 use tokio::stream::StreamExt;
 use vector_api_client::{
-    gql::{self, ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
+    gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
 };
 
@@ -17,21 +17,13 @@ async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
             let c = d.component_added;
-            let component_type = match &c.on {
-                gql::component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Source(d) => &d.source_type,
-                gql::component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Transform(d) => {
-                    &d.transform_type
-                }
-                gql::component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Sink(d) => &d.sink_type,
-            };
-
             let _ = tx
                 .send((
                     c.name.clone(),
                     state::EventType::ComponentAdded(state::ComponentRow {
                         name: c.name,
                         kind: c.on.to_string(),
-                        component_type: component_type.to_string(),
+                        component_type: c.component_type,
                         events_processed_total: 0,
                         bytes_processed_total: 0,
                         errors: 0,
@@ -126,20 +118,12 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .components
         .into_iter()
         .map(|d| {
-            let component_type = match &d.on {
-                gql::components_query::ComponentsQueryComponentsOn::Source(d) => &d.source_type,
-                gql::components_query::ComponentsQueryComponentsOn::Transform(d) => {
-                    &d.transform_type
-                }
-                gql::components_query::ComponentsQueryComponentsOn::Sink(d) => &d.sink_type,
-            };
-
             (
                 d.name.clone(),
                 state::ComponentRow {
                     name: d.name,
                     kind: d.on.to_string(),
-                    component_type: component_type.to_string(),
+                    component_type: d.component_type,
                     events_processed_total: d
                         .events_processed_total
                         .as_ref()
