@@ -79,6 +79,7 @@ impl<'a> Widgets<'a> {
                 Constraint::Percentage(15),
                 Constraint::Percentage(15),
                 Constraint::Percentage(15),
+                Constraint::Percentage(15),
             ]);
 
         f.render_widget(w, area);
