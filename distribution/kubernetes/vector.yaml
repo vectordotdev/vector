@@ -176,5 +176,13 @@ spec:
             path: /var/lib/vector/
         # Vector config dir.
         - name: config-dir
-          configMap:
-            name: vector-agent
+          projected:
+            sources:
+              - configMap:
+                  name: vector-agent
+              - configMap:
+                  name: vector-agent-config
+                  optional: true
+              - secret:
+                  name: vector-agent-config
+                  optional: true
