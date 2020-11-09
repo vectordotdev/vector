@@ -36,7 +36,7 @@ build() {
     docker buildx install
 
     ARGS=()
-    if [[ -z "${PUSH:-}" ]]; then
+    if [[ -n "${PUSH:-}" ]]; then
       ARGS+=(--push)
     fi
 
