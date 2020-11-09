@@ -35,7 +35,7 @@ impl HealthSubscription {
     /// Heartbeat, containing the UTC timestamp of the last server-sent payload
     async fn heartbeat(
         &self,
-        #[graphql(default = 1000, validator(IntRange(min = "100", max = "60_000")))] interval: i32,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Heartbeat> {
         tokio::time::interval(Duration::from_millis(interval as u64)).map(|_| Heartbeat::new())
     }

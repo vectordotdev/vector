@@ -45,25 +45,23 @@ impl HealthQueryExt for crate::Client {
 }
 
 /// Extension methods for health subscriptions
-#[async_trait]
 pub trait HealthSubscriptionExt {
     /// Executes a heartbeart subscription, on a millisecond `interval`
-    async fn heartbeat_subscription(
+    fn heartbeat_subscription(
         &self,
         interval: i64,
-    ) -> crate::SubscriptionResult<HeartbeatSubscription>;
+    ) -> crate::BoxedSubscription<HeartbeatSubscription>;
 }
 
-#[async_trait]
 impl HealthSubscriptionExt for crate::SubscriptionClient {
     /// Executes a heartbeart subscription, on a millisecond `interval`
-    async fn heartbeat_subscription(
+    fn heartbeat_subscription(
         &self,
         interval: i64,
-    ) -> crate::SubscriptionResult<HeartbeatSubscription> {
+    ) -> crate::BoxedSubscription<HeartbeatSubscription> {
         let request_body =
             HeartbeatSubscription::build_query(heartbeat_subscription::Variables { interval });
 
-        self.start::<HeartbeatSubscription>(&request_body).await
+        self.start::<HeartbeatSubscription>(&request_body)
     }
 }
