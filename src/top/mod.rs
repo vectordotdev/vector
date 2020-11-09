@@ -1,6 +1,7 @@
 mod cmd;
 mod dashboard;
 mod events;
+mod metrics;
 mod state;
 
 use structopt::StructOpt;

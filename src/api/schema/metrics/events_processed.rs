@@ -31,3 +31,33 @@ impl From<Metric> for EventsProcessedTotal {
         Self(m)
     }
 }
+
+pub struct ComponentEventsProcessedTotal {
+    name: String,
+    metric: Metric,
+}
+
+impl ComponentEventsProcessedTotal {
+    /// Returns a new `ComponentEventsProcessedTotal` struct, which is a GraphQL type. The
+    /// component name is hoisted for clear field resolution in the resulting payload
+    pub fn new(metric: Metric) -> Self {
+        let name = metric.tag_value("component_name").expect(
+            "Returned a metric without a `component_name`, which shouldn't happen. Please report.",
+        );
+
+        Self { name, metric }
+    }
+}
+
+#[Object]
+impl ComponentEventsProcessedTotal {
+    /// Component name
+    async fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Events processed total metric
+    async fn metric(&self) -> EventsProcessedTotal {
+        EventsProcessedTotal::new(self.metric.clone())
+    }
+}
