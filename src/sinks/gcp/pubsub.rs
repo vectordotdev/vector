@@ -27,14 +27,13 @@ enum HealthcheckError {
     TopicNotFound,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
-#[derivative(Default)]
+#[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[serde(deny_unknown_fields)]
 pub struct PubsubConfig {
     pub project: String,
     pub topic: String,
     pub endpoint: Option<String>,
-    #[derivative(Default(value = "false"))]
+    #[serde(default = "default_skip_authentication")]
     pub skip_authentication: bool,
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
@@ -50,6 +49,10 @@ pub struct PubsubConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
+}
+
+fn default_skip_authentication() -> bool {
+    false
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
