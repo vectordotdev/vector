@@ -1409,7 +1409,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
 
     // Ensure we did get at least one event since before deployed the test pod.
     assert!(
-        events_processed_after >= events_processed_before + 1,
+        events_processed_after > events_processed_before,
         "before: {}, after: {}",
         events_processed_before,
         events_processed_after
