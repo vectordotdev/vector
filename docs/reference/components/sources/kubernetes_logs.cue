@@ -26,15 +26,6 @@ components: sources: kubernetes_logs: {
 					file_system: {
 						directory: _directory
 					}
-					socket: {
-						api: {
-							title: "kube-apiserver"
-							url:   "dynamically detected at runtime"
-						}
-						direction: "outgoing"
-						ssl:       "required"
-						protocols: ["http"]
-					}
 				}
 			}
 		}
