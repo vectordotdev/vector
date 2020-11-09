@@ -137,11 +137,15 @@ where
     type Error = crate::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        while self.buffer.is_some() {
+        if self.buffer.is_some() {
             match self.as_mut().poll_flush(cx) {
                 Poll::Ready(Ok(())) => {}
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
-                Poll::Pending => {}
+                Poll::Pending => {
+                    if self.buffer.is_some() {
+                        return Poll::Pending;
+                    }
+                }
             }
         }
 
@@ -311,11 +315,15 @@ where
     type Error = crate::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        while self.buffer.is_some() {
+        if self.buffer.is_some() {
             match self.as_mut().poll_flush(cx) {
                 Poll::Ready(Ok(())) => {}
                 Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
-                Poll::Pending => {}
+                Poll::Pending => {
+                    if self.buffer.is_some() {
+                        return Poll::Pending;
+                    }
+                }
             }
         }
 
