@@ -256,6 +256,8 @@ urls: {
 	prometheus_summary:                                       "https://prometheus.io/docs/concepts/metric_types/#summary"
 	prometheus_text_based_exposition_format:                  "https://github.com/prometheus/docs/blob/master/content/docs/instrumenting/exposition_formats.md#text-based-format"
 	prometheus_metric_naming:                                 "https://prometheus.io/docs/practices/naming/#metric-names"
+	prometheus_remote_integrations:                           "https://prometheus.io/docs/operating/integrations/#remote-endpoints-and-storage"
+	prometheus_remote_write:                                  "https://prometheus.io/docs/prometheus/latest/configuration/configuration/#remote_write"
 	pulsar:                                                   "https://pulsar.apache.org/"
 	pulsar_protocol:                                          "https://pulsar.apache.org/docs/en/develop-binary-protocol/"
 	rdkafka:                                                  "https://github.com/edenhill/librdkafka"

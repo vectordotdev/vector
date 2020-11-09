@@ -5543,6 +5543,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "snap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da73c8f77aebc0e40c300b93f0a5f1bece7a248a36eee287d4e095f35c7b7d6e"
+
+[[package]]
 name = "socket2"
 version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6783,6 +6789,7 @@ dependencies = [
  "slab",
  "smpl_jwt",
  "snafu",
+ "snap",
  "stream-cancel",
  "strip-ansi-escapes",
  "structopt",
