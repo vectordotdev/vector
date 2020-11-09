@@ -1,4 +1,3 @@
-use crate::transforms::TaskTransform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
@@ -6,7 +5,7 @@ use crate::{
     internal_events::{
         AwsEc2MetadataEventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
     },
-    transforms::Transform,
+    transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
 use futures01::Stream as Stream01;

@@ -16,7 +16,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    fn try_empty_queue(&mut self) -> Poll<(), <Self as Sink>::SinkError> {
+    fn try_flush(&mut self) -> Poll<(), <Self as Sink>::SinkError> {
         while let Some(event) = self.enqueued.pop_front() {
             if let AsyncSink::NotReady(item) = self.inner.start_send(event)? {
                 self.enqueued.push_front(item);
@@ -47,12 +47,12 @@ impl Sink for Pipeline {
         }
         self.enqueued.extend(working_set);
 
-        self.try_empty_queue()?;
+        self.try_flush()?;
         Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        futures01::try_ready!(self.try_empty_queue());
+        futures01::try_ready!(self.try_flush());
         debug_assert!(self.enqueued.is_empty());
         self.inner.poll_complete()
     }
