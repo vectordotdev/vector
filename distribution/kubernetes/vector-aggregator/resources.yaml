@@ -55,7 +55,7 @@ data:
     [sinks.prometheus_sink]
       type = "prometheus"
       inputs = ["internal_metrics"]
-      address = "0.0.0.0:8080"
+      address = "0.0.0.0:9090"
 ---
 # Source: vector-aggregator/templates/service-headless.yaml
 apiVersion: v1
@@ -124,7 +124,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: e7dd4b56dd953d2210fd1090cf4fadf27424977efb7c8cf0131cd32892761aa5
+        checksum/config: f21e03060de6e60eeda4b7d6cbc3121890b76a4b3618f30fded3a8a4eb226c24
         
       labels:
         app.kubernetes.io/name: vector-aggregator
@@ -148,7 +148,7 @@ spec:
               value: info
           ports:
             - name: metrics
-              containerPort: 8080
+              containerPort: 9090
               protocol: TCP
           resources:
             {}

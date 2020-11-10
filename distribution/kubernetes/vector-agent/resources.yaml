@@ -54,7 +54,7 @@ data:
     [sinks.prometheus_sink]
       type = "prometheus"
       inputs = ["internal_metrics"]
-      address = "0.0.0.0:8080"
+      address = "0.0.0.0:9090"
 ---
 # Source: vector-agent/templates/rbac.yaml
 # Permissions to use Kubernetes API.
@@ -113,7 +113,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 71f4cc90c95a020c5a42658ca23574fc958cbe9ef674d78c8419a6d1dc4512bc
+        checksum/config: 3dac4d3f040851abd23fb5bf6d48a5babbd001e35aaa5465fa23e45816918c14
         
       labels:
         app.kubernetes.io/name: vector-agent
@@ -150,7 +150,7 @@ spec:
               value: info
           ports:
             - name: metrics
-              containerPort: 8080
+              containerPort: 9090
               protocol: TCP
           resources:
             {}
