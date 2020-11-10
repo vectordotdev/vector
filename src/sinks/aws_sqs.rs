@@ -8,6 +8,7 @@ use crate::{
         sink::Response,
         BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
+    template::{Template, TemplateError},
     Event,
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
@@ -20,7 +21,7 @@ use rusoto_sqs::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
-    convert::TryInto,
+    convert::{TryFrom, TryInto},
     task::{Context, Poll},
 };
 use tower::Service;
@@ -30,6 +31,8 @@ use tracing_futures::Instrument;
 enum BuildError {
     #[snafu(display("`message_group_id` should be defined for FIFO queue."))]
     MessageGroupIdWithFifo,
+    #[snafu(display("invalid topic template: {}", source))]
+    TopicTemplate { source: TemplateError },
 }
 
 #[derive(Debug, Snafu)]
@@ -147,11 +150,11 @@ impl SqsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
-        let message_group_id = config.message_group_id;
-
-        if fifo && message_group_id.is_none() {
-            return Err(Box::new(BuildError::MessageGroupIdWithFifo));
-        }
+        let message_group_id = match config.message_group_id {
+            Some(value) => Some(Template::try_from(value).context(TopicTemplate)?),
+            None if fifo => return Err(Box::new(BuildError::MessageGroupIdWithFifo)),
+            None => None,
+        };
 
         let sqs = SqsSink {
             client,
@@ -168,7 +171,7 @@ impl SqsSink {
             )
             .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
-                stream::iter(encode_event(event, &encoding, message_group_id.clone())).map(Ok)
+                stream::iter(encode_event(event, &encoding, message_group_id.as_ref())).map(Ok)
             });
 
         Ok(sink)
@@ -201,7 +204,12 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
         Box::pin(async move {
             client
                 .send_message(request)
-                .inspect_ok(|result| emit!(AwsSqsEventSent { byte_size, message_id: result.message_id.as_ref() }))
+                .inspect_ok(|result| {
+                    emit!(AwsSqsEventSent {
+                        byte_size,
+                        message_id: result.message_id.as_ref()
+                    })
+                })
                 .instrument(info_span!("request"))
                 .await
         })
@@ -241,9 +249,20 @@ impl RetryLogic for SqsRetryLogic {
 fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
-    message_group_id: Option<String>,
+    message_group_id: Option<&Template>,
 ) -> Option<SendMessageEntry> {
     encoding.apply_rules(&mut event);
+
+    let message_group_id = message_group_id.and_then(|tpl| match tpl.render_string(&event) {
+        Ok(value) => Some(value),
+        Err(missing_keys) => {
+            error!(
+                message = "Missing keys for `message_group_id`.",
+                ?missing_keys
+            );
+            None
+        }
+    });
 
     let log = event.into_log();
     let message_body = match encoding.codec() {

@@ -87,7 +87,7 @@ components: sinks: aws_sqs: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["vector-aws-sqs-sink"]
+				examples: ["vector", "vector-%Y-%m-%d"]
 			}
 		}
 	}

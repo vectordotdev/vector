@@ -4,7 +4,7 @@ use metrics::counter;
 #[derive(Debug)]
 pub struct AwsSqsEventSent<'a> {
     pub byte_size: usize,
-    pub message_id: Option<&'a String>
+    pub message_id: Option<&'a String>,
 }
 
 impl InternalEvent for AwsSqsEventSent<'_> {
