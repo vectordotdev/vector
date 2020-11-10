@@ -159,6 +159,8 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "tokio",
+ "zstd",
+ "zstd-safe",
 ]
 
 [[package]]
@@ -677,7 +679,7 @@ version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8504b63dd1249fd1745b7b4ef9b6f7b107ddeb3c95370043c7dbcc38653a2679"
 dependencies = [
- "semver",
+ "semver 0.9.0",
  "serde",
  "toml 0.5.6",
  "url",
@@ -4989,6 +4991,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusoto_sqs"
+version = "0.45.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcd228a1b4ce3f3a40541ee8cef526ff3702b58a4779fb05c31e739174efda5e"
+dependencies = [
+ "async-trait",
+ "bytes 0.5.6",
+ "futures 0.3.5",
+ "rusoto_core",
+ "serde_urlencoded",
+ "xml-rs",
+]
+
+[[package]]
 name = "rusoto_sts"
 version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5044,7 +5060,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "138e3e0acb6c9fb258b19b67cb8abd63c00679d2851805ea151465464fe9030a"
 dependencies = [
- "semver",
+ "semver 0.9.0",
 ]
 
 [[package]]
@@ -5234,6 +5250,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "semver"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f301af10236f6df4160f7c3f04eec6dbc70ace82d23326abad5edee88801c6b6"
+dependencies = [
+ "semver-parser 0.10.1",
+ "serde",
+]
+
+[[package]]
 name = "semver-parser"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5244,6 +5270,15 @@ name = "semver-parser"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b46e1121e8180c12ff69a742aabc4f310542b6ccb69f1691689ac17fdf8618aa"
+
+[[package]]
+name = "semver-parser"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42ef146c2ad5e5f4b037cd6ce2ebb775401729b19a82040c1beac9d36c7d1428"
+dependencies = [
+ "pest",
+]
 
 [[package]]
 name = "serde"
@@ -6789,11 +6824,13 @@ dependencies = [
  "rusoto_logs",
  "rusoto_s3",
  "rusoto_signature",
+ "rusoto_sqs",
  "rusoto_sts",
  "rust_decimal",
  "schannel",
  "seahash",
  "security-framework 0.4.4",
+ "semver 0.11.0",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -7369,6 +7406,25 @@ name = "zeroize"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3cbac2ed2ba24cc90f5e06485ac8c7c1e5449fe8911aef4d8877218af021a5b8"
+
+[[package]]
+name = "zstd"
+version = "0.5.1+zstd.1.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c5d978b793ae64375b80baf652919b148f6a496ac8802922d9999f5a553194f"
+dependencies = [
+ "zstd-safe",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "2.0.3+zstd.1.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bee25eac9753cfedd48133fa1736cbd23b774e253d89badbeac7d12b23848d3f"
+dependencies = [
+ "libc",
+ "zstd-sys",
+]
 
 [[package]]
 name = "zstd-sys"

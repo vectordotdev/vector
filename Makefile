@@ -314,7 +314,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
@@ -324,7 +324,7 @@ else
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
 	 -p 4566:4566 -p 4571:4571 \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
