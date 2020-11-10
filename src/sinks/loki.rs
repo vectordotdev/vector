@@ -19,7 +19,7 @@ use crate::{
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, TowerRequestConfig, UriSerde,
     },
     template::Template,
@@ -103,7 +103,6 @@ impl SinkConfig for LokiConfig {
         let sink = BatchedHttpSink::new(
             self.clone(),
             LokiBuffer::new(batch_settings.size),
-            HttpRetryLogic,
             request_settings,
             batch_settings.timeout,
             client.clone(),

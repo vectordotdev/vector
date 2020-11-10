@@ -39,7 +39,7 @@ pub trait HttpSink: Send + Sync + 'static {
 /// to be able to send it to the inner batch type and sink. Because of
 /// this we must provide a single buffer slot. To ensure the buffer is
 /// fully flushed make sure `poll_complete` returns ready.
-pub struct BatchedHttpSink<T, B, L>
+pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
@@ -58,6 +58,32 @@ where
     slot: Option<B::Input>,
 }
 
+impl<T, B> BatchedHttpSink<T, B, HttpRetryLogic>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn new(
+        sink: T,
+        batch: B,
+        request_settings: TowerRequestSettings,
+        batch_timeout: Duration,
+        client: HttpClient,
+        acker: Acker,
+    ) -> Self {
+        Self::with_retry_logic(
+            sink,
+            batch,
+            HttpRetryLogic,
+            request_settings,
+            batch_timeout,
+            client,
+            acker,
+        )
+    }
+}
+
 impl<T, B, L> BatchedHttpSink<T, B, L>
 where
     B: Batch,
@@ -65,7 +91,7 @@ where
     L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
-    pub fn new(
+    pub fn with_retry_logic(
         sink: T,
         batch: B,
         logic: L,

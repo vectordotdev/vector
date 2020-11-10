@@ -121,7 +121,7 @@ impl SinkConfig for ElasticSearchConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::with_retry_logic(
             common,
             Buffer::new(batch.size, compression),
             ElasticSearchRetryLogic,

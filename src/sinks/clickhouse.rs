@@ -80,7 +80,6 @@ impl SinkConfig for ClickhouseConfig {
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
-            HttpRetryLogic,
             request,
             batch.timeout,
             client.clone(),

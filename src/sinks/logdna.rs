@@ -4,7 +4,7 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
@@ -88,7 +88,6 @@ impl SinkConfig for LogdnaConfig {
         let sink = BatchedHttpSink::new(
             self.clone(),
             JsonArrayBuffer::new(batch_settings.size),
-            HttpRetryLogic,
             request_settings,
             batch_settings.timeout,
             client.clone(),

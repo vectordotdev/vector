@@ -7,7 +7,7 @@ use crate::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
             TowerRequestConfig, VecBuffer,
         },
@@ -115,7 +115,6 @@ impl DatadogLogsConfig {
         let sink = BatchedHttpSink::new(
             service,
             batch,
-            HttpRetryLogic,
             request_settings,
             timeout,
             client,
