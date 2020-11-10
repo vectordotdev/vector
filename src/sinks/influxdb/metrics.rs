@@ -18,8 +18,10 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::future::{ready, BoxFuture};
-use futures01::Sink;
+use futures::{
+    future::{self, BoxFuture},
+    SinkExt,
+};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -142,7 +144,7 @@ impl InfluxDBSvc {
             )
             .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
 
-        Ok(VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(VectorSink::Sink(Box::new(sink)))
     }
 }
 
@@ -176,7 +178,7 @@ fn create_build_request(
 {
     let auth = format!("Token {}", token);
     move |body| {
-        Box::pin(ready(
+        Box::pin(future::ready(
             hyper::Request::post(uri.clone())
                 .header("Content-Type", "text/plain")
                 .header("Authorization", auth.clone())
@@ -880,9 +882,7 @@ mod integration_tests {
         http::HttpClient,
         sinks::influxdb::{
             metrics::{default_summary_quantiles, InfluxDBConfig, InfluxDBSvc},
-            test_util::{
-                cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, DATABASE, ORG, TOKEN,
-            },
+            test_util::{cleanup_v1, onboarding_v1, onboarding_v2, query_v1, BUCKET, ORG, TOKEN},
             InfluxDB1Settings, InfluxDB2Settings,
         },
         tls::TlsOptions,
@@ -893,7 +893,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn insert_metrics_over_https() {
-        onboarding_v1("https://localhost:8087").await;
+        let database = onboarding_v1("https://localhost:8087").await;
 
         let cx = SinkContext::new_test();
 
@@ -901,7 +901,7 @@ mod integration_tests {
             endpoint: "https://localhost:8087".to_string(),
             influxdb1_settings: Some(InfluxDB1Settings {
                 consistency: None,
-                database: DATABASE.to_string(),
+                database: database.clone(),
                 retention_policy_name: Some("autogen".to_string()),
                 username: None,
                 password: None,
@@ -924,7 +924,7 @@ mod integration_tests {
 
         let res = query_v1(
             "https://localhost:8087",
-            &format!("show series on {}", DATABASE),
+            &format!("show series on {}", database),
         )
         .await;
         let string = res.text().await.unwrap();
@@ -955,7 +955,7 @@ mod integration_tests {
             10
         );
 
-        cleanup_v1("https://localhost:8087").await;
+        cleanup_v1("https://localhost:8087", &database).await;
     }
 
     #[tokio::test]

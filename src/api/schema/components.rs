@@ -10,6 +10,30 @@ use tokio::stream::{Stream, StreamExt};
 
 pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
 
+lazy_static! {
+    pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+}
+
+#[derive(Debug, Clone, Interface)]
+#[graphql(
+    field(name = "name", type = "String"),
+    field(name = "component_type", type = "String"),
+    field(
+        name = "events_processed_total",
+        type = "Option<metrics::EventsProcessedTotal>"
+    ),
+    field(
+        name = "bytes_processed_total",
+        type = "Option<metrics::BytesProcessedTotal>"
+    )
+)]
+pub enum Component {
+    Source(Source),
+    Transform(Transform),
+    Sink(Sink),
+}
+
 #[derive(Enum, Eq, PartialEq, Copy, Clone)]
 pub enum SourceOutputType {
     Any,
@@ -30,7 +54,7 @@ impl From<DataType> for SourceOutputType {
 #[derive(Debug, Clone)]
 pub struct SourceData {
     name: String,
-    source_type: String,
+    component_type: String,
     output_type: DataType,
 }
 
@@ -45,8 +69,8 @@ impl Source {
     }
 
     /// Source type
-    async fn source_type(&self) -> &str {
-        &*self.0.source_type
+    async fn component_type(&self) -> &str {
+        &*self.0.component_type
     }
 
     /// Source output type
@@ -84,7 +108,7 @@ impl Source {
 #[derive(Debug, Clone)]
 pub struct TransformData {
     name: String,
-    transform_type: String,
+    component_type: String,
     inputs: Vec<String>,
 }
 
@@ -99,8 +123,8 @@ impl Transform {
     }
 
     /// Transform type
-    async fn transform_type(&self) -> &str {
-        &*self.0.transform_type
+    async fn component_type(&self) -> &str {
+        &*self.0.component_type
     }
 
     /// Source inputs
@@ -140,7 +164,7 @@ impl Transform {
 #[derive(Debug, Clone)]
 pub struct SinkData {
     name: String,
-    sink_type: String,
+    component_type: String,
     inputs: Vec<String>,
 }
 
@@ -155,8 +179,8 @@ impl Sink {
     }
 
     /// Sink type
-    async fn sink_type(&self) -> &str {
-        &*self.0.sink_type
+    async fn component_type(&self) -> &str {
+        &*self.0.component_type
     }
 
     /// Source inputs
@@ -199,30 +223,6 @@ impl Sink {
         metrics::component_bytes_processed_total(&self.0.name)
     }
 }
-
-#[derive(Debug, Clone, Interface)]
-#[graphql(
-    field(name = "name", type = "String"),
-    field(
-        name = "events_processed_total",
-        type = "Option<metrics::EventsProcessedTotal>"
-    ),
-    field(
-        name = "bytes_processed_total",
-        type = "Option<metrics::BytesProcessedTotal>"
-    )
-)]
-pub enum Component {
-    Source(Source),
-    Transform(Transform),
-    Sink(Sink),
-}
-
-lazy_static! {
-    pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
-
 #[derive(Default)]
 pub struct ComponentsQuery;
 
@@ -344,7 +344,7 @@ pub fn update_config(config: &Config) {
             name.to_owned(),
             Component::Source(Source(SourceData {
                 name: name.to_owned(),
-                source_type: source.source_type().to_string(),
+                component_type: source.source_type().to_string(),
                 output_type: source.output_type(),
             })),
         );
@@ -356,7 +356,7 @@ pub fn update_config(config: &Config) {
             name.to_string(),
             Component::Transform(Transform(TransformData {
                 name: name.to_owned(),
-                transform_type: transform.inner.transform_type().to_string(),
+                component_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
             })),
         );
@@ -368,7 +368,7 @@ pub fn update_config(config: &Config) {
             name.to_string(),
             Component::Sink(Sink(SinkData {
                 name: name.to_owned(),
-                sink_type: sink.inner.sink_type().to_string(),
+                component_type: sink.inner.sink_type().to_string(),
                 inputs: sink.inputs.clone(),
             })),
         );

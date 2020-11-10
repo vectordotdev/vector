@@ -1,20 +1,16 @@
-use super::auto_concurrency::{
-    AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings,
+use super::{
+    auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings},
+    retries::{FixedRetryPolicy, RetryLogic},
+    sink::Response,
+    Batch, BatchSink, Partition, PartitionBatchSink,
 };
-use super::retries::{FixedRetryPolicy, RetryLogic};
-use super::sink::Response;
-use super::{Batch, BatchSink, Partition, PartitionBatchSink};
 use crate::buffers::Acker;
 use futures::TryFutureExt;
 use serde::{
     de::{self, Unexpected, Visitor},
     Deserialize, Deserializer, Serialize,
 };
-use std::fmt;
-use std::hash::Hash;
-use std::sync::Arc;
-use std::task::Poll;
-use std::time::Duration;
+use std::{fmt, hash::Hash, sync::Arc, task::Poll, time::Duration};
 use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,

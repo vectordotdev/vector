@@ -679,6 +679,18 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-mongodb_metrics
 endif
 
+.PHONY: test-integration-prometheus
+test-integration-prometheus: ## Runs Prometheus integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-influxdb
+	$(MAKE) start-integration-influxdb
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib integration_tests:: --  ::prometheus --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-influxdb
+endif
+
 .PHONY: start-integration-pulsar
 start-integration-pulsar:
 ifeq ($(CONTAINER_TOOL),podman)

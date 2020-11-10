@@ -118,3 +118,43 @@ impl std::fmt::Display
         write!(f, "{}", res)
     }
 }
+
+impl std::fmt::Display
+    for component_added_subscription::ComponentAddedSubscriptionComponentAddedOn
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let res = match self {
+            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Source => {
+                "source"
+            }
+            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Transform => {
+                "transform"
+            }
+            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Sink => {
+                "sink"
+            }
+        };
+
+        write!(f, "{}", res)
+    }
+}
+
+impl std::fmt::Display
+    for component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let res = match self {
+            component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Source => {
+                "source"
+            }
+            component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Transform => {
+                "transform"
+            }
+            component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Sink => {
+                "sink"
+            }
+        };
+
+        write!(f, "{}", res)
+    }
+}

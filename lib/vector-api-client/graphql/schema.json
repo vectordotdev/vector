@@ -149,6 +149,22 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "componentType",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
               "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
@@ -1271,7 +1287,7 @@
               "deprecationReason": null,
               "description": "Sink type",
               "isDeprecated": false,
-              "name": "sinkType",
+              "name": "componentType",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1392,7 +1408,7 @@
               "deprecationReason": null,
               "description": "Source type",
               "isDeprecated": false,
-              "name": "sourceType",
+              "name": "componentType",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1973,7 +1989,7 @@
               "deprecationReason": null,
               "description": "Transform type",
               "isDeprecated": false,
-              "name": "transformType",
+              "name": "componentType",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
