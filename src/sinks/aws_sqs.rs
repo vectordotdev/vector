@@ -139,6 +139,7 @@ impl SqsSink {
         cx: SinkContext,
         client: SqsClient,
     ) -> crate::Result<impl Sink<Event, Error = ()>> {
+        // Currently we do not use batching, so this mostly for future. Also implement `Service` is simpler than `Sink`.
         // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html
         // Up to 10 events, not more than 256KB as total size.
         let batch = BatchSettings::default().events(1).bytes(262_144);
