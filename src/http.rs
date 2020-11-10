@@ -1,5 +1,7 @@
-use crate::dns::Resolver;
-use crate::tls::{tls_connector_builder, MaybeTlsSettings};
+use crate::{
+    dns::Resolver,
+    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+};
 use futures::future::BoxFuture;
 use http::header::HeaderValue;
 use http::Request;
@@ -9,6 +11,7 @@ use hyper::{
 };
 use hyper_openssl::HttpsConnector;
 use serde::{Deserialize, Serialize};
+use snafu::{ResultExt, Snafu};
 use std::{
     fmt,
     task::{Context, Poll},
@@ -16,6 +19,14 @@ use std::{
 use tower::Service;
 use tracing::Span;
 use tracing_futures::Instrument;
+
+#[derive(Debug, Snafu)]
+pub enum HttpError {
+    #[snafu(display("Failed to build TLS connector"))]
+    BuildTlsConnector { source: TlsError },
+    #[snafu(display("Failed to build HTTPS connector"))]
+    MakeHttpsConnector { source: openssl::error::ErrorStack },
+}
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
@@ -31,13 +42,13 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
-    pub fn new(tls_settings: impl Into<MaybeTlsSettings>) -> crate::Result<HttpClient<B>> {
+    pub fn new(tls_settings: impl Into<MaybeTlsSettings>) -> Result<HttpClient<B>, HttpError> {
         let mut http = HttpConnector::new_with_resolver(Resolver);
         http.enforce_http(false);
 
         let settings = tls_settings.into();
-        let tls = tls_connector_builder(&settings)?;
-        let mut https = HttpsConnector::with_connector(http, tls)?;
+        let tls = tls_connector_builder(&settings).context(BuildTlsConnector)?;
+        let mut https = HttpsConnector::with_connector(http, tls).context(MakeHttpsConnector)?;
 
         let settings = settings.tls().cloned();
         https.set_callback(move |c, _uri| {
