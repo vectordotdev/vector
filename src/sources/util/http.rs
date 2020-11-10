@@ -146,6 +146,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
         let fut = async move {
             let span = crate::trace::current_span();
+
             let mut filter: BoxedFilter<()> = warp::post().boxed();
             if !path.is_empty() && path != "/" {
                 for s in path.split('/') {
