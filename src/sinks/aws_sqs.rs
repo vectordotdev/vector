@@ -200,7 +200,7 @@ impl Service<Vec<SendMessageEntry>> for SqsSink {
         Box::pin(async move {
             client
                 .send_message(request)
-                .inspect_ok(|_| emit!(AwsSqsEventSent { byte_size }))
+                .inspect_ok(|result| emit!(AwsSqsEventSent { byte_size, message_id: result.message_id.as_ref() }))
                 .instrument(info_span!("request"))
                 .await
         })
