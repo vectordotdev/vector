@@ -261,6 +261,62 @@ impl TryFrom<Value> for i64 {
     }
 }
 
+macro_rules! value_impl {
+    ($(($func:expr, $variant:expr, $ret:ty)),+ $(,)*) => {
+        impl Value {
+            $(paste::paste! {
+            pub fn [<as_ $func>](&self) -> Option<&$ret> {
+                match self {
+                    Value::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            pub fn [<try_ $func>](self) -> Result<$ret, Error> {
+                match self {
+                    Value::$variant(v) => Ok(v),
+                    v => Err(Error::Expected(ValueKind::$variant, v.kind())),
+                }
+            }
+
+            pub fn [<unwrap_ $func>](self) -> $ret {
+                self.[<try_ $func>]().expect(stringify!($func))
+            }
+            })+
+
+            pub fn as_null(&self) -> Option<()> {
+                match self {
+                    Value::Null => Some(()),
+                    _ => None,
+                }
+            }
+
+            pub fn try_null(self) -> Result<(), Error> {
+                match self {
+                    Value::Null => Ok(()),
+                    v => Err(Error::Expected(ValueKind::Null, v.kind())),
+                }
+            }
+
+            pub fn unwrap_null(self) -> () {
+                self.try_null().expect("null")
+            }
+        }
+    };
+}
+
+value_impl! {
+    (string, String, Bytes),
+    (integer, Integer, i64),
+    (float, Float, f64),
+    (boolean, Boolean, bool),
+    (map, Map, BTreeMap<String, Value>),
+    (array, Array, Vec<Value>),
+    (timestamp, Timestamp, DateTime<Utc>),
+    // manually implemented due to no variant value
+    // (null, Null, ()),
+}
+
 impl Value {
     pub fn kind(&self) -> ValueKind {
         self.into()
