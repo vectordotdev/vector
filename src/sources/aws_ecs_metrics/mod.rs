@@ -16,19 +16,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub mod parser;
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(rename_all = "lowercase")]
-enum Version {
-    V2,
-    V3,
-    V4,
-}
+mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct AwsEcsMetricsSourceConfig {
-    version: Version,
+    endpoint: Option<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
@@ -44,7 +36,7 @@ inventory::submit! {
 impl GenerateConfig for AwsEcsMetricsSourceConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            version: Version::V4,
+            endpoint: None,
             scrape_interval_secs: default_scrape_interval_secs(),
         })
         .unwrap()
@@ -61,11 +53,16 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let url = match self.version {
-            Version::V2 => "169.254.170.2/v2/stats".to_string(),
-            Version::V3 => format!("{}/task/stats", env::var("ECS_CONTAINER_METADATA_URI")?),
-            Version::V4 => format!("{}/task/stats", env::var("ECS_CONTAINER_METADATA_URI_V4")?),
-        };
+        let url = self
+            .endpoint
+            .clone()
+            .or(env::var("ECS_CONTAINER_METADATA_URI_V4")
+                .ok()
+                .map(|s| format!("{}/task/stats", s)))
+            .or(env::var("ECS_CONTAINER_METADATA_URI")
+                .ok()
+                .map(|s| format!("{}/task/stats", s)))
+            .unwrap_or("http://169.254.170.2/v2/stats".into());
 
         Ok(aws_ecs_metrics(
             url,
@@ -91,7 +88,7 @@ fn aws_ecs_metrics(
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_map_err(|error| error!(message = "Error sending ECS metrics.", %error))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
@@ -166,33 +163,24 @@ fn aws_ecs_metrics(
     Box::new(task.boxed().compat())
 }
 
-#[cfg(feature = "sinks-prometheus")]
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::{
-        config,
-        sinks::prometheus::PrometheusSinkConfig,
-        test_util::{next_addr, start_topology},
+        event::MetricValue,
+        test_util::{collect_ready, next_addr, wait_for_tcp},
         Error,
     };
     use futures::compat::Future01CompatExt;
     use hyper::{
         service::{make_service_fn, service_fn},
-        {Body, Client, Response, Server},
+        {Body, Response, Server},
     };
     use tokio::time::{delay_for, Duration};
-
-    fn metric_eq(lines: &[&str], name: &str, tag: &str, value: u64) -> bool {
-        lines
-            .iter()
-            .any(|s| s.starts_with(name) && s.contains(tag) && s.ends_with(&value.to_string()))
-    }
 
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
         let in_addr = next_addr();
-        let out_addr = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
@@ -498,87 +486,47 @@ mod test {
                 error!("server error: {:?}", e);
             }
         });
+        wait_for_tcp(in_addr).await;
 
-        env::set_var(
-            "ECS_CONTAINER_METADATA_URI_V4",
-            format!("http://{}", in_addr),
-        );
+        let (tx, rx) = Pipeline::new_test();
 
-        let mut config = config::Config::builder();
-        config.add_source(
-            "in",
-            AwsEcsMetricsSourceConfig {
-                version: Version::V4,
-                scrape_interval_secs: 1,
-            },
-        );
-        config.add_sink(
-            "out",
-            &["in"],
-            PrometheusSinkConfig {
-                address: out_addr,
-                namespace: None,
-                buckets: vec![1.0, 2.0, 4.0],
-                quantiles: vec![],
-                flush_period_secs: 1,
-            },
-        );
+        let source = AwsEcsMetricsSourceConfig {
+            endpoint: Some(format!("http://{}", in_addr)),
+            scrape_interval_secs: 1,
+        }
+        .build(
+            "default",
+            &GlobalOptions::default(),
+            ShutdownSignal::noop(),
+            tx,
+        )
+        .await
+        .unwrap()
+        .compat();
+        tokio::spawn(source);
 
-        let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
         delay_for(Duration::from_secs(1)).await;
 
-        let response = Client::new()
-            .get(format!("http://{}/metrics", out_addr).parse().unwrap())
+        let metrics = collect_ready(rx)
             .await
-            .unwrap();
-        assert!(response.status().is_success());
-
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-        let lines = std::str::from_utf8(&body)
             .unwrap()
-            .lines()
+            .into_iter()
+            .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        assert!(metric_eq(
-            &lines,
-            "aws_ecs_blkio_io_service_bytes_recursive",
-            "op=\"read\"",
-            0
-        ));
-        assert!(metric_eq(
-            &lines,
-            "aws_ecs_blkio_io_service_bytes_recursive",
-            "op=\"write\"",
-            520192
-        ));
+        match metrics.iter().find(|m| m.name == "network_rx_bytes") {
+            Some(m) => {
+                assert_eq!(m.value, MetricValue::Counter { value: 329932716.0 });
+                assert_eq!(m.namespace, Some("aws_ecs".into()));
 
-        assert!(metric_eq(
-            &lines,
-            "aws_ecs_cpu_total_usage",
-            "vector1",
-            863993897
-        ));
-        assert!(metric_eq(
-            &lines,
-            "aws_ecs_cpu_total_usage",
-            "vector2",
-            2324920942
-        ));
-
-        assert!(metric_eq(
-            &lines,
-            "aws_ecs_memory_total_pgfault",
-            "vector1",
-            15745
-        ));
-
-        assert!(metric_eq(
-            &lines,
-            "aws_ecs_network_rx_bytes",
-            "eth1",
-            329932716
-        ));
-
-        topology.stop().compat().await.unwrap();
+                match &m.tags {
+                    Some(tags) => {
+                        assert_eq!(tags.get("network"), Some(&"eth1".to_string()));
+                    }
+                    None => panic!("No tags for metric. {:?}", m),
+                }
+            }
+            None => panic!("Could not find 'network_rx_bytes' in {:?}.", metrics),
+        }
     }
 }

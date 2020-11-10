@@ -33,10 +33,7 @@ impl InternalEvent for AwsEcsMetricsRequestCompleted {
 
     fn emit_metrics(&self) {
         counter!("requests_completed_total", 1);
-        histogram!("request_duration_nanoseconds", self.end - self.start,
-            "component_kind" => "source",
-            "component_type" => "aws_ecs_metrics",
-        );
+        histogram!("request_duration_nanoseconds", self.end - self.start);
     }
 }
 
@@ -51,17 +48,14 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
     fn emit_logs(&self) {
         error!(message = "Parsing error.", url = %self.url, error = %self.error);
         debug!(
-            message = %format!("Failed to parse response:\n\n{}\n\n", self.body),
+            message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body),
             url = %self.url,
             rate_limit_secs = 10
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("parse_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "aws_ecs_metrics",
-        );
+        counter!("parse_errors_total", 1);
     }
 }
 

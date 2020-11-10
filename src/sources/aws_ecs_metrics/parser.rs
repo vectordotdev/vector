@@ -60,6 +60,7 @@ struct ContainerStats {
 
 pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
     let mut result = Vec::new();
+    let namespace = Some("aws_ecs".to_string());
     let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(packet.as_bytes())?;
 
     for (_, container) in parsed {
@@ -75,7 +76,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
                 tags.insert("op".into(), item.op.to_lowercase());
 
                 let counter = Metric {
-                    name: format!("aws_ecs_blkio_{}", name),
+                    name: format!("blkio_{}", name),
+                    namespace: namespace.clone(),
                     timestamp: Some(container.ts),
                     tags: Some(tags),
                     kind: MetricKind::Absolute,
@@ -89,7 +91,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
         // extracts cpu metrics
         if let Some(cpu) = container.cpu {
             let online_cpus = Metric {
-                name: "aws_ecs_cpu_online_cpus".into(),
+                name: "cpu_online_cpus".into(),
+                namespace: namespace.clone(),
                 timestamp: Some(container.ts),
                 tags: Some(tags.clone()),
                 kind: MetricKind::Absolute,
@@ -111,7 +114,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
 
             for (name, value) in stats.iter() {
                 let counter = Metric {
-                    name: format!("aws_ecs_cpu_{}", name),
+                    name: format!("cpu_{}", name),
+                    namespace: namespace.clone(),
                     timestamp: Some(container.ts),
                     tags: Some(tags.clone()),
                     kind: MetricKind::Absolute,
@@ -126,7 +130,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
                 tags.insert("cpu".into(), index.to_string());
 
                 let counter = Metric {
-                    name: "aws_ecs_cpu_percpu_usage".into(),
+                    name: "cpu_percpu_usage".into(),
+                    namespace: namespace.clone(),
                     timestamp: Some(container.ts),
                     tags: Some(tags.clone()),
                     kind: MetricKind::Absolute,
@@ -154,7 +159,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
 
             for (name, value) in stats.iter() {
                 let gauge = Metric {
-                    name: format!("aws_ecs_memory_{}", name),
+                    name: format!("memory_{}", name),
+                    namespace: namespace.clone(),
                     timestamp: Some(container.ts),
                     tags: Some(tags.clone()),
                     kind: MetricKind::Absolute,
@@ -166,7 +172,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
 
             for (name, value) in memory.stats.iter() {
                 let gauge = Metric {
-                    name: format!("aws_ecs_memory_{}", name),
+                    name: format!("memory_{}", name),
+                    namespace: namespace.clone(),
                     timestamp: Some(container.ts),
                     tags: Some(tags.clone()),
                     kind: MetricKind::Absolute,
@@ -184,7 +191,8 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
 
             for (name, value) in stats.iter() {
                 let counter = Metric {
-                    name: format!("aws_ecs_network_{}", name),
+                    name: format!("network_{}", name),
+                    namespace: namespace.clone(),
                     timestamp: Some(container.ts),
                     tags: Some(tags.clone()),
                     kind: MetricKind::Absolute,
@@ -208,6 +216,10 @@ mod test {
 
     fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
+    }
+
+    fn namespace() -> Option<String> {
+        Some("aws_ecs".into())
     }
 
     #[test]
@@ -248,7 +260,8 @@ mod test {
             parse(json).unwrap(),
             vec![
                 Metric {
-                    name: "aws_ecs_blkio_io_service_bytes_recursive".into(),
+                    name: "blkio_io_service_bytes_recursive".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -267,7 +280,8 @@ mod test {
                     value: MetricValue::Counter { value: 0.0 },
                 },
                 Metric {
-                    name: "aws_ecs_blkio_io_service_bytes_recursive".into(),
+                    name: "blkio_io_service_bytes_recursive".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -324,7 +338,8 @@ mod test {
             parse(json).unwrap(),
             vec![
                 Metric {
-                    name: "aws_ecs_cpu_online_cpus".into(),
+                    name: "cpu_online_cpus".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -341,7 +356,8 @@ mod test {
                     value: MetricValue::Gauge { value: 2.0 },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_system_cpu_usage".into(),
+                    name: "cpu_system_cpu_usage".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -360,7 +376,8 @@ mod test {
                     },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_usage_in_usermode".into(),
+                    name: "cpu_usage_in_usermode".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -377,7 +394,8 @@ mod test {
                     value: MetricValue::Counter { value: 510000000.0 },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_usage_in_kernelmode".into(),
+                    name: "cpu_usage_in_kernelmode".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -394,7 +412,8 @@ mod test {
                     value: MetricValue::Counter { value: 190000000.0 },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_total_usage".into(),
+                    name: "cpu_total_usage".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -413,7 +432,8 @@ mod test {
                     },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_throttling_periods".into(),
+                    name: "cpu_throttling_periods".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -430,7 +450,8 @@ mod test {
                     value: MetricValue::Counter { value: 0.0 },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_throttled_periods".into(),
+                    name: "cpu_throttled_periods".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -447,7 +468,8 @@ mod test {
                     value: MetricValue::Counter { value: 0.0 },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_throttled_time".into(),
+                    name: "cpu_throttled_time".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -464,7 +486,8 @@ mod test {
                     value: MetricValue::Counter { value: 0.0 },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_percpu_usage".into(),
+                    name: "cpu_percpu_usage".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -484,7 +507,8 @@ mod test {
                     },
                 },
                 Metric {
-                    name: "aws_ecs_cpu_percpu_usage".into(),
+                    name: "cpu_percpu_usage".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -531,7 +555,8 @@ mod test {
             parse(json).unwrap(),
             vec![
                 Metric {
-                    name: "aws_ecs_memory_usage".into(),
+                    name: "memory_usage".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -548,7 +573,8 @@ mod test {
                     value: MetricValue::Gauge { value: 40120320.0 },
                 },
                 Metric {
-                    name: "aws_ecs_memory_max_usage".into(),
+                    name: "memory_max_usage".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -565,7 +591,8 @@ mod test {
                     value: MetricValue::Gauge { value: 47177728.0 },
                 },
                 Metric {
-                    name: "aws_ecs_memory_limit".into(),
+                    name: "memory_limit".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -584,7 +611,8 @@ mod test {
                     },
                 },
                 Metric {
-                    name: "aws_ecs_memory_active_anon".into(),
+                    name: "memory_active_anon".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -601,7 +629,8 @@ mod test {
                     value: MetricValue::Gauge { value: 34885632.0 },
                 },
                 Metric {
-                    name: "aws_ecs_memory_active_file".into(),
+                    name: "memory_active_file".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -642,7 +671,8 @@ mod test {
             parse(json).unwrap(),
             vec![
                 Metric {
-                    name: "aws_ecs_network_rx_bytes".into(),
+                    name: "network_rx_bytes".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
@@ -660,7 +690,8 @@ mod test {
                     value: MetricValue::Counter { value: 329932716.0 },
                 },
                 Metric {
-                    name: "aws_ecs_network_tx_bytes".into(),
+                    name: "network_tx_bytes".into(),
+                    namespace: namespace(),
                     timestamp: Some(ts()),
                     tags: Some(
                         vec![
