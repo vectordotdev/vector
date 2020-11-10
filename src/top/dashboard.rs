@@ -6,7 +6,7 @@ use crossterm::{
     tty::IsTty,
     ExecutableCommand,
 };
-use human_format::{Formatter, Scales};
+use human_format::Formatter;
 use num_format::{Locale, ToFormattedString};
 use std::io::{stdout, Write};
 use tui::{
@@ -20,11 +20,11 @@ use tui::{
 
 /// Format metrics, with thousands separation
 trait ThousandsFormatter {
-    fn format_thousands(&self) -> String;
+    fn thousands_format(&self) -> String;
 }
 
 impl ThousandsFormatter for i64 {
-    fn format_thousands(&self) -> String {
+    fn thousands_format(&self) -> String {
         match self {
             0 => "--".into(),
             _ => self.to_formatted_string(&Locale::en),
@@ -34,28 +34,17 @@ impl ThousandsFormatter for i64 {
 
 /// Format metrics, using the 'humanized' format, abbreviating with suffixes
 trait HumanFormatter {
-    fn format_human(&self) -> String;
-    fn format_human_bytes(&self) -> String;
+    fn human_format(&self) -> String;
 }
 
 impl HumanFormatter for i64 {
     /// Format an i64 as a string, returning `--` if zero, the value as a string if < 1000, or
     /// the value abbreviated with 'k' if at least 1,000
-    fn format_human(&self) -> String {
+    fn human_format(&self) -> String {
         match self {
             0 => "--".into(),
             1..=999 => self.to_string(),
             _ => Formatter::new().with_decimals(2).format(*self as f64),
-        }
-    }
-
-    /// Format an i64 as a string that represents a binary size
-    fn format_human_bytes(&self) -> String {
-        match self {
-            0 => "--".into(),
-            _ => Formatter::new()
-                .with_scales(Scales::SI())
-                .format(*self as f64),
         }
     }
 }
@@ -106,15 +95,15 @@ impl<'a> Widgets<'a> {
             // Build metric stats
             let formatted_metrics = if self.human_metrics {
                 [
-                    r.events_processed_total.format_human(),
-                    r.bytes_processed_total.format_human_bytes(),
-                    r.errors.format_human(),
+                    r.events_processed_total.human_format(),
+                    r.bytes_processed_total.human_format(),
+                    r.errors.human_format(),
                 ]
             } else {
                 [
-                    r.events_processed_total.format_thousands(),
-                    r.bytes_processed_total.format_thousands(),
-                    r.errors.format_thousands(),
+                    r.events_processed_total.thousands_format(),
+                    r.bytes_processed_total.thousands_format(),
+                    r.errors.thousands_format(),
                 ]
             };
 
