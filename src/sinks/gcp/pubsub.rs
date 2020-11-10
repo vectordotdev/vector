@@ -32,7 +32,9 @@ enum HealthcheckError {
 pub struct PubsubConfig {
     pub project: String,
     pub topic: String,
-    pub emulator_host: Option<String>,
+    pub endpoint: Option<String>,
+    #[serde(default = "default_skip_authentication")]
+    pub skip_authentication: bool,
     #[serde(flatten)]
     pub auth: GcpAuthConfig,
 
@@ -47,6 +49,10 @@ pub struct PubsubConfig {
     pub encoding: EncodingConfigWithDefault<Encoding>,
 
     pub tls: Option<TlsOptions>,
+}
+
+fn default_skip_authentication() -> bool {
+    false
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -118,13 +124,14 @@ struct PubsubSink {
 impl PubsubSink {
     async fn from_config(config: &PubsubConfig) -> crate::Result<Self> {
         // We only need to load the credentials if we are not targeting an emulator.
-        let creds = match config.emulator_host {
-            None => config.auth.make_credentials(Scope::PubSub).await?,
-            Some(_) => None,
+        let creds = if config.skip_authentication {
+            None
+        } else {
+            config.auth.make_credentials(Scope::PubSub).await?
         };
 
-        let uri_base = match config.emulator_host.as_ref() {
-            Some(host) => format!("http://{}", host),
+        let uri_base = match config.endpoint.as_ref() {
+            Some(host) => host.to_string(),
             None => "https://pubsub.googleapis.com".into(),
         };
         let uri_base = format!(
@@ -226,12 +233,13 @@ mod integration_tests {
     use reqwest::{Client, Method, Response};
     use serde_json::{json, Value};
 
-    const EMULATOR_HOST: &str = "localhost:8681";
+    const EMULATOR_HOST: &str = "http://localhost:8681";
     const PROJECT: &str = "testproject";
 
     fn config(topic: &str) -> PubsubConfig {
         PubsubConfig {
-            emulator_host: Some(EMULATOR_HOST.into()),
+            endpoint: Some(EMULATOR_HOST.into()),
+            skip_authentication: true,
             project: PROJECT.into(),
             topic: topic.into(),
             ..Default::default()
@@ -300,7 +308,7 @@ mod integration_tests {
     }
 
     async fn request(method: Method, path: &str, json: Value) -> Response {
-        let url = format!("http://{}/v1/projects/{}/{}", EMULATOR_HOST, PROJECT, path);
+        let url = format!("{}/v1/projects/{}/{}", EMULATOR_HOST, PROJECT, path);
         Client::new()
             .request(method.clone(), &url)
             .json(&json)
