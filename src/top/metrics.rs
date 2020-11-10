@@ -22,7 +22,8 @@ async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx
                     c.name.clone(),
                     state::EventType::ComponentAdded(state::ComponentRow {
                         name: c.name,
-                        component_type: c.on.to_string(),
+                        kind: c.on.to_string(),
+                        component_type: c.component_type,
                         events_processed_total: 0,
                         bytes_processed_total: 0,
                         errors: 0,
@@ -121,7 +122,8 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                 d.name.clone(),
                 state::ComponentRow {
                     name: d.name,
-                    component_type: d.on.to_string(),
+                    kind: d.on.to_string(),
+                    component_type: d.component_type,
                     events_processed_total: d
                         .events_processed_total
                         .as_ref()

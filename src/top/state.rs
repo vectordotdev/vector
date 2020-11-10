@@ -2,7 +2,7 @@ use num_format::{Locale, ToFormattedString};
 use std::collections::btree_map::BTreeMap;
 use tokio::sync::mpsc;
 
-pub static COMPONENT_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Bytes", "Errors"];
+pub static COMPONENT_HEADERS: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
 
 pub type State = BTreeMap<String, ComponentRow>;
 pub type EventTx = mpsc::Sender<(String, EventType)>;
@@ -20,6 +20,7 @@ pub enum EventType {
 #[derive(Debug, Clone)]
 pub struct ComponentRow {
     pub name: String,
+    pub kind: String,
     pub component_type: String,
     pub events_processed_total: i64,
     pub bytes_processed_total: i64,
