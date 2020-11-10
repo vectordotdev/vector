@@ -27,7 +27,7 @@ pub struct HttpClient<B = Body> {
 
 impl<B> HttpClient<B>
 where
-    B: HttpBody + Send + 'static,
+    B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
@@ -70,7 +70,7 @@ where
 
 impl<B> Service<Request<B>> for HttpClient<B>
 where
-    B: HttpBody + Send + 'static,
+    B: fmt::Debug + HttpBody + Send + 'static,
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
@@ -91,16 +91,25 @@ where
                 .insert("User-Agent", self.user_agent.clone());
         }
 
-        debug!(message = "Sending request.", uri = %request.uri(), method = %request.method());
+        debug!(
+            message = "Sending HTTP request.",
+            uri = %request.uri(),
+            method = %request.method(),
+            version = ?request.version(),
+            headers = ?request.headers(),
+            body = ?request.body(),
+        );
 
         let response = self.client.request(request);
 
         let fut = async move {
             let res = response.await?;
             debug!(
-                    message = "Response.",
-                    status = ?res.status(),
+                    message = "HTTP response.",
+                    status = %res.status(),
                     version = ?res.version(),
+                    headers = ?res.headers(),
+                    body = ?res.body(),
             );
             Ok(res)
         }
