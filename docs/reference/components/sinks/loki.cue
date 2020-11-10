@@ -67,52 +67,10 @@ components: sinks: loki: {
 	}
 
 	configuration: {
-		auth: {
-			common:      false
-			description: "Options for the authentication strategy."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					password: {
-						description: "The basic authentication password. If using GrafanaLab's hosted Loki then this must be set to your `instanceId`."
-						required:    true
-						warnings: []
-						type: string: {
-							examples: ["${LOKI_PASSWORD}", "password"]
-						}
-					}
-					strategy: {
-						description: "The authentication strategy to use."
-						required:    true
-						warnings: []
-						type: string: {
-							enum: {
-								basic:  "The [basic authentication strategy][urls.basic_auth]."
-								bearer: "The bearer token authentication strategy."
-							}
-						}
-					}
-					token: {
-						description: "The token to use for bearer authentication"
-						required:    true
-						warnings: []
-						type: string: {
-							examples: ["${API_TOKEN}", "xyz123"]
-						}
-					}
-					user: {
-						description: "The basic authentication user name. If using GrafanaLab's hosted Loki then this must be set to your Grafana.com api key."
-						required:    true
-						warnings: []
-						type: string: {
-							examples: ["${LOKI_USERNAME}", "username"]
-						}
-					}
-				}
-			}
-		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${LOKI_PASSWORD}"
+			username_example: "${LOKI_USERNAME}"
+		}}
 		labels: {
 			description: "A set of labels that will be attached to each batch of events. These values are also templateable to allow events to provide dynamic label values.Note: If the set of label values has high cardinality this can cause drastic performance issues with Loki. To ensure this does not happen one should try to reduce the amount of unique label values."
 			required:    true
