@@ -209,7 +209,7 @@ prometheusSink:
   # The address to listen at.
   listenAddress: "0.0.0.0"
   # The port to listen at.
-  listenPort: "8080"
+  listenPort: "9090"
   # Raw TOML config to embed at the vector source.
   rawConfig: null
   # Add Prometheus annotations to Pod to opt-in for Prometheus scraping.

@@ -1318,7 +1318,7 @@ async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
 
     let mut vector_metrics_port_forward =
-        framework.port_forward("test-vector", "daemonset/vector-agent", 8080, 8080)?;
+        framework.port_forward("test-vector", "daemonset/vector-agent", 9090, 9090)?;
     vector_metrics_port_forward.wait_until_ready().await?;
     let vector_metrics_url = format!(
         "http://{}/metrics",
