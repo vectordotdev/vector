@@ -53,6 +53,7 @@ components: sources: [Name=string]: {
 						common:      true
 						sort:        4
 						type: uint: {
+							default: null
 							examples: [1_000, 600_000]
 							unit: "milliseconds"
 						}
