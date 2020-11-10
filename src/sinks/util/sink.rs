@@ -176,17 +176,14 @@ where
             }
 
             // Try send batch.
-            let should_send = {
-                if (self.closing && !self.batch.is_empty()) || self.batch.was_full() {
-                    true
-                } else {
-                    self.linger
-                        .as_mut()
-                        .map(|linger| matches!(linger.poll_unpin(cx), Poll::Ready(())))
-                        .unwrap_or(false)
-                }
-            };
-            if should_send {
+            if (self.closing && !self.batch.is_empty())
+                || self.batch.was_full()
+                || self
+                    .linger
+                    .as_mut()
+                    .map(|linger| matches!(linger.poll_unpin(cx), Poll::Ready(())))
+                    .unwrap_or(false)
+            {
                 let service_ready = match self.service.poll_ready(cx) {
                     Poll::Ready(Ok(())) => true,
                     Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
@@ -207,15 +204,15 @@ where
             }
 
             // Try move buffer to batch.
-            if self.buffer.is_some() && self.batch.is_empty() {
-                let item = self.buffer.take().unwrap();
-                self.as_mut().start_send(item)?;
+            if self.batch.is_empty() {
+                if let Some(item) = self.buffer.take() {
+                    self.as_mut().start_send(item)?;
+                    if self.buffer.is_some() {
+                        unreachable!("Empty buffer overflowed.");
+                    }
 
-                if self.buffer.is_some() {
-                    unreachable!("Empty buffer overflowed.");
+                    continue;
                 }
-
-                continue;
             }
 
             // Only poll inner service and return `Poll::Pending` anyway.
@@ -362,19 +359,16 @@ where
             let this = self.as_mut().project();
             let mut partitions_ready = vec![];
             for (partition, batch) in this.partitions.iter() {
-                let should_send = {
-                    if (*this.closing && !batch.is_empty()) || batch.was_full() {
-                        true
-                    } else {
-                        let linger = this
-                            .lingers
+                if (*this.closing && !batch.is_empty())
+                    || batch.was_full()
+                    || matches!(
+                        this.lingers
                             .get_mut(&partition)
-                            .expect("linger should exists for poll_flush");
-                        matches!(linger.poll_unpin(cx), Poll::Ready(()))
-                    }
-                };
-
-                if should_send {
+                            .expect("linger should exists for poll_flush")
+                            .poll_unpin(cx),
+                        Poll::Ready(())
+                    )
+                {
                     partitions_ready.push(partition.clone());
                 }
             }
