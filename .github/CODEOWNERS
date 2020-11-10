@@ -26,6 +26,7 @@
 /docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
 
 /docs/reference/components/sources/apache_metrics.cue @jszwedko
+/docs/reference/components/sources/aws_s3.cue @jszwedko
 /docs/reference/components/sources/docker.cue @fanatid
 /docs/reference/components/sources/generator.cue @bruceg
 /docs/reference/components/sources/host_metrics.cue @bruceg
@@ -132,6 +133,7 @@
 
 /src/sources/apache_metrics/ @jszwedko
 /src/sources/aws_kinesis_firehose/ @jszwedko
+/src/sources/aws_s3.rs @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/host_metrics.rs @bruceg
