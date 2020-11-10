@@ -28,7 +28,7 @@ use tracing_futures::Instrument;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
-    #[snafu(display("`message_group_id` can not be used with FIFO queue."))]
+    #[snafu(display("`message_group_id` should be defined for FIFO queue."))]
     MessagrGroupIdWithFifo,
 }
 
@@ -148,7 +148,7 @@ impl SqsSink {
         let fifo = config.queue_url.ends_with(".fifo");
         let message_group_id = config.message_group_id;
 
-        if fifo && message_group_id.is_some() {
+        if fifo && message_group_id.is_none() {
             return Err(Box::new(BuildError::MessagrGroupIdWithFifo));
         }
 
