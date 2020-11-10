@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
     internal_events::AwsSqsEventSent,
     rusoto,
     sinks::util::{
@@ -11,8 +10,7 @@ use crate::{
     },
     Event,
 };
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rusoto_core::RusotoError;
@@ -95,13 +93,10 @@ impl SinkConfig for SqsSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone());
         let sink = SqsSink::new(self.clone(), cx, client)?;
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck.boxed(),
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck.boxed()))
     }
 
     fn input_type(&self) -> DataType {
@@ -126,9 +121,9 @@ impl SqsSinkConfig {
             .map_err(Into::into)
     }
 
-    pub fn create_client(&self, resolver: Resolver) -> crate::Result<SqsClient> {
+    pub fn create_client(&self) -> crate::Result<SqsClient> {
         let region = (&self.region).try_into()?;
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
 
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
@@ -141,7 +136,7 @@ impl SqsSink {
         config: SqsSinkConfig,
         cx: SinkContext,
         client: SqsClient,
-    ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
+    ) -> crate::Result<impl Sink<Event, Error = ()>> {
         // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html
         // Up to 10 events, not more than 256KB as total size.
         let batch = BatchSettings::default()
@@ -167,8 +162,8 @@ impl SqsSink {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("Fatal sqs sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &encoding, fifo)));
+            .sink_map_err(|error| error!("Fatal sqs sink error: {}", error))
+            .with_flat_map(move |event| stream::iter(encode_event(event, &encoding, fifo)).map(Ok));
 
         Ok(sink)
     }
@@ -308,7 +303,6 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::test_util::{random_lines_with_stream, random_string};
-    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_sqs::{CreateQueueRequest, GetQueueUrlRequest, ReceiveMessageRequest};
     use std::collections::HashMap;
@@ -343,12 +337,10 @@ mod integration_tests {
 
         config.clone().healthcheck(client.clone()).await.unwrap();
 
-        let sink = SqsSink::new(config, cx, client.clone()).unwrap();
+        let mut sink = SqsSink::new(config, cx, client.clone()).unwrap();
 
         let (mut input_lines, events) = random_lines_with_stream(100, 10);
-        let mut events = events.map(Ok);
-
-        sink.sink_compat().send_all(&mut events).await.unwrap();
+        sink.send_all(&mut events.map(Ok)).await.unwrap();
 
         delay_for(Duration::from_secs(1)).await;
 
