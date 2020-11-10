@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     http::HttpClient,
     internal_events::{
-        EventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
+        AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
     },
     transforms::{TaskTransform, Transform},
 };
@@ -195,8 +195,6 @@ impl Ec2MetadataTransform {
                 }
             });
         }
-
-        emit!(EventProcessed);
 
         Some(event)
     }

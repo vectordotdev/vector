@@ -7,6 +7,7 @@ use crate::{
     buffers,
     config::{DataType, SinkContext},
     event::Event,
+    internal_events::EventProcessed,
     shutdown::SourceShutdownCoordinator,
     transforms::Transform,
     Pipeline,
@@ -121,6 +122,7 @@ pub async fn build_pieces(
                 let transformed = filtered
                     .map(move |v| {
                         let mut buf = Vec::with_capacity(1);
+                        emit!(EventProcessed);
                         t.transform(&mut buf, v);
                         futures01::stream::iter_ok(buf.into_iter())
                     })
@@ -130,8 +132,12 @@ pub async fn build_pieces(
             }
             Transform::Task(t) => {
                 let filtered = filter_event_type(input_rx, input_type);
+                let decorated = Box::new(filtered.map(move |event| {
+                    emit!(EventProcessed);
+                    event
+                }));
                 let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
-                    t.transform(filtered);
+                    t.transform(decorated);
                 transformed.forward(output)
             }
         }

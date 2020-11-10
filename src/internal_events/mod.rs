@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-mod events_processed;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
@@ -29,6 +28,7 @@ mod dedupe;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
+mod events_processed;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-grok_parser")]
@@ -97,7 +97,6 @@ mod wasm;
 
 pub mod kubernetes;
 
-pub use self::events_processed::EventProcessed;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
@@ -126,6 +125,7 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
+pub use self::events_processed::EventProcessed;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
