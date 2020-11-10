@@ -70,49 +70,9 @@ impl ComponentsSubscriptionExt for crate::SubscriptionClient {
 impl std::fmt::Display for components_query::ComponentsQueryComponentsOn {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let res = match self {
-            components_query::ComponentsQueryComponentsOn::Source(_) => "source",
-            components_query::ComponentsQueryComponentsOn::Transform(_) => "transform",
-            components_query::ComponentsQueryComponentsOn::Sink(_) => "sink",
-        };
-
-        write!(f, "{}", res)
-    }
-}
-
-impl std::fmt::Display
-    for component_added_subscription::ComponentAddedSubscriptionComponentAddedOn
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let res = match self {
-            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Source(_) => {
-                "source"
-            }
-            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Transform(
-                _,
-            ) => "transform",
-            component_added_subscription::ComponentAddedSubscriptionComponentAddedOn::Sink(_) => {
-                "sink"
-            }
-        };
-
-        write!(f, "{}", res)
-    }
-}
-
-impl std::fmt::Display
-    for component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let res = match self {
-            component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Source => {
-                "source"
-            }
-            component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Transform => {
-                "transform"
-            }
-            component_removed_subscription::ComponentRemovedSubscriptionComponentRemovedOn::Sink => {
-                "sink"
-            }
+            components_query::ComponentsQueryComponentsOn::Source => "source",
+            components_query::ComponentsQueryComponentsOn::Transform => "transform",
+            components_query::ComponentsQueryComponentsOn::Sink => "sink",
         };
 
         write!(f, "{}", res)
