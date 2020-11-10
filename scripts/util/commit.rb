@@ -67,6 +67,21 @@ module Vector
       type == "feat"
     end
 
+    def to_cue_struct
+      "{" +
+        "sha: #{sha.to_json}, " +
+        "date: #{date.to_json}, " +
+        "description: #{description.to_json}, " +
+        "pr_number: #{pr_number.to_json}, " +
+        "scopes: #{scopes.to_json}, " +
+        "type: #{type.to_json}, " +
+        "breaking_change: #{breaking_change.to_json}, " +
+        "author: #{author.to_json}, " +
+        "files_count: #{files_count.to_json}, " +
+        "insertions_count: #{insertions_count.to_json}, " +
+        "deletions_count: #{deletions_count.to_json}}"
+    end
+
     def to_git_log_commit
       message = ""
 

@@ -31,11 +31,8 @@ where
     B::Data: Send,
     B::Error: Into<crate::Error>,
 {
-    pub fn new(
-        resolver: Resolver,
-        tls_settings: impl Into<MaybeTlsSettings>,
-    ) -> crate::Result<HttpClient<B>> {
-        let mut http = HttpConnector::new_with_resolver(resolver);
+    pub fn new(tls_settings: impl Into<MaybeTlsSettings>) -> crate::Result<HttpClient<B>> {
+        let mut http = HttpConnector::new_with_resolver(Resolver);
         http.enforce_http(false);
 
         let settings = tls_settings.into();
@@ -150,7 +147,7 @@ impl Auth {
             }
             Auth::Bearer { token } => match Authorization::bearer(&token) {
                 Ok(auth) => req.headers_mut().typed_insert(auth),
-                Err(error) => error!(message = "invalid bearer token", %token, %error),
+                Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
         }
     }

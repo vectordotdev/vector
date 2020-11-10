@@ -1,21 +1,20 @@
-use super::Transform;
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
-    event::Lookup,
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         AddFieldsEventProcessed, AddFieldsFieldNotOverwritten, AddFieldsFieldOverwritten,
         AddFieldsTemplateRenderingError,
     },
     template::Template,
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::{convert::TryFrom, str::FromStr};
+use std::convert::TryFrom;
 use toml::value::Value as TomlValue;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddFieldsConfig {
     pub fields: Fields<TomlValue>,
@@ -43,7 +42,7 @@ impl From<Value> for TemplateOrValue {
 
 #[derive(Clone)]
 pub struct AddFields {
-    fields: IndexMap<Lookup, TemplateOrValue>,
+    fields: IndexMap<String, TemplateOrValue>,
     overwrite: bool,
 }
 
@@ -60,13 +59,13 @@ impl GenerateConfig for AddFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_fields")]
 impl TransformConfig for AddFieldsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let all_fields = self.fields.clone().all_fields().collect::<IndexMap<_, _>>();
         let mut fields = IndexMap::with_capacity(all_fields.len());
         for (key, value) in all_fields {
-            fields.insert(Lookup::from_str(&key)?, Value::try_from(value)?);
+            fields.insert(key, Value::try_from(value)?);
         }
-        Ok(Box::new(AddFields::new(fields, self.overwrite)?))
+        Ok(Transform::function(AddFields::new(fields, self.overwrite)?))
     }
 
     fn input_type(&self) -> DataType {
@@ -83,7 +82,7 @@ impl TransformConfig for AddFieldsConfig {
 }
 
 impl AddFields {
-    pub fn new(mut fields: IndexMap<Lookup, Value>, overwrite: bool) -> crate::Result<Self> {
+    pub fn new(mut fields: IndexMap<String, Value>, overwrite: bool) -> crate::Result<Self> {
         let mut with_templates = IndexMap::with_capacity(fields.len());
         for (k, v) in fields.drain(..) {
             let maybe_template = match v {
@@ -103,8 +102,8 @@ impl AddFields {
     }
 }
 
-impl Transform for AddFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for AddFields {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddFieldsEventProcessed);
 
         for (key, value_or_template) in self.fields.clone() {
@@ -113,9 +112,7 @@ impl Transform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
-                        emit!(AddFieldsTemplateRenderingError {
-                            field: &format!("{}", &key),
-                        });
+                        emit!(AddFieldsTemplateRenderingError { field: &key });
                         continue;
                     }
                 }
@@ -124,20 +121,16 @@ impl Transform for AddFields {
             };
             if self.overwrite {
                 if event.as_mut_log().insert(&key_string, value).is_some() {
-                    emit!(AddFieldsFieldOverwritten {
-                        field: &format!("{}", &key),
-                    });
+                    emit!(AddFieldsFieldOverwritten { field: &key });
                 }
             } else if event.as_mut_log().contains(&key_string) {
-                emit!(AddFieldsFieldNotOverwritten {
-                    field: &format!("{}", &key),
-                });
+                emit!(AddFieldsFieldNotOverwritten { field: &key });
             } else {
                 event.as_mut_log().insert(&key_string, value);
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -158,9 +151,9 @@ mod tests {
         fields.insert("some_key".into(), "some_val".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
-        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let key = "some_key".to_string();
         let kv = new_event.as_log().get_flat(&key);
 
         let val = "some_val".to_string();
@@ -174,9 +167,9 @@ mod tests {
         fields.insert("some_key".into(), "{{message}} {{message}}".into());
         let mut augment = AddFields::new(fields, true).unwrap();
 
-        let new_event = augment.transform(event).unwrap();
+        let new_event = augment.transform_one(event).unwrap();
 
-        let key = Lookup::from_str("some_key").unwrap().to_string();
+        let key = "some_key".to_string();
         let kv = new_event.as_log().get_flat(&key);
 
         let val = "augment me augment me".to_string();
@@ -193,7 +186,7 @@ mod tests {
 
         let mut augment = AddFields::new(fields, false).unwrap();
 
-        let new_event = augment.transform(event.clone()).unwrap();
+        let new_event = augment.transform_one(event.clone()).unwrap();
 
         assert_eq!(new_event, event);
     }
@@ -204,26 +197,20 @@ mod tests {
         let event = Event::from("hello world");
 
         let mut fields = IndexMap::new();
-        fields.insert(Lookup::from_str("float").unwrap(), Value::from(4.5));
-        fields.insert(Lookup::from_str("int").unwrap(), Value::from(4));
-        fields.insert(
-            Lookup::from_str("string").unwrap(),
-            Value::from("thisisastring"),
-        );
-        fields.insert(Lookup::from_str("bool").unwrap(), Value::from(true));
-        fields.insert(
-            Lookup::from_str("array").unwrap(),
-            Value::from(vec![1_isize, 2, 3]),
-        );
+        fields.insert(String::from("float"), Value::from(4.5));
+        fields.insert(String::from("int"), Value::from(4));
+        fields.insert(String::from("string"), Value::from("thisisastring"));
+        fields.insert(String::from("bool"), Value::from(true));
+        fields.insert(String::from("array"), Value::from(vec![1_isize, 2, 3]));
 
         let mut map = IndexMap::new();
         map.insert(String::from("key"), Value::from("value"));
 
-        fields.insert(Lookup::from_str("table").unwrap(), Value::from_iter(map));
+        fields.insert(String::from("table"), Value::from_iter(map));
 
         let mut transform = AddFields::new(fields, false).unwrap();
 
-        let event = transform.transform(event).unwrap().into_log();
+        let event = transform.transform_one(event).unwrap().into_log();
 
         tracing::error!(?event);
         assert_eq!(event["float"], 4.5.into());

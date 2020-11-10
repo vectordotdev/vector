@@ -16,10 +16,12 @@ pub(super) use assignment::{Assignment, Target};
 pub(super) use block::Block;
 pub(super) use function::Function;
 pub(super) use if_statement::IfStatement;
-pub(super) use literal::Literal;
-pub(super) use noop::Noop;
 pub(super) use not::Not;
-pub(super) use path::Path;
+pub(super) use variable::Variable;
+
+pub use literal::Literal;
+pub use noop::Noop;
+pub use path::Path;
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum Error {
@@ -45,9 +47,11 @@ pub enum Error {
     Variable(#[from] variable::Error),
 }
 
-pub trait Expression: std::fmt::Debug {
+pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
     fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
 }
+
+dyn_clone::clone_trait_object!(Expression);
 
 macro_rules! expression_dispatch {
     ($($expr:tt),+ $(,)?) => (
@@ -61,7 +65,7 @@ macro_rules! expression_dispatch {
         ///
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
-        #[derive(Debug)]
+        #[derive(Debug, Clone)]
         pub(crate) enum Expr {
             $($expr($expr)),+
         }
@@ -94,4 +98,5 @@ expression_dispatch![
     Noop,
     Not,
     Path,
+    Variable,
 ];

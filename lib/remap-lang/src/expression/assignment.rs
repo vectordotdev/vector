@@ -7,12 +7,13 @@ pub enum Error {
     PathInsertion(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Target {
-    Path(String),
+    Path(Vec<Vec<String>>),
+    Variable(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Assignment {
     target: Target,
     value: Box<Expr>,
@@ -32,6 +33,9 @@ impl Expression for Assignment {
             None => Ok(None),
             Some(value) => {
                 match &self.target {
+                    Target::Variable(ident) => {
+                        state.variables_mut().insert(ident.clone(), value.clone());
+                    }
                     Target::Path(path) => object
                         .insert(&path, value.clone())
                         .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,

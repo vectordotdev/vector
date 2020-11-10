@@ -26,7 +26,8 @@ assets = [
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
   ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
-  ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"]
+  ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"],
+  ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
 ]
 license-file = ["target/debian-license.txt"]
 extended-description-file = "target/debian-extended-description.txt"
@@ -56,7 +57,7 @@ vector-api-client = { path = "lib/vector-api-client", optional = true }
 # Tokio / Futures
 futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
-tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "signal", "sync"] }
+tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "udp", "signal", "sync", "time", "stream"] }
 tokio-openssl = "0.4.0"
 tokio-retry = "0.2.0"
 tokio-util = { version = "0.3.1", features = ["codec"] }
@@ -65,7 +66,7 @@ async-trait = "0.1"
 # Tracing
 tracing = "0.1.15"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
-tracing-subscriber = "0.2.2"
+tracing-subscriber = "0.2.14"
 tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
@@ -103,15 +104,19 @@ goauth = { version = "0.7.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
-async-graphql = { version = "2.0.0", optional = true }
-async-graphql-warp = { version = "2.0.0", optional = true }
-slab = { version = "0.4.2", optional = true }
-anymap = {version = "0.12.1", optional = true }
+async-graphql = { version = "2.0.15", optional = true }
+async-graphql-warp = { version = "2.0.15", optional = true }
+itertools = { version = "0.9.0", optional = true }
 
 # API client
-prettytable-rs = { version = "0.8.0", optional = true }
 human_format = { version = "1.0.3", optional = true }
 num-format = { version = "0.4.0", optional = true }
+crossterm = { version = "0.18.0", optional = true }
+tui = { version = "0.12.0", optional = true, default-features = false, features = ["crossterm"] }
+bus = { version = "2.2.3", optional = true }
+
+# Remap Lang
+remap = { package = "remap-lang", path = "lib/remap-lang" }
 
 # External libs
 derivative = "2.1.1"
@@ -125,7 +130,7 @@ hyper = "0.13"
 hyper-openssl = "0.8"
 openssl = "0.10.30"
 openssl-probe = "0.1.2"
-flate2 = "1.0.6"
+flate2 = "1.0.19"
 async-compression = { version = "0.3.5", features = ["tokio-02", "gzip"] }
 structopt = "0.3.19"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
@@ -133,7 +138,7 @@ http = "0.2"
 typetag = "0.1"
 toml = "0.4"
 syslog = "5"
-syslog_loose = { version = "0.4.0" }
+syslog_loose = { version = "0.5.0" }
 derive_is_enum_variant = "0.1.1"
 leveldb = { version = "0.8", optional = true, default-features = false }
 db-key = "0.0.5"
@@ -154,12 +159,12 @@ pest_derive = "2.1.0"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
-url = "2.1.1"
+url = "2.2.0"
 base64 = { version = "0.13.0", optional = true }
 bollard = { version = "0.8.0", optional = true }
 listenfd = { version = "0.3.3", optional = true }
 inventory = "0.1"
-maxminddb = { version = "0.14.0", optional = true }
+maxminddb = { version = "0.15.0", optional = true }
 strip-ansi-escapes = { version = "0.1.0"}
 colored = "2.0"
 warp = { version = "0.2.5", default-features = false, optional = true }
@@ -173,7 +178,7 @@ bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
 cidr-utils = "0.4.2"
-pin-project = "0.4.26"
+pin-project = "1.0.1"
 k8s-openapi = { version = "0.9", features = ["v1_15"], optional = true }
 portpicker = "0.1.0"
 sha-1 = "0.9"
@@ -183,21 +188,23 @@ md-5 = "0.9"
 hex = "0.4.2"
 chrono-tz = "0.5.3"
 heim = { version = "0.1.0-beta.3", optional = true, features = ["full"] }
-uom = { version = "0.29.0", optional = true }
+uom = { version = "0.30.0", optional = true }
 rust_decimal = "1.8.1"
 mongodb = { version = "1.1.1", optional = true }
+anyhow = { version = "1.0.28" }
+snap = { version = "1.0.1", optional = true }
+dyn-clone = "1.0.3"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-runtime = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
 lucet-wasi = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
-anyhow = { version = "1.0.28", optional = true }
 async-stream = "0.3.0"
 
 [target.'cfg(windows)'.dependencies]
 schannel = "0.1"
-windows-service = "0.3.0"
+windows-service = "0.3.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 security-framework = "0.4"
@@ -214,7 +221,7 @@ built = { version = "0.4", features = ["git2", "chrono"] }
 approx = "0.3.0"
 criterion = "0.3"
 tempfile = "3.0.6"
-libc = "0.2.78"
+libc = "0.2.80"
 libz-sys = "1.1.2"
 walkdir = "2.2.7"
 matches = "0.1.8"
@@ -246,6 +253,9 @@ target-x86_64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms",
 target-aarch64-unknown-linux-gnu = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
 target-aarch64-unknown-linux-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix",  "leveldb", "rdkafka-cmake"]
+# TODO: Enable leveldb here for armv7-unknown-linux-musleabihf
+target-armv7-unknown-linux-musleabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "rdkafka-cmake"]
+target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["jemallocator"]
@@ -262,7 +272,7 @@ rdkafka-plain = ["rdkafka"]
 # The `sasl` feature has to be added because of the limitations of `librdkafka` build scripts for `cmake`.
 rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 # This feature enables the WASM foreign module support.
-wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm", "anyhow"]
+wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -272,16 +282,16 @@ kubernetes = ["k8s-openapi", "evmap"]
 api = [
   "async-graphql",
   "async-graphql-warp",
-  "slab",
-  "anymap",
+  "itertools",
 ]
 
 # API client
 api-client = [
   "vector-api-client",
-  "prettytable-rs",
   "human_format",
   "num-format",
+  "crossterm",
+  "tui",
 ]
 
 # Sources
@@ -449,7 +459,7 @@ sinks-kafka = []
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
-sinks-prometheus = []
+sinks-prometheus = ["snap"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
 sinks-socket = []
 sinks-papertrail = []
@@ -475,6 +485,7 @@ all-integration-tests = [
   "kafka-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
+  "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
 ]
@@ -495,7 +506,7 @@ aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-e
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sinks-aws_s3"]
 aws-sqs-integration-tests = ["sinks-aws_sqs"]
-clickhouse-integration-tests = ["sinks-clickhouse"]
+clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 docker-integration-tests = ["sources-docker", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
@@ -506,6 +517,7 @@ influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
+prometheus-integration-tests = ["sinks-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 

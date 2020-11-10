@@ -7,8 +7,7 @@ use crate::{
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -59,7 +58,7 @@ impl SinkConfig for HoneycombConfig {
             .timeout(1)
             .parse_config(self.batch)?;
 
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -69,14 +68,11 @@ impl SinkConfig for HoneycombConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

@@ -14,8 +14,7 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -100,7 +99,7 @@ impl SinkConfig for HecSinkConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -110,14 +109,11 @@ impl SinkConfig for HecSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -631,11 +627,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck() {
-        let resolver = crate::dns::Resolver;
-
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(resolver, tls_settings).unwrap();
+            let client = HttpClient::new(tls_settings).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 

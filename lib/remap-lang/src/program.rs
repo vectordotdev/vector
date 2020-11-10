@@ -1,6 +1,5 @@
-use crate::{parser, Error, Expr, Result};
+use crate::{parser, Error, Expr, Function, RemapError};
 use pest::Parser;
-use std::str::FromStr;
 
 /// The program to execute.
 ///
@@ -8,18 +7,24 @@ use std::str::FromStr;
 ///
 /// You can create a program using [`Program::from_str`]. The provided string
 /// will be parsed. If parsing fails, an [`Error`] is returned.
+#[derive(Debug, Clone)]
 pub struct Program {
     pub(crate) expressions: Vec<Expr>,
 }
 
-impl FromStr for Program {
-    type Err = Error;
+impl Program {
+    pub fn new(
+        source: &str,
+        function_definitions: &[Box<dyn Function>],
+    ) -> Result<Self, RemapError> {
+        let pairs = parser::Parser::parse(parser::Rule::program, source)
+            .map_err(|s| Error::Parser(s.to_string()))
+            .map_err(RemapError)?;
 
-    fn from_str(s: &str) -> Result<Self> {
-        let pairs = parser::Parser::parse(parser::Rule::program, s)
-            .map_err(|s| Error::Parser(s.to_string()))?;
-
-        let expressions = parser::pairs_to_expressions(pairs)?;
+        let parser = parser::Parser {
+            function_definitions,
+        };
+        let expressions = parser.pairs_to_expressions(pairs).map_err(RemapError)?;
 
         Ok(Self { expressions })
     }

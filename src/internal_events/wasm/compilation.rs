@@ -65,7 +65,7 @@ impl InternalEvent for WasmCompilationProgress {
             State::Errored => error!(
                 state = self.state.as_const_str(),
                 role = self.role.as_const_str(),
-                error = %self.error.as_ref().unwrap_or(&String::from("")),
+                error = ?self.error.as_ref().unwrap_or(&String::from("")),
                 elapsed_micros = self.elapsed.as_micros() as u64,
                 // We do not rate limit this since it should never spam, it's a oneshot at startup.
                 "WASM Compilation via `lucet`.",

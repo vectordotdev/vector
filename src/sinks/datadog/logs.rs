@@ -17,8 +17,7 @@ use crate::{
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode};
 use hyper::body::Body;
 use serde::{Deserialize, Serialize};
@@ -110,7 +109,7 @@ impl DatadogLogsConfig {
             false,
         )?;
 
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
         let sink = BatchedHttpSink::new(
             service,
@@ -120,9 +119,9 @@ impl DatadogLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal datadog_logs text sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     /// Build the request, GZipping the contents if the config specifies.

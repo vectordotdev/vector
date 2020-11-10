@@ -187,6 +187,18 @@ build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector
 build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-armv7-unknown-linux-gnueabihf
+build-armv7-unknown-linux-gnueabihf: target/armv7-unknown-linux-gnueabihf/release/vector ## Build a release binary for the armv7-unknown-linux-gnueabihf triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-armv7-unknown-linux-musleabihf
+build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/release/vector ## Build a release binary for the armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-graphql-schema
+build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
+
 ##@ Cross Compiling
 .PHONY: cross-enable
 cross-enable: cargo-install-cross
@@ -260,7 +272,7 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --workspace --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -500,7 +512,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1_tls \
-	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 \
+	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 -e INFLUXDB_BIND_ADDRESS=:8089 \
 	 -e INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/localhost.crt -e INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/localhost.key \
 	 -v $(PWD)/tests/data:/etc/ssl:ro influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v2 \
@@ -665,6 +677,18 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-mongodb_metrics
+endif
+
+.PHONY: test-integration-prometheus
+test-integration-prometheus: ## Runs Prometheus integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-influxdb
+	$(MAKE) start-integration-influxdb
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib integration_tests:: --  ::prometheus --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-influxdb
 endif
 
 .PHONY: start-integration-pulsar
@@ -847,8 +871,8 @@ check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
-check-internal-events: ## Check that internal events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-internal-events.sh
+check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
 
 ##@ Packaging
 
@@ -872,6 +896,9 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
+.PHONY: package-armv7-unknown-linux-gnueabihf-all
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
@@ -888,6 +915,14 @@ package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linu
 package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
+.PHONY: package-armv7-unknown-linux-gnueabihf
+package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-gnueabihf` triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-armv7-unknown-linux-musleabihf
+package-armv7-unknown-linux-musleabihf: target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}."
+
 # debs
 
 .PHONY: package-deb-x86_64
@@ -898,6 +933,10 @@ package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb pac
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
+.PHONY: package-deb-armv7-gnu
+package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-deb.sh
+
 # rpms
 
 .PHONY: package-rpm-x86_64
@@ -907,6 +946,10 @@ package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm pac
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
+
+.PHONY: package-rpm-armv7-gnu
+package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-rpm.sh
 
 ##@ Releasing
 

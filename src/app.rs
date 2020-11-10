@@ -127,7 +127,7 @@ impl Application {
                     return Err(code);
                 };
 
-                info!("Log level {:?} is enabled.", level);
+                info!(message = "Log level is enabled.", level = ?level);
 
                 let config_paths = config::process_paths(&config_paths).ok_or(exitcode::CONFIG)?;
 

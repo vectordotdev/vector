@@ -7,9 +7,15 @@ pub enum Error {
     Undefined(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Variable {
     ident: String,
+}
+
+impl Variable {
+    pub fn new(ident: String) -> Self {
+        Self { ident }
+    }
 }
 
 impl Expression for Variable {

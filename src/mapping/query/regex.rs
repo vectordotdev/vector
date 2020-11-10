@@ -42,17 +42,12 @@ impl Regex {
         &self.compiled
     }
 
-    #[allow(dead_code)]
-    pub fn is_global(&self) -> bool {
-        self.global
-    }
-
     fn compile(pattern: &str, multiline: bool, insensitive: bool) -> Result<regex::Regex> {
         regex::RegexBuilder::new(pattern)
             .case_insensitive(insensitive)
             .multi_line(multiline)
             .build()
-            .map_err(|err| format!("invalid regex: {}", err))
+            .map_err(|error| format!("invalid regex: {}", error))
     }
 }
 

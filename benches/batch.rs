@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion, Throughput};
-use futures::{compat::Future01CompatExt, future};
-use futures01::{Sink, Stream};
+use futures::{future, stream, SinkExt, StreamExt};
 use std::{convert::Infallible, time::Duration};
 use vector::{
     buffers::Acker,
@@ -24,9 +23,8 @@ fn batching(
             move || {
                 let input = random_lines(event_len)
                     .take(num_events)
-                    .map(|s| s.into_bytes())
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
+                    .map(|s| s.into_bytes());
+                stream::iter(input).map(Ok)
             },
             |input| {
                 let mut rt = runtime();
@@ -41,9 +39,9 @@ fn batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
-                let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
+                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
             },
         )
     })
@@ -62,16 +60,15 @@ fn partitioned_batching(
     Benchmark::new(bench_name, move |b| {
         b.iter_with_setup(
             move || {
-                let key = Bytes::from("key");
                 let input = random_lines(event_len)
                     .take(num_events)
                     .map(|s| s.into_bytes())
                     .map(|b| InnerBuffer {
                         inner: b,
-                        key: key.clone(),
+                        key: Bytes::from("key"),
                     })
-                    .collect::<Vec<_>>();
-                futures01::stream::iter_ok::<_, ()>(input.into_iter())
+                    .map(Ok);
+                stream::iter(input)
             },
             |input| {
                 let mut rt = runtime();
@@ -86,9 +83,9 @@ fn partitioned_batching(
                     Duration::from_secs(1),
                     acker,
                 )
-                .sink_map_err(|e| panic!(e));
+                .sink_map_err(|error| panic!(error));
 
-                let _ = rt.block_on(input.forward(batch_sink).compat()).unwrap();
+                let _ = rt.block_on(input.forward(batch_sink)).unwrap();
             },
         )
     })

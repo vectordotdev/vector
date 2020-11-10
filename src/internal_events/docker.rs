@@ -90,7 +90,7 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Error in communication with docker daemon.",
-            error = %self.error,
+            error = ?self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
         );
@@ -111,7 +111,7 @@ impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to fetch container metadata.",
-            error = %self.error,
+            error = ?self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
         );
@@ -132,7 +132,7 @@ impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to parse timestamp as rfc3339 timestamp.",
-            error = %self.error,
+            error = ?self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
         );
@@ -155,7 +155,7 @@ impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
             message = r#"Docker engine is not using either `jsonfile` or `journald`
                 logging driver. Please enable one of these logging drivers
                 to get logs from the docker daemon."#,
-            error = %self.error,
+            error = ?self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
         );

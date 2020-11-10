@@ -15,8 +15,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
@@ -109,7 +108,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
+        let client = HttpClient::new(common.tls_settings.clone())?;
 
         let healthcheck = healthcheck(client.clone(), common).boxed();
 
@@ -130,12 +129,9 @@ impl SinkConfig for ElasticSearchConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -170,8 +166,6 @@ enum ParseError {
     HostMustIncludeHostname { host: String },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
-    #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
-    AWSCompressionNotAllowed,
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateError },
 }
@@ -379,12 +373,7 @@ impl ElasticSearchCommon {
             ),
         };
 
-        // Only allow compression if we are running with no AWS credentials.
         let compression = config.compression;
-        if credentials.is_some() && compression != Compression::None {
-            return Err(ParseError::AWSCompressionNotAllowed.into());
-        }
-
         let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
         let index = Template::try_from(index).context(IndexTemplate)?;
 
@@ -590,7 +579,6 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        dns::Resolver,
         http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
@@ -645,7 +633,7 @@ mod integration_tests {
             .unwrap();
 
         // make sure writes all all visible
-        flush(cx.resolver(), common).await.unwrap();
+        flush(common).await.unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", base_url, index))
@@ -783,9 +771,7 @@ mod integration_tests {
         }
 
         // make sure writes all all visible
-        flush(cx.resolver(), common)
-            .await
-            .expect("Flushing writes failed");
+        flush(common).await.expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -840,12 +826,12 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    async fn flush(resolver: Resolver, common: ElasticSearchCommon) -> crate::Result<()> {
+    async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let mut client = HttpClient::new(resolver, common.tls_settings.clone())
-            .expect("Could not build client to flush");
+        let mut client =
+            HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
         let response = client.send(request).await?;
         match response.status() {
             StatusCode::OK => Ok(()),

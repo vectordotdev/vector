@@ -82,25 +82,16 @@ struct NetworkConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-struct Namespace(String);
+struct Namespace(Option<String>);
 
 impl Default for Namespace {
     fn default() -> Self {
-        Self("host".into())
-    }
-}
-
-impl Namespace {
-    fn encode(&self, word: &str) -> String {
-        if self.0.is_empty() {
-            word.into()
-        } else {
-            [self.0.as_str(), word].join("_")
-        }
+        Self(Some("host".into()))
     }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct HostMetricsConfig {
     #[serde(default = "default_scrape_interval")]
     scrape_interval_secs: u64,
@@ -137,7 +128,10 @@ impl SourceConfig for HostMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        Ok(Box::new(self.clone().run(out, shutdown).boxed().compat()))
+        let mut config = self.clone();
+        config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
+
+        Ok(Box::new(config.run(out, shutdown).boxed().compat()))
     }
 
     fn output_type(&self) -> DataType {
@@ -176,7 +170,7 @@ impl HostMetricsConfig {
                 .send_all(futures01::stream::iter_ok(metrics))
                 .compat()
                 .await
-                .map_err(|error| error!(message = "Error sending host metrics", %error))?;
+                .map_err(|error| error!(message = "Error sending host metrics.", %error))?;
             out = sink;
         }
 
@@ -227,7 +221,7 @@ impl HostMetricsConfig {
         match heim::cpu::times().await {
             Ok(times) => {
                 times
-                    .filter_map(|result| filter_result(result, "Failed to load/parse CPU time"))
+                    .filter_map(|result| filter_result(result, "Failed to load/parse CPU time."))
                     .enumerate()
                     .map(|(index, times)| {
                         let timestamp = Utc::now();
@@ -268,7 +262,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load CPU times", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load CPU times.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -349,7 +343,7 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load memory info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load memory info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -395,7 +389,7 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load swap info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load swap info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -418,7 +412,7 @@ impl HostMetricsConfig {
                 ]
             }
             Err(error) => {
-                error!(message = "Failed to load load average info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load load average info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         };
@@ -432,7 +426,9 @@ impl HostMetricsConfig {
         match heim::net::io_counters().await {
             Ok(counters) => {
                 counters
-                    .filter_map(|result| filter_result(result, "Failed to load/parse network data"))
+                    .filter_map(|result| {
+                        filter_result(result, "Failed to load/parse network data.")
+                    })
                     // The following pair should be possible to do in one
                     // .filter_map, but it results in a strange "one type is
                     // more general than the other" error.
@@ -501,7 +497,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load network I/O counters", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load network I/O counters.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -512,7 +508,7 @@ impl HostMetricsConfig {
             Ok(partitions) => {
                 partitions
                     .filter_map(|result| {
-                        filter_result(result, "Failed to load/parse partition data")
+                        filter_result(result, "Failed to load/parse partition data.")
                     })
                     // Filter on configured mountpoints
                     .map(|partition| {
@@ -548,7 +544,7 @@ impl HostMetricsConfig {
                             .await
                             .map_err(|error| {
                                 error!(
-                                    message = "Failed to load partition usage data",
+                                    message = "Failed to load partition usage data.",
                                     mount_point = ?partition.mount_point(),
                                     %error,
                                     rate_limit_secs = 60,
@@ -607,7 +603,7 @@ impl HostMetricsConfig {
             Ok(counters) => {
                 counters
                     .filter_map(|result| {
-                        filter_result(result, "Failed to load/parse disk I/O data")
+                        filter_result(result, "Failed to load/parse disk I/O data.")
                     })
                     .map(|counter| {
                         self.disk
@@ -656,7 +652,7 @@ impl HostMetricsConfig {
                     .await
             }
             Err(error) => {
-                error!(message = "Failed to load disk I/O info", %error, rate_limit_secs = 60);
+                error!(message = "Failed to load disk I/O info.", %error, rate_limit_secs = 60);
                 vec![]
             }
         }
@@ -670,8 +666,8 @@ impl HostMetricsConfig {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric {
-            name: self.namespace.encode(name),
-            namespace: None,
+            name: name.into(),
+            namespace: self.namespace.0.clone(),
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Counter { value },
@@ -687,8 +683,8 @@ impl HostMetricsConfig {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric {
-            name: self.namespace.encode(name),
-            namespace: None,
+            name: name.into(),
+            namespace: self.namespace.0.clone(),
             timestamp: Some(timestamp),
             kind: MetricKind::Absolute,
             value: MetricValue::Gauge { value },
@@ -865,10 +861,7 @@ mod tests {
 
     #[tokio::test]
     async fn filters_on_collectors() {
-        let all_metrics = HostMetricsConfig::default()
-            .capture_metrics()
-            .await
-            .collect::<Vec<_>>();
+        let all_metrics_count = HostMetricsConfig::default().capture_metrics().await.count();
 
         for collector in &[
             Collector::Cpu,
@@ -883,11 +876,10 @@ mod tests {
                 ..Default::default()
             }
             .capture_metrics()
-            .await
-            .collect::<Vec<_>>();
+            .await;
 
             assert!(
-                all_metrics.len() > some_metrics.len(),
+                all_metrics_count > some_metrics.count(),
                 "collector={:?}",
                 collector
             );
@@ -896,12 +888,9 @@ mod tests {
 
     #[tokio::test]
     async fn are_taged_with_hostname() {
-        let metrics = HostMetricsConfig::default()
-            .capture_metrics()
-            .await
-            .collect::<Vec<_>>();
+        let mut metrics = HostMetricsConfig::default().capture_metrics().await;
         let hostname = crate::get_hostname().expect("Broken hostname");
-        assert!(!metrics.into_iter().any(|event| event
+        assert!(!metrics.any(|event| event
             .into_metric()
             .tags
             .expect("Missing tags")
@@ -912,17 +901,21 @@ mod tests {
 
     #[tokio::test]
     async fn uses_custom_namespace() {
-        let metrics = HostMetricsConfig {
-            namespace: Namespace("other".into()),
+        let mut metrics = HostMetricsConfig {
+            namespace: Namespace(Some("other".into())),
             ..Default::default()
         }
         .capture_metrics()
-        .await
-        .collect::<Vec<_>>();
+        .await;
 
-        assert!(!metrics
-            .into_iter()
-            .any(|event| !event.into_metric().name.starts_with("other_")));
+        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("other")));
+    }
+
+    #[tokio::test]
+    async fn uses_default_namespace() {
+        let mut metrics = HostMetricsConfig::default().capture_metrics().await;
+
+        assert!(metrics.all(|event| event.into_metric().namespace.as_deref() == Some("host")));
     }
 
     #[tokio::test]
@@ -932,10 +925,7 @@ mod tests {
         assert!(all_counters(&metrics));
 
         // They should all be named cpu_seconds_total
-        assert_eq!(
-            metrics.len(),
-            count_name(&metrics, "host_cpu_seconds_total")
-        );
+        assert_eq!(metrics.len(), count_name(&metrics, "cpu_seconds_total"));
 
         // They should all have a "mode" tag
         assert_eq!(count_tag(&metrics, "mode"), metrics.len());
@@ -950,10 +940,10 @@ mod tests {
 
         // There are exactly four disk_* names
         for name in &[
-            "host_disk_read_bytes_total",
-            "host_disk_reads_completed_total",
-            "host_disk_written_bytes_total",
-            "host_disk_writes_completed_total",
+            "disk_read_bytes_total",
+            "disk_reads_completed_total",
+            "disk_written_bytes_total",
+            "disk_writes_completed_total",
         ] {
             assert_eq!(
                 count_name(&metrics, name),
@@ -989,9 +979,9 @@ mod tests {
 
         // There are exactly three filesystem_* names
         for name in &[
-            "host_filesystem_free_bytes",
-            "host_filesystem_total_bytes",
-            "host_filesystem_used_bytes",
+            "filesystem_free_bytes",
+            "filesystem_total_bytes",
+            "filesystem_used_bytes",
         ] {
             assert_eq!(
                 count_name(&metrics, name),
@@ -1066,7 +1056,7 @@ mod tests {
         // All metrics are named network_*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("host_network_")));
+            .any(|metric| !metric.name.starts_with("network_")));
 
         // They should all have a "device" tag
         assert_eq!(count_tag(&metrics, "device"), metrics.len());
@@ -1099,7 +1089,7 @@ mod tests {
         // All metrics are named load*
         assert!(!metrics
             .iter()
-            .any(|metric| !metric.name.starts_with("host_load")));
+            .any(|metric| !metric.name.starts_with("load")));
     }
 
     fn all_counters(metrics: &[Metric]) -> bool {

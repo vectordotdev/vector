@@ -11,8 +11,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -75,24 +74,22 @@ impl SinkConfig for ClickhouseConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
-        let sink = BatchedHttpSink::new(
+        let sink = BatchedHttpSink::with_retry_logic(
             self.clone(),
             Buffer::new(batch.size, self.compression),
+            ClickhouseRetryLogic::default(),
             request,
             batch.timeout,
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal clickhouse sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal clickhouse sink error.", %error));
 
         let healthcheck = healthcheck(client, self.clone()).boxed();
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -183,14 +180,14 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
     Ok(url.parse::<Uri>().context(super::UriParseError)?)
 }
 
-#[derive(Clone)]
+#[derive(Debug, Default, Clone)]
 struct ClickhouseRetryLogic {
     inner: HttpRetryLogic,
 }
 
 impl RetryLogic for ClickhouseRetryLogic {
-    type Response = http::Response<Bytes>;
     type Error = hyper::Error;
+    type Response = http::Response<Bytes>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)
@@ -207,6 +204,8 @@ impl RetryLogic for ClickhouseRetryLogic {
                 //
                 // Reference: https://github.com/timberio/vector/pull/693#issuecomment-517332654
                 // Error code definitions: https://github.com/ClickHouse/ClickHouse/blob/master/dbms/src/Common/ErrorCodes.cpp
+                //
+                // Fix already merged: https://github.com/ClickHouse/ClickHouse/pull/6271
                 if body.starts_with(b"Code: 117") {
                     RetryAction::DontRetry("incorrect data".into())
                 } else if body.starts_with(b"Code: 53") {
@@ -256,6 +255,15 @@ mod integration_tests {
     };
     use futures::{future, stream};
     use serde_json::Value;
+    use std::{
+        convert::Infallible,
+        net::SocketAddr,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    };
+    use warp::Filter;
 
     use tokio::time::{timeout, Duration};
 
@@ -450,6 +458,50 @@ timestamp_format = "unix""#,
             .create_table(&table, "host String, timestamp String")
             .await;
 
+        let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
+
+        let mut input_event = Event::from("raw log line");
+        input_event.as_mut_log().insert("host", "example.com");
+
+        // Retries should go on forever, so if we are retrying incorrectly
+        // this timeout should trigger.
+        timeout(
+            Duration::from_secs(5),
+            sink.run(stream::once(future::ready(input_event))),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn no_retry_on_incorrect_data_warp() {
+        trace_init();
+
+        let visited = Arc::new(AtomicBool::new(false));
+        let routes = warp::any().and_then(move || {
+            assert!(!visited.load(Ordering::SeqCst), "Should not retry request.");
+            visited.store(true, Ordering::SeqCst);
+
+            future::ok::<_, Infallible>(warp::reply::with_status(
+                "Code: 117",
+                StatusCode::INTERNAL_SERVER_ERROR,
+            ))
+        });
+        let server = warp::serve(routes).bind("0.0.0.0:8124".parse::<SocketAddr>().unwrap());
+        tokio::spawn(server);
+
+        let host = String::from("http://localhost:8124");
+
+        let config = ClickhouseConfig {
+            endpoint: host,
+            table: gen_table(),
+            batch: BatchConfig {
+                max_events: Some(1),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
