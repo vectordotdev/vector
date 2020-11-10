@@ -679,16 +679,28 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-mongodb_metrics
 endif
 
+.PHONY: start-integration-prometheus stop-integration-prometheus test-integration-prometheus
+start-integration-prometheus:
+	$(CONTAINER_TOOL) run -d --name vector_prometheus --net=host \
+	 --volume $(PWD)/tests/data:/etc/vector:ro \
+	 prom/prometheus --config.file=/etc/vector/prometheus.yaml
+
+stop-integration-prometheus:
+	$(CONTAINER_TOOL) rm --force vector_prometheus 2>/dev/null; true
+
 .PHONY: test-integration-prometheus
 test-integration-prometheus: ## Runs Prometheus integration tests
 ifeq ($(AUTOSPAWN), true)
 	-$(MAKE) -k stop-integration-influxdb
+	-$(MAKE) -k stop-integration-prometheus
 	$(MAKE) start-integration-influxdb
+	$(MAKE) start-integration-prometheus
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib integration_tests:: --  ::prometheus --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-influxdb
+	$(MAKE) -k stop-integration-prometheus
 endif
 
 .PHONY: start-integration-pulsar
