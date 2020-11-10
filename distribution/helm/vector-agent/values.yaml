@@ -71,6 +71,10 @@ affinity: {}
 # managed by `DaemonSet`.
 extraContainersPorts: []
 
+# Additional sources to include at the `config-dir` projection of the `Pod`s
+# managed by `DaemonSet`.
+extraConfigDirSources: []
+
 # Additional volumes to pass to the `Pod`s managed by `DaemonSet`.
 extraVolumes: []
 
