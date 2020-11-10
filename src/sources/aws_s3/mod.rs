@@ -323,14 +323,14 @@ mod integration_tests {
         .await;
     }
 
-    fn config(queue_name: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
+    fn config(queue_url: &str, multiline: Option<MultilineConfig>) -> AwsS3Config {
         AwsS3Config {
             region: RegionOrEndpoint::with_endpoint("http://localhost:4566".to_owned()),
             strategy: Strategy::Sqs,
             compression: Compression::Auto,
             multiline,
             sqs: Some(sqs::Config {
-                queue_name: queue_name.to_string(),
+                queue_url: queue_url.to_string(),
                 poll_secs: 1,
                 ..Default::default()
             }),
@@ -404,7 +404,7 @@ mod integration_tests {
 
         let queue_name = uuid::Uuid::new_v4().to_string();
 
-        client
+        let res = client
             .create_queue(CreateQueueRequest {
                 queue_name: queue_name.clone(),
                 ..Default::default()
@@ -412,7 +412,7 @@ mod integration_tests {
             .await
             .expect("Could not create queue");
 
-        queue_name
+        res.queue_url.expect("no queue url")
     }
 
     /// creates a new bucket with notifications to given SQS queue
