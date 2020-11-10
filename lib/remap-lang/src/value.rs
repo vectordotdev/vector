@@ -272,6 +272,13 @@ macro_rules! value_impl {
                 }
             }
 
+            pub fn [<as_ $func _mut>](&mut self) -> Option<&mut $ret> {
+                match self {
+                    Value::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
             pub fn [<try_ $func>](self) -> Result<$ret, Error> {
                 match self {
                     Value::$variant(v) => Ok(v),
