@@ -6,17 +6,16 @@ use crate::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
+        BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
     Event,
 };
 use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
-    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageBatchError,
-    SendMessageBatchRequest, SendMessageBatchRequestEntry, SendMessageBatchResult, Sqs, SqsClient,
+    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError,
+    SendMessageRequest, SendMessageResult, Sqs, SqsClient,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -56,8 +55,6 @@ pub struct SqsSinkConfig {
     pub encoding: EncodingConfig<Encoding>,
     #[serde(default = "default_message_group_id")]
     pub message_group_id: Option<String>,
-    #[serde(default)]
-    pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub assume_role: Option<String>,
@@ -150,10 +147,8 @@ impl SqsSink {
         // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html
         // Up to 10 events, not more than 256KB as total size.
         let batch = BatchSettings::default()
-            .events(10)
-            .bytes(262_144)
-            .timeout(1)
-            .parse_config(config.batch)?;
+            .events(1)
+            .bytes(262_144);
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding;
@@ -186,66 +181,59 @@ impl SqsSink {
     }
 }
 
-impl Service<Vec<SendMessageBatchRequestEntry>> for SqsSink {
-    type Response = SendMessageBatchResult;
-    type Error = RusotoError<SendMessageBatchError>;
+impl Service<Vec<SendMessageEntry>> for SqsSink {
+    type Response = SendMessageResult;
+    type Error = RusotoError<SendMessageError>;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut entries: Vec<SendMessageBatchRequestEntry>) -> Self::Future {
-        debug!(
-            message = "Sending records.",
-            events = %entries.len(),
-        );
+    fn call(&mut self, mut entries: Vec<SendMessageEntry>) -> Self::Future {
+        assert_eq!(entries.len(), 1, "Sending batch is not supported.");
 
-        let sizes: Vec<usize> = entries
-            .iter()
-            .map(|entry| entry.message_body.len())
-            .collect();
-
-        // Make sure that `id` in batch is uniq
-        for (i, entry) in entries.iter_mut().enumerate() {
-            // `unwrap` is safe because batch can sent only maximum 10 events
-            entry.id.push(std::char::from_digit(i as u32, 10).unwrap());
-        }
+        let entry = entries.remove(0);
+        let byte_size = entry.message_body.len();
 
         let client = self.client.clone();
-        let request = SendMessageBatchRequest {
-            entries,
+        let request = SendMessageRequest {
+            message_body: entry.message_body,
+            message_group_id: entry.message_group_id,
             queue_url: self.queue_url.clone(),
+            ..Default::default()
         };
 
         Box::pin(async move {
             client
-                .send_message_batch(request)
-                .inspect_ok(|_| {
-                    for byte_size in sizes {
-                        emit!(AwsSqsEventSent { byte_size });
-                    }
-                })
+                .send_message(request)
+                .inspect_ok(|_| emit!(AwsSqsEventSent { byte_size }))
                 .instrument(info_span!("request"))
                 .await
         })
     }
 }
 
-impl EncodedLength for SendMessageBatchRequestEntry {
+#[derive(Debug, Clone)]
+struct SendMessageEntry {
+    message_body: String,
+    message_group_id: Option<String>,
+}
+
+impl EncodedLength for SendMessageEntry {
     fn encoded_length(&self) -> usize {
         self.message_body.len()
     }
 }
 
-impl Response for SendMessageBatchResult {}
+impl Response for SendMessageResult {}
 
 #[derive(Debug, Clone)]
 struct SqsRetryLogic;
 
 impl RetryLogic for SqsRetryLogic {
-    type Error = RusotoError<SendMessageBatchError>;
-    type Response = SendMessageBatchResult;
+    type Error = RusotoError<SendMessageError>;
+    type Response = SendMessageResult;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
@@ -260,7 +248,7 @@ fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
     message_group_id: Option<String>,
-) -> Option<SendMessageBatchRequestEntry> {
+) -> Option<SendMessageEntry> {
     encoding.apply_rules(&mut event);
 
     let log = event.into_log();
@@ -272,16 +260,10 @@ fn encode_event(
         Encoding::Json => serde_json::to_string(&log).expect("Error encoding event as json."),
     };
 
-    Some(SendMessageBatchRequestEntry {
-        id: gen_id(30),
+    Some(SendMessageEntry {
         message_body,
         message_group_id,
-        ..Default::default()
     })
-}
-
-fn gen_id(len: usize) -> String {
-    thread_rng().sample_iter(&Alphanumeric).take(len).collect()
 }
 
 #[cfg(test)]
@@ -341,10 +323,6 @@ mod integration_tests {
             region: rusoto::RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
             message_group_id: None,
-            batch: BatchConfig {
-                max_events: Some(2),
-                ..Default::default()
-            },
             request: Default::default(),
             assume_role: None,
         };
