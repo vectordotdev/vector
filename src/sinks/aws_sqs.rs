@@ -177,7 +177,7 @@ impl SqsSink {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|error| error!("Fatal sqs sink error: {}", error))
+            .sink_map_err(|error| error!(message = "Fatal sqs sink error.", %error))
             .with_flat_map(move |event| {
                 stream::iter(encode_event(event, &encoding, message_group_id.clone())).map(Ok)
             });
