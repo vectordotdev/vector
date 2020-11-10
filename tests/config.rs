@@ -382,7 +382,7 @@ async fn bad_s3_region() {
         err,
         vec![
             "Sink \"out1\": Must set either 'region' or 'endpoint'",
-            "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
+            "Sink \"out2\": Failed to parse region: Not a valid AWS region: moonbase-alpha",
             "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
             "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"
         ]
