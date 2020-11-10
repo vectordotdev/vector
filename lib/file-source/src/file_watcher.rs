@@ -1,11 +1,12 @@
 use crate::FilePosition;
 use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
 use std::{
     fs::{self, File},
     io::{self, BufRead, Seek},
     path::PathBuf,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 
 use crate::metadata_ext::PortableFileExt;
@@ -40,7 +41,7 @@ impl FileWatcher {
     pub fn new(
         path: PathBuf,
         file_position: FilePosition,
-        ignore_before: Option<SystemTime>,
+        ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
@@ -48,9 +49,10 @@ impl FileWatcher {
         let metadata = f.metadata()?;
         let mut reader = io::BufReader::new(f);
 
-        let too_old = if let (Some(ignore_before), Ok(modified_time)) =
-            (ignore_before, metadata.modified())
-        {
+        let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
+            ignore_before,
+            metadata.modified().map(|t| DateTime::<Utc>::from(t)),
+        ) {
             modified_time < ignore_before
         } else {
             false
