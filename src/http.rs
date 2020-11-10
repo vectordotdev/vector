@@ -26,6 +26,8 @@ pub enum HttpError {
     BuildTlsConnector { source: TlsError },
     #[snafu(display("Failed to build HTTPS connector"))]
     MakeHttpsConnector { source: openssl::error::ErrorStack },
+    #[snafu(display("Failed to make HTTP(S) request"))]
+    CallRequest { source: hyper::Error },
 }
 
 pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
@@ -74,8 +76,8 @@ where
         })
     }
 
-    pub async fn send(&mut self, request: Request<B>) -> crate::Result<http::Response<Body>> {
-        self.call(request).await.map_err(Into::into)
+    pub async fn send(&mut self, request: Request<B>) -> Result<http::Response<Body>, HttpError> {
+        self.call(request).await.context(CallRequest)
     }
 }
 

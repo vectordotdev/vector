@@ -268,6 +268,7 @@ impl MetadataClient {
             .client
             .send(req)
             .await
+            .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
                 status_code => Err(UnexpectedHTTPStatusError {
@@ -417,6 +418,7 @@ impl MetadataClient {
             .client
             .send(req)
             .await
+            .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
                 status_code => Err(UnexpectedHTTPStatusError {
