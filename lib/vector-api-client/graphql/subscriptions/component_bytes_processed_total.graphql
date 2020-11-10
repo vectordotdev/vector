@@ -1,0 +1,8 @@
+subscription ComponentBytesProcessedTotalSubscription($interval: Int!) {
+  componentBytesProcessedTotal(interval: $interval) {
+    name
+    metric {
+      bytesProcessedTotal
+    }
+  }
+}

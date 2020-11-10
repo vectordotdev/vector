@@ -11,8 +11,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::RusotoError;
@@ -27,7 +26,6 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
-
 use tower::Service;
 use tracing_futures::Instrument;
 
@@ -93,10 +91,7 @@ impl SinkConfig for KinesisSinkConfig {
         let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisService::new(self.clone(), client, cx)?;
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -147,7 +142,7 @@ impl KinesisService {
         config: KinesisSinkConfig,
         client: KinesisClient,
         cx: SinkContext,
-    ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
+    ) -> crate::Result<impl Sink<Event, Error = ()>> {
         let batch = BatchSettings::default()
             .bytes(5_000_000)
             .events(500)
@@ -168,7 +163,9 @@ impl KinesisService {
                 cx.acker(),
             )
             .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error.", %error))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
+            .with_flat_map(move |e| {
+                stream::iter(encode_event(e, &partition_key_field, &encoding)).map(Ok)
+            });
 
         Ok(sink)
     }
@@ -397,7 +394,6 @@ mod integration_tests {
         rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
@@ -431,14 +427,14 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let client = config.create_client().unwrap();
-        let sink = KinesisService::new(config, client, cx).unwrap();
+        let mut sink = KinesisService::new(config, client, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
         let (mut input_lines, events) = random_lines_with_stream(100, 11);
         let mut events = events.map(Ok);
 
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink.send_all(&mut events).await.unwrap();
 
         delay_for(Duration::from_secs(1)).await;
 

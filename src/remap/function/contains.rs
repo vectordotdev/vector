@@ -41,7 +41,7 @@ impl Function for Contains {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ContainsFn {
     value: Box<dyn Expression>,
     substring: Box<dyn Expression>,

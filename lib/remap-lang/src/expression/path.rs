@@ -10,7 +10,7 @@ pub enum Error {
     Resolve(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Path {
     // TODO: Switch to String once Event API is cleaned up.
     segments: Vec<Vec<String>>,

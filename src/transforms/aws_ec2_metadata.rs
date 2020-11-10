@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
@@ -6,6 +5,7 @@ use crate::{
     internal_events::{
         AwsEc2MetadataEventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
     },
+    transforms::{FunctionTransform, Transform},
 };
 use bytes::Bytes;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
@@ -69,7 +69,7 @@ lazy_static::lazy_static! {
     static ref HOST: Uri = Uri::from_static("http://169.254.169.254");
 }
 
-#[derive(Default, Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize, Clone)]
 pub struct Ec2Metadata {
     // Deprecated name
     #[serde(alias = "host")]
@@ -79,6 +79,7 @@ pub struct Ec2Metadata {
     fields: Option<Vec<String>>,
 }
 
+#[derive(Clone, Debug)]
 pub struct Ec2MetadataTransform {
     state: ReadHandle,
 }
@@ -108,7 +109,7 @@ impl_generate_config_from_default!(Ec2Metadata);
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_ec2_metadata")]
 impl TransformConfig for Ec2Metadata {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let (read, write) = evmap::new();
 
         // Check if the namespace is set to `""` which should mean that we do
@@ -153,7 +154,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Box::new(Ec2MetadataTransform { state: read }))
+        Ok(Transform::function(Ec2MetadataTransform { state: read }))
     }
 
     fn input_type(&self) -> DataType {
@@ -169,8 +170,8 @@ impl TransformConfig for Ec2Metadata {
     }
 }
 
-impl Transform for Ec2MetadataTransform {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Ec2MetadataTransform {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
 
         if let Some(read_ref) = self.state.read() {
@@ -183,7 +184,7 @@ impl Transform for Ec2MetadataTransform {
 
         emit!(AwsEc2MetadataEventProcessed);
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -514,13 +515,14 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build().await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
@@ -548,13 +550,14 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build().await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), None);
@@ -576,13 +579,14 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build().await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(
@@ -601,13 +605,14 @@ mod integration_tests {
             ..Default::default()
         };
         let mut transform = config.build().await.unwrap();
+        let transform = transform.as_function();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
 
-        let event = transform.transform(event).unwrap();
+        let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));

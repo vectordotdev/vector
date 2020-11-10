@@ -24,7 +24,7 @@ impl Function for Upcase {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct UpcaseFn {
     value: Box<dyn Expression>,
 }

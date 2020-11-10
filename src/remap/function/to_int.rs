@@ -32,7 +32,7 @@ impl Function for ToInt {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToIntFn {
     value: Box<dyn Expression>,
     default: Option<Box<dyn Expression>>,

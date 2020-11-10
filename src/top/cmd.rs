@@ -1,54 +1,10 @@
 use super::{
-    dashboard::{init_dashboard, is_tty, Widgets},
-    state::{ComponentRow, ComponentsState, WidgetsState},
+    dashboard::{init_dashboard, is_tty},
+    metrics, state,
 };
 use crate::config;
-use std::sync::Arc;
 use url::Url;
-use vector_api_client::{
-    gql::{ComponentsQueryExt, HealthQueryExt},
-    Client,
-};
-
-/// Executes a toplogy query to the GraphQL server, and creates an initial ComponentsState
-/// table based on the returned components/metrics. This will contain all of the rows initially
-/// to render the components table widget
-async fn update_components(
-    interval: u64,
-    client: Client,
-    state: Arc<WidgetsState>,
-) -> Result<(), ()> {
-    // Loop every `interval` ms to update components
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(interval));
-
-    loop {
-        interval.tick().await;
-
-        // Execute a query to get the latest components, and aggregate metrics for each resource
-        let rows = client
-            .components_query()
-            .await
-            .map_err(|_| ())?
-            .data
-            .ok_or_else(|| ())?
-            .components
-            .into_iter()
-            .map(|d| ComponentRow {
-                name: d.name,
-                component_type: d.on.to_string(),
-                events_processed_total: d
-                    .events_processed_total
-                    .as_ref()
-                    .map(|ep| ep.events_processed_total as i64)
-                    .unwrap_or(0),
-                errors: 0,
-                throughput: 0.00,
-            })
-            .collect::<Vec<_>>();
-
-        state.update_component_rows(rows);
-    }
-}
+use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
 /// Vector API server via HTTP/WebSockets
@@ -80,20 +36,44 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         }
     }
 
-    // Create initial topology, to be shared by the API client and dashboard renderer
-    let state = Arc::new(WidgetsState::new(url, ComponentsState::new()));
+    // Create a metrics state updater
+    let (tx, rx) = tokio::sync::mpsc::channel(20);
 
-    // Update dashboard based on the provided refresh interval
-    tokio::spawn(update_components(
-        opts.refresh_interval,
-        client,
-        Arc::clone(&state),
-    ));
+    // Get the initial component state
+    let sender = match metrics::init_components(&client).await {
+        Ok(state) => state::updater(state, rx).await,
+        _ => {
+            eprintln!("Couldn't query Vector components");
+            return exitcode::UNAVAILABLE;
+        }
+    };
 
-    // Render a dashboard with the configured widgets
-    let widgets = Widgets::new(Arc::clone(&state));
+    // Change the HTTP schema to WebSockets
+    let mut ws_url = url.clone();
+    ws_url
+        .set_scheme(match url.scheme() {
+            "https" => "wss",
+            _ => "ws",
+        })
+        .expect("Couldn't build WebSocket URL. Please report.");
 
-    match init_dashboard(&widgets).await {
+    let subscription_client = match connect_subscription_client(ws_url).await {
+        Ok(c) => c,
+        _ => {
+            eprintln!("Couldn't connect to Vector API via WebSockets");
+            return exitcode::UNAVAILABLE;
+        }
+    };
+
+    // Subscribe to updated metrics
+    metrics::subscribe(
+        subscription_client,
+        tx.clone(),
+        opts.refresh_interval as i64,
+    );
+
+    // Initialize the dashboard
+    match init_dashboard(url.as_str(), sender).await {
         Ok(_) => exitcode::OK,
         _ => {
             eprintln!("Your terminal doesn't support building a dashboard. Exiting.");

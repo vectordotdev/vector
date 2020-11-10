@@ -8,13 +8,14 @@ use crate::{
     config::{DataType, SinkContext},
     event::Event,
     shutdown::SourceShutdownCoordinator,
+    transforms::Transform,
     Pipeline,
 };
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     future, FutureExt, StreamExt, TryFutureExt,
 };
-use futures01::{sync::mpsc, Future, Stream};
+use futures01::{sync::mpsc, Future as Future01, Stream as Stream01};
 use std::collections::HashMap;
 use tokio::time::{timeout, Duration};
 
@@ -112,11 +113,30 @@ pub async fn build_pieces(
 
         let (output, control) = Fanout::new();
 
-        let transform = transform
-            .transform_stream(filter_event_type(input_rx, input_type))
-            .forward(output)
-            .map(|_| debug!("Finished."))
-            .compat();
+        let transform = match transform {
+            Transform::Function(mut t) => {
+                let filtered = filter_event_type(input_rx, input_type);
+                #[allow(deprecated)]
+                // `boxed()` here is deprecated, but the replacement won't work until we adopt futures 0.3 here.
+                let transformed = filtered
+                    .map(move |v| {
+                        let mut buf = Vec::with_capacity(1);
+                        t.transform(&mut buf, v);
+                        futures01::stream::iter_ok(buf.into_iter())
+                    })
+                    .flatten()
+                    .boxed();
+                transformed.forward(output)
+            }
+            Transform::Task(t) => {
+                let filtered = filter_event_type(input_rx, input_type);
+                let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
+                    t.transform(filtered);
+                transformed.forward(output)
+            }
+        }
+        .map(|_| debug!("Finished."))
+        .compat();
         let task = Task::new(name, typetag, transform);
 
         inputs.insert(name.clone(), (input_tx, trans_inputs.clone()));
@@ -215,9 +235,9 @@ pub async fn build_pieces(
 fn filter_event_type<S>(
     stream: S,
     data_type: DataType,
-) -> Box<dyn Stream<Item = Event, Error = ()> + Send>
+) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
 where
-    S: Stream<Item = Event, Error = ()> + Send + 'static,
+    S: Stream01<Item = Event, Error = ()> + Send + 'static,
 {
     match data_type {
         DataType::Any => Box::new(stream), // it's possible to not call any comparing function if any type is supported

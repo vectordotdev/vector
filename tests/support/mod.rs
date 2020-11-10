@@ -30,7 +30,7 @@ use vector::{
     sinks::{util::StreamSink, Healthcheck, VectorSink},
     sources::Source,
     test_util::{temp_dir, temp_file},
-    transforms::Transform,
+    transforms::{FunctionTransform, Transform},
     Event, Pipeline,
 };
 
@@ -188,13 +188,14 @@ impl SourceConfig for MockSourceConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct MockTransform {
     suffix: String,
     increase: f64,
 }
 
-impl Transform for MockTransform {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for MockTransform {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         match &mut event {
             Event::Log(log) => {
                 let mut v = log
@@ -240,11 +241,11 @@ impl Transform for MockTransform {
                 }
             },
         };
-        Some(event)
+        output.push(event);
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MockTransformConfig {
     suffix: String,
     increase: f64,
@@ -259,8 +260,8 @@ impl MockTransformConfig {
 #[async_trait]
 #[typetag::serde(name = "mock")]
 impl TransformConfig for MockTransformConfig {
-    async fn build(&self) -> Result<Box<dyn Transform>, vector::Error> {
-        Ok(Box::new(MockTransform {
+    async fn build(&self) -> Result<Transform, vector::Error> {
+        Ok(Transform::function(MockTransform {
             suffix: self.suffix.clone(),
             increase: self.increase,
         }))

@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
     rusoto::{self, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
@@ -11,11 +10,11 @@ use crate::{
         PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
+    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::BoxFuture, FutureExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{future::BoxFuture, stream, FutureExt, SinkExt, StreamExt};
 use http::StatusCode;
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
@@ -24,11 +23,11 @@ use rusoto_s3::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
-use std::collections::BTreeMap;
-use std::convert::{TryFrom, TryInto};
-use std::task::Context;
-use std::task::Poll;
-
+use std::{
+    collections::BTreeMap,
+    convert::{TryFrom, TryInto},
+    task::{Context, Poll},
+};
 use tower::{Service, ServiceBuilder};
 use tracing_futures::Instrument;
 use uuid::Uuid;
@@ -214,10 +213,10 @@ impl S3SinkConfig {
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, self.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)))
+            .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok))
             .sink_map_err(|error| error!(message = "Sink failed to flush.", %error));
 
-        Ok(super::VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(super::VectorSink::Sink(Box::new(sink)))
     }
 
     pub async fn healthcheck(self, client: S3Client) -> crate::Result<()> {
@@ -419,9 +418,6 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-
-    use std::collections::BTreeMap;
 
     #[test]
     fn generate_config() {
@@ -539,17 +535,12 @@ mod integration_tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
-        config::SinkContext,
-        event::Event,
-        rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
-    use futures::{stream, StreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::region::Region;
-    use rusoto_s3::{S3Client, S3};
     use std::io::{BufRead, BufReader};
 
     const BUCKET: &str = "router-tests";

@@ -15,12 +15,11 @@ use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     shutdown::ShutdownSignal,
     sources,
-    transforms::Transform,
+    transforms::{FunctionTransform, TaskTransform},
     Pipeline,
 };
 use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};
-use futures::{future::FutureExt, sink::Sink, stream::StreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -36,6 +35,10 @@ mod pod_metadata_annotator;
 mod transform_utils;
 mod util;
 
+use futures::{
+    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
+};
+use futures01::Stream as Stream01;
 use k8s_paths_provider::K8sPathsProvider;
 use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
@@ -199,7 +202,7 @@ impl Source {
 
     async fn run<O>(self, out: O, global_shutdown: ShutdownSignal) -> crate::Result<()>
     where
-        O: Sink<Event> + Send + 'static,
+        O: Sink<Event> + Send + 'static + Unpin,
         <O as Sink<Event>>::Error: std::error::Error,
     {
         let Self {
@@ -294,30 +297,30 @@ impl Source {
             futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
 
         let mut parser = parser::build();
-        let mut partial_events_merger = partial_events_merger::build(auto_partial_merge);
+        let partial_events_merger = Box::new(partial_events_merger::build(auto_partial_merge));
 
-        let events =
-            file_source_rx
-                .map(futures::stream::iter)
-                .flatten()
-                .map(move |(bytes, file)| {
-                    emit!(KubernetesLogsEventReceived {
-                        file: &file,
-                        byte_size: bytes.len(),
-                    });
-                    let mut event = create_event(bytes, &file);
-                    if annotator.annotate(&mut event, &file).is_none() {
-                        emit!(KubernetesLogsEventAnnotationFailed { event: &event });
-                    }
-                    event
-                });
-        let events = events
-            .filter_map(move |event| futures::future::ready(parser.transform(event)))
-            .filter_map(move |event| {
-                futures::future::ready(partial_events_merger.transform(event))
+        let events = file_source_rx.map(futures::stream::iter);
+        let events = events.flatten();
+        let events = events.map(move |(bytes, file)| {
+            emit!(KubernetesLogsEventReceived {
+                file: &file,
+                byte_size: bytes.len(),
             });
+            let mut event = create_event(bytes, &file);
+            if annotator.annotate(&mut event, &file).is_none() {
+                emit!(KubernetesLogsEventAnnotationFailed { event: &event });
+            }
+            event
+        });
+        let events = events.flat_map(move |event| {
+            let mut buf = Vec::with_capacity(1);
+            parser.transform(&mut buf, event);
+            futures::stream::iter(buf)
+        });
 
-        let event_processing_loop = events.map(Ok).forward(out);
+        let event_processing_loop = partial_events_merger.transform(
+            Box::new(events.map(Ok).compat())
+        ).map_err(|_| unreachable!("These errors should only happen if our futures compat layer is wrong. If you meet this, please report it.")).compat().forward(out);
 
         let mut lifecycle = Lifecycle::new();
         {
