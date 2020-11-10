@@ -12,7 +12,7 @@ pub struct MultilineConfig {
     pub start_pattern: String,
     pub condition_pattern: String,
     pub mode: line_agg::Mode,
-    pub timeout_ms: u64,
+    pub timeout_ms: Option<u64>,
 }
 
 impl TryFrom<&MultilineConfig> for line_agg::Config {
@@ -31,7 +31,7 @@ impl TryFrom<&MultilineConfig> for line_agg::Config {
         let condition_pattern = Regex::new(condition_pattern)
             .with_context(|| InvalidMultilineConditionPattern { condition_pattern })?;
         let mode = mode.clone();
-        let timeout = Duration::from_millis(*timeout_ms);
+        let timeout = timeout_ms.map(|t| Duration::from_millis(t));
 
         Ok(Self {
             start_pattern,

@@ -60,7 +60,7 @@ pub struct Config {
     /// The maximum time to wait for the continuation. Once this timeout is
     /// reached, the buffered message is guaranteed to be flushed, even if
     /// incomplete.
-    pub timeout: Duration,
+    pub timeout: Option<Duration>,
 }
 
 impl Config {
@@ -70,7 +70,7 @@ impl Config {
         let start_pattern = marker;
         let condition_pattern = start_pattern.clone();
         let mode = Mode::HaltBefore;
-        let timeout = Duration::from_millis(timeout_ms);
+        let timeout = Some(Duration::from_millis(timeout_ms));
 
         Self {
             start_pattern,
@@ -351,8 +351,9 @@ where
                 if self.config.start_pattern.is_match(line.as_ref()) {
                     // It was indeed a new line we need to filter.
                     // Set the timeout and buffer this line.
-                    self.timeouts
-                        .insert(entry.key().clone(), self.config.timeout);
+                    if let Some(timeout) = self.config.timeout {
+                        self.timeouts.insert(entry.key().clone(), timeout);
+                    }
                     entry.insert(Aggregate::new(line, context));
                     None
                 } else {
@@ -419,7 +420,7 @@ mod tests {
             start_pattern: Regex::new("^[^\\s]").unwrap(),
             condition_pattern: Regex::new("^[\\s]+").unwrap(),
             mode: Mode::ContinueThrough,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![
             "some usual line",
@@ -450,7 +451,7 @@ mod tests {
             start_pattern: Regex::new("\\\\$").unwrap(),
             condition_pattern: Regex::new("\\\\$").unwrap(),
             mode: Mode::ContinuePast,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![
             "some usual line",
@@ -481,7 +482,7 @@ mod tests {
             start_pattern: Regex::new("").unwrap(),
             condition_pattern: Regex::new("^(INFO|ERROR) ").unwrap(),
             mode: Mode::HaltBefore,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![
             "INFO some usual line",
@@ -512,7 +513,7 @@ mod tests {
             start_pattern: Regex::new("[^;]$").unwrap(),
             condition_pattern: Regex::new(";$").unwrap(),
             mode: Mode::HaltWith,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![
             "some usual line;",
@@ -538,7 +539,7 @@ mod tests {
             start_pattern: Regex::new("^[^\\s]").unwrap(),
             condition_pattern: Regex::new("^[\\s]+at").unwrap(),
             mode: Mode::ContinueThrough,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![concat!(
             "java.lang.Exception\n",
@@ -560,7 +561,7 @@ mod tests {
             start_pattern: Regex::new("^[^\\s]").unwrap(),
             condition_pattern: Regex::new("^[\\s]+from").unwrap(),
             mode: Mode::ContinueThrough,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![concat!(
             "foobar.rb:6:in `/': divided by 0 (ZeroDivisionError)\n",
@@ -594,7 +595,7 @@ mod tests {
             start_pattern: Regex::new("^\\s").unwrap(),
             condition_pattern: Regex::new("^\\s").unwrap(),
             mode: Mode::ContinueThrough,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![
             "not merged 1",
@@ -632,7 +633,7 @@ mod tests {
             start_pattern: Regex::new("").unwrap(),
             condition_pattern: Regex::new("^START ").unwrap(),
             mode: Mode::HaltBefore,
-            timeout: Duration::from_millis(10),
+            timeout: Some(Duration::from_millis(10)),
         };
         let expected = vec![
             "part 0.1\npart 0.2",

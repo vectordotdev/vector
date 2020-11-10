@@ -49,7 +49,8 @@ components: sources: [Name=string]: {
 					}
 					timeout_ms: {
 						description: "The maximum time to wait for the continuation. Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete."
-						required:    true
+						required:    false
+						common: true
 						sort:        4
 						type: uint: {
 							examples: [1_000, 600_000]
