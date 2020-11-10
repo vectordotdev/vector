@@ -5,7 +5,7 @@ use crate::{
     rusoto,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        retries::{RetryAction, RetryLogic},
+        retries::RetryLogic,
         sink::Response,
         BatchConfig, BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
     },
@@ -23,15 +23,12 @@ use rusoto_sqs::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
-    collections::HashSet,
     convert::TryInto,
-    sync::{Arc, Mutex},
     task::{Context, Poll},
 };
 use tower::Service;
 use tracing_futures::Instrument;
 
-const MESSAGE_ID_LENGTH: usize = 64;
 const MESSAGE_GROUP_ID: &str = "vector-sinks-aws-sqs------------------------------------------------------------------------------------------------------------";
 
 #[derive(Debug, Snafu)]
@@ -44,7 +41,6 @@ enum HealthcheckError {
 
 #[derive(Clone)]
 pub struct SqsSink {
-    successful_messages: Arc<Mutex<HashSet<String>>>,
     client: SqsClient,
     queue_url: String,
 }
@@ -158,19 +154,14 @@ impl SqsSink {
         let encoding = config.encoding.clone();
         let fifo = config.queue_url.ends_with(".fifo");
 
-        let successful_messages = Arc::new(Mutex::new(HashSet::new()));
-
         let sqs = SqsSink {
-            successful_messages: Arc::clone(&successful_messages),
             client,
             queue_url: config.queue_url,
         };
 
         let sink = request
             .batch_sink(
-                SqsRetryLogic {
-                    successful_messages,
-                },
+                SqsRetryLogic,
                 sqs,
                 VecBuffer::new(batch.size),
                 batch.timeout,
@@ -204,15 +195,9 @@ impl Service<Vec<SendMessageBatchRequestEntry>> for SqsSink {
             .collect();
 
         // Make sure that `id` in batch is uniq
-        if entries[0].id.len() < MESSAGE_ID_LENGTH {
-            for (i, entry) in entries.iter_mut().enumerate() {
-                // `unwrap` is safe because batch can sent only maximum 10 events
-                entry.id.push(std::char::from_digit(i as u32, 10).unwrap());
-            }
-        } else {
-            // Remove entries which already were sent
-            let mut successful_messages = self.successful_messages.lock().unwrap();
-            entries.retain(|entry| !successful_messages.remove(&entry.id));
+        for (i, entry) in entries.iter_mut().enumerate() {
+            // `unwrap` is safe because batch can sent only maximum 10 events
+            entry.id.push(std::char::from_digit(i as u32, 10).unwrap());
         }
 
         let client = self.client.clone();
@@ -244,9 +229,7 @@ impl EncodedLength for SendMessageBatchRequestEntry {
 impl Response for SendMessageBatchResult {}
 
 #[derive(Debug, Clone)]
-struct SqsRetryLogic {
-    successful_messages: Arc<Mutex<HashSet<String>>>,
-}
+struct SqsRetryLogic;
 
 impl RetryLogic for SqsRetryLogic {
     type Error = RusotoError<SendMessageBatchError>;
@@ -259,34 +242,6 @@ impl RetryLogic for SqsRetryLogic {
             RusotoError::Unknown(res) if res.status.is_server_error() => true,
             _ => false,
         }
-    }
-
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
-        if response.failed.is_empty() {
-            RetryAction::Successful
-        } else {
-            let mut successful_messages = self.successful_messages.lock().unwrap();
-            for entry in response.successful.iter() {
-                successful_messages.insert(entry.id.clone());
-            }
-
-            RetryAction::Retry(format!(
-                "failed send messages (count: {})",
-                response.failed.len()
-            ))
-        }
-    }
-
-    fn clone_request(&self, entries: &Self::Request) -> Option<Self::Request> {
-        // Remove request with cloned failed messages
-        let successful_messages = self.successful_messages.lock().unwrap();
-        Some(
-            entries
-                .iter()
-                .filter(|entry| !successful_messages.contains(&entry.id))
-                .cloned()
-                .collect(),
-        )
     }
 }
 
@@ -307,7 +262,7 @@ fn encode_event(
     };
 
     Some(SendMessageBatchRequestEntry {
-        id: gen_id(MESSAGE_ID_LENGTH - 1),
+        id: gen_id(30),
         message_body,
         message_group_id: if fifo {
             Some(MESSAGE_GROUP_ID.to_string())
