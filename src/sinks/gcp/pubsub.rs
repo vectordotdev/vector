@@ -13,8 +13,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
@@ -102,7 +101,7 @@ impl SinkConfig for PubsubConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {

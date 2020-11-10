@@ -15,8 +15,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, FutureExt as _};
-use futures01::Sink as _;
+use futures::{future::BoxFuture, FutureExt, SinkExt};
 use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -94,10 +93,7 @@ impl SinkConfig for RemoteWriteConfig {
             )
             .sink_map_err(|error| error!(message = "Prometheus remote_write sink error.", %error));
 
-        Ok((
-            sinks::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> crate::config::DataType {

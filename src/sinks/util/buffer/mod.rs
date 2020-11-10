@@ -127,10 +127,11 @@ impl Batch for Buffer {
 #[cfg(test)]
 mod test {
     use super::{Buffer, Compression};
-    use crate::buffers::Acker;
-    use crate::sinks::util::{BatchSettings, BatchSink};
-    use futures::{compat::Future01CompatExt, future};
-    use futures01::Sink;
+    use crate::{
+        buffers::Acker,
+        sinks::util::{BatchSettings, BatchSink},
+    };
+    use futures::{future, stream, SinkExt, StreamExt};
     use std::{
         io::Read,
         sync::{Arc, Mutex},
@@ -166,8 +167,7 @@ mod test {
 
         let _ = buffered
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(input))
-            .compat()
+            .send_all(&mut stream::iter(input).map(Ok))
             .await
             .unwrap();
 
