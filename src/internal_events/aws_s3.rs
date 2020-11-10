@@ -91,7 +91,7 @@ pub mod source {
 
     impl<'a> InternalEvent for SqsMessageDeleteFailed<'a> {
         fn emit_logs(&self) {
-            warn!(message = "Deletion of SQS message failed", %self.message_id, %self.error);
+            warn!(message = "Deletion of SQS message failed.", %self.message_id, %self.error);
         }
 
         fn emit_metrics(&self) {
