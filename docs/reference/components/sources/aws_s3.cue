@@ -118,22 +118,12 @@ components: sources: aws_s3: {
 						warnings: []
 						type: bool: default: true
 					}
-					queue_name: {
-						description: "The name of the SQS queue to receieve bucket notifications from."
+					queue_url: {
+						description: "The URL of the SQS queue to receieve bucket notifications from."
 						required:    true
 						warnings: []
 						type: string: {
-							examples: ["my-queue-name"]
-						}
-					}
-					queue_owner: {
-						common:      false
-						description: "The AWS account ID of the owner of the queue. This is only needed if AWS user or role that Vector is using is different than the queue owner."
-						required:    false
-						warnings: []
-						type: string: {
-							default: null
-							examples: ["123456789012"]
+							examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 						}
 					}
 				}

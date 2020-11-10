@@ -23,8 +23,8 @@ use lazy_static::lazy_static;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{GetObjectError, GetObjectRequest, S3Client, S3};
 use rusoto_sqs::{
-    DeleteMessageError, DeleteMessageRequest, GetQueueUrlError, GetQueueUrlRequest, Message,
-    ReceiveMessageError, ReceiveMessageRequest, Sqs, SqsClient,
+    DeleteMessageError, DeleteMessageRequest, Message, ReceiveMessageError, ReceiveMessageRequest,
+    Sqs, SqsClient,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
@@ -40,8 +40,7 @@ lazy_static! {
 #[derive(Derivative, Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
-    pub(super) queue_name: String,
-    pub(super) queue_owner: Option<String>,
+    pub(super) queue_url: String,
 
     #[serde(default = "default_poll_interval_secs")]
     #[derivative(Default(value = "default_poll_interval_secs()"))]
@@ -68,14 +67,6 @@ const fn default_true() -> bool {
 
 #[derive(Debug, Snafu)]
 pub(super) enum IngestorNewError {
-    #[snafu(display("Unable to fetch queue URL for {}: {}", name, source))]
-    FetchQueueUrl {
-        source: RusotoError<GetQueueUrlError>,
-        name: String,
-        owner: Option<String>,
-    },
-    #[snafu(display("Got an empty queue URL for {}", name))]
-    MissingQueueUrl { name: String, owner: Option<String> },
     #[snafu(display("Invalid visibility timeout {}: {}", timeout, source))]
     InvalidVisibilityTimeout {
         source: std::num::TryFromIntError,
@@ -151,24 +142,6 @@ impl Ingestor {
         compression: super::Compression,
         multiline: Option<line_agg::Config>,
     ) -> Result<Ingestor, IngestorNewError> {
-        let queue_url_result = sqs_client
-            .get_queue_url(GetQueueUrlRequest {
-                queue_name: config.queue_name.clone(),
-                queue_owner_aws_account_id: config.queue_owner.clone(),
-            })
-            .await
-            .with_context(|| FetchQueueUrl {
-                name: config.queue_name.clone(),
-                owner: config.queue_owner.clone(),
-            })?;
-
-        let queue_url = queue_url_result
-            .queue_url
-            .ok_or(IngestorNewError::MissingQueueUrl {
-                name: config.queue_name.clone(),
-                owner: config.queue_owner.clone(),
-            })?;
-
         let visibility_timeout_secs: i64 = config.visibility_timeout_secs.into();
 
         Ok(Ingestor {
@@ -180,7 +153,7 @@ impl Ingestor {
             compression,
             multiline,
 
-            queue_url,
+            queue_url: config.queue_url,
             poll_interval: Duration::from_secs(config.poll_secs),
             visibility_timeout_secs,
             delete_message: config.delete_message,
