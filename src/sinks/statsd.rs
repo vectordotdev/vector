@@ -3,22 +3,23 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::Event,
     internal_events::StatsdInvalidMetricReceived,
-    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
+        encode_namespace,
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
+        BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
     },
+    Event,
 };
-use futures::{future, FutureExt, TryFutureExt};
-use futures01::{stream, Sink};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-
-use std::collections::BTreeMap;
-use std::fmt::Display;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::task::{Context, Poll};
+use std::{
+    collections::BTreeMap,
+    fmt::Display,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    task::{Context, Poll},
+};
 use tower::{Service, ServiceBuilder};
 
 pub struct StatsdSvc {
@@ -110,13 +111,10 @@ impl SinkConfig for StatsdSinkConfig {
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
                 .with_flat_map(move |event| {
-                    stream::iter_ok(encode_event(event, default_namespace.as_deref()))
+                    stream::iter(encode_event(event, default_namespace.as_deref())).map(Ok)
                 });
 
-                Ok((
-                    super::VectorSink::Futures01Sink(Box::new(sink)),
-                    healthcheck,
-                ))
+                Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
@@ -244,13 +242,9 @@ impl Service<Vec<u8>> for StatsdSvc {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
-        test_util::*,
-        Event,
-    };
+    use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
-    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
+    use futures::{compat::Sink01CompatExt, TryStreamExt};
     use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};

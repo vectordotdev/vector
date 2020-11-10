@@ -83,6 +83,16 @@ components: sinks: gcp_pubsub: {
 				examples: ["/path/to/credentials.json"]
 			}
 		}
+		endpoint: {
+			common:      false
+			description: "The endpoint to which to send data."
+			required:    false
+			warnings: []
+			type: string: {
+				default: "https://pubsub.googleapis.com"
+				examples: ["https://us-central1-pubsub.googleapis.com"]
+			}
+		}
 		project: {
 			description: "The project name to which to publish logs."
 			required:    true

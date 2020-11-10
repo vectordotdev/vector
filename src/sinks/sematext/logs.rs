@@ -8,7 +8,10 @@ use crate::{
     sinks::{Healthcheck, VectorSink},
     Event,
 };
-use futures01::{Future, Sink};
+use futures::{
+    future::{self, BoxFuture},
+    FutureExt, SinkExt,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -73,9 +76,9 @@ impl SinkConfig for SematextLogsConfig {
         .build(cx)
         .await?;
 
-        let sink = Box::new(sink.into_futures01sink().with(map_timestamp));
+        let sink = Box::new(sink.into_sink().with(map_timestamp));
 
-        Ok((VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((VectorSink::Sink(sink), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -88,7 +91,7 @@ impl SinkConfig for SematextLogsConfig {
 }
 
 /// Used to map `timestamp` to `@timestamp`.
-fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
+fn map_timestamp(mut event: Event) -> BoxFuture<'static, Result<Event, ()>> {
     let log = event.as_mut_log();
 
     if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key()) {
@@ -99,7 +102,7 @@ fn map_timestamp(mut event: Event) -> impl Future<Item = Event, Error = ()> {
         log.insert("os.host", host);
     }
 
-    futures01::future::ok(event)
+    future::ok(event).boxed()
 }
 
 #[cfg(test)]
