@@ -80,7 +80,7 @@ impl SinkConfig for ClickhouseConfig {
         let sink = BatchedHttpSink::new(
             self.clone(),
             Buffer::new(batch.size, self.compression),
-            HttpRetryLogic::default(),
+            HttpRetryLogic,
             request,
             batch.timeout,
             client.clone(),
@@ -185,17 +185,13 @@ fn encode_uri(host: &str, database: &str, table: &str) -> crate::Result<Uri> {
 }
 
 #[derive(Clone)]
-struct ClickhouseRetryLogic<Request> {
-    inner: HttpRetryLogic<Request>,
+struct ClickhouseRetryLogic {
+    inner: HttpRetryLogic,
 }
 
-impl<Request> RetryLogic for ClickhouseRetryLogic<Request>
-where
-    Request: Clone + Send + Sync + 'static,
-{
+impl RetryLogic for ClickhouseRetryLogic {
     type Response = http::Response<Bytes>;
     type Error = hyper::Error;
-    type Request = Request;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         self.inner.is_retriable_error(error)

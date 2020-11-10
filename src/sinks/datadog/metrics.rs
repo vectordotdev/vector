@@ -181,7 +181,7 @@ impl SinkConfig for DatadogConfig {
         };
 
         let svc = request.service(
-            HttpRetryLogic::default(),
+            HttpRetryLogic,
             HttpBatchService::new(client, move |request| {
                 future::ready(sink.build_request(request))
             }),

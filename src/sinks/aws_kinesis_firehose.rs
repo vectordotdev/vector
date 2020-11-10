@@ -224,7 +224,6 @@ struct KinesisFirehoseRetryLogic;
 impl RetryLogic for KinesisFirehoseRetryLogic {
     type Error = RusotoError<PutRecordBatchError>;
     type Response = PutRecordBatchOutput;
-    type Request = Vec<Record>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {

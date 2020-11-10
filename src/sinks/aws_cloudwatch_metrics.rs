@@ -231,7 +231,6 @@ struct CloudWatchMetricsRetryLogic;
 impl RetryLogic for CloudWatchMetricsRetryLogic {
     type Error = RusotoError<PutMetricDataError>;
     type Response = ();
-    type Request = Vec<Metric>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {

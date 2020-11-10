@@ -242,7 +242,6 @@ struct KinesisRetryLogic;
 impl RetryLogic for KinesisRetryLogic {
     type Error = RusotoError<PutRecordsError>;
     type Response = PutRecordsOutput;
-    type Request = Vec<PutRecordsRequestEntry>;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {

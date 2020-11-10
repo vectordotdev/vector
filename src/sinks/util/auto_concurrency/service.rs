@@ -146,8 +146,6 @@ mod tests {
     impl RetryLogic for TestRetryLogic {
         type Error = TestError;
         type Response = String;
-        type Request = ();
-
         fn is_retriable_error(&self, _error: &Self::Error) -> bool {
             true
         }

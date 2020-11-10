@@ -368,7 +368,6 @@ struct S3RetryLogic;
 impl RetryLogic for S3RetryLogic {
     type Error = RusotoError<PutObjectError>;
     type Response = PutObjectOutput;
-    type Request = Request;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {

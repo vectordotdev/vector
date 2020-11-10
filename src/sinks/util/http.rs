@@ -11,7 +11,6 @@ use hyper::body::{self, Body};
 use std::{
     fmt,
     future::Future,
-    marker::PhantomData,
     sync::Arc,
     task::{Context, Poll},
     time::Duration,
@@ -44,7 +43,7 @@ pub struct BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Response = http::Response<Bytes>, Request = B::Output> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
     inner: TowerBatchedSink<
@@ -63,9 +62,7 @@ impl<T, B, L> BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
-    L: RetryLogic<Error = hyper::Error, Response = http::Response<Bytes>, Request = B::Output>
-        + Send
-        + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
 {
     pub fn new(
@@ -102,7 +99,7 @@ where
     B: Batch,
     B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
-    L: RetryLogic<Response = http::Response<Bytes>, Request = B::Output> + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     type SinkItem = crate::Event;
     type SinkError = crate::Error;
@@ -193,25 +190,11 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
 }
 
 #[derive(Clone)]
-pub struct HttpRetryLogic<Request> {
-    request_type: PhantomData<Request>,
-}
+pub struct HttpRetryLogic;
 
-impl<Request> Default for HttpRetryLogic<Request> {
-    fn default() -> Self {
-        Self {
-            request_type: PhantomData,
-        }
-    }
-}
-
-impl<Request> RetryLogic for HttpRetryLogic<Request>
-where
-    Request: Clone + Send + Sync + 'static,
-{
+impl RetryLogic for HttpRetryLogic {
     type Error = hyper::Error;
     type Response = hyper::Response<Bytes>;
-    type Request = Request;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
@@ -250,7 +233,7 @@ mod test {
 
     #[test]
     fn util_http_retry_logic() {
-        let logic = HttpRetryLogic::<()>::default();
+        let logic = HttpRetryLogic;
 
         let response_429 = Response::builder().status(429).body(Bytes::new()).unwrap();
         let response_500 = Response::builder().status(500).body(Bytes::new()).unwrap();

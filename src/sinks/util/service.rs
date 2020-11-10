@@ -243,7 +243,7 @@ impl TowerRequestSettings {
     // `trait SinkExt` above), as it is missing a bound on the
     // associated types that cannot be expressed in stable Rust.
     where
-        L: RetryLogic<Response = S::Response, Request = B::Output>,
+        L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -261,7 +261,7 @@ impl TowerRequestSettings {
 
     pub fn service<L, S, Request>(&self, retry_logic: L, service: S) -> Svc<S, L>
     where
-        L: RetryLogic<Response = S::Response, Request = Request>,
+        L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -295,7 +295,7 @@ where
     S::Response: Response + Send + 'static,
     S::Error: Into<crate::Error> + Send + Sync + 'static,
     S::Future: Send + 'static,
-    L: RetryLogic<Response = S::Response, Request = Request> + Send + 'static,
+    L: RetryLogic<Response = S::Response> + Send + 'static,
     Request: Clone + Send + 'static,
 {
     type Service = BoxService<Request, S::Response, crate::Error>;

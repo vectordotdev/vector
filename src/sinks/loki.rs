@@ -103,7 +103,7 @@ impl SinkConfig for LokiConfig {
         let sink = BatchedHttpSink::new(
             self.clone(),
             LokiBuffer::new(batch_settings.size),
-            HttpRetryLogic::default(),
+            HttpRetryLogic,
             request_settings,
             batch_settings.timeout,
             client.clone(),
