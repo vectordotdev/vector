@@ -14,8 +14,8 @@ use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, Tr
 use lazy_static::lazy_static;
 use rusoto_core::RusotoError;
 use rusoto_sqs::{
-    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError,
-    SendMessageRequest, SendMessageResult, Sqs, SqsClient,
+    GetQueueAttributesError, GetQueueAttributesRequest, SendMessageError, SendMessageRequest,
+    SendMessageResult, Sqs, SqsClient,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -141,9 +141,7 @@ impl SqsSink {
     ) -> crate::Result<impl Sink<Event, Error = ()>> {
         // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html
         // Up to 10 events, not more than 256KB as total size.
-        let batch = BatchSettings::default()
-            .events(1)
-            .bytes(262_144);
+        let batch = BatchSettings::default().events(1).bytes(262_144);
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding;
