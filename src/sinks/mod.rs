@@ -1,10 +1,5 @@
 use crate::Event;
-use futures::{
-    compat::{Compat, Future01CompatExt},
-    future::BoxFuture,
-    Sink, Stream, StreamExt, TryFutureExt,
-};
-use futures01::{Sink as Sink01, Stream as Stream01};
+use futures::{future::BoxFuture, Sink, Stream, StreamExt};
 use snafu::Snafu;
 use std::fmt;
 
@@ -70,7 +65,6 @@ pub mod statsd;
 pub mod vector;
 
 pub enum VectorSink {
-    Futures01Sink(Box<dyn Sink01<SinkItem = Event, SinkError = ()> + Send + 'static>),
     Sink(Box<dyn Sink<Event, Error = ()> + Send + Unpin>),
     Stream(Box<dyn util::StreamSink + Send>),
 }
@@ -103,23 +97,15 @@ impl VectorSink {
         S: Stream<Item = Event> + Send + 'static,
     {
         match self {
-            Self::Futures01Sink(sink) => {
-                // Convert stream03 to stream01 instead of sink01 to sink03 to avoid close issues with Compat01as03Sink
-                // See https://github.com/timberio/vector/issues/4256
-                let inner = Compat::new(Box::pin(input.map(Ok)));
-                inner.forward(sink).compat().map_ok(|_| ()).await
-            }
             Self::Sink(sink) => input.map(Ok).forward(sink).await,
             Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
         }
     }
 
-    pub fn into_futures01sink(
-        self,
-    ) -> Box<dyn Sink01<SinkItem = Event, SinkError = ()> + Send + 'static> {
+    pub fn into_sink(self) -> Box<dyn Sink<Event, Error = ()> + Send + Unpin> {
         match self {
-            Self::Futures01Sink(sink) => sink,
-            _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+            Self::Sink(sink) => sink,
+            _ => panic!("Failed type coercion, {:?} is not a Sink", self),
         }
     }
 }

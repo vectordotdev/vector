@@ -10,8 +10,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{future, FutureExt};
-use futures01::Sink;
+use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Request, StatusCode, Uri,
@@ -141,7 +140,7 @@ impl SinkConfig for HttpSinkConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
-        let sink = super::VectorSink::Futures01Sink(Box::new(sink));
+        let sink = super::VectorSink::Sink(Box::new(sink));
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
