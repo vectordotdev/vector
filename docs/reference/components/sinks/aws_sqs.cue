@@ -8,7 +8,7 @@ components: sinks: aws_sqs: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		development:   "beta"
-		egress_method: "batch"
+		egress_method: "stream"
 		service_providers: ["AWS"]
 	}
 
@@ -16,13 +16,6 @@ components: sinks: aws_sqs: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
-			batch: {
-				enabled:      true
-				common:       false
-				max_bytes:    262144
-				max_events:   10
-				timeout_secs: 1
-			}
 			compression: enabled: false
 			encoding: {
 				enabled: true
@@ -87,21 +80,20 @@ components: sinks: aws_sqs: {
 				examples: ["https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"]
 			}
 		}
+		message_group_id: {
+			common:      false
+			description: "The tag that specifies that a message belongs to a specific message group. Can be applied only to FIFO queues."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["vector-aws-sqs-sink"]
+			}
+		}
 	}
 
 	input: {
 		logs:    true
 		metrics: null
-	}
-
-	how_it_works: {
-		batching: {
-			title: "Batch Limitations"
-			body:  """
-				Amazon SQS batch allow upload up to 10 messages in one batch
-				with maximum total payload size 256KB (262,144 bytes).
-				[SQS Developer Guide](\(urls.aws_sqs_batch_actions)).
-				"""
-		}
 	}
 }

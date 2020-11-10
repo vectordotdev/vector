@@ -53,7 +53,6 @@ pub struct SqsSinkConfig {
     #[serde(flatten)]
     pub region: rusoto::RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
-    #[serde(default = "default_message_group_id")]
     pub message_group_id: Option<String>,
     #[serde(default)]
     pub request: TowerRequestConfig,
@@ -72,10 +71,6 @@ lazy_static! {
 pub enum Encoding {
     Text,
     Json,
-}
-
-fn default_message_group_id() -> Option<String> {
-    Some("vector-sinks-aws-sqs".to_owned())
 }
 
 inventory::submit! {
