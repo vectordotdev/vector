@@ -27,7 +27,11 @@ use std::{
 use tower::Service;
 use tracing_futures::Instrument;
 
-const MESSAGE_GROUP_ID: &str = "vector-sinks-aws-sqs------------------------------------------------------------------------------------------------------------";
+#[derive(Debug, Snafu)]
+enum BuildError {
+    #[snafu(display("`message_group_id` can not be used with FIFO queue."))]
+    MessagrGroupIdWithFifo,
+}
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -50,6 +54,8 @@ pub struct SqsSinkConfig {
     #[serde(flatten)]
     pub region: rusoto::RegionOrEndpoint,
     pub encoding: EncodingConfig<Encoding>,
+    #[serde(default = "default_message_group_id")]
+    pub message_group_id: Option<String>,
     #[serde(default)]
     pub batch: BatchConfig,
     #[serde(default)]
@@ -69,6 +75,10 @@ lazy_static! {
 pub enum Encoding {
     Text,
     Json,
+}
+
+fn default_message_group_id() -> Option<String> {
+    Some("vector-sinks-aws-sqs".to_owned())
 }
 
 inventory::submit! {
@@ -146,8 +156,13 @@ impl SqsSink {
             .parse_config(config.batch)?;
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
-        let encoding = config.encoding.clone();
+        let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
+        let message_group_id = config.message_group_id;
+
+        if fifo && message_group_id.is_some() {
+            return Err(Box::new(BuildError::MessagrGroupIdWithFifo));
+        }
 
         let sqs = SqsSink {
             client,
@@ -163,7 +178,9 @@ impl SqsSink {
                 cx.acker(),
             )
             .sink_map_err(|error| error!("Fatal sqs sink error: {}", error))
-            .with_flat_map(move |event| stream::iter(encode_event(event, &encoding, fifo)).map(Ok));
+            .with_flat_map(move |event| {
+                stream::iter(encode_event(event, &encoding, message_group_id.clone())).map(Ok)
+            });
 
         Ok(sink)
     }
@@ -242,7 +259,7 @@ impl RetryLogic for SqsRetryLogic {
 fn encode_event(
     mut event: Event,
     encoding: &EncodingConfig<Encoding>,
-    fifo: bool,
+    message_group_id: Option<String>,
 ) -> Option<SendMessageBatchRequestEntry> {
     encoding.apply_rules(&mut event);
 
@@ -258,11 +275,7 @@ fn encode_event(
     Some(SendMessageBatchRequestEntry {
         id: gen_id(30),
         message_body,
-        message_group_id: if fifo {
-            Some(MESSAGE_GROUP_ID.to_string())
-        } else {
-            None
-        },
+        message_group_id,
         ..Default::default()
     })
 }
@@ -279,7 +292,7 @@ mod tests {
     #[test]
     fn sqs_encode_event_text() {
         let message = "hello world".to_string();
-        let event = encode_event(message.clone().into(), &Encoding::Text.into(), false).unwrap();
+        let event = encode_event(message.clone().into(), &Encoding::Text.into(), None).unwrap();
 
         assert_eq!(&event.message_body, &message);
     }
@@ -289,7 +302,7 @@ mod tests {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("key", "value");
-        let event = encode_event(event, &Encoding::Json.into(), false).unwrap();
+        let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_str(&event.message_body).unwrap();
 
@@ -327,6 +340,7 @@ mod integration_tests {
             queue_url: queue_url.clone(),
             region: rusoto::RegionOrEndpoint::with_endpoint("http://localhost:4566".into()),
             encoding: Encoding::Text.into(),
+            message_group_id: None,
             batch: BatchConfig {
                 max_events: Some(2),
                 ..Default::default()
