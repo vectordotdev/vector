@@ -2,7 +2,7 @@ use crate::{expression, function, parser::Rule, program, value};
 use std::error::Error as StdError;
 use std::fmt;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("parser error: {0}")]
     Parser(String),

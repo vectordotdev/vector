@@ -2,7 +2,7 @@ use crate::{parser, CompilerState, Error as E, Expr, Expression, Function, Remap
 use pest::Parser;
 use std::fmt;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error(transparent)]
     ResolvesTo(#[from] ResolvesToError),
@@ -11,7 +11,7 @@ pub enum Error {
     Fallible,
 }
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub struct ResolvesToError(TypeDef, TypeDef);
 
 impl fmt::Display for ResolvesToError {

@@ -4,7 +4,7 @@ use crate::{
     Result, TypeDef, Value, ValueKind,
 };
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("undefined")]
     Undefined,

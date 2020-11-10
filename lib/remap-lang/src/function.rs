@@ -2,7 +2,7 @@ use crate::{Expression, Result, Value};
 use core::convert::TryInto;
 use std::collections::HashMap;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error(r#"expected expression argument, got regex"#)]
     ArgumentExprRegex,

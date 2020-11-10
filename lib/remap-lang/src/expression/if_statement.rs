@@ -3,7 +3,7 @@ use crate::{
     value, CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value, ValueKind,
 };
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("invalid value kind")]
     Value(#[from] value::Error),

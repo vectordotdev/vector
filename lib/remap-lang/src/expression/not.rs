@@ -4,7 +4,7 @@ use crate::{
     ValueConstraint, ValueKind,
 };
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("invalid value kind")]
     Value(#[from] value::Error),

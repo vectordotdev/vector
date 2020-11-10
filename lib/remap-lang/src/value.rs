@@ -84,7 +84,7 @@ impl From<&Value> for ValueKind {
     }
 }
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error(r#"expected "{0}", got "{1}""#)]
     Expected(ValueKind, ValueKind),

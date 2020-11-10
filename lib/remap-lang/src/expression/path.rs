@@ -1,7 +1,7 @@
 use super::Error as E;
 use crate::{CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value};
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("missing path: {0}")]
     Missing(String),

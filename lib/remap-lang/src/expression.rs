@@ -23,7 +23,7 @@ pub use literal::Literal;
 pub use noop::Noop;
 pub use path::Path;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("expected expression, got none")]
     Missing,
