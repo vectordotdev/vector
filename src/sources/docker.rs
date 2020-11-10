@@ -1493,7 +1493,7 @@ mod integration_tests {
                 start_pattern: "^[^\\s]".to_owned(),
                 condition_pattern: "^[\\s]+at".to_owned(),
                 mode: line_agg::Mode::ContinueThrough,
-                timeout_ms: 10,
+                timeout_ms: Some(10),
             }),
             ..DockerConfig::default()
         };

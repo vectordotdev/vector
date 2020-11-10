@@ -31,7 +31,7 @@ impl TryFrom<&MultilineConfig> for line_agg::Config {
         let condition_pattern = Regex::new(condition_pattern)
             .with_context(|| InvalidMultilineConditionPattern { condition_pattern })?;
         let mode = mode.clone();
-        let timeout = timeout_ms.map(|t| Duration::from_millis(t));
+        let timeout = timeout_ms.map(Duration::from_millis);
 
         Ok(Self {
             start_pattern,
