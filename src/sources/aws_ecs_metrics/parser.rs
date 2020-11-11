@@ -58,9 +58,8 @@ struct ContainerStats {
     networks: BTreeMap<String, BTreeMap<String, f64>>,
 }
 
-pub fn parse(packet: &str) -> Result<Vec<Metric>, serde_json::Error> {
+pub fn parse(packet: &str, namespace: Option<String>) -> Result<Vec<Metric>, serde_json::Error> {
     let mut result = Vec::new();
-    let namespace = Some("aws_ecs".to_string());
     let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(packet.as_bytes())?;
 
     for (_, container) in parsed {
@@ -257,7 +256,7 @@ mod test {
         }"##;
 
         assert_eq!(
-            parse(json).unwrap(),
+            parse(json, namespace()).unwrap(),
             vec![
                 Metric {
                     name: "blkio_io_service_bytes_recursive".into(),
@@ -335,7 +334,7 @@ mod test {
         }"##;
 
         assert_eq!(
-            parse(json).unwrap(),
+            parse(json, namespace()).unwrap(),
             vec![
                 Metric {
                     name: "cpu_online_cpus".into(),
@@ -552,7 +551,7 @@ mod test {
         }"##;
 
         assert_eq!(
-            parse(json).unwrap(),
+            parse(json, namespace()).unwrap(),
             vec![
                 Metric {
                     name: "memory_usage".into(),
@@ -668,7 +667,7 @@ mod test {
         }"##;
 
         assert_eq!(
-            parse(json).unwrap(),
+            parse(json, namespace()).unwrap(),
             vec![
                 Metric {
                     name: "network_rx_bytes".into(),

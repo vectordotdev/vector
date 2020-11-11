@@ -7,7 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
@@ -15,6 +15,7 @@ use std::{
     env,
     time::{Duration, Instant},
 };
+use tokio::{select, time};
 
 mod parser;
 
@@ -23,10 +24,16 @@ struct AwsEcsMetricsSourceConfig {
     endpoint: Option<String>,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
+    #[serde(default = "default_namespace")]
+    namespace: String,
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
     15
+}
+
+pub fn default_namespace() -> String {
+    "aws_ecs".to_string()
 }
 
 inventory::submit! {
@@ -38,6 +45,7 @@ impl GenerateConfig for AwsEcsMetricsSourceConfig {
         toml::Value::try_from(Self {
             endpoint: None,
             scrape_interval_secs: default_scrape_interval_secs(),
+            namespace: default_namespace(),
         })
         .unwrap()
     }
@@ -64,11 +72,12 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
                 .map(|s| format!("{}/task/stats", s)))
             .unwrap_or("http://169.254.170.2/v2/stats".into());
 
-        Ok(aws_ecs_metrics(
-            url,
-            self.scrape_interval_secs,
-            shutdown,
-            out,
+        let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+
+        Ok(Box::new(
+            aws_ecs_metrics(url, self.scrape_interval_secs, namespace, out, shutdown)
+                .boxed()
+                .compat(),
         ))
     }
 
@@ -81,86 +90,85 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
     }
 }
 
-fn aws_ecs_metrics(
+async fn aws_ecs_metrics(
     url: String,
     interval: u64,
-    shutdown: ShutdownSignal,
-    out: Pipeline,
-) -> super::Source {
-    let out = out
-        .sink_map_err(|error| error!(message = "Error sending ECS metrics.", %error))
-        .sink_compat();
-    let task = tokio::time::interval(Duration::from_secs(interval))
-        .take_until(shutdown)
-        .map(move |_| {
-            let client = Client::new();
+    namespace: Option<String>,
+    mut out: Pipeline,
+    mut shutdown: ShutdownSignal,
+) -> Result<(), ()> {
+    let interval = Duration::from_secs(interval);
+    let mut interval = time::interval(interval).map(|_| ());
 
-            let request = Request::get(&url)
-                .body(Body::empty())
-                .expect("error creating request");
+    loop {
+        select! {
+            Some(()) = interval.next() => (),
+            _ = &mut shutdown => break,
+            else => break,
+        };
 
-            let start = Instant::now();
-            let url2 = url.clone();
-            client
-                .request(request)
-                .and_then(|response| async move {
-                    let (header, body) = response.into_parts();
-                    let body = hyper::body::to_bytes(body).await?;
-                    Ok((header, body))
-                })
-                .into_stream()
-                .filter_map(move |response| {
-                    future::ready(match response {
-                        Ok((header, body)) if header.status == hyper::StatusCode::OK => {
-                            emit!(AwsEcsMetricsRequestCompleted {
-                                start,
-                                end: Instant::now()
-                            });
+        let client = Client::new();
 
-                            let byte_size = body.len();
-                            let body = String::from_utf8_lossy(&body);
+        let request = Request::get(&url)
+            .body(Body::empty())
+            .expect("error creating request");
 
-                            match parser::parse(&body) {
-                                Ok(metrics) => {
-                                    emit!(AwsEcsMetricsReceived {
-                                        byte_size,
-                                        count: metrics.len(),
-                                    });
-                                    Some(stream::iter(metrics).map(Event::Metric).map(Ok))
-                                }
-                                Err(error) => {
-                                    emit!(AwsEcsMetricsParseError {
-                                        error,
-                                        url: url2.clone(),
-                                        body,
-                                    });
-                                    None
-                                }
+        let start = Instant::now();
+        match client.request(request).await {
+            Ok(response) if response.status() == hyper::StatusCode::OK => {
+                match hyper::body::to_bytes(response).await {
+                    Ok(body) => {
+                        emit!(AwsEcsMetricsRequestCompleted {
+                            start,
+                            end: Instant::now()
+                        });
+
+                        let byte_size = body.len();
+                        let body = String::from_utf8_lossy(&body);
+
+                        match parser::parse(&body, namespace.clone()) {
+                            Ok(metrics) => {
+                                emit!(AwsEcsMetricsReceived {
+                                    byte_size,
+                                    count: metrics.len(),
+                                });
+
+                                let metrics = metrics.into_iter().map(Event::Metric);
+
+                                let (sink, _) = out
+                                    .send_all(futures01::stream::iter_ok(metrics))
+                                    .compat()
+                                    .await
+                                    .map_err(|error| error!(message = "Error sending ECS metrics.", %error))?;
+                                out = sink;
+                            }
+                            Err(error) => {
+                                emit!(AwsEcsMetricsParseError {
+                                    error,
+                                    url: &url,
+                                    body,
+                                });
                             }
                         }
-                        Ok((header, _)) => {
-                            emit!(AwsEcsMetricsErrorResponse {
-                                code: header.status,
-                                url: url2.clone(),
-                            });
-                            None
-                        }
-                        Err(error) => {
-                            emit!(AwsEcsMetricsHttpError {
-                                error,
-                                url: url2.clone(),
-                            });
-                            None
-                        }
-                    })
-                })
-                .flatten()
-        })
-        .flatten()
-        .forward(out)
-        .inspect(|_| info!("finished sending"));
+                    }
+                    Err(error) => {
+                        emit!(AwsEcsMetricsHttpError { error, url: &url });
+                    }
+                }
+            }
+            Ok(response) => {
+                emit!(AwsEcsMetricsErrorResponse {
+                    code: response.status(),
+                    url: &url,
+                });
+            }
+            Err(error) => {
+                emit!(AwsEcsMetricsHttpError { error, url: &url });
+            }
+        }
+    }
 
-    Box::new(task.boxed().compat())
+    Ok(())
 }
 
 #[cfg(test)]
@@ -171,7 +179,6 @@ mod test {
         test_util::{collect_ready, next_addr, wait_for_tcp},
         Error,
     };
-    use futures::compat::Future01CompatExt;
     use hyper::{
         service::{make_service_fn, service_fn},
         {Body, Response, Server},
@@ -493,6 +500,7 @@ mod test {
         let source = AwsEcsMetricsSourceConfig {
             endpoint: Some(format!("http://{}", in_addr)),
             scrape_interval_secs: 1,
+            namespace: default_namespace(),
         }
         .build(
             "default",

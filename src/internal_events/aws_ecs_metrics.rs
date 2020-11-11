@@ -40,11 +40,11 @@ impl InternalEvent for AwsEcsMetricsRequestCompleted {
 #[derive(Debug)]
 pub struct AwsEcsMetricsParseError<'a> {
     pub error: serde_json::Error,
-    pub url: String,
+    pub url: &'a str,
     pub body: Cow<'a, str>,
 }
 
-impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
+impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
     fn emit_logs(&self) {
         error!(message = "Parsing error.", url = %self.url, error = %self.error);
         debug!(
@@ -60,12 +60,12 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'a> {
 }
 
 #[derive(Debug)]
-pub struct AwsEcsMetricsErrorResponse {
+pub struct AwsEcsMetricsErrorResponse<'a> {
     pub code: hyper::StatusCode,
-    pub url: String,
+    pub url: &'a str,
 }
 
-impl InternalEvent for AwsEcsMetricsErrorResponse {
+impl InternalEvent for AwsEcsMetricsErrorResponse<'_> {
     fn emit_logs(&self) {
         error!(message = "HTTP error response.", url = %self.url, code = %self.code);
     }
@@ -76,12 +76,12 @@ impl InternalEvent for AwsEcsMetricsErrorResponse {
 }
 
 #[derive(Debug)]
-pub struct AwsEcsMetricsHttpError {
+pub struct AwsEcsMetricsHttpError<'a> {
     pub error: hyper::Error,
-    pub url: String,
+    pub url: &'a str,
 }
 
-impl InternalEvent for AwsEcsMetricsHttpError {
+impl InternalEvent for AwsEcsMetricsHttpError<'_> {
     fn emit_logs(&self) {
         error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
     }
