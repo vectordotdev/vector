@@ -211,7 +211,7 @@ pub fn component_bytes_processed_total(component_name: &str) -> Option<BytesProc
     capture_metrics(&GLOBAL_CONTROLLER)
         .find(|ev| match ev {
             Event::Metric(m)
-                if m.name.as_str().eq("bytes_processed_total")
+                if m.name.as_str().eq("processed_bytes_total")
                     && m.tag_matches("component_name", &component_name) =>
             {
                 true
