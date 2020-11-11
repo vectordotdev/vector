@@ -249,16 +249,16 @@ pub fn component_counter_metrics_batch(
     get_metrics_sorted_batch(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
-            .filter_map(|m| match m.tag_value("component_name") {
-                Some(name) => match m.value {
+            .filter_map(|m| {
+                let component_name = m.tag_value("component_name")?;
+                match m.value {
                     MetricValue::Counter { value }
-                        if cache.insert(name, value).unwrap_or(0.00) < value =>
+                        if cache.insert(component_name, value).unwrap_or(0.00) < value =>
                     {
                         Some(m)
                     }
                     _ => None,
-                },
-                _ => None,
+                }
             })
             .collect()
     })
