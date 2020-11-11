@@ -16,6 +16,8 @@ mod aws_ec2_metadata;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
+#[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
+pub(crate) mod aws_s3;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
