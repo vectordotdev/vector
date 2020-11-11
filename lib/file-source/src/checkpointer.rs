@@ -333,11 +333,11 @@ mod test {
         {
             let mut chkptr = Checkpointer::new(&data_dir.path());
 
-            for (fingerprint, modified) in vec![&newer, &newish, &oldish, &older] {
+            for (fingerprint, modified) in &[&newer, &newish, &oldish, &older] {
                 chkptr.load_checkpoint(Checkpoint {
                     fingerprint: *fingerprint,
                     position,
-                    modified: modified.clone(),
+                    modified: *modified,
                 });
                 assert_eq!(chkptr.get_checkpoint(*fingerprint), Some(position));
                 chkptr.write_checkpoints().unwrap();
