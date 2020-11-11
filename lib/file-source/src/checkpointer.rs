@@ -149,7 +149,7 @@ impl Checkpointer {
                         .modified_times
                         .get(&fingerprint)
                         .cloned()
-                        .unwrap_or_else(|| Utc::now()),
+                        .unwrap_or_else(Utc::now),
                 })
                 .collect(),
         }
@@ -245,7 +245,7 @@ impl Checkpointer {
         info!("Attempting to read legacy checkpoint files.");
         self.read_legacy_checkpoints(ignore_before);
 
-        if let Ok(_) = self.write_checkpoints() {
+        if self.write_checkpoints().is_ok() {
             fs::remove_dir_all(&self.directory).ok();
         }
     }

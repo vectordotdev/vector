@@ -51,7 +51,7 @@ impl FileWatcher {
 
         let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
             ignore_before,
-            metadata.modified().map(|t| DateTime::<Utc>::from(t)),
+            metadata.modified().map(DateTime::<Utc>::from),
         ) {
             modified_time < ignore_before
         } else {

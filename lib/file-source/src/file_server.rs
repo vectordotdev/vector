@@ -102,7 +102,7 @@ where
         existing_files.sort_by_key(|(path, _file_id)| {
             fs::metadata(&path)
                 .and_then(|m| m.created())
-                .map(|t| DateTime::<Utc>::from(t))
+                .map(DateTime::<Utc>::from)
                 .unwrap_or_else(|_| Utc::now())
         });
 
