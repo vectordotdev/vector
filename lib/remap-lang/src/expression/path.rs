@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value};
+use crate::{state, Expression, Object, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -31,7 +31,7 @@ impl Path {
 }
 
 impl Expression for Path {
-    fn execute(&self, _: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
         object
             .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?
@@ -42,7 +42,7 @@ impl Expression for Path {
     /// A path resolves to `Any` by default, but the script might assign
     /// specific values to paths during its execution, which increases our exact
     /// understanding of the value kind the path contains.
-    fn type_def(&self, state: &CompilerState) -> TypeDef {
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
         state
             .path_query_type(&segments_to_path(&self.segments))
             .cloned()
@@ -69,11 +69,11 @@ pub(crate) fn segments_to_path(segments: &[Vec<String>]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, value::Kind::*, value::Constraint::*};
 
     test_type_def![
         ident_match {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef::default());
                 Path::from("foo")
             },
@@ -81,7 +81,7 @@ mod tests {
         }
 
         exact_match {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
@@ -98,7 +98,7 @@ mod tests {
         }
 
         ident_mismatch {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     ..Default::default()

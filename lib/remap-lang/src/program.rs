@@ -1,4 +1,4 @@
-use crate::{parser, CompilerState, Error as E, Expr, Expression, Function, RemapError, TypeDef};
+use crate::{parser, state, Error as E, Expr, Expression, Function, RemapError, TypeDef};
 use pest::Parser;
 use std::fmt;
 
@@ -91,7 +91,7 @@ impl Program {
             .map_err(|s| E::Parser(s.to_string()))
             .map_err(RemapError)?;
 
-        let compiler_state = CompilerState::default();
+        let compiler_state = state::Compiler::default();
 
         let mut parser = parser::Parser {
             function_definitions,
@@ -128,13 +128,13 @@ impl Program {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ValueConstraint, ValueKind};
+    use crate::value;
     use std::error::Error;
 
     #[test]
     fn program_test() {
-        use ValueConstraint::*;
-        use ValueKind::*;
+        use value::Constraint::*;
+        use value::Kind::*;
 
         let cases = vec![
             (".foo", TypeDef { fallible: true, ..Default::default()}, Ok(())),

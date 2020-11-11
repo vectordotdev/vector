@@ -8,7 +8,7 @@ macro_rules! test_type_def {
             $(
                 #[test]
                 fn $name() {
-                    let mut state = CompilerState::default();
+                    let mut state = state::Compiler::default();
                     let expression: Box<dyn Expression> = Box::new($expr(&mut state));
 
                     assert_eq!(expression.type_def(&state), $def);

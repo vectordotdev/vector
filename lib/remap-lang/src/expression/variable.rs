@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value};
+use crate::{state, Expression, Object, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -8,7 +8,7 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Variable {
+pub struct Variable {
     ident: String,
 }
 
@@ -16,10 +16,14 @@ impl Variable {
     pub fn new(ident: String) -> Self {
         Self { ident }
     }
+
+    pub fn boxed(self) -> Box<Self> {
+        Box::new(self)
+    }
 }
 
 impl Expression for Variable {
-    fn execute(&self, state: &mut ProgramState, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
         state
             .variable(&self.ident)
             .cloned()
@@ -27,7 +31,7 @@ impl Expression for Variable {
             .map(Some)
     }
 
-    fn type_def(&self, state: &CompilerState) -> TypeDef {
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
         state
             .variable_type(&self.ident)
             .cloned()
@@ -43,11 +47,11 @@ impl Expression for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, value::Kind::*, value::Constraint::*};
 
     test_type_def![
         ident_match {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef::default());
                 Variable::new("foo".to_owned())
             },
@@ -55,7 +59,7 @@ mod tests {
         }
 
         exact_match {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
@@ -72,7 +76,7 @@ mod tests {
         }
 
         ident_mismatch {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     ..Default::default()

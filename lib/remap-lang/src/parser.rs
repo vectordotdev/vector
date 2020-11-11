@@ -5,7 +5,8 @@ use crate::{
         Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
         Variable,
     },
-    Argument, CompilerState, Error, Expr, Function as Fn, Operator, Result, Value,
+    function::Argument,
+    state, Error, Expr, Function as Fn, Operator, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
@@ -15,7 +16,7 @@ use std::str::FromStr;
 #[grammar = "../grammar.pest"]
 pub(super) struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
-    pub compiler_state: CompilerState,
+    pub compiler_state: state::Compiler,
 }
 
 type R = Rule;

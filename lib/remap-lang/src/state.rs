@@ -2,11 +2,11 @@ use crate::{TypeDef, Value};
 use std::collections::HashMap;
 
 #[derive(Debug, Default)]
-pub struct ProgramState {
+pub struct Program {
     variables: HashMap<String, Value>,
 }
 
-impl ProgramState {
+impl Program {
     pub fn variable(&self, key: impl AsRef<str>) -> Option<&Value> {
         self.variables.get(key.as_ref())
     }
@@ -18,15 +18,15 @@ impl ProgramState {
 
 /// State held by the compiler as it parses the program source.
 #[derive(Debug, Default)]
-pub struct CompilerState {
-    /// The [`ValueConstraint`] each variable is expected to have.
+pub struct Compiler {
+    /// The [`Constraint`] each variable is expected to have.
     ///
     /// This allows assignment operations to tell the compiler what kinds each
     /// variable will have at runtime, so that the compiler can then check the
     /// variable kinds at compile-time when a variable is called.
     variable_types: HashMap<String, TypeDef>,
 
-    /// The [`ValueConstraint`] each path query is expected to have.
+    /// The [`Constraint`] each path query is expected to have.
     ///
     /// By default, the first time a path is queried, it resolves to `Any`, but
     /// when a path is used to assign a value to, we can potentially narrow down
@@ -39,7 +39,7 @@ pub struct CompilerState {
     path_query_types: HashMap<String, TypeDef>,
 }
 
-impl CompilerState {
+impl Compiler {
     pub fn variable_type(&self, key: impl AsRef<str>) -> Option<&TypeDef> {
         self.variable_types.get(key.as_ref())
     }

@@ -1,7 +1,7 @@
-use crate::{CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value};
+use crate::{state, Expr, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone)]
-pub(crate) struct Block {
+pub struct Block {
     expressions: Vec<Expr>,
 }
 
@@ -12,7 +12,11 @@ impl Block {
 }
 
 impl Expression for Block {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let mut value = None;
 
         for expr in &self.expressions {
@@ -22,7 +26,7 @@ impl Expression for Block {
         Ok(value)
     }
 
-    fn type_def(&self, state: &CompilerState) -> TypeDef {
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
         let mut type_defs = self
             .expressions
             .iter()
@@ -48,7 +52,7 @@ impl Expression for Block {
 mod tests {
     use super::*;
     use crate::{
-        expression::Arithmetic, test_type_def, Literal, Operator, ValueConstraint::*, ValueKind::*,
+        expression::Arithmetic, test_type_def, value::Kind::*, value::Constraint::*, Literal, Operator,
     };
 
     test_type_def![

@@ -46,7 +46,11 @@ impl ToStringFn {
 }
 
 impl Expression for ToStringFn {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let to_string = |value| match value {
             Value::String(_) => Ok(value),
             _ => Ok(value.as_string_lossy()),
@@ -90,7 +94,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

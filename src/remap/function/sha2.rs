@@ -41,7 +41,7 @@ impl Sha2Fn {
 }
 
 impl Expression for Sha2Fn {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(v) => v);
         let variant = optional!(state, object, self.variant, Value::String(v) => v);
 
@@ -139,7 +139,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

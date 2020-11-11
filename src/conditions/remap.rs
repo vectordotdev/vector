@@ -4,6 +4,7 @@ use crate::{
     internal_events::RemapConditionExecutionFailed,
     Event,
 };
+use remap::{value, Program, RemapError, Runtime, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -20,13 +21,13 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let expected_result = remap::TypeDef {
+        let expected_result = TypeDef {
             fallible: true,
             optional: false,
-            constraint: remap::ValueConstraint::Exact(remap::ValueKind::Boolean),
+            constraint: value::Constraint::Exact(value::Kind::Boolean),
         };
 
-        let program = remap::Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)?;
+        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -36,11 +37,11 @@ impl ConditionConfig for RemapConfig {
 
 #[derive(Clone)]
 pub struct Remap {
-    program: remap::Program,
+    program: Program,
 }
 
 impl Remap {
-    fn execute(&self, event: &Event) -> Result<Option<remap::Value>, remap::RemapError> {
+    fn execute(&self, event: &Event) -> Result<Option<remap::Value>, RemapError> {
         // TODO(jean): This clone exists until remap-lang has an "immutable"
         // mode.
         //
@@ -53,7 +54,7 @@ impl Remap {
         // program wants to mutate its events.
         //
         // see: https://github.com/timberio/vector/issues/4744
-        remap::Runtime::default().execute(&mut event.clone(), &self.program)
+        Runtime::default().execute(&mut event.clone(), &self.program)
     }
 }
 
@@ -65,7 +66,7 @@ impl Condition for Remap {
                 None => unreachable!("non-optional constraint set"),
             })
             .map(|value| match value {
-                remap::Value::Boolean(boolean) => boolean,
+                Value::Boolean(boolean) => boolean,
                 _ => unreachable!("boolean type constraint set"),
             })
             .unwrap_or_else(|_| {
@@ -79,8 +80,8 @@ impl Condition for Remap {
             .map_err(|err| format!("source execution failed: {:#}", err))?
             .ok_or_else(|| unreachable!("non-optional constraint set"))
             .and_then(|value| match value {
-                remap::Value::Boolean(v) if v => Ok(()),
-                remap::Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
+                Value::Boolean(v) if v => Ok(()),
+                Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
                 _ => unreachable!("boolean type constraint set"),
             })
     }

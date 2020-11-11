@@ -88,6 +88,24 @@ pub enum Argument {
     Regex(regex::Regex),
 }
 
+impl From<Box<dyn Expression>> for Argument {
+    fn from(expr: Box<dyn Expression>) -> Self {
+        Argument::Expression(expr)
+    }
+}
+
+impl<T: Expression + 'static> From<Box<T>> for Argument {
+    fn from(expr: Box<T>) -> Self {
+        Argument::Expression(expr)
+    }
+}
+
+impl From<regex::Regex> for Argument {
+    fn from(regex: regex::Regex) -> Self {
+        Argument::Regex(regex)
+    }
+}
+
 impl TryInto<Box<dyn Expression>> for Argument {
     type Error = Error;
 

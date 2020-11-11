@@ -37,7 +37,7 @@ impl StripAnsiEscapeCodesFn {
 }
 
 impl Expression for StripAnsiEscapeCodesFn {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
         let bytes = required!(state, object, self.value, Value::String(v) => v);
 
         strip_ansi_escapes::strip(&bytes)
@@ -83,7 +83,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -1,51 +1,70 @@
-use crate::ValueKind;
+use crate::value;
 use std::fmt;
 
-/// The constraint of a set of [`ValueKind`]s.
+/// The constraint of a set of [`value::Kind`]s.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum ValueConstraint {
+pub enum Constraint {
     /// Any value kind is accepted.
     Any,
 
     /// Exactly one value kind is accepted
-    Exact(ValueKind),
+    Exact(value::Kind),
 
     /// A subset of value kinds is accepted.
-    OneOf(Vec<ValueKind>),
+    OneOf(Vec<value::Kind>),
 }
 
-impl Default for ValueConstraint {
+impl Default for Constraint {
     fn default() -> Self {
-        ValueConstraint::Any
+        Constraint::Any
     }
 }
 
-impl ValueConstraint {
-    /// Returns `true` if this is a [`ValueConstraint::Exact`].
+impl<T: Into<value::Kind>> From<T> for Constraint {
+    fn from(kind: T) -> Self {
+        Constraint::Exact(kind.into())
+    }
+}
+
+impl From<Vec<value::Kind>> for Constraint {
+    fn from(kinds: Vec<value::Kind>) -> Self {
+        debug_assert!(kinds.len() > 1);
+
+        Constraint::OneOf(kinds)
+    }
+}
+
+impl Constraint {
+    /// Returns `true` if this is a [`Constraint::Exact`].
     pub fn is_exact(&self) -> bool {
         matches!(self, Self::Exact(_))
     }
 
-    /// Returns `true` if this is a [`ValueConstraint::Any`].
+    /// Returns `true` if this is a [`Constraint::Any`].
     pub fn is_any(&self) -> bool {
         matches!(self, Self::Any)
     }
 
-    /// Get a collection of [`ValueKind`]s accepted by this [`ValueConstraint`].
-    pub fn value_kinds(&self) -> Vec<ValueKind> {
-        use ValueConstraint::*;
+    /// Returns `true` if this constraint exactly matches `other`.
+    pub fn is(&self, other: impl Into<Self>) -> bool {
+        self == &other.into()
+    }
+
+    /// Get a collection of [`value::Kind`]s accepted by this [`Constraint`].
+    pub fn value_kinds(&self) -> Vec<value::Kind> {
+        use Constraint::*;
 
         match self {
-            Any => ValueKind::all(),
+            Any => value::Kind::all(),
             OneOf(v) => v.clone(),
             Exact(v) => vec![*v],
         }
     }
 
-    /// Merge two [`ValueConstraint`]s, such that the new `ValueConstraint`
-    /// provides the most constraint possible value constraint.
+    /// Merge two [`Constraint`]s, such that the new `Constraint` provides the
+    /// most constraint possible value constraint.
     pub fn merge(&self, other: &Self) -> Self {
-        use ValueConstraint::*;
+        use Constraint::*;
 
         if self.is_any() || other.is_any() {
             return Any;
@@ -67,8 +86,8 @@ impl ValueConstraint {
         }
     }
 
-    /// Returns `true` if the _other_ [`ValueConstraint`] is contained within
-    /// the current one.
+    /// Returns `true` if the _other_ [`Constraint`] is contained within the
+    /// current one.
     ///
     /// That is to say, its constraints must be more strict or equal to the
     /// constraints of the current one.
@@ -86,10 +105,10 @@ impl ValueConstraint {
     }
 }
 
-impl fmt::Display for ValueConstraint {
+impl fmt::Display for Constraint {
     /// Print a human readable version of the value constraint.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use ValueConstraint::*;
+        use Constraint::*;
 
         match self {
             Any => f.write_str("any"),

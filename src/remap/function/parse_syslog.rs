@@ -100,7 +100,11 @@ fn message_to_value(message: Message<&str>) -> Value {
 }
 
 impl Expression for ParseSyslogFn {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let message = required!(state, object, self.value, Value::String(v) => String::from_utf8_lossy(&v).into_owned());
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
@@ -160,7 +164,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -182,7 +186,7 @@ mod tests {
             }
         }
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
         let mut object = map![];
 
         let msg = format!(

@@ -1,7 +1,5 @@
 use super::Error as E;
-use crate::{
-    value, CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value, ValueKind,
-};
+use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -10,7 +8,7 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct IfStatement {
+pub struct IfStatement {
     conditional: Box<Expr>,
     true_expression: Box<Expr>,
     false_expression: Box<Expr>,
@@ -31,19 +29,23 @@ impl IfStatement {
 }
 
 impl Expression for IfStatement {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         match self.conditional.execute(state, object)? {
             Some(Value::Boolean(true)) => self.true_expression.execute(state, object),
             Some(Value::Boolean(false)) | None => self.false_expression.execute(state, object),
             Some(v) => Err(E::from(Error::from(value::Error::Expected(
-                ValueKind::Boolean,
+                value::Kind::Boolean,
                 v.kind(),
             )))
             .into()),
         }
     }
 
-    fn type_def(&self, state: &CompilerState) -> TypeDef {
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
         let true_type_def = self.true_expression.type_def(state);
         let false_type_def = self.false_expression.type_def(state);
 
@@ -54,7 +56,7 @@ impl Expression for IfStatement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, Literal, Noop, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, value::Kind::*, value::Constraint::*, Literal, Noop};
 
     test_type_def![
         concrete_type_def {

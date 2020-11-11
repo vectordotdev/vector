@@ -1,8 +1,5 @@
-use super::{
-    CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value, ValueConstraint,
-    ValueKind,
-};
-use crate::Operator;
+use super::{Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{state, value, Operator};
 
 #[derive(Debug, Clone)]
 pub struct Arithmetic {
@@ -12,13 +9,17 @@ pub struct Arithmetic {
 }
 
 impl Arithmetic {
-    pub(crate) fn new(lhs: Box<Expr>, rhs: Box<Expr>, op: Operator) -> Self {
+    pub fn new(lhs: Box<Expr>, rhs: Box<Expr>, op: Operator) -> Self {
         Self { lhs, rhs, op }
     }
 }
 
 impl Expression for Arithmetic {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let lhs = self
             .lhs
             .execute(state, object)?
@@ -52,24 +53,20 @@ impl Expression for Arithmetic {
         result.map(Some).map_err(Into::into)
     }
 
-    fn type_def(&self, state: &CompilerState) -> TypeDef {
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::{Constraint::*, Kind::*};
         use Operator::*;
+
         let constraint = match self.op {
             Or => self
                 .lhs
                 .type_def(state)
                 .constraint
                 .merge(&self.rhs.type_def(state).constraint),
-            Multiply | Add => ValueConstraint::OneOf(vec![
-                ValueKind::String,
-                ValueKind::Integer,
-                ValueKind::Float,
-            ]),
-            Remainder | Subtract | Divide => {
-                ValueConstraint::OneOf(vec![ValueKind::Integer, ValueKind::Float])
-            }
+            Multiply | Add => OneOf(vec![String, Integer, Float]),
+            Remainder | Subtract | Divide => OneOf(vec![Integer, Float]),
             And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => {
-                ValueConstraint::Exact(ValueKind::Boolean)
+                Exact(Boolean)
             }
         };
 
@@ -84,7 +81,7 @@ impl Expression for Arithmetic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, Literal, Noop, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
 
     test_type_def![
         or_exact {

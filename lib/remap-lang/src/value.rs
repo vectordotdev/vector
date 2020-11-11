@@ -1,10 +1,14 @@
+mod constraint;
+mod kind;
+
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
-use std::fmt;
-use std::ops::Deref;
 use std::string::String as StdString;
+
+pub use constraint::Constraint;
+pub use kind::Kind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -18,112 +22,46 @@ pub enum Value {
     Null,
 }
 
-#[derive(Eq, PartialEq, Hash, Debug, Clone, Copy, Ord, PartialOrd)]
-pub enum ValueKind {
-    String,
-    Integer,
-    Float,
-    Boolean,
-    Map,
-    Array,
-    Timestamp,
-    Null,
-}
-
-impl fmt::Display for ValueKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self)
-    }
-}
-
-impl ValueKind {
-    pub fn all() -> Vec<Self> {
-        use ValueKind::*;
-
-        vec![String, Integer, Float, Boolean, Map, Array, Timestamp, Null]
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        use ValueKind::*;
-
-        match self {
-            String => "string",
-            Integer => "integer",
-            Float => "float",
-            Boolean => "boolean",
-            Map => "map",
-            Array => "array",
-            Timestamp => "timestamp",
-            Null => "null",
-        }
-    }
-}
-
-impl Deref for ValueKind {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-impl From<&Value> for ValueKind {
-    fn from(value: &Value) -> Self {
-        use ValueKind::*;
-
-        match value {
-            Value::String(_) => String,
-            Value::Integer(_) => Integer,
-            Value::Float(_) => Float,
-            Value::Boolean(_) => Boolean,
-            Value::Map(_) => Map,
-            Value::Array(_) => Array,
-            Value::Timestamp(_) => Timestamp,
-            Value::Null => Null,
-        }
-    }
-}
-
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error(r#"expected "{0}", got "{1}""#)]
-    Expected(ValueKind, ValueKind),
+    Expected(Kind, Kind),
 
     #[error(r#"unable to coerce "{0}" into "{1}""#)]
-    Coerce(ValueKind, ValueKind),
+    Coerce(Kind, Kind),
 
     #[error("unable to calculate remainder of values type {0} and {1}")]
-    Rem(ValueKind, ValueKind),
+    Rem(Kind, Kind),
 
     #[error("unable to multiply value type {0} by {1}")]
-    Mul(ValueKind, ValueKind),
+    Mul(Kind, Kind),
 
     #[error("unable to divide value type {0} by {1}")]
-    Div(ValueKind, ValueKind),
+    Div(Kind, Kind),
 
     #[error("unable to add value type {1} to {0}")]
-    Add(ValueKind, ValueKind),
+    Add(Kind, Kind),
 
     #[error("unable to subtract value type {1} from {0}")]
-    Sub(ValueKind, ValueKind),
+    Sub(Kind, Kind),
 
     #[error("unable to OR value type {0} with {1}")]
-    Or(ValueKind, ValueKind),
+    Or(Kind, Kind),
 
     #[error("unable to AND value type {0} with {1}")]
-    And(ValueKind, ValueKind),
+    And(Kind, Kind),
 
     #[error("unable to compare {0} > {1}")]
-    Gt(ValueKind, ValueKind),
+    Gt(Kind, Kind),
 
     #[error("unable to compare {0} >= {1}")]
-    Ge(ValueKind, ValueKind),
+    Ge(Kind, Kind),
 
     #[error("unable to compare {0} < {1}")]
-    Lt(ValueKind, ValueKind),
+    Lt(Kind, Kind),
 
     #[error("unable to compare {0} <= {1}")]
-    Le(ValueKind, ValueKind),
+    Le(Kind, Kind),
 }
 
 impl From<i32> for Value {
@@ -211,7 +149,7 @@ impl TryFrom<&Value> for f64 {
         match value {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(*v),
-            _ => Err(Error::Coerce(value.kind(), ValueKind::Float)),
+            _ => Err(Error::Coerce(value.kind(), Kind::Float)),
         }
     }
 }
@@ -223,7 +161,7 @@ impl TryFrom<&Value> for i64 {
         match value {
             Value::Integer(v) => Ok(*v),
             Value::Float(v) => Ok(*v as i64),
-            _ => Err(Error::Coerce(value.kind(), ValueKind::Integer)),
+            _ => Err(Error::Coerce(value.kind(), Kind::Integer)),
         }
     }
 }
@@ -240,7 +178,7 @@ impl TryFrom<&Value> for String {
             Float(v) => Ok(format!("{}", v)),
             Boolean(v) => Ok(format!("{}", v)),
             Null => Ok("".to_owned()),
-            _ => Err(Error::Coerce(value.kind(), ValueKind::String)),
+            _ => Err(Error::Coerce(value.kind(), Kind::String)),
         }
     }
 }
@@ -282,7 +220,7 @@ macro_rules! value_impl {
             pub fn [<try_ $func>](self) -> Result<$ret, Error> {
                 match self {
                     Value::$variant(v) => Ok(v),
-                    v => Err(Error::Expected(ValueKind::$variant, v.kind())),
+                    v => Err(Error::Expected(Kind::$variant, v.kind())),
                 }
             }
 
@@ -301,7 +239,7 @@ macro_rules! value_impl {
             pub fn try_null(self) -> Result<(), Error> {
                 match self {
                     Value::Null => Ok(()),
-                    v => Err(Error::Expected(ValueKind::Null, v.kind())),
+                    v => Err(Error::Expected(Kind::Null, v.kind())),
                 }
             }
 
@@ -325,7 +263,7 @@ value_impl! {
 }
 
 impl Value {
-    pub fn kind(&self) -> ValueKind {
+    pub fn kind(&self) -> Kind {
         self.into()
     }
 

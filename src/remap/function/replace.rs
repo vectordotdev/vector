@@ -72,7 +72,11 @@ impl ReplaceFn {
 }
 
 impl Expression for ReplaceFn {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let with = required!(state, object, self.with, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let count = optional!(state, object, self.count, Value::Integer(v) => v).unwrap_or(-1);
@@ -117,7 +121,7 @@ mod test {
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Box::new(Literal::from("a")).into(),
                     "o",
                     None,
                 ),
@@ -127,7 +131,7 @@ mod test {
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Box::new(Literal::from("a")).into(),
                     "o",
                     Some(-1),
                 ),
@@ -137,7 +141,7 @@ mod test {
                 Ok(Some("I like apples and bananas".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Box::new(Literal::from("a")).into(),
                     "o",
                     Some(0),
                 ),
@@ -147,7 +151,7 @@ mod test {
                 Ok(Some("I like opples and bananas".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Box::new(Literal::from("a")).into(),
                     "o",
                     Some(1),
                 ),
@@ -157,14 +161,14 @@ mod test {
                 Ok(Some("I like opples ond bananas".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Box::new(Literal::from("a")).into(),
                     "o",
                     Some(2),
                 ),
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -183,7 +187,7 @@ mod test {
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     None,
                 ),
@@ -193,7 +197,7 @@ mod test {
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(-1),
                 ),
@@ -203,7 +207,7 @@ mod test {
                 Ok(Some("I like apples and bananas".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(0),
                 ),
@@ -213,7 +217,7 @@ mod test {
                 Ok(Some("I like opples and bananas".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(1),
                 ),
@@ -223,14 +227,14 @@ mod test {
                 Ok(Some("I like opples ond bananas".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(2),
                 ),
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -249,7 +253,7 @@ mod test {
                 Ok(Some("I like biscuits and bananas".into())),
                 ReplaceFn::new(
                     Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("apples"))),
+                    Box::new(Literal::from("apples")).into(),
                     "biscuits",
                     None,
                 ),
@@ -259,7 +263,7 @@ mod test {
                 Ok(Some("I like opples and bananas".into())),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(1),
                 ),
@@ -269,14 +273,14 @@ mod test {
                 Ok(Some("I like biscuits and bananas".into())),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
-                    Argument::Regex(regex::Regex::new("\\[apples\\]").unwrap()),
+                    regex::Regex::new("\\[apples\\]").unwrap().into(),
                     "biscuits",
                     None,
                 ),
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

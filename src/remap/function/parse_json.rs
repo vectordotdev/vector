@@ -47,7 +47,11 @@ impl ParseJsonFn {
 }
 
 impl Expression for ParseJsonFn {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let to_json = |value| match value {
             Value::String(bytes) => serde_json::from_slice(&bytes)
                 .map(|v: serde_json::Value| {
@@ -106,7 +110,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -1,6 +1,4 @@
-use crate::{
-    CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value, ValueConstraint,
-};
+use crate::{state, value, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub struct Literal(Value);
@@ -12,13 +10,13 @@ impl<T: Into<Value>> From<T> for Literal {
 }
 
 impl Expression for Literal {
-    fn execute(&self, _: &mut ProgramState, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
         Ok(Some(self.0.clone()))
     }
 
-    fn type_def(&self, _: &CompilerState) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            constraint: ValueConstraint::Exact(self.0.kind()),
+            constraint: value::Constraint::Exact(self.0.kind()),
             ..Default::default()
         }
     }
@@ -27,7 +25,7 @@ impl Expression for Literal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
     use std::collections::BTreeMap;
 
     test_type_def![

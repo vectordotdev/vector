@@ -1,29 +1,26 @@
-use crate::{
-    CompilerState, Object, ProgramState, Result, TypeDef, Value, ValueConstraint, ValueKind,
-};
+use crate::{state, Object, Result, TypeDef, Value};
 
-pub(super) mod arithmetic;
-pub(super) mod assignment;
+mod arithmetic;
+mod assignment;
 mod block;
-pub(super) mod function;
-pub(super) mod if_statement;
+mod function;
+mod if_statement;
 mod literal;
 mod noop;
-pub(super) mod not;
-pub(super) mod path;
-pub(super) mod variable;
+mod not;
+mod path;
+mod variable;
 
-pub(super) use arithmetic::Arithmetic;
-pub(super) use assignment::{Assignment, Target};
-pub(super) use block::Block;
-pub(super) use function::Function;
-pub(super) use if_statement::IfStatement;
-pub(super) use not::Not;
-pub(super) use variable::Variable;
-
+pub use arithmetic::Arithmetic;
+pub use assignment::{Assignment, Target};
+pub use block::Block;
+pub use function::Function;
+pub use if_statement::IfStatement;
 pub use literal::Literal;
 pub use noop::Noop;
+pub use not::Not;
 pub use path::Path;
+pub use variable::Variable;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -50,8 +47,9 @@ pub enum Error {
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>>;
-    fn type_def(&self, state: &CompilerState) -> TypeDef;
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object)
+        -> Result<Option<Value>>;
+    fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
 
 dyn_clone::clone_trait_object!(Expression);
@@ -69,18 +67,18 @@ macro_rules! expression_dispatch {
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
         #[derive(Debug, Clone)]
-        pub(crate) enum Expr {
+        pub enum Expr {
             $($expr($expr)),+
         }
 
         impl Expression for Expr {
-            fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+            fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
                 match self {
                     $(Expr::$expr(expression) => expression.execute(state, object)),+
                 }
             }
 
-            fn type_def(&self, state: &CompilerState) -> TypeDef {
+            fn type_def(&self, state: &state::Compiler) -> TypeDef {
                 match self {
                     $(Expr::$expr(expression) => expression.type_def(state)),+
                 }
@@ -116,8 +114,8 @@ mod tests {
 
     #[test]
     fn test_contains() {
-        use ValueConstraint::*;
-        use ValueKind::*;
+        use value::Constraint::*;
+        use value::Kind::*;
 
         let cases = vec![
             (true, Any, Any),
@@ -139,8 +137,8 @@ mod tests {
 
     #[test]
     fn test_merge() {
-        use ValueConstraint::*;
-        use ValueKind::*;
+        use value::Constraint::*;
+        use value::Kind::*;
 
         let cases = vec![
             (Any, Any, Any),

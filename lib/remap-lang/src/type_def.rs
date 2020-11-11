@@ -1,4 +1,4 @@
-use crate::ValueConstraint;
+use crate::value;
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
@@ -19,11 +19,11 @@ pub struct TypeDef {
     /// nothing if the if-condition does not match.
     pub optional: bool,
 
-    /// The [`ValueConstraint`] applied to this type check.
+    /// The [`value::Constraint`] applied to this type check.
     ///
-    /// This resolves to a list of [`ValueKind`]s the expression is expected to
-    /// return.
-    pub constraint: ValueConstraint,
+    /// This resolves to a list of [`value::Kind`]s the expression is expected
+    /// to return.
+    pub constraint: value::Constraint,
 }
 
 impl TypeDef {
@@ -65,7 +65,7 @@ impl TypeDef {
         self.constraint.contains(&other.constraint)
     }
 
-    pub fn fallible_unless(mut self, constraint: impl Into<ValueConstraint>) -> Self {
+    pub fn fallible_unless(mut self, constraint: impl Into<value::Constraint>) -> Self {
         if !constraint.into().contains(&self.constraint) {
             self.fallible = true
         }
@@ -73,7 +73,7 @@ impl TypeDef {
         self
     }
 
-    pub fn with_constraint(mut self, constraint: impl Into<ValueConstraint>) -> Self {
+    pub fn with_constraint(mut self, constraint: impl Into<value::Constraint>) -> Self {
         self.constraint = constraint.into();
         self
     }

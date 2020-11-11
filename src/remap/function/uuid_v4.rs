@@ -18,7 +18,7 @@ impl Function for UuidV4 {
 struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
-    fn execute(&self, _: &mut ProgramState, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
         let mut buf = [0; 36];
         let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
 
@@ -34,7 +34,7 @@ mod tests {
 
     #[test]
     fn uuid_v4() {
-        let mut state = remap::ProgramState::default();
+        let mut state = state::Program::default();
         let mut object = map![];
         let value = UuidV4Fn.execute(&mut state, &mut object).unwrap().unwrap();
 

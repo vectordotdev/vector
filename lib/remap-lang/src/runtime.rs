@@ -1,12 +1,12 @@
-use crate::{Expression, Object, Program, ProgramState, RemapError, Value};
+use crate::{state, Expression, Object, Program, RemapError, Value};
 
 #[derive(Debug, Default)]
 pub struct Runtime {
-    state: ProgramState,
+    state: state::Program,
 }
 
 impl Runtime {
-    pub fn new(state: ProgramState) -> Self {
+    pub fn new(state: state::Program) -> Self {
         Self { state }
     }
 

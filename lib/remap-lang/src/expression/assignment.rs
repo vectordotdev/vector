@@ -1,5 +1,5 @@
 use super::Error as E;
-use crate::{CompilerState, Expr, Expression, Object, ProgramState, Result, TypeDef, Value};
+use crate::{state, Expr, Expression, Object, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -8,19 +8,19 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum Target {
+pub enum Target {
     Path(Vec<Vec<String>>),
     Variable(String),
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Assignment {
+pub struct Assignment {
     target: Target,
     value: Box<Expr>,
 }
 
 impl Assignment {
-    pub fn new(target: Target, value: Box<Expr>, state: &mut CompilerState) -> Self {
+    pub fn new(target: Target, value: Box<Expr>, state: &mut state::Compiler) -> Self {
         let type_def = value.type_def(state);
 
         match &target {
@@ -36,7 +36,11 @@ impl Assignment {
 }
 
 impl Expression for Assignment {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = self.value.execute(state, object)?;
 
         match value {
@@ -56,7 +60,7 @@ impl Expression for Assignment {
         }
     }
 
-    fn type_def(&self, state: &CompilerState) -> TypeDef {
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
         match &self.target {
             Target::Variable(ident) => state
                 .variable_type(ident.clone())
@@ -76,11 +80,11 @@ impl Expression for Assignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, Literal, ValueConstraint::*, ValueKind::*};
+    use crate::{test_type_def, value::Kind::*, value::Constraint::*, Literal};
 
     test_type_def![
         variable {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 let target = Target::Variable("foo".to_owned());
                 let value = Box::new(Literal::from(true).into());
 
@@ -93,7 +97,7 @@ mod tests {
         }
 
         path {
-            expr: |state: &mut CompilerState| {
+            expr: |state: &mut state::Compiler| {
                 let target = Target::Path(vec![vec!["foo".to_owned()]]);
                 let value = Box::new(Literal::from("foo").into());
 

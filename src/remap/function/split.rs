@@ -50,7 +50,7 @@ pub(crate) struct SplitFn {
 }
 
 impl Expression for SplitFn {
-    fn execute(&self, state: &mut ProgramState, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
         let string: String = self
             .value
             .execute(state, object)?

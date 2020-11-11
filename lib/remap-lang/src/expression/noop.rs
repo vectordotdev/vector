@@ -1,14 +1,14 @@
-use crate::{CompilerState, Expression, Object, ProgramState, Result, TypeDef, Value};
+use crate::{state, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub struct Noop;
 
 impl Expression for Noop {
-    fn execute(&self, _: &mut ProgramState, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
         Ok(None)
     }
 
-    fn type_def(&self, _: &CompilerState) -> TypeDef {
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
             optional: true,
             ..Default::default()
