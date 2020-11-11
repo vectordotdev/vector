@@ -48,7 +48,6 @@ impl Function for ParseGrok {
 
         Ok(Box::new(ParseGrokFn {
             value,
-            patternstr,
             pattern,
         }))
     }
@@ -57,25 +56,20 @@ impl Function for ParseGrok {
 #[derive(Debug)]
 struct ParseGrokFn {
     value: Box<dyn Expression>,
-    patternstr: String,
     // Wrapping pattern in an Arc, as cloning the pattern could otherwise be expensive.
     pattern: Arc<grok::Pattern>,
 }
 
 impl ParseGrokFn {
     #[cfg(test)]
-    fn new(value: Box<dyn Expression>, patternstr: String) -> Result<Self> {
+    fn new(value: Box<dyn Expression>, pattern: String) -> Result<Self> {
         let mut grok = grok::Grok::with_patterns();
         let pattern = Arc::new(
-            grok.compile(&patternstr, true)
+            grok.compile(&pattern, true)
                 .map_err(|e| Error::from(e.to_string()))?,
         );
 
-        Ok(Self {
-            value,
-            patternstr,
-            pattern,
-        })
+        Ok(Self { value, pattern })
     }
 }
 
@@ -83,7 +77,6 @@ impl Clone for ParseGrokFn {
     fn clone(&self) -> Self {
         Self {
             value: self.value.clone(),
-            patternstr: self.patternstr.clone(),
             pattern: Arc::clone(&self.pattern),
         }
     }
