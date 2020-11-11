@@ -46,10 +46,10 @@ impl fmt::Display for ResolvesToError {
             if got.is_optional() {
                 got_str.push_str(" optional");
             }
-        } else {
-            want_str.push_str(" value");
-            got_str.push_str(" value");
         }
+
+        want_str.push_str(" value");
+        got_str.push_str(" value");
 
         let want_kinds = want.constraint.value_kinds();
         let got_kinds = got.constraint.value_kinds();
