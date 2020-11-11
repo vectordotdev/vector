@@ -9,6 +9,7 @@ use crate::{
     event::{Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
+    tcp::TcpKeepaliveConfig,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
@@ -46,6 +47,7 @@ pub struct SyslogConfig {
 pub enum Mode {
     Tcp {
         address: SocketListenAddr,
+        keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
     },
     Udp {
@@ -80,6 +82,7 @@ impl GenerateConfig for SyslogConfig {
         toml::Value::try_from(Self {
             mode: Mode::Tcp {
                 address: SocketListenAddr::SocketAddr("0.0.0.0:514".parse().unwrap()),
+                keepalive: None,
                 tls: None,
             },
             host_key: None,
@@ -105,14 +108,18 @@ impl SourceConfig for SyslogConfig {
             .unwrap_or_else(|| log_schema().host_key().to_string());
 
         match self.mode.clone() {
-            Mode::Tcp { address, tls } => {
+            Mode::Tcp {
+                address,
+                keepalive,
+                tls,
+            } => {
                 let source = SyslogTcpSource {
                     max_length: self.max_length,
                     host_key,
                 };
                 let shutdown_secs = 30;
                 let tls = MaybeTlsSettings::from_config(&tls, true)?;
-                source.run(address, shutdown_secs, tls, shutdown, out)
+                source.run(address, keepalive, shutdown_secs, tls, shutdown, out)
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]

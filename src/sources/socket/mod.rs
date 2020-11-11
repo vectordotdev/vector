@@ -96,6 +96,7 @@ impl SourceConfig for SocketConfig {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 tcp.run(
                     config.address,
+                    config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
                     shutdown,

@@ -32,6 +32,7 @@ async fn test_tcp_syslog() {
         "in",
         SyslogConfig::new(Mode::Tcp {
             address: in_addr.into(),
+            keepalive: None,
             tls: None,
         }),
     );
@@ -148,6 +149,7 @@ async fn test_octet_counting_syslog() {
         "in",
         SyslogConfig::new(Mode::Tcp {
             address: in_addr.into(),
+            keepalive: None,
             tls: None,
         }),
     );

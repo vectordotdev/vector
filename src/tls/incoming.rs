@@ -4,6 +4,7 @@ use super::{
 };
 #[cfg(feature = "listenfd")]
 use super::{Handshake, MaybeTls};
+use crate::tcp::TcpKeepaliveConfig;
 use bytes::{Buf, BufMut};
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
 use openssl::ssl::{SslAcceptor, SslMethod};
@@ -156,6 +157,20 @@ impl MaybeTlsIncomingStream<TcpStream> {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn set_keepalive(
+        &mut self,
+        keepalive: Option<TcpKeepaliveConfig>,
+    ) -> io::Result<()> {
+        let stream = self.get_ref().ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotConnected,
+                "Can't set keepalive on connection that has not been accepted yet.",
+            )
+        })?;
+
+        stream.set_keepalive(keepalive.and_then(|keepalive| keepalive.time))
     }
 
     fn poll_io<T, F>(self: Pin<&mut Self>, cx: &mut Context, poll_fn: F) -> Poll<io::Result<T>>
