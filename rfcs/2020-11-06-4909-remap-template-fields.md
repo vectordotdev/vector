@@ -6,22 +6,55 @@ the Remap language.
 
 ## Scope
 
-This RFC will look into ways we can use Remap whilst still supporting the current
-method of templating fields.
-
+This RFC will look into ways we can use Remap whilst still supporting the
+current method of templating fields (known throughout this RFC as the template
+syntax).
 
 ## Motivation
 
-Using the Remap language rather than simple template fields provides much greater
-power in how these fields are defined. A difficulty does arise in that the 
-templatie fields did provide a list of fields that were used in the template. 
-This was straightforward as the template fields were very simply defined. With
-Remap it is much harder to come up with this list.
+Using the Remap language rather than the template syntax provides much greater
+power in how these fields are defined. 
 
-The Loki sink wants a list of the fields that were used in the template. It
-uses this list to remove these fields from the event sent to Loki. 
+The advantages of using Remap rather than the existing template syntax are:
 
-As an example if you had this sink:
+- One familiar syntax and function reference for Vector.
+- Access to all of remap's functions for templating.
+
+However, we do still need to support the template syntax in order to maintain
+backward compatability.
+
+
+## Internal Proposal
+
+There are two issues that need resolving to allow Remap to be used.
+
+### Determine which syntax is being used
+
+We need to determine if a template field is using Remap syntax or the 
+template syntax. 
+
+- With the template syntax each templated field will contain a single path - for
+example `{{ message.field[2] }}`.
+
+- With the Remap syntax it is possible to contain a single path, however this will
+be prefixed by a `.` - eg. `{{ .message.field[2] }}`. Any more complex syntax
+will be at minimum an `if` statement - eg. `{{ if .bar { .baz } else { .boo } }}`
+or a function call - eg. `{{ replace(.bar, "foo", "bar) }}`
+
+So, we can assume that if (after trimming) the template within the `{{..}}`
+starts with a `.` or it contains a single bracket `{` or parentheses (`(..)`)
+the syntax will be Remap syntax and should be parsed as such.
+
+
+### Removing fields used in the template
+
+A feature available with the template syntax is to be able to list all the fields
+used within the template.
+
+The Loki sink wants a list of the fields that were used in the
+template. It uses this list to remove these fields from the event sent to Loki.
+
+If you had this sink:
 
 ```toml
 [sinks.loki]
@@ -44,23 +77,32 @@ The actual message sent to Loki would be:
 {"message1": "thing", "message2": "thong"}
 ```
 
-With the label `key = bar-zab` attached to the message. The fields `foo` and 
+With the label `key = bar-zab` attached to the message. The fields `foo` and
 `buzz` that were used in defining the label have been removed from the message.
 
-With Remap this list becomes dynamic. So the script `if .foo { .bar } else 
-{ .baz }` means sometimes `.bar` is used and other times `.baz` is used. It is 
-not clear how we should proceed to determine which fields need to be removed
-from the message.
+It is not going to be possible to do this with the Remap syntax as it is much
+more complicated and ambiguous to determine which fields are used to generate
+the templated string. To replicate this functionality a remap function will be
+needed to mark fields for deletion, call it `mark(field)` for now. The above
+script could be written in the remap syntax as:
 
+```
+  labels.key = """
+  {{
+    mark(.foo)
+    mark(.buzz)
+    .foo + "-" + .buzz
+  }}
+  """
+```
 
-## Internal Proposal
+The function `mark` is technically not a mutable function, so it is safe to use
+in template fields. The event is kept intact throughout the process and the
+fields are only removed from the event at the end. This differs from the `del`
+function in that `del` will remove the field immediately and it would not be
+available for use after that point. The order in which the template fields are
+calculated would have an impact on the final result.
 
-As there are a number of complications with working out which fields are used
-in the output, we could only support this feature if the old style template
-syntax is used. If Remap is used, the user won't have the option to remove these
-fields from the message in the Loki sink.
-
-(This is the simplest option.)
 
 ## Rationale
 
@@ -73,10 +115,9 @@ The benefits of using Remap in the template fields are:
 
 ## Drawbacks
 
-There could be an additional maintenance burden. Should the need to track fields
-used in the script be implemented that is a fairly significant complication to
-the script execution process that will need to always be kept in mind when 
-future additions to the language are being implemented.
+There could be an additional maintenance burden. The Remap syntax is more
+complex which does mean there is more of a learning curve for the user and more
+likelyhood that they make mistakes.
 
 
 ## Alternatives
@@ -91,21 +132,29 @@ used as a transform, should the user really need this they could put a Remap
 transform in the process to process these fields so they can be easily used in 
 the template for the next phase.
 
+### Use distinct syntax to distinguish between template and Remap syntax.
+
+We could specify that double parentheses (`{{..}}`) are used for template
+syntax (the current technique) and triple parentheses (`{{{...}}}`) are used 
+for Remap syntax.
+
+This would provide a clear and unambiguous way to distinguish between the
+syntaxes rather than rely on a set of heuristics.
+
 ### Returning fields at load time
 
-To fix the issue with returning fields so that the Loki sink removes them, whilst
-Remap is parsing the script, it could keep track of all fields that are being
-used in the script.
+Instead of requiring the user to mark the fields that are removed, Remap could
+keep track of the fields used whilst running the script.
 
+There are several options:
+
+- *Keep track of all fields used in the script*
 This script, `if .foo { .bar } else { .baz }`, would result in all three
 fields being returned - `.foo`, `.bar` and `.baz`, and subsequently removed
 from the message sent to Loki.
 
-
-### Returning fields at run time
-
-Remap could keep track of all the fields that are read from as it runs and
-return these fields. So the script, `if .foo { .bar } else { .baz }`,
+- *Keep track of the fields used in the run path*
+The script, `if .foo { .bar } else { .baz }`,
 would result in `.foo` and either `.bar` or `.baz` being returned.
 
 If necessary, Remap could distinguish between fields that are used in the
