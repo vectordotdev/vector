@@ -1,6 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+source "../values-shared.sh"
+
+generate() {
+cat <<'EOF'
 # Default values for vector-agent.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
+
+EOF
+shared-globals
+cat <<'EOF'
 
 image:
   repository: timberio/vector
@@ -135,3 +146,7 @@ sinks: {}
   #   inputs: ["input1", "input2"]
   #   rawConfig: |
   #     option = "value"
+EOF
+}
+
+generate >values.yaml
