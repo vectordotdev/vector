@@ -63,9 +63,7 @@ pub async fn start_validated(
     {
         return None;
     }
-    running_topology
-        .connect_diff(&diff, &mut pieces, &HashSet::new())
-        .await;
+    running_topology.connect_diff(&diff, &mut pieces).await;
     running_topology.spawn_diff(&diff, pieces);
 
     Some((running_topology, abort_rx))
@@ -262,8 +260,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces, &wait_for_sinks)
-                    .await;
+                self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
                 // We have successfully changed to new config.
@@ -279,8 +276,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces, &wait_for_sinks)
-                    .await;
+                self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 // We have successfully returned to old config.
                 return Ok(false);
@@ -394,6 +390,13 @@ impl RunningTopology {
             self.remove_inputs(&name);
         }
 
+        // Detach changed sinks that we have to wait for.
+        for name in &diff.sinks.to_change {
+            if wait_for_sinks.contains(name) {
+                self.detach_inputs(&name);
+            }
+        }
+
         // Second pass for final cleanup
         for name in &diff.sinks.to_remove {
             let previous = self.tasks.remove(name).unwrap();
@@ -403,15 +406,17 @@ impl RunningTopology {
                 drop(previous); // detach and forget
             }
         }
+
+        for name in &diff.sinks.to_change {
+            if wait_for_sinks.contains(name) {
+                let previous = self.tasks.remove(name).unwrap();
+                previous.await.unwrap().unwrap();
+            }
+        }
     }
 
     /// Rewires topology
-    async fn connect_diff(
-        &mut self,
-        diff: &ConfigDiff,
-        new_pieces: &mut Pieces,
-        wait_for_sinks: &HashSet<String>,
-    ) {
+    async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
         for name in diff.sources.changed_and_added() {
             self.setup_outputs(&name, new_pieces);
@@ -439,17 +444,6 @@ impl RunningTopology {
 
         for name in &diff.sinks.to_add {
             self.setup_inputs(&name, new_pieces);
-        }
-
-        // Since inputs of diff.sinks.to_change need to be replaced to avoid losing events
-        // that requires for new_pieces to be built, so waiting on changed sinks is done here
-        // instead of in fn shutdown_diff. A consequence of that is a strict requirement on
-        // the sinks with resources to not use their resources in the build method, but only
-        // once they have been run. Otherwise build will fail.
-        for name in wait_for_sinks {
-            if let Some(previous) = self.tasks.remove(name) {
-                previous.await.unwrap().unwrap();
-            }
         }
     }
 
@@ -639,11 +633,27 @@ impl RunningTopology {
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), tx.get()));
+            let _ = self.outputs[input].unbounded_send(fanout::ControlMessage::Replace(
+                name.to_string(),
+                Some(tx.get()),
+            ));
         }
 
         self.inputs.insert(name.to_string(), tx);
+    }
+
+    fn detach_inputs(&mut self, name: &str) {
+        self.inputs.remove(name);
+
+        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let old_inputs = sink_inputs.or(trans_inputs).unwrap();
+
+        for input in old_inputs {
+            // This can only fail if we are disconnected, which is a valid situation.
+            let _ = self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+        }
     }
 
     /// Borrows the Config

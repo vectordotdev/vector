@@ -197,8 +197,6 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     fn sink_type(&self) -> &'static str;
 
     /// Resources that the sink is using.
-    /// These resources shouldn't be used in the build method as that can result
-    /// in a build error. Only sinks are constrained by this.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
@@ -545,9 +543,9 @@ mod test {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
-    use super::Resource;
+    use super::{load_from_str, Resource};
     use std::collections::HashSet;
 
     #[test]
@@ -584,5 +582,24 @@ mod resource_tests {
             conflicting,
             vec!["sink_0", "sink_1", "sink_2"].into_iter().collect()
         );
+    }
+
+    #[test]
+    fn config_conflict_detected() {
+        assert!(load_from_str(
+            r#"
+        [sources.in0]
+        type = "stdin"
+  
+        [sources.in1]
+        type = "stdin"
+  
+        [sinks.out]
+        type = "console"
+        inputs = ["in0","in1"]
+        encoding = "json"
+        "#
+        )
+        .is_err());
     }
 }

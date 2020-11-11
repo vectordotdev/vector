@@ -5,7 +5,7 @@ use futures01::{future, sync::mpsc, Async, AsyncSink, Poll, Sink, StartSend, Str
 type RouterSink = Box<dyn Sink<SinkItem = Event, SinkError = ()> + 'static + Send>;
 
 pub struct Fanout {
-    sinks: Vec<(String, RouterSink)>,
+    sinks: Vec<(String, Option<RouterSink>)>,
     i: usize,
     control_channel: mpsc::UnboundedReceiver<ControlMessage>,
 }
@@ -13,7 +13,8 @@ pub struct Fanout {
 pub enum ControlMessage {
     Add(String, RouterSink),
     Remove(String),
-    Replace(String, RouterSink),
+    /// Will stop accepting events until Some with given name is replaced.
+    Replace(String, Option<RouterSink>),
 }
 
 pub type ControlChannel = mpsc::UnboundedSender<ControlMessage>;
@@ -37,23 +38,25 @@ impl Fanout {
             "Duplicate output name in fanout"
         );
 
-        self.sinks.push((name, sink));
+        self.sinks.push((name, Some(sink)));
     }
 
     fn remove(&mut self, name: &str) {
         let i = self.sinks.iter().position(|(n, _)| n == name);
         let i = i.expect("Didn't find output in fanout");
 
-        let (_name, mut removed) = self.sinks.remove(i);
+        let (_name, removed) = self.sinks.remove(i);
 
-        tokio::spawn(future::poll_fn(move || removed.close()).compat());
+        if let Some(mut removed) = removed {
+            tokio::spawn(future::poll_fn(move || removed.close()).compat());
+        }
 
         if self.i > i {
             self.i -= 1;
         }
     }
 
-    fn replace(&mut self, name: String, sink: RouterSink) {
+    fn replace(&mut self, name: String, sink: Option<RouterSink>) {
         if let Some((_, existing)) = self.sinks.iter_mut().find(|(n, _)| n == &name) {
             *existing = sink
         } else {
@@ -92,16 +95,18 @@ impl Fanout {
         for i in 0..self.sinks.len() {
             let (_name, sink) = &mut self.sinks[i];
 
-            let result = if close {
-                sink.close()
-            } else {
-                sink.poll_complete()
-            };
+            if let Some(sink) = sink {
+                let result = if close {
+                    sink.close()
+                } else {
+                    sink.poll_complete()
+                };
 
-            match result {
-                Ok(Async::Ready(())) => {}
-                Ok(Async::NotReady) => poll_result = Async::NotReady,
-                Err(()) => self.handle_sink_error(i)?,
+                match result {
+                    Ok(Async::Ready(())) => {}
+                    Ok(Async::NotReady) => poll_result = Async::NotReady,
+                    Err(()) => self.handle_sink_error(i)?,
+                }
             }
         }
 
@@ -122,18 +127,32 @@ impl Sink for Fanout {
 
         while self.i < self.sinks.len() - 1 {
             let (_name, sink) = &mut self.sinks[self.i];
-            match sink.start_send(item.clone()) {
-                Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
-                Ok(AsyncSink::Ready) => self.i += 1,
-                Err(()) => self.handle_sink_error(self.i)?,
+            if let Some(sink) = sink.as_mut() {
+                match sink.start_send(item.clone()) {
+                    Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
+                    Ok(AsyncSink::Ready) => self.i += 1,
+                    Err(()) => self.handle_sink_error(self.i)?,
+                }
+            } else {
+                // process_control_messages ended because control channel returned
+                // NotReady so it's fine to return NotReady here since the control
+                // channel will notify current task when it receives a message.
+                return Ok(AsyncSink::NotReady(item));
             }
         }
 
         let (_name, sink) = &mut self.sinks[self.i];
-        match sink.start_send(item) {
-            Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
-            Ok(AsyncSink::Ready) => self.i += 1,
-            Err(()) => self.handle_sink_error(self.i)?,
+        if let Some(sink) = sink.as_mut() {
+            match sink.start_send(item) {
+                Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
+                Ok(AsyncSink::Ready) => self.i += 1,
+                Err(()) => self.handle_sink_error(self.i)?,
+            }
+        } else {
+            // process_control_messages ended because control channel returned
+            // NotReady so it's fine to return NotReady here since the control
+            // channel will notify current task when it receives a message.
+            return Ok(AsyncSink::NotReady(item));
         }
 
         self.i = 0;
@@ -433,7 +452,7 @@ mod tests {
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
-        fanout.replace("a".to_string(), tx_a2);
+        fanout.replace("a".to_string(), Some(tx_a2));
 
         let rec3 = Event::from("line 3".to_string());
         let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
