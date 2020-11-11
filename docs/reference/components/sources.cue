@@ -48,12 +48,12 @@ components: sources: [Name=string]: {
 						type: string: examples: ["^[^\\s]", "\\\\$", "^(INFO|ERROR) ", "[^;]$"]
 					}
 					timeout_ms: {
-						description: "The maximum time to wait for the continuation. Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete."
+						description: "The maximum time to wait for the continuation. Once this timeout is reached, the buffered message is guaranteed to be flushed, even if incomplete. Set to \"none\" for no timeout."
 						required:    false
 						common:      true
 						sort:        4
 						type: uint: {
-							default: null
+							default: 1_000
 							examples: [1_000, 600_000]
 							unit: "milliseconds"
 						}
