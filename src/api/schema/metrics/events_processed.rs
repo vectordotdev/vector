@@ -61,3 +61,28 @@ impl ComponentEventsProcessedTotal {
         EventsProcessedTotal::new(self.metric.clone())
     }
 }
+
+pub struct ComponentEventsThroughput {
+    name: String,
+    throughput: i64,
+}
+
+impl ComponentEventsThroughput {
+    /// Returns a new `ComponentsEventsThroughput`, set to the provided name/throughput values
+    pub fn new(name: String, throughput: i64) -> Self {
+        Self { name, throughput }
+    }
+}
+
+#[Object]
+impl ComponentEventsThroughput {
+    /// Component name
+    async fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Throughput
+    async fn throughput(&self) -> i64 {
+        self.throughput
+    }
+}
