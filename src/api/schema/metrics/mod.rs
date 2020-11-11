@@ -170,7 +170,8 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     }
 }
 
-/// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order
+/// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order.
+/// Metrics are 'batched' into a `Vec<Metric>`, yielding at `inverval` milliseconds
 fn get_metrics_sorted_batch(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     let controller = get_controller().unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
@@ -234,7 +235,7 @@ pub fn component_bytes_processed_total(component_name: &str) -> Option<BytesProc
 
 type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
 
-/// Returns a stream of metrics, where `metric_name` matches the name of the metric
+/// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
 /// (e.g. "events_processed"), and the value is derived from `MetricValue::Counter`. Uses a
 /// local cache to match against the `component_name` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
@@ -263,6 +264,7 @@ pub fn component_counter_metrics_batch(
     })
 }
 
+/// A flattened variant of `component_counter_metrics_batch`, returning a stream of `Metric`
 pub fn component_counter_metrics(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
