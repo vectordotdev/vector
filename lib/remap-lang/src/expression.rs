@@ -1,4 +1,6 @@
-use crate::{CompilerState, Object, ProgramState, Result, Value, ValueConstraint, ValueKind};
+use crate::{
+    CompilerState, Object, ProgramState, Result, TypeDef, Value, ValueConstraint, ValueKind,
+};
 
 pub(super) mod arithmetic;
 pub(super) mod assignment;
@@ -45,76 +47,6 @@ pub enum Error {
 
     #[error("variable error")]
     Variable(#[from] variable::Error),
-}
-
-/// Properties for a given expression that express the expected outcome of the
-/// expression.
-///
-/// This includes whether the expression is fallible, whether it can return
-/// "nothing", and a list of values the expression can resolve to.
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub struct TypeDef {
-    /// True, if an expression can return an error.
-    ///
-    /// Some expressions are infallible (e.g. the [`Literal`] expression, or any
-    /// custom function designed to be infallible).
-    pub fallible: bool,
-
-    /// True, if an expression can resolve to "nothing".
-    ///
-    /// For example, and if-statement without an else-condition can resolve to
-    /// nothing if the if-condition does not match.
-    pub optional: bool,
-
-    /// The [`ValueConstraint`] applied to this type check.
-    ///
-    /// This resolves to a list of [`ValueKind`]s the expression is expected to
-    /// return.
-    pub constraint: ValueConstraint,
-}
-
-impl TypeDef {
-    pub fn is_fallible(&self) -> bool {
-        self.fallible
-    }
-
-    pub fn is_optional(&self) -> bool {
-        self.optional
-    }
-
-    /// Merge two [`TypeDef`]s, such that the new `TypeDef` provides the
-    /// strictest type check possible.
-    pub fn merge(&self, other: &Self) -> Self {
-        let fallible = self.is_fallible() || other.is_fallible();
-        let optional = self.is_optional() || other.is_optional();
-        let constraint = self.constraint.merge(&other.constraint);
-
-        Self {
-            fallible,
-            optional,
-            constraint,
-        }
-    }
-
-    /// Returns `true` if the _other_ [`TypeDef`] is contained within the
-    /// current one.
-    ///
-    /// That is to say, its constraints must be more strict or equal to the
-    /// constraints of the current one.
-    pub fn contains(&self, other: &Self) -> bool {
-        // If we don't expect none, but the other does, the other's requirement
-        // is less strict than ours.
-        if !self.is_optional() && other.is_optional() {
-            return false;
-        }
-
-        // The same applies to fallible checks.
-        if !self.is_fallible() && other.is_fallible() {
-            return false;
-        }
-
-        self.constraint.contains(&other.constraint)
-    }
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
