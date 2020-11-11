@@ -359,6 +359,7 @@ transforms = [
   "transforms-geoip",
   "transforms-grok_parser",
   "transforms-json_parser",
+  "transforms-key_value_parser",
   "transforms-log_to_metric",
   "transforms-logfmt_parser",
   "transforms-lua",
@@ -389,6 +390,7 @@ transforms-field_filter = []
 transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
+transforms-key_value_parser = []
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
