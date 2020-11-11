@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
     metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
@@ -15,28 +15,29 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::select;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct InternalMetricsConfig {
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
 }
 
-pub fn default_scrape_interval_secs() -> u64 {
+pub const fn default_scrape_interval_secs() -> u64 {
     2
+}
+
+impl Default for InternalMetricsConfig {
+    fn default() -> Self {
+        Self {
+            scrape_interval_secs: default_scrape_interval_secs(),
+        }
+    }
 }
 
 inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
 }
 
-impl GenerateConfig for InternalMetricsConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
-            scrape_interval_secs: default_scrape_interval_secs(),
-        })
-        .unwrap()
-    }
-}
+impl_generate_config_from_default!(InternalMetricsConfig);
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
