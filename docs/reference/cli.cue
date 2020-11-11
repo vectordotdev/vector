@@ -214,7 +214,16 @@ cli: #CommandLineTool & {
 				instance
 				"""
 
-			flags: _default_flags
+			flags: _default_flags & {
+				"human-metrics": {
+					_short: "h"
+					description: """
+						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
+						1,000,000 = 1.00 M
+						"""
+					default: false
+				}
+			}
 
 			options: {
 				"refresh-interval": {
