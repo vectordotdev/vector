@@ -76,7 +76,7 @@ where
         })
     }
 
-    fn call_internal(
+    pub fn send(
         &self,
         mut request: Request<B>,
     ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
@@ -114,10 +114,6 @@ where
 
         Box::pin(fut)
     }
-
-    pub async fn send(&self, request: Request<B>) -> Result<http::Response<Body>, HttpError> {
-        self.call_internal(request).await
-    }
 }
 
 impl<B> Service<Request<B>> for HttpClient<B>
@@ -135,7 +131,7 @@ where
     }
 
     fn call(&mut self, request: Request<B>) -> Self::Future {
-        self.call_internal(request)
+        self.send(request)
     }
 }
 
