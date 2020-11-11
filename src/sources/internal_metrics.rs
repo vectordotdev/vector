@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::select;
 
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct InternalMetricsConfig {
     #[serde(default = "default_scrape_interval_secs")]
