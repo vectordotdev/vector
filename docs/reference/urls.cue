@@ -60,7 +60,6 @@ urls: {
 	aws_s3_tags:                                              "https://docs.aws.amazon.com/AmazonS3/latest/user-guide/add-object-tags.html"
 	aws_sqs:                                                  "https://aws.amazon.com/sqs/"
 	aws_sqs_api:                                              "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/Welcome.html"
-	aws_sqs_batch_actions:                                    "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html"
 	azure_monitor:                                            "https://azure.microsoft.com/en-us/services/monitor/"
 	azure_monitor_logs_endpoints:                             "https://docs.microsoft.com/en-us/rest/api/monitor/"
 	basic_auth:                                               "https://en.wikipedia.org/wiki/Basic_access_authentication"

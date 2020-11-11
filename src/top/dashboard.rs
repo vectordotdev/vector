@@ -58,6 +58,7 @@ impl<'a> Widgets<'a> {
             Row::StyledData(
                 vec![
                     r.name.clone(),
+                    r.kind.clone(),
                     r.component_type.clone(),
                     r.format_events_processed_total(),
                     r.format_bytes_processed_total(),
@@ -73,11 +74,12 @@ impl<'a> Widgets<'a> {
             .header_gap(1)
             .column_spacing(2)
             .widths(&[
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
+                Constraint::Percentage(15),
+                Constraint::Percentage(15),
+                Constraint::Percentage(15),
+                Constraint::Percentage(15),
+                Constraint::Percentage(15),
+                Constraint::Percentage(15),
             ]);
 
         f.render_widget(w, area);
