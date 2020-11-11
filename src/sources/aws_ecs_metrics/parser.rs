@@ -169,17 +169,32 @@ pub fn parse(packet: &str, namespace: Option<String>) -> Result<Vec<Metric>, ser
                 result.push(gauge);
             }
 
+            let pg_stats = vec![
+                "pgfault",
+                "pgmajfault",
+                "pgpgin",
+                "pgpgout",
+                "total_pgfault",
+                "total_pgmajfault",
+                "total_pgpgin",
+                "total_pgpgout",
+            ];
+
             for (name, value) in memory.stats.iter() {
-                let gauge = Metric {
+                let metric = Metric {
                     name: format!("memory_{}", name),
                     namespace: namespace.clone(),
                     timestamp: Some(container.ts),
                     tags: Some(tags.clone()),
                     kind: MetricKind::Absolute,
-                    value: MetricValue::Gauge { value: *value },
+                    value: if pg_stats.contains(&name.as_str()) {
+                        MetricValue::Counter { value: *value }
+                    } else {
+                        MetricValue::Gauge { value: *value }
+                    },
                 };
 
-                result.push(gauge);
+                result.push(metric);
             }
         }
 
@@ -543,7 +558,8 @@ mod test {
                     "max_usage": 47177728,
                     "stats": {
                         "active_anon": 34885632,
-                        "active_file": 65536
+                        "active_file": 65536,
+                        "total_pgfault": 15745
                     },
                     "limit": 9223372036854771712
                 }
@@ -644,6 +660,24 @@ mod test {
                     ),
                     kind: MetricKind::Absolute,
                     value: MetricValue::Gauge { value: 65536.0 },
+                },
+                Metric {
+                    name: "memory_total_pgfault".into(),
+                    namespace: namespace(),
+                    timestamp: Some(ts()),
+                    tags: Some(
+                        vec![
+                            (
+                                "container_id".into(),
+                                "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352".into()
+                            ),
+                            ("container_name".into(), "vector2".into())
+                        ]
+                        .into_iter()
+                        .collect()
+                    ),
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 15745.0 },
                 },
             ],
         );
