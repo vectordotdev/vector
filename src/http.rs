@@ -76,26 +76,10 @@ where
         })
     }
 
-    pub async fn send(&mut self, request: Request<B>) -> Result<http::Response<Body>, HttpError> {
-        self.call(request).await.context(CallRequest)
-    }
-}
-
-impl<B> Service<Request<B>> for HttpClient<B>
-where
-    B: fmt::Debug + HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<crate::Error>,
-{
-    type Response = http::Response<Body>;
-    type Error = hyper::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, mut request: Request<B>) -> Self::Future {
+    fn call_internal(
+        &self,
+        mut request: Request<B>,
+    ) -> BoxFuture<'static, hyper::Result<http::Response<Body>>> {
         let _enter = self.span.enter();
 
         if !request.headers().contains_key("User-Agent") {
@@ -129,6 +113,29 @@ where
         .instrument(self.span.clone());
 
         Box::pin(fut)
+    }
+
+    pub async fn send(&self, request: Request<B>) -> Result<http::Response<Body>, HttpError> {
+        self.call_internal(request).await.context(CallRequest)
+    }
+}
+
+impl<B> Service<Request<B>> for HttpClient<B>
+where
+    B: fmt::Debug + HttpBody + Send + 'static,
+    B::Data: Send,
+    B::Error: Into<crate::Error>,
+{
+    type Response = http::Response<Body>;
+    type Error = hyper::Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, request: Request<B>) -> Self::Future {
+        self.call_internal(request)
     }
 }
 

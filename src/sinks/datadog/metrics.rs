@@ -254,7 +254,7 @@ fn build_uri(host: &str, endpoint: &'static str) -> crate::Result<Uri> {
     Ok(uri)
 }
 
-async fn healthcheck(config: DatadogConfig, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(config: DatadogConfig, client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}/api/v1/validate", config.get_endpoint())
         .parse::<Uri>()
         .context(UriParseError)?;

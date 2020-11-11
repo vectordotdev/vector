@@ -124,7 +124,7 @@ impl HoneycombConfig {
     }
 }
 
-async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Result<()> {
     let req = config
         .build_request(Vec::new())
         .await?

@@ -233,7 +233,7 @@ impl GcsSink {
         Ok(VectorSink::Sink(Box::new(sink)))
     }
 
-    async fn healthcheck(mut self) -> crate::Result<()> {
+    async fn healthcheck(self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
