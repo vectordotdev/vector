@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
@@ -13,16 +13,30 @@ use futures::{
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tokio::{select, time::interval};
+use tokio::select;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct InternalMetricsConfig {}
+pub struct InternalMetricsConfig {
+    #[serde(default = "default_scrape_interval_secs")]
+    scrape_interval_secs: u64,
+}
+
+pub fn default_scrape_interval_secs() -> u64 {
+    2
+}
 
 inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
 }
 
-impl_generate_config_from_default!(InternalMetricsConfig);
+impl GenerateConfig for InternalMetricsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            scrape_interval_secs: default_scrape_interval_secs(),
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
@@ -34,7 +48,9 @@ impl SourceConfig for InternalMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let fut = run(get_controller()?, out, shutdown).boxed().compat();
+        let fut = run(get_controller()?, self.scrape_interval_secs, out, shutdown)
+            .boxed()
+            .compat();
         Ok(Box::new(fut))
     }
 
@@ -49,10 +65,11 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     controller: &Controller,
+    interval: u64,
     mut out: Pipeline,
     mut shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut interval = interval(Duration::from_secs(2)).map(|_| ());
+    let mut interval = tokio::time::interval(Duration::from_secs(interval)).map(|_| ());
 
     let mut run = true;
     while run {
