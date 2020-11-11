@@ -86,6 +86,20 @@ impl MetricsSubscription {
             .map(ComponentEventsProcessedTotal::new)
     }
 
+    /// Component events processed metrics, received in batches containing metrics over `interval`
+    async fn component_events_processed_total_batch(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = Vec<ComponentEventsProcessedTotal>> {
+        component_counter_metrics_batch(interval, &|m| m.name == "events_processed_total").map(
+            |m| {
+                m.into_iter()
+                    .map(ComponentEventsProcessedTotal::new)
+                    .collect()
+            },
+        )
+    }
+
     /// Bytes processed metrics
     async fn bytes_processed_total(
         &self,
@@ -157,7 +171,7 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
 }
 
 /// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order
-fn get_metrics_sorted(interval: i32) -> impl Stream<Item = Metric> {
+fn get_metrics_sorted_batch(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     let controller = get_controller().unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
@@ -166,7 +180,7 @@ fn get_metrics_sorted(interval: i32) -> impl Stream<Item = Metric> {
         loop {
             interval.tick().await;
 
-            let sorted = capture_metrics(&controller)
+            yield capture_metrics(&controller)
                 .filter_map(|m| match m {
                     Event::Metric(m) => match m.tag_value("component_name") {
                         Some(name) => match COMPONENTS.read().expect(components::INVARIANT).get(&name) {
@@ -182,11 +196,8 @@ fn get_metrics_sorted(interval: i32) -> impl Stream<Item = Metric> {
                     _ => None,
                 })
                 .sorted_by_key(|m| m.1)
-                .map(|(m, _)| m);
-
-            for m in sorted {
-                yield m;
-            }
+                .map(|(m, _)| m)
+                .collect();
         }
     }
 }
@@ -228,23 +239,35 @@ type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
 /// local cache to match against the `component_name` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.
+pub fn component_counter_metrics_batch(
+    interval: i32,
+    filter_fn: &'static MetricFilterFn,
+) -> impl Stream<Item = Vec<Metric>> {
+    let mut cache = BTreeMap::new();
+
+    get_metrics_sorted_batch(interval).map(move |m| {
+        m.into_iter()
+            .filter(filter_fn)
+            .filter_map(|m| match m.tag_value("component_name") {
+                Some(name) => match m.value {
+                    MetricValue::Counter { value }
+                        if cache.insert(name, value).unwrap_or(0.00) < value =>
+                    {
+                        Some(m)
+                    }
+                    _ => None,
+                },
+                _ => None,
+            })
+            .collect()
+    })
+}
+
 pub fn component_counter_metrics(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
 ) -> impl Stream<Item = Metric> {
-    let mut cache = BTreeMap::new();
-
-    get_metrics_sorted(interval)
-        .filter(filter_fn)
-        .filter_map(move |m| match m.tag_value("component_name") {
-            Some(name) => match m.value {
-                MetricValue::Counter { value }
-                    if cache.insert(name, value).unwrap_or(0.00) < value =>
-                {
-                    Some(m)
-                }
-                _ => None,
-            },
-            _ => None,
-        })
+    futures::StreamExt::flatten(
+        component_counter_metrics_batch(interval, filter_fn).map(futures::stream::iter),
+    )
 }
