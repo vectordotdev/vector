@@ -590,10 +590,10 @@ mod resource_tests {
             r#"
         [sources.in0]
         type = "stdin"
-  
+
         [sources.in1]
         type = "stdin"
-  
+
         [sinks.out]
         type = "console"
         inputs = ["in0","in1"]
