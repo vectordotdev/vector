@@ -20,7 +20,7 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let expected_result = remap::TypeCheck {
+        let expected_result = remap::TypeDef {
             fallible: true,
             optional: false,
             constraint: remap::ValueConstraint::Exact(remap::ValueKind::Boolean),
@@ -77,11 +77,11 @@ impl Condition for Remap {
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
         self.execute(event)
             .map_err(|err| format!("source execution failed: {:#}", err))?
-            .ok_or_else(|| "source execution resolved to no value".into())
+            .ok_or_else(|| unreachable!("non-optional constraint set"))
             .and_then(|value| match value {
                 remap::Value::Boolean(v) if v => Ok(()),
                 remap::Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-                _ => Err("source execution resolved to non-boolean value".into()),
+                _ => unreachable!("boolean type constraint set"),
             })
     }
 }
@@ -107,7 +107,7 @@ mod test {
             ),
             (
                 log_event!["foo" => true, "bar" => false],
-                ".bar || .foo",
+                "to_bool(.bar || .foo)",
                 Ok(()),
                 Ok(()),
             ),
@@ -120,14 +120,14 @@ mod test {
             (
                 log_event![],
                 "",
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any optional value"),
                 Ok(()),
-                Err("source execution resolved to no value"),
             ),
             (
                 log_event!["foo" => "string"],
                 ".foo",
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
-                Err("source execution resolved to non-boolean value"),
             ),
             (
                 log_event![],
