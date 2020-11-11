@@ -21,11 +21,19 @@ mod parser;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct AwsEcsMetricsSourceConfig {
-    endpoint: Option<String>,
+    #[serde(default = "default_endpoint")]
+    endpoint: String,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     #[serde(default = "default_namespace")]
     namespace: String,
+}
+
+pub fn default_endpoint() -> String {
+    env::var("ECS_CONTAINER_METADATA_URI_V4")
+        .or_else(|_| env::var("ECS_CONTAINER_METADATA_URI"))
+        .map(|s| format!("{}/task/stats", s))
+        .unwrap_or_else(|_| "http://169.254.170.2/v2/stats".into())
 }
 
 pub fn default_scrape_interval_secs() -> u64 {
@@ -43,7 +51,7 @@ inventory::submit! {
 impl GenerateConfig for AwsEcsMetricsSourceConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            endpoint: None,
+            endpoint: default_endpoint(),
             scrape_interval_secs: default_scrape_interval_secs(),
             namespace: default_namespace(),
         })
@@ -61,23 +69,18 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let url = self
-            .endpoint
-            .clone()
-            .or(env::var("ECS_CONTAINER_METADATA_URI_V4")
-                .ok()
-                .map(|s| format!("{}/task/stats", s)))
-            .or(env::var("ECS_CONTAINER_METADATA_URI")
-                .ok()
-                .map(|s| format!("{}/task/stats", s)))
-            .unwrap_or("http://169.254.170.2/v2/stats".into());
-
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         Ok(Box::new(
-            aws_ecs_metrics(url, self.scrape_interval_secs, namespace, out, shutdown)
-                .boxed()
-                .compat(),
+            aws_ecs_metrics(
+                self.endpoint.clone(),
+                self.scrape_interval_secs,
+                namespace,
+                out,
+                shutdown,
+            )
+            .boxed()
+            .compat(),
         ))
     }
 
@@ -498,7 +501,7 @@ mod test {
         let (tx, rx) = Pipeline::new_test();
 
         let source = AwsEcsMetricsSourceConfig {
-            endpoint: Some(format!("http://{}", in_addr)),
+            endpoint: format!("http://{}", in_addr),
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
