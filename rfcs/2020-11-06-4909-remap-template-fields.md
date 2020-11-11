@@ -148,12 +148,12 @@ keep track of the fields used whilst running the script.
 
 There are several options:
 
-- *Keep track of all fields used in the script*
+- *Keep track of all fields used in the script.*
 This script, `if .foo { .bar } else { .baz }`, would result in all three
 fields being returned - `.foo`, `.bar` and `.baz`, and subsequently removed
 from the message sent to Loki.
 
-- *Keep track of the fields used in the run path*
+- *Keep track of the fields used in the run path.*
 The script, `if .foo { .bar } else { .baz }`,
 would result in `.foo` and either `.bar` or `.baz` being returned.
 
