@@ -13,7 +13,7 @@ components: transforms: key_value_parser: {
 		parse: {
 			format: {
 				name:     "KeyValue"
-				url:      urls.keyvalue
+				url:      null
 				versions: null
 			}
 		}
@@ -179,6 +179,6 @@ components: transforms: key_value_parser: {
 					"loguid": "{0x5f0fa4d6,0x1,0x696ac072,0xc28d839a}"
 				}
 			}
-		}
+		},
 	]
 }
