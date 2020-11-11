@@ -492,8 +492,8 @@ mod test {
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", %error);
             }
         });
         wait_for_tcp(in_addr).await;
