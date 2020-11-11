@@ -158,6 +158,7 @@
 /src/transforms/field_filter.rs @lukesteensen
 /src/transforms/geoip.rs @lukesteensen
 /src/transforms/grok_parser.rs @lukesteensen
+/src/transforms/key_value_parser.rs @Nick011 @bruceg
 /src/transforms/log_to_metric.rs @lukesteensen
 /src/transforms/merge.rs @MOZGIII
 /src/transforms/regex_parser.rs @lukesteensen
