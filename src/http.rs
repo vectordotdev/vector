@@ -79,7 +79,7 @@ where
     fn call_internal(
         &self,
         mut request: Request<B>,
-    ) -> BoxFuture<'static, hyper::Result<http::Response<Body>>> {
+    ) -> BoxFuture<'static, Result<http::Response<Body>, HttpError>> {
         let _enter = self.span.enter();
 
         if !request.headers().contains_key("User-Agent") {
@@ -100,7 +100,7 @@ where
         let response = self.client.request(request);
 
         let fut = async move {
-            let res = response.await?;
+            let res = response.await.context(CallRequest)?;
             debug!(
                     message = "HTTP response.",
                     status = %res.status(),
@@ -116,7 +116,7 @@ where
     }
 
     pub async fn send(&self, request: Request<B>) -> Result<http::Response<Body>, HttpError> {
-        self.call_internal(request).await.context(CallRequest)
+        self.call_internal(request).await
     }
 }
 
@@ -127,7 +127,7 @@ where
     B::Error: Into<crate::Error>,
 {
     type Response = http::Response<Body>;
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
