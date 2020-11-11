@@ -27,6 +27,60 @@ the metric to determine how to process the tags.
 
 The Remap language can work with the metadata around a metric.
 
+When the event the Remap function is working with, the metric metadata can be 
+accessed through a number of set fields in a similar way to how the language 
+works with log events.
+
+The following fields are available:
+
+- `.name` - The name of the metric.
+- `.namespace` - The namespace for the metric.
+- `.timestamp` - Timestamp of the metric.
+- `.kind` - The kind of the metric - *Incremental* or *Absolute*
+- `.tags` - A map containing the tags set for the metric.
+ 
+There are strict limitations to how this data can be represented. 
+
+Setting `name` or `namespace` to anything other than a string will be an 
+error. `.timestamp` has to be a timestamp. `tags` is a map of string keys to 
+string values. No nesting is allowed. 
+
+To add a tag, or change an existing tag you can set it:
+
+```
+.tags.host = "localhost"
+```
+
+To delete a tag, use the `del` function:
+
+```
+del(".tags.host")
+```
+
+Note variables (identifiers starting with a `$`) are available and there are
+no limitations on the types you can set variables to.
+
+## Rationale
+
+Enabling the Remap language to work with metric events will allow users to
+simplify their configurations if they already use the `*_tag` transforms
+provided. It will also allow them remove the use of the `Lua` transform if they
+have been falling back to that for anything but the most complex manipulation.
+
+
+## Drawbacks
+
+In order to maintain these functions there will be a slight maintenance burden.
+
+By exposing the metric data to Remap, it may place some restrictions should we 
+want to change the internal model in the future. The more we decide to expose to
+the language, the more it may restrict us going forwards if we need to ensure
+backwards compatibility for users configurations.
+
+## Alternatives
+
+### Provide functions to manipulate the metrics
+
 The following functions are provided:
 
 ### `get_name() -> string`
@@ -69,48 +123,6 @@ Removes the tag with the given key from the metric.
 Note that accessing path values (identifiers starting with a `.`) are not 
 available for metric events.
 
-Variables (identifiers starting with a `$`) are available.
-
-## Rationale
-
-Enabling the Remap language to work with metric events will allow users to
-simplify their configurations if they already use the `*_tag` transforms
-provided. It will also allow them remove the use of the `Lua` transform if they
-have been falling back to that for anything but the most complex manipulation.
-
-  
-## Prior Art
-
-
-## Drawbacks
-
-In order to maintain these functions there will be a slight maintenance burden.
-
-By exposing the metric data to Remap, it may place some restrictions should we 
-want to change the internal model in the future. The more we decide to expose to
-the language, the more it may restrict us going forwards if we need to ensure
-backwards compatibility for users configurations.
-
-## Alternatives
-
-### Use paths
-
-We could allow the metric data to be manipulated through paths in a similar way
-to how the language works with log events.
-
-The following fields would be available:
-
-- `.name` - The name of the metric.
-- `.namespace` - The namespace for the metric.
-- `.timestamp` - Timestamp of the metric.
-- `.kind` - The kind of the metric - *Incremental* or *Absolute*
-- `.tags` - A map containing the tags set for the metric.
- 
-However, there are strict limitations to how this data can be represented. 
-Setting `name` or `namespace` to anything other than a string should be an 
-error. `tags` has to be a map of string keys to string values. No nesting should
-be allowed. The inflexibility around this data means that the attempt to make
-it "feel" the same as log events would not be effective.
 
 ### Manipulate the metric data
 
@@ -183,9 +195,5 @@ Note that this could still be implemented later as a next stage.
 Incremental steps that execute this change. Generally this is in the form of:
 
 - [ ] Adjust the Remap transform to allow it to handle both log and metric.
-- [ ] Implement `remap-lang::Object` for metric events. `remap-lang::Object`
-      may need a new function to `get_metric` to return the metric that the
-      metric events will work with. The other functions will just return an 
-      error.
-- [ ] Write the functions required to work with the metric data.
+- [ ] Implement `remap-lang::Object` to handle the paths for metric events. 
 
