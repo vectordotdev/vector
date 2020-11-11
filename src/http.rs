@@ -94,7 +94,7 @@ where
             method = %request.method(),
             version = ?request.version(),
             headers = ?request.headers(),
-            body = ?request.body(),
+            body = %FormatBody(request.body()),
         );
 
         let response = self.client.request(request);
@@ -106,13 +106,32 @@ where
                     status = %res.status(),
                     version = ?res.version(),
                     headers = ?res.headers(),
-                    body = ?res.body(),
+                    body = %FormatBody(res.body()),
             );
             Ok(res)
         }
         .instrument(self.span.clone());
 
         Box::pin(fut)
+    }
+}
+
+/// Newtype placeholder to provide a formatter for the request and response body.
+struct FormatBody<'a, B>(&'a B);
+
+impl<'a, B: HttpBody> fmt::Display for FormatBody<'a, B> {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let size = self.0.size_hint();
+        match (size.lower(), size.upper()) {
+            (0, None) => write!(fmt, "[unknown]"),
+            (lower, None) => write!(fmt, "[>={} bytes]", lower),
+
+            (0, Some(0)) => write!(fmt, "[empty]"),
+            (0, Some(upper)) => write!(fmt, "[<={} bytes]", upper),
+
+            (lower, Some(upper)) if lower == upper => write!(fmt, "[{} bytes]", lower),
+            (lower, Some(upper)) => write!(fmt, "[{}..={} bytes]", lower, upper),
+        }
     }
 }
 
