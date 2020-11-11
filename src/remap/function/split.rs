@@ -1,5 +1,5 @@
 use remap::prelude::*;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Split;
@@ -51,12 +51,7 @@ pub(crate) struct SplitFn {
 
 impl Expression for SplitFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
-        let string: String = self
-            .value
-            .execute(state, object)?
-            .ok_or_else(|| Error::from("argument missing"))?
-            .try_into()?;
-
+        let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let limit: usize = self
             .limit
             .as_ref()
@@ -69,16 +64,13 @@ impl Expression for SplitFn {
 
         let value = match &self.pattern {
             Argument::Regex(pattern) => pattern
-                .splitn(&string, limit as usize)
+                .splitn(&value, limit as usize)
                 .collect::<Vec<_>>()
                 .into(),
             Argument::Expression(expr) => {
-                let pattern: String = expr
-                    .execute(state, object)?
-                    .ok_or_else(|| Error::from("argument missing"))?
-                    .try_into()?;
+                let pattern = required!(state, object, expr, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
 
-                string.splitn(limit, &pattern).collect::<Vec<_>>().into()
+                value.splitn(limit, &pattern).collect::<Vec<_>>().into()
             }
         };
 

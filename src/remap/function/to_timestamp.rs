@@ -73,13 +73,15 @@ impl Expression for ToTimestampFn {
 
         let to_timestamp = |value| match value {
             Timestamp(_) => Ok(value),
+            Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
+            Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
             String(_) => Conversion::Timestamp
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
-            Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
-            _ => Err("unable to convert value to timestamp".into()),
+            Boolean(_) | Array(_) | Map(_) | Null => {
+                Err("unable to convert value to timestamp".into())
+            }
         };
 
         super::convert_value_or_default(

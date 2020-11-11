@@ -74,9 +74,11 @@ impl Expression for TruncateFn {
 
         let limit = required!(
             state, object, self.limit,
-            Value::Float(f) if f >= 0.0 => f.floor() as usize,
-            Value::Integer(i) if i >= 0 => i as usize,
+            Value::Float(f) => f.floor() as i64,
+            Value::Integer(i) => i as i64,
         );
+
+        let limit = if limit < 0 { 0 } else { limit as usize };
 
         let ellipsis =
             optional!(state, object, self.ellipsis, Value::Boolean(v) => v).unwrap_or_default();

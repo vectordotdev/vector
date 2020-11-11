@@ -58,11 +58,12 @@ impl Expression for ToFloatFn {
             Float(_) => Ok(value),
             Integer(v) => Ok(Float(v as f64)),
             Boolean(v) => Ok(Float(if v { 1.0 } else { 0.0 })),
+            Null => Ok(0.0.into()),
             String(_) => Conversion::Float
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            _ => Err("unable to convert value to float".into()),
+            Array(_) | Map(_) | Timestamp(_) => Err("unable to convert value to float".into()),
         };
 
         super::convert_value_or_default(

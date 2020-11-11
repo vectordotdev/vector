@@ -69,15 +69,15 @@ impl Expression for ParseTimestampFn {
         state: &mut state::Program,
         object: &mut dyn Object,
     ) -> Result<Option<Value>> {
-        let format = {
-            let bytes = required!(state, object, self.format, Value::String(v) => v);
-            format!("timestamp|{}", String::from_utf8_lossy(&bytes))
-        };
-
-        let conversion: Conversion = format.parse().map_err(|e| format!("{}", e))?;
+        let format = self.format.execute(state, object);
 
         let to_timestamp = |value| match value {
-            Value::String(_) => conversion
+            Value::String(_) => format
+                .clone()?
+                .ok_or_else(|| Error::from(function::Error::Required("format".to_owned())))
+                .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_string())))?
+                .parse::<Conversion>()
+                .map_err(|e| format!("{}", e))?
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
