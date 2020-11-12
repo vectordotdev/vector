@@ -380,16 +380,6 @@ _internal_metrics_tags: {
 }
 
 // Helpful metrics groupings
-_internal_metrics: {
-	vector_config_load_errors_total: _vector_config_load_errors_total
-	vector_quit_total:               _vector_quit_total
-	vector_recover_errors_total:     _vector_recover_errors_total
-	vector_reload_errors_total:      _vector_reload_errors_total
-	vector_reloaded_total:           _vector_reloaded_total
-	vector_started_total:            _vector_started_total
-	vector_stopped_total:            _vector_stopped_total
-}
-
 _prometheus_metrics: {
 	vector_events_processed_total:       _vector_events_processed_total
 	vector_http_error_response_total:    _vector_http_error_response_total

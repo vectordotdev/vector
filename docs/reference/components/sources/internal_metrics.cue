@@ -40,5 +40,60 @@ components: sources: internal_metrics: {
 		warnings: []
 	}
 
-	output: metrics: _internal_metrics
+	output: metrics: {
+		// Default internal metrics tags
+		_internal_metrics_tags: {
+			instance: {
+				description: "The Vector instance identified by host and port."
+				required:    true
+				examples: [_values.instance]
+			}
+			job: {
+				description: "The name of the job producing Vector metrics."
+				required:    true
+				default:     "vector"
+			}
+		}
+
+		vector_config_load_errors_total: {
+			description: "The total number of errors loading the Vector configuration."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
+		vector_connection_errors_total: {
+			description: "The total number of connection errors for this Vector instance."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
+		vector_quit_total: {
+			description: "The total number of times the Vector instance has quit."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
+		vector_recover_errors_total: {
+			description: "The total number of errors caused by Vector failing to recover from a failed reload."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
+		vector_reload_errors_total: {
+			description: "The total number of errors encountered when reloading Vector."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
+		vector_reloaded_total: {
+			description: "The total number of times the Vector instance has been reloaded."
+			type:        "counter"
+			tags:       _internal_metrics_tags
+		}
+		vector_started_total: {
+			description: "The total number of times the Vector instance has been started."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
+		vector_stopped_total: {
+			description: "The total number of times the Vector instance has been stopped."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
+	}
 }
