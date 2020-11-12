@@ -149,7 +149,7 @@ components: transforms: reduce: {
 		vector_stale_events_flushed_total: {
 			description: "The number of stale events that Vector has flushed."
 			type:        "counter"
-			tags:        _component_tags
+			tags:        telemetry.metrics._component_tags
 		}
 	}
 }

@@ -112,6 +112,20 @@ components: sources: apache_metrics: {
 	}
 
 	output: metrics: {
+		// Default Apache metrics tags
+		_apache_metrics_tags: {
+			endpoint: {
+				description: "The absolute path of originating file."
+				required:    true
+				examples: ["http://localhost:8080/server-status?auto"]
+			}
+			host: {
+				description: "The hostname of the Apache HTTP server."
+				required:    true
+				examples: [_values.local_host]
+			}
+		}
+
 		apache_access_total: {
 			description:   "The total number of time the Apache server has been accessed."
 			relevant_when: "`ExtendedStatus On`"

@@ -66,6 +66,6 @@ components: transforms: sampler: {
 	}
 
 	telemetry: metrics: {
-		vector_events_discarded_total: _vector_events_discarded_total
+		vector_events_discarded_total: telemetry.metrics._vector_events_discarded_total
 	}
 }

@@ -261,6 +261,18 @@ components: sources: host_metrics: {
 	}
 
 	output: metrics: {
+		_host_metrics_tags: {
+			collector: {
+				description: "Which collector this metric comes from."
+				required:    true
+			}
+			host: {
+				description: "The hostname of the originating system."
+				required:    true
+				examples: [_values.local_host]
+			}
+		}
+
 		// Host CPU
 		host_cpu_seconds_total: {
 			description: "The number of CPU seconds accumulated in different operating modes."

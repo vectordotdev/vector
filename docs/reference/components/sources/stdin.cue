@@ -105,7 +105,7 @@ components: sources: stdin: {
 		vector_stdin_reads_failed_total: {
 			description: "The total number of errors reading from stdin."
 			type:        "counter"
-			tags:        _component_tags
+			tags:        telemetry.metrics._component_tags
 		}
 	}
 }

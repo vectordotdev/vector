@@ -241,6 +241,6 @@ components: sinks: elasticsearch: {
 	}
 
 	telemetry: metrics: {
-		vector_missing_keys_total: _vector_missing_keys_total
+		vector_missing_keys_total: telemetry.metrics._vector_missing_keys_total
 	}
 }

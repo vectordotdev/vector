@@ -93,12 +93,12 @@ components: _kafka: {
 		vector_consumer_offset_updates_failed_total: {
 			description: "The total number of failures to update a Kafka consumer offset."
 			type:        "counter"
-			tags:        _component_tags
+			tags:        telemetry.metrics._component_tags
 		}
 		vector_events_failed_total: {
 			description: "The total number of failures to read a Kafka message."
 			type:        "counter"
-			tags:        _component_tags
+			tags:        telemetry.metrics._component_tags
 		}
 	}
 }

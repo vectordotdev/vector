@@ -98,21 +98,22 @@ components: sources: mongodb_metrics: {
 		collect_duration_nanoseconds: {
 			description: "The duration spent collecting MongoDB metrics."
 			type:        "histogram"
-			tags:        _internal_metrics_tags
+			tags:        telemetry.metrics._internal_metrics_tags
 		}
 		collect_completed_total: {
 			description: "The total number of MongoDB metrics collections completed."
 			type:        "counter"
-			tags:        _internal_metrics_tags
+			tags:        telemetry.metrics._internal_metrics_tags
 		}
 		request_error_total: {
 			description: "The total number of MongoDB request errors."
 			type:        "counter"
-			tags:        _internal_metrics_tags
+			tags:        telemetry.metrics._internal_metrics_tags
 		}
 	}
 
 	output: metrics: {
+		// Default MongoDB tags
 		_mongodb_metrics_tags: {
 			endpoint: {
 				description: "The absolute path of the originating file."

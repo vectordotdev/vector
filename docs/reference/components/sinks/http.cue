@@ -121,6 +121,6 @@ components: sinks: http: {
 	}
 
 	telemetry: metrics: {
-		vector_http_bad_requests_total: _vector_http_bad_requests_total
+		vector_http_bad_requests_total: telemetry.metrics._vector_http_bad_requests_total
 	}
 }

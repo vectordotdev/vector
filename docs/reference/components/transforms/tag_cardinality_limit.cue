@@ -226,7 +226,7 @@ components: transforms: tag_cardinality_limit: {
 				hitting the configured `value_limit`.
 				"""
 			type: "counter"
-			tags: _component_tags
+			tags: telemetry.metrics._component_tags
 		}
 		vector_value_limit_reached_total: {
 			description: """
@@ -234,7 +234,7 @@ components: transforms: tag_cardinality_limit: {
 				value limit has been reached.
 				"""
 			type: "counter"
-			tags: _component_tags
+			tags: telemetry.metrics._component_tags
 		}
 	}
 }

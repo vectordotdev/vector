@@ -187,7 +187,7 @@ components: sources: syslog: {
 		vector_connection_read_errors_total: {
 			description: "The total number of errors reading datagram."
 			type:        "counter"
-			tags:        _component_tags & {
+			tags:        telemetry.metrics._component_tags & {
 				mode: {
 					description: ""
 					required:    true
@@ -200,7 +200,7 @@ components: sources: syslog: {
 		vector_utf8_convert_errors_total: {
 			description: "The total number of errors converting bytes to a UTF-8 string in UDP mode."
 			type:        "counter"
-			tags:        _component_tags & {
+			tags:        telemetry.metrics._component_tags & {
 				mode: {
 					description: "The connection mode used by the component."
 					required:    true

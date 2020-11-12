@@ -112,6 +112,6 @@ components: sources: vector: {
 	}
 
 	telemetry: metrics: {
-		vector_protobuf_decode_errors_total: _vector_protobuf_decode_errors_total
+		vector_protobuf_decode_errors_total: telemetry.metrics._vector_protobuf_decode_errors_total
 	}
 }

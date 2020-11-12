@@ -55,6 +55,11 @@ components: sources: internal_metrics: {
 			}
 		}
 
+		vector_api_started_total: {
+			description: "The number of times the Vector GraphQL API has been started."
+			type:        "counter"
+			tags:        _internal_metrics_tags
+		}
 		vector_config_load_errors_total: {
 			description: "The total number of errors loading the Vector configuration."
 			type:        "counter"

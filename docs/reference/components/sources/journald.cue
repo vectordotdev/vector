@@ -194,12 +194,12 @@ components: sources: journald: {
 		vector_invalid_record_total: {
 			description: "The total number of invalid journald records discarded."
 			type:        "counter"
-			tags:        _component_tags
+			tags:        telemetry.metrics._component_tags
 		}
 		vector_invalid_record_bytes_total: {
 			description: "The total number of bytes from discarded journald records."
 			type:        "counter"
-			tags:        _component_tags
+			tags:        telemetry.metrics._component_tags
 		}
 	}
 }
