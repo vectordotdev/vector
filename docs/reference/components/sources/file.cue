@@ -517,15 +517,15 @@ components: sources: file: {
 	}
 
 	telemetry: metrics: {
-		vector_checkpoint_write_errors_total: telemetry.metrics._vector_checkpoint_write_errors_total
-		vector_checkpoints_total:             telemetry.metrics._vector_checkpoints_total
-		vector_checksum_errors:               telemetry.metrics._vector_checksum_errors
-		vector_file_delete_errors:            telemetry.metrics._vector_file_delete_errors
-		vector_file_watch_errors:             telemetry.metrics._vector_file_watch_errors
-		vector_files_added:                   telemetry.metrics._vector_files_added
-		vector_files_deleted:                 telemetry.metrics._vector_files_deleted
-		vector_files_resumed:                 telemetry.metrics._vector_files_resumed
-		vector_files_unwatched:               telemetry.metrics._vector_files_unwatched
-		vector_fingerprint_read_errors:       telemetry.metrics._vector_fingerprint_read_errors
+		checkpoint_write_errors_total: telemetry.metrics._checkpoint_write_errors_total
+		checkpoints_total:             telemetry.metrics._checkpoints_total
+		checksum_errors:               telemetry.metrics._checksum_errors
+		file_delete_errors:            telemetry.metrics._file_delete_errors
+		file_watch_errors:             telemetry.metrics._file_watch_errors
+		files_added:                   telemetry.metrics._files_added
+		files_deleted:                 telemetry.metrics._files_deleted
+		files_resumed:                 telemetry.metrics._files_resumed
+		files_unwatched:               telemetry.metrics._files_unwatched
+		fingerprint_read_errors:       telemetry.metrics._fingerprint_read_errors
 	}
 }

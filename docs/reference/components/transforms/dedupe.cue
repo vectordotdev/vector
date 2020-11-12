@@ -148,6 +148,6 @@ components: transforms: dedupe: {
 	}
 
 	telemetry: metrics: {
-		vector_events_discarded_total: telemetry.metrics._vector_events_discarded_total
+		events_discarded_total: telemetry.metrics._events_discarded_total
 	}
 }

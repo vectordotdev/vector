@@ -167,10 +167,10 @@ components: sinks: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		vector_encode_errors_total:           telemetry.metrics._vector_encode_errors_total
-		vector_http_request_errors_total:     telemetry.metrics._vector_http_request_errors_total
-		vector_http_requests_total:           telemetry.metrics._vector_http_requests_total
-		vector_source_missing_keys_total:     telemetry.metrics._vector_source_missing_keys_total
-		vector_sourcetype_missing_keys_total: telemetry.metrics._vector_sourcetype_missing_keys_total
+		encode_errors_total:           telemetry.metrics._encode_errors_total
+		http_request_errors_total:     telemetry.metrics._http_request_errors_total
+		http_requests_total:           telemetry.metrics._http_requests_total
+		source_missing_keys_total:     telemetry.metrics._source_missing_keys_total
+		sourcetype_missing_keys_total: telemetry.metrics._sourcetype_missing_keys_total
 	}
 }

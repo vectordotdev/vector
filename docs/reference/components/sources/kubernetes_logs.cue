@@ -301,16 +301,18 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
-		vector_k8s_docker_format_parse_failures_total: {
-			description: "The total number of failures to parse a message as a JSON object."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		docker_format_parse_failures_total: {
+			description:       "The total number of failures to parse a message as a JSON object."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
 
-		vector_k8s_event_annotation_failures_total: {
-			description: "The total number of failures to annotate Vector events with Kubernetes Pod metadata."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		event_annotation_failures_total: {
+			description:       "The total number of failures to annotate Vector events with Kubernetes Pod metadata."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
 	}
 }

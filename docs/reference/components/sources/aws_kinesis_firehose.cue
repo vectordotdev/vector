@@ -189,7 +189,7 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	telemetry: metrics: {
-		vector_request_read_errors_total: telemetry.metrics._vector_request_read_errors_total
-		vector_requests_received_total:   telemetry.metrics._vector_requests_received_total
+		request_read_errors_total: telemetry.metrics._request_read_errors_total
+		requests_received_total:   telemetry.metrics._requests_received_total
 	}
 }

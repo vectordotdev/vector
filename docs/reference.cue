@@ -185,6 +185,15 @@ _values: {
 	sum:   float
 }
 
+#MetricOutput: [Name=string]: close({
+	description:       string
+	relevant_when?:    string
+	tags:              #MetricTags
+	name:              Name
+	type:              #MetricType
+	default_namespace: string
+})
+
 #MetricTags: [Name=string]: close({
 	name:        Name
 	description: string

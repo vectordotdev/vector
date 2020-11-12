@@ -208,6 +208,6 @@ components: sources: http: {
 	]
 
 	telemetry: metrics: {
-		vector_http_bad_requests_total: telemetry.metrics._vector_http_bad_requests_total
+		http_bad_requests_total: telemetry.metrics._http_bad_requests_total
 	}
 }

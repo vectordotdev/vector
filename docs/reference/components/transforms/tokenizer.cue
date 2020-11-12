@@ -116,6 +116,6 @@ components: transforms: tokenizer: {
 	}
 
 	telemetry: metrics: {
-		vector_processing_errors_total: telemetry.metrics._vector_processing_errors_total
+		processing_errors_total: telemetry.metrics._processing_errors_total
 	}
 }

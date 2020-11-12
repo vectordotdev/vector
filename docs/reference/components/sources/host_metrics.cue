@@ -274,7 +274,7 @@ components: sources: host_metrics: {
 		}
 
 		// Host CPU
-		host_cpu_seconds_total: {
+		host_cpu_seconds_total: _host & {
 			description: "The number of CPU seconds accumulated in different operating modes."
 			type:        "counter"
 			tags:        _host_metrics_tags & {
@@ -293,52 +293,56 @@ components: sources: host_metrics: {
 		}
 
 		// Host disk
-		host_disk_read_bytes_total:       _disk_counter & {description: "The accumulated number of bytes read in."}
-		host_disk_reads_completed_total:  _disk_counter & {description: "The accumulated number of read operations completed."}
-		host_disk_written_bytes_total:    _disk_counter & {description: "The accumulated number of bytes written out."}
-		host_disk_writes_completed_total: _disk_counter & {description: "The accumulated number of write operations completed."}
+		host_disk_read_bytes_total:       _host & _disk_counter & {description: "The accumulated number of bytes read in."}
+		host_disk_reads_completed_total:  _host & _disk_counter & {description: "The accumulated number of read operations completed."}
+		host_disk_written_bytes_total:    _host & _disk_counter & {description: "The accumulated number of bytes written out."}
+		host_disk_writes_completed_total: _host & _disk_counter & {description: "The accumulated number of write operations completed."}
 
 		// Host filesystem
-		host_filesystem_free_bytes:  _filesystem_bytes & {description: "The number of bytes free on the named filesystem."}
-		host_filesystem_total_bytes: _filesystem_bytes & {description: "The total number of bytes in the named filesystem."}
-		host_filesystem_used_bytes:  _filesystem_bytes & {description: "The number of bytes used on the named filesystem."}
+		host_filesystem_free_bytes:  _host & _filesystem_bytes & {description: "The number of bytes free on the named filesystem."}
+		host_filesystem_total_bytes: _host & _filesystem_bytes & {description: "The total number of bytes in the named filesystem."}
+		host_filesystem_used_bytes:  _host & _filesystem_bytes & {description: "The number of bytes used on the named filesystem."}
 
 		// Host load
-		host_load1:  _loadavg & {description: "System load averaged over the last 1 second."}
-		host_load5:  _loadavg & {description: "System load averaged over the last 5 seconds."}
-		host_load15: _loadavg & {description: "System load averaged over the last 15 seconds."}
+		host_load1:  _host & _loadavg & {description: "System load averaged over the last 1 second."}
+		host_load5:  _host & _loadavg & {description: "System load averaged over the last 5 seconds."}
+		host_load15: _host & _loadavg & {description: "System load averaged over the last 15 seconds."}
 
 		// Host memory
-		host_memory_active_bytes:           _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
-		host_memory_available_bytes:        _memory_gauge & {description:                 "The number of bytes of main memory available."}
-		host_memory_buffers_bytes:          _memory_linux & {description:                 "The number of bytes of main memory used by buffers."}
-		host_memory_cached_bytes:           _memory_linux & {description:                 "The number of bytes of main memory used by cached blocks."}
-		host_memory_free_bytes:             _memory_gauge & {description:                 "The number of bytes of main memory not used."}
-		host_memory_inactive_bytes:         _memory_macos & {description:                 "The number of bytes of main memory that is not active."}
-		host_memory_shared_bytes:           _memory_linux & {description:                 "The number of bytes of main memory shared between processes."}
-		host_memory_swap_free_bytes:        _memory_gauge & {description:                 "The number of free bytes of swap space."}
-		host_memory_swapped_in_bytes_total: _memory_counter & _memory_nowin & {
+		host_memory_active_bytes:           _host & _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
+		host_memory_available_bytes:        _host & _memory_gauge & {description:                 "The number of bytes of main memory available."}
+		host_memory_buffers_bytes:          _host & _memory_linux & {description:                 "The number of bytes of main memory used by buffers."}
+		host_memory_cached_bytes:           _host & _memory_linux & {description:                 "The number of bytes of main memory used by cached blocks."}
+		host_memory_free_bytes:             _host & _memory_gauge & {description:                 "The number of bytes of main memory not used."}
+		host_memory_inactive_bytes:         _host & _memory_macos & {description:                 "The number of bytes of main memory that is not active."}
+		host_memory_shared_bytes:           _host & _memory_linux & {description:                 "The number of bytes of main memory shared between processes."}
+		host_memory_swap_free_bytes:        _host & _memory_gauge & {description:                 "The number of free bytes of swap space."}
+		host_memory_swapped_in_bytes_total: _host & _memory_counter & _memory_nowin & {
 			description: "The number of bytes that have been swapped in to main memory."
 		}
-		host_memory_swapped_out_bytes_total: _memory_counter & _memory_nowin & {
+		host_memory_swapped_out_bytes_total: _host & _memory_counter & _memory_nowin & {
 			description: "The number of bytes that have been swapped out from main memory."
 		}
-		host_memory_swap_total_bytes: _memory_gauge & {description: "The total number of bytes of swap space."}
-		host_memory_swap_used_bytes:  _memory_gauge & {description: "The number of used bytes of swap space."}
-		host_memory_total_bytes:      _memory_gauge & {description: "The total number of bytes of main memory."}
-		host_memory_used_bytes:       _memory_linux & {description: "The number of bytes of main memory used by programs or caches."}
-		host_memory_wired_bytes:      _memory_macos & {description: "The number of wired bytes of main memory."}
+		host_memory_swap_total_bytes: _host & _memory_gauge & {description: "The total number of bytes of swap space."}
+		host_memory_swap_used_bytes:  _host & _memory_gauge & {description: "The number of used bytes of swap space."}
+		host_memory_total_bytes:      _host & _memory_gauge & {description: "The total number of bytes of main memory."}
+		host_memory_used_bytes:       _host & _memory_linux & {description: "The number of bytes of main memory used by programs or caches."}
+		host_memory_wired_bytes:      _host & _memory_macos & {description: "The number of wired bytes of main memory."}
 
 		// Host network
-		host_network_receive_bytes_total:         _network_gauge & {description: "The number of bytes received on this interface."}
-		host_network_receive_errs_total:          _network_gauge & {description: "The number of errors encountered during receives on this interface."}
-		host_network_receive_packets_total:       _network_gauge & {description: "The number of packets received on this interface."}
-		host_network_transmit_bytes_total:        _network_gauge & {description: "The number of bytes transmitted on this interface."}
-		host_network_transmit_errs_total:         _network_gauge & {description: "The number of errors encountered during transmits on this interface."}
-		host_network_transmit_packets_drop_total: _network_nomac & {description: "The number of packets dropped during transmits on this interface."}
-		host_network_transmit_packets_total:      _network_nomac & {description: "The number of packets transmitted on this interface."}
+		host_network_receive_bytes_total:         _host & _network_gauge & {description: "The number of bytes received on this interface."}
+		host_network_receive_errs_total:          _host & _network_gauge & {description: "The number of errors encountered during receives on this interface."}
+		host_network_receive_packets_total:       _host & _network_gauge & {description: "The number of packets received on this interface."}
+		host_network_transmit_bytes_total:        _host & _network_gauge & {description: "The number of bytes transmitted on this interface."}
+		host_network_transmit_errs_total:         _host & _network_gauge & {description: "The number of errors encountered during transmits on this interface."}
+		host_network_transmit_packets_drop_total: _host & _network_nomac & {description: "The number of packets dropped during transmits on this interface."}
+		host_network_transmit_packets_total:      _host & _network_nomac & {description: "The number of packets transmitted on this interface."}
 
 		// Helpers
+		_host: {
+			default_namespace: "host"
+		}
+
 		_disk_device: {
 			description: "The disk device name."
 			required:    true

@@ -126,16 +126,18 @@ components: sources: apache_metrics: {
 			}
 		}
 
-		apache_access_total: {
-			description:   "The total number of time the Apache server has been accessed."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags:          _apache_metrics_tags
+		access_total: {
+			description:       "The total number of time the Apache server has been accessed."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_connections: {
-			description: "The total number of time the Apache server has been accessed."
-			type:        "gauge"
-			tags:        _apache_metrics_tags & {
+		connections: {
+			description:       "The total number of time the Apache server has been accessed."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
 				state: {
 					description: "The state of the connection"
 					required:    true
@@ -143,17 +145,19 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_cpu_load: {
-			description:   "The current CPU of the Apache server."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "gauge"
-			tags:          _apache_metrics_tags
+		cpu_load: {
+			description:       "The current CPU of the Apache server."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_cpu_seconds_total: {
-			description:   "The CPU time of various Apache processes."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags:          _apache_metrics_tags & {
+		cpu_seconds_total: {
+			description:       "The CPU time of various Apache processes."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
 				state: {
 					description: "The state of the connection"
 					required:    true
@@ -161,16 +165,18 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_duration_seconds_total: {
-			description:   "The amount of time the Apache server has been running."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags:          _apache_metrics_tags
+		duration_seconds_total: {
+			description:       "The amount of time the Apache server has been running."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_scoreboard: {
-			description: "The amount of times various Apache server tasks have been run."
-			type:        "gauge"
-			tags:        _apache_metrics_tags & {
+		scoreboard: {
+			description:       "The amount of times various Apache server tasks have been run."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
 				state: {
 					description: "The connect state"
 					required:    true
@@ -178,26 +184,30 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_sent_bytes_total: {
-			description:   "The amount of bytes sent by the Apache server."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags:          _apache_metrics_tags
+		sent_bytes_total: {
+			description:       "The amount of bytes sent by the Apache server."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_up: {
-			description: "If the Apache server is up or not."
-			type:        "gauge"
-			tags:        _apache_metrics_tags
+		up: {
+			description:       "If the Apache server is up or not."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_uptime_seconds_total: {
-			description: "The amount of time the Apache server has been running."
-			type:        "counter"
-			tags:        _apache_metrics_tags
+		uptime_seconds_total: {
+			description:       "The amount of time the Apache server has been running."
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_workers: {
-			description: "Apache worker statuses."
-			type:        "gauge"
-			tags:        _apache_metrics_tags & {
+		workers: {
+			description:       "Apache worker statuses."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
 				state: {
 					description: "The state of the worker"
 					required:    true

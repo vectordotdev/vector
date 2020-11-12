@@ -267,35 +267,44 @@ components: sources: docker_logs: {
 	}
 
 	telemetry: metrics: {
-		vector_communication_errors_total: {
-			description: "The total number of errors stemming from communication with the Docker daemon."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		communication_errors_total: {
+			description:       "The total number of errors stemming from communication with the Docker daemon."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
-		vector_container_events_processed_total: {
-			description: "The total number of container events processed."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		container_events_processed_total: {
+			description:       "The total number of container events processed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
-		vector_container_metadata_fetch_errors_total: {
-			description: "The total number of errors caused by failure to fetch container metadata."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		container_metadata_fetch_errors_total: {
+			description:       "The total number of errors caused by failure to fetch container metadata."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
-		vector_containers_unwatched_total: {
-			description: "The total number of times Vector stopped watching for container logs."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		containers_unwatched_total: {
+			description:       "The total number of times Vector stopped watching for container logs."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
-		vector_containers_watched_total: {
-			description: "The total number of times Vector started watching for container logs."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		containers_watched_total: {
+			description:       "The total number of times Vector started watching for container logs."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
-		vector_logging_driver_errors_total: {
-			description: "The total number of logging driver errors encountered caused by not using either the `jsonfile` or `journald` driver."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		logging_driver_errors_total: {
+			description: """
+				The total number of logging driver errors encountered caused by not using either
+				the `jsonfile` or `journald` driver.
+				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
 	}
 }

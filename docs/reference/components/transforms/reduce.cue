@@ -146,10 +146,11 @@ components: transforms: reduce: {
 	]
 
 	telemetry: metrics: {
-		vector_stale_events_flushed_total: {
-			description: "The number of stale events that Vector has flushed."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
+		stale_events_flushed_total: {
+			description:       "The number of stale events that Vector has flushed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
 		}
 	}
 }

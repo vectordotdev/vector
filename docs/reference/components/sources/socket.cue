@@ -151,6 +151,6 @@ components: sources: socket: {
 	]
 
 	telemetry: metrics: {
-		vector_connection_errors_total: telemetry.metrics._vector_connection_errors_total
+		connection_errors_total: telemetry.metrics._connection_errors_total
 	}
 }
