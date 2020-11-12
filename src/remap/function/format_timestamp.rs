@@ -49,7 +49,11 @@ impl FormatTimestampFn {
 }
 
 impl Expression for FormatTimestampFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let format = required!(state, object, self.format, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let ts = required!(state, object, self.value, Value::Timestamp(ts) => ts);
 

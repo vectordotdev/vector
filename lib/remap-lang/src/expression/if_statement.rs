@@ -46,10 +46,11 @@ impl Expression for IfStatement {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let true_type_def = self.true_expression.type_def(state);
-        let false_type_def = self.false_expression.type_def(state);
-
-        true_type_def.merge(false_type_def)
+        self.conditional
+            .type_def(state)
+            .fallible_unless(value::Kind::Boolean)
+            .merge(self.true_expression.type_def(state))
+            .merge(self.false_expression.type_def(state))
     }
 }
 

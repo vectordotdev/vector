@@ -79,7 +79,11 @@ impl ParseDurationFn {
 }
 
 impl Expression for ParseDurationFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = {
             let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()

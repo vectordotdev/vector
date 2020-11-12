@@ -50,7 +50,11 @@ pub(crate) struct SplitFn {
 }
 
 impl Expression for SplitFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let limit: usize = self
             .limit
