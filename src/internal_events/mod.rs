@@ -28,7 +28,7 @@ mod dedupe;
 #[cfg(feature = "sources-docker")]
 mod docker;
 mod elasticsearch;
-mod events_processed;
+mod event_processed;
 #[cfg(feature = "sources-generator")]
 mod generator;
 #[cfg(feature = "transforms-grok_parser")]
@@ -125,7 +125,7 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker")]
 pub use self::docker::*;
 pub use self::elasticsearch::*;
-pub use self::events_processed::EventProcessed;
+pub use self::event_processed::EventProcessed;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
