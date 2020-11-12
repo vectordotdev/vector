@@ -4,7 +4,10 @@ use crate::{
     event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
-    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+        BatchConfig,
+    },
     template::{Template, TemplateError},
 };
 use futures::{
@@ -45,6 +48,9 @@ pub struct KafkaSinkConfig {
     topic: String,
     key_field: Option<String>,
     encoding: EncodingConfigWithDefault<Encoding>,
+    /// These batching options will **not** override librdkafka_options values.
+    #[serde(default)]
+    batch: BatchConfig,
     #[serde(default)]
     compression: KafkaCompression,
     #[serde(flatten)]
@@ -53,7 +59,8 @@ pub struct KafkaSinkConfig {
     socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
     message_timeout_ms: u64,
-    librdkafka_options: Option<HashMap<String, String>>,
+    #[serde(default)]
+    librdkafka_options: HashMap<String, String>,
 }
 
 fn default_socket_timeout_ms() -> u64 {
@@ -137,10 +144,50 @@ impl KafkaSinkConfig {
 
         self.auth.apply(&mut client_config)?;
 
-        if let Some(ref librdkafka_options) = self.librdkafka_options {
-            for (key, value) in librdkafka_options.iter() {
-                client_config.set(key.as_str(), value.as_str());
+        if let Some(queue_buffering_max_ms) = self.batch.timeout_secs {
+            // Delay in milliseconds to wait for messages in the producer queue to accumulate before
+            // constructing message batches (MessageSets) to transmit to brokers. A higher value
+            // allows larger and more effective (less overhead, improved compression) batches of
+            // messages to accumulate at the expense of increased message delivery latency.
+            // Type: float
+            let key = "queue.buffering.max.ms";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{}={}`.\
+                                    The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
+                                    Please delete one.", key, queue_buffering_max_ms, val).into());
             }
+            client_config.set(key, &queue_buffering_max_ms.to_string());
+        }
+        if let Some(batch_num_messages) = self.batch.max_events {
+            // Maximum number of messages batched in one MessageSet. The total MessageSet size is
+            // also limited by batch.size and message.max.bytes.
+            // Type: integer
+            let key = "batch.num.messages";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{}={}`.\
+                                    The config already sets this as `librdkafka_options.batch.num.messages={}`.\
+                                    Please delete one.", key, batch_num_messages, val).into());
+            }
+            client_config.set(key, &batch_num_messages.to_string());
+        }
+        if let Some(batch_size) = self.batch.max_bytes {
+            // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
+            // framing overhead. This limit is applied after the first message has been added to the
+            // batch, regardless of the first message's size, this is to ensure that messages that
+            // exceed batch.size are produced. The total MessageSet size is also limited by
+            // batch.num.messages and message.max.bytes.
+            // Type: integer
+            let key = "batch.size";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{}={}`.\
+                                    The config already sets this as `librdkafka_options.batch.size={}`.\
+                                    Please delete one.", key, batch_size, val).into());
+            }
+            client_config.set(key, &batch_size.to_string());
+        }
+
+        for (key, value) in self.librdkafka_options.iter() {
+            client_config.set(key.as_str(), value.as_str());
         }
 
         Ok(client_config)
