@@ -36,7 +36,7 @@ evaluates to a boolean `True`.
 
 This is performed using `if...else if...else`:
 
-```
+```rust
 if ... {
    ...
 } else if ... {
@@ -63,13 +63,13 @@ It is possible to have multiple statements within the condition. The statements
 must be surrounded with parentheses and separated by either a semicolon or a
 new line.
 
-```
+```rust
 (statement1; statement2; statement3)
 ```
 
 or
 
-```
+```rust
 (statement1
  statement2
  statement3)
@@ -146,6 +146,7 @@ still hold the original value if the predicate doesn't succeed.
 ## Alternatives
 
 ### Don't enforce boolean conditions
+
 We could loosen the typing rules and allow non boolean values to signal a
 success of a condition. This would mean we wouldn't need to have multiple
 statements within a condition. In the following code, match returns a non-empty
@@ -160,6 +161,7 @@ if $match = match(.message, /^Started (?P<method>[^\s]*) for (?P<remote_addr>[^\
 ```
 
 ### Use `switch`
+
 There are some alternative syntaxes that may be worth considering. One
 possibility that is common in many languages is a `switch` statement.
 
@@ -190,6 +192,7 @@ conditions working differently depending on their context could be confusing for
 the user.
 
 ### Scoping
+
 We could introduce scoping rules into the condition. Any modifications to the
 variables would only be visible in the block that is run should the condition
 succeed. This could avoid surprises outlined in the Drawbacks section where
@@ -217,4 +220,3 @@ Incremental steps that execute this change. Generally this is in the form of:
 - [ ] Write the `matches` function that will run a regular expression and return
       any matched groups found. This is potentially out of scope for this rfc,
       but would be useful nevertheless.
-

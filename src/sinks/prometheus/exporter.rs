@@ -321,3 +321,104 @@ mod tests {
         crate::test_util::test_generate_config::<PrometheusExporterConfig>();
     }
 }
+
+#[cfg(all(test, feature = "prometheus-integration-tests"))]
+mod integration_tests {
+    use super::*;
+    use crate::{
+        config::SinkContext,
+        event::{Metric, MetricValue},
+    };
+    use futures::{stream, task::Poll};
+    use hyper::Client;
+    use serde_json::Value;
+    use std::{pin::Pin, task::Context};
+    use tokio::time::Duration;
+
+    #[tokio::test]
+    async fn prometheus_scrapes_metrics() {
+        let start = Utc::now().timestamp();
+        let address = "127.0.0.1:9101";
+
+        let config = PrometheusExporterConfig {
+            address: address.parse().unwrap(),
+            ..Default::default()
+        };
+
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
+
+        let (name, events) = make_gauges(123.4, 1);
+        let stream = DeliverEventsAndPause { events };
+        tokio::spawn(sink.run(stream));
+        // Wait a bit for the prometheus server to scrape the metrics
+        tokio::time::delay_for(Duration::from_secs(2)).await;
+
+        // Now try to download them from prometheus
+        let result = prometheus_query(&name).await;
+
+        let data = &result["data"]["result"][0];
+        assert_eq!(data["metric"]["__name__"], Value::String(name));
+        assert_eq!(data["metric"]["instance"], Value::String(address.into()));
+        assert_eq!(
+            data["metric"]["some_tag"],
+            Value::String("some_value".into())
+        );
+        assert!(data["value"][0].as_f64().unwrap() >= start as f64);
+        assert_eq!(data["value"][1], Value::String("123.4".into()));
+    }
+
+    async fn prometheus_query(query: &str) -> Value {
+        let uri = format!("http://127.0.0.1:9090/api/v1/query?query={}", query)
+            .parse::<http::Uri>()
+            .expect("Invalid query URL");
+        let request = Request::post(uri)
+            .body(Body::empty())
+            .expect("Error creating request.");
+        let result = Client::new()
+            .request(request)
+            .await
+            .expect("Could not fetch query");
+        let result = hyper::body::to_bytes(result.into_body())
+            .await
+            .expect("Error fetching body");
+        let result = String::from_utf8_lossy(&result).into_owned();
+        serde_json::from_str(&result).expect("Invalid JSON from prometheus")
+    }
+
+    #[pin_project::pin_project]
+    struct DeliverEventsAndPause<I> {
+        events: I,
+    }
+
+    impl<I: Iterator<Item = Event>> stream::Stream for DeliverEventsAndPause<I> {
+        type Item = Event;
+        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+            let this = self.project();
+            match this.events.next() {
+                Some(event) => Poll::Ready(Some(event)),
+                None => Poll::Pending,
+            }
+        }
+    }
+
+    fn make_gauges(value: f64, count: usize) -> (String, impl Iterator<Item = Event>) {
+        let name = format!("gauge_{}", crate::test_util::random_string(16));
+        let name2 = name.clone();
+        let events = (0..count).map(move |_| {
+            Metric {
+                name: name2.clone(),
+                namespace: None,
+                timestamp: None,
+                tags: Some(
+                    vec![("some_tag".into(), "some_value".into())]
+                        .into_iter()
+                        .collect(),
+                ),
+                kind: MetricKind::Absolute,
+                value: MetricValue::Gauge { value },
+            }
+            .into()
+        });
+        (name, events)
+    }
+}

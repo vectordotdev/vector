@@ -314,7 +314,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
@@ -324,7 +324,7 @@ else
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
 	 -p 4566:4566 -p 4571:4571 \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
@@ -679,16 +679,28 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-mongodb_metrics
 endif
 
+.PHONY: start-integration-prometheus stop-integration-prometheus test-integration-prometheus
+start-integration-prometheus:
+	$(CONTAINER_TOOL) run -d --name vector_prometheus --net=host \
+	 --volume $(PWD)/tests/data:/etc/vector:ro \
+	 prom/prometheus --config.file=/etc/vector/prometheus.yaml
+
+stop-integration-prometheus:
+	$(CONTAINER_TOOL) rm --force vector_prometheus 2>/dev/null; true
+
 .PHONY: test-integration-prometheus
 test-integration-prometheus: ## Runs Prometheus integration tests
 ifeq ($(AUTOSPAWN), true)
 	-$(MAKE) -k stop-integration-influxdb
+	-$(MAKE) -k stop-integration-prometheus
 	$(MAKE) start-integration-influxdb
+	$(MAKE) start-integration-prometheus
 	sleep 10 # Many services are very slow... Give them a sec..
 endif
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib integration_tests:: --  ::prometheus --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-influxdb
+	$(MAKE) -k stop-integration-prometheus
 endif
 
 .PHONY: start-integration-pulsar
