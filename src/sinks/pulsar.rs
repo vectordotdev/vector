@@ -6,8 +6,8 @@ use crate::{
 };
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::{
-    producer::SendFuture, proto::CommandSendReceipt, Authentication, Error as PulsarError,
-    Producer, Pulsar, TokioExecutor,
+    message::proto, producer::SendFuture, proto::CommandSendReceipt, Authentication,
+    Error as PulsarError, Producer, Pulsar, TokioExecutor,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
@@ -46,6 +46,7 @@ pub enum Encoding {
     #[derivative(Default)]
     Text,
     Json,
+    Avro,
 }
 
 type PulsarProducer = Producer<TokioExecutor>;
@@ -125,8 +126,26 @@ impl PulsarSinkConfig {
                 data: auth.token.as_bytes().to_vec(),
             });
         }
-        let pulsar = builder.build().await?;
-        pulsar.producer().with_topic(&self.topic).build().await
+
+        if let Some(avro_schema) = &self.encoding.schema() {
+            let pulsar = builder.build().await?;
+            pulsar
+                .producer()
+                .with_options(pulsar::producer::ProducerOptions {
+                    schema: Some(proto::Schema {
+                        schema_data: avro_schema.to_string().into_bytes(),
+                        type_: proto::schema::Type::Avro as i32,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })
+                .with_topic(&self.topic)
+                .build()
+                .await
+        } else {
+            let pulsar = builder.build().await?;
+            pulsar.producer().with_topic(&self.topic).build().await
+        }
     }
 }
 
@@ -249,6 +268,11 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
             .get(log_schema().message_key())
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
+        Encoding::Avro => {
+            let schema = avro_rs::Schema::parse_str(encoding.schema().as_ref().unwrap()).unwrap();
+            let value = avro_rs::to_value(log).unwrap();
+            avro_rs::to_avro_datum(&schema, value).unwrap()
+        }
     })
 }
 

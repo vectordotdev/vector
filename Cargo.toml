@@ -195,6 +195,9 @@ snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
 
+# For AVRO
+avro-rs = "0.11.0"
+
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
 lucetc = { git = "https://github.com/bytecodealliance/lucet.git", rev = "b1863dacc8c92c11e5434fc8815d9b9a26cfe3db", optional = true }
