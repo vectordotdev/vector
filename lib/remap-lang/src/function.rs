@@ -1,5 +1,5 @@
-use crate::{Expression, Result, Value};
-use core::convert::TryInto;
+use crate::{expression, Expr, Expression, Result, Value};
+use core::convert::{TryFrom, TryInto};
 use std::collections::HashMap;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -12,6 +12,9 @@ pub enum Error {
 
     #[error(r#"missing required argument "{0}""#)]
     Required(String),
+
+    #[error("unknown enum variant: {0}, must be one of: {}", .1.join(", "))]
+    UnknownEnumVariant(String, &'static [&'static str]),
 }
 
 #[derive(Copy, Clone)]
@@ -51,26 +54,68 @@ impl ArgumentList {
         self.0.remove(keyword)
     }
 
+    pub fn required(&mut self, keyword: &str) -> Result<Argument> {
+        self.optional(keyword)
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
     pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Box<dyn Expression>>> {
         self.optional(keyword)
             .map(|v| v.try_into().map_err(Into::into))
             .transpose()
     }
 
-    pub fn required(&mut self, keyword: &str) -> Result<Argument> {
-        self.0
-            .remove(keyword)
+    pub fn required_expr(&mut self, keyword: &str) -> Result<Box<dyn Expression>> {
+        self.optional_expr(keyword)?
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
-    pub fn required_expr(&mut self, keyword: &str) -> Result<Box<dyn Expression>> {
-        self.required(keyword)
-            .and_then(|v| v.try_into().map_err(Into::into))
+    pub fn optional_regex(&mut self, keyword: &str) -> Result<Option<regex::Regex>> {
+        self.optional(keyword)
+            .map(|v| v.try_into().map_err(Into::into))
+            .transpose()
     }
 
     pub fn required_regex(&mut self, keyword: &str) -> Result<regex::Regex> {
-        self.required(keyword)
-            .and_then(|v| v.try_into().map_err(Into::into))
+        self.optional_regex(keyword)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
+    pub fn optional_enum(
+        &mut self,
+        keyword: &str,
+        variants: &'static [&'static str],
+    ) -> Result<Option<String>> {
+        let expr = self
+            .optional(keyword)
+            .map(|v| Expr::try_from(v))
+            .transpose()?;
+
+        let argument = match expr {
+            Some(expr) => expression::Argument::try_from(expr)?,
+            None => return Ok(None),
+        };
+
+        let variant = expression::Literal::try_from(argument.into_expr())?
+            .as_value()
+            .clone()
+            .try_string()
+            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())?;
+
+        if variants.contains(&variant.as_str()) {
+            Ok(Some(variant))
+        } else {
+            Err(Error::UnknownEnumVariant(variant.to_owned(), &variants).into())
+        }
+    }
+
+    pub fn required_enum(
+        &mut self,
+        keyword: &str,
+        variants: &'static [&'static str],
+    ) -> Result<String> {
+        self.optional_enum(keyword, variants)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
     pub fn keywords(&self) -> Vec<&'static str> {
@@ -84,19 +129,13 @@ impl ArgumentList {
 
 #[derive(Debug, Clone)]
 pub enum Argument {
-    Expression(Box<dyn Expression>),
+    Expression(Expr),
     Regex(regex::Regex),
 }
 
-impl From<Box<dyn Expression>> for Argument {
-    fn from(expr: Box<dyn Expression>) -> Self {
-        Argument::Expression(expr)
-    }
-}
-
-impl<T: Expression + 'static> From<Box<T>> for Argument {
-    fn from(expr: Box<T>) -> Self {
-        Argument::Expression(expr)
+impl<T: Into<Expr>> From<T> for Argument {
+    fn from(expr: T) -> Self {
+        Argument::Expression(expr.into())
     }
 }
 
@@ -106,22 +145,33 @@ impl From<regex::Regex> for Argument {
     }
 }
 
-impl TryInto<Box<dyn Expression>> for Argument {
+impl TryFrom<Argument> for Expr {
     type Error = Error;
 
-    fn try_into(self) -> std::result::Result<Box<dyn Expression>, Self::Error> {
-        match self {
+    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
+        match arg {
             Argument::Expression(expr) => Ok(expr),
             Argument::Regex(_) => Err(Error::ArgumentExprRegex),
         }
     }
 }
 
-impl TryInto<regex::Regex> for Argument {
+impl TryFrom<Argument> for Box<dyn Expression> {
     type Error = Error;
 
-    fn try_into(self) -> std::result::Result<regex::Regex, Self::Error> {
-        match self {
+    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
+        match arg {
+            Argument::Expression(expr) => Ok(Box::new(expr) as _),
+            Argument::Regex(_) => Err(Error::ArgumentExprRegex),
+        }
+    }
+}
+
+impl TryFrom<Argument> for regex::Regex {
+    type Error = Error;
+
+    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
+        match arg {
             Argument::Regex(regex) => Ok(regex),
             Argument::Expression(_) => Err(Error::ArgumentRegexExpr),
         }

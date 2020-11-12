@@ -136,7 +136,7 @@ mod test {
         pattern_expression_infallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from("foo").boxed().into(),
+                pattern: Literal::from("foo").into(),
                 limit: None,
             },
             def: TypeDef {
@@ -148,7 +148,7 @@ mod test {
         pattern_expression_fallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from(10).boxed().into(),
+                pattern: Literal::from(10).into(),
                 limit: None,
             },
             def: TypeDef {
