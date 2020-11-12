@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    internal_events::{RemoveFieldsFieldMissing},
+    internal_events::RemoveFieldsFieldMissing,
     transforms::{FunctionTransform, Transform},
     Event,
 };

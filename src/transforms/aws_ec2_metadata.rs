@@ -2,9 +2,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     http::HttpClient,
-    internal_events::{
-        AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
-    },
+    internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
     transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;

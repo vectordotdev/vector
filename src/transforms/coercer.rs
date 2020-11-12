@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{CoercerConversionFailed},
+    internal_events::CoercerConversionFailed,
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };

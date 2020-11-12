@@ -1,9 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{
-        RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten,
-    },
+    internal_events::{RenameFieldsFieldDoesNotExist, RenameFieldsFieldOverwritten},
     serde::Fields,
     transforms::{FunctionTransform, Transform},
 };

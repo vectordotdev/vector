@@ -1,9 +1,7 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::{Event, PathComponent, PathIter},
-    internal_events::{
-        GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField,
-    },
+    internal_events::{GrokParserConversionFailed, GrokParserFailedMatch, GrokParserMissingField},
     transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };

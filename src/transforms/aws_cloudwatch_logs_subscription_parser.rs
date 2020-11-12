@@ -2,7 +2,7 @@ use super::Transform;
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{AwsCloudwatchLogsSubscriptionParserFailedParse},
+    internal_events::AwsCloudwatchLogsSubscriptionParserFailedParse,
     transforms::FunctionTransform,
 };
 use chrono::{serde::ts_milliseconds, DateTime, Utc};

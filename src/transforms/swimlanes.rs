@@ -2,7 +2,7 @@ use crate::{
     conditions::{AnyCondition, Condition},
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{SwimlanesEventDiscarded},
+    internal_events::SwimlanesEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;

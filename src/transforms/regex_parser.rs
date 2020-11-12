@@ -2,8 +2,8 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
-        RegexParserConversionFailed, RegexParserFailedMatch,
-        RegexParserMissingField, RegexParserTargetExists,
+        RegexParserConversionFailed, RegexParserFailedMatch, RegexParserMissingField,
+        RegexParserTargetExists,
     },
     transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},

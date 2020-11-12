@@ -1,9 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Value,
-    internal_events::{
-        ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing,
-    },
+    internal_events::{ANSIStripperFailed, ANSIStripperFieldInvalid, ANSIStripperFieldMissing},
     transforms::{FunctionTransform, Transform},
     Event, Result,
 };

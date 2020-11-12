@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{SamplerEventDiscarded},
+    internal_events::SamplerEventDiscarded,
     transforms::{FunctionTransform, Transform},
 };
 use regex::RegexSet; // TODO: use regex::bytes

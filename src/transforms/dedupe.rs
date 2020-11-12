@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, Value},
-    internal_events::{DedupeEventDiscarded},
+    internal_events::DedupeEventDiscarded,
     transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;

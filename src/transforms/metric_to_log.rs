@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{self, Event, LogEvent},
-    internal_events::{MetricToLogFailedSerialize},
+    internal_events::MetricToLogFailedSerialize,
     transforms::{FunctionTransform, Transform},
     types::Conversion,
 };

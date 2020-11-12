@@ -3,7 +3,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::{Event, LogEvent},
-    internal_events::{ReduceStaleEventFlushed},
+    internal_events::ReduceStaleEventFlushed,
     transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;

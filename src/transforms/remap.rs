@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
-    internal_events::{RemapFailedMapping},
+    internal_events::RemapFailedMapping,
     transforms::{FunctionTransform, Transform},
     Result,
 };

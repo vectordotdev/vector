@@ -4,8 +4,8 @@ use crate::{
     event::LogEvent,
     event::Value,
     internal_events::{
-        LogToMetricFieldNotFound, LogToMetricParseFloatError,
-        LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
+        LogToMetricFieldNotFound, LogToMetricParseFloatError, LogToMetricTemplateParseError,
+        LogToMetricTemplateRenderError,
     },
     template::{Template, TemplateError},
     transforms::{FunctionTransform, Transform},
