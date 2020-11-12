@@ -1,4 +1,3 @@
-mod broker;
 pub mod components;
 mod health;
 mod metrics;

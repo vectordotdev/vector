@@ -1,9 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{
-        metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        Event,
-    },
+    event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
     http::HttpClient,
     sinks::{
         util::{
@@ -14,17 +11,19 @@ use crate::{
         },
         Healthcheck, HealthcheckError, UriParseError, VectorSink,
     },
+    Event,
 };
 use chrono::{DateTime, Utc};
-use futures::{future, FutureExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt};
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
-use std::sync::atomic::{AtomicI64, Ordering::SeqCst};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, HashMap},
+    sync::atomic::{AtomicI64, Ordering::SeqCst},
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -193,10 +192,10 @@ impl SinkConfig for DatadogConfig {
             .sink_map_err(|error| error!(message = "Fatal datadog metric sink error.", %error))
             .with_flat_map(move |event: Event| {
                 let ep = DatadogEndpoint::from_metric(&event);
-                iter_ok(Some(PartitionInnerBuffer::new(event, ep)))
+                stream::iter(Some(PartitionInnerBuffer::new(event, ep))).map(Ok)
             });
 
-        Ok((VectorSink::Futures01Sink(Box::new(svc_sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(svc_sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -510,12 +509,9 @@ fn encode_distribution_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        sinks::util::test::load_sink,
-    };
-    use chrono::{offset::TimeZone, Utc};
-    use http::{Method, Uri};
+    use crate::sinks::util::test::load_sink;
+    use chrono::offset::TimeZone;
+    use http::Method;
     use pretty_assertions::assert_eq;
     use std::sync::atomic::AtomicI64;
 

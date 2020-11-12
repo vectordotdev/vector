@@ -235,6 +235,7 @@ jobs:
         if: needs.changes.outputs.docs == 'true'
         run: make check-docs
       - name: Check code format
+        if: needs.changes.outputs.source == 'true'
         run: make check-fmt
       - name: Check clippy
         if: needs.changes.outputs.source == 'true'

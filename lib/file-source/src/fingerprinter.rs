@@ -1,4 +1,5 @@
 use crate::{metadata_ext::PortableFileExt, FileSourceInternalEvents};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     fs::{self, File},
@@ -19,7 +20,7 @@ pub enum Fingerprinter {
     DevInode,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum FileFingerprint {
     Checksum(u64),
     FirstLineChecksum(u64),
