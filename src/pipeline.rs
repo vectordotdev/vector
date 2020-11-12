@@ -123,7 +123,7 @@ mod test {
         )?;
 
         let (pipeline, reciever) =
-            Pipeline::new_test(vec![Box::new(transform_1), Box::new(transform_2)]);
+            Pipeline::new_with_buffer(100, vec![Box::new(transform_1), Box::new(transform_2)]);
 
         let event = Event::try_from(json!({
             "message": "MESSAGE_MARKER",
@@ -149,7 +149,7 @@ mod test {
             },
         )));
 
-        let (pipeline, reciever) = Pipeline::new_test(vec![Box::new(transform_1)]);
+        let (pipeline, reciever) = Pipeline::new_with_buffer(100, vec![Box::new(transform_1)]);
 
         let event = Event::try_from(json!({
             "message": "MESSAGE_MARKER",
