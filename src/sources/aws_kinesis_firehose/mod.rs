@@ -97,7 +97,7 @@ mod tests {
     }
 
     async fn source(access_key: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test(vec![]);
+        let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {

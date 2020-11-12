@@ -646,7 +646,7 @@ mod tests {
     }
 
     async fn run_journal(iunits: &[&str], xunits: &[&str], cursor: Option<&str>) -> Vec<Event> {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger, shutdown, _) = ShutdownSignal::new_wired();
 
         let tempdir = tempdir().unwrap();

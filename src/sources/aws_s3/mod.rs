@@ -366,7 +366,7 @@ mod integration_tests {
         .await
         .expect("Could not put object");
 
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         tokio::spawn(async move {
             config
                 .build(

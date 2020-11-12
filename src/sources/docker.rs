@@ -1027,7 +1027,7 @@ mod integration_tests {
     /// None if docker is not present on the system
     fn source_with_config(config: DockerConfig) -> mpsc01::Receiver<Event> {
         // trace_init();
-        let (sender, recv) = Pipeline::new_test(vec![]);
+        let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
             config
                 .build(

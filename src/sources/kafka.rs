@@ -255,12 +255,7 @@ mod test {
     #[test]
     fn kafka_source_create_ok() {
         let config = make_config();
-        assert!(kafka_source(
-            &config,
-            ShutdownSignal::noop(),
-            Pipeline::new_test(vec![]).0
-        )
-        .is_ok());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_ok());
     }
 
     #[test]
@@ -269,12 +264,7 @@ mod test {
             auto_offset_reset: "incorrect-auto-offset-reset".to_string(),
             ..make_config()
         };
-        assert!(kafka_source(
-            &config,
-            ShutdownSignal::noop(),
-            Pipeline::new_test(vec![]).0
-        )
-        .is_err());
+        assert!(kafka_source(&config, ShutdownSignal::noop(), Pipeline::new_test().0).is_err());
     }
 }
 
@@ -346,7 +336,7 @@ mod integration_test {
         .await;
 
         println!("Receiving event...");
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         tokio::spawn(
             kafka_source(&config, ShutdownSignal::noop(), tx)
                 .unwrap()

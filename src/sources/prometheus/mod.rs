@@ -353,7 +353,7 @@ mod integration_tests {
             tls: None,
         };
 
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let source = config
             .build(
                 "prometheus",

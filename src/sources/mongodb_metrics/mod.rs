@@ -1066,7 +1066,7 @@ mod integration_tests {
         let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
-        let (sender, recv) = Pipeline::new_test(vec![]);
+        let (sender, recv) = Pipeline::new_test();
         let mut recv = recv.compat();
 
         tokio::spawn(async move {
