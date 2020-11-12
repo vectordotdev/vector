@@ -19,6 +19,7 @@ use tokio::{select, time};
 
 mod parser;
 
+#[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct AwsEcsMetricsSourceConfig {
     #[serde(default = "default_endpoint")]
@@ -36,12 +37,12 @@ pub fn default_endpoint() -> String {
         .unwrap_or_else(|_| "http://169.254.170.2/v2/stats".into())
 }
 
-pub fn default_scrape_interval_secs() -> u64 {
+pub const fn default_scrape_interval_secs() -> u64 {
     15
 }
 
 pub fn default_namespace() -> String {
-    "aws_ecs".to_string()
+    "awsecs".to_string()
 }
 
 inventory::submit! {
@@ -530,7 +531,7 @@ mod test {
         {
             Some(m) => {
                 assert_eq!(m.value, MetricValue::Counter { value: 329932716.0 });
-                assert_eq!(m.namespace, Some("aws_ecs".into()));
+                assert_eq!(m.namespace, Some("awsecs".into()));
 
                 match &m.tags {
                     Some(tags) => {

@@ -48,7 +48,7 @@ impl<'a> InternalEvent for AwsEcsMetricsParseError<'_> {
     fn emit_logs(&self) {
         error!(message = "Parsing error.", url = %self.url, error = %self.error);
         debug!(
-            message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body),
+            message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body.escape_debug()),
             url = %self.url,
             rate_limit_secs = 10
         );

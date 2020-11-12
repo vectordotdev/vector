@@ -78,7 +78,7 @@ components: sources: aws_ecs_metrics: {
 			common:      true
 			required:    false
 			type: string: {
-				default: "aws_ecs"
+				default: "awsecs"
 			}
 		}
 	}

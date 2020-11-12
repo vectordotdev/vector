@@ -303,22 +303,20 @@ fn cpu_metrics(
         }),
     );
 
-    metrics.extend((0..cpu.online_cpus).map(|index| {
-        let mut tags = tags.clone();
-        tags.insert("cpu".into(), index.to_string());
+    metrics.extend((0..cpu.online_cpus).filter_map(|index| {
+        cpu.cpu_usage.percpu_usage.get(index).map(|value| {
+            let mut tags = tags.clone();
+            tags.insert("cpu".into(), index.to_string());
 
-        counter(
-            "cpu",
-            "usage_percpu_jiffies_total",
-            namespace.clone(),
-            timestamp,
-            cpu.cpu_usage
-                .percpu_usage
-                .get(index)
-                .cloned()
-                .unwrap_or_default(),
-            tags,
-        )
+            counter(
+                "cpu",
+                "usage_percpu_jiffies_total",
+                namespace.clone(),
+                timestamp,
+                *value,
+                tags,
+            )
+        })
     }));
 
     metrics
