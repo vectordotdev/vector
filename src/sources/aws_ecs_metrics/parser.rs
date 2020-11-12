@@ -106,8 +106,7 @@ struct NetworkStats {
 struct ContainerStats {
     #[serde(rename = "read")]
     ts: DateTime<Utc>,
-    name: String,
-    id: String,
+    name: Option<String>,
     blkio_stats: Option<BlockIoStats>,
     cpu_stats: Option<CpuStats>,
     memory_stats: Option<MemoryStats>,
@@ -453,10 +452,12 @@ pub fn parse(bytes: &[u8], namespace: Option<String>) -> Result<Vec<Metric>, ser
     let mut metrics = Vec::new();
     let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
 
-    for (_, container) in parsed {
+    for (id, container) in parsed {
         let mut tags = BTreeMap::new();
-        tags.insert("container_name".into(), container.name.clone());
-        tags.insert("container_id".into(), container.id.clone());
+        tags.insert("container_id".into(), id);
+        if let Some(name) = container.name {
+            tags.insert("container_name".into(), name);
+        }
 
         if let Some(blkio) = container.blkio_stats {
             metrics.extend(blkio_metrics(&blkio, container.ts, &namespace, &tags));

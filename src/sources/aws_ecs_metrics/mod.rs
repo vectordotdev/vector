@@ -547,3 +547,38 @@ mod test {
         }
     }
 }
+
+#[cfg(feature = "aws-ecs-metrics-integration-tests")]
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use crate::test_util::collect_ready;
+    use tokio::time::{delay_for, Duration};
+
+    #[tokio::test]
+    async fn scrapes_metrics() {
+        let (tx, rx) = Pipeline::new_test();
+
+        let source = AwsEcsMetricsSourceConfig {
+            endpoint: "http://localhost:9088/v3/task/stats".into(),
+            scrape_interval_secs: 1,
+            namespace: default_namespace(),
+        }
+        .build(
+            "default",
+            &GlobalOptions::default(),
+            ShutdownSignal::noop(),
+            tx,
+        )
+        .await
+        .unwrap()
+        .compat();
+        tokio::spawn(source);
+
+        delay_for(Duration::from_secs(5)).await;
+
+        let metrics = collect_ready(rx).await.unwrap();
+
+        assert!(!metrics.is_empty());
+    }
+}
