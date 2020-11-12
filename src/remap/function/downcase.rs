@@ -37,7 +37,11 @@ impl DowncaseFn {
 }
 
 impl Expression for DowncaseFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         self.value
             .execute(state, object)?
             .map(String::try_from)

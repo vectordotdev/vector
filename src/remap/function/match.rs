@@ -46,7 +46,11 @@ impl MatchFn {
 }
 
 impl Expression for MatchFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         required!(
             state, object, self.value,
 

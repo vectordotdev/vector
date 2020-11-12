@@ -63,7 +63,11 @@ impl StartsWithFn {
 }
 
 impl Expression for StartsWithFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let substring = {
             let bytes = required!(state, object, self.substring, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()

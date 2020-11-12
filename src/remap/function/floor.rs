@@ -46,7 +46,11 @@ impl FloorFn {
 }
 
 impl Expression for FloorFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let precision =
             optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(state, object, self.value,

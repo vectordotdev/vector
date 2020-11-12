@@ -47,7 +47,7 @@ impl Expression for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Kind::*, value::Constraint::*};
+    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
 
     test_type_def![
         ident_match {

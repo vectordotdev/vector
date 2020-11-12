@@ -36,7 +36,11 @@ impl Sha1Fn {
 }
 
 impl Expression for Sha1Fn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         use ::sha1::{Digest, Sha1};
 
         self.value.execute(state, object).map(|r| {

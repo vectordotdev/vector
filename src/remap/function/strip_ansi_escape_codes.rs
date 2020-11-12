@@ -37,7 +37,11 @@ impl StripAnsiEscapeCodesFn {
 }
 
 impl Expression for StripAnsiEscapeCodesFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let bytes = required!(state, object, self.value, Value::String(v) => v);
 
         strip_ansi_escapes::strip(&bytes)
