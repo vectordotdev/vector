@@ -902,6 +902,77 @@ components: {
 			// Default metrics for each component
 			vector_events_processed_total: _vector_events_processed_total
 			vector_processed_bytes_total:  _vector_processed_bytes_total
+
+			// Helpful tag groupings
+			_component_tags: _internal_metrics_tags & {
+				component_kind: _component_kind
+				component_name: _component_name
+				component_type: _component_type
+			}
+
+			_internal_metrics_tags: {
+				instance: _instance
+				job:      _job
+			}
+
+			// All available tags
+			_collector: {
+				description: "Which collector this metric comes from."
+				required:    true
+			}
+			_component_kind: {
+				description: "The component's kind (options are `source`, `sink`, or `transform`)."
+				required:    true
+				options: ["sink", "source", "transform"]
+			}
+			_component_name: {
+				description: "The name of the component as specified in the Vector configuration."
+				required:    true
+				examples: ["file_source", "splunk_sink"]
+			}
+			_component_type: {
+				description: "The type of component (source, transform, or sink)."
+				required:    true
+				examples: ["file", "http", "honeycomb", "splunk_hec"]
+			}
+			_endpoint: {
+				description: "The absolute path of originating file."
+				required:    true
+				examples: ["http://localhost:8080/server-status?auto"]
+			}
+			_error_type: {
+				description: "The type of the error"
+				required:    true
+				options: [
+					"field_missing",
+					"invalid_metric",
+					"mapping_failed",
+					"match_failed",
+					"parse_failed",
+					"render_error",
+					"type_conversion_failed",
+					"value_invalid",
+				]
+			}
+			_file: {
+				description: "The file that produced the error"
+				required:    false
+			}
+			_host: {
+				description: "The hostname of the originating system."
+				required:    true
+				examples: [_values.local_host]
+			}
+			_instance: {
+				description: "The Vector instance identified by host and port."
+				required:    true
+				examples: [_values.instance]
+			}
+			_job: {
+				description: "The name of the job producing Vector metrics."
+				required:    true
+				default:     "vector"
+			}
 		}
 	}}
 }

@@ -1,42 +1,5 @@
 package metadata
 
-// Container metrics
-_vector_communication_errors_total: {
-	description: "The total number of errors stemming from communication with the Docker daemon."
-	type:        "counter"
-	tags:        _component_tags
-}
-
-_vector_container_events_processed_total: {
-	description: "The total number of container events processed."
-	type:        "counter"
-	tags:        _component_tags
-}
-
-_vector_container_metadata_fetch_errors_total: {
-	description: "The total number of errors caused by failure to fetch container metadata."
-	type:        "counter"
-	tags:        _component_tags
-}
-
-_vector_containers_unwatched_total: {
-	description: "The total number of times Vector stopped watching for container logs."
-	type:        "counter"
-	tags:        _component_tags
-}
-
-_vector_containers_watched_total: {
-	description: "The total number of times Vector started watching for container logs."
-	type:        "counter"
-	tags:        _component_tags
-}
-
-_vector_logging_driver_errors_total: {
-	description: "The total number of logging driver errors encountered caused by not using either the `jsonfile` or `journald` driver."
-	type:        "counter"
-	tags:        _component_tags
-}
-
 // Kubernetes metrics
 _vector_k8s_docker_format_parse_failures_total: {
 	description: "The total number of failures to parse a message as a JSON object."
@@ -410,8 +373,6 @@ _component_tags: _internal_metrics_tags & {
 	component_kind: _component_kind
 	component_name: _component_name
 	component_type: _component_type
-	instance:       _instance
-	job:            _job
 }
 
 _apache_metrics_tags: {

@@ -267,10 +267,35 @@ components: sources: docker_logs: {
 	}
 
 	telemetry: metrics: {
-		vector_communication_errors_total:            _vector_communication_errors_total
-		vector_container_events_processed_total:      _vector_container_events_processed_total
-		vector_container_metadata_fetch_errors_total: _vector_container_metadata_fetch_errors_total
-		vector_containers_watched_total:              _vector_containers_watched_total
-		vector_logging_driver_errors_total:           _vector_logging_driver_errors_total
+		vector_communication_errors_total: {
+			description: "The total number of errors stemming from communication with the Docker daemon."
+			type:        "counter"
+			tags:        telemetry.metrics._component_tags
+		}
+		vector_container_events_processed_total: {
+			description: "The total number of container events processed."
+			type:        "counter"
+			tags:        telemetry.metrics._component_tags
+		}
+		vector_container_metadata_fetch_errors_total: {
+			description: "The total number of errors caused by failure to fetch container metadata."
+			type:        "counter"
+			tags:        telemetry.metrics._component_tags
+		}
+		vector_containers_unwatched_total: {
+			description: "The total number of times Vector stopped watching for container logs."
+			type:        "counter"
+			tags:        telemetry.metrics._component_tags
+		}
+		vector_containers_watched_total: {
+			description: "The total number of times Vector started watching for container logs."
+			type:        "counter"
+			tags:        telemetry.metrics._component_tags
+		}
+		vector_logging_driver_errors_total: {
+			description: "The total number of logging driver errors encountered caused by not using either the `jsonfile` or `journald` driver."
+			type:        "counter"
+			tags:        telemetry.metrics._component_tags
+		}
 	}
 }
