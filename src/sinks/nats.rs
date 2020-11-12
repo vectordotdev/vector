@@ -50,7 +50,18 @@ inventory::submit! {
     SinkDescription::new::<NatsSinkConfig>("nats")
 }
 
-impl GenerateConfig for NatsSinkConfig {}
+impl GenerateConfig for NatsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"
+            encoding.codec = "json"
+            name = "vector"
+            subject = "from.vector"
+            url = "nats://127.0.0.1:4222""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "nats")]
@@ -194,9 +205,15 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
+    use super::*;
     use super::{encode_event, Encoding, EncodingConfig};
     use crate::event::{Event, Value};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<NatsSinkConfig>();
+    }
 
     #[test]
     fn encodes_raw_logs() {

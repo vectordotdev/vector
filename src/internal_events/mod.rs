@@ -55,9 +55,9 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
-mod open;
 #[cfg(feature = "sinks-nats")]
 mod nats;
+mod open;
 mod process;
 #[cfg(feature = "sources-prometheus")]
 mod prometheus;
