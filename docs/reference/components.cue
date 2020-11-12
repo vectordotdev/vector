@@ -1129,29 +1129,6 @@ components: {
 				tags:              _component_tags
 			}
 
-			// Splunk
-			_encode_errors_total: {
-				description:       """
-					The total number of errors encoding [Splunk HEC](\(urls.splunk_hec_protocol)) events
-					to JSON for this `splunk_hec` sink.
-					"""
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _component_tags
-			}
-			_source_missing_keys_total: {
-				description:       "The total number of errors rendering the template for this source."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _component_tags
-			}
-			_sourcetype_missing_keys_total: {
-				description:       "The total number of errors rendering the template for this sourcetype."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _component_tags
-			}
-
 			// Vector instance metrics
 			_config_load_errors_total: {
 				description:       "The total number of errors loading the Vector configuration."

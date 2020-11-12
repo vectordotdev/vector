@@ -94,10 +94,7 @@ components: sources: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		source_missing_keys_total:     telemetry.metrics._source_missing_keys_total
-		sourcetype_missing_keys_total: telemetry.metrics._sourcetype_missing_keys_total
-		encode_errors_total:           telemetry.metrics._encode_errors_total
-		http_request_errors_total:     telemetry.metrics._http_request_errors_total
-		requests_received_total:       telemetry.metrics._requests_received_total
+		http_request_errors_total: telemetry.metrics._http_request_errors_total
+		requests_received_total:   telemetry.metrics._requests_received_total
 	}
 }
