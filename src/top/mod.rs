@@ -16,9 +16,11 @@ pub struct Opts {
     #[structopt(default_value = "500", short = "i", long)]
     refresh_interval: u64,
 
+    /// Vector GraphQL API server endpoint
     #[structopt(short, long)]
     url: Option<Url>,
 
+    /// Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k, 1,000,000 = 1.00 M
     #[structopt(short, long)]
-    human: bool,
+    human_metrics: bool,
 }
