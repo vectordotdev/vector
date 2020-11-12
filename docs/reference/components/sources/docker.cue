@@ -2,15 +2,7 @@ package metadata
 
 components: sources: docker: {
 	title:       "Docker"
-	description: """
-		[Docker](\(urls.docker)) is an open platform for developing, shipping, and running
-		applications and services. Docker enables you to separate your services from
-		your infrastructure so you can ship quickly. With Docker, you can manage your
-		infrastructure in the same ways you manage your services. By taking advantage
-		of Docker's methodologies for shipping, testing, and deploying code quickly,
-		you can significantly reduce the delay between writing code and running it in
-		production.
-		"""
+	description: installation.platforms.docker.description
 
 	classes: {
 		commonly_used: false
@@ -45,9 +37,9 @@ components: sources: docker: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Docker Engine"
-				thing:    "the \(name)"
-				url:      urls.docker_engine
+				name:     "Docker"
+				thing:    "the \(name) platform"
+				url:      urls.docker
 				versions: ">= 1.24"
 
 				interface: socket: {

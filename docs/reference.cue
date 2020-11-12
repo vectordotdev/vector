@@ -19,6 +19,8 @@ _values: {
 // `#Any` allows for any value.
 #Any: _ | {[_=string]: #Any}
 
+#Arch: "ARM64" | "ARMv7" | "x86_64"
+
 // `#Classes` represent various `#Components` classifications.
 #Classes: {
 	_args: kind: string
@@ -569,6 +571,8 @@ _values: {
 
 #Object: {[_=string]: #Any}
 
+#OperatingSystem: "Linux" | "MacOS" | "Windows"
+
 #Output: {
 	logs?:    #LogOutput
 	metrics?: #MetricOutput
@@ -580,15 +584,6 @@ _values: {
 	}
 }
 
-#Platforms: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
-}
-
 #Protocol: "http" | "tcp" | "udp" | "unix"
 
 #Releases: [Name=string]: {
@@ -598,6 +593,10 @@ _values: {
 	commits: [...#Commit]
 	whats_next: #Any
 }
+
+#RemapParameterTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
+
+#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
 #Runtime: {
 	name:    string
@@ -683,7 +682,7 @@ _values: {
 	//
 	// For example, the `journald` source is only available on Linux
 	// environments.
-	platforms: #Platforms
+	platforms: #TargetTriples
 
 	// `requirements` describes any external requirements that the component
 	// needs to function properly.
@@ -705,6 +704,15 @@ _values: {
 	// For example, the `lua` transform offers a Lua version notice that
 	// communicate which version of Lua is embedded.
 	notices: [...string] | null
+}
+
+#TargetTriples: {
+	"aarch64-unknown-linux-gnu":  bool
+	"aarch64-unknown-linux-musl": bool
+	"x86_64-apple-darwin":        bool
+	"x86_64-pc-windows-msv":      bool
+	"x86_64-unknown-linux-gnu":   bool
+	"x86_64-unknown-linux-musl":  bool
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
@@ -861,6 +869,10 @@ _values: {
 
 #Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
+//
+// Schema
+//
+
 components: close({
 	sources:    #Components
 	transforms: #Components
@@ -871,11 +883,9 @@ data_model: close({
 	schema: #Schema
 })
 
+installation: _
+
 releases: #Releases
-
-#RemapParameterTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
-
-#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
 remap: {
 	errors: [Name=string]: {
