@@ -125,13 +125,11 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentBytesProcessedTotal>> {
-        component_counter_metrics_batch(interval, &|m| m.name == "processed_bytes_total").map(
-            |m| {
-                m.into_iter()
-                    .map(ComponentBytesProcessedTotal::new)
-                    .collect()
-            },
-        )
+        component_counter_metrics_batch(interval, &|m| m.name == "processed_bytes_total").map(|m| {
+            m.into_iter()
+                .map(ComponentBytesProcessedTotal::new)
+                .collect()
+        })
     }
 
     /// Total error metrics
@@ -158,13 +156,8 @@ impl MetricsSubscription {
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentErrorsTotal>> {
-        component_counter_metrics_batch(interval, &|m| m.name.ends_with("_errors_total")).map(
-            |m| {
-                m.into_iter()
-                    .map(ComponentErrorsTotal::new)
-                    .collect()
-            },
-        )
+        component_counter_metrics_batch(interval, &|m| m.name.ends_with("_errors_total"))
+            .map(|m| m.into_iter().map(ComponentErrorsTotal::new).collect())
     }
 
     /// All metrics
