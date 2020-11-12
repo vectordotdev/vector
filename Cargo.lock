@@ -2455,12 +2455,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f90b9d206a509fdc5034ea8ffb4d6ca080dd61883cfa222c480cfcba8c570368"
 
 [[package]]
-name = "human_format"
-version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86cce260d758a9aa3d7c4b99d55c815a540f8a37514ba6046ab6be402a157cb0"
-
-[[package]]
 name = "humantime"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3737,6 +3731,12 @@ dependencies = [
  "quote 1.0.7",
  "syn 1.0.48",
 ]
+
+[[package]]
+name = "number_prefix"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "object"
@@ -6768,7 +6768,6 @@ dependencies = [
  "hex",
  "hostname",
  "http",
- "human_format",
  "hyper",
  "hyper-openssl",
  "indexmap",
@@ -6798,6 +6797,7 @@ dependencies = [
  "notify",
  "num-format",
  "num_cpus",
+ "number_prefix",
  "once_cell",
  "openssl",
  "openssl-probe",
