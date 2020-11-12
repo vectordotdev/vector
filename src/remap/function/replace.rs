@@ -137,6 +137,103 @@ mod test {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![
+        infallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                constraint: value::Kind::String.into(),
+                ..Default::default()
+            },
+        }
+
+        value_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from(10).boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::String.into(),
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_infallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from("foo").boxed().into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                constraint: value::Kind::String.into(),
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from(10).boxed().into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::String.into(),
+                ..Default::default()
+            },
+        }
+
+        with_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from(10).boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::String.into(),
+                ..Default::default()
+            },
+        }
+
+        count_infallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: Some(Literal::from(10).boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::String.into(),
+                ..Default::default()
+            },
+        }
+
+        count_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::String.into(),
+                ..Default::default()
+            },
+        }
+    ];
+
     #[test]
     fn check_replace_string() {
         let cases = vec![

@@ -90,6 +90,57 @@ impl Expression for ParseJsonFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseJsonFn {
+                value: Literal::from("foo").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                ..Default::default()
+            },
+        }
+
+        optional_default {
+            expr: |_| ParseJsonFn {
+                value: Literal::from("foo").boxed(),
+                default: Some(Box::new(Noop)),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                ..Default::default()
+            },
+        }
+
+        optional_value {
+            expr: |_| ParseJsonFn {
+                value: Box::new(Noop),
+                default: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                ..Default::default()
+            },
+        }
+
+        optional_value_and_default {
+            expr: |_| ParseJsonFn {
+                value: Box::new(Noop),
+                default: Some(Box::new(Noop)),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+            },
+        }
+    ];
 
     #[test]
     fn parse_json() {

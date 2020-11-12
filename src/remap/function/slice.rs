@@ -122,6 +122,36 @@ impl Expression for SliceFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| SliceFn {
+                value: Literal::from("foo").boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_array {
+            expr: |_| SliceFn {
+                value: Literal::from(vec!["foo"]).boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, constraint: Array.into(), ..Default::default() },
+        }
+
+        value_unknown {
+            expr: |_| SliceFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, constraint: vec![String, Array].into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn bytes() {

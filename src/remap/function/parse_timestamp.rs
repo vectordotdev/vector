@@ -136,6 +136,82 @@ mod tests {
     use crate::map;
     use chrono::{DateTime, Utc};
 
+    remap::test_type_def![
+        value_fallible_no_default {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_fallible_default_fallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from("<timestamp>").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_fallible_default_infallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from(chrono::Utc::now()).boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_infallible_no_default {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_infallible_default_fallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from("<timestamp>").boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_infallible_default_infallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from(chrono::Utc::now()).boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+    ];
+
     #[test]
     fn parse_timestamp() {
         let cases = vec![

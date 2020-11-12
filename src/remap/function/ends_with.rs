@@ -111,6 +111,45 @@ impl Expression for EndsWithFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| EndsWithFn {
+                value: Literal::from("foo").boxed(),
+                substring: Literal::from("foo").boxed(),
+                case_sensitive: None,
+            },
+            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| EndsWithFn {
+                value: Literal::from(true).boxed(),
+                substring: Literal::from("foo").boxed(),
+                case_sensitive: None,
+            },
+            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+        }
+
+        substring_non_string {
+            expr: |_| EndsWithFn {
+                value: Literal::from("foo").boxed(),
+                substring: Literal::from(true).boxed(),
+                case_sensitive: None,
+            },
+            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+        }
+
+        case_sensitive_non_boolean {
+            expr: |_| EndsWithFn {
+                value: Literal::from("foo").boxed(),
+                substring: Literal::from("foo").boxed(),
+                case_sensitive: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn ends_with() {

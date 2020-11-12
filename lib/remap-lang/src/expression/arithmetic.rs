@@ -81,7 +81,12 @@ impl Expression for Arithmetic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{
+        expression::{Literal, Noop},
+        test_type_def,
+        value::Constraint::*,
+        value::Kind::*,
+    };
 
     test_type_def![
         or_exact {

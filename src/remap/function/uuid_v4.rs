@@ -39,6 +39,14 @@ mod tests {
     use crate::map;
     use std::convert::TryFrom;
 
+    remap::test_type_def![static_def {
+        expr: |_| UuidV4Fn,
+        def: TypeDef {
+            constraint: value::Kind::String.into(),
+            ..Default::default()
+        },
+    }];
+
     #[test]
     fn uuid_v4() {
         let mut state = state::Program::default();

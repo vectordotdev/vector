@@ -63,6 +63,24 @@ impl Expression for Md5Fn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| Md5Fn { value: Literal::from("foo").boxed() },
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| Md5Fn { value: Literal::from(1).boxed() },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| Md5Fn { value: Box::new(Noop) },
+            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+        }
+    ];
 
     #[test]
     fn md5() {

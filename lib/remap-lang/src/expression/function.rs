@@ -201,7 +201,7 @@ impl Expression for ArgumentValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, Noop};
+    use crate::{expression::Noop, test_type_def, value::Constraint::*};
 
     test_type_def![pass_through {
         expr: |_| {

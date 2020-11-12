@@ -29,3 +29,16 @@ impl Expression for NowFn {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    remap::test_type_def![static_def {
+        expr: |_| NowFn,
+        def: TypeDef {
+            constraint: value::Kind::Timestamp.into(),
+            ..Default::default()
+        },
+    }];
+}

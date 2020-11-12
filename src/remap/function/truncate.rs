@@ -128,6 +128,62 @@ mod tests {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![
+        infallible {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from(1).boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| TruncateFn {
+                value: Literal::from(false).boxed(),
+                limit: Literal::from(1).boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+        }
+
+        limit_float {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from(1.0).boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+        }
+
+        limit_non_number {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from("bar").boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+        }
+
+        ellipsis_boolean {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from(10).boxed(),
+                ellipsis: Some(Literal::from(true).boxed()),
+            },
+            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+        }
+
+        ellipsis_non_boolean {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from("bar").boxed(),
+                ellipsis: Some(Literal::from("baz").boxed()),
+            },
+            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+        }
+    ];
+
     #[test]
     fn truncate() {
         let cases = vec![

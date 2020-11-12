@@ -87,6 +87,25 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::TimeZone;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_and_format {
+            expr: |_| FormatTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("%s").boxed(),
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        optional_value {
+            expr: |_| FormatTimestampFn {
+                value: Box::new(Noop),
+                format: Literal::from("%s").boxed(),
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+        }
+    ];
 
     #[test]
     fn format_timestamp() {

@@ -98,3 +98,85 @@ impl Expression for SplitFn {
             .with_constraint(Array)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    remap::test_type_def![
+        infallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: None,
+            },
+            def: TypeDef {
+                constraint: value::Kind::Array.into(),
+                ..Default::default()
+            },
+        }
+
+        value_fallible {
+            expr: |_| SplitFn {
+                value: Literal::from(10).boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::Array.into(),
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_infallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from("foo").boxed().into(),
+                limit: None,
+            },
+            def: TypeDef {
+                constraint: value::Kind::Array.into(),
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_fallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from(10).boxed().into(),
+                limit: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::Array.into(),
+                ..Default::default()
+            },
+        }
+
+        limit_infallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: Some(Literal::from(10).boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::Array.into(),
+                ..Default::default()
+            },
+        }
+
+        limit_fallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::Array.into(),
+                ..Default::default()
+            },
+        }
+    ];
+}

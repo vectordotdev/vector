@@ -3,12 +3,12 @@ use crate::{state, Object, Result, TypeDef, Value};
 mod arithmetic;
 mod assignment;
 mod block;
-mod function;
+pub(crate) mod function;
 mod if_statement;
 mod literal;
 mod noop;
 mod not;
-mod path;
+pub(crate) mod path;
 mod variable;
 
 pub use arithmetic::Arithmetic;
@@ -110,7 +110,7 @@ expression_dispatch![
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::value;
 
     #[test]
     fn test_contains() {

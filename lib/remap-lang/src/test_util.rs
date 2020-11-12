@@ -1,4 +1,3 @@
-#[cfg(test)]
 #[macro_export]
 macro_rules! test_type_def {
     ($($name:ident { expr: $expr:expr, def: $def:expr, })+) => {

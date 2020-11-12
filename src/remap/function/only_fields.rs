@@ -83,3 +83,20 @@ impl Expression for OnlyFieldsFn {
             .into_optional(true)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| OnlyFieldsFn { paths: vec![Literal::from("foo").boxed()] },
+            def: TypeDef { optional: true, constraint: value::Constraint::Any, ..Default::default() },
+        }
+
+        fallible_expression {
+            expr: |_| OnlyFieldsFn { paths: vec![Variable::new("foo".to_owned()).boxed(), Literal::from("foo").boxed()] },
+            def: TypeDef { fallible: true, optional: true, constraint: value::Constraint::Any },
+        }
+    ];
+}

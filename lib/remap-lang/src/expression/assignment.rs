@@ -80,7 +80,7 @@ impl Expression for Assignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Kind::*, value::Constraint::*, Literal};
+    use crate::{expression::Literal, test_type_def, value::Constraint::*, value::Kind::*};
 
     test_type_def![
         variable {

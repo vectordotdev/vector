@@ -92,6 +92,107 @@ impl Expression for ToIntFn {
 mod tests {
     use super::*;
     use crate::map;
+    use std::collections::BTreeMap;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        boolean_infallible {
+            expr: |_| ToIntFn { value: Literal::from(true).boxed(), default: None },
+            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+        }
+
+        integer_infallible {
+            expr: |_| ToIntFn { value: Literal::from(1).boxed(), default: None },
+            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+        }
+
+        float_infallible {
+            expr: |_| ToIntFn { value: Literal::from(1.0).boxed(), default: None },
+            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+        }
+
+        null_infallible {
+            expr: |_| ToIntFn { value: Literal::from(()).boxed(), default: None },
+            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+        }
+
+        string_fallible {
+            expr: |_| ToIntFn { value: Literal::from("foo").boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+        }
+
+        map_fallible {
+            expr: |_| ToIntFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+        }
+
+        array_fallible {
+            expr: |_| ToIntFn { value: Literal::from(vec![0]).boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+        }
+
+        timestamp_infallible {
+            expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+        }
+
+        fallible_value_without_default {
+            expr: |_| ToIntFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Integer.into(),
+            },
+        }
+
+       fallible_value_with_fallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Integer.into(),
+            },
+        }
+
+       fallible_value_with_infallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Integer.into(),
+            },
+        }
+
+        infallible_value_with_fallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Integer.into(),
+            },
+        }
+
+        infallible_value_with_infallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Integer.into(),
+            },
+        }
+    ];
 
     #[test]
     fn to_int() {

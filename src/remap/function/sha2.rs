@@ -87,6 +87,41 @@ fn encode<T: Digest>(value: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| Sha2Fn {
+                value: Literal::from("foo").boxed(),
+                variant: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| Sha2Fn {
+                value: Literal::from(1).boxed(),
+                variant: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| Sha2Fn {
+                value: Box::new(Noop),
+                variant: None,
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+        }
+
+        variant_fallible {
+            expr: |_| Sha2Fn {
+                value: Literal::from("foo").boxed(),
+                variant: Some(Variable::new("foo".to_string()).boxed()),
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn sha2() {

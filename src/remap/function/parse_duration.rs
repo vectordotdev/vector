@@ -133,6 +133,24 @@ mod tests {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseDurationFn {
+                value: Literal::from("foo").boxed(),
+                output: Literal::from("foo").boxed(),
+            },
+            def: TypeDef { fallible: true, constraint: value::Kind::Float.into(), ..Default::default() },
+        }
+
+        optional_expression {
+            expr: |_| ParseDurationFn {
+                value: Box::new(Noop),
+                output: Literal::from("foo").boxed(),
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: value::Kind::Float.into() },
+        }
+    ];
+
     #[test]
     fn parse_duration() {
         let cases = vec![

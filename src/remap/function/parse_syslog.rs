@@ -126,6 +126,23 @@ mod tests {
     use crate::map;
     use chrono::prelude::*;
 
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { constraint: value::Kind::Map.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::Map.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| ParseSyslogFn { value: Box::new(Noop) },
+            def: TypeDef { fallible: true, optional: true, constraint: value::Kind::Map.into() },
+        }
+    ];
+
     #[test]
     fn parses() {
         let cases = vec![

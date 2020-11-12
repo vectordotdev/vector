@@ -187,6 +187,41 @@ impl Expression for FormatNumberFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_integer {
+            expr: |_| FormatNumberFn {
+                value: Literal::from(1).boxed(),
+                scale: None,
+                decimal_separator: None,
+                grouping_separator: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_float {
+            expr: |_| FormatNumberFn {
+                value: Literal::from(1.0).boxed(),
+                scale: None,
+                decimal_separator: None,
+                grouping_separator: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        // TODO(jean): we should update the function to ignore `None` values,
+        // instead of aborting.
+        optional_scale {
+            expr: |_| FormatNumberFn {
+                value: Literal::from(1.0).boxed(),
+                scale: Some(Box::new(Noop)),
+                decimal_separator: None,
+                grouping_separator: None,
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+        }
+    ];
 
     #[test]
     fn format_number() {

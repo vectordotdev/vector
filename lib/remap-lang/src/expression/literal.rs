@@ -3,6 +3,12 @@ use crate::{state, value, Expression, Object, Result, TypeDef, Value};
 #[derive(Debug, Clone)]
 pub struct Literal(Value);
 
+impl Literal {
+    pub fn boxed(self) -> Box<dyn Expression> {
+        Box::new(self)
+    }
+}
+
 impl<T: Into<Value>> From<T> for Literal {
     fn from(value: T) -> Self {
         Self(value.into())

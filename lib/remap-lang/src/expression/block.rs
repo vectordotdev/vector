@@ -52,7 +52,11 @@ impl Expression for Block {
 mod tests {
     use super::*;
     use crate::{
-        expression::Arithmetic, test_type_def, value::Kind::*, value::Constraint::*, Literal, Operator,
+        expression::{Arithmetic, Literal},
+        test_type_def,
+        value::Constraint::*,
+        value::Kind::*,
+        Operator,
     };
 
     test_type_def![

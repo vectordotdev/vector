@@ -94,6 +94,18 @@ mod tests {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseUrlFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::Map.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| ParseUrlFn { value: Box::new(Noop) },
+            def: TypeDef { fallible: true, optional: true, constraint: value::Kind::Map.into() },
+        }
+    ];
+
     #[test]
     fn parse_url() {
         let cases = vec![

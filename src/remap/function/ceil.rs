@@ -89,6 +89,41 @@ impl Expression for CeilFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_float {
+            expr: |_| CeilFn {
+                value: Literal::from(1.0).boxed(),
+                precision: None,
+            },
+            def: TypeDef { constraint: Float.into(), ..Default::default() },
+        }
+
+        value_integer {
+            expr: |_| CeilFn {
+                value: Literal::from(1).boxed(),
+                precision: None,
+            },
+            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+        }
+
+        value_float_or_integer {
+            expr: |_| CeilFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                precision: None,
+            },
+            def: TypeDef { fallible: true, constraint: vec![Integer, Float].into(), ..Default::default() },
+        }
+
+        fallible_precision {
+            expr: |_| CeilFn {
+                value: Literal::from(1).boxed(),
+                precision: Some(Variable::new("foo".to_owned()).boxed()),
+            },
+            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn ceil() {

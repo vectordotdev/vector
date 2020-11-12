@@ -110,6 +110,107 @@ impl Expression for ToTimestampFn {
 mod tests {
     use super::*;
     use crate::map;
+    use std::collections::BTreeMap;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        timestamp_infallible {
+            expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
+            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        integer_infallible {
+            expr: |_| ToTimestampFn { value: Literal::from(1).boxed(), default: None},
+            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        float_infallible {
+            expr: |_| ToTimestampFn { value: Literal::from(1.0).boxed(), default: None},
+            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        null_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(()).boxed(), default: None},
+            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        string_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from("foo").boxed(), default: None},
+            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        map_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
+            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        array_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(vec![0]).boxed(), default: None},
+            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        boolean_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(true).boxed(), default: None},
+            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+        }
+
+        fallible_value_without_default {
+            expr: |_| ToTimestampFn { value: Variable::new("foo".to_owned()).boxed(), default: None},
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Timestamp.into(),
+            },
+        }
+
+       fallible_value_with_fallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Timestamp.into(),
+            },
+        }
+
+       fallible_value_with_infallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Timestamp.into(),
+            },
+        }
+
+        infallible_value_with_fallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Timestamp.into(),
+            },
+        }
+
+        infallible_value_with_infallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Timestamp.into(),
+            },
+        }
+    ];
 
     #[test]
     fn to_timestamp() {

@@ -68,6 +68,18 @@ mod tests {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![
+        value_string {
+            expr: |_| TokenizeFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { constraint: value::Kind::Array.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| TokenizeFn { value: Literal::from(10).boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::Array.into(), ..Default::default() },
+        }
+    ];
+
     #[test]
     fn tokenize() {
         let cases = vec![(

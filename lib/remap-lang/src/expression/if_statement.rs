@@ -49,14 +49,19 @@ impl Expression for IfStatement {
         let true_type_def = self.true_expression.type_def(state);
         let false_type_def = self.false_expression.type_def(state);
 
-        true_type_def.merge(&false_type_def)
+        true_type_def.merge(false_type_def)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Kind::*, value::Constraint::*, Literal, Noop};
+    use crate::{
+        expression::{Literal, Noop},
+        test_type_def,
+        value::Constraint::*,
+        value::Kind::*,
+    };
 
     test_type_def![
         concrete_type_def {

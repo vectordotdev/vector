@@ -55,6 +55,18 @@ mod tests {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![
+        value_string {
+            expr: |_| StripWhitespaceFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+        }
+
+        fallible_expression {
+            expr: |_| StripWhitespaceFn { value: Literal::from(10).boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+        }
+    ];
+
     #[test]
     fn strip_whitespace() {
         let cases = vec![

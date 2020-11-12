@@ -69,6 +69,33 @@ impl Expression for MatchFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| MatchFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| MatchFn {
+                value: Literal::from(1).boxed(),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| MatchFn {
+                value: Box::new(Noop),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: Boolean.into() },
+        }
+    ];
 
     #[test]
     fn r#match() {
