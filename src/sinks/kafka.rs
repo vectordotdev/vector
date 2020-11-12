@@ -515,6 +515,74 @@ mod integration_test {
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::Zstd).await;
     }
 
+    fn kafka_batch_options_overrides(batch: BatchConfig, librdkafka_options: HashMap<String, String>) -> crate::Result<KafkaSink> {
+        let topic = format!("test-{}", random_string(10));
+        let config = KafkaSinkConfig {
+            bootstrap_servers: "localhost:9091".to_string(),
+            topic: format!("{}-%Y%m%d", topic),
+            compression: KafkaCompression::None,
+            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            key_field: None,
+            auth: KafkaAuthConfig {
+                sasl: None,
+                tls: None,
+            },
+            socket_timeout_ms: 60000,
+            message_timeout_ms: 300000,
+            batch,
+            librdkafka_options,
+            ..Default::default()
+        };
+        let (acker, _ack_counter) = Acker::new_for_testing();
+        KafkaSink::new(config, acker)
+    }
+
+    #[tokio::test]
+    async fn kafka_batch_options_max_bytes_errors_on_double_set() {
+        assert!(kafka_batch_options_overrides(
+            BatchConfig {
+                max_bytes: Some(1000),
+                max_events: None,
+                max_size: None,
+                timeout_secs: None
+            },
+            indexmap::indexmap! {
+                "batch.size".to_string() => 1.to_string(),
+            }.into_iter().collect()
+        ).is_err())
+    }
+
+    #[tokio::test]
+    async fn kafka_batch_options_max_events_errors_on_double_set() {
+        assert!(kafka_batch_options_overrides(
+            BatchConfig {
+                max_bytes: None,
+                max_events: Some(10),
+                max_size: None,
+                timeout_secs: None
+            },
+            indexmap::indexmap! {
+                "batch.num.messages".to_string() => 1.to_string(),
+            }.into_iter().collect()
+        ).is_err())
+    }
+
+    #[tokio::test]
+    async fn kafka_batch_options_timeout_secs_errors_on_double_set() {
+        assert!(kafka_batch_options_overrides(
+            BatchConfig {
+                max_bytes: None,
+                max_events: None,
+                max_size: None,
+                timeout_secs: Some(10),
+            },
+            indexmap::indexmap! {
+                "queue.buffering.max.ms".to_string() => 1.to_string(),
+            }.into_iter().collect()
+        ).is_err())
+    }
+
+
     #[tokio::test]
     async fn kafka_happy_path_tls() {
         kafka_happy_path(
