@@ -1706,6 +1706,45 @@
                 }
               ],
               "deprecationReason": null,
+              "description": "Component events processed metrics, received in batches containing metrics over `interval`",
+              "isDeprecated": false,
+              "name": "componentEventsProcessedTotalBatch",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentEventsProcessedTotal",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
               "name": "bytesProcessedTotal",
@@ -1768,6 +1807,45 @@
                 }
               ],
               "deprecationReason": null,
+              "description": "Component bytes processed metrics, received in batches containing metrics over `interval`",
+              "isDeprecated": false,
+              "name": "componentBytesProcessedTotalBatch",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentBytesProcessedTotal",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
               "description": "Total error metrics",
               "isDeprecated": false,
               "name": "errorsTotal",
@@ -1809,6 +1887,45 @@
                   "kind": "OBJECT",
                   "name": "ComponentErrorsTotal",
                   "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Component errors metrics, received in batches containing metrics over `interval`",
+              "isDeprecated": false,
+              "name": "componentErrorsTotalBatch",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentErrorsTotal",
+                      "ofType": null
+                    }
+                  }
                 }
               }
             },
