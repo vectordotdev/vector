@@ -1,9 +1,9 @@
 package metadata
 
-components: sinks: prometheus: {
+components: sinks: prometheus_exporter: {
 	_port: 9598
 
-	title:       "Prometheus"
+	title:       "Prometheus Exporter"
 	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
@@ -92,9 +92,13 @@ components: sinks: prometheus: {
 				unit:    "seconds"
 			}
 		}
-		namespace: {
+		default_namespace: {
 			common:      true
-			description: "A prefix that will be added to all metric names.\nIt should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming))."
+			description: """
+				Used as a namespace for metrics that don't have it.
+				A namespace will be prefixed to a metric's name.
+				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
+				"""
 			required:    false
 			warnings: []
 			type: string: {
@@ -128,11 +132,14 @@ components: sinks: prometheus: {
 
 	examples: [
 		{
-			_host:  _values.local_host
-			_name:  "logins"
-			_value: 1.5
-			title:  "Counter"
-			configuration: {}
+			_host:      _values.local_host
+			_name:      "logins"
+			_namespace: "service"
+			_value:     1.5
+			title:      "Counter"
+			configuration: {
+				default_namespace: _namespace
+			}
 			input: metric: {
 				kind: "incremental"
 				name: _name
@@ -144,20 +151,22 @@ components: sinks: prometheus: {
 				}
 			}
 			output: """
-				# HELP \(_name) \(_name)
-				# TYPE \(_name) counter
-				\(_name){host="\(_host)"} \(_value)
+				# HELP \(_namespace)_\(_name) \(_name)
+				# TYPE \(_namespace)_\(_name) counter
+				\(_namespace)_\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
-			_host:  _values.local_host
-			_name:  "memory_rss"
-			_value: 1.5
-			title:  "Gauge"
+			_host:      _values.local_host
+			_name:      "memory_rss"
+			_namespace: "app"
+			_value:     1.5
+			title:      "Gauge"
 			configuration: {}
 			input: metric: {
-				kind: "absolute"
-				name: _name
+				kind:      "absolute"
+				name:      _name
+				namespace: _namespace
 				gauge: {
 					value: _value
 				}
@@ -166,16 +175,17 @@ components: sinks: prometheus: {
 				}
 			}
 			output: """
-				# HELP \(_name) \(_name)
-				# TYPE \(_name) gauge
-				\(_name){host="\(_host)"} \(_value)
+				# HELP \(_namespace)_\(_name) \(_name)
+				# TYPE \(_namespace)_\(_name) gauge
+				\(_namespace)_\(_name){host="\(_host)"} \(_value)
 				"""
 		},
 		{
 			_host: _values.local_host
 			_name: "response_time_s"
 			title: "Histogram"
-			configuration: {}
+			configuration: {
+			}
 			input: metric: {
 				kind: "absolute"
 				name: _name
@@ -263,7 +273,7 @@ components: sinks: prometheus: {
 				\(_name)_count 6
 				\(_name)_min 0
 				\(_name)_max 4
-				\(_name)_avg 1				
+				\(_name)_avg 1
 				"""
 		},
 		{
@@ -291,7 +301,7 @@ components: sinks: prometheus: {
 				\(_name){host="\(_host)",quantile="0.5"} 2
 				\(_name){host="\(_host)",quantile="0.99"} 3
 				\(_name)_sum{host="\(_host)"} 12
-				\(_name)_count{host="\(_host)"} 6		
+				\(_name)_count{host="\(_host)"} 6
 				"""
 		},
 	]

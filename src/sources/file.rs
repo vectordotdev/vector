@@ -9,6 +9,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     FileServer, Fingerprinter,
@@ -24,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryInto;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::task::spawn_blocking;
 
 #[derive(Debug, Snafu)]
@@ -193,7 +194,7 @@ pub fn file_source(
 ) -> super::Source {
     let ignore_before = config
         .ignore_older
-        .map(|secs| SystemTime::now() - Duration::from_secs(secs));
+        .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
     let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
@@ -459,7 +460,7 @@ mod tests {
     #[tokio::test]
     async fn file_happy_path() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -517,7 +518,7 @@ mod tests {
     #[tokio::test]
     async fn file_truncate() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -582,7 +583,7 @@ mod tests {
     #[tokio::test]
     async fn file_rotate() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -648,7 +649,7 @@ mod tests {
     #[tokio::test]
     async fn file_multiple_paths() {
         let n = 5;
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -707,7 +708,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -743,7 +744,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -780,7 +781,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, shutdown_done) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
@@ -838,7 +839,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             tokio::spawn(source.compat());
 
@@ -859,7 +860,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             tokio::spawn(source.compat());
 
@@ -885,7 +886,7 @@ mod tests {
                 start_at_beginning: true,
                 ..test_default_file_config(&dir)
             };
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             tokio::spawn(source.compat());
 
@@ -921,7 +922,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             tokio::spawn(source.compat());
 
@@ -946,7 +947,7 @@ mod tests {
         {
             let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
-            let (tx, rx) = Pipeline::new_test(vec![]);
+            let (tx, rx) = Pipeline::new_test();
             let source = file::file_source(&config, config.data_dir.clone().unwrap(), shutdown, tx);
             tokio::spawn(source.compat());
 
@@ -972,7 +973,7 @@ mod tests {
         use std::os::unix::io::AsRawFd;
         use std::time::{Duration, SystemTime};
 
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
@@ -1047,7 +1048,7 @@ mod tests {
 
     #[tokio::test]
     async fn file_max_line_bytes() {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1105,7 +1106,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation_legacy() {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1176,7 +1177,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_line_aggregation() {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1251,7 +1252,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fair_reads() {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1316,7 +1317,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_oldest_first() {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1381,7 +1382,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_split_reads() {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1439,7 +1440,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_gzipped_file() {
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();
@@ -1488,7 +1489,7 @@ mod tests {
         let n = 5;
         let remove_after = 1;
 
-        let (tx, rx) = Pipeline::new_test(vec![]);
+        let (tx, rx) = Pipeline::new_test();
         let (trigger_shutdown, shutdown, _) = ShutdownSignal::new_wired();
 
         let dir = tempdir().unwrap();

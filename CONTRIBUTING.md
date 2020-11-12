@@ -662,7 +662,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 ### Benchmarking
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
-run benchmarks via the `make benchmarks` command. In addition, Vector
+run benchmarks via the `make bench` command. In addition, Vector
 maintains a full [test harness][urls.vector_test_harness] for complex
 end-to-end integration and performance testing.
 

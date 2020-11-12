@@ -18,7 +18,7 @@ impl InternalEvent for VectorStarted {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_started_total", 1);
+        counter!("started_total", 1);
     }
 }
 
@@ -37,7 +37,7 @@ impl InternalEvent for VectorReloaded<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_reloaded_total", 1);
+        counter!("reloaded_total", 1);
     }
 }
 
@@ -53,7 +53,7 @@ impl InternalEvent for VectorStopped {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_stopped_total", 1);
+        counter!("stopped_total", 1);
     }
 }
 
@@ -69,7 +69,7 @@ impl InternalEvent for VectorQuit {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_quit_total", 1);
+        counter!("quit_total", 1);
     }
 }
 
@@ -85,7 +85,7 @@ impl InternalEvent for VectorReloadFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_reload_errors_total", 1);
+        counter!("reload_errors_total", 1);
     }
 }
 
@@ -117,7 +117,7 @@ impl InternalEvent for VectorRecoveryFailed {
     }
 
     fn emit_metrics(&self) {
-        counter!("vector_recover_errors_total", 1);
+        counter!("recover_errors_total", 1);
     }
 }
 

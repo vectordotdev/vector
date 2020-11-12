@@ -548,7 +548,7 @@ pub struct CheckFields {
 }
 
 impl CheckFields {
-    #[cfg(all(test, features = "transforms-add-fields"))]
+    #[cfg(all(test, feature = "transforms-add_fields"))]
     pub(crate) fn new(predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>) -> Self {
         Self { predicates }
     }

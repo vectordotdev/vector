@@ -22,10 +22,9 @@ use crate::{
 use core::task::Context;
 use futures::{
     compat::Future01CompatExt,
-    future::{self, pending, BoxFuture},
-    FutureExt,
+    future::{self, BoxFuture},
+    FutureExt, SinkExt,
 };
-use futures01::Sink;
 use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
 use serde::{Deserialize, Serialize};
@@ -172,7 +171,7 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -253,7 +252,7 @@ impl Service<Vec<Event>> for TestSink {
             }
             Some(Action::Drop) => {
                 stats.end_request(now, false);
-                Box::pin(pending())
+                Box::pin(future::pending())
             }
         }
     }

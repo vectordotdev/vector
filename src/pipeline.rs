@@ -35,20 +35,24 @@ impl Sink for Pipeline {
         &mut self,
         item: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        // Note how this gets **swapped** with `new_working_set` in the loop.
-        // At the end of the loop, it will only contain finalized events.
-        let mut working_set = vec![item];
-        for inline in self.inlines.iter_mut() {
-            let mut new_working_set = Vec::with_capacity(working_set.len());
-            for event in working_set.drain(..) {
-                inline.transform(&mut new_working_set, event);
+        match self.try_flush() {
+            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(item)),
+            Ok(Async::Ready(())) => {
+                // Note how this gets **swapped** with `new_working_set` in the loop.
+                // At the end of the loop, it will only contain finalized events.
+                let mut working_set = vec![item];
+                for inline in self.inlines.iter_mut() {
+                    let mut new_working_set = Vec::with_capacity(working_set.len());
+                    for event in working_set.drain(..) {
+                        inline.transform(&mut new_working_set, event);
+                    }
+                    core::mem::swap(&mut new_working_set, &mut working_set);
+                }
+                self.enqueued.extend(working_set);
+                Ok(AsyncSink::Ready)
             }
-            core::mem::swap(&mut new_working_set, &mut working_set);
+            Err(e) => Err(e),
         }
-        self.enqueued.extend(working_set);
-
-        self.try_flush()?;
-        Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
@@ -60,8 +64,8 @@ impl Sink for Pipeline {
 
 impl Pipeline {
     #[cfg(test)]
-    pub fn new_test(inlines: Vec<Box<dyn FunctionTransform>>) -> (Self, Receiver<Event>) {
-        Self::new_with_buffer(100, inlines)
+    pub fn new_test() -> (Self, Receiver<Event>) {
+        Self::new_with_buffer(100, vec![])
     }
 
     pub fn new_with_buffer(
@@ -87,7 +91,7 @@ impl Pipeline {
     }
 }
 
-#[cfg(all(test, feature = "transforms-add-fields"))]
+#[cfg(all(test, feature = "transforms-add_fields"))]
 mod test {
     use super::*;
     use crate::{
@@ -119,7 +123,7 @@ mod test {
         )?;
 
         let (pipeline, reciever) =
-            Pipeline::new_test(vec![Box::new(transform_1), Box::new(transform_2)]);
+            Pipeline::new_with_buffer(100, vec![Box::new(transform_1), Box::new(transform_2)]);
 
         let event = Event::try_from(json!({
             "message": "MESSAGE_MARKER",
@@ -145,7 +149,7 @@ mod test {
             },
         )));
 
-        let (pipeline, reciever) = Pipeline::new_test(vec![Box::new(transform_1)]);
+        let (pipeline, reciever) = Pipeline::new_with_buffer(100, vec![Box::new(transform_1)]);
 
         let event = Event::try_from(json!({
             "message": "MESSAGE_MARKER",

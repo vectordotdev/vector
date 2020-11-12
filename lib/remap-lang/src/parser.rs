@@ -267,7 +267,12 @@ impl Parser<'_> {
     fn regex_from_pair(&self, pair: Pair<R>) -> Result<Regex> {
         let mut inner = pair.into_inner();
 
-        let pattern = inner.next().ok_or(e(R::regex_inner))?.as_str();
+        let pattern = inner
+            .next()
+            .ok_or(e(R::regex_inner))?
+            .as_str()
+            .replace("\\/", "/");
+
         let (x, i, m) = inner
             .next()
             .map(|flags| {
@@ -283,7 +288,7 @@ impl Parser<'_> {
             })
             .unwrap_or_default();
 
-        RegexBuilder::new(pattern)
+        RegexBuilder::new(&pattern)
             .case_insensitive(i)
             .multi_line(m)
             .ignore_whitespace(x)

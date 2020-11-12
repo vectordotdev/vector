@@ -253,7 +253,7 @@ mod tests {
         headers: Vec<String>,
         query_parameters: Vec<String>,
     ) -> (mpsc::Receiver<Event>, SocketAddr) {
-        let (sender, recv) = Pipeline::new_test(vec![]);
+        let (sender, recv) = Pipeline::new_test();
         let address = next_addr();
         tokio::spawn(async move {
             SimpleHttpConfig {

@@ -13,8 +13,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytesize::ByteSize;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{
     header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
 };
@@ -128,7 +127,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
