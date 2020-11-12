@@ -156,7 +156,7 @@ impl KafkaSinkConfig {
                                     The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
                                     Please delete one.", key, queue_buffering_max_ms, val).into());
             }
-            client_config.set(key, &queue_buffering_max_ms.to_string());
+            client_config.set(key, &(queue_buffering_max_ms * 1000).to_string());
         }
         if let Some(batch_num_messages) = self.batch.max_events {
             // Maximum number of messages batched in one MessageSet. The total MessageSet size is
@@ -515,7 +515,10 @@ mod integration_test {
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::Zstd).await;
     }
 
-    fn kafka_batch_options_overrides(batch: BatchConfig, librdkafka_options: HashMap<String, String>) -> crate::Result<KafkaSink> {
+    fn kafka_batch_options_overrides(
+        batch: BatchConfig,
+        librdkafka_options: HashMap<String, String>,
+    ) -> crate::Result<KafkaSink> {
         let topic = format!("test-{}", random_string(10));
         let config = KafkaSinkConfig {
             bootstrap_servers: "localhost:9091".to_string(),
@@ -531,7 +534,6 @@ mod integration_test {
             message_timeout_ms: 300000,
             batch,
             librdkafka_options,
-            ..Default::default()
         };
         let (acker, _ack_counter) = Acker::new_for_testing();
         KafkaSink::new(config, acker)
@@ -548,8 +550,11 @@ mod integration_test {
             },
             indexmap::indexmap! {
                 "batch.size".to_string() => 1.to_string(),
-            }.into_iter().collect()
-        ).is_err())
+            }
+            .into_iter()
+            .collect()
+        )
+        .is_err())
     }
 
     #[tokio::test]
@@ -563,8 +568,11 @@ mod integration_test {
             },
             indexmap::indexmap! {
                 "batch.num.messages".to_string() => 1.to_string(),
-            }.into_iter().collect()
-        ).is_err())
+            }
+            .into_iter()
+            .collect()
+        )
+        .is_err())
     }
 
     #[tokio::test]
@@ -578,10 +586,12 @@ mod integration_test {
             },
             indexmap::indexmap! {
                 "queue.buffering.max.ms".to_string() => 1.to_string(),
-            }.into_iter().collect()
-        ).is_err())
+            }
+            .into_iter()
+            .collect()
+        )
+        .is_err())
     }
-
 
     #[tokio::test]
     async fn kafka_happy_path_tls() {
