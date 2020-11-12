@@ -40,11 +40,11 @@ impl fmt::Display for ResolvesToError {
 
         if optional_diff {
             if want.is_optional() {
-                want_str.push_str(" optional");
+                want_str.push_str(" or no");
             }
 
             if got.is_optional() {
-                got_str.push_str(" optional");
+                got_str.push_str(" or no");
             }
         }
 

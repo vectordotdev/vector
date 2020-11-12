@@ -124,13 +124,13 @@ mod test {
             (
                 log_event![],
                 "",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any optional value"),
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
             ),
             (
                 log_event!["foo" => "string"],
                 ".foo",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
+                Err("remap error: program error: expected to resolve to boolean or no value, but instead resolves to any value"),
                 Ok(()),
             ),
             (
