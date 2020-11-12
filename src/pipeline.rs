@@ -35,20 +35,24 @@ impl Sink for Pipeline {
         &mut self,
         item: Self::SinkItem,
     ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        // Note how this gets **swapped** with `new_working_set` in the loop.
-        // At the end of the loop, it will only contain finalized events.
-        let mut working_set = vec![item];
-        for inline in self.inlines.iter_mut() {
-            let mut new_working_set = Vec::with_capacity(working_set.len());
-            for event in working_set.drain(..) {
-                inline.transform(&mut new_working_set, event);
+        match self.try_flush() {
+            Ok(Async::NotReady) => Ok(AsyncSink::NotReady(item)),
+            Ok(Async::Ready(())) => {
+                // Note how this gets **swapped** with `new_working_set` in the loop.
+                // At the end of the loop, it will only contain finalized events.
+                let mut working_set = vec![item];
+                for inline in self.inlines.iter_mut() {
+                    let mut new_working_set = Vec::with_capacity(working_set.len());
+                    for event in working_set.drain(..) {
+                        inline.transform(&mut new_working_set, event);
+                    }
+                    core::mem::swap(&mut new_working_set, &mut working_set);
+                }
+                self.enqueued.extend(working_set);
+                Ok(AsyncSink::Ready)
             }
-            core::mem::swap(&mut new_working_set, &mut working_set);
+            Err(e) => Err(e),
         }
-        self.enqueued.extend(working_set);
-
-        self.try_flush()?;
-        Ok(AsyncSink::Ready)
     }
 
     fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
@@ -87,7 +91,7 @@ impl Pipeline {
     }
 }
 
-#[cfg(all(test, feature = "transforms-add-fields"))]
+#[cfg(all(test, feature = "transforms-add_fields"))]
 mod test {
     use super::*;
     use crate::{
