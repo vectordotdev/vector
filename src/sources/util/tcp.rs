@@ -250,7 +250,7 @@ impl From<SocketAddr> for SocketListenAddr {
 impl From<SocketListenAddr> for Resource {
     fn from(addr: SocketListenAddr) -> Resource {
         match addr {
-            SocketListenAddr::SocketAddr(addr) => Self::Port(addr.port()),
+            SocketListenAddr::SocketAddr(addr) => addr.into(),
             SocketListenAddr::SystemdFd(offset) => Self::SystemFdOffset(offset),
         }
     }

@@ -127,32 +127,30 @@ impl Sink for Fanout {
 
         while self.i < self.sinks.len() - 1 {
             let (_name, sink) = &mut self.sinks[self.i];
-            if let Some(sink) = sink.as_mut() {
-                match sink.start_send(item.clone()) {
+            match sink.as_mut() {
+                Some(sink) => match sink.start_send(item.clone()) {
                     Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
                     Ok(AsyncSink::Ready) => self.i += 1,
                     Err(()) => self.handle_sink_error(self.i)?,
-                }
-            } else {
+                },
                 // process_control_messages ended because control channel returned
                 // NotReady so it's fine to return NotReady here since the control
                 // channel will notify current task when it receives a message.
-                return Ok(AsyncSink::NotReady(item));
+                None => return Ok(AsyncSink::NotReady(item)),
             }
         }
 
         let (_name, sink) = &mut self.sinks[self.i];
-        if let Some(sink) = sink.as_mut() {
-            match sink.start_send(item) {
+        match sink.as_mut() {
+            Some(sink) => match sink.start_send(item) {
                 Ok(AsyncSink::NotReady(item)) => return Ok(AsyncSink::NotReady(item)),
                 Ok(AsyncSink::Ready) => self.i += 1,
                 Err(()) => self.handle_sink_error(self.i)?,
-            }
-        } else {
+            },
             // process_control_messages ended because control channel returned
             // NotReady so it's fine to return NotReady here since the control
             // channel will notify current task when it receives a message.
-            return Ok(AsyncSink::NotReady(item));
+            None => return Ok(AsyncSink::NotReady(item)),
         }
 
         self.i = 0;
