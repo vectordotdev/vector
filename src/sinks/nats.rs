@@ -249,7 +249,7 @@ mod integration_tests {
 
         // Establish the consumer subscription.
         let consumer = cnf.clone().connect().await.unwrap();
-        let mut sub = consumer.subscribe(&subject).await.unwrap();
+        let sub = consumer.subscribe(&subject).await.unwrap();
 
         // Publish events.
         let (acker, ack_counter) = Acker::new_for_testing();
@@ -263,19 +263,10 @@ mod integration_tests {
         thread::sleep(Duration::from_secs(3));
         let _ = sub.drain().await.unwrap();
 
-        // Observe that there are delivered events.
-        let mut failures: u32 = 0;
-        let mut output = Vec::new();
-
-        while failures < 100 {
-            if let Some(msg) = sub.next().await {
-                let value = std::str::from_utf8(&msg.data).unwrap();
-                output.push(value.to_owned());
-            } else {
-                failures += 1;
-                thread::sleep(Duration::from_millis(50));
-            }
-        }
+        let output: Vec<String> = sub
+            .map(|msg| String::from_utf8_lossy(&msg.data).to_string())
+            .collect()
+            .await;
 
         assert_eq!(output.len(), input.len());
         assert_eq!(output, input);
