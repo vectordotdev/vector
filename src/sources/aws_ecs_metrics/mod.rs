@@ -127,9 +127,8 @@ async fn aws_ecs_metrics(
                         });
 
                         let byte_size = body.len();
-                        let body = String::from_utf8_lossy(&body);
 
-                        match parser::parse(&body, namespace.clone()) {
+                        match parser::parse(body.as_ref(), namespace.clone()) {
                             Ok(metrics) => {
                                 emit!(AwsEcsMetricsReceived {
                                     byte_size,
@@ -149,7 +148,7 @@ async fn aws_ecs_metrics(
                                 emit!(AwsEcsMetricsParseError {
                                     error,
                                     url: &url,
-                                    body,
+                                    body: String::from_utf8_lossy(&body),
                                 });
                             }
                         }
@@ -525,19 +524,25 @@ mod test {
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "network_rx_bytes") {
+        match metrics
+            .iter()
+            .find(|m| m.name == "network_receive_bytes_total")
+        {
             Some(m) => {
                 assert_eq!(m.value, MetricValue::Counter { value: 329932716.0 });
                 assert_eq!(m.namespace, Some("aws_ecs".into()));
 
                 match &m.tags {
                     Some(tags) => {
-                        assert_eq!(tags.get("network"), Some(&"eth1".to_string()));
+                        assert_eq!(tags.get("device"), Some(&"eth1".to_string()));
                     }
                     None => panic!("No tags for metric. {:?}", m),
                 }
             }
-            None => panic!("Could not find 'network_rx_bytes' in {:?}.", metrics),
+            None => panic!(
+                "Could not find 'network_receive_bytes_total' in {:?}.",
+                metrics
+            ),
         }
     }
 }

@@ -123,25 +123,25 @@ components: sources: aws_ecs_metrics: {
 			}
 		}
 
-		blkio_io_merged_recursive:        _blkio_counter & {description: "Total number of bios/requests merged into requests."}
-		blkio_io_queue_recursive:         _blkio_counter & {description: "Total number of requests queued up at any given instant."}
-		blkio_io_service_bytes_recursive: _blkio_counter & {description: "Number of bytes transferred to/from the disk."}
-		blkio_io_serviced_recursive:      _blkio_counter & {description: "Number of IOs completed to/from the disk."}
-		blkio_io_service_time_recursive:  _blkio_counter & {description: "Total amount of time in nanoseconds between request dispatch and request completion for the IOs done."}
-		blkio_io_time_recursive:          _blkio_counter & {description: "Disk time allocated per device in nanoseconds."}
-		blkio_io_wait_time_recursive:     _blkio_counter & {description: "Total amount of time in nanoseconds the IOs for this cgroup spent waiting in the scheduler queues for service."}
-		blkio_sectors_recursive:          _blkio_counter & {description: "Number of sectors transferred to/from disk."}
+		blkio_recursive_io_merged_total:               _blkio_counter & {description: "Total number of bios/requests merged into requests."}
+		blkio_recursive_io_queued_total:               _blkio_counter & {description: "Total number of requests queued up at any given instant."}
+		blkio_recursive_io_service_bytes_total:        _blkio_counter & {description: "Number of bytes transferred to/from the disk."}
+		blkio_recursive_io_service_time_seconds_total: _blkio_counter & {description: "Total amount of time in seconds between request dispatch and request completion for the IOs done."}
+		blkio_recursive_io_serviced_total:             _blkio_counter & {description: "Number of IOs completed to/from the disk."}
+		blkio_recursive_io_time_seconds_total:         _blkio_counter & {description: "Disk time allocated per device in seconds."}
+		blkio_recursive_io_wait_time_seconds_total:    _blkio_counter & {description: "Total amount of time in seconds the IOs spent waiting in the scheduler queues for service."}
+		blkio_recursive_sectors_total:                 _blkio_counter & {description: "Number of sectors transferred to/from disk."}
 
-		cpu_online_cpus:         _gauge & {description:   "Number of CPU cores."}
-		cpu_system_cpu_usage:    _counter & {description: "Jiffies of CPU time used by the system."}
-		cpu_usage_in_usermode:   _counter & {description: "Jiffies of CPU time spent in user mode by the container."}
-		cpu_usage_in_kernelmode: _counter & {description: "Jiffies of CPU time spent in kernel mode by the container."}
-		cpu_total_usage:         _counter & {description: "Jiffies of CPU time used by the container."}
-		cpu_throttling_periods:  _counter & {description: "Number of periods."}
-		cpu_throttled_periods:   _counter & {description: "Number of periods throttled."}
-		cpu_throttled_time:      _counter & {description: "Throttling time in nanoseconds."}
+		cpu_online_cpus:                    _gauge & {description:   "Number of CPU cores."}
+		cpu_usage_system_jiffies_total:     _counter & {description: "Jiffies of CPU time used by the system."}
+		cpu_usage_usermode_jiffies_total:   _counter & {description: "Jiffies of CPU time spent in user mode by the container."}
+		cpu_usage_kernelmode_jiffies_total: _counter & {description: "Jiffies of CPU time spent in kernel mode by the container."}
+		cpu_usage_total_jiffies_total:      _counter & {description: "Jiffies of CPU time used by the container."}
+		cpu_throttling_periods_total:       _counter & {description: "Number of periods."}
+		cpu_throttled_periods_total:        _counter & {description: "Number of periods throttled."}
+		cpu_throttled_time_seconds_total:   _counter & {description: "Throttling time in seconds."}
 
-		cpu_percpu_usage: {
+		cpu_usage_percpu_jiffies_total: {
 			description: "Jiffies of CPU time used by the container, per CPU core."
 			type:        "counter"
 			tags:        _tags & {
@@ -153,46 +153,46 @@ components: sources: aws_ecs_metrics: {
 			}
 		}
 
-		memory_usage:                     _gauge & {description:   "Memory used by the container, in bytes."}
-		memory_max_usage:                 _gauge & {description:   "Maximum measured memory usage of the container, in bytes."}
-		memory_limit:                     _gauge & {description:   "Memory usage limit of the container, in bytes."}
-		memory_active_anon:               _gauge & {description:   "Amount of memory that has been identified as active by the kernel. Anonymous memory is memory that is not linked to disk pages."}
-		memory_active_file:               _gauge & {description:   "Amount of active file cache memory. Cache memory = active_file + inactive_file + tmpfs."}
-		memory_cache:                     _gauge & {description:   "The amount of memory used by the processes of this cgroup that can be associated with a block on a block device. Also accounts for memory used by tmpfs."}
-		memory_dirty:                     _gauge & {description:   "The amount of memory waiting to get written to disk."}
-		memory_hierarchical_memory_limit: _gauge & {description:   "The memory limit in place by the hierarchy cgroup."}
-		memory_hierarchical_memsw_limit:  _gauge & {description:   "The memory + swap limit in place by the hierarchy cgroup."}
-		memory_inactive_anon:             _gauge & {description:   "Amount of memory that has been identified as inactive by the kernel."}
-		memory_inactive_file:             _gauge & {description:   "Amount of inactive file cache memory."}
-		memory_mapped_file:               _gauge & {description:   "Indicates the amount of memory mapped by the processes in the cgroup. It doesn’t give you information about how much memory is used; it rather tells you how it is used."}
-		memory_pgfault:                   _counter & {description: "Number of times that a process of the cgroup triggered a page fault."}
-		memory_pgmajfault:                _counter & {description: "Number of times that a process of the cgroup triggered a major page fault."}
-		memory_pgpgin:                    _counter & {description: "Number of charging events to the memory cgroup. Charging events happen each time a page is accounted as either mapped anon page(RSS) or cache page to the cgroup."}
-		memory_pgpgout:                   _counter & {description: "Number of uncharging events to the memory cgroup. Uncharging events happen each time a page is unaccounted from the cgroup."}
-		memory_rss:                       _gauge & {description:   "The amount of memory that doesn’t correspond to anything on disk: stacks, heaps, and anonymous memory maps."}
-		memory_rss_huge:                  _gauge & {description:   "Amount of memory due to anonymous transparent hugepages."}
-		memory_unevictable:               _gauge & {description:   "The amount of memory that cannot be reclaimed."}
-		memory_writeback:                 _gauge & {description:   "The amount of memory from file/anon cache that are queued for syncing to the disk."}
-		memory_total_active_anon:         _gauge & {description:   "Total amount of memory that has been identified as active by the kernel."}
-		memory_total_active_file:         _gauge & {description:   "Total amount of active file cache memory."}
-		memory_total_cache:               _gauge & {description:   "Total amount of memory used by the processes of this cgroup that can be associated with a block on a block device."}
-		memory_total_dirty:               _gauge & {description:   "Total amount of memory waiting to get written to disk."}
-		memory_total_inactive_anon:       _gauge & {description:   "Total amount of memory that has been identified as inactive by the kernel."}
-		memory_total_inactive_file:       _gauge & {description:   "Total amount of inactive file cache memory."}
-		memory_total_mapped_file:         _gauge & {description:   "Total amount of memory mapped by the processes in the cgroup."}
-		memory_total_pgfault:             _counter & {description: "Total number of page faults."}
-		memory_total_pgmajfault:          _counter & {description: "Total number of major page faults."}
-		memory_total_pgpgin:              _counter & {description: "Total number of charging events."}
-		memory_total_pgpgout:             _counter & {description: "Total number of uncharging events."}
-		memory_total_rss:                 _gauge & {description:   "Total amount of memory that doesn’t correspond to anything on disk: stacks, heaps, and anonymous memory maps."}
-		memory_total_rss_huge:            _gauge & {description:   "Total amount of memory due to anonymous transparent hugepages."}
-		memory_total_unevictable:         _gauge & {description:   "Total amount of memory that can not be reclaimed."}
-		memory_total_writeback:           _gauge & {description:   "Total amount of memory from file/anon cache that are queued for syncing to the disk."}
+		memory_used_bytes:                      _gauge & {description:   "Memory used by the container, in bytes."}
+		memory_max_used_bytes:                  _gauge & {description:   "Maximum measured memory usage of the container, in bytes."}
+		memory_limit_bytes:                     _gauge & {description:   "Memory usage limit of the container, in bytes."}
+		memory_active_anonymous_bytes:          _gauge & {description:   "Amount of memory that has been identified as active by the kernel. Anonymous memory is memory that is not linked to disk pages."}
+		memory_active_file_bytes:               _gauge & {description:   "Amount of active file cache memory. Cache memory = active_file + inactive_file + tmpfs."}
+		memory_cache_bytes:                     _gauge & {description:   "The amount of memory used by the processes of this cgroup that can be associated with a block on a block device. Also accounts for memory used by tmpfs."}
+		memory_dirty_bytes:                     _gauge & {description:   "The amount of memory waiting to get written to disk."}
+		memory_inactive_anonymous_bytes:        _gauge & {description:   "Amount of memory that has been identified as inactive by the kernel."}
+		memory_inactive_file_bytes:             _gauge & {description:   "Amount of inactive file cache memory."}
+		memory_mapped_file_bytes:               _gauge & {description:   "Indicates the amount of memory mapped by the processes in the cgroup. It doesn’t give you information about how much memory is used; it rather tells you how it is used."}
+		memory_page_faults_total:               _counter & {description: "Number of times that a process of the cgroup triggered a page fault."}
+		memory_major_faults_total:              _counter & {description: "Number of times that a process of the cgroup triggered a major page fault."}
+		memory_page_charged_total:              _counter & {description: "Number of charging events to the memory cgroup. Charging events happen each time a page is accounted as either mapped anon page(RSS) or cache page to the cgroup."}
+		memory_page_uncharged_total:            _counter & {description: "Number of uncharging events to the memory cgroup. Uncharging events happen each time a page is unaccounted from the cgroup."}
+		memory_rss_bytes:                       _gauge & {description:   "The amount of memory that doesn’t correspond to anything on disk: stacks, heaps, and anonymous memory maps."}
+		memory_rss_hugepages_bytes:             _gauge & {description:   "Amount of memory due to anonymous transparent hugepages."}
+		memory_unevictable_bytes:               _gauge & {description:   "The amount of memory that cannot be reclaimed."}
+		memory_writeback_bytes:                 _gauge & {description:   "The amount of memory from file/anon cache that are queued for syncing to the disk."}
+		memory_total_active_anonymous_bytes:    _gauge & {description:   "Total amount of memory that has been identified as active by the kernel."}
+		memory_total_active_file_bytes:         _gauge & {description:   "Total amount of active file cache memory."}
+		memory_total_cache_bytes:               _gauge & {description:   "Total amount of memory used by the processes of this cgroup that can be associated with a block on a block device."}
+		memory_total_dirty_bytes:               _gauge & {description:   "Total amount of memory waiting to get written to disk."}
+		memory_total_inactive_anonymous_bytes:  _gauge & {description:   "Total amount of memory that has been identified as inactive by the kernel."}
+		memory_total_inactive_file_bytes:       _gauge & {description:   "Total amount of inactive file cache memory."}
+		memory_total_mapped_file_bytes:         _gauge & {description:   "Total amount of memory mapped by the processes in the cgroup."}
+		memory_total_page_faults_total:         _counter & {description: "Total number of page faults."}
+		memory_total_major_faults_total:        _counter & {description: "Total number of major page faults."}
+		memory_total_page_charged_total:        _counter & {description: "Total number of charging events."}
+		memory_total_page_uncharged_total:      _counter & {description: "Total number of uncharging events."}
+		memory_total_rss_bytes:                 _gauge & {description:   "Total amount of memory that doesn’t correspond to anything on disk: stacks, heaps, and anonymous memory maps."}
+		memory_total_rss_hugepages_bytes:       _gauge & {description:   "Total amount of memory due to anonymous transparent hugepages."}
+		memory_total_unevictable_bytes:         _gauge & {description:   "Total amount of memory that can not be reclaimed."}
+		memory_total_writeback_bytes:           _gauge & {description:   "Total amount of memory from file/anon cache that are queued for syncing to the disk."}
+		memory_hierarchical_memory_limit_bytes: _gauge & {description:   "The memory limit in place by the hierarchy cgroup."}
+		memory_hierarchical_memsw_limit_bytes:  _gauge & {description:   "The memory + swap limit in place by the hierarchy cgroup."}
 
 		_network_counter: {
 			type: "counter"
 			tags: _tags & {
-				network: {
+				device: {
 					description: "The network interface."
 					required:    true
 					examples: ["eth1"]
@@ -200,13 +200,13 @@ components: sources: aws_ecs_metrics: {
 			}
 		}
 
-		network_rx_bytes:   _network_counter & {description: "Bytes received by the container via the network interface."}
-		network_rx_packets: _network_counter & {description: "Number of packets received by the container via the network interface."}
-		network_rx_dropped: _network_counter & {description: "Number of inbound packets dropped by the container."}
-		network_rx_errors:  _network_counter & {description: "Errors receiving packets."}
-		network_tx_bytes:   _network_counter & {description: "Bytes sent by the container via the network interface."}
-		network_tx_packets: _network_counter & {description: "Number of packets sent by the container via the network interface."}
-		network_tx_dropped: _network_counter & {description: "Number of outbound packets dropped by the container."}
-		network_tx_errors:  _network_counter & {description: "Errors sending packets."}
+		network_receive_bytes_total:         _network_counter & {description: "Bytes received by the container via the network interface."}
+		network_receive_packets_total:       _network_counter & {description: "Number of packets received by the container via the network interface."}
+		network_receive_packets_drop_total:  _network_counter & {description: "Number of inbound packets dropped by the container."}
+		network_receive_errs_total:          _network_counter & {description: "Errors receiving packets."}
+		network_transmit_bytes_total:        _network_counter & {description: "Bytes sent by the container via the network interface."}
+		network_transmit_packets_total:      _network_counter & {description: "Number of packets sent by the container via the network interface."}
+		network_transmit_packets_drop_total: _network_counter & {description: "Number of outbound packets dropped by the container."}
+		network_transmit_errs_total:         _network_counter & {description: "Errors sending packets."}
 	}
 }
