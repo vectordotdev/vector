@@ -91,6 +91,43 @@ impl Expression for ParseTimestampFn {
             to_timestamp,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(value::Kind::Timestamp);
+
+        let default_def = self
+            .default
+            .as_ref()
+            .map(|v| v.type_def(state).fallible_unless(value::Kind::Timestamp));
+
+        // The `format` type definition is only relevant if:
+        //
+        // 1. `value` can resolve to a string, AND:
+        //   1. `default` is not defined, OR
+        //   2. `default` can also resolve to a string.
+        //
+        // The `format` type is _always_ fallible, because its string has to be
+        // parsed into a valid timestamp format.
+        let format_def = if value_def.constraint.contains(&value::Kind::String.into()) {
+            match &default_def {
+                Some(def) if def.constraint.contains(&value::Kind::String.into()) => {
+                    Some(self.format.type_def(state).into_fallible(true))
+                }
+                Some(_) => None,
+                None => Some(self.format.type_def(state).into_fallible(true)),
+            }
+        } else {
+            None
+        };
+
+        value_def
+            .merge_with_default_optional(default_def)
+            .merge_optional(format_def)
+            .with_constraint(value::Kind::Timestamp)
+    }
 }
 
 #[cfg(test)]

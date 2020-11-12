@@ -58,6 +58,27 @@ impl Expression for RoundFn {
 
         Ok(res.into())
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(vec![Integer, Float]);
+        let precision_def = self
+            .precision
+            .as_ref()
+            .map(|precision| precision.type_def(state).fallible_unless(Integer));
+
+        value_def
+            .clone()
+            .merge_optional(precision_def)
+            .with_constraint(match value_def.constraint {
+                v if v.is(Float) || v.is(Integer) => v,
+                _ => vec![Integer, Float].into(),
+            })
+    }
 }
 
 #[cfg(test)]

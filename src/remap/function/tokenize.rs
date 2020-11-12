@@ -54,6 +54,13 @@ impl Expression for TokenizeFn {
 
         Ok(Some(tokens))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::Array)
+    }
 }
 
 #[cfg(test)]

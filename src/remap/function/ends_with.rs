@@ -63,7 +63,11 @@ impl EndsWithFn {
 }
 
 impl Expression for EndsWithFn {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let substring = {
             let bytes = required!(state, object, self.substring, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -74,13 +78,32 @@ impl Expression for EndsWithFn {
             String::from_utf8_lossy(&bytes).into_owned()
         };
 
-        let starts_with = value.ends_with(&substring)
+        let ends_with = value.ends_with(&substring)
             || optional!(state, object, self.case_sensitive, Value::Boolean(b) => b)
                 .iter()
                 .filter(|&case_sensitive| !case_sensitive)
                 .any(|_| value.to_lowercase().ends_with(&substring.to_lowercase()));
 
-        Ok(Some(starts_with.into()))
+        Ok(Some(ends_with.into()))
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let substring_def = self
+            .substring
+            .type_def(state)
+            .fallible_unless(value::Kind::String);
+
+        let case_sensitive_def = self
+            .case_sensitive
+            .as_ref()
+            .map(|cs| cs.type_def(state).fallible_unless(value::Kind::Boolean));
+
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .merge(substring_def)
+            .merge_optional(case_sensitive_def)
+            .with_constraint(value::Kind::Boolean)
     }
 }
 

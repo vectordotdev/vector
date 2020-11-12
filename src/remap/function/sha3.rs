@@ -61,6 +61,19 @@ impl Expression for Sha3Fn {
 
         Ok(Some(hash.into()))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .merge_optional(
+                self.variant
+                    .as_ref()
+                    .map(|variant| variant.type_def(state).fallible_unless(value::Kind::String)),
+            )
+            .into_fallible(true) // unknown variant enum
+            .with_constraint(value::Kind::String)
+    }
 }
 
 #[inline]

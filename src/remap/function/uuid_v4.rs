@@ -24,6 +24,13 @@ impl Expression for UuidV4Fn {
 
         Ok(Some(Bytes::copy_from_slice(uuid.as_bytes()).into()))
     }
+
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef {
+            constraint: value::Kind::String.into(),
+            ..Default::default()
+        }
+    }
 }
 
 #[cfg(test)]

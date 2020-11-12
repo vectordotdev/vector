@@ -62,6 +62,15 @@ impl Expression for ToStringFn {
             to_string,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .merge_with_default_optional(
+                self.default.as_ref().map(|default| default.type_def(state)),
+            )
+            .with_constraint(value::Kind::String)
+    }
 }
 
 #[cfg(test)]

@@ -56,6 +56,13 @@ impl Expression for MatchFn {
             }
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::Boolean)
+    }
 }
 
 #[cfg(test)]

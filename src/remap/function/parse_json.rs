@@ -68,6 +68,22 @@ impl Expression for ParseJsonFn {
             to_json,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let default_def = self
+            .default
+            .as_ref()
+            .map(|default| default.type_def(state).fallible_unless(String));
+
+        self.value
+            .type_def(state)
+            .fallible_unless(String)
+            .merge_with_default_optional(default_def)
+            .into_fallible(true) // JSON parsing errors
+            .with_constraint(vec![String, Boolean, Integer, Float, Array, Map, Null])
+    }
 }
 
 #[cfg(test)]

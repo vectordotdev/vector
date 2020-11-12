@@ -72,6 +72,20 @@ impl Expression for ToIntFn {
             to_int,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(vec![Integer, Float, Boolean, Null])
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(vec![Integer, Float, Boolean, Null])
+            }))
+            .with_constraint(Integer)
+    }
 }
 
 #[cfg(test)]

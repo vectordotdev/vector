@@ -72,6 +72,20 @@ impl Expression for ToFloatFn {
             to_float,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(vec![Float, Integer, Boolean, Null])
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(vec![Float, Integer, Boolean, Null])
+            }))
+            .with_constraint(Float)
+    }
 }
 
 #[cfg(test)]

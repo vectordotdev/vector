@@ -82,6 +82,23 @@ impl Expression for StartsWithFn {
 
         Ok(Some(starts_with.into()))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .merge(
+                self.substring
+                    .type_def(state)
+                    .fallible_unless(value::Kind::String),
+            )
+            .merge_optional(self.case_sensitive.as_ref().map(|case_sensitive| {
+                case_sensitive
+                    .type_def(state)
+                    .fallible_unless(value::Kind::Boolean)
+            }))
+            .with_constraint(value::Kind::Boolean)
+    }
 }
 
 #[cfg(test)]

@@ -111,6 +111,13 @@ impl Expression for ParseSyslogFn {
 
         Ok(Some(message_to_value(parsed)))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::Map)
+    }
 }
 
 #[cfg(test)]

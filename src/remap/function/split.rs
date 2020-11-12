@@ -76,4 +76,25 @@ impl Expression for SplitFn {
 
         Ok(Some(value))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let limit_def = self
+            .limit
+            .as_ref()
+            .map(|limit| limit.type_def(state).fallible_unless(vec![Integer, Float]));
+
+        let pattern_def = match &self.pattern {
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(String)),
+            Argument::Regex(_) => None, // regex is a concrete infallible type
+        };
+
+        self.value
+            .type_def(state)
+            .fallible_unless(String)
+            .merge_optional(limit_def)
+            .merge_optional(pattern_def)
+            .with_constraint(Array)
+    }
 }

@@ -90,6 +90,20 @@ impl Expression for ToTimestampFn {
             to_timestamp,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(vec![Timestamp, Integer, Float])
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(vec![Timestamp, Integer, Float])
+            }))
+            .with_constraint(Timestamp)
+    }
 }
 
 #[cfg(test)]

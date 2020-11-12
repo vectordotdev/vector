@@ -70,4 +70,18 @@ impl Expression for DelFn {
 
         Ok(None)
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.paths
+            .iter()
+            .fold(TypeDef::default(), |acc, expression| {
+                acc.merge(
+                    expression
+                        .type_def(state)
+                        .fallible_unless(value::Kind::String),
+                )
+            })
+            .with_constraint(value::Constraint::Any)
+            .into_optional(true)
+    }
 }

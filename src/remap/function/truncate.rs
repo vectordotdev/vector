@@ -102,6 +102,25 @@ impl Expression for TruncateFn {
 
         Ok(Some(value.into()))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(String)
+            .merge(
+                self.limit
+                    .type_def(state)
+                    .fallible_unless(vec![Integer, Float]),
+            )
+            .merge_optional(
+                self.ellipsis
+                    .as_ref()
+                    .map(|ellipsis| ellipsis.type_def(state).fallible_unless(Boolean)),
+            )
+            .with_constraint(String)
+    }
 }
 
 #[cfg(test)]

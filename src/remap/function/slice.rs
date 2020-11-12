@@ -93,6 +93,29 @@ impl Expression for SliceFn {
                 .map(Some),
         }
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(vec![String, Array]);
+        let end_def = self
+            .end
+            .as_ref()
+            .map(|end| end.type_def(state).fallible_unless(Integer));
+
+        value_def
+            .clone()
+            .merge(self.start.type_def(state).fallible_unless(Integer))
+            .merge_optional(end_def)
+            .with_constraint(match value_def.constraint {
+                v if v.is(String) || v.is(Array) => v,
+                _ => vec![String, Array].into(),
+            })
+            .into_fallible(true) // can fail for invalid start..end ranges
+    }
 }
 
 #[cfg(test)]

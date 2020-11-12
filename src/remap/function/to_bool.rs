@@ -72,6 +72,20 @@ impl Expression for ToBoolFn {
             to_bool,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(vec![Boolean, Integer, Float, Null])
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(vec![Boolean, Integer, Float, Null])
+            }))
+            .with_constraint(Boolean)
+    }
 }
 
 #[cfg(test)]

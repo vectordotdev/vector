@@ -55,6 +55,20 @@ impl Expression for FormatTimestampFn {
 
         try_format(&ts, &format).map(Into::into).map(Some)
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let format_def = self
+            .format
+            .type_def(state)
+            .fallible_unless(value::Kind::String);
+
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::Timestamp)
+            .merge(format_def)
+            .into_fallible(true) // due to `try_format`
+            .with_constraint(value::Kind::String)
+    }
 }
 
 fn try_format(dt: &DateTime<Utc>, format: &str) -> Result<String> {

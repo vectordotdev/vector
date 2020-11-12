@@ -106,6 +106,30 @@ impl Expression for ReplaceFn {
             }
         }
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let with_def = self.with.type_def(state).fallible_unless(String);
+
+        let count_def = self
+            .count
+            .as_ref()
+            .map(|count| count.type_def(state).fallible_unless(Integer));
+
+        let pattern_def = match &self.pattern {
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(String)),
+            Argument::Regex(_) => None, // regex is a concrete infallible type
+        };
+
+        self.value
+            .type_def(state)
+            .fallible_unless(String)
+            .merge(with_def)
+            .merge_optional(pattern_def)
+            .merge_optional(count_def)
+            .with_constraint(String)
+    }
 }
 
 #[cfg(test)]

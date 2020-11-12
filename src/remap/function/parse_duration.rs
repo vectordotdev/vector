@@ -112,6 +112,20 @@ impl Expression for ParseDurationFn {
 
         Ok(Some(number.into()))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let output_def = self
+            .output
+            .type_def(state)
+            .fallible_unless(value::Kind::String);
+
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .merge(output_def)
+            .into_fallible(true) // parsing errors
+            .with_constraint(value::Kind::Float)
+    }
 }
 
 #[cfg(test)]

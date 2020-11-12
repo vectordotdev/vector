@@ -46,6 +46,16 @@ impl Expression for StripAnsiEscapeCodesFn {
             .map(Into::into)
             .map_err(|e| e.to_string().into())
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            // TODO: Can probably remove this, as it only fails if writing to
+            //       the buffer fails.
+            .into_fallible(true)
+            .with_constraint(value::Kind::String)
+    }
 }
 
 #[cfg(test)]

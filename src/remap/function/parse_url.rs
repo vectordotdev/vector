@@ -49,6 +49,14 @@ impl Expression for ParseUrlFn {
             .map(Into::into)
             .map(Some)
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .into_fallible(true) // URL parsing error
+            .with_constraint(value::Kind::Map)
+    }
 }
 
 impl From<Url> for event::Value {

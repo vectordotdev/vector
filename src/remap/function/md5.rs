@@ -50,6 +50,13 @@ impl Expression for Md5Fn {
             })
         })
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::String)
+    }
 }
 
 #[cfg(test)]
