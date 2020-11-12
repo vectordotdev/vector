@@ -9,6 +9,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
     FileServer, Fingerprinter,
@@ -24,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryInto;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::task::spawn_blocking;
 
 #[derive(Debug, Snafu)]
@@ -193,7 +194,7 @@ pub fn file_source(
 ) -> super::Source {
     let ignore_before = config
         .ignore_older
-        .map(|secs| SystemTime::now() - Duration::from_secs(secs));
+        .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
     let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())

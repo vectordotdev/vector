@@ -6,6 +6,8 @@ use crossterm::{
     tty::IsTty,
     ExecutableCommand,
 };
+use num_format::{Locale, ToFormattedString};
+use number_prefix::NumberPrefix;
 use std::io::{stdout, Write};
 use tui::{
     backend::{Backend, CrosstermBackend},
@@ -16,14 +18,61 @@ use tui::{
     Frame, Terminal,
 };
 
+/// Format metrics, with thousands separation
+trait ThousandsFormatter {
+    fn thousands_format(&self) -> String;
+}
+
+impl ThousandsFormatter for i64 {
+    fn thousands_format(&self) -> String {
+        match self {
+            0 => "--".into(),
+            _ => self.to_formatted_string(&Locale::en),
+        }
+    }
+}
+
+/// Format metrics, using the 'humanized' format, abbreviating with suffixes
+trait HumanFormatter {
+    fn human_format(&self) -> String;
+    fn human_format_bytes(&self) -> String;
+}
+
+impl HumanFormatter for i64 {
+    /// Format an i64 as a string, returning `--` if zero, the value as a string if < 1000, or
+    /// the value and the recognised abbreviation
+    fn human_format(&self) -> String {
+        match self {
+            0 => "--".into(),
+            n => match NumberPrefix::decimal(*n as f64) {
+                NumberPrefix::Standalone(n) => n.to_string(),
+                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}", n, p),
+            },
+        }
+    }
+
+    /// Format an i64 as a string in the same way as `human_format`, but using a 1024 base
+    /// for binary, and appended with a "B" to represent byte values
+    fn human_format_bytes(&self) -> String {
+        match self {
+            0 => "--".into(),
+            n => match NumberPrefix::binary(*n as f64) {
+                NumberPrefix::Standalone(n) => n.to_string(),
+                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}B", n, p),
+            },
+        }
+    }
+}
+
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
+    human_metrics: bool,
 }
 
 impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(url_string: &'a str) -> Self {
+    pub fn new(url_string: &'a str, human_metrics: bool) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
@@ -33,6 +82,7 @@ impl<'a> Widgets<'a> {
         Self {
             constraints,
             url_string,
+            human_metrics,
         }
     }
 
@@ -55,18 +105,25 @@ impl<'a> Widgets<'a> {
     /// statistics pulled from `ComponentsState`,
     fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
         let items = state.iter().map(|(_, r)| {
-            Row::StyledData(
-                vec![
-                    r.name.clone(),
-                    r.kind.clone(),
-                    r.component_type.clone(),
-                    r.format_events_processed_total(),
-                    r.format_bytes_processed_total(),
-                    r.format_errors(),
+            let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
+
+            // Build metric stats
+            let formatted_metrics = if self.human_metrics {
+                [
+                    r.events_processed_total.human_format(),
+                    r.bytes_processed_total.human_format_bytes(),
+                    r.errors.human_format(),
                 ]
-                .into_iter(),
-                Style::default().fg(Color::White),
-            )
+            } else {
+                [
+                    r.events_processed_total.thousands_format(),
+                    r.bytes_processed_total.thousands_format(),
+                    r.errors.thousands_format(),
+                ]
+            };
+
+            data.extend_from_slice(&formatted_metrics);
+            Row::StyledData(data.into_iter(), Style::default().fg(Color::White))
         });
 
         let w = Table::new(state::COMPONENT_HEADERS.iter(), items)
@@ -123,6 +180,7 @@ pub fn is_tty() -> bool {
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
 pub async fn init_dashboard(
     url: &str,
+    human_metrics: bool,
     mut state_rx: state::StateRx,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
@@ -144,7 +202,7 @@ pub async fn init_dashboard(
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    let widgets = Widgets::new(url);
+    let widgets = Widgets::new(url, human_metrics);
 
     loop {
         tokio::select! {
@@ -167,4 +225,102 @@ pub async fn init_dashboard(
     disable_raw_mode()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// Zero should be formatted as "--" in all cases
+    fn format_zero() {
+        const N: i64 = 0;
+
+        assert_eq!(N.thousands_format(), "--");
+        assert_eq!(N.human_format(), "--");
+    }
+
+    #[test]
+    /// < 1000 should always be as-is
+    fn format_hundred() {
+        const N: i64 = 100;
+
+        assert_eq!(N.thousands_format(), "100");
+        assert_eq!(N.human_format(), "100");
+    }
+
+    #[test]
+    /// 1,000+ starts to make a difference...
+    fn format_thousands() {
+        const N: i64 = 1_000;
+
+        assert_eq!(N.thousands_format(), "1,000");
+        assert_eq!(N.human_format(), "1.00 k");
+    }
+
+    #[test]
+    /// Shouldn't round down
+    fn format_thousands_no_rounding() {
+        const N: i64 = 1_500;
+
+        assert_eq!(N.thousands_format(), "1,500");
+        assert_eq!(N.human_format(), "1.50 k");
+    }
+
+    #[test]
+    /// Should round down when human formatted
+    fn format_thousands_round_down() {
+        const N: i64 = 1_514;
+
+        assert_eq!(N.thousands_format(), "1,514");
+        assert_eq!(N.human_format(), "1.51 k");
+    }
+
+    #[test]
+    /// Should round up when human formatted
+    fn format_thousands_round_up() {
+        const N: i64 = 1_999;
+
+        assert_eq!(N.thousands_format(), "1,999");
+        assert_eq!(N.human_format(), "2.00 k");
+    }
+
+    #[test]
+    /// Should format millions
+    fn format_millions() {
+        const N: i64 = 1_000_000;
+
+        assert_eq!(N.thousands_format(), "1,000,000");
+        assert_eq!(N.human_format(), "1.00 M");
+    }
+
+    #[test]
+    /// Should format billions
+    fn format_billions() {
+        const N: i64 = 1_000_000_000;
+
+        assert_eq!(N.thousands_format(), "1,000,000,000");
+        assert_eq!(N.human_format(), "1.00 G");
+    }
+
+    #[test]
+    /// Should format trillions
+    fn format_trillions() {
+        const N: i64 = 1_100_000_000_000;
+
+        assert_eq!(N.thousands_format(), "1,100,000,000,000");
+        assert_eq!(N.human_format(), "1.10 T");
+    }
+
+    #[test]
+    /// Should format bytes
+    fn format_bytes() {
+        const N: i64 = 1024;
+
+        assert_eq!(N.human_format_bytes(), "1.00 KiB");
+        assert_eq!((N * N).human_format_bytes(), "1.00 MiB");
+        assert_eq!((N * (N * N)).human_format_bytes(), "1.00 GiB");
+        assert_eq!((N * (N * (N * N))).human_format_bytes(), "1.00 TiB");
+        assert_eq!((N * (N * (N * (N * N)))).human_format_bytes(), "1.00 PiB");
+    }
 }
