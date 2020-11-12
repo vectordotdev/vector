@@ -23,11 +23,12 @@ impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
         let expected_result = TypeDef {
             fallible: true,
-            optional: false,
+            optional: true,
             constraint: value::Constraint::Exact(value::Kind::Boolean),
         };
 
-        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)?;
+        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)
+            .map_err(|e| e.to_string())?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -63,7 +64,7 @@ impl Condition for Remap {
         self.execute(&event)
             .map(|opt| match opt {
                 Some(value) => value,
-                None => unreachable!("non-optional constraint set"),
+                None => Value::Boolean(false),
             })
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
@@ -76,14 +77,16 @@ impl Condition for Remap {
     }
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        self.execute(event)
+        let result = self
+            .execute(event)
             .map_err(|err| format!("source execution failed: {:#}", err))?
-            .ok_or_else(|| unreachable!("non-optional constraint set"))
-            .and_then(|value| match value {
-                Value::Boolean(v) if v => Ok(()),
-                Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-                _ => unreachable!("boolean type constraint set"),
-            })
+            .unwrap_or_else(|| Value::Boolean(false));
+
+        match result {
+            Value::Boolean(v) if v => Ok(()),
+            Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
+            _ => unreachable!("boolean type constraint set"),
+        }
     }
 }
 
