@@ -15,8 +15,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
@@ -132,10 +131,7 @@ impl SinkConfig for ElasticSearchConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -170,8 +166,6 @@ enum ParseError {
     HostMustIncludeHostname { host: String },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
-    #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
-    AWSCompressionNotAllowed,
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateError },
 }
@@ -379,12 +373,7 @@ impl ElasticSearchCommon {
             ),
         };
 
-        // Only allow compression if we are running with no AWS credentials.
         let compression = config.compression;
-        if credentials.is_some() && compression != Compression::None {
-            return Err(ParseError::AWSCompressionNotAllowed.into());
-        }
-
         let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
         let index = Template::try_from(index).context(IndexTemplate)?;
 

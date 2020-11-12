@@ -233,7 +233,7 @@ impl Metric {
 
         Self {
             name: key.name().to_string(),
-            namespace: None,
+            namespace: Some("vector".to_string()),
             timestamp: Some(Utc::now()),
             tags: if labels.is_empty() {
                 None
@@ -251,6 +251,11 @@ impl Metric {
             .as_ref()
             .filter(|t| t.get(name).filter(|v| *v == value).is_some())
             .is_some()
+    }
+
+    /// Returns the string value of a tag, if it exists
+    pub fn tag_value(&self, name: &str) -> Option<String> {
+        self.tags.as_ref().and_then(|t| t.get(name).cloned())
     }
 }
 

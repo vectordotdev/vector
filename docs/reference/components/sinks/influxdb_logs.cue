@@ -57,7 +57,17 @@ components: sinks: influxdb_logs: {
 		notices: []
 	}
 
-	configuration: sinks._influxdb.configuration
+	configuration: sinks._influxdb.configuration & {
+		namespace: {
+			description: "A prefix that will be added to all logs names."
+			groups: ["v1", "v2"]
+			required: true
+			warnings: []
+			type: string: {
+				examples: ["service"]
+			}
+		}
+	}
 
 	input: {
 		logs:    true

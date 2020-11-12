@@ -39,6 +39,7 @@ lazy_static! {
         Box::new(StripWhitespace),
         Box::new(StripAnsiEscapeCodes),
         Box::new(Match),
+        Box::new(Replace),
     ];
 
     // List of both mutable, and immutable functions that can be loaded into a
