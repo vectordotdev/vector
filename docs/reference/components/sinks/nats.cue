@@ -1,30 +1,47 @@
 package metadata
 
 components: sinks: nats: {
-	title:             "NATS"
-	short_description: "Streams log events to a [NATS][urls.nats] on a NATS subject."
-	long_description:  "NATS.io is a simple, secure and high performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures. NATS.io is a Cloud Native Computing Foundation project."
+	title:       "NATS"
+	description: "[NATS.io](\(urls.nats)) is a simple, secure and high performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures. NATS.io is a Cloud Native Computing Foundation project."
 
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
 		development:   "beta"
 		egress_method: "stream"
-		function:      "transmit"
 		service_providers: []
 	}
 
 	features: {
 		buffer: enabled:      false
-		compression: enabled: false
-		encoding: codec: {
-			enabled: true
-			default: null
-			enum: ["json", "text"]
-		}
 		healthcheck: enabled: true
-		request: enabled:     false
-		tls: enabled:         false
+		send: {
+			compression: enabled: false
+			encoding: {
+				enabled: true
+				codec: {
+					enabled: true
+					default: null
+					enum: ["json", "text"]
+				}
+			}
+			request: enabled: false
+			tls: enabled:     false
+			to: {
+				name:     "NATS"
+				thing:    "a \(name) server"
+				url:      urls.nats
+				versions: null
+
+				interface: {
+					socket: {
+						direction: "outgoing"
+						protocols: ["tcp"]
+						ssl: "disabled"
+					}
+				}
+			}
+		}
 	}
 
 	support: {
@@ -58,6 +75,7 @@ components: sinks: nats: {
 			warnings: []
 			type: string: {
 				examples: ["foo", "time.us.east", "time.*.east", "time.>", ">"]
+				templateable: true
 			}
 		}
 		name: {
@@ -73,6 +91,6 @@ components: sinks: nats: {
 
 	input: {
 		logs:    true
-		metrics: false
+		metrics: null
 	}
 }
