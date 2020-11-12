@@ -136,12 +136,16 @@ pub(super) trait MetricCollector {
                     count,
                     sum,
                 } => {
+                    let mut value = 0f64;
                     for (b, c) in buckets.iter().zip(counts.iter()) {
+                        // prometheus uses cumulative histogram
+                        // https://prometheus.io/docs/concepts/metric_types/#histogram
+                        value += *c as f64;
                         self.emit(
                             timestamp,
                             &name,
                             "_bucket",
-                            *c as f64,
+                            value,
                             tags,
                             Some(("le", b.to_string())),
                         );
@@ -490,7 +494,16 @@ mod tests {
             header,
             "# HELP vector_requests requests\n# TYPE vector_requests histogram\n".to_owned()
         );
-        assert_eq!(frame, "vector_requests_bucket{le=\"1\"} 1\nvector_requests_bucket{le=\"2.1\"} 2\nvector_requests_bucket{le=\"3\"} 3\nvector_requests_bucket{le=\"+Inf\"} 6\nvector_requests_sum 12.5\nvector_requests_count 6\n".to_owned());
+        assert_eq!(
+            frame,
+            r#"vector_requests_bucket{le="1"} 1
+vector_requests_bucket{le="2.1"} 3
+vector_requests_bucket{le="3"} 6
+vector_requests_bucket{le="+Inf"} 6
+vector_requests_sum 12.5
+vector_requests_count 6
+"#
+        );
     }
 
     #[test]
