@@ -1,11 +1,12 @@
 use crate::FilePosition;
 use bytes::{Bytes, BytesMut};
+use chrono::{DateTime, Utc};
 use flate2::bufread::MultiGzDecoder;
 use std::{
     fs::{self, File},
     io::{self, BufRead, Seek},
     path::PathBuf,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 
 use crate::metadata_ext::PortableFileExt;
@@ -40,7 +41,7 @@ impl FileWatcher {
     pub fn new(
         path: PathBuf,
         file_position: FilePosition,
-        ignore_before: Option<SystemTime>,
+        ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
     ) -> Result<FileWatcher, io::Error> {
         let f = fs::File::open(&path)?;
@@ -48,9 +49,10 @@ impl FileWatcher {
         let metadata = f.metadata()?;
         let mut reader = io::BufReader::new(f);
 
-        let too_old = if let (Some(ignore_before), Ok(modified_time)) =
-            (ignore_before, metadata.modified())
-        {
+        let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
+            ignore_before,
+            metadata.modified().map(DateTime::<Utc>::from),
+        ) {
             modified_time < ignore_before
         } else {
             false
@@ -314,7 +316,7 @@ mod test {
         let p = read_until_with_max_size(&mut buf, &mut pos, b'3', &mut v, 1000).unwrap();
         assert_eq!(pos, 4);
         assert_eq!(p, None);
-        assert_eq!(&*v, []);
+        assert_eq!(&*v, [0; 0]);
 
         let mut buf = Cursor::new(&b"short\nthis is too long\nexact size\n11 eleven11\n"[..]);
         let mut pos = 0;
@@ -332,6 +334,6 @@ mod test {
         let p = read_until_with_max_size(&mut buf, &mut pos, b'\n', &mut v, 10).unwrap();
         assert_eq!(pos, 46);
         assert_eq!(p, None);
-        assert_eq!(&*v, []);
+        assert_eq!(&*v, [0; 0]);
     }
 }
