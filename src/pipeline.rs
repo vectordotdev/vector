@@ -91,7 +91,7 @@ impl Pipeline {
     }
 }
 
-#[cfg(all(test, feature = "transforms-add_fields"))]
+#[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
 mod test {
     use super::*;
     use crate::{
