@@ -40,4 +40,5 @@ jobs:
         run: |
           $ErrorActionPreference = 'SilentlyContinue'
           cargo test --no-fail-fast --no-default-features --features default-msvc
+        shell: powershell -Command "& '{0}'"
       - run: Get-CimInstance -Class CIM_LogicalDisk
