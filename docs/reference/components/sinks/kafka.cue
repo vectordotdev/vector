@@ -16,6 +16,13 @@ components: sinks: kafka: {
 		buffer: enabled:      true
 		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       true
+				max_bytes:    null
+				max_events:   null
+				timeout_secs: null
+			}
 			compression: {
 				enabled: true
 				default: "none"
