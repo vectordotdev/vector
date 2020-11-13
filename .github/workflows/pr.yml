@@ -37,16 +37,16 @@ jobs:
       - run: |
           $ErrorActionPreference = 'Continue'
 
-          $sys = Get-CmiInstance -Class Win32_Computersystem
+          $sys = Get-CimInstance -Class Win32_Computersystem
           $sys.AutomaticManagedPagefile = $false
           Set-CimInstance -InputObject $sys
 
-          $Pagefile = Get-CmiInstance -Class Win32_PagefileSetting | Where-Object {$_.name -eq “C:\pagefile.sys”}
+          $Pagefile = Get-CimInstance -Class Win32_PagefileSetting | Where-Object {$_.name -eq “C:\pagefile.sys”}
           $Pagefile.InitialSize = 20000
           $Pagefile.MaximumSize = 80000
           Set-CimInstance -InputObject $PageFile
 
-          $Pagefile = Get-CmiInstance -Class Win32_PagefileSetting
+          $Pagefile = Get-CimInstance -Class Win32_PagefileSetting
           $pagefile.Name = “D:\pagefile.sys”
           $pagefile.Caption = “D:\pagefile.sys”
           $pagefile.Description = “’pagefile.sys’ @ D:\”
@@ -58,7 +58,7 @@ jobs:
           Get-CimInstance -Class CIM_LogicalDisk
           Get-CimInstance -Class Win32_PageFileUsage | Select-Object *
           Get-CimInstance -Class Win32_Pagefile | Select-Object *
-          (Get-CmiInstance -Class Win32_Pagefile) –eq $null
+          (Get-CimInstance -Class Win32_Pagefile) –eq $null
 
           exit 0
       - env:
