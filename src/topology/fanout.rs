@@ -89,9 +89,11 @@ impl Fanout {
 
         let mut poll_result = Async::Ready(());
 
-        for i in 0..self.sinks.len() {
-            let (_name, sink) = &mut self.sinks[i];
+        // Cannot remove a sink while iterating over them, so just make
+        // note of sink error and handle them later.
+        let mut errors = vec![];
 
+        for (i, (_name, sink)) in self.sinks.iter_mut().enumerate() {
             let result = if close {
                 sink.close()
             } else {
@@ -101,8 +103,12 @@ impl Fanout {
             match result {
                 Ok(Async::Ready(())) => {}
                 Ok(Async::NotReady) => poll_result = Async::NotReady,
-                Err(()) => self.handle_sink_error(i)?,
+                Err(()) => errors.push(i),
             }
+        }
+
+        for i in errors {
+            self.handle_sink_error(i)?;
         }
 
         Ok(poll_result)
