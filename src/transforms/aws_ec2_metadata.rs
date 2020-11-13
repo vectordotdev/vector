@@ -5,9 +5,10 @@ use crate::{
     internal_events::{
         AwsEc2MetadataEventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
     },
-    transforms::{FunctionTransform, Transform},
+    transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
+use futures01::Stream as Stream01;
 use http::{uri::PathAndQuery, Request, StatusCode, Uri};
 use hyper::{body::to_bytes as body_to_bytes, Body};
 use serde::{Deserialize, Serialize};
@@ -154,7 +155,7 @@ impl TransformConfig for Ec2Metadata {
             .instrument(info_span!("aws_ec2_metadata: worker")),
         );
 
-        Ok(Transform::function(Ec2MetadataTransform { state: read }))
+        Ok(Transform::task(Ec2MetadataTransform { state: read }))
     }
 
     fn input_type(&self) -> DataType {
@@ -170,8 +171,21 @@ impl TransformConfig for Ec2Metadata {
     }
 }
 
-impl FunctionTransform for Ec2MetadataTransform {
-    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
+impl TaskTransform for Ec2MetadataTransform {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::new(task.filter_map(move |event| inner.transform_one(event)))
+    }
+}
+
+impl Ec2MetadataTransform {
+    fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         let log = event.as_mut_log();
 
         if let Some(read_ref) = self.state.read() {
@@ -184,7 +198,7 @@ impl FunctionTransform for Ec2MetadataTransform {
 
         emit!(AwsEc2MetadataEventProcessed);
 
-        output.push(event)
+        Some(event)
     }
 }
 
