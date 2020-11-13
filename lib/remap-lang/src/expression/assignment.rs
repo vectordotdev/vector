@@ -88,7 +88,7 @@ mod tests {
     test_type_def![
         variable {
             expr: |state: &mut state::Compiler| {
-                let target = Target::Variable("foo".to_owned());
+                let target = Target::Variable(Variable::new("foo".to_owned()));
                 let value = Box::new(Literal::from(true).into());
 
                 Assignment::new(target, value, state)
@@ -101,7 +101,7 @@ mod tests {
 
         path {
             expr: |state: &mut state::Compiler| {
-                let target = Target::Path(vec![vec!["foo".to_owned()]]);
+                let target = Target::Path(Path::from("foo"));
                 let value = Box::new(Literal::from("foo").into());
 
                 Assignment::new(target, value, state)
