@@ -9,7 +9,7 @@ use crate::{
 };
 use evmap::ReadHandle;
 use k8s_openapi::{
-    api::core::v1::{Container, Pod, PodSpec},
+    api::core::v1::{Container, Pod, PodSpec, PodStatus},
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
 use serde::{Deserialize, Serialize};
@@ -20,6 +20,8 @@ pub struct FieldsSpec {
     pub pod_name: String,
     pub pod_namespace: String,
     pub pod_uid: String,
+    pub pod_ip: String,
+    pub pod_ips: String,
     pub pod_labels: String,
     pub pod_node_name: String,
     pub container_name: String,
@@ -32,6 +34,8 @@ impl Default for FieldsSpec {
             pod_name: "kubernetes.pod_name".to_owned(),
             pod_namespace: "kubernetes.pod_namespace".to_owned(),
             pod_uid: "kubernetes.pod_uid".to_owned(),
+            pod_ip: "kubernetes.pod_ip".to_owned(),
+            pod_ips: "kubernetes.pod_ips".to_owned(),
             pod_labels: "kubernetes.pod_labels".to_owned(),
             pod_node_name: "kubernetes.pod_node_name".to_owned(),
             container_name: "kubernetes.container_name".to_owned(),
@@ -72,6 +76,7 @@ impl PodMetadataAnnotator {
 
         annotate_from_file_info(log, &self.fields_spec, &file_info);
         annotate_from_metadata(log, &self.fields_spec, &pod.metadata);
+
         if let Some(ref pod_spec) = pod.spec {
             annotate_from_pod_spec(log, &self.fields_spec, pod_spec);
 
@@ -82,6 +87,10 @@ impl PodMetadataAnnotator {
             if let Some(container) = container {
                 annotate_from_container(log, &self.fields_spec, container);
             }
+        }
+
+        if let Some(ref pod_status) = pod.status {
+            annotate_from_pod_status(log, &self.fields_spec, pod_status);
         }
         Some(())
     }
@@ -130,6 +139,24 @@ fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec
     }
 }
 
+fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_status: &PodStatus) {
+    for (ref key, ref val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
+        if let Some(val) = val {
+            log.insert(key, val.to_owned());
+        }
+    }
+
+    for (ref key, ref val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
+        if let Some(val) = val {
+            let inner: Vec<String> = val
+                .iter()
+                .filter_map(|v| v.ip.clone())
+                .collect::<Vec<String>>();
+            log.insert(key, inner);
+        }
+    }
+}
+
 fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, container: &Container) {
     for (ref key, ref val) in [(&fields_spec.container_image, &container.image)].iter() {
         if let Some(val) = val {
@@ -141,6 +168,7 @@ fn annotate_from_container(log: &mut LogEvent, fields_spec: &FieldsSpec, contain
 #[cfg(test)]
 mod tests {
     use super::*;
+    use k8s_openapi::api::core::v1::PodIP;
 
     #[test]
     fn test_annotate_from_metadata() {
@@ -319,6 +347,106 @@ mod tests {
         for (fields_spec, pod_spec, expected) in cases.into_iter() {
             let mut log = LogEvent::default();
             annotate_from_pod_spec(&mut log, &fields_spec, &pod_spec);
+            assert_eq!(log, expected);
+        }
+    }
+
+    #[test]
+    fn test_annotate_from_pod_status() {
+        let cases = vec![
+            (
+                FieldsSpec::default(),
+                PodStatus::default(),
+                LogEvent::default(),
+            ),
+            (
+                FieldsSpec::default(),
+                PodStatus {
+                    pod_ip: Some("192.168.1.2".to_owned()),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log
+                },
+            ),
+            (
+                FieldsSpec::default(),
+                PodStatus {
+                    pod_ips: Some(vec![PodIP {
+                        ip: Some("192.168.1.2".to_owned()),
+                    }]),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    let mut ips_vec = Vec::new();
+                    ips_vec.push("192.168.1.2");
+                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log
+                },
+            ),
+            (
+                FieldsSpec {
+                    pod_ip: "kubernetes.custom_pod_ip".to_owned(),
+                    pod_ips: "kubernetes.custom_pod_ips".to_owned(),
+                    ..FieldsSpec::default()
+                },
+                PodStatus {
+                    pod_ip: Some("192.168.1.2".to_owned()),
+                    pod_ips: Some(vec![
+                        PodIP {
+                            ip: Some("192.168.1.2".to_owned()),
+                        },
+                        PodIP {
+                            ip: Some("192.168.1.3".to_owned()),
+                        },
+                    ]),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.custom_pod_ip", "192.168.1.2");
+                    let mut ips_vec = Vec::new();
+                    ips_vec.push("192.168.1.2");
+                    ips_vec.push("192.168.1.3");
+                    log.insert("kubernetes.custom_pod_ips", ips_vec);
+                    log
+                },
+            ),
+            (
+                FieldsSpec {
+                    pod_node_name: "node_name".to_owned(),
+                    ..FieldsSpec::default()
+                },
+                PodStatus {
+                    pod_ip: Some("192.168.1.2".to_owned()),
+                    pod_ips: Some(vec![
+                        PodIP {
+                            ip: Some("192.168.1.2".to_owned()),
+                        },
+                        PodIP {
+                            ip: Some("192.168.1.3".to_owned()),
+                        },
+                    ]),
+                    ..Default::default()
+                },
+                {
+                    let mut log = LogEvent::default();
+                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    let mut ips_vec = Vec::new();
+                    ips_vec.push("192.168.1.2");
+                    ips_vec.push("192.168.1.3");
+                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log
+                },
+            ),
+        ];
+
+        for (fields_spec, pod_status, expected) in cases.into_iter() {
+            let mut log = LogEvent::default();
+            annotate_from_pod_status(&mut log, &fields_spec, &pod_status);
             assert_eq!(log, expected);
         }
     }
