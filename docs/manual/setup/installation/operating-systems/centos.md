@@ -113,9 +113,9 @@ Vector's RPM source files are located in
 
 ### Start Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+```bash
+sudo systemctl start vector
+```
 
 </li>
 </ol>

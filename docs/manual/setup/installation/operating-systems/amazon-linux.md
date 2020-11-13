@@ -103,20 +103,16 @@ Vector's RPM source files are located in
 
 ### Configure Vector
 
-<ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
-  sinkName={null} />
+<ConfigExample format="toml" path={"/etc/vector/vector.toml"} sourceName={"journald"} sinkName={null} />
 
 </li>
 <li>
 
 ### Start Vector
 
-    ```bash
-    sudo systemctl start vector
-    ```
+```bash
+sudo systemctl start vector
+```
 
 </li>
 </ol>

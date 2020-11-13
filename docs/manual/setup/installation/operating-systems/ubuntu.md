@@ -55,7 +55,7 @@ The following diagram demonstrates how it works.
 <li>
 
 ### Install
-#
+
 Vector can be installed from an [Apt package repository][urls.apt] which is
 generally used on Debian and Ubuntu.
 
