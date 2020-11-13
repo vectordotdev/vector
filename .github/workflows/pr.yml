@@ -35,20 +35,40 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-          $ErrorActionPreference = 'SilentlyContinue'
+          $ErrorActionPreference = 'Continue'
+
+          $sys = Get-WmiObject Win32_Computersystem –EnableAllPrivileges
+          $sys.AutomaticManagedPagefile = $false
+          $sys.put()
+
+          $Pagefile = Get-WmiObject Win32_PagefileSetting | Where-Object {$_.name -eq “C:\pagefile.sys”}
+          $Pagefile.InitialSize = 20000
+          $Pagefile.MaximumSize = 80000
+          $Pagefile.put()
+
+          $Pagefile = Get-WmiObject Win32_PagefileSetting
+          $pagefile.Name = “D:\pagefile.sys”
+          $pagefile.Caption = “D:\pagefile.sys”
+          $pagefile.Description = “’pagefile.sys’ @ D:\”
+          $pagefile.SettingID =”pagefile.sys @ D:”
+          $pagefile.InitialSize = 20000
+          $pagefile.MaximumSize = 80000
+          $pagefile.put()
+
           Get-CimInstance -Class CIM_LogicalDisk
           Get-CimInstance -Class Win32_PageFileUsage | Select-Object *
           (Get-WmiObject Win32_Pagefile) –eq $null
+
           exit 0
       - env:
           RUSTFLAGS: "-D warnings"
         run: |
-          $ErrorActionPreference = 'SilentlyContinue'
+          $ErrorActionPreference = 'Continue'
           cargo test --no-fail-fast --no-default-features --features default-msvc
           exit 0
         shell: powershell -Command "& '{0}'"
       - run: |
-          $ErrorActionPreference = 'SilentlyContinue'
+          $ErrorActionPreference = 'Continue'
           Get-CimInstance -Class CIM_LogicalDisk
           Get-CimInstance -Class Win32_PageFileUsage | Select-Object *
           exit 0
