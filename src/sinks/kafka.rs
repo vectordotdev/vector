@@ -26,7 +26,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::{sync::watch, time::Duration};
+use tokio::{sync::Notify, time::Duration};
 
 // Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
 const SEND_RESULT_LIMIT: usize = 5;
@@ -78,7 +78,7 @@ pub struct KafkaSink {
     topic: Template,
     key_field: Option<String>,
     encoding: EncodingConfig<Encoding>,
-    watch_channel: (watch::Sender<()>, watch::Receiver<()>),
+    flush_signal: Arc<Notify>,
     delivery_fut: FuturesUnordered<BoxFuture<'static, (usize, Result<DeliveryFuture, KafkaError>)>>,
     in_flight: FuturesUnordered<
         BoxFuture<'static, (usize, Result<Result<(i32, i64), KafkaError>, Canceled>)>,
@@ -156,7 +156,7 @@ impl KafkaSink {
             topic: Template::try_from(config.topic).context(TopicTemplate)?,
             key_field: config.key_field,
             encoding: config.encoding.into(),
-            watch_channel: watch::channel(()),
+            flush_signal: Arc::new(Notify::new()),
             delivery_fut: FuturesUnordered::new(),
             in_flight: FuturesUnordered::new(),
             acker,
@@ -211,7 +211,7 @@ impl Sink<Event> for KafkaSink {
         self.seq_head += 1;
 
         let producer = Arc::clone(&self.producer);
-        let mut rx = self.watch_channel.1.clone();
+        let flush_signal = Arc::clone(&self.flush_signal);
         self.delivery_fut.push(Box::pin(async move {
             let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
             if let Some(Value::Timestamp(timestamp)) =
@@ -232,7 +232,7 @@ impl Sink<Event> for KafkaSink {
                     {
                         debug!(message = "The rdkafka queue full.", %error, %seqno, rate_limit_secs = 1);
                         record = future_record;
-                        let _ = rx.recv().await;
+                        let _ = flush_signal.notified().await;
                     }
                     Err((error, _)) => break Err(error),
                 }
@@ -249,7 +249,7 @@ impl Sink<Event> for KafkaSink {
 
         while !this.delivery_fut.is_empty() || !this.in_flight.is_empty() {
             while let Poll::Ready(Some(item)) = this.in_flight.poll_next_unpin(cx) {
-                let _ = this.watch_channel.0.broadcast(());
+                this.flush_signal.notify();
                 match item {
                     (seqno, Ok(result)) => {
                         match result {
