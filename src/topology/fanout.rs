@@ -155,7 +155,7 @@ mod tests {
     use super::{ControlMessage, Fanout};
     use crate::{test_util::collect_ready, Event};
     use futures::compat::Future01CompatExt;
-    use futures01::{stream, sync::mpsc, Future, Sink, Stream};
+    use futures01::{stream, sync::mpsc, Async, AsyncSink, Future, Poll, Sink, StartSend, Stream};
     use tokio::time::{delay_for, Duration};
 
     #[tokio::test]
@@ -173,14 +173,12 @@ mod tests {
         let rec1 = Event::from("line 1".to_string());
         let rec2 = Event::from("line 2".to_string());
 
-        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
-        let _fanout = fanout.send(rec2.clone()).compat().await.unwrap();
+        let recs = vec![rec1, rec2];
+        let fanout = fanout.send_all(stream::iter_ok(recs.clone())).compat();
+        let _ = fanout.await.unwrap();
 
-        assert_eq!(
-            collect_ready(rx_a).await.unwrap(),
-            vec![rec1.clone(), rec2.clone()]
-        );
-        assert_eq!(collect_ready(rx_b).await.unwrap(), vec![rec1, rec2]);
+        assert_eq!(collect_ready(rx_a).await.unwrap(), recs.clone());
+        assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
     }
 
     #[tokio::test]
@@ -447,5 +445,79 @@ mod tests {
             vec![rec1, rec2, rec3.clone()]
         );
         assert_eq!(collect_ready(rx_a2).await.unwrap(), vec![rec3]);
+    }
+
+    #[tokio::test]
+    async fn fanout_error_send() {
+        fanout_error(ErrorWhen::Send).await
+    }
+
+    #[tokio::test]
+    async fn fanout_error_poll() {
+        fanout_error(ErrorWhen::Poll).await
+    }
+
+    async fn fanout_error(when: ErrorWhen) {
+        let (tx_a, rx_a) = mpsc::channel(1);
+        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
+
+        let tx_b = AlwaysErrors { when };
+        let tx_b = Box::new(tx_b.sink_map_err(|_| ()));
+
+        let (tx_c, rx_c) = mpsc::channel(1);
+        let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
+
+        let mut fanout = Fanout::new().0;
+
+        fanout.add("a".to_string(), tx_a);
+        fanout.add("b".to_string(), tx_b);
+        fanout.add("c".to_string(), tx_c);
+
+        let rec1 = Event::from("line 1".to_string());
+        let rec2 = Event::from("line 2".to_string());
+        let rec3 = Event::from("line 3".to_string());
+
+        let recs = vec![rec1, rec2, rec3];
+        let send = fanout.send_all(stream::iter_ok(recs.clone()));
+        tokio::spawn(send.map(|_| ()).compat());
+
+        delay_for(Duration::from_millis(50)).await;
+
+        let collect_a = tokio::spawn(rx_a.collect().compat());
+        let collect_c = tokio::spawn(rx_c.collect().compat());
+
+        assert_eq!(collect_a.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_c.await.unwrap().unwrap(), recs);
+    }
+
+    enum ErrorWhen {
+        Send,
+        Poll,
+    }
+
+    struct AlwaysErrors {
+        when: ErrorWhen,
+    }
+
+    impl Sink for AlwaysErrors {
+        type SinkItem = Event;
+        type SinkError = crate::Error;
+
+        fn start_send(
+            &mut self,
+            _item: Self::SinkItem,
+        ) -> StartSend<Self::SinkItem, Self::SinkError> {
+            match self.when {
+                ErrorWhen::Send => Err("Something failed".into()),
+                _ => Ok(AsyncSink::Ready),
+            }
+        }
+
+        fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
+            match self.when {
+                ErrorWhen::Poll => Err("Something failed".into()),
+                _ => Ok(Async::Ready(())),
+            }
+        }
     }
 }
