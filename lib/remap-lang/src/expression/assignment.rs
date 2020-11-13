@@ -75,7 +75,7 @@ impl Expression for Assignment {
             Target::Path(path) => state
                 .path_query_type(&path.as_string())
                 .cloned()
-                .expect("variable must be assigned via Assignment::new"),
+                .expect("path must be assigned via Assignment::new"),
         }
     }
 }
