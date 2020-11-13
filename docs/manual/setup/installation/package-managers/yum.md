@@ -4,25 +4,15 @@ sidebar_label: Yum Repository
 description: Install Vector through an RPM package repository
 ---
 
-import Alert from '@site/src/components/Alert';
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import Jump from '@site/src/components/Jump';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector can be installed from an [Yum package repository][urls.rpm] which is
 generally used on Red Hat, Fedora, and CentOS.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -41,13 +31,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"yum"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"Yum","value":"yum"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"yum"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"Yum","value":"yum"}]}>
 <TabItem value="yum">
 
 <Steps headingDepth={3}>
@@ -103,10 +93,10 @@ Vector's RPM source files are located in
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"journald"}
+sinkName={null} />
 
 </li>
 <li>
@@ -151,7 +141,6 @@ Vector can be managed through the [Systemd][urls.systemd] service manager:
 <Jump to="/docs/administration/">Administration</Jump>
 
 ## Uninstalling
-
 
 Via `yum`:
 

@@ -93,7 +93,10 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     }
                 }
 
-                for (tags, aggregate) in aggregates {
+                for (tags, mut aggregate) in aggregates {
+                    for i in (1..aggregate.counts.len()).rev() {
+                        aggregate.counts[i] -= aggregate.counts[i - 1];
+                    }
                     let hist = Metric {
                         name: group.name.clone(),
                         namespace: None,
@@ -741,7 +744,7 @@ mod test {
                 kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
-                    counts: vec![24054, 33444, 100392, 129389, 133988],
+                    counts: vec![24054, 9390, 66948, 28997, 4599],
                     count: 144320,
                     sum: 53423.0,
                 },
@@ -809,7 +812,7 @@ mod test {
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
                             36000.0
                         ],
-                        counts: vec![327, 474, 535, 536, 536, 536, 536, 536, 536, 536],
+                        counts: vec![327, 147, 61, 1, 0, 0, 0, 0, 0, 0],
                         count: 536,
                         sum: 19690.129384881966,
                     },
@@ -825,7 +828,7 @@ mod test {
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
                             36000.0
                         ],
-                        counts: vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                        counts: vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                         count: 1,
                         sum: 28.975436316,
                     },
@@ -841,7 +844,7 @@ mod test {
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
                             36000.0
                         ],
-                        counts: vec![285, 1165, 3071, 3151, 3252, 3255, 3255, 3255, 3255, 3255],
+                        counts: vec![285, 880, 1906, 80, 101, 3, 0, 0, 0, 0],
                         count: 3255,
                         sum: 381111.7498891335,
                     },

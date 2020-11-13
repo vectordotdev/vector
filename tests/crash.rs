@@ -2,9 +2,13 @@
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
 use async_trait::async_trait;
-use futures::{compat::Future01CompatExt, future, FutureExt};
-use futures01::{Async, AsyncSink, Sink, Stream};
+use futures::{compat::Future01CompatExt, future, FutureExt, Sink};
+use futures01::Stream;
 use serde::{Deserialize, Serialize};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 use tokio::time::{delay_for, Duration};
 use vector::{
     config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
@@ -25,7 +29,7 @@ struct PanicSink;
 impl SinkConfig for PanicSink {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Futures01Sink(Box::new(PanicSink)),
+            VectorSink::Sink(Box::new(PanicSink)),
             future::ok(()).boxed(),
         ))
     }
@@ -39,19 +43,23 @@ impl SinkConfig for PanicSink {
     }
 }
 
-impl Sink for PanicSink {
-    type SinkItem = Event;
-    type SinkError = ();
+impl Sink<Event> for PanicSink {
+    type Error = ();
 
-    fn start_send(
-        &mut self,
-        _item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        panic!();
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
     }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        panic!();
+    fn start_send(self: Pin<&mut Self>, _item: Event) -> Result<(), Self::Error> {
+        panic!()
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
     }
 }
 
@@ -107,7 +115,7 @@ struct ErrorSink;
 impl SinkConfig for ErrorSink {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Futures01Sink(Box::new(ErrorSink)),
+            VectorSink::Sink(Box::new(ErrorSink)),
             future::ok(()).boxed(),
         ))
     }
@@ -121,19 +129,23 @@ impl SinkConfig for ErrorSink {
     }
 }
 
-impl Sink for ErrorSink {
-    type SinkItem = Event;
-    type SinkError = ();
+impl Sink<Event> for ErrorSink {
+    type Error = ();
 
-    fn start_send(
-        &mut self,
-        _item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, _item: Event) -> Result<(), Self::Error> {
         Err(())
     }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        Err(())
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
     }
 }
 

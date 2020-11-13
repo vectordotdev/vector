@@ -1,4 +1,3 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Value,
@@ -6,11 +5,12 @@ use crate::{
         ANSIStripperEventProcessed, ANSIStripperFailed, ANSIStripperFieldInvalid,
         ANSIStripperFieldMissing,
     },
-    Event,
+    transforms::{FunctionTransform, Transform},
+    Event, Result,
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AnsiStripperConfig {
     field: Option<String>,
@@ -29,13 +29,13 @@ impl GenerateConfig for AnsiStripperConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "ansi_stripper")]
 impl TransformConfig for AnsiStripperConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into());
 
-        Ok(Box::new(AnsiStripper { field }))
+        Ok(Transform::function(AnsiStripper { field }))
     }
 
     fn input_type(&self) -> DataType {
@@ -51,12 +51,13 @@ impl TransformConfig for AnsiStripperConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct AnsiStripper {
     field: String,
 }
 
-impl Transform for AnsiStripper {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for AnsiStripper {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
@@ -75,17 +76,14 @@ impl Transform for AnsiStripper {
 
         emit!(ANSIStripperEventProcessed);
 
-        Some(event)
+        output.push(event);
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{AnsiStripper, AnsiStripperConfig};
-    use crate::{
-        event::{Event, Value},
-        transforms::Transform,
-    };
+    use super::*;
+    use crate::event::{Event, Value};
 
     #[test]
     fn generate_config() {
@@ -100,7 +98,7 @@ mod tests {
                 };
 
                 let event = Event::from($in);
-                let event = transform.transform(event).unwrap();
+                let event = transform.transform_one(event).unwrap();
 
                 assert_eq!(
                     event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),

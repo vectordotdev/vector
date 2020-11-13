@@ -142,18 +142,18 @@ impl SourceConfig for SocketConfig {
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
+        config::{log_schema, GlobalOptions, SinkContext, SourceConfig},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
-        sinks::util::tcp::TcpSink,
+        sinks::util::tcp::TcpSinkConfig,
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{MaybeTlsSettings, TlsConfig, TlsOptions},
-        Pipeline,
+        tls::{TlsConfig, TlsOptions},
+        Event, Pipeline,
     };
     use bytes::Bytes;
     use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
+        compat::{Future01CompatExt, Stream01CompatExt},
         stream, StreamExt,
     };
     use std::{
@@ -448,20 +448,20 @@ mod test {
 
         wait_for_tcp(addr).await;
 
-        // Spawn future that keeps sending lines to the TCP source forever.
-        let sink = TcpSink::new(
-            "localhost".to_owned(),
-            addr.port(),
-            MaybeTlsSettings::Raw(()),
-        );
         let message = random_string(512);
-        let message_event = Bytes::from(message.clone() + "\n");
+        let message_bytes = Bytes::from(message.clone() + "\n");
+
+        let cx = SinkContext::new_test();
+        let encode_event = move |_event| Some(message_bytes.clone());
+        let sink_config = TcpSinkConfig::new(format!("localhost:{}", addr.port()), None);
+        let (sink, _healthcheck) = sink_config.build(cx, encode_event).unwrap();
+
+        // Spawn future that keeps sending lines to the TCP source forever.
         tokio::spawn(async move {
-            let _ = stream::repeat(())
-                .map(move |_| Ok(message_event.clone()))
-                .forward(sink.sink_compat())
-                .await
-                .unwrap();
+            let input = stream::repeat(())
+                .map(move |_| Event::new_empty_log())
+                .boxed();
+            sink.run(input).await.unwrap();
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.

@@ -4,24 +4,15 @@ sidebar_label: Homebrew
 description: Install Vector through the Homebrew package manager
 ---
 
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import Jump from '@site/src/components/Jump';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector can be installed through [Homebrew][urls.homebrew] which is generally
 used on MacOS systems.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -40,13 +31,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"homebrew"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"homebrew"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"Homebrew","value":"homebrew"}]}>
 <TabItem value="homebrew">
 
 <Steps headingDepth={3}>
@@ -67,10 +58,10 @@ brew tap timberio/brew && brew install vector
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/usr/local/etc/vector/vector.toml"}
-  sourceName={"file"}
-  sinkName={null} />
+format="toml"
+path={"/usr/local/etc/vector/vector.toml"}
+sourceName={"file"}
+sinkName={null} />
 
 </li>
 <li>

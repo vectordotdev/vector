@@ -24,7 +24,7 @@ impl Function for Tokenize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TokenizeFn {
     value: Box<dyn Expression>,
 }

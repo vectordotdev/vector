@@ -4,24 +4,15 @@ sidebar_label: RPM
 description: Install Vector through the RPM package manager
 ---
 
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import Jump from '@site/src/components/Jump';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector can be installed through the [RPM package manager][urls.rpm] which is
 generally used on CentOS.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -40,13 +31,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"rpm"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"rpm"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"RPM","value":"rpm"}]}>
 <TabItem value="rpm">
 
 <Steps headingDepth={3}>
@@ -75,10 +66,10 @@ The following diagram demonstrates how it works.
 3.  ### Configure Vector
 
     <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
-      sinkName={null} />
+    format="toml"
+    path={"/etc/vector/vector.toml"}
+    sourceName={"journald"}
+    sinkName={null} />
 
 4.  ### Start Vector
 
@@ -106,10 +97,10 @@ The following diagram demonstrates how it works.
 3.  ### Configure Vector
 
     <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
-      sinkName={null} />
+    format="toml"
+    path={"/etc/vector/vector.toml"}
+    sourceName={"journald"}
+    sinkName={null} />
 
 4.  ### Start Vector
 
@@ -176,13 +167,13 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 [released][urls.vector_releases]:
 
 <Tabs
-  className="mini"
-  defaultValue="ARM64"
-  values={[{"label":"ARM64","value":"ARM64"},{"label":"x86_64","value":"x86_64"}]}>
+className="mini"
+defaultValue="ARM64"
+values={[{"label":"ARM64","value":"ARM64"},{"label":"x86_64","value":"x86_64"}]}>
 <TabItem value="ARM64">
 
-| Version          | URL                                                                                               |
-|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Version          | URL                                                                         |
+| :--------------- | :-------------------------------------------------------------------------- |
 | Latest major     | `https://packages.timber.io/vector/latest/vector-aarch64.rpm`               |
 | Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-aarch64.rpm`            |
 | Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-aarch64.rpm`      |
@@ -193,8 +184,8 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 </TabItem>
 <TabItem value="x86_64">
 
-| Version          | URL                                                                                               |
-|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Version          | URL                                                                        |
+| :--------------- | :------------------------------------------------------------------------- |
 | Latest major     | `https://packages.timber.io/vector/latest/vector-x86_64.rpm`               |
 | Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-x86_64.rpm`            |
 | Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-x86_64.rpm`      |
@@ -204,7 +195,6 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 
 </TabItem>
 </Tabs>
-
 
 ### Source Files
 

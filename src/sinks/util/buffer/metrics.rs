@@ -1,11 +1,13 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
-use crate::event::Event;
-use crate::sinks::util::batch::{
-    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+use crate::{
+    event::metric::{Metric, MetricKind, MetricValue},
+    sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+    Event,
 };
-use std::cmp::Ordering;
-use std::collections::{hash_map::DefaultHasher, HashSet};
-use std::hash::{Hash, Hasher};
+use std::{
+    cmp::Ordering,
+    collections::{hash_map::DefaultHasher, HashSet},
+    hash::{Hash, Hasher},
+};
 
 #[derive(Clone, Debug)]
 pub struct MetricEntry(pub Metric);
@@ -286,14 +288,12 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
-        event::metric::{Metric, MetricValue, StatisticKind},
-        Event,
+        event::metric::{MetricValue, StatisticKind},
+        sinks::util::BatchSink,
     };
-    use futures::{compat::Future01CompatExt, future};
-    use futures01::Sink;
+    use futures::{future, stream, Sink, SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
     use std::{
         collections::BTreeMap,
@@ -314,7 +314,7 @@ mod test {
     }
 
     fn sink() -> (
-        impl Sink<SinkItem = Event, SinkError = crate::Error>,
+        impl Sink<Event, Error = crate::Error>,
         Arc<Mutex<Vec<Vec<Metric>>>>,
     ) {
         let (acker, _) = Acker::new_for_testing();
@@ -380,8 +380,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -501,8 +500,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -581,8 +579,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -677,8 +674,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -769,8 +765,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -834,8 +829,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -950,8 +944,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -1046,8 +1039,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -1114,8 +1106,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 

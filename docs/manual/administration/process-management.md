@@ -3,28 +3,22 @@ title: Process Management
 description: "How to manage the Vector process: starting, stopping, and reloading."
 ---
 
-import CodeExplanation from '@site/src/components/CodeExplanation';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 This document covers how to manage the Vector process using various interfaces.
 How you manage the Vector process is largely dependent on how you installed
 Vector.
-
-
 
 ## Starting
 
 ### Command
 
 <Tabs
-  block={false}
-  centered={true}
-  groupId="interfaces"
-  placeholder="How did you install Vector?"
-  select={true}
-  size={null}
-  values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
+block={false}
+centered={true}
+groupId="interfaces"
+placeholder="How did you install Vector?"
+select={true}
+size={null}
+values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
 <TabItem value="apt">
 
 ```bash
@@ -49,15 +43,13 @@ docker run \
 
 <CodeExplanation>
 
-* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+- The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+- The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 
 </TabItem>
 <TabItem value="docker-compose">
-
-
 
 </TabItem>
 <TabItem value="homebrew">
@@ -82,8 +74,8 @@ vector --config /etc/vector/vector.toml
 
 <CodeExplanation>
 
-* `vector` is placed in your `$PATH`.
-* You must create a [Vector configuration file][docs.configuration] to
+- `vector` is placed in your `$PATH`.
+- You must create a [Vector configuration file][docs.configuration] to
   successfully start Vector.
 
 </CodeExplanation>
@@ -114,19 +106,19 @@ sudo systemctl start vector
 
 ### Flags
 
-| Flag                    | Description                                                                                                         |    |
-|:------------------------|:--------------------------------------------------------------------------------------------------------------------|:---|
-| **Required**            |                                                                                                                     |    |
-| `-c, --config <path>`   | Path the Vector [configuration file][docs.configuration].                                                           |    |
-| **Optional**            |                                                                                                                     |    |
-| `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |    |
-| `-qq`                   | Raises the log level to `error`.                                                                                    |    |
-| `-qqq`                  | Turns logging off.                                                                                                  |    |
-| `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks.                                             |    |
-| `-t, --threads`         | Limits the number of internal threads Vector can spawn.                                                             |    |
-| `-v, --verbose`         | Drops the log level to `debug`.                                                                                     |    |
-| `-vv`                   | Drops the log level to `trace`, the lowest level possible.                                                          |    |
-| `-w, --watch-config`    | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |    |
+| Flag                    | Description                                                                                                         |     |
+| :---------------------- | :------------------------------------------------------------------------------------------------------------------ | :-- |
+| **Required**            |                                                                                                                     |     |
+| `-c, --config <path>`   | Path the Vector [configuration file][docs.configuration].                                                           |     |
+| **Optional**            |                                                                                                                     |     |
+| `-q, --quiet`           | Raises the log level to `warn`.                                                                                     |     |
+| `-qq`                   | Raises the log level to `error`.                                                                                    |     |
+| `-qqq`                  | Turns logging off.                                                                                                  |     |
+| `-r, --require-healthy` | Causes vector to immediately exit if any sinks fail their healthchecks.                                             |     |
+| `-t, --threads`         | Limits the number of internal threads Vector can spawn.                                                             |     |
+| `-v, --verbose`         | Drops the log level to `debug`.                                                                                     |     |
+| `-vv`                   | Drops the log level to `trace`, the lowest level possible.                                                          |     |
+| `-w, --watch-config`    | Vector will watch for changes in [configuration file][docs.configuration], and reload accordingly. (Mac/Linux only) |     |
 
 ### Daemonizing
 
@@ -142,13 +134,13 @@ The Vector process can be stopped by sending it a `SIGTERM` process signal.
 ### Command
 
 <Tabs
-  block={false}
-  centered={true}
-  groupId="interfaces"
-  placeholder="How did you install Vector?"
-  select={true}
-  size={null}
-  values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
+block={false}
+centered={true}
+groupId="interfaces"
+placeholder="How did you install Vector?"
+select={true}
+size={null}
+values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
 <TabItem value="apt">
 
 ```bash
@@ -171,8 +163,6 @@ docker stop timberio/vector
 
 </TabItem>
 <TabItem value="docker-compose">
-
-
 
 </TabItem>
 <TabItem value="homebrew">
@@ -240,9 +230,9 @@ as defined by `sysexits.h`. A full list of exit codes can be found in the
 [`exitcodes` Rust crate][urls.exit_codes]. The relevant codes that Vector uses
 are:
 
-| Code | Description |
-|:-----|:------------|
-| `0`  | No error. |
+| Code | Description                              |
+| :--- | :--------------------------------------- |
+| `0`  | No error.                                |
 | `78` | Bad [configuration][docs.configuration]. |
 
 ## Reloading
@@ -253,13 +243,13 @@ sending the Vector process a `SIGHUP` signal.
 ### Command
 
 <Tabs
-  block={false}
-  centered={true}
-  groupId="interfaces"
-  placeholder="How did you install Vector?"
-  select={true}
-  size={null}
-  values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
+block={false}
+centered={true}
+groupId="interfaces"
+placeholder="How did you install Vector?"
+select={true}
+size={null}
+values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
 <TabItem value="apt">
 
 ```bash
@@ -282,8 +272,6 @@ docker stop timberio/vector
 
 </TabItem>
 <TabItem value="docker-compose">
-
-
 
 </TabItem>
 <TabItem value="homebrew">

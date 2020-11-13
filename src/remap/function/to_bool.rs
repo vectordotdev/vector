@@ -32,7 +32,7 @@ impl Function for ToBool {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToBoolFn {
     value: Box<dyn Expression>,
     default: Option<Box<dyn Expression>>,

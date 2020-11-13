@@ -78,7 +78,7 @@ impl InternalEvent for PrometheusErrorResponse {
 
 #[derive(Debug)]
 pub struct PrometheusHttpError {
-    pub error: hyper::Error,
+    pub error: crate::Error,
     pub url: http::Uri,
 }
 

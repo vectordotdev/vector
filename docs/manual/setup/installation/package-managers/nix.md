@@ -4,15 +4,6 @@ sidebar_label: Nix
 description: Install Vector through the Nix package manager
 ---
 
-import Alert from '@site/src/components/Alert';
-import CodeExplanation from '@site/src/components/CodeExplanation';
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import Jump from '@site/src/components/Jump';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector can be installed through the [Nix package manager][urls.nix] via
 [Vector's Nix package][urls.vector_nix_package]. This package manager is
 generally used on [NixOS][urls.nixos].
@@ -24,14 +15,12 @@ delayed. Generally new Vector releases are made available within a few days.
 
 </Alert>
 
-
-
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -50,13 +39,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"nix"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"Nix","value":"nix"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"nix"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"Nix","value":"nix"}]}>
 <TabItem value="nix">
 
 <Steps headingDepth={3}>
@@ -69,9 +58,9 @@ The following diagram demonstrates how it works.
 
     <CodeExplanation>
 
-    * The `--file` flag ensures that you're installing the latest stable version
+    - The `--file` flag ensures that you're installing the latest stable version
       of Vector (0.10.0).
-    * The `--attr` improves installation speed.
+    - The `--attr` improves installation speed.
 
     </CodeExplanation>
 
@@ -80,10 +69,10 @@ The following diagram demonstrates how it works.
 2.  ### Configure Vector
 
     <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
-      sinkName={null} />
+    format="toml"
+    path={"/etc/vector/vector.toml"}
+    sourceName={"journald"}
+    sinkName={null} />
 
 3.  ### Start Vector
 
@@ -93,8 +82,8 @@ The following diagram demonstrates how it works.
 
     <CodeExplanation>
 
-    * `vector` is placed in your `$PATH`.
-    * You must create a [Vector configuration file][docs.configuration] to
+    - `vector` is placed in your `$PATH`.
+    - You must create a [Vector configuration file][docs.configuration] to
       successfully start Vector.
 
     </CodeExplanation>

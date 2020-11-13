@@ -4,23 +4,14 @@ sidebar_label: MSI
 description: Install Vector through the Windows Installer
 ---
 
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import Jump from '@site/src/components/Jump';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector can be installed from an MSI package through the Windows Installer.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -39,13 +30,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"msi"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"MSI","value":"msi"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"msi"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"MSI","value":"msi"}]}>
 <TabItem value="msi">
 
 <Steps headingDepth={3}>
@@ -80,10 +71,10 @@ The following diagram demonstrates how it works.
 4.  ### Configure Vector
 
     <ConfigExample
-      format="toml"
-      path={"config\\vector.toml"}
-      sourceName={"file"}
-      sinkName={null} />
+    format="toml"
+    path={"config\\vector.toml"}
+    sourceName={"file"}
+    sinkName={null} />
 
 5.  ### Start Vector
 
@@ -148,13 +139,13 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 [released][urls.vector_releases]:
 
 <Tabs
-  className="mini"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"}]}>
+className="mini"
+defaultValue="x86_64"
+values={[{"label":"x86_64","value":"x86_64"}]}>
 <TabItem value="x86_64">
 
-| Version          | URL                                                                                               |
-|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Version          | URL                                                                     |
+| :--------------- | :---------------------------------------------------------------------- |
 | Latest major     | `https://packages.timber.io/vector/latest/vector-x64.msi`               |
 | Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-x64.msi`            |
 | Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-x64.msi`      |
@@ -164,7 +155,6 @@ Vector maintains special URLS that are automatically updated whenever Vector is
 
 </TabItem>
 </Tabs>
-
 
 ### Source Files
 

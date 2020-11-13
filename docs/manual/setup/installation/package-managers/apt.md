@@ -4,25 +4,15 @@ sidebar_label: Apt Repository
 description: Install Vector from an Apt Repository
 ---
 
-import Alert from '@site/src/components/Alert';
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import Jump from '@site/src/components/Jump';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector can be installed from an [Apt package repository][urls.apt] which is
 generally used on Debian and Ubuntu.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -41,13 +31,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"apt"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"APT","value":"apt"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"apt"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"APT","value":"apt"}]}>
 <TabItem value="apt">
 
 <Steps headingDepth={3}>
@@ -104,10 +94,10 @@ Vector's DPKG source files are located in
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"journald"}
+sinkName={null} />
 
 </li>
 <li>

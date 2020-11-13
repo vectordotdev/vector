@@ -5,29 +5,18 @@ description: Install Vector on the Docker platform
 source_url: https://github.com/timberio/vector/tree/master/distribution/docker
 ---
 
-import CodeExplanation from '@site/src/components/CodeExplanation';
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import ServiceDiagram from '@site/src/components/ServiceDiagram';
-import SidecarDiagram from '@site/src/components/SidecarDiagram';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector maintains the [`timberio/vector` Docker images][urls.docker_hub_vector]
 available on [Docker Hub][urls.docker_hub_vector] which come pre-installed
 with Vector and any recommended system dependencies. These images are available
 for x86_64 and ARM64
 architectures.
 
-
-
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Sidecar","value":"sidecar"},{"label":"As a Service","value":"service"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"},{"label":"As a Sidecar","value":"sidecar"},{"label":"As a Service","value":"service"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -39,20 +28,20 @@ through any of Vector's [sources][docs.sources].
 The following diagram demonstrates how it works.
 
 <DaemonDiagram
-  platformName={"docker"}
-  sourceName={null}
-  sinkName={null} />
+platformName={"docker"}
+sourceName={null}
+sinkName={null} />
 
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"docker-cli"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"docker-cli"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
 <Steps headingDepth={3}>
@@ -62,10 +51,10 @@ The following diagram demonstrates how it works.
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"docker"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"docker"}
+sinkName={null} />
 
 </li>
 <li>
@@ -81,9 +70,9 @@ docker run \
 
 <CodeExplanation>
 
-* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `-v /var/run/docke...` flag ensures that Vector has access to the appropriate resources.
-* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+- The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+- The `-v /var/run/docke...` flag ensures that Vector has access to the appropriate resources.
+- The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 
@@ -110,20 +99,20 @@ each service. Typically data is collected by tailing local files via Vector's
 [sources][docs.sources]. The following diagram demonstrates how it works.
 
 <SidecarDiagram
-  platformName={"docker"}
-  sourceName={null}
-  sinkName={null} />
+platformName={"docker"}
+sourceName={null}
+sinkName={null} />
 
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"docker-cli"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"docker-cli"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
 <Steps headingDepth={3}>
@@ -133,10 +122,10 @@ each service. Typically data is collected by tailing local files via Vector's
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"file"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"file"}
+sinkName={null} />
 
 </li>
 <li>
@@ -152,9 +141,9 @@ docker run \
 
 <CodeExplanation>
 
-* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `-v /var/log:/var/log` flag ensures that Vector has access to the appropriate resources.
-* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+- The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+- The `-v /var/log:/var/log` flag ensures that Vector has access to the appropriate resources.
+- The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 
@@ -183,20 +172,20 @@ Typically, upstream sources are other Vector instances sending data via the
 The following diagram demonstrates how it works.
 
 <ServiceDiagram
-  platformName={"docker"}
-  sourceName={null}
-  sinkName={null} />
+platformName={"docker"}
+sourceName={null}
+sinkName={null} />
 
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"docker-cli"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"docker-cli"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="docker-cli">
 
 <Steps headingDepth={3}>
@@ -206,10 +195,10 @@ The following diagram demonstrates how it works.
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"vector"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"vector"}
+sinkName={null} />
 
 </li>
 <li>
@@ -225,9 +214,9 @@ docker run \
 
 <CodeExplanation>
 
-* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `-p 9000:9000` flag ensures that Vector has access to the appropriate resources.
-* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+- The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+- The `-p 9000:9000` flag ensures that Vector has access to the appropriate resources.
+- The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 
@@ -310,7 +299,7 @@ Vector maintains special tags that are automatically updated whenever Vector is
 [released][urls.vector_releases]:
 
 | Version          | URL                                                      |
-|:-----------------|:---------------------------------------------------------|
+| :--------------- | :------------------------------------------------------- |
 | Latest major     | `timberio/vector:latest-alpine`                          |
 | Latest minor     | `timberio/vector:<MAJOR>.X-alpine`                       |
 | Latest patch     | `timberio/vector:<MAJOR.MINOR>.X-alpine`                 |
@@ -323,7 +312,6 @@ Vector maintains special tags that are automatically updated whenever Vector is
 | Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-alpine`            |
 | Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-distroless-libc`   |
 | Specific nightly | `timberio/vector:nightly-<YYYY-MM-DD>-distroless-static` |
-
 
 ### Source Files
 

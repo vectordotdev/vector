@@ -3,26 +3,20 @@ title: Monitoring
 description: How to monitor and observe Vector with logs, metrics, and more.
 ---
 
-import Jump from '@site/src/components/Jump';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 This document will cover monitoring Vector.
-
-
 
 ## Logs
 
 ### Accessing
 
 <Tabs
-  block={false}
-  centered={true}
-  groupId="interfaces"
-  placeholder="How did you install Vector?"
-  select={true}
-  size={null}
-  values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
+block={false}
+centered={true}
+groupId="interfaces"
+placeholder="How did you install Vector?"
+select={true}
+size={null}
+values={[{"group":"Package managers","label":"APT","value":"apt"},{"group":"Package managers","label":"DPKG","value":"dpkg"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"},{"group":"Package managers","label":"Homebrew","value":"homebrew"},{"group":"Package managers","label":"MSI","value":"msi"},{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Package managers","label":"RPM","value":"rpm"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Package managers","label":"Yum","value":"yum"}]}>
 <TabItem value="apt">
 
 The Vector package from the APT repository installs Vector as a Systemd service. Logs can be
@@ -132,7 +126,7 @@ By default, Vector logs on the `info` level, you can change the level through
 a variety of methods:
 
 | Method                                       | Description                                                                         |
-|:---------------------------------------------|:------------------------------------------------------------------------------------|
+| :------------------------------------------- | :---------------------------------------------------------------------------------- |
 | [`-v` flag][docs.process-management#flags]   | Drops the log level to `debug`.                                                     |
 | [`-vv` flag][docs.process-management#flags]  | Drops the log level to `trace`.                                                     |
 | [`-q` flag][docs.process-management#flags]   | Raises the log level to `warn`.                                                     |

@@ -4,25 +4,15 @@ sidebar_label: DPKG
 description: Install Vector through the DKG package manager
 ---
 
-import Alert from '@site/src/components/Alert';
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import Jump from '@site/src/components/Jump';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 Vector can be installed through the [DPKG package manager][urls.dpkg] which is
 generally used on Debian and Ubuntu systems.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -41,20 +31,20 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"dpkg"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"DPKG","value":"dpkg"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"dpkg"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"DPKG","value":"dpkg"}]}>
 <TabItem value="dpkg">
 
 <Tabs
-  centered={true}
-  className="rounded"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"}]}>
+centered={true}
+className="rounded"
+defaultValue="x86_64"
+values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"arm64"}]}>
 
 <TabItem value="x86_64">
 <Steps headingDepth={3}>
@@ -84,10 +74,10 @@ sudo dpkg -i vector-amd64.deb
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"journald"}
+sinkName={null} />
 
 </li>
 <li>
@@ -130,10 +120,10 @@ sudo dpkg -i vector-arm64.deb
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"journald"}
+sinkName={null} />
 
 </li>
 <li>
@@ -203,13 +193,13 @@ architectures. The architecture name is prepended to the artifact file name.
 Vector's DPKG packages can be downloaded with the following URLs:
 
 <Tabs
-  className="mini"
-  defaultValue="x86_64"
-  values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"}]}>
+className="mini"
+defaultValue="x86_64"
+values={[{"label":"x86_64","value":"x86_64"},{"label":"ARM64","value":"ARM64"}]}>
 <TabItem value="x86_64">
 
-| Version          | URL                                                                                               |
-|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Version          | URL                                                                       |
+| :--------------- | :------------------------------------------------------------------------ |
 | Latest major     | `https://packages.timber.io/vector/latest/vector-amd64.deb`               |
 | Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-amd64.deb`            |
 | Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-amd64.deb`      |
@@ -220,8 +210,8 @@ Vector's DPKG packages can be downloaded with the following URLs:
 </TabItem>
 <TabItem value="ARM64">
 
-| Version          | URL                                                                                               |
-|:-----------------|:--------------------------------------------------------------------------------------------------|
+| Version          | URL                                                                       |
+| :--------------- | :------------------------------------------------------------------------ |
 | Latest major     | `https://packages.timber.io/vector/latest/vector-arm64.deb`               |
 | Latest minor     | `https://packages.timber.io/vector/<MAJOR>.X/vector-arm64.deb`            |
 | Latest patch     | `https://packages.timber.io/vector/<MAJOR.MINOR>.X/vector-arm64.deb`      |
@@ -231,7 +221,6 @@ Vector's DPKG packages can be downloaded with the following URLs:
 
 </TabItem>
 </Tabs>
-
 
 <Alert type="info">
 

@@ -4,24 +4,14 @@ sidebar_label: NixOS
 description: Install Vector on NixOS
 ---
 
-import CodeExplanation from '@site/src/components/CodeExplanation';
-import ConfigExample from '@site/src/components/ConfigExample';
-import DaemonDiagram from '@site/src/components/DaemonDiagram';
-import InstallationCommand from '@site/src/components/InstallationCommand';
-import Steps from '@site/src/components/Steps';
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
 This document will cover installing Vector on NixOS.
-
-
 
 ## Install
 
 <Tabs
-  block={true}
-  defaultValue="daemon"
-  values={[{"label":"As a Daemon","value":"daemon"}]}>
+block={true}
+defaultValue="daemon"
+values={[{"label":"As a Daemon","value":"daemon"}]}>
 <TabItem value="daemon">
 
 The [daemon deployment strategy][docs.strategies#daemon] is designed for data
@@ -40,13 +30,13 @@ The following diagram demonstrates how it works.
 ---
 
 <Tabs
-  centered={true}
-  className={"rounded"}
-  defaultValue={"nix"}
-  placeholder="Please choose an installation method..."
-  select={false}
-  size={null}
-  values={[{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
+centered={true}
+className={"rounded"}
+defaultValue={"nix"}
+placeholder="Please choose an installation method..."
+select={false}
+size={null}
+values={[{"group":"Package managers","label":"Nix","value":"nix"},{"group":"Nones","label":"Vector CLI","value":"vector-cli"},{"group":"Platforms","label":"Docker CLI","value":"docker-cli"},{"group":"Platforms","label":"Docker Compose","value":"docker-compose"}]}>
 <TabItem value="nix">
 
 <Steps headingDepth={3}>
@@ -59,9 +49,9 @@ The following diagram demonstrates how it works.
 
     <CodeExplanation>
 
-    * The `--file` flag ensures that you're installing the latest stable version
+    - The `--file` flag ensures that you're installing the latest stable version
       of Vector (0.10.0).
-    * The `--attr` improves installation speed.
+    - The `--attr` improves installation speed.
 
     </CodeExplanation>
 
@@ -70,10 +60,10 @@ The following diagram demonstrates how it works.
 2.  ### Configure Vector
 
     <ConfigExample
-      format="toml"
-      path={"/etc/vector/vector.toml"}
-      sourceName={"journald"}
-      sinkName={null} />
+    format="toml"
+    path={"/etc/vector/vector.toml"}
+    sourceName={"journald"}
+    sinkName={null} />
 
 3.  ### Start Vector
 
@@ -83,8 +73,8 @@ The following diagram demonstrates how it works.
 
     <CodeExplanation>
 
-    * `vector` is placed in your `$PATH`.
-    * You must create a [Vector configuration file][docs.configuration] to
+    - `vector` is placed in your `$PATH`.
+    - You must create a [Vector configuration file][docs.configuration] to
       successfully start Vector.
 
     </CodeExplanation>
@@ -110,10 +100,10 @@ Or choose your [preferred method][docs.installation].
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"vector.toml"}
-  sourceName={"journald"}
-  sinkName={null} />
+format="toml"
+path={"vector.toml"}
+sourceName={"journald"}
+sinkName={null} />
 
 </li>
 <li>
@@ -140,10 +130,10 @@ That's it! Simple and to the point. Hit `ctrl+c` to exit.
 ### Configure Vector
 
 <ConfigExample
-  format="toml"
-  path={"/etc/vector/vector.toml"}
-  sourceName={"journald"}
-  sinkName={null} />
+format="toml"
+path={"/etc/vector/vector.toml"}
+sourceName={"journald"}
+sinkName={null} />
 
 </li>
 <li>
@@ -158,8 +148,8 @@ docker run \
 
 <CodeExplanation>
 
-* The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
-* The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
+- The `-v $PWD/vector.to...` flag passes your custom configuration to Vector.
+- The `timberio/vector:latest-alpine` is the default image we've chosen, you are welcome to use [other image variants][docs.platforms.docker#variants].
 
 </CodeExplanation>
 

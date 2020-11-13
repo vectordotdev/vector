@@ -3,9 +3,6 @@ title: Guarantees
 description: Vector's gaurantees. Covering delivery and reliability guarantees for each Vector component.
 ---
 
-import Alert from '@site/src/components/Alert';
-import Jump from '@site/src/components/Jump';
-
 Faults in distributed systems are like green Skittles, we all wish they'd never
 happen but in reality the best we can do is understand and control the damage
 they cause. In event streaming pipelines that means understanding delivery
@@ -20,8 +17,6 @@ Here you can find an overview of delivery guarantee types and their meaning as
 well as how we label the stability of our components. Next, you can head over to
 the [components page][pages.components] and use filters to see which components
 support specific guarantees.
-
-
 
 ## Delivery Guarantees
 
@@ -94,6 +89,7 @@ environments. A feature is `prod-ready` if it meets the following criteria:
 4. There are no major [open bugs][urls.vector_bug_issues] for the feature.
 
 <Jump to="/components/?prod-ready=true">View all prod-ready components</Jump>
+
 </li>
 <li>
 

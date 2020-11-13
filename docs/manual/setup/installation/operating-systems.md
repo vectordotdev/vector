@@ -4,10 +4,6 @@ sidebar_label: hidden
 hide_pagination: true
 ---
 
-
-
-import Jump from '@site/src/components/Jump';
-
 <Jump to="/docs/setup/installation/operating-systems/amazon-linux/">Amazon Linux</Jump>
 <Jump to="/docs/setup/installation/operating-systems/centos/">CentOS</Jump>
 <Jump to="/docs/setup/installation/operating-systems/debian/">Debian</Jump>
@@ -17,5 +13,3 @@ import Jump from '@site/src/components/Jump';
 <Jump to="/docs/setup/installation/operating-systems/rhel/">RHEL</Jump>
 <Jump to="/docs/setup/installation/operating-systems/ubuntu/">Ubuntu</Jump>
 <Jump to="/docs/setup/installation/operating-systems/windows/">Windows</Jump>
-
-
