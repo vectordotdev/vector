@@ -40,5 +40,6 @@ jobs:
         run: |
           $ErrorActionPreference = 'SilentlyContinue'
           roceuhroceuh
+          exit 0
         shell: powershell -Command "& '{0}'"
       - run: Get-CimInstance -Class CIM_LogicalDisk
