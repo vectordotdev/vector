@@ -86,10 +86,7 @@ impl ArgumentList {
         keyword: &str,
         variants: &'static [&'static str],
     ) -> Result<Option<String>> {
-        let expr = self
-            .optional(keyword)
-            .map(|v| Expr::try_from(v))
-            .transpose()?;
+        let expr = self.optional(keyword).map(Expr::try_from).transpose()?;
 
         let argument = match expr {
             Some(expr) => expression::Argument::try_from(expr)?,
@@ -105,7 +102,7 @@ impl ArgumentList {
         if variants.contains(&variant.as_str()) {
             Ok(Some(variant))
         } else {
-            Err(Error::UnknownEnumVariant(variant.to_owned(), &variants).into())
+            Err(Error::UnknownEnumVariant(variant, &variants).into())
         }
     }
 
