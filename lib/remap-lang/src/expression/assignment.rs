@@ -1,5 +1,8 @@
 use super::Error as E;
-use crate::{state, Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{
+    expression::{Path, Variable},
+    state, Expr, Expression, Object, Result, TypeDef, Value,
+};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -9,8 +12,8 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub enum Target {
-    Path(Vec<Vec<String>>),
-    Variable(String),
+    Path(Path),
+    Variable(Variable),
 }
 
 #[derive(Debug, Clone)]
@@ -24,11 +27,12 @@ impl Assignment {
         let type_def = value.type_def(state);
 
         match &target {
-            Target::Variable(ident) => state.variable_types_mut().insert(ident.clone(), type_def),
-            Target::Path(segments) => {
-                let path = crate::expression::path::segments_to_path(segments);
-                state.path_query_types_mut().insert(path, type_def)
-            }
+            Target::Variable(variable) => state
+                .variable_types_mut()
+                .insert(variable.ident().to_owned(), type_def),
+            Target::Path(path) => state
+                .path_query_types_mut()
+                .insert(path.as_string(), type_def),
         };
 
         Self { target, value }
@@ -47,11 +51,13 @@ impl Expression for Assignment {
             None => Ok(None),
             Some(value) => {
                 match &self.target {
-                    Target::Variable(ident) => {
-                        state.variables_mut().insert(ident.clone(), value.clone());
+                    Target::Variable(variable) => {
+                        state
+                            .variables_mut()
+                            .insert(variable.ident().to_owned(), value.clone());
                     }
                     Target::Path(path) => object
-                        .insert(&path, value.clone())
+                        .insert(path.segments(), value.clone())
                         .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
                 }
 
@@ -62,17 +68,14 @@ impl Expression for Assignment {
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         match &self.target {
-            Target::Variable(ident) => state
-                .variable_type(ident.clone())
+            Target::Variable(variable) => state
+                .variable_type(variable.ident().to_owned())
                 .cloned()
                 .expect("variable must be assigned via Assignment::new"),
-            Target::Path(segments) => {
-                let path = crate::expression::path::segments_to_path(segments);
-                state
-                    .path_query_type(&path)
-                    .cloned()
-                    .expect("variable must be assigned via Assignment::new")
-            }
+            Target::Path(path) => state
+                .path_query_type(&path.as_string())
+                .cloned()
+                .expect("variable must be assigned via Assignment::new"),
         }
     }
 }
