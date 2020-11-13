@@ -39,6 +39,7 @@ components: sinks: aws_cloudwatch_logs: {
 			}
 			request: {
 				enabled:                    true
+				auto_concurrency:           false
 				in_flight_limit:            5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5

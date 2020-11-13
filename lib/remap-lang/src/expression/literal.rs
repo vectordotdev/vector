@@ -1,6 +1,6 @@
 use crate::{Expression, Object, Result, State, Value};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Literal(Value);
 
 impl<T: Into<Value>> From<T> for Literal {

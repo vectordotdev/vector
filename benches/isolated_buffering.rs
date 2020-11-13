@@ -1,31 +1,39 @@
+use async_trait::async_trait;
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
-    stream::StreamExt,
+    stream::BoxStream,
+    StreamExt,
 };
-use futures01::{stream, AsyncSink, Poll, Sink, StartSend, Stream};
+use futures01::{stream, Sink, Stream};
 use rand::distributions::Alphanumeric;
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use tempfile::tempdir;
 use vector::{
-    buffers::disk::{leveldb_buffer, DiskBuffer},
-    sinks::util::StreamSinkOld,
+    buffers::{
+        disk::{leveldb_buffer, DiskBuffer},
+        Acker,
+    },
+    sinks::util::StreamSink,
     test_util::runtime,
     Event,
 };
 
-struct NullSink;
+struct NullSink {
+    acker: Acker,
+}
 
-impl Sink for NullSink {
-    type SinkItem = Event;
-    type SinkError = ();
-
-    fn start_send(&mut self, _item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        Ok(AsyncSink::Ready)
+impl NullSink {
+    fn new(acker: Acker) -> Self {
+        Self { acker }
     }
+}
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        Ok(().into())
+#[async_trait]
+impl StreamSink for NullSink {
+    async fn run(&mut self, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        input.for_each(|_| async { self.acker.ack(1) }).await;
+        Ok(())
     }
 }
 
@@ -136,12 +144,16 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
                     drop(writer);
 
-                    let read_loop = StreamSinkOld::new(NullSink, acker).send_all(reader);
+                    let read_loop = async move {
+                        NullSink::new(acker)
+                            .run(Box::pin(reader.compat().map(Result::unwrap)))
+                            .await
+                    };
 
                     (rt, read_loop)
                 },
                 |(mut rt, read_loop)| {
-                    let read_handle = rt.spawn(read_loop.compat());
+                    let read_handle = rt.spawn(read_loop);
                     rt.block_on(read_handle).unwrap().unwrap();
                 },
             );
@@ -162,14 +174,18 @@ fn benchmark_buffers(c: &mut Criterion) {
                     let (writer, reader, acker) =
                         leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
 
-                    let read_loop = StreamSinkOld::new(NullSink, acker).send_all(reader);
+                    let read_loop = async move {
+                        NullSink::new(acker)
+                            .run(Box::pin(reader.compat().map(Result::unwrap)))
+                            .await
+                    };
 
                     (rt, writer, read_loop)
                 },
                 |(mut rt, writer, read_loop)| {
                     let send = writer.send_all(random_events(line_size).take(num_lines as u64));
 
-                    let read_handle = rt.spawn(read_loop.compat());
+                    let read_handle = rt.spawn(read_loop);
                     let write_handle = rt.spawn(send.compat());
 
                     let _ = rt.block_on(write_handle).unwrap().unwrap();

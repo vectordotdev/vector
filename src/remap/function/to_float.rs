@@ -32,7 +32,7 @@ impl Function for ToFloat {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToFloatFn {
     value: Box<dyn Expression>,
     default: Option<Box<dyn Expression>>,

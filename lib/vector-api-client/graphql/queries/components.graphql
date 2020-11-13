@@ -2,8 +2,12 @@ query ComponentsQuery {
   components {
     __typename
     name
+    componentType
     eventsProcessedTotal {
       eventsProcessedTotal
+    }
+    bytesProcessedTotal {
+      bytesProcessedTotal
     }
   }
 }

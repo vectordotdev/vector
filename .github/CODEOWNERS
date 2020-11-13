@@ -7,9 +7,9 @@
 /NOTICE @binarylogic @jamtur01
 /SECURITY.md @binarylogic @jamtur01
 
-/skaffold/ @MOZGIII
-/skaffold.yaml @MOZGIII
-/kustomization.yaml @MOZGIII
+/skaffold/ @vector-kubernetes
+/skaffold.yaml @vector-kubernetes
+/kustomization.yaml @vector-kubernetes
 
 /docs/reference/components/sinks/*_metrics.cue @lukesteensen
 /docs/reference/components/sinks/aws_kinesis_streams.cue @jszwedko
@@ -20,23 +20,25 @@
 /docs/reference/components/sinks/humio_logs.cue @jszwedko
 /docs/reference/components/sinks/splunk_hec.cue @ktff
 /docs/reference/components/sinks/kafka.cue @lukesteensen
-/docs/reference/components/sinks/prometheus.cue @lukesteensen
+/docs/reference/components/sinks/prometheus_exporter.cue @lukesteensen
 /docs/reference/components/sinks/splunk_hec.cue @lukesteensen
 /docs/reference/components/sinks/statsd.cue @lukesteensen
 /docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
 
 /docs/reference/components/sources/apache_metrics.cue @jszwedko
+/docs/reference/components/sources/aws_s3.cue @jszwedko
 /docs/reference/components/sources/docker.cue @fanatid
 /docs/reference/components/sources/generator.cue @bruceg
 /docs/reference/components/sources/host_metrics.cue @bruceg
 /docs/reference/components/sources/journald.cue @bruceg
+/docs/reference/components/sources/kubernetes_logs.cue @vector-kubernetes
 /docs/reference/components/sources/mongodb_metrics.cue @fanatid
 /docs/reference/components/sources/stdin.cue @bruceg
 /docs/reference/components/sources/syslog.cue @lukesteensen
 /docs/reference/components/sources/tcp.cue @bruceg
 /docs/reference/components/sources/udp.cue @bruceg
 /docs/reference/components/sources/vector.cue @lukesteensen
-/docs/reference/components/sources/kubernetes_* @MOZGIII @JeanMertz
+/docs/reference/components/sources/kubernetes_* @vector-kubernetes
 /docs/reference/components/sources/splunk_hec.cue @ktff
 
 /docs/reference/components/transforms/add_tags.cue @lukesteensen
@@ -56,14 +58,14 @@
 /docs/reference/components/transforms/tokenzier.cue @lukesteensen
 
 /distribution/ @hoverbear @jamtur01
-/distribution/docker/ @MOZGIII
-/distribution/helm/ @MOZGIII
-/distribution/kubernetes/ @MOZGIII
+/distribution/docker/ @vector-kubernetes
+/distribution/helm/ @vector-kubernetes
+/distribution/kubernetes/ @vector-kubernetes
 
 /lib/file-source/src/paths_provider/mod.rs @MOZGIII
 /lib/file-source/src/paths_provider/glob.rs @MOZGIII
-/lib/k8s-test-framework/ @MOZGIII @JeanMertz
-/lib/k8s-e2e-tests/ @MOZGIII @JeanMertz
+/lib/k8s-test-framework/ @vector-kubernetes
+/lib/k8s-e2e-tests/ @vector-kubernetes
 /lib/prometheus-parser/ @juchiast
 /lib/vector-wasm/ @hoverbear @JeanMertz
 
@@ -79,14 +81,14 @@
 /scripts/package-* @jamtur01
 /scripts/release-* @hoverbear
 /scripts/upgrade-* @hoverbear
-/scripts/*docker* @MOZGIII
-/scripts/ci-setup-minikube.sh @MOZGIII
-/scripts/environment/setup-helm.sh @MOZGIII
-/scripts/release-helm.sh @MOZGIII
-/scripts/deploy-kubernetes-test.sh @MOZGIII @JeanMertz
-/scripts/test-e2e-kubernetes.sh @MOZGIII @JeanMertz
-/scripts/kubernetes-yaml.sh @MOZGIII
-/scripts/kubernetes-yaml/ @MOZGIII
+/scripts/*docker* @vector-kubernetes
+/scripts/ci-setup-minikube.sh @vector-kubernetes
+/scripts/environment/setup-helm.sh @vector-kubernetes
+/scripts/release-helm.sh @vector-kubernetes
+/scripts/deploy-kubernetes-test.sh @vector-kubernetes
+/scripts/test-e2e-kubernetes.sh @vector-kubernetes
+/scripts/kubernetes-yaml.sh @vector-kubernetes
+/scripts/kubernetes-yaml/ @vector-kubernetes
 
 /src/metrics.rs @lukesteensen
 /src/main.rs @lukesteensen
@@ -107,7 +109,7 @@
 
 /src/internal_events/ @JeanMertz
 
-/src/kubernetes/ @MOZGIII @JeanMertz
+/src/kubernetes/ @vector-kubernetes
 
 /src/mapping/ @JeanMertz @FungusHumungus
 
@@ -120,7 +122,9 @@
 /src/sinks/humio_logs.rs @jszwedko
 /src/sinks/splunk_hec.rs @ktff
 /src/sinks/kafka.rs @lukesteensen
-/src/sinks/prometheus.rs @lukesteensen
+/src/sinks/prometheus/collector.rs @bruceg
+/src/sinks/prometheus/remote_write.rs @bruceg
+/src/sinks/prometheus/exporter.rs @lukesteensen
 /src/sinks/splunk_hec.rs @lukesteensen
 /src/sinks/statsd.rs @lukesteensen
 /src/sinks/tcp.rs @bruceg
@@ -129,6 +133,7 @@
 
 /src/sources/apache_metrics/ @jszwedko
 /src/sources/aws_kinesis_firehose/ @jszwedko
+/src/sources/aws_s3.rs @jszwedko
 /src/sources/docker.rs @fanatid
 /src/sources/generator.rs @bruceg
 /src/sources/host_metrics.rs @bruceg
@@ -140,7 +145,7 @@
 /src/sources/udp.rs @bruceg
 /src/sources/vector.rs @lukesteensen
 /src/sources/util/multiline_config.rs @MOZGIII @JeanMertz
-/src/sources/kubernetes_logs/ @MOZGIII @JeanMertz
+/src/sources/kubernetes_logs/ @vector-kubernetes
 /src/sources/splunk_hec.rs @ktff
 
 /src/topology/ @lukesteensen
@@ -153,6 +158,7 @@
 /src/transforms/field_filter.rs @lukesteensen
 /src/transforms/geoip.rs @lukesteensen
 /src/transforms/grok_parser.rs @lukesteensen
+/src/transforms/key_value_parser.rs @Nick011 @bruceg
 /src/transforms/log_to_metric.rs @lukesteensen
 /src/transforms/merge.rs @MOZGIII
 /src/transforms/regex_parser.rs @lukesteensen
@@ -173,5 +179,5 @@
 /.github/SUPPORT.md @binarylogic @jamtur01
 /.github/PULL_REQUEST_TEMPLATE.md @binarylogic @jamtur01
 /.github/ISSUE_TEMPLATE/ @binarylogic @jamtur01
-/.github/workflows/e2e.yml @MOZGIII
+/.github/workflows/k8s_e2e.yml @vector-kubernetes
 /.github/workflows/ @jamtur01

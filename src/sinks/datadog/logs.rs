@@ -17,8 +17,7 @@ use crate::{
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode};
 use hyper::body::Body;
 use serde::{Deserialize, Serialize};
@@ -122,7 +121,7 @@ impl DatadogLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     /// Build the request, GZipping the contents if the config specifies.
@@ -252,7 +251,7 @@ impl HttpSink for DatadogLogsTextService {
 
 /// The healthcheck is performed by sending an empty request to Datadog and checking
 /// the return.
-async fn healthcheck<T, O>(sink: T, mut client: HttpClient) -> crate::Result<()>
+async fn healthcheck<T, O>(sink: T, client: HttpClient) -> crate::Result<()>
 where
     T: HttpSink<Output = Vec<O>>,
 {

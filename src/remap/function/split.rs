@@ -42,7 +42,7 @@ impl Function for Split {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct SplitFn {
     value: Box<dyn Expression>,
     pattern: Argument,

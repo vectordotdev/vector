@@ -1,6 +1,6 @@
 use crate::{Expr, Expression, Object, Result, State, Value};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Block {
     expressions: Vec<Expr>,
 }

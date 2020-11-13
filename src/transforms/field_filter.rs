@@ -1,11 +1,11 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
+    transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldFilterConfig {
     pub field: String,
@@ -29,12 +29,12 @@ impl GenerateConfig for FieldFilterConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "field_filter")]
 impl TransformConfig for FieldFilterConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         warn!(
             message =
                 r#"The "field_filter" transform is deprecated, use the "filter" transform instead"#
         );
-        Ok(Box::new(FieldFilter::new(
+        Ok(Transform::function(FieldFilter::new(
             self.field.clone(),
             self.value.clone(),
         )))
@@ -53,6 +53,7 @@ impl TransformConfig for FieldFilterConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct FieldFilter {
     field_name: String,
     value: String,
@@ -64,17 +65,15 @@ impl FieldFilter {
     }
 }
 
-impl Transform for FieldFilter {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for FieldFilter {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if event
             .as_log()
             .get(&self.field_name)
             .map(|f| f.as_bytes())
             .map_or(false, |b| b == self.value.as_bytes())
         {
-            Some(event)
-        } else {
-            None
+            output.push(event);
         }
     }
 }

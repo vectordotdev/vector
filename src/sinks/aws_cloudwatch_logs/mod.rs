@@ -13,11 +13,7 @@ use crate::{
     template::Template,
 };
 use chrono::{Duration, Utc};
-use futures::{
-    future::{BoxFuture, FutureExt, TryFutureExt},
-    ready,
-};
-use futures01::{stream::iter_ok, Sink};
+use futures::{future::BoxFuture, ready, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
@@ -195,19 +191,16 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             ));
 
         let encoding = self.encoding.clone();
-        let sink = {
-            let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
-            let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
-                .with_flat_map(move |event| {
-                    iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
-                });
-            Box::new(svc_sink)
-        };
+        let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
+            .with_flat_map(move |event| {
+                stream::iter(partition_encode(event, &encoding, &log_group, &log_stream)).map(Ok)
+            });
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -863,7 +856,7 @@ mod integration_tests {
         rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
+    use futures::{stream, SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -1122,12 +1115,7 @@ mod integration_tests {
 
         let (input_lines, events) = random_lines_with_stream(100, 11);
         let mut events = events.map(Ok);
-        let _ = sink
-            .into_futures01sink()
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .unwrap();
+        let _ = sink.into_sink().send_all(&mut events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
         request.log_stream_name = stream_name;
