@@ -27,22 +27,22 @@ enum Errors {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-struct RemoteWriteConfig {
-    endpoint: String,
+pub(crate) struct RemoteWriteConfig {
+    pub endpoint: String,
 
-    default_namespace: Option<String>,
+    pub default_namespace: Option<String>,
 
     #[serde(default = "prometheus::default_histogram_buckets")]
-    buckets: Vec<f64>,
+    pub buckets: Vec<f64>,
     #[serde(default = "prometheus::default_summary_quantiles")]
-    quantiles: Vec<f64>,
+    pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    batch: BatchConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
-    tls: Option<TlsOptions>,
+    pub tls: Option<TlsOptions>,
 }
 
 inventory::submit! {

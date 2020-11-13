@@ -6,8 +6,10 @@ mod tcp;
 #[cfg(all(unix, feature = "sources-utils-unix",))]
 mod unix;
 
+#[cfg(feature = "sources-http")]
+pub(crate) use self::http::add_query_parameters;
 #[cfg(feature = "sources-utils-http")]
-pub use self::http::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig};
+pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
 pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};

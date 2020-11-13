@@ -1,5 +1,5 @@
 use crate::{
-    event::{Event, Value},
+    event::Event,
     internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -20,6 +20,7 @@ use warp::{
     Filter,
 };
 
+#[cfg(feature = "sources-http")]
 pub fn add_query_parameters(
     mut events: Vec<Event>,
     query_parameters_config: &[String],
@@ -30,7 +31,7 @@ pub fn add_query_parameters(
         for event in events.iter_mut() {
             event.as_mut_log().insert(
                 query_parameter_name as &str,
-                Value::from(value.map(String::to_owned)),
+                crate::event::Value::from(value.map(String::to_owned)),
             );
         }
     }
