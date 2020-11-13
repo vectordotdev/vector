@@ -25,7 +25,9 @@ async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx
                         kind: c.on.to_string(),
                         component_type: c.component_type,
                         events_processed_total: 0,
+                        events_processed_throughput: 0,
                         bytes_processed_total: 0,
+                        bytes_processed_throughput: 0,
                         errors: 0,
                     }),
                 ))
@@ -52,8 +54,12 @@ async fn component_removed(client: Arc<SubscriptionClient>, mut tx: state::Event
     }
 }
 
-/// Events processed metrics
-async fn events_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx, interval: i64) {
+/// Events processed total metrics
+async fn events_processed_total(
+    client: Arc<SubscriptionClient>,
+    mut tx: state::EventTx,
+    interval: i64,
+) {
     let res = client.component_events_processed_total_subscription(interval);
 
     tokio::pin! {
@@ -73,8 +79,37 @@ async fn events_processed(client: Arc<SubscriptionClient>, mut tx: state::EventT
     }
 }
 
-/// Bytes processed metrics
-async fn bytes_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx, interval: i64) {
+/// Events processed throughput metrics
+async fn events_processed_throughput(
+    client: Arc<SubscriptionClient>,
+    mut tx: state::EventTx,
+    interval: i64,
+) {
+    let res = client.component_events_processed_throughput_subscription(interval);
+
+    tokio::pin! {
+        let stream = res.stream();
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_events_processed_throughput;
+            let _ = tx
+                .send((
+                    c.name,
+                    state::EventType::EventsProcessedThroughput(c.throughput as i64),
+                ))
+                .await;
+        }
+    }
+}
+
+/// Bytes processed total metrics
+async fn bytes_processed_total(
+    client: Arc<SubscriptionClient>,
+    mut tx: state::EventTx,
+    interval: i64,
+) {
     let res = client.component_bytes_processed_total_subscription(interval);
 
     tokio::pin! {
@@ -94,6 +129,31 @@ async fn bytes_processed(client: Arc<SubscriptionClient>, mut tx: state::EventTx
     }
 }
 
+/// Bytes processed throughput metrics
+async fn bytes_processed_throughput(
+    client: Arc<SubscriptionClient>,
+    mut tx: state::EventTx,
+    interval: i64,
+) {
+    let res = client.component_bytes_processed_throughput_subscription(interval);
+
+    tokio::pin! {
+        let stream = res.stream();
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            let c = d.component_bytes_processed_throughput;
+            let _ = tx
+                .send((
+                    c.name,
+                    state::EventType::BytesProcessedThroughput(c.throughput as i64),
+                ))
+                .await;
+        }
+    }
+}
+
 /// Subscribe to each metrics channel through a separate client. This is a temporary workaround
 /// until client multiplexing is fixed. In future, we should be able to use a single client
 pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) {
@@ -101,8 +161,26 @@ pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) 
 
     tokio::spawn(component_added(Arc::clone(&client), tx.clone()));
     tokio::spawn(component_removed(Arc::clone(&client), tx.clone()));
-    tokio::spawn(events_processed(Arc::clone(&client), tx.clone(), interval));
-    tokio::spawn(bytes_processed(Arc::clone(&client), tx, interval));
+    tokio::spawn(events_processed_total(
+        Arc::clone(&client),
+        tx.clone(),
+        interval,
+    ));
+    tokio::spawn(events_processed_throughput(
+        Arc::clone(&client),
+        tx.clone(),
+        interval,
+    ));
+    tokio::spawn(bytes_processed_total(
+        Arc::clone(&client),
+        tx.clone(),
+        interval,
+    ));
+    tokio::spawn(bytes_processed_throughput(
+        Arc::clone(&client),
+        tx,
+        interval,
+    ));
 }
 
 /// Retrieve the initial components/metrics for first paint. Further updating the metrics
@@ -129,11 +207,13 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                         .as_ref()
                         .map(|ep| ep.events_processed_total as i64)
                         .unwrap_or(0),
+                    events_processed_throughput: 0,
                     bytes_processed_total: d
                         .bytes_processed_total
                         .as_ref()
                         .map(|ep| ep.bytes_processed_total as i64)
                         .unwrap_or(0),
+                    bytes_processed_throughput: 0,
                     errors: 0,
                 },
             )

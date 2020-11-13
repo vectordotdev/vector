@@ -1,7 +1,9 @@
 use std::collections::btree_map::BTreeMap;
 use tokio::sync::mpsc;
 
-pub static COMPONENT_HEADERS: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
+pub static COMPONENT_HEADERS: [&str; 8] = [
+    "Name", "Kind", "Type", "Events", "I/O", "Bytes", "I/O", "Errors",
+];
 
 pub type State = BTreeMap<String, ComponentRow>;
 pub type EventTx = mpsc::Sender<(String, EventType)>;
@@ -11,7 +13,9 @@ pub type StateRx = mpsc::Receiver<State>;
 #[derive(Debug)]
 pub enum EventType {
     EventsProcessedTotal(i64),
+    EventsProcessedThroughput(i64),
     BytesProcessedTotal(i64),
+    BytesProcessedThroughput(i64),
     ComponentAdded(ComponentRow),
     ComponentRemoved(String),
 }
@@ -22,7 +26,9 @@ pub struct ComponentRow {
     pub kind: String,
     pub component_type: String,
     pub events_processed_total: i64,
+    pub events_processed_throughput: i64,
     pub bytes_processed_total: i64,
+    pub bytes_processed_throughput: i64,
     pub errors: i64,
 }
 
@@ -44,9 +50,19 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                             r.events_processed_total = v;
                         }
                     }
+                    EventType::EventsProcessedThroughput(v) => {
+                        if let Some(r) = state.get_mut(&name) {
+                            r.events_processed_throughput = v;
+                        }
+                    }
                     EventType::BytesProcessedTotal(v) => {
                         if let Some(r) = state.get_mut(&name) {
                             r.bytes_processed_total = v;
+                        }
+                    }
+                    EventType::BytesProcessedThroughput(v) => {
+                        if let Some(r) = state.get_mut(&name) {
+                            r.bytes_processed_throughput = v;
                         }
                     }
                     EventType::ComponentAdded(c) => {

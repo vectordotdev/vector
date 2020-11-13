@@ -62,12 +62,12 @@ impl ComponentEventsProcessedTotal {
     }
 }
 
-pub struct ComponentEventsThroughput {
+pub struct ComponentEventsProcessedThroughput {
     name: String,
     throughput: i64,
 }
 
-impl ComponentEventsThroughput {
+impl ComponentEventsProcessedThroughput {
     /// Returns a new `ComponentsEventsThroughput`, set to the provided name/throughput values
     pub fn new(name: String, throughput: i64) -> Self {
         Self { name, throughput }
@@ -75,13 +75,13 @@ impl ComponentEventsThroughput {
 }
 
 #[Object]
-impl ComponentEventsThroughput {
+impl ComponentEventsProcessedThroughput {
     /// Component name
     async fn name(&self) -> &str {
         &self.name
     }
 
-    /// Throughput
+    /// Events processed throughput
     async fn throughput(&self) -> i64 {
         self.throughput
     }

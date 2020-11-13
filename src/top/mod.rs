@@ -9,7 +9,7 @@ use url::Url;
 
 pub use cmd::cmd;
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Clone)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
     /// How often the screen refreshes (in milliseconds)
