@@ -1,7 +1,6 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Criterion, SamplingMode, Throughput};
-use futures::{compat::Future01CompatExt, future};
-use futures01::{Sink, Stream};
+use futures::{future, stream, SinkExt, StreamExt};
 use std::{convert::Infallible, time::Duration};
 use vector::{
     buffers::Acker,
@@ -54,18 +53,15 @@ fn benchmark_batching(c: &mut Criterion) {
 
                         (
                             rt,
-                            futures01::stream::iter_ok::<_, ()>(input.clone().into_iter().map(
-                                |b| InnerBuffer {
-                                    inner: b,
-                                    key: Bytes::from("key"),
-                                },
-                            )),
+                            stream::iter(input.clone().into_iter().map(|b| InnerBuffer {
+                                inner: b,
+                                key: Bytes::from("key"),
+                            }))
+                            .map(Ok),
                             batch_sink,
                         )
                     },
-                    |(mut rt, input, batch_sink)| {
-                        rt.block_on(input.forward(batch_sink).compat()).unwrap()
-                    },
+                    |(mut rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                     criterion::BatchSize::LargeInput,
                 )
             },
@@ -88,15 +84,9 @@ fn benchmark_batching(c: &mut Criterion) {
                     )
                     .sink_map_err(|error| panic!(error));
 
-                    (
-                        rt,
-                        futures01::stream::iter_ok::<_, ()>(input.clone()),
-                        batch_sink,
-                    )
+                    (rt, stream::iter(input.clone()).map(Ok), batch_sink)
                 },
-                |(mut rt, input, batch_sink)| {
-                    rt.block_on(input.forward(batch_sink).compat()).unwrap()
-                },
+                |(mut rt, input, batch_sink)| rt.block_on(input.forward(batch_sink)).unwrap(),
                 criterion::BatchSize::LargeInput,
             )
         });

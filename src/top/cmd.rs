@@ -73,7 +73,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     );
 
     // Initialize the dashboard
-    match init_dashboard(url.as_str(), sender).await {
+    match init_dashboard(url.as_str(), opts.human_metrics, sender).await {
         Ok(_) => exitcode::OK,
         _ => {
             eprintln!("Your terminal doesn't support building a dashboard. Exiting.");

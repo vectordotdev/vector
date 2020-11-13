@@ -2,5 +2,6 @@ subscription ComponentAddedSubscription {
   componentAdded {
     __typename
     name
+    componentType
   }
 }

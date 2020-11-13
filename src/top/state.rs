@@ -1,8 +1,7 @@
-use num_format::{Locale, ToFormattedString};
 use std::collections::btree_map::BTreeMap;
 use tokio::sync::mpsc;
 
-pub static COMPONENT_HEADERS: [&str; 5] = ["Name", "Type", "Events", "Bytes", "Errors"];
+pub static COMPONENT_HEADERS: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
 
 pub type State = BTreeMap<String, ComponentRow>;
 pub type EventTx = mpsc::Sender<(String, EventType)>;
@@ -20,35 +19,11 @@ pub enum EventType {
 #[derive(Debug, Clone)]
 pub struct ComponentRow {
     pub name: String,
+    pub kind: String,
     pub component_type: String,
     pub events_processed_total: i64,
     pub bytes_processed_total: i64,
     pub errors: i64,
-}
-
-impl ComponentRow {
-    /// Helper method for formatting an i64 value -> String
-    fn format_i64(val: i64) -> String {
-        match val {
-            0 => "--".into(),
-            _ => val.to_formatted_string(&Locale::en),
-        }
-    }
-
-    /// Format events processed total
-    pub fn format_events_processed_total(&self) -> String {
-        Self::format_i64(self.events_processed_total)
-    }
-
-    /// Format bytes processed total
-    pub fn format_bytes_processed_total(&self) -> String {
-        Self::format_i64(self.bytes_processed_total)
-    }
-
-    /// Format errors count
-    pub fn format_errors(&self) -> String {
-        Self::format_i64(self.errors)
-    }
 }
 
 /// Takes the receiver `EventRx` channel, and returns a `StateTx` state transmitter. This

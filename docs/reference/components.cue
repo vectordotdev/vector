@@ -269,6 +269,55 @@ components: {
 				}
 			}
 
+			_http_auth: {
+				_args: {
+					password_example: string
+					username_example: string
+				}
+				let Args = _args
+
+				common:      false
+				description: "Configures the authentication strategy."
+				required:    false
+				type: object: options: {
+					password: {
+						description: "The basic authentication password."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: [Args.password_example, "password"]
+						}
+					}
+					strategy: {
+						description: "The authentication strategy to use."
+						required:    true
+						warnings: []
+						type: string: {
+							enum: {
+								basic:  "The [basic authentication strategy](\(urls.basic_auth))."
+								bearer: "The bearer token authentication strategy."
+							}
+						}
+					}
+					token: {
+						description: "The token to use for bearer authentication"
+						required:    true
+						warnings: []
+						type: string: {
+							examples: ["${API_TOKEN}", "xyz123"]
+						}
+					}
+					user: {
+						description: "The basic authentication user name."
+						required:    true
+						warnings: []
+						type: string: {
+							examples: [Args.username_example, "username"]
+						}
+					}
+				}
+			}
+
 			_types: {
 				common:      true
 				description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."

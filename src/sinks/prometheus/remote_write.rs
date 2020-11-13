@@ -15,8 +15,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::{Bytes, BytesMut};
-use futures::{future::BoxFuture, FutureExt as _};
-use futures01::Sink as _;
+use futures::{future::BoxFuture, FutureExt, SinkExt};
 use http::Uri;
 use prost::Message;
 use serde::{Deserialize, Serialize};
@@ -94,10 +93,7 @@ impl SinkConfig for RemoteWriteConfig {
             )
             .sink_map_err(|error| error!(message = "Prometheus remote_write sink error.", %error));
 
-        Ok((
-            sinks::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> crate::config::DataType {
@@ -109,7 +105,7 @@ impl SinkConfig for RemoteWriteConfig {
     }
 }
 
-async fn healthcheck(endpoint: Uri, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
     let request = http::Request::get(endpoint)
         .body(hyper::Body::empty())
         .unwrap();
@@ -171,10 +167,10 @@ impl tower::Service<Vec<Metric>> for RemoteWriteService {
             .header("Content-Type", "application/x-protobuf")
             .body(body.into())
             .unwrap();
-        let mut client = self.client.clone();
+        let client = self.client.clone();
 
         Box::pin(async move {
-            let response = client.call(request).await?;
+            let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
             Ok(hyper::Response::from_parts(parts, body))

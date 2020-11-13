@@ -149,6 +149,22 @@
               "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
+              "name": "componentType",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
               "name": "eventsProcessedTotal",
               "type": {
                 "kind": "OBJECT",
@@ -960,6 +976,45 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Vector version",
+              "isDeprecated": false,
+              "name": "version",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Hostname",
+              "isDeprecated": false,
+              "name": "hostname",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              }
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "kind": "OBJECT",
+          "name": "Meta",
+          "possibleTypes": null
+        },
+        {
+          "description": null,
+          "enumValues": null,
+          "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": null,
               "isDeprecated": false,
               "name": "timestamp",
@@ -1111,6 +1166,22 @@
           "description": null,
           "enumValues": null,
           "fields": [
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": null,
+              "isDeprecated": false,
+              "name": "meta",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Meta",
+                  "ofType": null
+                }
+              }
+            },
             {
               "args": [],
               "deprecationReason": null,
@@ -1269,6 +1340,22 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Sink type",
+              "isDeprecated": false,
+              "name": "componentType",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Source inputs",
               "isDeprecated": false,
               "name": "sources",
@@ -1361,6 +1448,22 @@
               "description": "Source name",
               "isDeprecated": false,
               "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Source type",
+              "isDeprecated": false,
+              "name": "componentType",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1581,7 +1684,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1612,7 +1715,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1658,6 +1761,45 @@
                 }
               ],
               "deprecationReason": null,
+              "description": "Component events processed metrics, received in batches containing metrics over `interval`",
+              "isDeprecated": false,
+              "name": "componentEventsProcessedTotalBatch",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentEventsProcessedTotal",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
               "description": "Bytes processed metrics",
               "isDeprecated": false,
               "name": "bytesProcessedTotal",
@@ -1674,7 +1816,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1705,7 +1847,46 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Component bytes processed metrics, received in batches containing metrics over `interval`",
+              "isDeprecated": false,
+              "name": "componentBytesProcessedTotalBatch",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentBytesProcessedTotal",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1736,7 +1917,7 @@
             {
               "args": [
                 {
-                  "defaultValue": null,
+                  "defaultValue": "1000",
                   "description": null,
                   "name": "interval",
                   "type": {
@@ -1761,6 +1942,45 @@
                   "kind": "OBJECT",
                   "name": "ComponentErrorsTotal",
                   "ofType": null
+                }
+              }
+            },
+            {
+              "args": [
+                {
+                  "defaultValue": "1000",
+                  "description": null,
+                  "name": "interval",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "Int",
+                      "ofType": null
+                    }
+                  }
+                }
+              ],
+              "deprecationReason": null,
+              "description": "Component errors metrics, received in batches containing metrics over `interval`",
+              "isDeprecated": false,
+              "name": "componentErrorsTotalBatch",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ComponentErrorsTotal",
+                      "ofType": null
+                    }
+                  }
                 }
               }
             },
@@ -1926,6 +2146,22 @@
               "description": "Transform name",
               "isDeprecated": false,
               "name": "name",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
+              "description": "Transform type",
+              "isDeprecated": false,
+              "name": "componentType",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
