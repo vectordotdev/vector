@@ -15,8 +15,6 @@ tags:
   ]
 ---
 
-import CodeExplanation from '@site/src/components/CodeExplanation';
-
 High cardinality metric tags can severly disrupt downstream metrics storages. To
 protect against this we built a new
 [`tag_cardinality_limit` transform][docs.transforms.tag_cardinality_limit].
