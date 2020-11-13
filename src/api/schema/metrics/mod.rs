@@ -161,9 +161,9 @@ impl MetricsSubscription {
     async fn bytes_processed_throughput(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = f64> {
+    ) -> impl Stream<Item = i64> {
         get_counter_throughput(interval, &|m| m.name == "processed_bytes_total")
-            .map(|(_, throughput)| throughput)
+            .map(|(_, throughput)| throughput as i64)
     }
 
     /// Component bytes processed metrics. Streams new data as the metric increases
@@ -185,6 +185,39 @@ impl MetricsSubscription {
                 .map(ComponentBytesProcessedTotal::new)
                 .collect()
         })
+    }
+
+    /// Component bytes processed throughput, sampled over a provided millisecond `interval`.
+    async fn component_bytes_processed_throughput(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ComponentBytesProcessedThroughput> {
+        get_component_counter_throughput(interval, &|m| m.name == "processed_bytes_total").map(
+            |(m, throughput)| {
+                ComponentBytesProcessedThroughput::new(
+                    m.tag_value("component_name").unwrap(),
+                    throughput as i64,
+                )
+            },
+        )
+    }
+
+    /// Component bytes processed throughput, received in batches containing metrics over `interval`
+    async fn component_bytes_processed_throughput_batch(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = Vec<ComponentBytesProcessedThroughput>> {
+        get_component_counter_throughput_batch(interval, &|m| m.name == "processed_bytes_total")
+            .map(|m| {
+                m.into_iter()
+                    .map(|(m, throughput)| {
+                        ComponentBytesProcessedThroughput::new(
+                            m.tag_value("component_name").unwrap(),
+                            throughput as i64,
+                        )
+                    })
+                    .collect()
+            })
     }
 
     /// Total error metrics

@@ -5,20 +5,22 @@ pub static COMPONENT_HEADERS: [&str; 8] = [
     "Name", "Kind", "Type", "Events", "I/O", "Bytes", "I/O", "Errors",
 ];
 
-pub type State = BTreeMap<String, ComponentRow>;
-pub type EventTx = mpsc::Sender<(String, EventType)>;
-pub type EventRx = mpsc::Receiver<(String, EventType)>;
-pub type StateRx = mpsc::Receiver<State>;
+type NamedMetric = (String, i64);
 
 #[derive(Debug)]
 pub enum EventType {
-    EventsProcessedTotal(i64),
-    EventsProcessedThroughput(i64),
-    BytesProcessedTotal(i64),
-    BytesProcessedThroughput(i64),
+    EventsProcessedTotalBatch(Vec<NamedMetric>),
+    EventsProcessedThroughputBatch(Vec<NamedMetric>),
+    BytesProcessedTotalBatch(Vec<NamedMetric>),
+    BytesProcessedThroughputBatch(Vec<NamedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(String),
 }
+
+pub type State = BTreeMap<String, ComponentRow>;
+pub type EventTx = mpsc::Sender<EventType>;
+pub type EventRx = mpsc::Receiver<EventType>;
+pub type StateRx = mpsc::Receiver<State>;
 
 #[derive(Debug, Clone)]
 pub struct ComponentRow {
@@ -43,30 +45,38 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
 
     tokio::spawn(async move {
         loop {
-            if let Some((name, event_type)) = event_rx.recv().await {
+            if let Some(event_type) = event_rx.recv().await {
                 match event_type {
-                    EventType::EventsProcessedTotal(v) => {
-                        if let Some(r) = state.get_mut(&name) {
-                            r.events_processed_total = v;
+                    EventType::EventsProcessedTotalBatch(rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.events_processed_total = v;
+                            }
                         }
                     }
-                    EventType::EventsProcessedThroughput(v) => {
-                        if let Some(r) = state.get_mut(&name) {
-                            r.events_processed_throughput = v;
+                    EventType::EventsProcessedThroughputBatch(rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.events_processed_throughput = v;
+                            }
                         }
                     }
-                    EventType::BytesProcessedTotal(v) => {
-                        if let Some(r) = state.get_mut(&name) {
-                            r.bytes_processed_total = v;
+                    EventType::BytesProcessedTotalBatch(rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.bytes_processed_total = v;
+                            }
                         }
                     }
-                    EventType::BytesProcessedThroughput(v) => {
-                        if let Some(r) = state.get_mut(&name) {
-                            r.bytes_processed_throughput = v;
+                    EventType::BytesProcessedThroughputBatch(rows) => {
+                        for (name, v) in rows {
+                            if let Some(r) = state.get_mut(&name) {
+                                r.bytes_processed_throughput = v;
+                            }
                         }
                     }
                     EventType::ComponentAdded(c) => {
-                        let _ = state.insert(name, c);
+                        let _ = state.insert(c.name.clone(), c);
                     }
                     EventType::ComponentRemoved(name) => {
                         let _ = state.remove(&name);

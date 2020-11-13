@@ -64,12 +64,12 @@ impl ComponentBytesProcessedTotal {
 
 pub struct ComponentBytesProcessedThroughput {
     name: String,
-    throughput: f64,
+    throughput: i64,
 }
 
 impl ComponentBytesProcessedThroughput {
     /// Returns a new `ComponentBytesProcessedThroughput`, set to the provided name/throughput values
-    pub fn new(name: String, throughput: f64) -> Self {
+    pub fn new(name: String, throughput: i64) -> Self {
         Self { name, throughput }
     }
 }
@@ -82,7 +82,7 @@ impl ComponentBytesProcessedThroughput {
     }
 
     /// Bytes processed throughput
-    async fn throughput(&self) -> f64 {
+    async fn throughput(&self) -> i64 {
         self.throughput
     }
 }

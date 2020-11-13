@@ -1,0 +1,6 @@
+subscription ComponentBytesProcessedThroughputBatchSubscription($interval: Int!) {
+    componentBytesProcessedThroughputBatch(interval: $interval) {
+        name
+        throughput
+    }
+}
