@@ -280,7 +280,7 @@ impl AzureMonitorLogsSink {
     }
 }
 
-async fn healthcheck(sink: AzureMonitorLogsSink, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::Result<()> {
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let res = client.send(request).await?;

@@ -242,7 +242,7 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub async fn healthcheck(config: HecSinkConfig, mut client: HttpClient) -> crate::Result<()> {
+pub async fn healthcheck(config: HecSinkConfig, client: HttpClient) -> crate::Result<()> {
     let uri = build_uri(&config.endpoint, "/services/collector/health/1.0")
         .context(super::UriParseError)?;
 

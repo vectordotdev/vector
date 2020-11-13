@@ -261,7 +261,7 @@ impl LogdnaConfig {
     }
 }
 
-async fn healthcheck(config: LogdnaConfig, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(config: LogdnaConfig, client: HttpClient) -> crate::Result<()> {
     let uri = config.build_uri("");
 
     let req = Request::post(uri).body(hyper::Body::empty()).unwrap();

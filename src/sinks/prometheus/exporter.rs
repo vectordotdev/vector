@@ -328,15 +328,17 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         event::{Metric, MetricValue},
+        http::HttpClient,
     };
     use futures::{stream, task::Poll};
-    use hyper::Client;
     use serde_json::Value;
     use std::{pin::Pin, task::Context};
     use tokio::time::Duration;
 
     #[tokio::test]
     async fn prometheus_scrapes_metrics() {
+        crate::test_util::trace_init();
+
         let start = Utc::now().timestamp();
         let address = "127.0.0.1:9101";
 
@@ -374,8 +376,9 @@ mod integration_tests {
         let request = Request::post(uri)
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = Client::new()
-            .request(request)
+        let result = HttpClient::new(None)
+            .unwrap()
+            .send(request)
             .await
             .expect("Could not fetch query");
         let result = hyper::body::to_bytes(result.into_body())
