@@ -1,6 +1,26 @@
-use crate::{expression, Expr, Expression, Result, Value};
+use crate::{
+    expression::{self, Path},
+    Expr, Expression, Result, Value,
+};
 use core::convert::{TryFrom, TryInto};
 use std::collections::HashMap;
+
+// workaround for missing variable argument length.
+//
+// We'll come up with a nicer solution at some point. It took Rust five
+// years to support [0; 34].
+#[macro_export]
+macro_rules! generate_param_list {
+    (accepts = $accepts:expr, required = $required:expr, keywords = [$($k:literal),+ $(,)?] $(,)?) => (
+        &[
+            $(Parameter {
+                keyword: $k,
+                accepts: $accepts,
+                required: $required,
+            }),+
+        ]
+    );
+}
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {

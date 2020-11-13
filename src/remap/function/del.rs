@@ -10,21 +10,13 @@ impl Function for Del {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        // workaround for missing variable argument length.
-        //
-        // We'll come up with a nicer solution at some point. It took Rust five
-        // years to support [0; 34].
-        macro_rules! set_variable_params {
-            ($($n:tt),+ $(,)?) => (
-                &[$(Parameter {
-                        keyword: stringify!($n),
-                        accepts: |v| matches!(v, Value::String(_)),
-                        required: false,
-                    }),+]
-            );
+        generate_param_list! {
+            accepts = |_| true,
+            required = false,
+            keywords = [
+                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
+            ],
         }
-
-        set_variable_params!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
