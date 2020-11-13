@@ -97,14 +97,16 @@ impl<'a> Widgets<'a> {
 
     /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
     fn title<B: Backend>(&'a self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![
-            Spans::from(self.url_string),
-            Spans::from("|"),
-            Spans::from(format!(
-                "Sample rate: {}ms",
-                self.opts.refresh_interval.thousands_format()
-            )),
-        ];
+        let text = vec![Spans::from(vec![
+            Span::from(self.url_string),
+            Span::styled(
+                format!(
+                    " | Sampling @ {}ms",
+                    self.opts.refresh_interval.thousands_format()
+                ),
+                Style::default().fg(Color::Gray),
+            ),
+        ])];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
             "Vector",
