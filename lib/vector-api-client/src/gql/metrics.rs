@@ -141,55 +141,55 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<EventsProcessedThroughputSubscription>;
 
-    /// Executes an events processed throughput subscription
+    /// Executes a bytes processed throughput subscription
     fn bytes_processed_throughput_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<BytesProcessedThroughputSubscription>;
 
-    /// Executes a components events processed total metrics subscription
+    /// Executes a component events processed total metrics subscription
     fn component_events_processed_total_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsProcessedTotalSubscription>;
 
-    /// Executes a components events processed total metrics batch subscription
+    /// Executes a component events processed total metrics batch subscription
     fn component_events_processed_total_batch_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsProcessedTotalBatchSubscription>;
 
-    /// Executes a components events processed throughput metrics subscription
+    /// Executes a component events processed throughput metrics subscription
     fn component_events_processed_throughput_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsProcessedThroughputSubscription>;
 
-    /// Executes a components events processed throughput matcj metrics subscription
+    /// Executes a component events processed throughput batch metrics subscription
     fn component_events_processed_throughput_batch_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsProcessedThroughputBatchSubscription>;
 
-    /// Executes a components bytes processed total metrics subscription
+    /// Executes a component bytes processed total metrics subscription
     fn component_bytes_processed_total_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentBytesProcessedTotalSubscription>;
 
-    /// Executes a components bytes processed total metrics batch subscription
+    /// Executes a component bytes processed total batch metrics subscription
     fn component_bytes_processed_total_batch_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentBytesProcessedTotalBatchSubscription>;
 
-    /// Executes a components bytes processed throughput metrics subscription
+    /// Executes a component bytes processed throughput metrics subscription
     fn component_bytes_processed_throughput_subscription(
         &self,
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentBytesProcessedThroughputSubscription>;
 
-    /// Executes a components bytes processed throughput batch metrics subscription
+    /// Executes a component bytes processed throughput batch metrics subscription
     fn component_bytes_processed_throughput_batch_subscription(
         &self,
         interval: i64,
@@ -240,7 +240,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<BytesProcessedThroughputSubscription>(&request_body)
     }
 
-    /// Executes a components events processed total metrics subscription
+    /// Executes a component events processed total metrics subscription
     fn component_events_processed_total_subscription(
         &self,
         interval: i64,
@@ -252,7 +252,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsProcessedTotalSubscription>(&request_body)
     }
 
-    /// Executes a components events processed total batch metrics subscription
+    /// Executes a component events processed total batch metrics subscription
     fn component_events_processed_total_batch_subscription(
         &self,
         interval: i64,
@@ -276,7 +276,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsProcessedThroughputSubscription>(&request_body)
     }
 
-    /// Executes a components events processed throughput batch metrics subscription
+    /// Executes a component events processed throughput batch metrics subscription
     fn component_events_processed_throughput_batch_subscription(
         &self,
         interval: i64,
@@ -287,7 +287,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
 
         self.start::<ComponentEventsProcessedThroughputBatchSubscription>(&request_body)
     }
-    /// Executes a components bytes processed total metrics subscription
+    /// Executes a component bytes processed total metrics subscription
     fn component_bytes_processed_total_subscription(
         &self,
         interval: i64,
@@ -299,7 +299,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentBytesProcessedTotalSubscription>(&request_body)
     }
 
-    /// Executes a components bytes processed total metrics subscription
+    /// Executes a component bytes processed total batch metrics subscription
     fn component_bytes_processed_total_batch_subscription(
         &self,
         interval: i64,
@@ -323,7 +323,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentBytesProcessedThroughputSubscription>(&request_body)
     }
 
-    /// Executes a components bytes processed throughput batch metrics subscription
+    /// Executes a component bytes processed throughput batch metrics subscription
     fn component_bytes_processed_throughput_batch_subscription(
         &self,
         interval: i64,
