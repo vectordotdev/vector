@@ -175,37 +175,16 @@ impl MetricsSubscription {
             .map(ComponentBytesProcessedTotal::new)
     }
 
-    /// Component bytes processed throughput, sampled over a provided millisecond `interval`.
-    async fn component_bytes_processed_throughput(
+    /// Component bytes processed metrics, received in batches containing metrics over `interval`
+    async fn component_bytes_processed_total_batch(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = ComponentBytesProcessedThroughput> {
-        get_component_counter_throughput(interval, &|m| m.name == "processed_bytes_total").map(
-            |(m, throughput)| {
-                ComponentBytesProcessedThroughput::new(
-                    m.tag_value("component_name").unwrap(),
-                    throughput,
-                )
-            },
-        )
-    }
-
-    /// Component bytes processed throughput, received in batches containing metrics over `interval`
-    async fn component_bytes_processed_throughput_batch(
-        &self,
-        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = Vec<ComponentBytesProcessedThroughput>> {
-        get_component_counter_throughput_batch(interval, &|m| m.name == "processed_bytes_total")
-            .map(|m| {
-                m.into_iter()
-                    .map(|(m, throughput)| {
-                        ComponentBytesProcessedThroughput::new(
-                            m.tag_value("component_name").unwrap(),
-                            throughput,
-                        )
-                    })
-                    .collect()
-            })
+    ) -> impl Stream<Item = Vec<ComponentBytesProcessedTotal>> {
+        component_counter_metrics_batch(interval, &|m| m.name == "processed_bytes_total").map(|m| {
+            m.into_iter()
+                .map(ComponentBytesProcessedTotal::new)
+                .collect()
+        })
     }
 
     /// Total error metrics
@@ -225,6 +204,15 @@ impl MetricsSubscription {
     ) -> impl Stream<Item = ComponentErrorsTotal> {
         component_counter_metrics(interval, &|m| m.name.ends_with("_errors_total"))
             .map(ComponentErrorsTotal::new)
+    }
+
+    /// Component errors metrics, received in batches containing metrics over `interval`
+    async fn component_errors_total_batch(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = Vec<ComponentErrorsTotal>> {
+        component_counter_metrics_batch(interval, &|m| m.name.ends_with("_errors_total"))
+            .map(|m| m.into_iter().map(ComponentErrorsTotal::new).collect())
     }
 
     /// All metrics
