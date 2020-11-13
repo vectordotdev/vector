@@ -100,10 +100,7 @@ impl<'a> Widgets<'a> {
         let text = vec![Spans::from(vec![
             Span::from(self.url_string),
             Span::styled(
-                format!(
-                    " | Sampling @ {}ms",
-                    self.opts.refresh_interval.thousands_format()
-                ),
+                format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
                 Style::default().fg(Color::Gray),
             ),
         ])];
