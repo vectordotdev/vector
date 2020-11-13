@@ -149,15 +149,18 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
 
 #[cfg(test)]
 mod test {
-    use super::Fingerprinter;
+    use super::{FingerprintStrategy, Fingerprinter};
     use std::fs;
     use tempfile::tempdir;
 
     #[test]
     fn test_checksum_fingerprint() {
-        let fingerprinter = Fingerprinter::Checksum {
-            bytes: 256,
-            ignored_header_bytes: 0,
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::Checksum {
+                bytes: 256,
+                ignored_header_bytes: 0,
+            },
+            ignore_not_found: false,
         };
 
         let target_dir = tempdir().unwrap();
@@ -195,9 +198,12 @@ mod test {
     #[test]
     fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
-        let fingerprinter = Fingerprinter::FirstLineChecksum {
-            max_line_length,
-            ignored_header_bytes: 0,
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::FirstLineChecksum {
+                max_line_length,
+                ignored_header_bytes: 0,
+            },
+            ignore_not_found: false,
         };
 
         let target_dir = tempdir().unwrap();
@@ -264,7 +270,10 @@ mod test {
 
     #[test]
     fn test_inode_fingerprint() {
-        let fingerprinter = Fingerprinter::DevInode;
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::DevInode,
+            ignore_not_found: false,
+        };
 
         let target_dir = tempdir().unwrap();
         let small_data = vec![b'x'; 1];
