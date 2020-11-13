@@ -114,7 +114,7 @@ impl Fingerprinter {
                     }
                 }
                 io::ErrorKind::NotFound => {
-                    if self.ignore_not_found {
+                    if !self.ignore_not_found {
                         emitter.emit_file_fingerprint_read_failed(path, error);
                     }
                 }
