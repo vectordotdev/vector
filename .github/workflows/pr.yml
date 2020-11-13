@@ -39,7 +39,7 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: |
           $ErrorActionPreference = 'SilentlyContinue'
-          roceuhroceuh
+          cargo test --no-fail-fast --no-default-features --features default-msvc
           exit 0
         shell: powershell -Command "& '{0}'"
       - run: Get-CimInstance -Class CIM_LogicalDisk
