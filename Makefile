@@ -277,8 +277,8 @@ test: ## Run the unit test suite
 .PHONY: test-all-components
 test-all-components: ## Test with all components enabled
 # TODO(jesse): renable after the wasm transform builds again
-#test-all-components: $(WASM_MODULE_OUTPUTS)
-#test-all-components: export DEFAULT_FEATURES:="$(DEFAULT_FEATURES) wasm-benches"
+test-all-components: $(WASM_MODULE_OUTPUTS)
+test-all-components: export DEFAULT_FEATURES:="$(DEFAULT_FEATURES) wasm-benches"
 test-all-components: test
 
 .PHONY: test-all
