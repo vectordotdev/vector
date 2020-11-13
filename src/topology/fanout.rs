@@ -176,14 +176,11 @@ mod tests {
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
-
-        let recs = vec![rec1, rec2];
+        let recs = make_events(2);
         let fanout = fanout.send_all(stream::iter_ok(recs.clone())).compat();
         let _ = fanout.await.unwrap();
 
-        assert_eq!(collect_ready(rx_a).await.unwrap(), recs.clone());
+        assert_eq!(collect_ready(rx_a).await.unwrap(), recs);
         assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
     }
 
@@ -202,11 +199,7 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
-        let rec3 = Event::from("line 3".to_string());
-
-        let recs = vec![rec1, rec2, rec3];
+        let recs = make_events(3);
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
@@ -234,28 +227,20 @@ mod tests {
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
+        let recs = make_events(3);
 
-        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
-        let mut fanout = fanout.send(rec2.clone()).compat().await.unwrap();
+        let fanout = fanout.send(recs[0].clone()).compat().await.unwrap();
+        let mut fanout = fanout.send(recs[1].clone()).compat().await.unwrap();
 
         let (tx_c, rx_c) = mpsc::unbounded();
         let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
         fanout.add("c".to_string(), tx_c);
 
-        let rec3 = Event::from("line 3".to_string());
-        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
+        let _fanout = fanout.send(recs[2].clone()).compat().await.unwrap();
 
-        assert_eq!(
-            collect_ready(rx_a).await.unwrap(),
-            vec![rec1.clone(), rec2.clone(), rec3.clone()]
-        );
-        assert_eq!(
-            collect_ready(rx_b).await.unwrap(),
-            vec![rec1, rec2, rec3.clone()]
-        );
-        assert_eq!(collect_ready(rx_c).await.unwrap(), vec![rec3]);
+        assert_eq!(collect_ready(rx_a).await.unwrap(), recs);
+        assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
+        assert_eq!(collect_ready(rx_c).await.unwrap(), &recs[2..]);
     }
 
     #[tokio::test]
@@ -270,25 +255,20 @@ mod tests {
         fanout.add("a".to_string(), tx_a);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
+        let recs = make_events(3);
 
-        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
-        let fanout = fanout.send(rec2.clone()).compat().await.unwrap();
+        let fanout = fanout.send(recs[0].clone()).compat().await.unwrap();
+        let fanout = fanout.send(recs[1].clone()).compat().await.unwrap();
 
         fanout_control
             .unbounded_send(ControlMessage::Remove("b".to_string()))
             .unwrap();
 
-        let rec3 = Event::from("line 3".to_string());
         use futures::compat::Future01CompatExt;
-        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
+        let _fanout = fanout.send(recs[2].clone()).compat().await.unwrap();
 
-        assert_eq!(
-            collect_ready(rx_a).await.unwrap(),
-            vec![rec1.clone(), rec2.clone(), rec3]
-        );
-        assert_eq!(collect_ready(rx_b).await.unwrap(), vec![rec1, rec2]);
+        assert_eq!(collect_ready(rx_a).await.unwrap(), recs);
+        assert_eq!(collect_ready(rx_b).await.unwrap(), &recs[..2]);
     }
 
     #[tokio::test]
@@ -306,11 +286,7 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
-        let rec3 = Event::from("line 3".to_string());
-
-        let recs = vec![rec1.clone(), rec2, rec3];
+        let recs = make_events(3);
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
@@ -324,9 +300,9 @@ mod tests {
         let collect_b = tokio::spawn(rx_b.collect().compat());
         let collect_c = tokio::spawn(rx_c.collect().compat());
 
-        assert_eq!(collect_b.await.unwrap().unwrap(), recs);
         assert_eq!(collect_a.await.unwrap().unwrap(), recs);
-        assert_eq!(collect_c.await.unwrap().unwrap(), vec![rec1]);
+        assert_eq!(collect_b.await.unwrap().unwrap(), recs);
+        assert_eq!(collect_c.await.unwrap().unwrap(), &recs[..1]);
     }
 
     #[tokio::test]
@@ -344,11 +320,7 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
-        let rec3 = Event::from("line 3".to_string());
-
-        let recs = vec![rec1.clone(), rec2, rec3];
+        let recs = make_events(3);
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
@@ -363,7 +335,7 @@ mod tests {
         let collect_c = tokio::spawn(rx_c.collect().compat());
 
         assert_eq!(collect_a.await.unwrap().unwrap(), recs);
-        assert_eq!(collect_b.await.unwrap().unwrap(), vec![rec1]);
+        assert_eq!(collect_b.await.unwrap().unwrap(), &recs[..1]);
         assert_eq!(collect_c.await.unwrap().unwrap(), recs);
     }
 
@@ -382,11 +354,7 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
-        let rec3 = Event::from("line 3".to_string());
-
-        let recs = vec![rec1.clone(), rec2.clone(), rec3];
+        let recs = make_events(3);
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
@@ -401,7 +369,7 @@ mod tests {
         let collect_b = tokio::spawn(rx_b.collect().compat());
         let collect_c = tokio::spawn(rx_c.collect().compat());
 
-        assert_eq!(collect_a.await.unwrap().unwrap(), [rec1, rec2]);
+        assert_eq!(collect_a.await.unwrap().unwrap(), &recs[..2]);
         assert_eq!(collect_b.await.unwrap().unwrap(), recs);
         assert_eq!(collect_c.await.unwrap().unwrap(), recs);
     }
@@ -410,11 +378,10 @@ mod tests {
     async fn fanout_no_sinks() {
         let fanout = Fanout::new().0;
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
+        let recs = make_events(2);
 
-        let fanout = fanout.send(rec1).compat().await.unwrap();
-        let _fanout = fanout.send(rec2).compat().await.unwrap();
+        let fanout = fanout.send(recs[0].clone()).compat().await.unwrap();
+        let _fanout = fanout.send(recs[1].clone()).compat().await.unwrap();
     }
 
     #[tokio::test]
@@ -429,28 +396,20 @@ mod tests {
         fanout.add("a".to_string(), tx_a1);
         fanout.add("b".to_string(), tx_b);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
+        let recs = make_events(3);
 
-        let fanout = fanout.send(rec1.clone()).compat().await.unwrap();
-        let mut fanout = fanout.send(rec2.clone()).compat().await.unwrap();
+        let fanout = fanout.send(recs[0].clone()).compat().await.unwrap();
+        let mut fanout = fanout.send(recs[1].clone()).compat().await.unwrap();
 
         let (tx_a2, rx_a2) = mpsc::unbounded();
         let tx_a2 = Box::new(tx_a2.sink_map_err(|_| unreachable!()));
         fanout.replace("a".to_string(), tx_a2);
 
-        let rec3 = Event::from("line 3".to_string());
-        let _fanout = fanout.send(rec3.clone()).compat().await.unwrap();
+        let _fanout = fanout.send(recs[2].clone()).compat().await.unwrap();
 
-        assert_eq!(
-            collect_ready(rx_a1).await.unwrap(),
-            vec![rec1.clone(), rec2.clone()]
-        );
-        assert_eq!(
-            collect_ready(rx_b).await.unwrap(),
-            vec![rec1, rec2, rec3.clone()]
-        );
-        assert_eq!(collect_ready(rx_a2).await.unwrap(), vec![rec3]);
+        assert_eq!(collect_ready(rx_a1).await.unwrap(), &recs[..2]);
+        assert_eq!(collect_ready(rx_b).await.unwrap(), recs);
+        assert_eq!(collect_ready(rx_a2).await.unwrap(), &recs[2..]);
     }
 
     #[tokio::test]
@@ -479,11 +438,7 @@ mod tests {
         fanout.add("b".to_string(), tx_b);
         fanout.add("c".to_string(), tx_c);
 
-        let rec1 = Event::from("line 1".to_string());
-        let rec2 = Event::from("line 2".to_string());
-        let rec3 = Event::from("line 3".to_string());
-
-        let recs = vec![rec1, rec2, rec3];
+        let recs = make_events(3);
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
         tokio::spawn(send.map(|_| ()).compat());
 
@@ -525,5 +480,11 @@ mod tests {
                 _ => Ok(Async::Ready(())),
             }
         }
+    }
+
+    fn make_events(count: usize) -> Vec<Event> {
+        (0..count)
+            .map(|i| Event::from(format!("line {}", i)))
+            .collect()
     }
 }
