@@ -498,7 +498,7 @@ mod tests {
 
         // Should only show byte totals on sinks
         assert_eq!(map[&0].name, "bytes_processed_total_sink");
-        assert_eq!(map[&0].name, "bytes_processed_total_sink");
+        assert_eq!(map[&1].name, "bytes_processed_total_sink");
 
         assert!(map[&0].metric.bytes_processed_total > 0.00);
         assert!(map[&1].metric.bytes_processed_total > map[&0].metric.bytes_processed_total)

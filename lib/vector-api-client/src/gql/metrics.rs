@@ -143,7 +143,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsProcessedTotalBatchSubscription>(&request_body)
     }
 
-    /// Executes a components events processed total metrics subscription
+    /// Executes a components bytes processed total metrics subscription
     fn component_bytes_processed_total_subscription(
         &self,
         interval: i64,
@@ -155,7 +155,7 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentBytesProcessedTotalSubscription>(&request_body)
     }
 
-    /// Executes a components events processed total metrics subscription
+    /// Executes a components bytes processed total metrics subscription
     fn component_bytes_processed_total_batch_subscription(
         &self,
         interval: i64,
