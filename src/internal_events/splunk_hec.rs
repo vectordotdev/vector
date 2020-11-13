@@ -121,7 +121,7 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Invalid request body.",
-                error = %self.error,
+                error = ?self.error,
                 rate_limit_secs = 10
             );
         }
@@ -138,7 +138,7 @@ mod source {
         fn emit_logs(&self) {
             error!(
                 message = "Error processing request.",
-                error = %self.error,
+                error = ?self.error,
                 rate_limit_secs = 10
             );
         }

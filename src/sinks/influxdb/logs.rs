@@ -1,21 +1,23 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         influxdb::{
-            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
-            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
+            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
+            encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures01::Sink;
+use futures::SinkExt;
 use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -97,7 +99,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         tags.insert(log_schema().source_type_key().to_string());
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
@@ -136,9 +138,9 @@ impl SinkConfig for InfluxDBLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -162,7 +164,12 @@ impl HttpSink for InfluxDBLogsSink {
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
+        let name = "vector";
+        let measurement = encode_namespace(
+            Some(self.namespace.as_str()).filter(|namespace| !namespace.is_empty()),
+            '.',
+            name,
+        );
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key(), false) {

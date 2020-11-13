@@ -1,6 +1,7 @@
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
+    http::HttpClient,
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
         ApacheMetricsParseError, ApacheMetricsRequestCompleted,
@@ -11,9 +12,7 @@ use crate::{
 use chrono::Utc;
 use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
-use hyper::{Body, Client, Request};
-use hyper_openssl::HttpsConnector;
-use parser::encode_namespace;
+use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::BTreeMap;
@@ -72,10 +71,12 @@ impl SourceConfig for ApacheMetricsConfig {
             .collect::<Result<Vec<_>, _>>()
             .context(super::UriParseError)?;
 
+        let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+
         Ok(apache_metrics(
             urls,
             self.scrape_interval_secs,
-            self.namespace.clone(),
+            namespace,
             shutdown,
             out,
         ))
@@ -124,7 +125,7 @@ impl UriExt for http::Uri {
         }
 
         if let Some(port) = self.port() {
-            s.push_str(":");
+            s.push(':');
             s.push_str(port.as_str());
         }
 
@@ -135,20 +136,19 @@ impl UriExt for http::Uri {
 fn apache_metrics(
     urls: Vec<http::Uri>,
     interval: u64,
-    namespace: String,
+    namespace: Option<String>,
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> super::Source {
     let out = out
-        .sink_map_err(|e| error!("error sending metric: {:?}", e))
+        .sink_map_err(|error| error!(message = "Error sending metric.", %error))
         .sink_compat();
     let task = tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
-            let https = HttpsConnector::new().expect("TLS initialization failed");
-            let client = Client::builder().build(https);
+            let client = HttpClient::new(None).expect("HTTPS initialization failed");
             let sanitized_url = url.to_sanitized_string();
 
             let request = Request::get(&url)
@@ -162,7 +162,8 @@ fn apache_metrics(
             let start = Instant::now();
             let namespace = namespace.clone();
             client
-                .request(request)
+                .send(request)
+                .map_err(crate::Error::from)
                 .and_then(|response| async {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;
@@ -180,14 +181,16 @@ fn apache_metrics(
                             let byte_size = body.len();
                             let body = String::from_utf8_lossy(&body);
 
-                            let results = parser::parse(&body, &namespace, Utc::now(), Some(&tags))
-                                .chain(vec![Ok(Metric {
-                                    name: encode_namespace(&namespace, "up"),
-                                    timestamp: Some(Utc::now()),
-                                    tags: Some(tags.clone()),
-                                    kind: MetricKind::Absolute,
-                                    value: MetricValue::Gauge { value: 1.0 },
-                                })]);
+                            let results =
+                                parser::parse(&body, namespace.as_deref(), Utc::now(), Some(&tags))
+                                    .chain(vec![Ok(Metric {
+                                        name: "up".into(),
+                                        namespace: namespace.clone(),
+                                        timestamp: Some(Utc::now()),
+                                        tags: Some(tags.clone()),
+                                        kind: MetricKind::Absolute,
+                                        value: MetricValue::Gauge { value: 1.0 },
+                                    })]);
 
                             let metrics = results
                                 .filter_map(|res| match res {
@@ -215,7 +218,8 @@ fn apache_metrics(
                             });
                             Some(
                                 stream::iter(vec![Metric {
-                                    name: encode_namespace(&namespace, "up"),
+                                    name: "up".into(),
+                                    namespace: namespace.clone(),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -232,7 +236,8 @@ fn apache_metrics(
                             });
                             Some(
                                 stream::iter(vec![Metric {
-                                    name: encode_namespace(&namespace, "up"),
+                                    name: "up".into(),
+                                    namespace: namespace.clone(),
                                     timestamp: Some(Utc::now()),
                                     tags: Some(tags.clone()),
                                     kind: MetricKind::Absolute,
@@ -248,7 +253,7 @@ fn apache_metrics(
         })
         .flatten()
         .forward(out)
-        .inspect(|_| info!("finished sending"));
+        .inspect(|_| info!("Finished sending."));
 
     Box::new(task.boxed().compat())
 }
@@ -325,8 +330,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", %error);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -358,7 +363,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "custom_up") {
+        match metrics.iter().find(|m| m.name == "up") {
             Some(m) => {
                 assert_eq!(m.value, MetricValue::Gauge { value: 1.0 });
 
@@ -370,10 +375,10 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
                         );
                         assert_eq!(tags.get("host"), Some(&format!("{}", in_addr)));
                     }
-                    None => error!("no tags for metric {:?}", m),
+                    None => error!(message = "No tags for metric.", metric = ?m),
                 }
             }
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
 
@@ -393,8 +398,8 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&in_addr).serve(make_svc).await {
-                error!("server error: {:?}", e);
+            if let Err(error) = Server::bind(&in_addr).serve(make_svc).await {
+                error!(message = "Server error.", %error);
             }
         });
         wait_for_tcp(in_addr).await;
@@ -426,12 +431,12 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        // we still publish `apache_up=1` for bad status codes following the pattern of the Prometheus exporter:
+        // we still publish `up=1` for bad status codes following the pattern of the Prometheus exporter:
         //
         // https://github.com/Lusitaniae/apache_exporter/blob/712a6796fb84f741ef3cd562dc11418f2ee8b741/apache_exporter.go#L200
-        match metrics.iter().find(|m| m.name == "apache_up") {
+        match metrics.iter().find(|m| m.name == "up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 1.0 }),
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
 
@@ -467,9 +472,9 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
             .map(|e| e.into_metric())
             .collect::<Vec<_>>();
 
-        match metrics.iter().find(|m| m.name == "custom_up") {
+        match metrics.iter().find(|m| m.name == "up") {
             Some(m) => assert_eq!(m.value, MetricValue::Gauge { value: 0.0 }),
-            None => error!("could not find apache_up metric in {:?}", metrics),
+            None => error!(message = "Could not find up metric in.", metrics = ?metrics),
         }
     }
 }

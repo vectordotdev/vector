@@ -1,8 +1,8 @@
 //! The test framework main entry point.
 
 use super::{
-    exec_tail, log_lookup, namespace, test_pod, up_down, vector, wait_for_resource,
-    wait_for_rollout, Interface, Reader, Result,
+    exec_tail, kubernetes_version, log_lookup, namespace, test_pod, up_down, vector,
+    wait_for_resource, wait_for_rollout, Interface, Reader, Result,
 };
 
 /// Framework wraps the interface to the system with an easy-to-use rust API
@@ -66,6 +66,12 @@ impl Framework {
     /// `namespace`.
     pub fn exec_tail(&self, namespace: &str, resource: &str, file: &str) -> Result<Reader> {
         exec_tail(&self.interface.kubectl_command, namespace, resource, file)
+    }
+
+    /// Exect a `kubectl --version`command returning a K8sVersion Struct
+    /// containing all version information  of the running Kubernetes test cluster.
+    pub async fn kubernetes_version(&self) -> Result<kubernetes_version::K8sVersion> {
+        kubernetes_version::get(&self.interface.kubectl_command).await
     }
 
     /// Wait for a set of `resources` in a specified `namespace` to achieve

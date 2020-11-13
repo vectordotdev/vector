@@ -3,6 +3,18 @@ use metrics::counter;
 use crate::event::Lookup;
 
 #[derive(Debug)]
+pub struct ConsoleEventProcessed {
+    pub byte_size: usize,
+}
+
+impl InternalEvent for ConsoleEventProcessed {
+    fn emit_metrics(&self) {
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
 pub struct ConsoleFieldNotFound<'a> {
     pub missing_field: Lookup<'a>,
 }

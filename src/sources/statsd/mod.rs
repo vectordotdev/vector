@@ -138,7 +138,7 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
                 // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
                 let mut metrics = stream::iter(metrics).boxed();
                 if let Err(error) = out.send_all(&mut metrics).await {
-                    error!("Error sending metric: {:?}", error);
+                    error!(message = "Error sending metric.", %error);
                     break;
                 }
             }
@@ -174,7 +174,7 @@ mod test {
     use super::*;
     use crate::{
         config,
-        sinks::prometheus::PrometheusSinkConfig,
+        sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
     use futures::{compat::Future01CompatExt, TryStreamExt};
@@ -282,9 +282,9 @@ mod test {
         config.add_sink(
             "out",
             &["in"],
-            PrometheusSinkConfig {
+            PrometheusExporterConfig {
                 address: out_addr,
-                namespace: Some("vector".into()),
+                default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
                 flush_period_secs: 1,

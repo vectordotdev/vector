@@ -1,16 +1,16 @@
 use super::util::tokenize::parse;
-use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{TokenizerConvertFailed, TokenizerEventProcessed, TokenizerFieldMissing},
+    transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct TokenizerConfig {
     pub field_names: Vec<LookupBuf>,
@@ -28,7 +28,7 @@ impl_generate_config_from_default!(TokenizerConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "tokenizer")]
 impl TransformConfig for TokenizerConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -39,7 +39,7 @@ impl TransformConfig for TokenizerConfig {
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| *f == field);
 
-        Ok(Box::new(Tokenizer::new(
+        Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
             field,
             drop_field,
@@ -60,6 +60,7 @@ impl TransformConfig for TokenizerConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Tokenizer {
     field_names: Vec<(LookupBuf, Conversion)>,
     field: LookupBuf,
@@ -89,8 +90,8 @@ impl Tokenizer {
     }
 }
 
-impl Transform for Tokenizer {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Tokenizer {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -119,7 +120,7 @@ impl Transform for Tokenizer {
 
         emit!(TokenizerEventProcessed);
 
-        Some(event)
+        output.push(event)
     }
 }
 
@@ -127,10 +128,7 @@ impl Transform for Tokenizer {
 mod tests {
     use super::TokenizerConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        Event,
-    };
+    use crate::{config::TransformConfig, Event};
 
     #[test]
     fn generate_config() {
@@ -152,11 +150,12 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let parser = parser.as_function();
 
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

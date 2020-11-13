@@ -1,6 +1,7 @@
+use super::{default_host_key, Encoding};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    sinks::splunk_hec::{self, HecSinkConfig},
+    sinks::splunk_hec::HecSinkConfig,
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
@@ -15,31 +16,31 @@ const HOST: &str = "https://cloud.humio.com";
 #[derive(Clone, Debug, Deserialize, Serialize, Derivative)]
 #[derivative(Default)]
 pub struct HumioLogsConfig {
-    token: String,
+    pub(in crate::sinks::humio) token: String,
     // Deprecated name
     #[serde(alias = "host")]
     pub(in crate::sinks::humio) endpoint: Option<String>,
-    source: Option<Template>,
+    pub(in crate::sinks::humio) source: Option<Template>,
     #[serde(
         skip_serializing_if = "crate::serde::skip_serializing_if_default",
         default
     )]
-    encoding: EncodingConfigWithDefault<Encoding>,
+    pub(in crate::sinks::humio) encoding: EncodingConfigWithDefault<Encoding>,
 
-    event_type: Option<Template>,
+    pub(in crate::sinks::humio) event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
     #[derivative(Default(value = "default_host_key()"))]
-    host_key: LookupBuf,
+    pub(in crate::sinks::humio) host_key: LookupBuf,
 
     #[serde(default)]
-    compression: Compression,
+    pub(in crate::sinks::humio) compression: Compression,
 
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub(in crate::sinks::humio) request: TowerRequestConfig,
 
     #[serde(default)]
-    batch: BatchConfig,
+    pub(in crate::sinks::humio) batch: BatchConfig,
 }
 
 fn default_host_key() -> LookupBuf {
@@ -51,24 +52,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(HumioLogsConfig);
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Json,
-    Text,
-}
-
-impl From<Encoding> for splunk_hec::Encoding {
-    fn from(v: Encoding) -> Self {
-        match v {
-            Encoding::Json => splunk_hec::Encoding::Json,
-            Encoding::Text => splunk_hec::Encoding::Text,
-        }
-    }
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "humio_logs")]

@@ -126,7 +126,7 @@ fn decode_value(input: proto::Value) -> Option<Value> {
         Some(proto::value::Kind::Array(array)) => decode_array(array.items),
         Some(proto::value::Kind::Null(_)) => Some(Value::Null),
         None => {
-            error!("encoded event contains unknown value kind");
+            error!("Encoded event contains unknown value kind.");
             None
         }
     }
@@ -195,6 +195,12 @@ impl From<proto::EventWrapper> for Event {
 
                 let name = proto.name;
 
+                let namespace = if proto.namespace.is_empty() {
+                    None
+                } else {
+                    Some(proto.namespace)
+                };
+
                 let timestamp = proto
                     .timestamp
                     .map(|ts| chrono::Utc.timestamp(ts.seconds, ts.nanos as u32));
@@ -239,6 +245,7 @@ impl From<proto::EventWrapper> for Event {
 
                 Event::Metric(Metric {
                     name,
+                    namespace,
                     timestamp,
                     tags,
                     kind,
@@ -297,11 +304,14 @@ impl From<Event> for proto::EventWrapper {
             }
             Event::Metric(Metric {
                 name,
+                namespace,
                 timestamp,
                 tags,
                 kind,
                 value,
             }) => {
+                let namespace = namespace.unwrap_or_default();
+
                 let timestamp = timestamp.map(|ts| prost_types::Timestamp {
                     seconds: ts.timestamp(),
                     nanos: ts.timestamp_subsec_nanos() as i32,
@@ -364,6 +374,7 @@ impl From<Event> for proto::EventWrapper {
 
                 let event = EventProto::Metric(proto::Metric {
                     name,
+                    namespace,
                     timestamp,
                     tags,
                     kind,
@@ -412,6 +423,86 @@ impl From<LogEvent> for Event {
 impl From<Metric> for Event {
     fn from(metric: Metric) -> Self {
         Event::Metric(metric)
+    }
+}
+
+// TODO(jean): add tests
+impl remap::Object for Event {
+    // TODO(jean): replace this with `Lookup`, once that lands.
+    fn insert(&mut self, path: &[Vec<String>], value: remap::Value) -> Result<(), String> {
+        let path_str = path
+            .iter()
+            .map(|c| {
+                c.iter()
+                    .map(|p| p.replace(".", "\\."))
+                    .collect::<Vec<_>>()
+                    .join(".")
+            })
+            .collect::<Vec<_>>()
+            .join(".");
+
+        self.as_mut_log().insert(path_str, value);
+        Ok(())
+    }
+
+    // TODO(jean): replace this with `Lookup`, once that lands.
+    fn find(&self, path: &[Vec<String>]) -> Result<Option<remap::Value>, String> {
+        let path = path
+            .iter()
+            .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+
+        // Event.as_log returns a LogEvent struct rather than a naked
+        // IndexMap<_, Value>, which means specifically for the first item in
+        // the path we need to manually call .get.
+        //
+        // If we could simply pull either an IndexMap or Value out of a LogEvent
+        // then we wouldn't need this duplicate code as we'd jump straight into
+        // the path walker.
+        let mut value = path[0]
+            .iter()
+            .find_map(|p| self.as_log().get(p))
+            .ok_or_else(|| format!("path .{} not found in event", path[0].first().unwrap()))?;
+
+        // Walk remaining (if any) path segments. Our parse is already capable
+        // of extracting individual path tokens from user input. For example,
+        // the path `.foo."bar.baz"[0]` could potentially be pulled out into
+        // the tokens `foo`, `bar.baz`, `0`. However, the Value API doesn't
+        // allow for traversing that way and we'd therefore need to implement
+        // our own walker.
+        //
+        // For now we're broken as we're using an API that assumes unescaped
+        // dots are path delimiters. We either need to escape dots within the
+        // path and take the hit of bridging one escaping mechanism with another
+        // or when we refactor the value API we add options for providing
+        // unescaped tokens.
+        for (i, segments) in path.iter().enumerate().skip(1) {
+            value = segments
+                .iter()
+                .find_map(|p| util::log::get_value(value, PathIter::new(p)))
+                .ok_or_else(|| {
+                    format!(
+                        "path {} not found in event",
+                        path.iter()
+                            .take(i + 1)
+                            .fold("".to_string(), |acc, p| format!(
+                                "{}.{}",
+                                acc,
+                                p.first().unwrap()
+                            ),)
+                    )
+                })?;
+        }
+
+        Ok(Some(value.clone().into()))
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.as_log().keys().collect()
+    }
+
+    fn remove(&mut self, path: &str, compact: bool) {
+        self.as_mut_log().remove_prune(path, compact);
     }
 }
 

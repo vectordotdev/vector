@@ -1,11 +1,11 @@
-use super::Transform;
 use crate::{
-    config::{log_schema, DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{log_schema, DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf},
     internal_events::{
         GrokParserConversionFailed, GrokParserEventProcessed, GrokParserFailedMatch,
         GrokParserMissingField,
     },
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use grok::Pattern;
@@ -20,7 +20,7 @@ enum BuildError {
     InvalidGrok { source: grok::Error },
 }
 
-#[derive(Deserialize, Serialize, Debug, Derivative)]
+#[derive(Deserialize, Serialize, Debug, Derivative, Clone)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct GrokParserConfig {
@@ -40,7 +40,7 @@ impl_generate_config_from_default!(GrokParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "grok_parser")]
 impl TransformConfig for GrokParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
@@ -52,15 +52,15 @@ impl TransformConfig for GrokParserConfig {
 
         Ok(grok
             .compile(&self.pattern, true)
-            .map::<Box<dyn Transform>, _>(|p| {
-                Box::new(GrokParser {
-                    pattern: p,
-                    field: field.clone(),
-                    drop_field: self.drop_field,
-                    types,
-                    paths: HashMap::new(),
-                })
+            .map(|p| GrokParser {
+                pattern: self.pattern.clone(),
+                pattern_built: p,
+                field: field.clone(),
+                drop_field: self.drop_field,
+                types,
+                paths: HashMap::new(),
             })
+            .map(Transform::function)
             .context(InvalidGrok)?)
     }
 
@@ -77,22 +77,40 @@ impl TransformConfig for GrokParserConfig {
     }
 }
 
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub struct GrokParser {
-    pattern: Pattern,
+    #[derivative(Debug = "ignore")]
+    pattern_built: Pattern,
+    pattern: String,
     field: LookupBuf,
     drop_field: bool,
     types: HashMap<LookupBuf, Conversion>,
     paths: HashMap<String, LookupBuf>,
 }
 
-impl Transform for GrokParser {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl Clone for GrokParser {
+    fn clone(&self) -> Self {
+        Self {
+            pattern_built: grok::Grok::with_patterns().compile(&self.pattern, true)
+                .expect("Panicked while cloning an already valid Grok parser. For some reason, the pattern could not be built again."),
+            pattern: self.pattern.clone(),
+            field: self.field.clone(),
+            drop_field: self.drop_field,
+            types: self.types.clone(),
+            paths: self.paths.clone(),
+        }
+    }
+}
+
+impl FunctionTransform for GrokParser {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let mut event = event.into_log();
         let value = event.get(&self.field).map(|s| s.to_string_lossy());
         emit!(GrokParserEventProcessed);
 
         if let Some(value) = value {
-            if let Some(matches) = self.pattern.match_against(&value) {
+            if let Some(matches) = self.pattern_built.match_against(&value) {
                 let drop_field = self.drop_field && matches.get(&self.field).is_none();
                 for (name, value) in matches.iter() {
                     let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
@@ -122,7 +140,7 @@ impl Transform for GrokParser {
             });
         }
 
-        Some(Event::Log(event))
+        output.push(Event::Log(event));
     }
 }
 
@@ -131,7 +149,7 @@ mod tests {
     use super::GrokParserConfig;
     use crate::event::LogEvent;
     use crate::{
-        config::{log_schema, TransformConfig, TransformContext},
+        config::{log_schema, TransformConfig},
         event, Event,
     };
     use pretty_assertions::assert_eq;
@@ -156,10 +174,12 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
-        parser.transform(event).unwrap().into_log()
+        let parser = parser.as_function();
+
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

@@ -1,15 +1,15 @@
-use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Value},
     internal_events::{SplitConvertFailed, SplitEventProcessed, SplitFieldMissing},
+    transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct SplitConfig {
     pub field_names: Vec<LookupBuf>,
@@ -28,19 +28,19 @@ impl_generate_config_from_default!(SplitConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "split")]
 impl TransformConfig for SplitConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)
-            .map_err(|err| format!("{}", err))?;
+            .map_err(|error| format!("{}", error))?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
         let drop_field = self.drop_field && !self.field_names.iter().any(|f| *f == field);
 
-        Ok(Box::new(Split::new(
+        Ok(Transform::function(Split::new(
             self.field_names.clone(),
             self.separator.clone(),
             field,
@@ -62,6 +62,7 @@ impl TransformConfig for SplitConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct Split {
     field_names: Vec<(LookupBuf, Conversion)>,
     separator: Option<String>,
@@ -94,8 +95,8 @@ impl Split {
     }
 }
 
-impl Transform for Split {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Split {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
@@ -122,7 +123,7 @@ impl Transform for Split {
 
         emit!(SplitEventProcessed);
 
-        Some(event)
+        output.push(event);
     }
 }
 
@@ -137,13 +138,9 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 
 #[cfg(test)]
 mod tests {
-    use super::split;
-    use super::SplitConfig;
+    use super::*;
     use crate::event::{LogEvent, Value};
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        Event,
-    };
+    use crate::{config::TransformConfig, Event};
 
     #[test]
     fn generate_config() {
@@ -189,11 +186,12 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let parser = parser.as_function();
 
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

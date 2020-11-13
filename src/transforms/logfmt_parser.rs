@@ -1,14 +1,17 @@
-use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Lookup, Value},
+    internal_events::{
+        LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
+    },
+    transforms::{FunctionTransform, Transform},
     types::{parse_conversion_map, Conversion},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::str;
 
-#[derive(Deserialize, Serialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 #[serde(default, deny_unknown_fields)]
 pub struct LogfmtConfig {
     pub field: Option<LookupBuf>,
@@ -25,14 +28,14 @@ impl_generate_config_from_default!(LogfmtConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "logfmt_parser")]
 impl TransformConfig for LogfmtConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         let field = self
             .field
             .clone()
             .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
         let conversions = parse_conversion_map(&self.types)?;
 
-        Ok(Box::new(Logfmt {
+        Ok(Transform::function(Logfmt {
             field,
             drop_field: self.drop_field,
             conversions,
@@ -52,14 +55,15 @@ impl TransformConfig for LogfmtConfig {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Logfmt {
     field: LookupBuf,
     drop_field: bool,
     conversions: HashMap<LookupBuf, Conversion>,
 }
 
-impl Transform for Logfmt {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Logfmt {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         let mut drop_field = self.drop_field;
@@ -81,12 +85,10 @@ impl Transform for Logfmt {
                             event.as_mut_log().insert(key, value);
                         }
                         Err(error) => {
-                            debug!(
-                                message = "Could not convert types.",
-                                %key,
-                                %error,
-                                rate_limit_secs = 30
-                            );
+                            emit!(LogfmtParserConversionFailed {
+                                name: key.as_ref(),
+                                error
+                            });
                         }
                     }
                 } else {
@@ -98,14 +100,12 @@ impl Transform for Logfmt {
                 event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = %self.field,
-                rate_limit_secs = 30
-            );
+            emit!(LogfmtParserMissingField { field: &self.field });
         };
 
-        Some(event)
+        emit!(LogfmtParserEventProcessed {});
+
+        output.push(event);
     }
 }
 
@@ -113,7 +113,7 @@ impl Transform for Logfmt {
 mod tests {
     use super::LogfmtConfig;
     use crate::{
-        config::{TransformConfig, TransformContext},
+        config::TransformConfig,
         event::{LogEvent, Value},
         Event,
     };
@@ -131,11 +131,12 @@ mod tests {
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),
         }
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let parser = parser.as_function();
 
-        parser.transform(event).unwrap().into_log()
+        parser.transform_one(event).unwrap().into_log()
     }
 
     #[tokio::test]

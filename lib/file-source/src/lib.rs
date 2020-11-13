@@ -3,16 +3,18 @@ extern crate scan_fmt;
 #[macro_use]
 extern crate tracing;
 
+mod checkpointer;
 mod file_server;
 mod file_watcher;
+mod fingerprinter;
 mod internal_events;
 mod metadata_ext;
 pub mod paths_provider;
 
-pub use self::file_server::{FileServer, Fingerprinter, Shutdown as FileServerShutdown};
+pub use self::file_server::{FileServer, Shutdown as FileServerShutdown};
+pub use self::fingerprinter::Fingerprinter;
 pub use self::internal_events::FileSourceInternalEvents;
 
-type FileFingerprint = u64;
 type FilePosition = u64;
 
 #[cfg(test)]

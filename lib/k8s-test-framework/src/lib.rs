@@ -19,6 +19,7 @@ mod exec_tail;
 pub mod framework;
 mod helm_values_file;
 pub mod interface;
+pub mod kubernetes_version;
 mod lock;
 mod log_lookup;
 pub mod namespace;

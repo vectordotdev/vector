@@ -1,12 +1,11 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    http::{HttpClient, HttpClientFuture, HttpError},
     serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -15,11 +14,11 @@ use crate::{
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
+    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::FutureExt;
-use futures01::{stream::iter_ok, Sink};
+use futures::{stream, FutureExt, SinkExt, StreamExt};
 use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -28,10 +27,7 @@ use hyper::{
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::task::Poll;
-
+use std::{collections::HashMap, convert::TryFrom, task::Poll};
 use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
 
@@ -190,14 +186,14 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    async fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    async fn new(config: &GcsSinkConfig, _cx: &SinkContext) -> crate::Result<Self> {
         let creds = config
             .auth
             .make_credentials(Scope::DevStorageReadWrite)
             .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls)?;
+        let client = HttpClient::new(tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
@@ -231,13 +227,13 @@ impl GcsSink {
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+            .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))
+            .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok));
 
-        Ok(VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(VectorSink::Sink(Box::new(sink)))
     }
 
-    async fn healthcheck(mut self) -> crate::Result<()> {
+    async fn healthcheck(self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
@@ -255,7 +251,7 @@ impl GcsSink {
 
 impl Service<RequestWrapper> for GcsSink {
     type Response = Response<Body>;
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Future = HttpClientFuture;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -323,7 +319,7 @@ impl RequestWrapper {
             settings.extension
         );
 
-        debug!(message = "sending events.", bytes = ?body.len(), ?key);
+        debug!(message = "Sending events.", bytes = ?body.len(), key = ?key);
 
         Self {
             body,
@@ -467,9 +463,6 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-
-    use std::collections::HashMap;
 
     #[test]
     fn generate_config() {

@@ -1,12 +1,14 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
+    http::HttpClient,
     event::{Event, Lookup, LookupBuf},
     sinks::{
         util::{
             batch::{Batch, BatchError},
             encode_event,
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
             TowerRequestConfig, VecBuffer,
         },
@@ -16,8 +18,7 @@ use crate::{
 };
 use bytes::Bytes;
 use flate2::write::GzEncoder;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode};
 use hyper::body::Body;
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,7 @@ impl DatadogLogsConfig {
     fn batch_settings<T: Batch>(&self) -> Result<BatchSettings<T>, BatchError> {
         BatchSettings::default()
             .bytes(bytesize::kib(100u64))
+            .events(20)
             .timeout(1)
             .parse_config(self.batch)
     }
@@ -108,7 +110,7 @@ impl DatadogLogsConfig {
             false,
         )?;
 
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = healthcheck(service.clone(), client.clone()).boxed();
         let sink = BatchedHttpSink::new(
             service,
@@ -118,16 +120,20 @@ impl DatadogLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal datadog_logs text sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal datadog_logs text sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     /// Build the request, GZipping the contents if the config specifies.
-    fn build_request(&self, body: Vec<u8>) -> crate::Result<http::Request<Vec<u8>>> {
+    fn build_request(
+        &self,
+        content_type: &str,
+        body: Vec<u8>,
+    ) -> crate::Result<http::Request<Vec<u8>>> {
         let uri = format!("{}/v1/input", self.get_endpoint());
         let request = Request::post(uri)
-            .header("Content-Type", "text/plain")
+            .header("Content-Type", content_type)
             .header("DD-API-KEY", self.api_key.clone());
 
         let compression = self.compression.unwrap_or(Compression::Gzip(None));
@@ -225,7 +231,7 @@ impl HttpSink for DatadogLogsJsonService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body = serde_json::to_vec(&events)?;
-        self.config.build_request(body)
+        self.config.build_request("application/json", body)
     }
 }
 
@@ -240,13 +246,13 @@ impl HttpSink for DatadogLogsTextService {
 
     async fn build_request(&self, events: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
         let body: Vec<u8> = events.into_iter().flat_map(Bytes::into_iter).collect();
-        self.config.build_request(body)
+        self.config.build_request("text/plain", body)
     }
 }
 
 /// The healthcheck is performed by sending an empty request to Datadog and checking
 /// the return.
-async fn healthcheck<T, O>(sink: T, mut client: HttpClient) -> crate::Result<()>
+async fn healthcheck<T, O>(sink: T, client: HttpClient) -> crate::Result<()>
 where
     T: HttpSink<Output = Vec<O>>,
 {
@@ -327,6 +333,7 @@ mod tests {
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {
+            assert_eq!(val.0.headers.get("Content-Type").unwrap(), "text/plain");
             assert_eq!(val.1, format!("{}\n", expected[i]));
         }
     }
@@ -361,6 +368,11 @@ mod tests {
         let output = rx.take(expected.len()).collect::<Vec<_>>().await;
 
         for (i, val) in output.iter().enumerate() {
+            assert_eq!(
+                val.0.headers.get("Content-Type").unwrap(),
+                "application/json"
+            );
+
             let mut json = serde_json::Deserializer::from_slice(&val.1[..])
                 .into_iter::<serde_json::Value>()
                 .map(|v| v.expect("decoding json"));

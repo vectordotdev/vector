@@ -1,11 +1,11 @@
-use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, LookupBuf, Lookup, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
         RegexParserMissingField, RegexParserTargetExists,
     },
+    transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
 use bytes::Bytes;
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::{collections::HashMap, str, borrow::BorrowMut};
 
-#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derive(Debug, Derivative, Deserialize, Serialize, Clone)]
 #[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {
@@ -42,7 +42,7 @@ impl_generate_config_from_default!(RegexParserConfig);
 #[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         RegexParser::build(&self)
     }
 
@@ -59,6 +59,7 @@ impl TransformConfig for RegexParserConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct RegexParser {
     regexset: RegexSet,
     patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
@@ -69,6 +70,7 @@ pub struct RegexParser {
     overwrite_target: bool,
 }
 
+#[derive(Debug, Clone)]
 struct CompiledRegex {
     regex: Regex,
     capture_names: Vec<(usize, LookupBuf, Conversion)>,
@@ -135,7 +137,7 @@ impl CompiledRegex {
 }
 
 impl RegexParser {
-    pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
+    pub fn build(config: &RegexParserConfig) -> crate::Result<Transform> {
         let field = config
             .field
             .clone()
@@ -144,7 +146,7 @@ impl RegexParser {
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
                 return Err(
-                    "At least one regular expression must be defined, but `patterns` is empty"
+                    "At least one regular expression must be defined, but `patterns` is empty."
                         .into(),
                 );
             }
@@ -156,7 +158,7 @@ impl RegexParser {
                     "Usage of `regex` is deprecated and will be removed in a future version. \
                      Please upgrade your config to use `patterns` instead: \
                      `patterns = ['{}']`. For more info, take a look at the documentation at \
-                     https://vector.dev/docs/reference/transforms/regex_parser/",
+                     https://vector.dev/docs/reference/transforms/regex_parser/.",
                     &regex
                 );
                 vec![regex.clone()]
@@ -185,7 +187,7 @@ impl RegexParser {
 
         let types = parse_check_conversion_map(&config.types, names)?;
 
-        Ok(Box::new(RegexParser::new(
+        Ok(Transform::function(RegexParser::new(
             regexset,
             patterns,
             field,
@@ -234,8 +236,8 @@ impl RegexParser {
     }
 }
 
-impl Transform for RegexParser {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RegexParser {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
         emit!(RegexParserEventProcessed);
@@ -246,7 +248,12 @@ impl Transform for RegexParser {
                 Some(id) => id,
                 None => {
                     emit!(RegexParserFailedMatch { value });
-                    return if self.drop_failed { None } else { Some(event) };
+                    if self.drop_failed {
+                        return;
+                    } else {
+                        output.push(event);
+                        return;
+                    };
                 }
             };
 
@@ -265,7 +272,8 @@ impl Transform for RegexParser {
                             log.remove(target_field, false);
                         } else {
                             emit!(RegexParserTargetExists { target_field });
-                            return Some(event);
+                            output.push(event);
+                            return;
                         }
                     }
                 }
@@ -278,16 +286,15 @@ impl Transform for RegexParser {
                 if self.drop_field {
                     log.remove(&self.field, false);
                 }
-                return Some(event);
+                output.push(event);
+                return;
             }
         } else {
             emit!(RegexParserMissingField { field: self.field.as_lookup() });
         }
 
-        if self.drop_failed {
-            None
-        } else {
-            Some(event)
+        if !self.drop_failed {
+            output.push(event);
         }
     }
 }
@@ -296,10 +303,7 @@ impl Transform for RegexParser {
 mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        Event,
-    };
+    use crate::{config::TransformConfig, Event};
 
     #[test]
     fn generate_config() {
@@ -316,11 +320,12 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
         .await
         .unwrap();
+        let parser = parser.as_function();
 
-        parser.transform(event).map(|event| event.into_log())
+        parser.transform_one(event).map(|event| event.into_log())
     }
 
     #[tokio::test]

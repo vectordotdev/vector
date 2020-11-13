@@ -1,35 +1,23 @@
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, TowerBatchedSink, TowerRequestSettings,
+    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestSettings,
 };
-use crate::{
-    buffers::Acker,
-    dns::Resolver,
-    event::Event,
-    tls::{tls_connector_builder, MaybeTlsSettings},
-};
+use crate::{buffers::Acker, http::HttpClient, Event};
 use bytes::{Buf, Bytes};
-use futures::future::BoxFuture;
-use futures01::{Async, AsyncSink, Poll as Poll01, Sink, StartSend};
-use http::header::HeaderValue;
-use http::{Request, StatusCode};
-use hyper::body::{self, Body, HttpBody};
-use hyper::client::HttpConnector;
-use hyper::Client;
-use hyper_openssl::HttpsConnector;
-use serde::{Deserialize, Serialize};
+use futures::{future::BoxFuture, ready, Sink};
+use http::StatusCode;
+use hyper::{body, Body};
+use pin_project::pin_project;
 use std::{
     fmt,
     future::Future,
+    hash::Hash,
+    pin::Pin,
     sync::Arc,
     task::{Context, Poll},
     time::Duration,
 };
 use tower::Service;
-use tracing::Span;
-use tracing_futures::Instrument;
-
-pub type HttpClientFuture = <HttpClient as Service<http::Request<Body>>>::Future;
 
 #[async_trait::async_trait]
 pub trait HttpSink: Send + Sync + 'static {
@@ -52,7 +40,8 @@ pub trait HttpSink: Send + Sync + 'static {
 /// to how `Sink` works. This is because we must "encode" the type
 /// to be able to send it to the inner batch type and sink. Because of
 /// this we must provide a single buffer slot. To ensure the buffer is
-/// fully flushed make sure `poll_complete` returns ready.
+/// fully flushed make sure `poll_flush` returns ready.
+#[pin_project]
 pub struct BatchedHttpSink<T, B, L = HttpRetryLogic>
 where
     B: Batch,
@@ -60,6 +49,7 @@ where
     L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
     sink: Arc<T>,
+    #[pin]
     inner: TowerBatchedSink<
         HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
         B,
@@ -134,152 +124,191 @@ where
     }
 }
 
-impl<T, B, L> Sink for BatchedHttpSink<T, B, L>
+impl<T, B, L> Sink<Event> for BatchedHttpSink<T, B, L>
 where
     B: Batch,
     B::Output: Clone + Send + 'static,
     T: HttpSink<Input = B::Input, Output = B::Output>,
     L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
 {
-    type SinkItem = crate::Event;
-    type SinkError = crate::Error;
+    type Error = crate::Error;
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
-        if self.slot.is_some() && self.poll_complete()?.is_not_ready() {
-            return Ok(AsyncSink::NotReady(item));
-        }
-        assert!(self.slot.is_none(), "poll_complete did not clear slot");
-
-        if let Some(item) = self.sink.encode_event(item) {
-            self.slot = Some(item);
-            self.poll_complete()?;
-        }
-
-        Ok(AsyncSink::Ready)
-    }
-
-    fn poll_complete(&mut self) -> Poll01<(), Self::SinkError> {
-        if let Some(item) = self.slot.take() {
-            if let AsyncSink::NotReady(item) = self.inner.start_send(item)? {
-                self.slot = Some(item);
-                return Ok(Async::NotReady);
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.slot.is_some() {
+            match self.as_mut().poll_flush(cx) {
+                Poll::Ready(Ok(())) => {}
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => {
+                    if self.slot.is_some() {
+                        return Poll::Pending;
+                    }
+                }
             }
         }
 
-        self.inner.poll_complete()
-    }
-}
-
-pub struct HttpClient<B = Body> {
-    client: Client<HttpsConnector<HttpConnector<Resolver>>, B>,
-    span: Span,
-    user_agent: HeaderValue,
-}
-
-impl<B> HttpClient<B>
-where
-    B: HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<crate::Error>,
-{
-    pub fn new(
-        resolver: Resolver,
-        tls_settings: impl Into<MaybeTlsSettings>,
-    ) -> crate::Result<HttpClient<B>> {
-        let mut http = HttpConnector::new_with_resolver(resolver);
-        http.enforce_http(false);
-
-        let settings = tls_settings.into();
-        let tls = tls_connector_builder(&settings)?;
-        let mut https = HttpsConnector::with_connector(http, tls)?;
-
-        let settings = settings.tls().cloned();
-        https.set_callback(move |c, _uri| {
-            if let Some(settings) = &settings {
-                settings.apply_connect_configuration(c);
-            }
-
-            Ok(())
-        });
-
-        let client = Client::builder().build(https);
-
-        let version = crate::get_version();
-        let user_agent = HeaderValue::from_str(&format!("Vector/{}", version))
-            .expect("Invalid header value for version!");
-
-        let span = tracing::info_span!("http");
-
-        Ok(HttpClient {
-            client,
-            span,
-            user_agent,
-        })
-    }
-
-    pub async fn send(&mut self, request: Request<B>) -> crate::Result<http::Response<Body>> {
-        self.call(request).await.map_err(Into::into)
-    }
-}
-
-impl<B> Service<Request<B>> for HttpClient<B>
-where
-    B: HttpBody + Send + 'static,
-    B::Data: Send,
-    B::Error: Into<crate::Error>,
-{
-    type Response = http::Response<Body>;
-    type Error = hyper::Error;
-    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut request: Request<B>) -> Self::Future {
-        let _enter = self.span.enter();
-
-        if !request.headers().contains_key("User-Agent") {
-            request
-                .headers_mut()
-                .insert("User-Agent", self.user_agent.clone());
+    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        if let Some(item) = self.sink.encode_event(item) {
+            *self.project().slot = Some(item);
         }
 
-        debug!(message = "Sending request.", uri = %request.uri(), method = %request.method());
+        Ok(())
+    }
 
-        let response = self.client.request(request);
-
-        let fut = async move {
-            let res = response.await?;
-            debug!(
-                    message = "Response.",
-                    status = ?res.status(),
-                    version = ?res.version(),
-            );
-            Ok(res)
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut this = self.project();
+        if this.slot.is_some() {
+            ready!(this.inner.as_mut().poll_ready(cx))?;
+            this.inner.as_mut().start_send(this.slot.take().unwrap())?;
         }
-        .instrument(self.span.clone());
 
-        Box::pin(fut)
+        this.inner.poll_flush(cx)
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        ready!(self.as_mut().poll_flush(cx))?;
+        self.project().inner.poll_close(cx)
     }
 }
 
-impl<B> Clone for HttpClient<B> {
-    fn clone(&self) -> Self {
+#[pin_project]
+pub struct PartitionHttpSink<T, B, K, L = HttpRetryLogic>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    sink: Arc<T>,
+    #[pin]
+    inner: TowerPartitionSink<
+        HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Vec<u8>>>>, B::Output>,
+        B,
+        L,
+        K,
+        B::Output,
+    >,
+    slot: Option<B::Input>,
+}
+
+impl<T, B, K> PartitionHttpSink<T, B, K, HttpRetryLogic>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn new(
+        sink: T,
+        batch: B,
+        request_settings: TowerRequestSettings,
+        batch_timeout: Duration,
+        client: HttpClient,
+        acker: Acker,
+    ) -> Self {
+        Self::with_retry_logic(
+            sink,
+            batch,
+            HttpRetryLogic,
+            request_settings,
+            batch_timeout,
+            client,
+            acker,
+        )
+    }
+}
+
+impl<T, B, K, L> PartitionHttpSink<T, B, K, L>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    L: RetryLogic<Response = http::Response<Bytes>, Error = hyper::Error> + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+{
+    pub fn with_retry_logic(
+        sink: T,
+        batch: B,
+        logic: L,
+        request_settings: TowerRequestSettings,
+        batch_timeout: Duration,
+        client: HttpClient,
+        acker: Acker,
+    ) -> Self {
+        let sink = Arc::new(sink);
+
+        let sink1 = Arc::clone(&sink);
+        let request_builder =
+            move |b| -> BoxFuture<'static, crate::Result<http::Request<Vec<u8>>>> {
+                let sink = Arc::clone(&sink1);
+                Box::pin(async move { sink.build_request(b).await })
+            };
+
+        let svc = HttpBatchService::new(client, request_builder);
+        let inner = request_settings.partition_sink(logic, svc, batch, batch_timeout, acker);
+
         Self {
-            client: self.client.clone(),
-            span: self.span.clone(),
-            user_agent: self.user_agent.clone(),
+            sink,
+            inner,
+            slot: None,
         }
     }
 }
 
-impl<B> fmt::Debug for HttpClient<B> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("HttpClient")
-            .field("client", &self.client)
-            .field("user_agent", &self.user_agent)
-            .finish()
+impl<T, B, K, L> Sink<Event> for PartitionHttpSink<T, B, K, L>
+where
+    B: Batch,
+    B::Output: Clone + Send + 'static,
+    B::Input: Partition<K>,
+    K: Hash + Eq + Clone + Send + 'static,
+    T: HttpSink<Input = B::Input, Output = B::Output>,
+    L: RetryLogic<Response = http::Response<Bytes>> + Send + 'static,
+{
+    type Error = crate::Error;
+
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.slot.is_some() {
+            match self.as_mut().poll_flush(cx) {
+                Poll::Ready(Ok(())) => {}
+                Poll::Ready(Err(error)) => return Poll::Ready(Err(error)),
+                Poll::Pending => {
+                    if self.slot.is_some() {
+                        return Poll::Pending;
+                    }
+                }
+            }
+        }
+
+        Poll::Ready(Ok(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        if let Some(item) = self.sink.encode_event(item) {
+            *self.project().slot = Some(item);
+        }
+
+        Ok(())
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let mut this = self.project();
+        if this.slot.is_some() {
+            ready!(this.inner.as_mut().poll_ready(cx))?;
+            this.inner.as_mut().start_send(this.slot.take().unwrap())?;
+        }
+
+        this.inner.poll_flush(cx)
+    }
+
+    fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        ready!(self.as_mut().poll_flush(cx))?;
+        self.project().inner.poll_close(cx)
     }
 }
 
@@ -342,7 +371,7 @@ impl<T: fmt::Debug> sink::Response for http::Response<T> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct HttpRetryLogic;
 
 impl RetryLogic for HttpRetryLogic {
@@ -372,30 +401,6 @@ impl RetryLogic for HttpRetryLogic {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
-pub enum Auth {
-    Basic { user: String, password: String },
-    Bearer { token: String },
-}
-
-impl Auth {
-    pub fn apply<B>(&self, req: &mut Request<B>) {
-        use headers::{Authorization, HeaderMapExt};
-
-        match &self {
-            Auth::Basic { user, password } => {
-                let auth = Authorization::basic(&user, &password);
-                req.headers_mut().typed_insert(auth);
-            }
-            Auth::Bearer { token } => match Authorization::bearer(&token) {
-                Ok(auth) => req.headers_mut().typed_insert(auth),
-                Err(error) => error!(message = "invalid bearer token", %token, %error),
-            },
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -404,9 +409,8 @@ mod test {
     use futures01::Stream;
     use hyper::{
         service::{make_service_fn, service_fn},
-        {Body, Response, Server, Uri},
+        Response, Server, Uri,
     };
-    use tower::Service;
 
     #[test]
     fn util_http_retry_logic() {
@@ -430,16 +434,17 @@ mod test {
     #[tokio::test]
     async fn util_http_it_makes_http_requests() {
         let addr = next_addr();
-        let resolver = Resolver;
 
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()
             .unwrap();
 
         let request = b"hello".to_vec();
-        let client = HttpClient::new(resolver, None).unwrap();
+        let client = HttpClient::new(None).unwrap();
         let mut service = HttpBatchService::new(client, move |body: Vec<u8>| {
-            Box::pin(ready(Request::post(&uri).body(body).map_err(Into::into)))
+            Box::pin(ready(
+                http::Request::post(&uri).body(body).map_err(Into::into),
+            ))
         });
 
         let (tx, rx) = futures01::sync::mpsc::channel(10);
@@ -453,7 +458,7 @@ mod test {
                 async move {
                     let body = hyper::body::aggregate(req.into_body())
                         .await
-                        .map_err(|e| format!("error: {}", e))?;
+                        .map_err(|error| format!("error: {}", error))?;
                     let string = String::from_utf8(body.bytes().into())
                         .map_err(|_| "Wasn't UTF-8".to_string())?;
                     tx.try_send(string).map_err(|_| "Send error".to_string())?;
@@ -466,8 +471,8 @@ mod test {
         });
 
         tokio::spawn(async move {
-            if let Err(e) = Server::bind(&addr).serve(new_service).await {
-                eprintln!("server error: {}", e);
+            if let Err(error) = Server::bind(&addr).serve(new_service).await {
+                eprintln!("Server error: {}", error);
             }
         });
 

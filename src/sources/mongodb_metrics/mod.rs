@@ -98,7 +98,7 @@ struct MongoDBMetricsConfig {
 struct MongoDBMetrics {
     client: Client,
     endpoint: String,
-    namespace: String,
+    namespace: Option<String>,
     tags: BTreeMap<String, String>,
 }
 
@@ -128,15 +128,17 @@ impl SourceConfig for MongoDBMetricsConfig {
     ) -> crate::Result<super::Source> {
         let mut interval = interval(Duration::from_secs(self.scrape_interval_secs)).map(|_| ());
 
+        let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
+
         let sources = try_join_all(
             self.endpoints
                 .iter()
-                .map(|endpoint| MongoDBMetrics::new(endpoint, &self.namespace)),
+                .map(|endpoint| MongoDBMetrics::new(endpoint, namespace.clone())),
         )
         .await?;
 
         let mut out = out
-            .sink_map_err(|e| error!("error sending metric: {:?}", e))
+            .sink_map_err(|error| error!(message = "Error sending metric.", %error))
             .sink_compat();
 
         Ok(Box::new(
@@ -157,7 +159,7 @@ impl SourceConfig for MongoDBMetricsConfig {
 
                     let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
                     if let Err(()) = out.send_all(&mut stream).await {
-                        error!(message = "Error sending mongodb metrics");
+                        error!(message = "Error sending mongodb metrics.");
                     }
                 }
             }
@@ -179,7 +181,7 @@ impl SourceConfig for MongoDBMetricsConfig {
 impl MongoDBMetrics {
     /// Works only with Standalone connection-string. Collect metrics only from specified instance.
     /// https://docs.mongodb.com/manual/reference/connection-string/#standard-connection-string-format
-    async fn new(endpoint: &str, namespace: &str) -> Result<MongoDBMetrics, BuildError> {
+    async fn new(endpoint: &str, namespace: Option<String>) -> Result<MongoDBMetrics, BuildError> {
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
 
         let mut client_options = ClientOptions::parse(endpoint)
@@ -196,16 +198,13 @@ impl MongoDBMetrics {
         let node_type = Self::get_node_type(&client).await?;
         let build_info = Self::get_build_info(&client).await?;
         debug!(
-            "Connected to: {:?} (node type: {:?}, server version: {})",
-            endpoint,
-            node_type,
-            serde_json::to_string(&build_info).unwrap()
+            message = "Connected to server.", endpoint = %endpoint, node_type = ?node_type, server_version = ?serde_json::to_string(&build_info).unwrap()
         );
 
         Ok(Self {
             client,
             endpoint,
-            namespace: namespace.to_owned(),
+            namespace,
             tags,
         })
     }
@@ -302,13 +301,6 @@ impl MongoDBMetrics {
         from_document(doc).context(CommandBuildInfoParseError)
     }
 
-    fn encode_namespace(&self, name: &str) -> String {
-        match self.namespace.as_str() {
-            "" => name.to_string(),
-            _ => format!("{}_{}", self.namespace, name),
-        }
-    }
-
     fn create_metric(
         &self,
         name: &str,
@@ -316,7 +308,8 @@ impl MongoDBMetrics {
         tags: BTreeMap<String, String>,
     ) -> Metric {
         Metric {
-            name: self.encode_namespace(name),
+            name: name.into(),
+            namespace: self.namespace.clone(),
             timestamp: Some(Utc::now()),
             tags: Some(tags),
             kind: MetricKind::Absolute,
@@ -587,12 +580,12 @@ impl MongoDBMetrics {
 
         // mongod_metrics_operation_total
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_operation_total",
+            "mongod_metrics_operation_total",
             counter!(status.metrics.operation.scan_and_order),
             tags!(self.tags, "type" => "scan_and_order"),
         ));
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_operation_total",
+            "mongod_metrics_operation_total",
             counter!(status.metrics.operation.write_conflicts),
             tags!(self.tags, "type" => "write_conflicts"),
         ));
@@ -659,17 +652,17 @@ impl MongoDBMetrics {
 
         // mongod_metrics_repl_executor_*
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_repl_executor_queue",
+            "mongod_metrics_repl_executor_queue",
             gauge!(status.metrics.repl.executor.queues.network_in_progress),
             tags!(self.tags, "type" => "network_in_progress"),
         ));
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_repl_executor_queue",
+            "mongod_metrics_repl_executor_queue",
             gauge!(status.metrics.repl.executor.queues.sleepers),
             tags!(self.tags, "type" => "sleepers"),
         ));
         metrics.push(self.create_metric(
-            "mongodb_mongod_metrics_repl_executor_unsignaled_events",
+            "mongod_metrics_repl_executor_unsignaled_events",
             gauge!(status.metrics.repl.executor.unsignaled_events),
             tags!(self.tags),
         ));
@@ -1112,7 +1105,7 @@ mod integration_tests {
         for event in events {
             let metric = event.expect("Valid Event").into_metric();
             // validate namespace
-            assert!(metric.name.starts_with(&format!("{}_", namespace)));
+            assert!(metric.namespace == Some(namespace.to_string()));
             // validate timestamp
             let timestamp = metric.timestamp.expect("existed timestamp");
             assert!((timestamp - Utc::now()).num_seconds() < 1);

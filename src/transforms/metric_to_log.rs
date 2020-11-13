@@ -1,11 +1,8 @@
-use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{self, Event, LogEvent, LookupBuf},
     internal_events::{MetricToLogEventProcessed, MetricToLogFailedSerialize},
+    transforms::{FunctionTransform, Transform},
     types::Conversion,
 };
 use chrono::Utc;
@@ -34,8 +31,8 @@ impl GenerateConfig for MetricToLogConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "metric_to_log")]
 impl TransformConfig for MetricToLogConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(MetricToLog::new(self.host_tag.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(MetricToLog::new(self.host_tag.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -51,6 +48,7 @@ impl TransformConfig for MetricToLogConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct MetricToLog {
     timestamp_key: LookupBuf,
     host_tag: LookupBuf,
@@ -68,12 +66,12 @@ impl MetricToLog {
     }
 }
 
-impl Transform for MetricToLog {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for MetricToLog {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let metric = event.into_metric();
         emit!(MetricToLogEventProcessed);
 
-        serde_json::to_value(&metric)
+        let retval = serde_json::to_value(&metric)
             .map_err(|error| emit!(MetricToLogFailedSerialize { error }))
             .ok()
             .and_then(|value| match value {
@@ -97,7 +95,8 @@ impl Transform for MetricToLog {
                     Some(log.into())
                 }
                 _ => None,
-            })
+            });
+        output.extend(retval.into_iter())
     }
 }
 
@@ -120,7 +119,9 @@ mod tests {
         let event = Event::Metric(metric);
         let mut transformer = MetricToLog::new(Some("host".into()));
 
-        transformer.transform(event).map(|event| event.into_log())
+        transformer
+            .transform_one(event)
+            .map(|event| event.into_log())
     }
 
     fn ts() -> DateTime<Utc> {
@@ -140,6 +141,7 @@ mod tests {
     fn transform_counter() {
         let counter = Metric {
             name: "counter".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Absolute,
@@ -166,6 +168,7 @@ mod tests {
     fn transform_gauge() {
         let gauge = Metric {
             name: "gauge".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -190,6 +193,7 @@ mod tests {
     fn transform_set() {
         let set = Metric {
             name: "set".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -217,6 +221,7 @@ mod tests {
     fn transform_distribution() {
         let distro = Metric {
             name: "distro".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -258,6 +263,7 @@ mod tests {
     fn transform_histogram() {
         let histo = Metric {
             name: "histo".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,
@@ -304,6 +310,7 @@ mod tests {
     fn transform_summary() {
         let summary = Metric {
             name: "summary".into(),
+            namespace: None,
             timestamp: Some(ts()),
             tags: None,
             kind: MetricKind::Absolute,

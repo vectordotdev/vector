@@ -68,7 +68,7 @@ fn test_buffering() {
 
         let _ = in_tx
             .sink_compat()
-            .sink_map_err(|err| panic!(err))
+            .sink_map_err(|error| panic!(error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();
@@ -119,7 +119,7 @@ fn test_buffering() {
 
         let _ = in_tx
             .sink_compat()
-            .sink_map_err(|err| panic!(err))
+            .sink_map_err(|error| panic!(error))
             .send_all(&mut input_events_stream)
             .await
             .unwrap();

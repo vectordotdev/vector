@@ -1,19 +1,21 @@
 use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, LookupBuf},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
+    transforms::{FunctionTransform, Transform},
+    Event,
 };
 use serde::{Deserialize, Serialize};
-use std::convert::TryFrom;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct RemoveFieldsConfig {
     fields: Vec<LookupBuf>,
     drop_empty: Option<bool>,
 }
 
+#[derive(Clone, Debug)]
 pub struct RemoveFields {
     fields: Vec<LookupBuf>,
     drop_empty: bool,
@@ -36,11 +38,9 @@ impl GenerateConfig for RemoveFieldsConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "remove_fields")]
 impl TransformConfig for RemoveFieldsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(RemoveFields {
-            fields: self.fields.clone(),
-            drop_empty: self.drop_empty.unwrap_or(false),
-        }))
+    async fn build(&self) -> crate::Result<Transform> {
+        RemoveFields::new(self.fields.clone(), self.drop_empty.unwrap_or(false))
+            .map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -57,21 +57,13 @@ impl TransformConfig for RemoveFieldsConfig {
 }
 
 impl RemoveFields {
-    pub fn new(fields: Vec<LookupBuf>, drop_empty: bool) -> crate::Result<Self> {
-        let mut lookups = Vec::with_capacity(fields.len());
-        for field in fields {
-            let string = field.to_string(); // TODO: Step 6 of https://github.com/timberio/vector/blob/c4707947bd876a0ff7d7aa36717ae2b32b731593/rfcs/2020-05-25-more-usable-logevents.md#sales-pitch.
-            lookups.push(LookupBuf::try_from(string)?);
-        }
-        Ok(RemoveFields {
-            fields: lookups,
-            drop_empty,
-        })
+    pub fn new(fields: Vec<String>, drop_empty: bool) -> crate::Result<Self> {
+        Ok(RemoveFields { fields, drop_empty })
     }
 }
 
-impl Transform for RemoveFields {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RemoveFields {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemoveFieldsEventProcessed);
 
         let log = event.as_mut_log();
@@ -84,14 +76,14 @@ impl Transform for RemoveFields {
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{RemoveFields, RemoveFieldsConfig};
-    use crate::{event::Event, transforms::Transform};
+    use super::*;
+    use crate::event::Event;
 
     #[test]
     fn generate_config() {
@@ -107,7 +99,7 @@ mod tests {
         let mut transform =
             RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
 
-        let new_event = transform.transform(event).unwrap();
+        let new_event = transform.transform_one(event).unwrap();
 
         assert!(new_event.as_log().get("to_remove").is_none());
         assert!(new_event.as_log().get("unknown").is_none());
