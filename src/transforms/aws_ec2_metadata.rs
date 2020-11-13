@@ -2,7 +2,9 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     http::HttpClient,
-    internal_events::{AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful},
+    internal_events::{
+        AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful, EventProcessed,
+    },
     transforms::{TaskTransform, Transform},
 };
 use bytes::Bytes;
@@ -194,6 +196,8 @@ impl Ec2MetadataTransform {
             });
         }
 
+        emit!(EventProcessed);
+
         Some(event)
     }
 }
@@ -278,6 +282,7 @@ impl MetadataClient {
             .client
             .send(req)
             .await
+            .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
                 status_code => Err(UnexpectedHTTPStatusError {
@@ -427,6 +432,7 @@ impl MetadataClient {
             .client
             .send(req)
             .await
+            .map_err(crate::Error::from)
             .and_then(|res| match res.status() {
                 StatusCode::OK => Ok(res),
                 status_code => Err(UnexpectedHTTPStatusError {

@@ -76,7 +76,7 @@ impl InternalEvent for ApacheMetricsErrorResponse<'_> {
 
 #[derive(Debug)]
 pub struct ApacheMetricsHttpError<'a> {
-    pub error: hyper::Error,
+    pub error: crate::Error,
     pub url: &'a str,
 }
 

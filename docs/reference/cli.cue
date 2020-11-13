@@ -5,9 +5,11 @@ package metadata
 
 #Args: [Arg=string]: {
 	description: !=""
-	type:        "string" | "list" | *"string"
+	type:        #ArgType
 	default?:    string | [...string]
 }
+
+#ArgType: "string" | "list"
 
 #CommandLineTool: {
 	name:     !=""
@@ -38,15 +40,22 @@ package metadata
 #Options: [Option=string]: {
 	option:      "--\(Option)"
 	description: !=""
-	default?:    string
+	default?:    string | int
 	enum?: [...string]
+	type: #OptionType
 
 	if _short != _|_ {
 		short: "-\(_short)"
 	}
 
 	_short: !=""
+
+	if enum != _|_ {
+		type: "enum"
+	}
 }
+
+#OptionType: "string" | "integer" | "enum"
 
 _default_flags: {
 	"help": {
@@ -106,6 +115,7 @@ cli: #CommandLineTool & {
 				supported. If zero files are specified the default config path
 				`/etc/vector/vector.toml` will be targeted
 				"""
+			type:    "string"
 			default: "/etc/vector/vector.toml"
 		}
 		"threads": {
@@ -114,6 +124,7 @@ cli: #CommandLineTool & {
 				Number of threads to use for processing (default is number of
 				available cores)
 				"""
+			type: "integer"
 		}
 		"log-format": {
 			description: "Set the logging format [default: text]"
@@ -195,6 +206,39 @@ cli: #CommandLineTool & {
 				therefore subject to change. For guidance on how to write unit tests check
 				out: https://vector.dev/docs/setup/guides/unit-testing/
 				"""
+		}
+
+		"top": {
+			description: """
+				Display topology and metrics in the console, for a local or remote Vector
+				instance
+				"""
+
+			flags: _default_flags & {
+				"human-metrics": {
+					_short: "h"
+					description: """
+						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
+						1,000,000 = 1.00 M
+						"""
+					default: false
+				}
+			}
+
+			options: {
+				"refresh-interval": {
+					_short:      "i"
+					description: "How often the screen refreshes (in milliseconds)"
+					type:        "integer"
+					default:     500
+				}
+				"url": {
+					_short:      "u"
+					description: "The URL for the GraphQL endpoint of the running Vector instance"
+					type:        "string"
+					default:     "http://127.0.0.1:8686/graphql"
+				}
+			}
 		}
 
 		"validate": {

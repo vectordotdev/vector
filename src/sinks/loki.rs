@@ -198,7 +198,7 @@ impl HttpSink for LokiConfig {
     }
 }
 
-async fn healthcheck(config: LokiConfig, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}ready", config.endpoint);
 
     let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();

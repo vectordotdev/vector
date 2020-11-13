@@ -1,6 +1,7 @@
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
     event::metric::{Metric, MetricKind, MetricValue},
+    http::HttpClient,
     internal_events::{
         ApacheMetricsErrorResponse, ApacheMetricsEventReceived, ApacheMetricsHttpError,
         ApacheMetricsParseError, ApacheMetricsRequestCompleted,
@@ -11,8 +12,7 @@ use crate::{
 use chrono::Utc;
 use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
-use hyper::{Body, Client, Request};
-use hyper_openssl::HttpsConnector;
+use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::BTreeMap;
@@ -148,8 +148,7 @@ fn apache_metrics(
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
-            let https = HttpsConnector::new().expect("TLS initialization failed");
-            let client = Client::builder().build(https);
+            let client = HttpClient::new(None).expect("HTTPS initialization failed");
             let sanitized_url = url.to_sanitized_string();
 
             let request = Request::get(&url)
@@ -163,7 +162,8 @@ fn apache_metrics(
             let start = Instant::now();
             let namespace = namespace.clone();
             client
-                .request(request)
+                .send(request)
+                .map_err(crate::Error::from)
                 .and_then(|response| async {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;

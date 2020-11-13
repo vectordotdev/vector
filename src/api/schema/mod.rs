@@ -1,5 +1,6 @@
 pub mod components;
 mod health;
+mod meta;
 mod metrics;
 
 use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
@@ -9,6 +10,7 @@ pub struct Query(
     health::HealthQuery,
     components::ComponentsQuery,
     metrics::MetricsQuery,
+    meta::MetaQuery,
 );
 
 #[derive(MergedSubscription, Default)]
