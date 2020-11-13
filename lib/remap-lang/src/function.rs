@@ -135,6 +135,20 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
+    pub fn optional_path(&mut self, keyword: &str) -> Result<Option<Path>> {
+        self.optional(keyword)
+            .map(Expr::try_from)
+            .transpose()?
+            .map(Path::try_from)
+            .transpose()
+            .map_err(Into::into)
+    }
+
+    pub fn required_path(&mut self, keyword: &str) -> Result<Path> {
+        self.optional_path(keyword)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
     pub fn keywords(&self) -> Vec<&'static str> {
         self.0.keys().copied().collect::<Vec<_>>()
     }
