@@ -107,6 +107,9 @@ impl Fanout {
             }
         }
 
+        // Must handle the last sink error first, or else the indices of
+        // all but the first will be wrong.
+        errors.reverse();
         for i in errors {
             self.handle_sink_error(i)?;
         }
@@ -413,50 +416,63 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fanout_error_send_first() {
-        fanout_error(0, ErrorWhen::Send).await
-    }
-
-    #[tokio::test]
-    async fn fanout_error_send_middle() {
-        fanout_error(1, ErrorWhen::Send).await
-    }
-
-    #[tokio::test]
-    async fn fanout_error_send_last() {
-        fanout_error(2, ErrorWhen::Send).await
-    }
-
-    #[tokio::test]
     async fn fanout_error_poll_first() {
-        fanout_error(0, ErrorWhen::Poll).await
+        fanout_error(&[Some(ErrorWhen::Poll), None, None]).await
     }
 
     #[tokio::test]
     async fn fanout_error_poll_middle() {
-        fanout_error(1, ErrorWhen::Poll).await
+        fanout_error(&[None, Some(ErrorWhen::Poll), None]).await
     }
 
     #[tokio::test]
     async fn fanout_error_poll_last() {
-        fanout_error(2, ErrorWhen::Poll).await
+        fanout_error(&[None, None, Some(ErrorWhen::Poll)]).await
     }
 
-    async fn fanout_error(index: usize, when: ErrorWhen) {
+    #[tokio::test]
+    async fn fanout_error_poll_not_middle() {
+        fanout_error(&[Some(ErrorWhen::Poll), None, Some(ErrorWhen::Poll)]).await
+    }
+
+    #[tokio::test]
+    async fn fanout_error_send_first() {
+        fanout_error(&[Some(ErrorWhen::Send), None, None]).await
+    }
+
+    #[tokio::test]
+    async fn fanout_error_send_middle() {
+        fanout_error(&[None, Some(ErrorWhen::Send), None]).await
+    }
+
+    #[tokio::test]
+    async fn fanout_error_send_last() {
+        fanout_error(&[None, None, Some(ErrorWhen::Send)]).await
+    }
+
+    #[tokio::test]
+    async fn fanout_error_send_not_middle() {
+        fanout_error(&[Some(ErrorWhen::Send), None, Some(ErrorWhen::Send)]).await
+    }
+
+    async fn fanout_error(modes: &[Option<ErrorWhen>]) {
         let mut fanout = Fanout::new().0;
         let mut rx_channels = vec![];
 
-        for i in 0..3 {
+        for (i, mode) in modes.iter().enumerate() {
             let name = format!("{}", i);
-            if i == index {
-                let tx = AlwaysErrors { when };
-                let tx = Box::new(tx.sink_map_err(|_| ()));
-                fanout.add(name, tx);
-            } else {
-                let (tx, rx) = mpsc::channel(1);
-                let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
-                fanout.add(name, tx);
-                rx_channels.push(rx);
+            match *mode {
+                Some(when) => {
+                    let tx = AlwaysErrors { when };
+                    let tx = Box::new(tx.sink_map_err(|_| ()));
+                    fanout.add(name, tx);
+                }
+                None => {
+                    let (tx, rx) = mpsc::channel(1);
+                    let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
+                    fanout.add(name, tx);
+                    rx_channels.push(rx);
+                }
             }
         }
 
