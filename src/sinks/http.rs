@@ -247,11 +247,7 @@ impl HttpSink for HttpSinkConfig {
     }
 }
 
-async fn healthcheck(
-    uri: UriSerde,
-    auth: Option<Auth>,
-    mut client: HttpClient,
-) -> crate::Result<()> {
+async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let uri = build_uri(uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 

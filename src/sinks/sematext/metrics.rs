@@ -59,7 +59,7 @@ impl GenerateConfig for SematextMetricsConfig {
     }
 }
 
-async fn healthcheck(endpoint: String, mut client: HttpClient) -> Result<()> {
+async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     let uri = format!("{}/health", endpoint);
 
     let request = Request::get(uri)
