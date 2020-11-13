@@ -1,5 +1,6 @@
 #![macro_use]
 
+mod assert;
 mod ceil;
 mod compact;
 mod contains;
@@ -44,6 +45,7 @@ mod truncate;
 mod upcase;
 mod uuid_v4;
 
+pub use self::assert::Assert;
 pub use self::md5::Md5;
 pub use self::sha1::Sha1;
 pub use self::sha2::Sha2;
