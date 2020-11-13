@@ -68,7 +68,7 @@ pub struct ComponentEventsProcessedThroughput {
 }
 
 impl ComponentEventsProcessedThroughput {
-    /// Returns a new `ComponentsEventsThroughput`, set to the provided name/throughput values
+    /// Returns a new `ComponentEventsProcessedThroughput`, set to the provided name/throughput values
     pub fn new(name: String, throughput: i64) -> Self {
         Self { name, throughput }
     }
