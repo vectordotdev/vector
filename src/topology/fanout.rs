@@ -413,30 +413,52 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fanout_error_send() {
-        fanout_error(ErrorWhen::Send).await
+    async fn fanout_error_send_first() {
+        fanout_error(0, ErrorWhen::Send).await
     }
 
     #[tokio::test]
-    async fn fanout_error_poll() {
-        fanout_error(ErrorWhen::Poll).await
+    async fn fanout_error_send_middle() {
+        fanout_error(1, ErrorWhen::Send).await
     }
 
-    async fn fanout_error(when: ErrorWhen) {
-        let (tx_a, rx_a) = mpsc::channel(1);
-        let tx_a = Box::new(tx_a.sink_map_err(|_| unreachable!()));
+    #[tokio::test]
+    async fn fanout_error_send_last() {
+        fanout_error(2, ErrorWhen::Send).await
+    }
 
-        let tx_b = AlwaysErrors { when };
-        let tx_b = Box::new(tx_b.sink_map_err(|_| ()));
+    #[tokio::test]
+    async fn fanout_error_poll_first() {
+        fanout_error(0, ErrorWhen::Poll).await
+    }
 
-        let (tx_c, rx_c) = mpsc::channel(1);
-        let tx_c = Box::new(tx_c.sink_map_err(|_| unreachable!()));
+    #[tokio::test]
+    async fn fanout_error_poll_middle() {
+        fanout_error(1, ErrorWhen::Poll).await
+    }
 
+    #[tokio::test]
+    async fn fanout_error_poll_last() {
+        fanout_error(2, ErrorWhen::Poll).await
+    }
+
+    async fn fanout_error(index: usize, when: ErrorWhen) {
         let mut fanout = Fanout::new().0;
+        let mut rx_channels = vec![];
 
-        fanout.add("a".to_string(), tx_a);
-        fanout.add("b".to_string(), tx_b);
-        fanout.add("c".to_string(), tx_c);
+        for i in 0..3 {
+            let name = format!("{}", i);
+            if i == index {
+                let tx = AlwaysErrors { when };
+                let tx = Box::new(tx.sink_map_err(|_| ()));
+                fanout.add(name, tx);
+            } else {
+                let (tx, rx) = mpsc::channel(1);
+                let tx = Box::new(tx.sink_map_err(|_| unreachable!()));
+                fanout.add(name, tx);
+                rx_channels.push(rx);
+            }
+        }
 
         let recs = make_events(3);
         let send = fanout.send_all(stream::iter_ok(recs.clone()));
@@ -444,13 +466,17 @@ mod tests {
 
         delay_for(Duration::from_millis(50)).await;
 
-        let collect_a = tokio::spawn(rx_a.collect().compat());
-        let collect_c = tokio::spawn(rx_c.collect().compat());
-
-        assert_eq!(collect_a.await.unwrap().unwrap(), recs);
-        assert_eq!(collect_c.await.unwrap().unwrap(), recs);
+        // Start collecting from all at once
+        let collectors = rx_channels
+            .into_iter()
+            .map(|rx| tokio::spawn(rx.collect().compat()))
+            .collect::<Vec<_>>();
+        for collect in collectors {
+            assert_eq!(collect.await.unwrap().unwrap(), recs);
+        }
     }
 
+    #[derive(Clone, Copy)]
     enum ErrorWhen {
         Send,
         Poll,
