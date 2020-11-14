@@ -2,14 +2,17 @@ package metadata
 
 installation: _interfaces: rpm: {
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	paths: {
+		bin:    "/usr/bin/vector"
+		config: "/etc/vector/vector.{config_format}"
+	}
 	roles: {
 		_commands: {
-			_config_path: "/etc/vector/vector.{config_format}"
 			install: #"""
 				sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm
 				"""#
 			configure: #"""
-				cat <<-VECTORCFG > \#(_config_path)
+				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
 				"""#

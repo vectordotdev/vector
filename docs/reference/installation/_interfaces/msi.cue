@@ -2,22 +2,24 @@ package metadata
 
 installation: _interfaces: msi: {
 	archs: ["x86_64"]
+	paths: {
+		_dir:   #"C:\Program Files\Vector"#
+		bin:    #"\#(_dir)\bin\vector"#
+		config: #"\#(_dir)\config\vector.{config_format}"#
+	}
 	roles: {
 		_commands: {
-			_vector_dir:  #"C:\Program Files\Vector"#
-			_bin_path:    #"\#(_vector_dir)\bin\vector"#
-			_config_path: #"\#(_vector_dir)\config\vector.{config_format}"#
 			install: #"""
 				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{arch}.msi && \
 					msiexec /i vector-{arch}.msi /quiet
 				"""#
 			configure: #"""
-				cat <<-VECTORCFG > \#(_config_path)
+				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
 				"""#
 			start:     #"""
-				\#(_bin_path) --config \#(_config_path)
+				\#(paths.bin) --config \#(paths.config)
 				"""#
 			stop:      null
 			reload:    null

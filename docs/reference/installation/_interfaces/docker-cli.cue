@@ -2,19 +2,22 @@ package metadata
 
 installation: _interfaces: "docker-cli": {
 	archs: ["x86_64", "ARM64"]
+	paths: {
+		bin:    "/usr/bin/vector"
+		config: "~/vector.{config_format}"
+	}
 	roles: {
 		_commands: {
-			_config_path:      "~/vector.{config_format}"
 			_docker_sock_path: "/var/run/docker.sock"
 			install:           null
 			configure:         #"""
-				cat <<-VECTORCFG > \#(_config_path)
+				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
 				"""#
 			start:             #"""
 				docker run \
-				  -v \#(_config_path):/etc/vector/vector.toml:ro \
+				  -v \#(paths.config):/etc/vector/vector.toml:ro \
 				  {flags} \
 				  timberio/vector:{version}-{variant}
 				"""#

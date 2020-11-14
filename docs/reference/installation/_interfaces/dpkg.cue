@@ -2,15 +2,18 @@ package metadata
 
 installation: _interfaces: dpkg: {
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	paths: {
+		bin:    "/usr/bin/vector"
+		config: "/etc/vector/vector.{config_format}"
+	}
 	roles: {
 		_commands: {
-			_config_path: "/etc/vector/vector.{config_format}"
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{arch}.deb && \
 					sudo dpkg -i vector-{arch}.deb
 				"""#
 			configure: #"""
-				cat <<-VECTORCFG > \#(_config_path)
+				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
 				"""#

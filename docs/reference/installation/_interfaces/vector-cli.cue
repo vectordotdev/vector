@@ -2,19 +2,22 @@ package metadata
 
 installation: _interfaces: "vector-cli": {
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	paths: {
+		bin:    "~/vector"
+		config: "~/vector.{config_format}"
+	}
 	roles: {
 		_commands: {
-			_config_path: "~/vector.{config_format}"
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
 				"""#
 			configure: #"""
-				cat <<-VECTORCFG > \#(_config_path)
+				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
 				"""#
 			start: #"""
-				vector --config \(_config_path)
+				vector --config \(paths.config)
 				"""#
 			stop: null
 			reload: #"""

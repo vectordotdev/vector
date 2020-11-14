@@ -2,16 +2,19 @@ package metadata
 
 installation: _interfaces: homebrew: {
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	paths: {
+		bin:    "/usr/local/bin/vector"
+		config: "/etc/vector/vector.{config_format}"
+	}
 	roles: {
 		_commands: {
-			_config_path: "/etc/vector/vector.{config_format}"
 			install: #"""
 				curl -1sLf \
 				  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
 				  | sudo -E bash
 				"""#
 			configure: #"""
-				cat <<-VECTORCFG > \#(_config_path)
+				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
 				"""#

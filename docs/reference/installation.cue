@@ -49,6 +49,10 @@ installation: close({
 
 	#Interface: {
 		archs: [#Arch, ...#Arch]
+		paths: {
+			bin:    string
+			config: string
+		}
 		roles: {
 			agent: commands:   #Commands
 			sidecar: commands: #Commands & {

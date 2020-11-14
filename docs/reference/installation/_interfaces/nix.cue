@@ -2,19 +2,22 @@ package metadata
 
 installation: _interfaces: nix: {
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	paths: {
+		bin:    "/usr/bin/vector"
+		config: "/etc/vector/vector.{config_format}"
+	}
 	roles: {
 		_commands: {
-			_config_path: "/etc/vector/vector.{config_format}"
 			install: #"""
 				nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
 				"""#
 			configure: #"""
-				cat <<-VECTORCFG > \#(_config_path)
+				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
 				"""#
 			start:     #"""
-				vector --config \#(_config_path)
+				vector --config \#(paths.config)
 				"""#
 			stop:      null
 			reload: #"""
