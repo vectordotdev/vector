@@ -1,12 +1,10 @@
-use super::proto;
 use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
+    prometheus::{proto, METRIC_NAME_LABEL},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
-
-const METRIC_NAME_LABEL: &str = "__name__";
 
 pub(super) trait MetricCollector {
     fn new() -> Self;
@@ -332,9 +330,11 @@ impl MetricCollector for TimeSeries {
 
 #[cfg(test)]
 mod tests {
-    use super::super::default_summary_quantiles;
     use super::*;
-    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
+    use crate::{
+        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
+        prometheus::default_summary_quantiles,
+    };
     use pretty_assertions::assert_eq;
 
     fn encode_metric_header(default_namespace: Option<&str>, metric: &Metric) -> String {

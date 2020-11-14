@@ -1,11 +1,9 @@
-use super::{
-    collector::{self, MetricCollector as _},
-    proto,
-};
+use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::Metric,
     http::HttpClient,
+    prometheus::{self, proto},
     sinks::{
         self,
         util::{
@@ -34,9 +32,9 @@ struct RemoteWriteConfig {
 
     default_namespace: Option<String>,
 
-    #[serde(default = "super::default_histogram_buckets")]
+    #[serde(default = "prometheus::default_histogram_buckets")]
     buckets: Vec<f64>,
-    #[serde(default = "super::default_summary_quantiles")]
+    #[serde(default = "prometheus::default_summary_quantiles")]
     quantiles: Vec<f64>,
 
     #[serde(default)]
