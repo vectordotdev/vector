@@ -71,7 +71,7 @@ components: sources: file: {
 			required:    false
 			type: array: {
 				default: null
-				items: type: string: examples: ["\(_directory)/apache/*.[0-9]*.log"]
+				items: type: string: examples: ["\(_directory)/binary-file.log"]
 			}
 		}
 		file_key: {
@@ -152,7 +152,7 @@ components: sources: file: {
 		include: {
 			description: "Array of file patterns to include. [Globbing](#globbing) is supported."
 			required:    true
-			type: array: items: type: string: examples: ["\(_directory)/apache/*.log"]
+			type: array: items: type: string: examples: ["\(_directory)/**/*.log"]
 		}
 		max_line_bytes: {
 			common:      false

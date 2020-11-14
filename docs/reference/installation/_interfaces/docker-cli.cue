@@ -18,8 +18,7 @@ installation: _interfaces: "docker-cli": {
 				"""#
 			start:             #"""
 				docker run \
-				  -v \#(paths.config):/etc/vector/vector.toml:ro \
-				  {flags} \
+				  -v \#(paths.config):/etc/vector/vector.toml:ro \{flags}
 				  timberio/vector:{version}-{variant}
 				"""#
 			stop: #"""
@@ -34,9 +33,9 @@ installation: _interfaces: "docker-cli": {
 			variables: {
 				flags: {
 					sources: {
-						file:   "-v path:path"
-						docker: "-v \(_docker_sock_path):\(_docker_sock_path)"
-						http:   "-p 80:80"
+						file:   "\n  -v path:path \\"
+						docker: "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
+						http:   "\n  -p 80:80 \\"
 					}
 				}
 				variant: ["debian", "alpine", "distroless"]
@@ -44,7 +43,7 @@ installation: _interfaces: "docker-cli": {
 			}
 		}
 		agent: commands: _commands & {
-			variables: config: sources: in: type: components.sources.journald.type
+			variables: config: sources: in: type: components.sources.docker.type
 		}
 		sidecar: commands:    _commands
 		aggregator: commands: _commands
