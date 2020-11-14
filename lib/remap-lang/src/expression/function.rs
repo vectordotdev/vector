@@ -142,7 +142,7 @@ impl Expression for Function {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression::Noop, test_type_def, value::Constraint::*};
+    use crate::{expression::Noop, test_type_def, value::Kind};
 
     test_type_def![pass_through {
         expr: |_| {
@@ -152,7 +152,7 @@ mod tests {
         def: TypeDef {
             fallible: false,
             optional: true,
-            constraint: Any
+            kind: Kind::all(),
         },
     }];
 }

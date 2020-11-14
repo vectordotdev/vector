@@ -64,16 +64,17 @@ impl Expression for UpcaseFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
 
     remap::test_type_def![
         string {
             expr: |_| UpcaseFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         non_string {
             expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
     ];
 

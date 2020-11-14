@@ -41,7 +41,7 @@ impl Expression for Not {
         TypeDef {
             fallible: true,
             optional: true,
-            constraint: value::Constraint::Exact(value::Kind::Boolean),
+            kind: value::Kind::Boolean,
         }
     }
 }
@@ -49,7 +49,7 @@ impl Expression for Not {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression::*, test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{expression::*, test_type_def, value::Kind};
 
     #[test]
     fn not() {
@@ -89,7 +89,7 @@ mod tests {
         def: TypeDef {
             fallible: true,
             optional: true,
-            constraint: Exact(Boolean),
+            kind: Kind::Boolean,
         },
     }];
 }

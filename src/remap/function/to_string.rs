@@ -78,47 +78,47 @@ mod tests {
     use super::*;
     use crate::map;
     use std::collections::BTreeMap;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         boolean_infallible {
             expr: |_| ToStringFn { value: Literal::from(true).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToStringFn { value: Literal::from(1).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToStringFn { value: Literal::from(1.0).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         null_infallible {
             expr: |_| ToStringFn { value: Literal::from(()).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         string_infallible {
             expr: |_| ToStringFn { value: Literal::from("foo").boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         map_infallible {
             expr: |_| ToStringFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         array_infallible {
             expr: |_| ToStringFn { value: Literal::from(vec![0]).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         timestamp_infallible {
             expr: |_| ToStringFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -126,7 +126,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::String,
             },
         }
 
@@ -138,7 +138,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::String,
             },
         }
 
@@ -150,7 +150,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::String,
             },
         }
 
@@ -162,7 +162,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::String,
             },
         }
 
@@ -174,7 +174,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::String,
             },
         }
     ];

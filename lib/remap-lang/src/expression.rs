@@ -145,49 +145,44 @@ expression_dispatch![
 #[cfg(test)]
 mod tests {
     use crate::value;
+    use value::Kind;
 
     #[test]
     fn test_contains() {
-        use value::Constraint::*;
-        use value::Kind::*;
-
         let cases = vec![
-            (true, Any, Any),
-            (true, Any, Exact(String)),
-            (true, Any, Exact(Integer)),
-            (true, Any, OneOf(vec![Float, Boolean])),
-            (true, Any, OneOf(vec![Map])),
-            (true, Exact(String), Exact(String)),
-            (true, Exact(String), OneOf(vec![String])),
-            (false, Exact(String), Exact(Array)),
-            (false, Exact(String), OneOf(vec![Integer])),
-            (false, Exact(String), OneOf(vec![Integer, Float])),
+            (true, Kind::all(), Kind::all()),
+            (true, Kind::all(), Kind::String),
+            (true, Kind::all(), Kind::Integer),
+            (true, Kind::all(), Kind::Float | Kind::Boolean),
+            (true, Kind::all(), Kind::Map),
+            (true, Kind::String, Kind::String),
+            (true, Kind::String, Kind::String),
+            (false, Kind::String, Kind::Array),
+            (false, Kind::String, Kind::Integer),
+            (false, Kind::String, Kind::Integer | Kind::Float),
         ];
 
         for (expect, this, other) in cases {
-            assert_eq!(this.contains(&other), expect);
+            assert_eq!(this.contains(other), expect);
         }
     }
 
     #[test]
     fn test_merge() {
-        use value::Constraint::*;
-        use value::Kind::*;
-
         let cases = vec![
-            (Any, Any, Any),
-            (Any, OneOf(vec![Integer, String]), Any),
-            (OneOf(vec![Integer, Float]), Exact(Integer), Exact(Float)),
-            (Exact(Integer), Exact(Integer), Exact(Integer)),
+            (Kind::all(), Kind::all(), Kind::all()),
+            (Kind::all(), Kind::Integer | Kind::String, Kind::all()),
+            (Kind::Integer | Kind::Float, Kind::Integer, Kind::Float),
+            (Kind::Integer, Kind::Integer, Kind::Integer),
             (
-                OneOf(vec![String, Integer, Float, Boolean]),
-                OneOf(vec![Integer, String]),
-                OneOf(vec![Float, Boolean]),
+                Kind::String | Kind::Integer | Kind::Float | Kind::Boolean,
+                Kind::Integer | Kind::String,
+                Kind::Float | Kind::Boolean,
             ),
         ];
 
         for (expect, this, other) in cases {
-            assert_eq!(this.merge(&other), expect);
+            assert_eq!(this | other, expect);
         }
     }
 }

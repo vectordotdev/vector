@@ -60,8 +60,7 @@ mod tests {
     use crate::{
         expression::{Literal, Noop},
         test_type_def,
-        value::Constraint::*,
-        value::Kind::*,
+        value::Kind,
     };
 
     test_type_def![
@@ -76,7 +75,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -91,7 +90,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: true,
-                constraint: Any,
+                kind: Kind::all(),
             },
         }
     ];

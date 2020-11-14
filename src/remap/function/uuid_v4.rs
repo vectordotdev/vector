@@ -27,7 +27,7 @@ impl Expression for UuidV4Fn {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            constraint: value::Kind::String.into(),
+            kind: value::Kind::String,
             ..Default::default()
         }
     }
@@ -42,7 +42,7 @@ mod tests {
     remap::test_type_def![static_def {
         expr: |_| UuidV4Fn,
         def: TypeDef {
-            constraint: value::Kind::String.into(),
+            kind: value::Kind::String,
             ..Default::default()
         },
     }];

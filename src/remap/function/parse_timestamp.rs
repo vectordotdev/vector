@@ -111,9 +111,9 @@ impl Expression for ParseTimestampFn {
         //
         // The `format` type is _always_ fallible, because its string has to be
         // parsed into a valid timestamp format.
-        let format_def = if value_def.constraint.contains(&value::Kind::String.into()) {
+        let format_def = if value_def.kind.contains(value::Kind::String) {
             match &default_def {
-                Some(def) if def.constraint.contains(&value::Kind::String.into()) => {
+                Some(def) if def.kind.contains(value::Kind::String) => {
                     Some(self.format.type_def(state).into_fallible(true))
                 }
                 Some(_) => None,
@@ -145,7 +145,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -158,7 +158,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -170,7 +170,7 @@ mod tests {
                 default: Some(Literal::from(chrono::Utc::now()).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -182,7 +182,7 @@ mod tests {
                 default: None,
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -194,7 +194,7 @@ mod tests {
                 default: Some(Literal::from("<timestamp>").boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -206,7 +206,7 @@ mod tests {
                 default: Some(Literal::from(chrono::Utc::now()).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }

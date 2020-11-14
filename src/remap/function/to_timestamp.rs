@@ -92,17 +92,17 @@ impl Expression for ToTimestampFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         self.value
             .type_def(state)
-            .fallible_unless(vec![Timestamp, Integer, Float])
+            .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
             .merge_with_default_optional(self.default.as_ref().map(|default| {
                 default
                     .type_def(state)
-                    .fallible_unless(vec![Timestamp, Integer, Float])
+                    .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
             }))
-            .with_constraint(Timestamp)
+            .with_constraint(Kind::Timestamp)
     }
 }
 
@@ -111,47 +111,47 @@ mod tests {
     use super::*;
     use crate::map;
     use std::collections::BTreeMap;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         timestamp_infallible {
             expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
-            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToTimestampFn { value: Literal::from(1).boxed(), default: None},
-            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToTimestampFn { value: Literal::from(1.0).boxed(), default: None},
-            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         null_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(()).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         string_fallible {
             expr: |_| ToTimestampFn { value: Literal::from("foo").boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         map_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         array_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(vec![0]).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         boolean_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(true).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -159,7 +159,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -171,7 +171,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -183,7 +183,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -195,7 +195,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -207,7 +207,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
     ];
