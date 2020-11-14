@@ -3,8 +3,9 @@ package metadata
 installation: _interfaces: nix: {
 	archs: ["x86_64", "ARM64", "ARMv7"]
 	paths: {
-		bin:    "/usr/bin/vector"
-		config: "/etc/vector/vector.{config_format}"
+		bin:         "/usr/bin/vector"
+		bin_in_path: true
+		config:      "/etc/vector/vector.{config_format}"
 	}
 	roles: {
 		_commands: {

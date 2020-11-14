@@ -3,8 +3,9 @@ package metadata
 installation: _interfaces: "vector-cli": {
 	archs: ["x86_64", "ARM64", "ARMv7"]
 	paths: {
-		bin:    "~/vector"
-		config: "~/vector.{config_format}"
+		bin:         "~/vector"
+		bin_in_path: false
+		config:      "~/vector.{config_format}"
 	}
 	roles: {
 		_commands: {

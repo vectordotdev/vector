@@ -3,8 +3,9 @@ package metadata
 installation: _interfaces: "docker-cli": {
 	archs: ["x86_64", "ARM64"]
 	paths: {
-		bin:    "/usr/bin/vector"
-		config: "~/vector.{config_format}"
+		bin:         "/usr/bin/vector"
+		bin_in_path: true
+		config:      "~/vector.{config_format}"
 	}
 	roles: {
 		_commands: {

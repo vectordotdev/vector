@@ -3,9 +3,10 @@ package metadata
 installation: _interfaces: msi: {
 	archs: ["x86_64"]
 	paths: {
-		_dir:   #"C:\Program Files\Vector"#
-		bin:    #"\#(_dir)\bin\vector"#
-		config: #"\#(_dir)\config\vector.{config_format}"#
+		_dir:        #"C:\Program Files\Vector"#
+		bin:         #"\#(_dir)\bin\vector"#
+		bin_in_path: true
+		config:      #"\#(_dir)\config\vector.{config_format}"#
 	}
 	roles: {
 		_commands: {

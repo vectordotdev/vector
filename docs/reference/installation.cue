@@ -50,8 +50,9 @@ installation: close({
 	#Interface: {
 		archs: [#Arch, ...#Arch]
 		paths: {
-			bin:    string
-			config: string
+			bin:         string
+			bin_in_path: bool
+			config:      string
 		}
 		roles: {
 			agent: commands:   #Commands
