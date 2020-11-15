@@ -4,12 +4,12 @@ use chrono::ParseError;
 use metrics::counter;
 
 #[derive(Debug)]
-pub struct DockerEventReceived<'a> {
+pub struct DockerLogsEventReceived<'a> {
     pub byte_size: usize,
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerEventReceived<'a> {
+impl<'a> InternalEvent for DockerLogsEventReceived<'a> {
     fn emit_logs(&self) {
         trace!(
             message = "Received one event.",
@@ -25,12 +25,12 @@ impl<'a> InternalEvent for DockerEventReceived<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerContainerEventReceived<'a> {
+pub struct DockerLogsContainerEventReceived<'a> {
     pub container_id: &'a str,
     pub action: &'a str,
 }
 
-impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
+impl<'a> InternalEvent for DockerLogsContainerEventReceived<'a> {
     fn emit_logs(&self) {
         debug!(
             message = "Received one container event.",
@@ -45,14 +45,14 @@ impl<'a> InternalEvent for DockerContainerEventReceived<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerContainerWatch<'a> {
+pub struct DockerLogsContainerWatch<'a> {
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerContainerWatch<'a> {
+impl<'a> InternalEvent for DockerLogsContainerWatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "Started watching for logs of container.",
+            message = "Started watching for container logs.",
             container_id = %self.container_id,
         );
     }
@@ -63,14 +63,14 @@ impl<'a> InternalEvent for DockerContainerWatch<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerContainerUnwatch<'a> {
+pub struct DockerLogsContainerUnwatch<'a> {
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerContainerUnwatch<'a> {
+impl<'a> InternalEvent for DockerLogsContainerUnwatch<'a> {
     fn emit_logs(&self) {
         info!(
-            message = "Stopped watching for logs of container.",
+            message = "Stopped watching for container logs.",
             container_id = %self.container_id,
         );
     }
@@ -89,7 +89,7 @@ pub struct DockerCommunicationError<'a> {
 impl<'a> InternalEvent for DockerCommunicationError<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "Error in communication with docker daemon.",
+            message = "Error in communication with Docker daemon.",
             error = ?self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -123,15 +123,15 @@ impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerTimestampParseFailed<'a> {
+pub struct DockerLogsTimestampParseFailed<'a> {
     pub error: ParseError,
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerTimestampParseFailed<'a> {
+impl<'a> InternalEvent for DockerLogsTimestampParseFailed<'a> {
     fn emit_logs(&self) {
         error!(
-            message = "Failed to parse timestamp as rfc3339 timestamp.",
+            message = "Failed to parse timestamp as RFC3339 timestamp.",
             error = ?self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
@@ -152,9 +152,9 @@ pub struct DockerLoggingDriverUnsupported<'a> {
 impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
     fn emit_logs(&self) {
         error!(
-            message = r#"Docker engine is not using either `jsonfile` or `journald`
+            message = r#"Docker engine is not using either the `jsonfile` or `journald`
                 logging driver. Please enable one of these logging drivers
-                to get logs from the docker daemon."#,
+                to get logs from the Docker daemon."#,
             error = ?self.error,
             container_id = ?self.container_id,
             rate_limit_secs = 10
