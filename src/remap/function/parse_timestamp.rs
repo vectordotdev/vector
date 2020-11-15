@@ -64,17 +64,12 @@ impl ParseTimestampFn {
 }
 
 impl Expression for ParseTimestampFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let format = self.format.execute(state, object);
 
         let to_timestamp = |value| match value {
             Value::String(_) => format
-                .clone()?
-                .ok_or_else(|| Error::from(function::Error::Required("format".to_owned())))
+                .clone()
                 .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_string())))?
                 .parse::<Conversion>()
                 .map_err(|e| format!("{}", e))?
@@ -222,14 +217,14 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Timestamp(
+                Ok(Value::Timestamp(
                     DateTime::parse_from_str(
                         "1983 Apr 13 12:09:14.274 +0000",
                         "%Y %b %d %H:%M:%S%.3f %z",
                     )
                     .unwrap()
                     .with_timezone(&Utc),
-                ))),
+                )),
                 ParseTimestampFn::new(
                     "%Y %b %d %H:%M:%S%.3f %z",
                     Box::new(Path::from("foo")),
@@ -242,22 +237,22 @@ mod tests {
                             .unwrap()
                             .with_timezone(&Utc),
                 ],
-                Ok(Some(
+                Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()
                         .with_timezone(&Utc)
                         .into(),
-                )),
+                ),
                 ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": "16/10/2019:12:00:00 +0000"],
-                Ok(Some(
+                Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()
                         .with_timezone(&Utc)
                         .into(),
-                )),
+                ),
                 ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo")), None),
             ),
         ];

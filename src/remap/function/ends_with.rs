@@ -63,11 +63,7 @@ impl EndsWithFn {
 }
 
 impl Expression for EndsWithFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let substring = {
             let bytes = required!(state, object, self.substring, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -84,7 +80,7 @@ impl Expression for EndsWithFn {
                 .filter(|&case_sensitive| !case_sensitive)
                 .any(|_| value.to_lowercase().ends_with(&substring.to_lowercase()));
 
-        Ok(Some(ends_with.into()))
+        Ok(ends_with.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -161,47 +157,47 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "foobar", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "oba", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("fooBAR")), "BAR", true),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", true),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", false),
             ),
         ];

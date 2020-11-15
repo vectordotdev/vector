@@ -136,24 +136,24 @@ mod tests {
     #[test]
     fn it_works() {
         let cases = vec![
-            (r#".foo = null || "bar""#, Ok(()), Ok(Some("bar".into()))),
-            (r#"$foo = null || "bar""#, Ok(()), Ok(Some("bar".into()))),
-            // (r#".foo == .bar"#, Ok(Some(Value::Boolean(false)))),
+            (r#".foo = null || "bar""#, Ok(()), Ok("bar".into())),
+            (r#"$foo = null || "bar""#, Ok(()), Ok("bar".into())),
+            // (r#".foo == .bar"#, Ok(Value::Boolean(false))),
             (
                 r#".foo == .bar"#,
                 Ok(()),
                 Err("remap error: path error: missing path: foo"),
             ),
-            (r#".foo = (null || "bar")"#, Ok(()), Ok(Some("bar".into()))),
-            (r#"!false"#, Ok(()), Ok(Some(true.into()))),
-            (r#"!!false"#, Ok(()), Ok(Some(false.into()))),
-            (r#"!!!true"#, Ok(()), Ok(Some(false.into()))),
-            (r#"if true { "yes" } else { "no" }"#, Ok(()), Ok(Some("yes".into()))),
+            (r#".foo = (null || "bar")"#, Ok(()), Ok("bar".into())),
+            (r#"!false"#, Ok(()), Ok(true.into())),
+            (r#"!!false"#, Ok(()), Ok(false.into())),
+            (r#"!!!true"#, Ok(()), Ok(false.into())),
+            (r#"if true { "yes" } else { "no" }"#, Ok(()), Ok("yes".into())),
             // (
             //     r#".a.b.(c | d) == .e."f.g"[2].(h | i)"#,
-            //     Ok(Some(Value::Boolean(false))),
+            //     Ok(Value::Boolean(false)),
             // ),
-            ("$bar = true\n.foo = $bar", Ok(()), Ok(Some(Value::Boolean(true)))),
+            ("$bar = true\n.foo = $bar", Ok(()), Ok(Value::Boolean(true))),
             (
                 r#"{
                     $foo = "foo"
@@ -162,7 +162,7 @@ mod tests {
                 }"#,
                 Ok(()),
 
-                Ok(Some("foobar".into())),
+                Ok("foobar".into()),
             ),
             (
                 r#"
@@ -173,55 +173,55 @@ mod tests {
 
                 Ok(()),
 
-                Ok(Some(true.into())),
+                Ok(true.into()),
             ),
-            (r#"if false { 1 }"#, Ok(()), Ok(None)),
-            (r#"if true { 1 }"#, Ok(()), Ok(Some(1.into()))),
-            (r#"if false { 1 } else { 2 }"#, Ok(()), Ok(Some(2.into()))),
-            (r#"if false { 1 } else if false { 2 }"#, Ok(()), Ok(None)),
-            (r#"if false { 1 } else if true { 2 }"#, Ok(()), Ok(Some(2.into()))),
+            (r#"if false { 1 }"#, Ok(()), Ok(Value::Null)),
+            (r#"if true { 1 }"#, Ok(()), Ok(1.into())),
+            (r#"if false { 1 } else { 2 }"#, Ok(()), Ok(2.into())),
+            (r#"if false { 1 } else if false { 2 }"#, Ok(()), Ok(Value::Null)),
+            (r#"if false { 1 } else if true { 2 }"#, Ok(()), Ok(2.into())),
             (
                 r#"if false { 1 } else if false { 2 } else { 3 }"#,
-                Ok(()), Ok(Some(3.into())),
+                Ok(()), Ok(3.into()),
             ),
             (
                 r#"if false { 1 } else if true { 2 } else { 3 }"#,
-                Ok(()), Ok(Some(2.into())),
+                Ok(()), Ok(2.into()),
             ),
             (
                 r#"if false { 1 } else if false { 2 } else if false { 3 }"#,
-                Ok(()), Ok(None),
+                Ok(()), Ok(Value::Null),
             ),
             (
                 r#"if false { 1 } else if false { 2 } else if true { 3 }"#,
-                Ok(()), Ok(Some(3.into())),
+                Ok(()), Ok(3.into()),
             ),
             (
                 r#"if false { 1 } else if true { 2 } else if false { 3 } else { 4 }"#,
-                Ok(()), Ok(Some(2.into())),
+                Ok(()), Ok(2.into()),
             ),
             (
                 r#"if false { 1 } else if false { 2 } else if false { 3 } else { 4 }"#,
-                Ok(()), Ok(Some(4.into())),
+                Ok(()), Ok(4.into()),
             ),
             (
                 r#"regex_printer(/escaped\/forward slash/)"#,
-                Ok(()), Ok(Some("regex: escaped/forward slash".into())),
+                Ok(()), Ok("regex: escaped/forward slash".into()),
             ),
             (
                 r#"enum_validator("foo")"#,
                 Ok(()),
-                Ok(Some("valid: foo".into())),
+                Ok("valid: foo".into()),
             ),
             (
                 r#"enum_validator("bar")"#,
                 Ok(()),
-                Ok(Some("valid: bar".into())),
+                Ok("valid: bar".into()),
             ),
             (
                 r#"enum_validator("baz")"#,
                 Err("remap error: function error: unknown enum variant: baz, must be one of: foo, bar"),
-                Ok(Some("valid: baz".into())),
+                Ok("valid: baz".into()),
             ),
         ];
 
@@ -290,8 +290,8 @@ mod tests {
         #[derive(Debug, Clone)]
         struct EnumValidatorFn(String);
         impl Expression for EnumValidatorFn {
-            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
-                Ok(Some(format!("valid: {}", self.0).into()))
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(format!("valid: {}", self.0).into())
             }
 
             fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -322,8 +322,8 @@ mod tests {
         #[derive(Debug, Clone)]
         struct RegexPrinterFn(regex::Regex);
         impl Expression for RegexPrinterFn {
-            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
-                Ok(Some(format!("regex: {:?}", self.0).into()))
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(format!("regex: {:?}", self.0).into())
             }
 
             fn type_def(&self, _: &state::Compiler) -> TypeDef {

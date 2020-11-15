@@ -79,11 +79,7 @@ impl ParseDurationFn {
 }
 
 impl Expression for ParseDurationFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = {
             let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -114,7 +110,7 @@ impl Expression for ParseDurationFn {
             .to_f64()
             .ok_or(format!("unable to format duration: '{}'", number))?;
 
-        Ok(Some(number.into()))
+        Ok(number.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -160,37 +156,37 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some(0.5.into())),
+                Ok(0.5.into()),
                 ParseDurationFn::new(Box::new(Literal::from("30s")), "m"),
             ),
             (
                 map![],
-                Ok(Some(1.2.into())),
+                Ok(1.2.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1200ms")), "s"),
             ),
             (
                 map![],
-                Ok(Some(100.0.into())),
+                Ok(100.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("100ms")), "ms"),
             ),
             (
                 map![],
-                Ok(Some(1.005.into())),
+                Ok(1.005.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1005ms")), "s"),
             ),
             (
                 map![],
-                Ok(Some(0.0001.into())),
+                Ok(0.0001.into()),
                 ParseDurationFn::new(Box::new(Literal::from("100ns")), "ms"),
             ),
             (
                 map![],
-                Ok(Some(86400.0.into())),
+                Ok(86400.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1d")), "s"),
             ),
             (
                 map![],
-                Ok(Some(1000000000.0.into())),
+                Ok(1000000000.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1 s")), "ns"),
             ),
             (

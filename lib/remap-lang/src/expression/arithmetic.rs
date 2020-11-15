@@ -15,23 +15,13 @@ impl Arithmetic {
 }
 
 impl Expression for Arithmetic {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let lhs = self
-            .lhs
-            .execute(state, object)?
-            .ok_or(super::Error::Missing)?;
-
-        let rhs = self
-            .rhs
-            .execute(state, object)?
-            .ok_or(super::Error::Missing)?;
-
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Operator::*;
-        let result = match self.op {
+
+        let lhs = self.lhs.execute(state, object)?;
+        let rhs = self.rhs.execute(state, object)?;
+
+        match self.op {
             Multiply => lhs.try_mul(rhs),
             Divide => lhs.try_div(rhs),
             Add => lhs.try_add(rhs),
@@ -48,9 +38,8 @@ impl Expression for Arithmetic {
             GreaterOrEqual => lhs.try_ge(rhs),
             Less => lhs.try_lt(rhs),
             LessOrEqual => lhs.try_le(rhs),
-        };
-
-        result.map(Some).map_err(Into::into)
+        }
+        .map_err(Into::into)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

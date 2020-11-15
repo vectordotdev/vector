@@ -37,11 +37,7 @@ impl TokenizeFn {
 }
 
 impl Expression for TokenizeFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = {
             let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -56,7 +52,7 @@ impl Expression for TokenizeFn {
             .collect::<Vec<_>>()
             .into();
 
-        Ok(Some(tokens))
+        Ok(tokens)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -89,7 +85,7 @@ mod tests {
     fn tokenize() {
         let cases = vec![(
                     map![],
-                    Ok(Some(vec![
+                    Ok(vec![
                             "217.250.207.207".into(),
                             Value::Null,
                             Value::Null,
@@ -98,7 +94,7 @@ mod tests {
                             "205".into(),
                             "11881".into(),
 
-                    ].into())),
+                    ].into()),
                     TokenizeFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
                 )];
 

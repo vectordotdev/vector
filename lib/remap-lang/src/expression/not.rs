@@ -19,13 +19,10 @@ impl Not {
 }
 
 impl Expression for Not {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        self.expression.execute(state, object).and_then(|opt| {
-            opt.map(|v| match v {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        self.expression
+            .execute(state, object)
+            .and_then(|v| match v {
                 Value::Boolean(b) => Ok(Value::Boolean(!b)),
                 _ => Err(E::from(Error::from(value::Error::Expected(
                     value::Kind::Boolean,
@@ -33,8 +30,6 @@ impl Expression for Not {
                 )))
                 .into()),
             })
-            .transpose()
-        })
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -59,11 +54,11 @@ mod tests {
                 Not::new(Box::new(Path::from("foo").into())),
             ),
             (
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 Not::new(Box::new(Literal::from(true).into())),
             ),
             (
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 Not::new(Box::new(Literal::from(false).into())),
             ),
             (

@@ -46,11 +46,7 @@ impl RoundFn {
 }
 
 impl Expression for RoundFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let precision =
             optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(state, object, self.value,
@@ -135,22 +131,22 @@ mod tests {
             ),
             (
                 map!["foo": 1234.2],
-                Ok(Some(1234.0.into())),
+                Ok(1234.0.into()),
                 RoundFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map![],
-                Ok(Some(1235.0.into())),
+                Ok(1235.0.into()),
                 RoundFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
             ),
             (
                 map![],
-                Ok(Some(1234.into())),
+                Ok(1234.into()),
                 RoundFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
             ),
             (
                 map![],
-                Ok(Some(1234.4.into())),
+                Ok(1234.4.into()),
                 RoundFn::new(
                     Box::new(Literal::from(Value::Float(1234.39429))),
                     Some(Box::new(Literal::from(1))),
@@ -158,7 +154,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(3.1416.into())),
+                Ok(3.1416.into()),
                 RoundFn::new(
                     Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
                     Some(Box::new(Literal::from(4))),
@@ -166,9 +162,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(
-                    9876543210123456789098765432101234567890987654321.98765.into(),
-                )),
+                Ok(9876543210123456789098765432101234567890987654321.98765.into()),
                 RoundFn::new(
                     Box::new(Literal::from(
                         9876543210123456789098765432101234567890987654321.987654321,

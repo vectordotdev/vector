@@ -12,18 +12,12 @@ impl Block {
 }
 
 impl Expression for Block {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let mut value = None;
-
-        for expr in &self.expressions {
-            value = expr.execute(state, object)?;
-        }
-
-        Ok(value)
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        self.expressions
+            .iter()
+            .map(|expr| expr.execute(state, object))
+            .last()
+            .unwrap_or(Ok(Value::Null))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

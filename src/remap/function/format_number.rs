@@ -80,11 +80,7 @@ impl FormatNumberFn {
 }
 
 impl Expression for FormatNumberFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = required!(state, object, self.value,
             Value::Integer(v) => Decimal::from_i64(v),
             Value::Float(v) => Decimal::from_f64(v),
@@ -147,11 +143,9 @@ impl Expression for FormatNumberFn {
         }
 
         // Join results, using configured decimal separator.
-        Ok(Some(
-            parts
-                .join(&String::from_utf8_lossy(&decimal_separator[..]))
-                .into(),
-        ))
+        Ok(parts
+            .join(&String::from_utf8_lossy(&decimal_separator[..]))
+            .into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -235,22 +229,22 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("1234.567".into())),
+                Ok("1234.567".into()),
                 FormatNumberFn::new(Box::new(Literal::from(1234.567)), None, None, None),
             ),
             (
                 map![],
-                Ok(Some("1234.56".into())),
+                Ok("1234.56".into()),
                 FormatNumberFn::new(Box::new(Literal::from(1234.567)), Some(2), None, None),
             ),
             (
                 map![],
-                Ok(Some("1234,56".into())),
+                Ok("1234,56".into()),
                 FormatNumberFn::new(Box::new(Literal::from(1234.567)), Some(2), Some(","), None),
             ),
             (
                 map![],
-                Ok(Some("1 234,56".into())),
+                Ok("1 234,56".into()),
                 FormatNumberFn::new(
                     Box::new(Literal::from(1234.567)),
                     Some(2),
@@ -260,7 +254,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("11.222.333.444,567".into())),
+                Ok("11.222.333.444,567".into()),
                 FormatNumberFn::new(
                     Box::new(Literal::from(11222333444.56789)),
                     Some(3),
@@ -270,22 +264,22 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("100".into())),
+                Ok("100".into()),
                 FormatNumberFn::new(Box::new(Literal::from(100.0)), None, None, None),
             ),
             (
                 map![],
-                Ok(Some("100.00".into())),
+                Ok("100.00".into()),
                 FormatNumberFn::new(Box::new(Literal::from(100.0)), Some(2), None, None),
             ),
             (
                 map![],
-                Ok(Some("123".into())),
+                Ok("123".into()),
                 FormatNumberFn::new(Box::new(Literal::from(123.45)), Some(0), None, None),
             ),
             (
                 map![],
-                Ok(Some("12345.00".into())),
+                Ok("12345.00".into()),
                 FormatNumberFn::new(Box::new(Literal::from(12345)), Some(2), None, None),
             ),
         ];

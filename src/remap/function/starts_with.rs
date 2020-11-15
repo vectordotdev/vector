@@ -63,11 +63,7 @@ impl StartsWithFn {
 }
 
 impl Expression for StartsWithFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let substring = {
             let bytes = required!(state, object, self.substring, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -84,7 +80,7 @@ impl Expression for StartsWithFn {
                 .filter(|&case_sensitive| !case_sensitive)
                 .any(|_| value.to_lowercase().starts_with(&substring.to_lowercase()));
 
-        Ok(Some(starts_with.into()))
+        Ok(starts_with.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -159,47 +155,47 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foo")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foo")), "foobar", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("foo")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "oba", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("FOObar")), "FOO", true),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "FOO", true),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 StartsWithFn::new(Box::new(Literal::from("foobar")), "FOO", false),
             ),
         ];

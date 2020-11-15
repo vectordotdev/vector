@@ -4,8 +4,8 @@ use crate::{state, Expression, Object, Result, TypeDef, Value};
 pub struct Noop;
 
 impl Expression for Noop {
-    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
-        Ok(None)
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+        Ok(Value::Null)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

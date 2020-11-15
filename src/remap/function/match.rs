@@ -46,17 +46,13 @@ impl MatchFn {
 }
 
 impl Expression for MatchFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         required!(
             state, object, self.value,
 
             Value::String(b) => {
                 let value = String::from_utf8_lossy(&b);
-                Ok(Some(self.pattern.is_match(&value).into()))
+                Ok(self.pattern.is_match(&value).into())
             }
         )
     }
@@ -111,22 +107,16 @@ mod tests {
             ),
             (
                 map!["foo": "foobar"],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 MatchFn::new(Box::new(Path::from("foo")), Regex::new("\\s\\w+").unwrap()),
             ),
             (
                 map!["foo": "foo 2 bar"],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 MatchFn::new(
                     Box::new(Path::from("foo")),
                     Regex::new("foo \\d bar").unwrap(),
                 ),
-            ),
-            // `Noop` returns `Ok(None)`, which is passed-through
-            (
-                map![],
-                Ok(None),
-                MatchFn::new(Box::new(Noop), Regex::new("true").unwrap()),
             ),
         ];
 
