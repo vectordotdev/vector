@@ -236,7 +236,10 @@ impl RunningTopology {
                     .chain(add_source)
                     .map(|(key, value)| ((false, key), value)),
             ),
-        );
+        )
+        .into_iter()
+        .flat_map(|(_, components)| components)
+        .collect::<HashSet<_>>();
         let wait_for_sinks = conflicts
             .into_iter()
             .filter(|&(existing_sink, _)| existing_sink)
