@@ -64,23 +64,32 @@ impl ContainsFn {
 
 impl Expression for ContainsFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let case_sensitive = match &self.case_sensitive {
+            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            None => false,
+        };
+
         let substring = {
-            let bytes = required!(state, object, self.substring, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+            let bytes = self.substring.execute(state, object)?.try_string()?;
+            let string = String::from_utf8_lossy(&bytes);
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
         };
 
         let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+            let bytes = self.value.execute(state, object)?.try_string()?;
+            let string = String::from_utf8_lossy(&bytes);
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
         };
 
-        let contains = value.contains(&substring)
-            || optional!(state, object, self.case_sensitive, Value::Boolean(b) => b)
-                .iter()
-                .filter(|&case_sensitive| !case_sensitive)
-                .any(|_| value.to_lowercase().contains(&substring.to_lowercase()));
-
-        Ok(contains.into())
+        Ok(value.contains(&substring).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

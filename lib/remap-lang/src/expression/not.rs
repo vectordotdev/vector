@@ -1,4 +1,3 @@
-use super::Error as E;
 use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -20,16 +19,9 @@ impl Not {
 
 impl Expression for Not {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        self.expression
-            .execute(state, object)
-            .and_then(|v| match v {
-                Value::Boolean(b) => Ok(Value::Boolean(!b)),
-                _ => Err(E::from(Error::from(value::Error::Expected(
-                    value::Kind::Boolean,
-                    v.kind(),
-                )))
-                .into()),
-            })
+        let boolean = self.expression.execute(state, object)?.try_boolean()?;
+
+        Ok((!boolean).into())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
@@ -62,7 +54,7 @@ mod tests {
                 Not::new(Box::new(Literal::from(false).into())),
             ),
             (
-                Err("not operation error".to_string()),
+                Err("value error".to_string()),
                 Not::new(Box::new(Literal::from("not a bool").into())),
             ),
         ];
