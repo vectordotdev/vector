@@ -2,30 +2,37 @@ package metadata
 
 installation: package_managers: {
 	apt: {
-		title: "APT"
+		title:       "APT"
+		description: installation._interfaces.apt.description
 	}
 
 	dpkg: {
-		title: "DPKG"
+		title:       "DPKG"
+		description: installation._interfaces.dpkg.description
 	}
 
 	homebrew: {
-		title: "Homebrew"
+		title:       "Homebrew"
+		description: installation._interfaces.homebrew.description
 	}
 
 	msi: {
-		title: "MSI"
+		title:       "MSI"
+		description: installation._interfaces.msi.description
 	}
 
 	nix: {
-		title: "Nix"
+		title:       "Nix"
+		description: installation._interfaces.nix.description
 	}
 
 	rpm: {
-		title: "RPM"
+		title:       "RPM"
+		description: installation._interfaces.rpm.description
 	}
 
 	yum: {
-		title: "YUM"
+		title:       "YUM"
+		description: installation._interfaces.yum.description
 	}
 }

@@ -24,7 +24,7 @@ installation: close({
 
 				sinks: out: {
 					type: "console"
-					inputs: [ for id, _source in sources { id } ]
+					inputs: [ for id, _source in sources {id}]
 				}
 			}
 			config_format: ["toml"]
@@ -161,8 +161,9 @@ installation: close({
 	}
 
 	#PackageManagers: [Name=string]: {
-		name:  Name
-		title: string
+		description: string
+		name:        Name
+		title:       string
 	}
 
 	#Platforms: [Name=string]: {
