@@ -60,18 +60,11 @@ mod tests {
 
     #[test]
     fn downcase() {
-        let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                DowncaseFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "FOO 2 bar"],
-                Ok(Value::from("foo 2 bar")),
-                DowncaseFn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+        let cases = vec![(
+            map!["foo": "FOO 2 bar"],
+            Ok(Value::from("foo 2 bar")),
+            DowncaseFn::new(Box::new(Path::from("foo"))),
+        )];
 
         let mut state = state::Program::default();
 

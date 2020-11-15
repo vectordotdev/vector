@@ -125,11 +125,6 @@ mod tests {
     fn floor() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                FloorFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
                 map!["foo": 1234.2],
                 Ok(1234.0.into()),
                 FloorFn::new(Box::new(Path::from("foo")), None),

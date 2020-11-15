@@ -113,11 +113,6 @@ mod tests {
     fn sha3() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                Sha3Fn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
                 map!["foo": "foo"],
                 Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7".into()),
                 Sha3Fn::new(Box::new(Path::from("foo")), None),

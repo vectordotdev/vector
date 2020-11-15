@@ -113,11 +113,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                FormatTimestampFn::new(Box::new(Path::from("foo")), "%s"),
-            ),
-            (
-                map![],
                 Err("function call error: invalid format".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),

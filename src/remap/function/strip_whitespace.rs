@@ -72,11 +72,6 @@ mod tests {
     fn strip_whitespace() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                StripWhitespaceFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
                 map!["foo": ""],
                 Ok("".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),

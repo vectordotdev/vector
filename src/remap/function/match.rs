@@ -97,11 +97,6 @@ mod tests {
     fn r#match() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                MatchFn::new(Box::new(Path::from("foo")), Regex::new("").unwrap()),
-            ),
-            (
                 map!["foo": "foobar"],
                 Ok(false.into()),
                 MatchFn::new(Box::new(Path::from("foo")), Regex::new("\\s\\w+").unwrap()),

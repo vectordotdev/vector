@@ -212,11 +212,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ParseTimestampFn::new("%a %b %e %T %Y", Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::Timestamp(
                     DateTime::parse_from_str(
                         "1983 Apr 13 12:09:14.274 +0000",

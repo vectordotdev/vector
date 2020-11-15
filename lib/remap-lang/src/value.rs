@@ -448,20 +448,4 @@ impl Value {
             _ => self == rhs,
         }
     }
-
-    /// Returns [`Value::Bytes`], lossy converting any other variant.
-    pub fn as_string_lossy(&self) -> Self {
-        use Value::*;
-
-        match self {
-            s @ Bytes(_) => s.clone(), // cloning a Bytes is cheap
-            Integer(v) => Value::from(format!("{}", v)),
-            Float(v) => Value::from(format!("{}", v)),
-            Boolean(v) => Value::from(format!("{}", v)),
-            Map(_) => Value::from(""),
-            Array(_) => Value::from(""),
-            Timestamp(v) => Value::from(v.to_string()),
-            Null => Value::from(""),
-        }
-    }
 }

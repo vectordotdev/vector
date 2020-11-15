@@ -76,18 +76,11 @@ mod tests {
 
     #[test]
     fn md5() {
-        let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                Md5Fn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "foo"],
-                Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
-                Md5Fn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+        let cases = vec![(
+            map!["foo": "foo"],
+            Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
+            Md5Fn::new(Box::new(Path::from("foo"))),
+        )];
 
         let mut state = state::Program::default();
 
