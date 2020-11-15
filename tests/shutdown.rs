@@ -88,6 +88,22 @@ fn vector_with(config_path: PathBuf, address: SocketAddr) -> Command {
     cmd
 }
 
+fn dbg_source_vector(source: &str) -> Command {
+    dbg_vector_with(create_file(source_config(source).as_str()), next_addr())
+}
+
+fn dbg_vector_with(config_path: PathBuf, address: SocketAddr) -> Command {
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+    cmd.arg("-c")
+        .arg(config_path)
+        .arg("-v")
+        .env("VECTOR_DATA_DIR", create_directory())
+        .env("VECTOR_TEST_UNIX_PATH", temp_file())
+        .env("VECTOR_TEST_ADDRESS", format!("{}", address));
+
+    cmd
+}
+
 fn test_timely_shutdown(cmd: Command) {
     test_timely_shutdown_with_sub(cmd, |_| ());
 }
@@ -244,7 +260,7 @@ fn timely_shutdown_logplex() {
 
 #[test]
 fn timely_shutdown_docker() {
-    test_timely_shutdown(source_vector(r#"type = "docker""#));
+    test_timely_shutdown(dbg_source_vector(r#"type = "docker""#));
 }
 
 #[test]
