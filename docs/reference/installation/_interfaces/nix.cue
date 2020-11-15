@@ -36,11 +36,7 @@ installation: _interfaces: nix: {
 				"""#
 			logs: null
 		}
-		agent: commands: _commands & {
-			variables: config: sources: in: type: components.sources.journald.type
-		}
-		aggregator: commands: _commands & {
-			variables: config: sources: in: type: components.sources.vector.type
-		}
+		agent:      roles._journald_agent & {commands:    _commands}
+		aggregator: roles._vector_aggregator & {commands: _commands}
 	}
 }

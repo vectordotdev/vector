@@ -39,11 +39,7 @@ installation: _interfaces: msi: {
 				version: true
 			}
 		}
-		agent: commands: _commands & {
-			variables: config: sources: in: type: components.sources.host_metrics.type
-		}
-		aggregator: commands: _commands & {
-			variables: config: sources: in: type: components.sources.vector.type
-		}
+		agent:      roles._file_agent & {commands:        _commands}
+		aggregator: roles._vector_aggregator & {commands: _commands}
 	}
 }

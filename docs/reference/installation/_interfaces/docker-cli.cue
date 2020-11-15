@@ -59,17 +59,24 @@ installation: _interfaces: "docker-cli": {
 				version: true
 			}
 		}
-		agent: commands: _commands & {
-			variables: config: sources: in: type: components.sources.docker.type
-		}
-		sidecar: commands: _commands & {
-			variables: config: sources: in: {
-				type: components.sources.file.type
-				include: ["/var/log/my-app*.log"]
+		agent: {
+			commands: _commands & {
+				variables: config: sources: in: type: components.sources.docker.type
 			}
+			description: #"""
+						The agent role is designed to collect all Docker data on
+						a single host. Vector runs in it's own container
+						interfacing with the [Docker Engine API](\#(urls.docker_engine_api))
+						for log via the [`docker` source](\#(urls.vector_docker_source)) and
+						metrics via the [`host_metrics` source](\#(urls.vector_host_metrics_source)),
+						but it is recommended to adjust your pipeline as
+						necessary using Vector's [sources](\#(urls.vector_sources)),
+						[transforms](\#(urls.vector_transforms)), and
+						[sinks](\#(urls.vector_sinks)).
+						"""#
+			title:       "Agent"
 		}
-		aggregator: commands: _commands & {
-			variables: config: sources: in: type: components.sources.vector.type
-		}
+		sidecar:    roles._file_sidecar & {commands:      _commands}
+		aggregator: roles._vector_aggregator & {commands: _commands}
 	}
 }

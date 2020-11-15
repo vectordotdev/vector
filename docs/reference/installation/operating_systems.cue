@@ -15,7 +15,7 @@ installation: operating_systems: {
 			installation._interfaces.yum,
 			installation._interfaces.rpm,
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.journald.type
+				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
 		]
@@ -34,7 +34,7 @@ installation: operating_systems: {
 			installation._interfaces.yum,
 			installation._interfaces.rpm,
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.journald.type
+				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
 		]
@@ -53,7 +53,7 @@ installation: operating_systems: {
 			installation._interfaces.apt,
 			installation._interfaces.dpkg,
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.journald.type
+				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
 		]
@@ -70,7 +70,9 @@ installation: operating_systems: {
 
 		interfaces: [
 			installation._interfaces.homebrew,
-			installation._interfaces."vector-installer",
+			installation._interfaces."vector-installer" & {
+				roles: agent: roles._file_agent
+			},
 			installation._interfaces."docker-cli",
 		]
 		os: "Linux"
@@ -87,7 +89,7 @@ installation: operating_systems: {
 		interfaces: [
 			installation._interfaces.nix,
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.journald.type
+				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
 		]
@@ -104,7 +106,7 @@ installation: operating_systems: {
 
 		interfaces: [
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.journald.type
+				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
 		]
@@ -122,7 +124,7 @@ installation: operating_systems: {
 			installation._interfaces.yum,
 			installation._interfaces.rpm,
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.journald.type
+				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
 		]
@@ -139,7 +141,7 @@ installation: operating_systems: {
 			installation._interfaces.apt,
 			installation._interfaces.dpkg,
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.journald.type
+				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
 		]
@@ -156,7 +158,7 @@ installation: operating_systems: {
 		interfaces: [
 			installation._interfaces.msi,
 			installation._interfaces."vector-installer" & {
-				roles: agent: commands: variables: config: sources: in: type: components.sources.host_metrics.type
+				roles: agent: roles._file_agent
 			},
 			installation._interfaces."docker-cli",
 		]

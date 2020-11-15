@@ -40,14 +40,7 @@ installation: _interfaces: homebrew: {
 				sudo journalctl -fu vector
 				"""#
 		}
-		agent: commands: _commands & {
-			variables: config: sources: in: {
-				type:    components.sources.file.type
-				include: [string, ...string] | *["/var/log/system.log"]
-			}
-		}
-		aggregator: commands: _commands & {
-			variables: config: sources: in: type: components.sources.vector.type
-		}
+		agent:      roles._file_agent & {commands:        _commands}
+		aggregator: roles._vector_aggregator & {commands: _commands}
 	}
 }

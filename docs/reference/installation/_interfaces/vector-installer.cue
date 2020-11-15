@@ -34,26 +34,8 @@ installation: _interfaces: "vector-installer": {
 				"""#
 			logs: null
 		}
-		agent: commands: _commands & {
-			variables: config: sources: in: {
-				type: string | *components.sources.file.type
-
-				if type == "file" {
-					include: [string, ...string] | *["/var/log/**/*.log"]
-				}
-			}
-		}
-		sidecar: commands: _commands & {
-			variables: config: sources: in: {
-				type: string | *components.sources.file.type
-
-				if type == "file" {
-					include: [string, ...string] | *["/var/log/my-app*.log"]
-				}
-			}
-		}
-		aggregator: commands: _commands & {
-			variables: config: sources: in: type: components.sources.vector.type
-		}
+		agent: {commands: _commands}
+		sidecar:    roles._file_sidecar & {commands:      _commands}
+		aggregator: roles._vector_aggregator & {commands: _commands}
 	}
 }
