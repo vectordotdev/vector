@@ -29,7 +29,7 @@ installation: close({
 					inputs: ["in"]
 				}
 			}
-			config_format: ["toml", "yaml", "json"]
+			config_format: ["toml"]
 			variant?: [string, ...string]
 			version: bool | *false
 		}

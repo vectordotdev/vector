@@ -32,10 +32,19 @@ installation: _interfaces: "docker-cli": {
 				"""#
 			variables: {
 				flags: {
+					// TODO: Use Cue field comprehensions to generate this list.
+					// I attempted this but couldn't get cue to compile.
 					sources: {
-						file:   "\n  -v path:path \\"
-						docker: "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
-						http:   "\n  -p 80:80 \\"
+						aws_kinesis_firehose: "\n  -p 443:443 \\"
+						file:                 "\n  -v /var/logs:/var/logs \\"
+						docker:               "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
+						http:                 "\n  -p 80:80 \\"
+						logplex:              "\n  -p 80:80 \\"
+						socket:               "\n  -p 9000:9000 \\"
+						splunk_hec:           "\n  -p 8080:8080 \\"
+						statsd:               "\n  -p 8125:8125 \\"
+						syslog:               "\n  -p 514:514 \\"
+						vector:               "\n  -p 9000:9000 \\"
 					}
 				}
 				variant: ["debian", "alpine", "distroless"]
