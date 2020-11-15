@@ -1,12 +1,20 @@
 package metadata
 
 installation: _interfaces: "docker-cli": {
+	title: "Docker CLI"
+	description: """
+		The Docker CLI is the command line interface to the Docker
+		platform. It is used to download, start, and manage Docker
+		images.
+		"""
+
 	archs: ["x86_64", "ARM64"]
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
 		config:      "~/vector.{config_format}"
 	}
+	platform_name: installation.platforms.docker.name
 	roles: {
 		_commands: {
 			_docker_sock_path: "/var/run/docker.sock"
@@ -36,7 +44,7 @@ installation: _interfaces: "docker-cli": {
 					// I attempted this but couldn't get cue to compile.
 					sources: {
 						aws_kinesis_firehose: "\n  -p 443:443 \\"
-						file:                 "\n  -v /var/logs:/var/logs \\"
+						file:                 "\n  -v /var/log:/var/log \\"
 						docker:               "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
 						http:                 "\n  -p 80:80 \\"
 						logplex:              "\n  -p 80:80 \\"
@@ -54,9 +62,14 @@ installation: _interfaces: "docker-cli": {
 		agent: commands: _commands & {
 			variables: config: sources: in: type: components.sources.docker.type
 		}
-		sidecar: commands:    _commands
-		aggregator: commands: _commands
+		sidecar: commands: _commands & {
+			variables: config: sources: in: {
+				type: components.sources.file.type
+				include: ["/var/log/my-app*.log"]
+			}
+		}
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
+		}
 	}
-	platform_name: installation.platforms.docker.name
-	title:         "Docker CLI"
 }

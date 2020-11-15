@@ -1,7 +1,15 @@
 package metadata
 
 installation: _interfaces: apt: {
+	title: "Apt"
+	description: """
+		Advanced Package Tool, or APT, is a free package manager that
+		handles the installation and removal of software on Debian,
+		Ubuntu, and other Linux distributions.
+		"""
+
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	package_manager_name: installation.package_managers.apt.name
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
@@ -35,9 +43,8 @@ installation: _interfaces: apt: {
 		agent: commands: _commands & {
 			variables: config: sources: in: type: components.sources.journald.type
 		}
-		sidecar: commands:    _commands
-		aggregator: commands: _commands
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
+		}
 	}
-	title:                "Apt"
-	package_manager_name: installation.package_managers.apt.name
 }

@@ -19,9 +19,7 @@ installation: close({
 				sources: in: {
 					type: string
 
-					if type == "file" {
-						include: [string, ...string]
-					}
+					include?: [string, ...string]
 				}
 
 				sinks: out: {
@@ -49,24 +47,15 @@ installation: close({
 
 	#Interface: {
 		archs: [#Arch, ...#Arch]
+		description: string
 		paths: {
 			bin:         string
 			bin_in_path: bool
 			config:      string
 		}
-		roles: {
-			agent: commands:   #Commands
-			sidecar: commands: #Commands & {
-				variables: config: {
-					sources: in: {
-						type:    components.sources.file.type
-						include: [string, ...string] | *[components.sources.file.configuration.include.type.array.items.type.string.examples[0]]
-					}
-				}
-			}
-			aggregator: commands: #Commands & {
-				variables: config: sources: in: type: components.sources.vector.type
-			}
+		roles: [Name=string]: {
+			commands: #Commands
+			name:     Name
 		}
 		name:                  string
 		package_manager_name?: string
@@ -79,6 +68,7 @@ installation: close({
 	}
 
 	#OperatingSystems: [Name=string]: {
+		description: string
 		interfaces: [#Interface, ...#Interface]
 		name:  Name
 		os:    string

@@ -1,7 +1,15 @@
 package metadata
 
 installation: _interfaces: yum: {
+	title: "YUM"
+	description: """
+		The Yellowdog Updater, Modified (YUM) is a free and open-source
+		command-line package-manager for Linux operating system using
+		the RPM Package Manager.
+		"""
+
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	package_manager_name: installation.package_managers.yum.name
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
@@ -35,9 +43,8 @@ installation: _interfaces: yum: {
 		agent: commands: _commands & {
 			variables: config: sources: in: type: components.sources.journald.type
 		}
-		sidecar: commands:    _commands
-		aggregator: commands: _commands
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
+		}
 	}
-	package_manager_name: installation.package_managers.yum.name
-	title:                "YUM"
 }

@@ -1,7 +1,16 @@
 package metadata
 
 installation: _interfaces: msi: {
+	title: "MSI (Windows Installer)"
+	description: """
+		MSI refers to the file format and command line utility for
+		the Windows Installer. Windows Installer (previously known as
+		Microsoft Installer) is an interface for Microsoft Windows that
+		is used to install and manage software on Windows systems.
+		"""
+
 	archs: ["x86_64"]
+	package_manager_name: installation.package_managers.msi.name
 	paths: {
 		_dir:        #"C:\Program Files\Vector"#
 		bin:         #"\#(_dir)\bin\vector"#
@@ -33,11 +42,8 @@ installation: _interfaces: msi: {
 		agent: commands: _commands & {
 			variables: config: sources: in: type: components.sources.host_metrics.type
 		}
-		sidecar: commands: _commands & {
-			variables: config: sources: in: include: [#"C:\path\to\logs\*.log"#]
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
 		}
-		aggregator: commands: _commands
 	}
-	package_manager_name: installation.package_managers.msi.name
-	title:                "MSI"
 }

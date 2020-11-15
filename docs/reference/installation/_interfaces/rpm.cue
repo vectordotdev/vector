@@ -1,7 +1,16 @@
 package metadata
 
 installation: _interfaces: rpm: {
+	title: "RPM"
+	description: """
+		RPM Package Manager is a free and open-source package management
+		system for installing and managing software on Fedra, CentOS,
+		OpenSUSE, OpenMandriva, Red Hat Enterprise Linux, and other
+		related Linux-based systems.
+		"""
+
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	package_manager_name: installation.package_managers.rpm.name
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
@@ -37,9 +46,8 @@ installation: _interfaces: rpm: {
 		agent: commands: _commands & {
 			variables: config: sources: in: type: components.sources.journald.type
 		}
-		sidecar: commands:    _commands
-		aggregator: commands: _commands
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
+		}
 	}
-	package_manager_name: installation.package_managers.rpm.name
-	title:                "RPM"
 }

@@ -1,7 +1,17 @@
 package metadata
 
 installation: _interfaces: nix: {
+	title:       "Nix"
+	description: """
+				[Nix](\(urls.nix)) is a cross-platform package manager
+				implemented on a functional deployment model where software is
+				installed into unique directories generated through
+				cryptographic hashes, it is also the name of the programming
+				language.
+				"""
+
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	package_manager_name: installation.package_managers.nix.name
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
@@ -29,9 +39,8 @@ installation: _interfaces: nix: {
 		agent: commands: _commands & {
 			variables: config: sources: in: type: components.sources.journald.type
 		}
-		sidecar: commands:    _commands
-		aggregator: commands: _commands
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
+		}
 	}
-	package_manager_name: installation.package_managers.nix.name
-	title:                "Nix"
 }

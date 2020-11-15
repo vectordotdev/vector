@@ -1,6 +1,12 @@
 package metadata
 
 installation: _interfaces: dpkg: {
+	description: """
+		Dpkg is the software that powers the package management system
+		in the Debian operating system and its derivatives. Dpkg is used
+		to install and manage software via `.deb` packages.
+		"""
+
 	archs: ["x86_64", "ARM64", "ARMv7"]
 	paths: {
 		bin:         "/usr/bin/vector"
@@ -38,8 +44,9 @@ installation: _interfaces: dpkg: {
 		agent: commands: _commands & {
 			variables: config: sources: in: type: components.sources.journald.type
 		}
-		sidecar: commands:    _commands
-		aggregator: commands: _commands
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
+		}
 	}
 	package_manager_name: installation.package_managers.dpkg.name
 	title:                "DPKG"

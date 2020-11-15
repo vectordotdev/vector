@@ -1,7 +1,15 @@
 package metadata
 
 installation: _interfaces: homebrew: {
+	title: "Homebrew"
+	description: """
+		Homebrew is a free and open-source package management system
+		that manage software installation and management for Apple's
+		MacOS operating system and other supported Linux systems.
+		"""
+
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	package_manager_name: installation.package_managers.homebrew.name
 	paths: {
 		bin:         "/usr/local/bin/vector"
 		bin_in_path: true
@@ -33,11 +41,13 @@ installation: _interfaces: homebrew: {
 				"""#
 		}
 		agent: commands: _commands & {
-			variables: config: sources: in: type: components.sources.file.type
+			variables: config: sources: in: {
+				type:    components.sources.file.type
+				include: [string, ...string] | *["/var/log/system.log"]
+			}
 		}
-		sidecar: commands:    _commands
-		aggregator: commands: _commands
+		aggregator: commands: _commands & {
+			variables: config: sources: in: type: components.sources.vector.type
+		}
 	}
-	package_manager_name: installation.package_managers.homebrew.name
-	title:                "Homebrew"
 }
