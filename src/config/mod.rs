@@ -316,7 +316,7 @@ impl Display for Resource {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             Resource::Port(address) => write!(fmt, "{}", address),
-            Resource::SystemFdOffset(offset) => write!(fmt, "systemfd {}th socket", offset + 1),
+            Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
             Resource::Stdin => write!(fmt, "stdin"),
         }
     }
