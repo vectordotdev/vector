@@ -122,7 +122,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
     if !output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
         println!("{}", stdout);
-        panic!("Vector didn't exit successfully.");
+        panic!("Vector didn't exit successfully. Status: {}", output.status);
     }
 
     // Check if vector has shutdown in a reasonable time
