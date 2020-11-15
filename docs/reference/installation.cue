@@ -22,9 +22,9 @@ installation: close({
 					include?: [string, ...string]
 				}
 
-				sinks: [Name=string]: {
+				sinks: out: {
 					type: "console"
-					inputs: ["in"]
+					inputs: [ for id, _source in sources { id } ]
 				}
 			}
 			config_format: ["toml"]
