@@ -73,30 +73,14 @@ fn source_vector(source: &str) -> Command {
 }
 
 fn vector(config: &str) -> Command {
-    vector_with(create_file(config), next_addr())
+    vector_with(create_file(config), next_addr(), false)
 }
 
-fn vector_with(config_path: PathBuf, address: SocketAddr) -> Command {
+fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> Command {
     let mut cmd = Command::cargo_bin("vector").unwrap();
     cmd.arg("-c")
         .arg(config_path)
-        .arg("--quiet")
-        .env("VECTOR_DATA_DIR", create_directory())
-        .env("VECTOR_TEST_UNIX_PATH", temp_file())
-        .env("VECTOR_TEST_ADDRESS", format!("{}", address));
-
-    cmd
-}
-
-fn dbg_source_vector(source: &str) -> Command {
-    dbg_vector_with(create_file(source_config(source).as_str()), next_addr())
-}
-
-fn dbg_vector_with(config_path: PathBuf, address: SocketAddr) -> Command {
-    let mut cmd = Command::cargo_bin("vector").unwrap();
-    cmd.arg("-c")
-        .arg(config_path)
-        .arg("-v")
+        .arg(if quiet { "--quiet" } else { "-v" })
         .env("VECTOR_DATA_DIR", create_directory())
         .env("VECTOR_TEST_UNIX_PATH", temp_file())
         .env("VECTOR_TEST_ADDRESS", format!("{}", address));
@@ -109,7 +93,7 @@ fn test_timely_shutdown(cmd: Command) {
 }
 
 /// Returns stdout output
-fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) -> String {
+fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child)) {
     let mut vector = cmd
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
@@ -133,16 +117,19 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
 
     // Wait for shutdown
     let output = vector.wait_with_output().unwrap();
-    assert!(output.status.success(), "Vector didn't exit successfully.");
+
+    // Check output
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        println!("{}", stdout);
+        panic!("Vector didn't exit successfully.");
+    }
 
     // Check if vector has shutdown in a reasonable time
     assert!(
         now.elapsed() < Duration::from_secs(3),
         "Shutdown lasted for more than 3 seconds."
     );
-
-    // Output
-    String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
 #[test]
@@ -178,7 +165,7 @@ fn configuration_path_recomputed() {
     );
 
     // Vector command
-    let mut cmd = vector_with(dir.join("*"), next_addr());
+    let mut cmd = vector_with(dir.join("*"), next_addr(), true);
 
     // Run vector
     let mut vector = cmd
@@ -260,7 +247,7 @@ fn timely_shutdown_logplex() {
 
 #[test]
 fn timely_shutdown_docker() {
-    test_timely_shutdown(dbg_source_vector(r#"type = "docker""#));
+    test_timely_shutdown(source_vector(r#"type = "docker""#));
 }
 
 #[test]
@@ -276,7 +263,7 @@ fn timely_shutdown_journald() {
 fn timely_shutdown_prometheus() {
     let address = next_addr();
     test_timely_shutdown_with_sub(
-        vector_with(create_file(PROMETHEUS_SINK_CONFIG), address),
+        vector_with(create_file(PROMETHEUS_SINK_CONFIG), address, false),
         |_| {
             test_timely_shutdown(vector_with(
                 create_file(
@@ -288,6 +275,7 @@ fn timely_shutdown_prometheus() {
                     .as_str(),
                 ),
                 address,
+                false,
             ));
         },
     );
@@ -457,7 +445,7 @@ fn timely_reload_shutdown() {
         .as_str(),
     );
 
-    let mut cmd = vector_with(path.clone(), next_addr());
+    let mut cmd = vector_with(path.clone(), next_addr(), false);
     cmd.arg("-w true");
 
     test_timely_shutdown_with_sub(cmd, |vector| {
