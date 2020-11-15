@@ -16,6 +16,7 @@ use vector::transforms::{
     FunctionTransform, Transform,
 };
 use vector::{
+    conditions::CheckFieldsConfig,
     config::{self, log_schema, TransformConfig},
     event::{Event, Value},
     sinks, sources,
@@ -524,8 +525,7 @@ fn benchmark_complex(c: &mut Criterion) {
                         transforms::sampler::SamplerConfig {
                             rate: 10,
                             key_field: Some(config::log_schema().message_key().into()),
-                            pass_list: vec![],
-                            property: transforms::sampler::SampleProperty::Hash,
+                            exclude: CheckFieldsConfig::default(),
                         },
                     );
                     config.add_sink(
