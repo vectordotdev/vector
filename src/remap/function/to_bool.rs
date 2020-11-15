@@ -55,7 +55,7 @@ impl Expression for ToBoolFn {
             Integer(v) => Ok(Boolean(v != 0)),
             Float(v) => Ok(Boolean(v != 0.0)),
             Null => Ok(Boolean(false)),
-            String(_) => Conversion::Boolean
+            Bytes(_) => Conversion::Boolean
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),

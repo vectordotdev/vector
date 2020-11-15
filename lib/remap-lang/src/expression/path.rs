@@ -88,7 +88,7 @@ mod tests {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    kind: Kind::String
+                    kind: Kind::Bytes
                 });
 
                 Path::from("foo")
@@ -96,7 +96,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
 

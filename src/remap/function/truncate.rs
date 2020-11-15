@@ -12,7 +12,7 @@ impl Function for Truncate {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -67,7 +67,7 @@ impl TruncateFn {
 
 impl Expression for TruncateFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_string()?;
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
         let mut value = String::from_utf8_lossy(&bytes).into_owned();
 
         let limit = match self.limit.execute(state, object)? {
@@ -107,7 +107,7 @@ impl Expression for TruncateFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::String)
+            .fallible_unless(Kind::Bytes)
             .merge(
                 self.limit
                     .type_def(state)
@@ -118,7 +118,7 @@ impl Expression for TruncateFn {
                     .as_ref()
                     .map(|ellipsis| ellipsis.type_def(state).fallible_unless(Kind::Boolean)),
             )
-            .with_constraint(Kind::String)
+            .with_constraint(Kind::Bytes)
     }
 }
 
@@ -135,7 +135,7 @@ mod tests {
                 limit: Literal::from(1).boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         value_non_string {
@@ -144,7 +144,7 @@ mod tests {
                 limit: Literal::from(1).boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         limit_float {
@@ -153,7 +153,7 @@ mod tests {
                 limit: Literal::from(1.0).boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         limit_non_number {
@@ -162,7 +162,7 @@ mod tests {
                 limit: Literal::from("bar").boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         ellipsis_boolean {
@@ -171,7 +171,7 @@ mod tests {
                 limit: Literal::from(10).boxed(),
                 ellipsis: Some(Literal::from(true).boxed()),
             },
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         ellipsis_non_boolean {
@@ -180,7 +180,7 @@ mod tests {
                 limit: Literal::from("bar").boxed(),
                 ellipsis: Some(Literal::from("baz").boxed()),
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
     ];
 

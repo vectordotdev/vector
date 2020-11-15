@@ -55,7 +55,7 @@ impl Expression for ToFloatFn {
             Integer(v) => Ok(Float(v as f64)),
             Boolean(v) => Ok(Float(if v { 1.0 } else { 0.0 })),
             Null => Ok(0.0.into()),
-            String(_) => Conversion::Float
+            Bytes(_) => Conversion::Float
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),

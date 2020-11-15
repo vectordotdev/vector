@@ -12,7 +12,7 @@ impl Function for Slice {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_) | Value::Array(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Array(_)),
                 required: true,
             },
             Parameter {
@@ -85,7 +85,7 @@ impl Expression for SliceFn {
         };
 
         match self.value.execute(state, object)? {
-            Value::String(v) => range(v.len() as i64)
+            Value::Bytes(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
                 .map(Value::from),
             Value::Array(mut v) => range(v.len() as i64)
@@ -101,7 +101,7 @@ impl Expression for SliceFn {
         let value_def = self
             .value
             .type_def(state)
-            .fallible_unless(Kind::String | Kind::Array);
+            .fallible_unless(Kind::Bytes | Kind::Array);
         let end_def = self
             .end
             .as_ref()
@@ -112,8 +112,8 @@ impl Expression for SliceFn {
             .merge(self.start.type_def(state).fallible_unless(Kind::Integer))
             .merge_optional(end_def)
             .with_constraint(match value_def.kind {
-                v if v.is_string() || v.is_array() => v,
-                _ => Kind::String | Kind::Array,
+                v if v.is_bytes() || v.is_array() => v,
+                _ => Kind::Bytes | Kind::Array,
             })
             .into_fallible(true) // can fail for invalid start..end ranges
     }
@@ -132,7 +132,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_array {
@@ -150,7 +150,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String | Kind::Array, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array, ..Default::default() },
         }
     ];
 

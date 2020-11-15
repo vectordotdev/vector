@@ -5,13 +5,12 @@ use chrono::{DateTime, Utc};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
-use std::string::String as StdString;
 
 pub use kind::Kind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    String(Bytes),
+    Bytes(Bytes),
     Integer(i64),
     Float(f64),
     Boolean(bool),
@@ -83,7 +82,7 @@ impl From<f64> for Value {
 
 impl From<Bytes> for Value {
     fn from(v: Bytes) -> Self {
-        Value::String(v)
+        Value::Bytes(v)
     }
 }
 
@@ -101,13 +100,13 @@ impl From<Vec<u8>> for Value {
 
 impl From<&[u8]> for Value {
     fn from(v: &[u8]) -> Self {
-        Value::String(Bytes::copy_from_slice(v))
+        Value::Bytes(Bytes::copy_from_slice(v))
     }
 }
 
 impl From<String> for Value {
     fn from(v: String) -> Self {
-        Value::String(v.into())
+        Value::Bytes(v.into())
     }
 }
 
@@ -125,7 +124,7 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 
 impl From<&str> for Value {
     fn from(v: &str) -> Self {
-        Value::String(Bytes::copy_from_slice(v.as_bytes()))
+        Value::Bytes(Bytes::copy_from_slice(v.as_bytes()))
     }
 }
 
@@ -178,12 +177,12 @@ impl TryFrom<&Value> for String {
         use Value::*;
 
         match value {
-            String(v) => Ok(StdString::from_utf8_lossy(&v).into_owned()),
+            Bytes(v) => Ok(String::from_utf8_lossy(&v).into_owned()),
             Integer(v) => Ok(format!("{}", v)),
             Float(v) => Ok(format!("{}", v)),
             Boolean(v) => Ok(format!("{}", v)),
             Null => Ok("".to_owned()),
-            _ => Err(Error::Coerce(value.kind(), Kind::String)),
+            _ => Err(Error::Coerce(value.kind(), Kind::Bytes)),
         }
     }
 }
@@ -256,7 +255,7 @@ macro_rules! value_impl {
 }
 
 value_impl! {
-    (string, String, Bytes),
+    (bytes, Bytes, Bytes),
     (integer, Integer, i64),
     (float, Float, f64),
     (boolean, Boolean, bool),
@@ -277,7 +276,7 @@ impl Value {
         let err = || Error::Mul(self.kind(), rhs.kind());
 
         let value = match &self {
-            Value::String(lhv) => lhv
+            Value::Bytes(lhv) => lhv
                 .repeat(i64::try_from(&rhs).map_err(|_| err())? as usize)
                 .into(),
             Value::Integer(lhv) => (lhv * i64::try_from(&rhs).map_err(|_| err())?).into(),
@@ -306,7 +305,7 @@ impl Value {
         let err = || Error::Add(self.kind(), rhs.kind());
 
         let value = match &self {
-            Value::String(lhv) => format!(
+            Value::Bytes(lhv) => format!(
                 "{}{}",
                 String::from_utf8_lossy(&lhv),
                 String::try_from(&rhs).map_err(|_| err())?
@@ -450,12 +449,12 @@ impl Value {
         }
     }
 
-    /// Returns [`Value::String`], lossy converting any other variant.
+    /// Returns [`Value::Bytes`], lossy converting any other variant.
     pub fn as_string_lossy(&self) -> Self {
         use Value::*;
 
         match self {
-            s @ String(_) => s.clone(), // cloning a Bytes is cheap
+            s @ Bytes(_) => s.clone(), // cloning a Bytes is cheap
             Integer(v) => Value::from(format!("{}", v)),
             Float(v) => Value::from(format!("{}", v)),
             Boolean(v) => Value::from(format!("{}", v)),

@@ -27,7 +27,7 @@ impl Expression for UuidV4Fn {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            kind: value::Kind::String,
+            kind: value::Kind::Bytes,
             ..Default::default()
         }
     }
@@ -42,7 +42,7 @@ mod tests {
     remap::test_type_def![static_def {
         expr: |_| UuidV4Fn,
         def: TypeDef {
-            kind: value::Kind::String,
+            kind: value::Kind::Bytes,
             ..Default::default()
         },
     }];
@@ -53,7 +53,7 @@ mod tests {
         let mut object = map![];
         let value = UuidV4Fn.execute(&mut state, &mut object).unwrap();
 
-        assert!(matches!(&value, Value::String(_)));
+        assert!(matches!(&value, Value::Bytes(_)));
 
         uuid::Uuid::parse_str(&String::try_from(value).unwrap()).expect("valid UUID V4");
     }

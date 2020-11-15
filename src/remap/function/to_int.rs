@@ -55,7 +55,7 @@ impl Expression for ToIntFn {
             Float(v) => Ok(Integer(v as i64)),
             Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
             Null => Ok(0.into()),
-            String(_) => Conversion::Integer
+            Bytes(_) => Conversion::Integer
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),

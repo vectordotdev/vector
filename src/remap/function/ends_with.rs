@@ -12,12 +12,12 @@ impl Function for EndsWith {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -70,7 +70,7 @@ impl Expression for EndsWithFn {
         };
 
         let substring = {
-            let bytes = self.substring.execute(state, object)?.try_string()?;
+            let bytes = self.substring.execute(state, object)?.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             match case_sensitive {
@@ -80,7 +80,7 @@ impl Expression for EndsWithFn {
         };
 
         let value = {
-            let bytes = self.value.execute(state, object)?.try_string()?;
+            let bytes = self.value.execute(state, object)?.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             match case_sensitive {
@@ -96,7 +96,7 @@ impl Expression for EndsWithFn {
         let substring_def = self
             .substring
             .type_def(state)
-            .fallible_unless(value::Kind::String);
+            .fallible_unless(value::Kind::Bytes);
 
         let case_sensitive_def = self
             .case_sensitive
@@ -105,7 +105,7 @@ impl Expression for EndsWithFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .merge(substring_def)
             .merge_optional(case_sensitive_def)
             .with_constraint(value::Kind::Boolean)

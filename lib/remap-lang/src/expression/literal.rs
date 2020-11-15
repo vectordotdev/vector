@@ -46,7 +46,7 @@ mod tests {
 
         string {
             expr: |_| Literal::from("foo"),
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         integer {

@@ -66,7 +66,7 @@ mod tests {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    kind: Kind::String
+                    kind: Kind::Bytes
                 });
 
                 Variable::new("foo".to_owned())
@@ -74,7 +74,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
 
