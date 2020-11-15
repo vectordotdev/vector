@@ -522,6 +522,13 @@ inventory::submit! {
 
 impl_generate_config_from_default!(CheckFieldsConfig);
 
+impl CheckFieldsConfig {
+    #[cfg(test)]
+    pub fn new(predicates: IndexMap<String, CheckFieldsPredicateArg>) -> Self {
+        Self { predicates }
+    }
+}
+
 #[typetag::serde(name = "check_fields")]
 impl ConditionConfig for CheckFieldsConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
