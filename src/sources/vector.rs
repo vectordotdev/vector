@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
@@ -72,6 +72,10 @@ impl SourceConfig for VectorConfig {
 
     fn source_type(&self) -> &'static str {
         "vector"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 

@@ -3,7 +3,8 @@ use super::util::{SocketListenAddr, TcpSource};
 use crate::sources::util::build_unix_source;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     event::{Event, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
@@ -132,6 +133,15 @@ impl SourceConfig for SyslogConfig {
 
     fn source_type(&self) -> &'static str {
         "syslog"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self.mode.clone() {
+            Mode::Tcp { address, .. } => vec![address.into()],
+            Mode::Udp { address } => vec![address.into()],
+            #[cfg(unix)]
+            Mode::Unix { .. } => vec![],
+        }
     }
 }
 

@@ -47,12 +47,17 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
 }
 
 pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
-    let conflicting_componenets = Resource::conflicts(
-        config
-            .sinks
-            .iter()
-            .map(|(name, config)| (name, config.inner.resources())),
-    );
+    let source_resources = config
+        .sources
+        .iter()
+        .map(|(name, config)| (name, config.resources()));
+    let sink_resources = config
+        .sinks
+        .iter()
+        .map(|(name, config)| (name, config.inner.resources()));
+
+    let conflicting_componenets = Resource::conflicts(source_resources.chain(sink_resources));
+
     if conflicting_componenets.is_empty() {
         Ok(())
     } else {
@@ -61,7 +66,7 @@ pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
             .map(|s| s.as_str())
             .collect::<Vec<_>>();
         let error = format!(
-            "Multiple sinks own the same resource. Conflicting sinks: {}.",
+            "Multiple components own the same resource. Conflicting components: {}.",
             conflicting_componenets.join(", ")
         );
         Err(vec![error])

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -55,6 +55,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
     fn source_type(&self) -> &'static str {
         "aws_kinesis_firehose"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 
