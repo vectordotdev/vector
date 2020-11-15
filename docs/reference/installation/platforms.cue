@@ -13,4 +13,13 @@ installation: platforms: {
 			production.
 			"""
 	}
+
+	kubernetes: {
+		title:       "Kubernetes"
+		description: """
+			[Kubernetes](\(urls.kubernetes)), also knows at k8s, is an
+			open-source container-orchestration system for automating
+			application deployment, scaling, and management.
+			"""
+	}
 }

@@ -23,10 +23,10 @@ installation: _interfaces: yum: {
 				  | sudo -E bash
 				"""#
 			configure: #"""
-				cat <<-VECTORCFG > \#(paths.config)
-				{config}
-				VECTORCFG
-				"""#
+						cat <<-VECTORCFG > \#(paths.config)
+						{config}
+						VECTORCFG
+						"""#
 			start: #"""
 				sudo systemctl start vector
 				"""#
@@ -38,6 +38,9 @@ installation: _interfaces: yum: {
 				"""#
 			logs: #"""
 				sudo journalctl -fu vector
+				"""#
+			uninstall: #"""
+				sudo yum remove vector
 				"""#
 		}
 		agent:      roles._journald_agent & {commands:    _commands}

@@ -18,13 +18,19 @@ installation: _interfaces: rpm: {
 	}
 	roles: {
 		_commands: {
-			install: #"""
-				sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm
-				"""#
 			configure: #"""
 				cat <<-VECTORCFG > \#(paths.config)
 				{config}
 				VECTORCFG
+				"""#
+			install: #"""
+				sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm
+				"""#
+			logs: #"""
+				sudo journalctl -fu vector
+				"""#
+			reload: #"""
+				systemctl kill -s HUP --kill-who=main vector.service
 				"""#
 			start: #"""
 				sudo systemctl start vector
@@ -32,11 +38,8 @@ installation: _interfaces: rpm: {
 			stop: #"""
 				sudo systemctl stop vector
 				"""#
-			reload: #"""
-				systemctl kill -s HUP --kill-who=main vector.service
-				"""#
-			logs: #"""
-				sudo journalctl -fu vector
+			uninstall: #"""
+				sudo rpm -e vector
 				"""#
 			variables: {
 				arch: ["x86_64", "aarch64", "armv7"]

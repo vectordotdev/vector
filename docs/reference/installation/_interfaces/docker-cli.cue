@@ -17,26 +17,31 @@ installation: _interfaces: "docker-cli": {
 	platform_name: installation.platforms.docker.name
 	roles: {
 		_commands: {
+			_api_port:         8383
 			_docker_sock_path: "/var/run/docker.sock"
-			install:           null
 			configure:         #"""
-				cat <<-VECTORCFG > \#(paths.config)
-				{config}
-				VECTORCFG
-				"""#
-			start:             #"""
-				docker run \
-				  -v \#(paths.config):/etc/vector/vector.toml:ro \{flags}
-				  timberio/vector:{version}-{variant}
-				"""#
-			stop: #"""
-				docker stop timberio/vector
+						cat <<-VECTORCFG > \#(paths.config)
+						{config}
+						VECTORCFG
+						"""#
+			install:           null
+			logs: #"""
+				docker logs -f $(docker ps -aqf "name=vector")
 				"""#
 			reload: #"""
 				docker kill --signal=HUP timberio/vector
 				"""#
-			logs: #"""
-				docker logs -f $(docker ps -aqf "name=vector")
+			start: #"""
+					docker run \
+					  -v \#(paths.config):/etc/vector/vector.toml:ro \
+					  -p \#(_api_port):\#(_api_port) \{flags}
+					  timberio/vector:{version}-{variant}
+					"""#
+			stop: #"""
+				docker stop timberio/vector
+				"""#
+			uninstall: #"""
+				docker rm timberio/vector timberio/vector
 				"""#
 			variables: {
 				flags: {

@@ -2,12 +2,13 @@ package metadata
 
 installation: close({
 	#Commands: {
-		install:   string | null
 		configure: string
-		start:     string
-		stop:      string | null
-		reload:    string | null
+		install:   string | null
 		logs:      string | null
+		reload:    string | null
+		start:     string | null
+		stop:      string | null
+		uninstall: string
 		variables: {
 			arch?: [string, ...string]
 			flags?: {

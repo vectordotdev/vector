@@ -19,21 +19,24 @@ installation: _interfaces: msi: {
 	}
 	roles: {
 		_commands: {
+			configure: #"""
+						cat <<-VECTORCFG > \#(paths.config)
+						{config}
+						VECTORCFG
+						"""#
 			install: #"""
 				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{arch}.msi && \
 					msiexec /i vector-{arch}.msi /quiet
 				"""#
-			configure: #"""
-				cat <<-VECTORCFG > \#(paths.config)
-				{config}
-				VECTORCFG
+			logs:   null
+			reload: null
+			start:  #"""
+					\#(paths.bin) --config \#(paths.config)
+					"""#
+			stop:   null
+			uninstall: #"""
+				msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet
 				"""#
-			start:     #"""
-				\#(paths.bin) --config \#(paths.config)
-				"""#
-			stop:      null
-			reload:    null
-			logs:      null
 			variables: {
 				arch: ["x64"]
 				version: true

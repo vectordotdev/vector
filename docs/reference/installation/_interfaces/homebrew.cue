@@ -17,15 +17,21 @@ installation: _interfaces: homebrew: {
 	}
 	roles: {
 		_commands: {
+			configure: #"""
+						cat <<-VECTORCFG > \#(paths.config)
+						{config}
+						VECTORCFG
+						"""#
 			install: #"""
 				curl -1sLf \
 				  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
 				  | sudo -E bash
 				"""#
-			configure: #"""
-				cat <<-VECTORCFG > \#(paths.config)
-				{config}
-				VECTORCFG
+			logs: #"""
+				sudo journalctl -fu vector
+				"""#
+			reload: #"""
+				systemctl kill -s HUP --kill-who=main vector.service
 				"""#
 			start: #"""
 				sudo systemctl start vector
@@ -33,11 +39,8 @@ installation: _interfaces: homebrew: {
 			stop: #"""
 				sudo systemctl stop vector
 				"""#
-			reload: #"""
-				systemctl kill -s HUP --kill-who=main vector.service
-				"""#
-			logs: #"""
-				sudo journalctl -fu vector
+			uninstall: #"""
+				brew remove vector
 				"""#
 		}
 		agent:      roles._file_agent & {commands:        _commands}
