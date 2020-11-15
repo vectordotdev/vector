@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     pub rate: u64,
-    pub hash_field: Option<String>,
-    pub condition: CheckFieldsConfig,
+    pub key_field: Option<String>,
+    pub exclude: CheckFieldsConfig,
 }
 
 inventory::submit! {
@@ -23,8 +23,8 @@ impl GenerateConfig for SamplerConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             rate: 10,
-            hash_field: None,
-            condition: CheckFieldsConfig::default(),
+            key_field: None,
+            exclude: CheckFieldsConfig::default(),
         })
         .unwrap()
     }
@@ -36,8 +36,8 @@ impl TransformConfig for SamplerConfig {
     async fn build(&self) -> crate::Result<Transform> {
         Ok(Transform::function(Sampler::new(
             self.rate,
-            self.hash_field.clone(),
-            self.condition.build()?,
+            self.key_field.clone(),
+            self.exclude.build()?,
         )))
     }
 
@@ -57,17 +57,17 @@ impl TransformConfig for SamplerConfig {
 #[derive(Clone)]
 pub struct Sampler {
     rate: u64,
-    hash_field: Option<String>,
-    pass_condition: Box<dyn Condition>,
+    key_field: Option<String>,
+    exclude: Box<dyn Condition>,
     count: u64,
 }
 
 impl Sampler {
-    pub fn new(rate: u64, hash_field: Option<String>, pass_condition: Box<dyn Condition>) -> Self {
+    pub fn new(rate: u64, key_field: Option<String>, exclude: Box<dyn Condition>) -> Self {
         Self {
             rate,
-            hash_field,
-            pass_condition,
+            key_field,
+            exclude,
             count: 0,
         }
     }
@@ -77,15 +77,15 @@ impl FunctionTransform for Sampler {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(SamplerEventProcessed);
 
-        if self.pass_condition.check(&event) {
+        if self.exclude.check(&event) {
             output.push(event);
             return;
         }
 
         let value = self
-            .hash_field
+            .key_field
             .as_ref()
-            .and_then(|hash_field| event.as_log().get(hash_field))
+            .and_then(|key_field| event.as_log().get(key_field))
             .map(|v| v.to_string_lossy());
 
         let num = if let Some(value) = value {
@@ -192,9 +192,9 @@ mod tests {
 
     #[test]
     fn always_passes_events_matching_pass_list() {
-        for hash_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, Some(log_schema().message_key().into())] {
             let event = Event::from("i am important");
-            let mut sampler = Sampler::new(0, hash_field.clone(), condition_contains("important"));
+            let mut sampler = Sampler::new(0, key_field.clone(), condition_contains("important"));
             let iterations = 0..1000;
             let total_passed = iterations
                 .filter_map(|_| sampler.transform_one(event.clone()))
@@ -205,11 +205,11 @@ mod tests {
 
     #[test]
     fn handles_key_field() {
-        for hash_field in &[None, Some(log_schema().timestamp_key().into())] {
+        for key_field in &[None, Some(log_schema().timestamp_key().into())] {
             let event = Event::from("nananana");
             let mut sampler = Sampler::new(
                 0,
-                hash_field.clone(),
+                key_field.clone(),
                 condition(log_schema().timestamp_key(), "contains", ":"),
             );
             let iterations = 0..1000;
@@ -222,9 +222,9 @@ mod tests {
 
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
-        for hash_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, Some(log_schema().message_key().into())] {
             let events = random_events(10000);
-            let mut sampler = Sampler::new(10, hash_field.clone(), condition_contains("na"));
+            let mut sampler = Sampler::new(10, key_field.clone(), condition_contains("na"));
             let passing = events
                 .into_iter()
                 .filter(|s| {
@@ -237,7 +237,7 @@ mod tests {
             assert_eq!(passing.as_log()["sample_rate"], "10".into());
 
             let events = random_events(10000);
-            let mut sampler = Sampler::new(25, hash_field.clone(), condition_contains("na"));
+            let mut sampler = Sampler::new(25, key_field.clone(), condition_contains("na"));
             let passing = events
                 .into_iter()
                 .filter(|s| {
@@ -250,7 +250,7 @@ mod tests {
             assert_eq!(passing.as_log()["sample_rate"], "25".into());
 
             // If the event passed the regex check, don't include the sampling rate
-            let mut sampler = Sampler::new(25, hash_field.clone(), condition_contains("na"));
+            let mut sampler = Sampler::new(25, key_field.clone(), condition_contains("na"));
             let event = Event::from("nananana");
             let passing = sampler.transform_one(event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
