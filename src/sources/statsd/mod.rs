@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
@@ -97,6 +97,15 @@ impl SourceConfig for StatsdConfig {
 
     fn source_type(&self) -> &'static str {
         "statsd"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self.clone() {
+            Self::Tcp(tcp) => vec![tcp.address.into()],
+            Self::Udp(udp) => vec![udp.address.into()],
+            #[cfg(unix)]
+            Self::Unix(_) => vec![],
+        }
     }
 }
 
