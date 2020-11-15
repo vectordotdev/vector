@@ -1,10 +1,10 @@
 package metadata
 
 installation: _interfaces: rpm: {
-	title: "RPM"
+	title:       "RPM"
 	description: """
-		RPM Package Manager is a free and open-source package management
-		system for installing and managing software on Fedra, CentOS,
+		[RPM Package Manager](\(urls.rpm)) is a free and open-source package
+		management system for installing and managing software on Fedra, CentOS,
 		OpenSUSE, OpenMandriva, Red Hat Enterprise Linux, and other
 		related Linux-based systems.
 		"""
@@ -23,24 +23,12 @@ installation: _interfaces: rpm: {
 				{config}
 				VECTORCFG
 				"""#
-			install: #"""
-				sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm
-				"""#
-			logs: #"""
-				sudo journalctl -fu vector
-				"""#
-			reload: #"""
-				systemctl kill -s HUP --kill-who=main vector.service
-				"""#
-			start: #"""
-				sudo systemctl start vector
-				"""#
-			stop: #"""
-				sudo systemctl stop vector
-				"""#
-			uninstall: #"""
-				sudo rpm -e vector
-				"""#
+			install:   "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm"
+			logs:      "sudo journalctl -fu vector"
+			reload:    "systemctl kill -s HUP --kill-who=main vector.service"
+			start:     "sudo systemctl start vector"
+			stop:      "sudo systemctl stop vector"
+			uninstall: "sudo rpm -e vector"
 			variables: {
 				arch: ["x86_64", "aarch64", "armv7"]
 				version: true

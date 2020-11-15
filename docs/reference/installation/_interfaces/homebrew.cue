@@ -1,11 +1,11 @@
 package metadata
 
 installation: _interfaces: homebrew: {
-	title: "Homebrew"
+	title:       "Homebrew"
 	description: """
-		Homebrew is a free and open-source package management system
-		that manage software installation and management for Apple's
-		MacOS operating system and other supported Linux systems.
+		[Homebrew](\(urls.homebrew)) is a free and open-source package
+		management system that manage software installation and management for
+		Apple's MacOS operating system and other supported Linux systems.
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]
@@ -27,21 +27,11 @@ installation: _interfaces: homebrew: {
 				  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
 				  | sudo -E bash
 				"""#
-			logs: #"""
-				sudo journalctl -fu vector
-				"""#
-			reload: #"""
-				systemctl kill -s HUP --kill-who=main vector.service
-				"""#
-			start: #"""
-				sudo systemctl start vector
-				"""#
-			stop: #"""
-				sudo systemctl stop vector
-				"""#
-			uninstall: #"""
-				brew remove vector
-				"""#
+			logs:      "sudo journalctl -fu vector"
+			reload:    "systemctl kill -s HUP --kill-who=main vector.service"
+			start:     "sudo systemctl start vector"
+			stop:      "sudo systemctl stop vector"
+			uninstall: "brew remove vector"
 		}
 		agent:      roles._file_agent & {commands:        _commands}
 		aggregator: roles._vector_aggregator & {commands: _commands}

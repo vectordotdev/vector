@@ -124,7 +124,7 @@ installation: close({
 				commands: variables: config: sources: in: type: components.sources.vector.type
 				description: #"""
 							The aggregator role is designed to receive and
-							process data from multiple upstream sources.
+							process data from multiple upstream agents.
 							Typically these are other Vector agents, but it
 							could be anything, including non-Vector agents.
 							By default, we recommend the [`vector` source](\#(urls.vector_source))

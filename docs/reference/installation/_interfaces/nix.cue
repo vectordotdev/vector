@@ -24,20 +24,12 @@ installation: _interfaces: nix: {
 						{config}
 						VECTORCFG
 						"""#
-			install: #"""
-				nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector
-				"""#
-			logs: null
-			reload: #"""
-				ps axf | grep vector | grep -v grep | awk '{print "kill -SIGHUP " $1}' | sh
-				"""#
-			start: #"""
-					vector --config \#(paths.config)
-					"""#
-			stop:  null
-			uninstall: #"""
-				nix-env --uninstall vector
-				"""#
+			install:   "nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector"
+			logs:      null
+			reload:    #"ps axf | grep vector | grep -v grep | awk '{print "kill -SIGHUP " $1}' | sh"#
+			start:     #"vector --config \#(paths.config)"#
+			stop:      null
+			uninstall: "nix-env --uninstall vector"
 		}
 		agent:      roles._journald_agent & {commands:    _commands}
 		aggregator: roles._vector_aggregator & {commands: _commands}

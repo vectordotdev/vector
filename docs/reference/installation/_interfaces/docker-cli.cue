@@ -1,10 +1,10 @@
 package metadata
 
 installation: _interfaces: "docker-cli": {
-	title: "Docker CLI"
+	title:       "Docker CLI"
 	description: """
-		The Docker CLI is the command line interface to the Docker
-		platform. It is used to download, start, and manage Docker
+		The [Docker CLI](\(urls.docker_cli)) is the command line interface to
+		the Docker platform. It is used to download, start, and manage Docker
 		images.
 		"""
 
@@ -20,29 +20,21 @@ installation: _interfaces: "docker-cli": {
 			_api_port:         8383
 			_docker_sock_path: "/var/run/docker.sock"
 			configure:         #"""
-						cat <<-VECTORCFG > \#(paths.config)
-						{config}
-						VECTORCFG
-						"""#
+								cat <<-VECTORCFG > \#(paths.config)
+								{config}
+								VECTORCFG
+								"""#
 			install:           null
-			logs: #"""
-				docker logs -f $(docker ps -aqf "name=vector")
-				"""#
-			reload: #"""
-				docker kill --signal=HUP timberio/vector
-				"""#
-			start: #"""
-					docker run \
-					  -v \#(paths.config):/etc/vector/vector.toml:ro \
-					  -p \#(_api_port):\#(_api_port) \{flags}
-					  timberio/vector:{version}-{variant}
-					"""#
-			stop: #"""
-				docker stop timberio/vector
-				"""#
-			uninstall: #"""
-				docker rm timberio/vector timberio/vector
-				"""#
+			logs:              "docker logs -f $(docker ps -aqf \"name=vector\")"
+			reload:            "docker kill --signal=HUP timberio/vector"
+			start:             #"""
+								docker run \
+								  -v \#(paths.config):/etc/vector/vector.toml:ro \
+								  -p \#(_api_port):\#(_api_port) \{flags}
+								  timberio/vector:{version}-{variant}
+								"""#
+			stop:              "docker stop timberio/vector"
+			uninstall:         "docker rm timberio/vector timberio/vector"
 			variables: {
 				flags: {
 					// TODO: Use Cue field comprehensions to generate this list.
@@ -65,9 +57,7 @@ installation: _interfaces: "docker-cli": {
 			}
 		}
 		agent: {
-			commands: _commands & {
-				variables: config: sources: in: type: components.sources.docker.type
-			}
+			title:       "Agent"
 			description: #"""
 						The agent role is designed to collect all Docker data on
 						a single host. Vector runs in it's own container
@@ -79,7 +69,10 @@ installation: _interfaces: "docker-cli": {
 						[transforms](\#(urls.vector_transforms)), and
 						[sinks](\#(urls.vector_sinks)).
 						"""#
-			title:       "Agent"
+
+			commands: _commands & {
+				variables: config: sources: in: type: components.sources.docker.type
+			}
 		}
 		sidecar:    roles._file_sidecar & {commands:      _commands}
 		aggregator: roles._vector_aggregator & {commands: _commands}

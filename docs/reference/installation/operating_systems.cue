@@ -2,11 +2,11 @@ package metadata
 
 installation: operating_systems: {
 	"amazon-linux": {
-		title: "Amazon Linux"
+		title:       "Amazon Linux"
 		description: """
-			The Amazon Linux AMI is a supported and maintained Linux
-			image provided by Amazon Web Services for use on Amazon
-			Elastic Compute Cloud (Amazon EC2). It is designed to
+			The [Amazon Linux AMI](\(urls.amazon_linux)) is a supported and
+			maintained Linux image provided by Amazon Web Services for use on
+			Amazon Elastic Compute Cloud (Amazon EC2). It is designed to
 			provide a stable, secure, and high performance execution
 			environment for applications running on Amazon EC2.
 			"""
@@ -23,10 +23,10 @@ installation: operating_systems: {
 	}
 
 	centos: {
-		title: "CentOS"
+		title:       "CentOS"
 		description: """
-			CentOS is a Linux distribution that is functionally
-			compatible with its upstream source, Red Hat Enterprise
+			[CentOS](\(urls.centos)) is a Linux distribution that is
+			functionally compatible with its upstream source, Red Hat Enterprise
 			Linux.
 			"""
 
@@ -37,15 +37,16 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
+			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
 		os: "Linux"
 	}
 
 	debian: {
-		title: "Debian"
+		title:       "Debian"
 		description: """
-			Debian, also known as Debian GNU/Linux, is a Linux
+			[Debian](\(urls.debian))), also known as Debian GNU/Linux, is a Linux
 			distribution composed of free and open-source software,
 			developed by the community-supported Debian Project.
 			"""
@@ -57,16 +58,17 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
+			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
 		os: "Linux"
 	}
 
 	macos: {
-		title: "MacOS"
+		title:       "MacOS"
 		description: """
-			MacOS is the primary operating system for Apple's Mac
-			computers. It is a certified Unix system based on Apple's
+			[MacOS](\(urls.macos)) is the primary operating system for Apple's
+			Mac computers. It is a certified Unix system based on Apple's
 			Darwin operating system.
 			"""
 
@@ -81,10 +83,10 @@ installation: operating_systems: {
 	}
 
 	nixos: {
-		title: "NixOS"
+		title:       "NixOS"
 		description: """
-			NixOS is a Linux distribution built on top of the Nix
-			package manager. It uses declarative configuration and
+			[NixOS](\(urls.nixos)) is a Linux distribution built on top of the
+			Nix package manager. It uses declarative configuration and
 			allows reliable system upgrades.
 			"""
 
@@ -99,11 +101,11 @@ installation: operating_systems: {
 	}
 
 	raspbian: {
-		title: "Raspbian"
+		title:       "Raspbian"
 		description: """
-			Raspbian is the operating system used on Raspberry Pis. It
-			is a Debian-based operating system designed for compact
-			single-board computers.
+			[Raspbian](\(urls.raspbian)) is the operating system used on
+			Raspberry Pis. It is a Debian-based operating system designed for
+			compact single-board computers.
 			"""
 
 		interfaces: [
@@ -116,10 +118,10 @@ installation: operating_systems: {
 	}
 
 	rhel: {
-		title: "RHEL"
+		title:       "RHEL"
 		description: """
-			Red Hat Enterprise Linux is a Linux distribution developed
-			by Red Hat for the commercial market.
+			[Red Hat Enterprise Linux](\(urls.rhel)) is a Linux distribution
+			developed by Red Hat for the commercial market.
 			"""
 
 		interfaces: [
@@ -129,15 +131,16 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
+			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
 		os: "Linux"
 	}
 
 	ubuntu: {
-		title: "Ubuntu"
+		title:       "Ubuntu"
 		description: """
-			Ubuntu is a Linux distribution based on Debian.
+			[Ubuntu](\(urls.ubuntu)) is a Linux distribution based on Debian.
 			"""
 
 		interfaces: [
@@ -147,16 +150,17 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
+			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
 		os: "Linux"
 	}
 
 	windows: {
-		title: "Windows"
+		title:       "Windows"
 		description: """
-			Microsoft Windows is an operating system developed and sold
-			by Microsoft.
+			[Microsoft Windows](\(urls.windows)) is an operating system
+			developed and sold by Microsoft.
 			"""
 
 		interfaces: [

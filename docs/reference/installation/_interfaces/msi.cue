@@ -1,12 +1,12 @@
 package metadata
 
 installation: _interfaces: msi: {
-	title: "MSI (Windows Installer)"
+	title:       "MSI (Windows Installer)"
 	description: """
 		MSI refers to the file format and command line utility for
-		the Windows Installer. Windows Installer (previously known as
-		Microsoft Installer) is an interface for Microsoft Windows that
-		is used to install and manage software on Windows systems.
+		the [Windows Installer](\(urls.windows_installer)). Windows Installer
+		(previously known as Microsoft Installer) is an interface for Microsoft
+		Windows that is used to install and manage software on Windows systems.
 		"""
 
 	archs: ["x86_64"]
@@ -28,15 +28,11 @@ installation: _interfaces: msi: {
 				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{arch}.msi && \
 					msiexec /i vector-{arch}.msi /quiet
 				"""#
-			logs:   null
-			reload: null
-			start:  #"""
-					\#(paths.bin) --config \#(paths.config)
-					"""#
-			stop:   null
-			uninstall: #"""
-				msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet
-				"""#
+			logs:      null
+			reload:    null
+			start:     #"\#(paths.bin) --config \#(paths.config)"#
+			stop:      null
+			uninstall: #"msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet"#
 			variables: {
 				arch: ["x64"]
 				version: true

@@ -1,14 +1,14 @@
 package metadata
 
 installation: _interfaces: kubectl: {
-	title: "Kubectl"
+	title:       "Kubectl"
 	description: """
-		The Kubernetes command-line tool, kubectl, allows users to run commands
-		against Kubernetes clusters facilitating in application deployment, scaling,
-		monitoring, and introspection.
+		The [Kubernetes command-line tool](\(urls.kubectl)), kubectl, allows
+		users to run commands against Kubernetes clusters facilitating in
+		application deployment, scaling, monitoring, and introspection.
 		"""
 
-	archs: ["x86_64", "ARM64", "ARMv7"]
+	archs: ["x86_64", "ARM64"]
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
@@ -23,20 +23,12 @@ installation: _interfaces: kubectl: {
 						{config}
 						VECTORCFG
 						"""#
-			install: #"""
-				kubectl apply -k .
-				"""#
-			logs:   #"""
-					kubectl logs -n vector daemonset/vector-\#(_role)
-					"""#
-			reload: #"""
-					kubectl rollout restart daemonset/vector-\#(_role)
-					"""#
-			start:  null
-			stop:   null
-			uninstall: #"""
-				kubectl delete -k .
-				"""#
+			install:   "kubectl apply -k ."
+			logs:      #"kubectl logs -n vector daemonset/vector-\#(_role)"#
+			reload:    #"kubectl rollout restart daemonset/vector-\#(_role)"#
+			start:     null
+			stop:      null
+			uninstall: "kubectl delete -k ."
 		}
 		agent: {
 			commands: _commands & {
