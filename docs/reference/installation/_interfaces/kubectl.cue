@@ -46,5 +46,13 @@ installation: _interfaces: kubectl: {
 			description: "test"
 			title:       "Agent"
 		}
+		aggregator: {
+			commands: _commands & {
+				_role: "aggregator"
+				variables: config: sources: in: type: components.sources.vector.type
+			}
+			description: "test"
+			title:       "Aggregator"
+		}
 	}
 }
