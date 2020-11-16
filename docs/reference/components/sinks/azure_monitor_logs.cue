@@ -37,10 +37,12 @@ components: sinks: azure_monitor_logs: {
 				enabled_default:        true
 			}
 			to: {
-				name:     "Azure Monitor logs"
-				thing:    "a \(name) account"
-				url:      urls.azure_monitor
-				versions: null
+				service: {
+					name:     "Azure Monitor logs"
+					thing:    "a \(name) account"
+					url:      urls.azure_monitor
+					versions: null
+				}
 
 				interface: {
 					socket: {

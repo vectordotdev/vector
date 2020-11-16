@@ -54,10 +54,12 @@ components: sinks: http: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "HTTP server"
-				thing:    "an \(name)"
-				url:      urls.http_server
-				versions: null
+				service: {
+					name:     "HTTP server"
+					thing:    "an \(name)"
+					url:      urls.http_server
+					versions: null
+				}
 
 				interface: {
 					socket: {

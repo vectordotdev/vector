@@ -16,10 +16,12 @@ components: sources: mongodb_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "MongoDB Server"
-				thing:    "a \(name)"
-				url:      urls.mongodb
-				versions: null
+				service: {
+					name:     "MongoDB Server"
+					thing:    "a \(name)"
+					url:      urls.mongodb
+					versions: null
+				}
 
 				interface: {
 					socket: {

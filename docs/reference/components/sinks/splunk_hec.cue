@@ -54,10 +54,23 @@ components: sinks: splunk_hec: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "Splunk"
-				thing:    "a \(name) index"
-				url:      urls.splunk
-				versions: null
+				service: {
+					name:     "Splunk"
+					thing:    "a \(name) index"
+					url:      urls.splunk
+					versions: null
+
+					setup: [
+						"""
+							Follow the [Splunk HEC setup docs][urls.splunk_hec_setup]
+							and create a Splunk HEC endpoint.
+							""",
+						"""
+							Splunk will provide you with a host and token. Copy those
+							values to the `host` and `token` options.
+							""",
+					]
+				}
 
 				interface: {
 					socket: {
@@ -70,17 +83,6 @@ components: sinks: splunk_hec: {
 						ssl: "optional"
 					}
 				}
-
-				setup: [
-					"""
-						Follow the [Splunk HEC setup docs][urls.splunk_hec_setup]
-						and create a Splunk HEC endpoint.
-						""",
-					"""
-						Splunk will provide you with a host and token. Copy those
-						values to the `host` and `token` options.
-						""",
-				]
 			}
 		}
 	}

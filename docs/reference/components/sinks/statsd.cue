@@ -18,10 +18,12 @@ components: sinks: statsd: {
 			request: sinks.socket.features.send.request
 			tls:     sinks.socket.features.send.tls
 			to: {
-				name:     "Statsd receiver"
-				thing:    "a \(name)"
-				url:      urls.statsd
-				versions: null
+				service: {
+					name:     "Statsd receiver"
+					thing:    "a \(name)"
+					url:      urls.statsd
+					versions: null
+				}
 
 				interface: {
 					socket: {

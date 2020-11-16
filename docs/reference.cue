@@ -216,8 +216,6 @@ _values: {
 	url:      string
 	versions: string | null
 
-	interface?: #Interface
-
 	setup?: [string, ...string]
 }
 

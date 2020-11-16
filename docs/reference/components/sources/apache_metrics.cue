@@ -19,10 +19,41 @@ components: sources: apache_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Apache HTTP server (HTTPD)"
-				thing:    "an \(name)"
-				url:      urls.apache
-				versions: null
+				service: {
+					name:     "Apache HTTP server (HTTPD)"
+					thing:    "an \(name)"
+					url:      urls.apache
+					versions: null
+
+					setup: [
+						"""
+							[Install the Apache HTTP server](\(urls.apache_install)).
+							""",
+						"""
+							Enable the [Apache Status module](\(urls.apache_mod_status))
+							in your Apache config:
+
+							```text file="\(_config_path)"
+							<Location "\(_path)">
+							    SetHandler server-status
+							    Require host example.com
+							</Location>
+							```
+							""",
+						"""
+							Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
+							for more detailed metrics (see [Output](#output)). Note,
+							this defaults to `On` in Apache >= 2.3.6.
+
+							```text file="\(_config_path)"
+							ExtendedStatus On
+							```
+							""",
+						"""
+							Start or reload Apache to apply the config changes.
+							""",
+					]
+				}
 
 				interface: {
 					socket: {
@@ -35,35 +66,6 @@ components: sources: apache_metrics: {
 						ssl: "disabled"
 					}
 				}
-
-				setup: [
-					"""
-						[Install the Apache HTTP server](\(urls.apache_install)).
-						""",
-					"""
-						Enable the [Apache Status module](\(urls.apache_mod_status))
-						in your Apache config:
-
-						```text file="\(_config_path)"
-						<Location "\(_path)">
-						    SetHandler server-status
-						    Require host example.com
-						</Location>
-						```
-						""",
-					"""
-						Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
-						for more detailed metrics (see [Output](#output)). Note,
-						this defaults to `On` in Apache >= 2.3.6.
-
-						```text file="\(_config_path)"
-						ExtendedStatus On
-						```
-						""",
-					"""
-						Start or reload Apache to apply the config changes.
-						""",
-				]
 			}
 		}
 	}

@@ -16,7 +16,7 @@ components: sources: kafka: {
 				can_verify_hostname:    false
 				enabled_default:        false
 			}
-			from: components._kafka.features.service
+			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false
 	}

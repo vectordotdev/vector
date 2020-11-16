@@ -18,10 +18,12 @@ components: sources: statsd: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "StatsD"
-				thing:    "a \(name) client"
-				url:      urls.statsd
-				versions: null
+				service: {
+					name:     "StatsD"
+					thing:    "a \(name) client"
+					url:      urls.statsd
+					versions: null
+				}
 
 				interface: socket: {
 					api: {

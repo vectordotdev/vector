@@ -48,10 +48,12 @@ components: sinks: aws_s3: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "AWS S3"
-				thing:    "a \(name) bucket"
-				url:      urls.aws_s3
-				versions: null
+				service: {
+					name:     "AWS S3"
+					thing:    "a \(name) bucket"
+					url:      urls.aws_s3
+					versions: null
+				}
 
 				interface: {
 					socket: {

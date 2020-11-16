@@ -50,10 +50,12 @@ components: sinks: clickhouse: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "Clickhouse"
-				thing:    "a \(name) database"
-				url:      urls.clickhouse
-				versions: null
+				service: {
+					name:     "Clickhouse"
+					thing:    "a \(name) database"
+					url:      urls.clickhouse
+					versions: null
+				}
 
 				interface: {
 					socket: {

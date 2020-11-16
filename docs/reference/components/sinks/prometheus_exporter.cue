@@ -19,10 +19,12 @@ components: sinks: prometheus_exporter: {
 		healthcheck: enabled: false
 		exposes: {
 			for: {
-				name:     "Prometheus"
-				thing:    "a \(name) database"
-				url:      urls.prometheus
-				versions: ">= 1.0"
+				service: {
+					name:     "Prometheus"
+					thing:    "a \(name) database"
+					url:      urls.prometheus
+					versions: ">= 1.0"
+				}
 
 				interface: {
 					socket: {

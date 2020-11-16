@@ -28,10 +28,12 @@ components: sinks: pulsar: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				name:     "Apache Pulsar"
-				thing:    "an \(name) cluster"
-				url:      urls.pulsar
-				versions: null
+				service: {
+					name:     "Apache Pulsar"
+					thing:    "an \(name) cluster"
+					url:      urls.pulsar
+					versions: null
+				}
 
 				interface: {
 					socket: {

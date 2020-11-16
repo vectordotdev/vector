@@ -40,10 +40,12 @@ components: sinks: datadog_logs: {
 				enabled_default:        true
 			}
 			to: {
-				name:     "Datadog logs"
-				thing:    "a \(name) account"
-				url:      urls.datadog_logs
-				versions: null
+				service: {
+					name:     "Datadog logs"
+					thing:    "a \(name) account"
+					url:      urls.datadog_logs
+					versions: null
+				}
 
 				interface: {
 					socket: {

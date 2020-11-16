@@ -17,33 +17,35 @@ components: sources: file: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				name:     "file system"
-				thing:    "one or more files"
-				url:      urls.file_system
-				versions: null
+				service: {
+					name:     "file system"
+					thing:    "one or more files"
+					url:      urls.file_system
+					versions: null
+
+					setup: [
+						"""
+							Ensure that [Docker is setup](\(urls.docker_setup)) and running.
+							""",
+						"""
+							Ensure that the Docker Engine is properly exposing logs:
+
+							```bash
+							docker logs $(docker ps | awk '{ print $1 }')
+							```
+
+							If you receive an error it's likely that you do not have
+							the proper Docker logging drivers installed. The Docker
+							Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
+							or [`journald`](docker_logging_driver_journald) Docker
+							logging driver to be installed.
+							""",
+					]
+				}
 
 				interface: file_system: {
 					directory: _directory
 				}
-
-				setup: [
-					"""
-						Ensure that [Docker is setup](\(urls.docker_setup)) and running.
-						""",
-					"""
-						Ensure that the Docker Engine is properly exposing logs:
-
-						```bash
-						docker logs $(docker ps | awk '{ print $1 }')
-						```
-
-						If you receive an error it's likely that you do not have
-						the proper Docker logging drivers installed. The Docker
-						Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
-						or [`journald`](docker_logging_driver_journald) Docker
-						logging driver to be installed.
-						""",
-				]
 			}
 		}
 		multiline: enabled: true

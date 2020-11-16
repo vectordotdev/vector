@@ -15,7 +15,7 @@ components: sources: host_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: {
+			from: service: {
 				name:     "host"
 				thing:    "a \(name)"
 				url:      urls.host

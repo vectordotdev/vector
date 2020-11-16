@@ -9,7 +9,7 @@ components: sources: aws_s3: {
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
-			from: {
+			from: service: {
 				name:     "AWS S3"
 				thing:    "an \(name) bucket"
 				url:      urls.aws_s3

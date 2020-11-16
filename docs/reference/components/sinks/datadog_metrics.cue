@@ -30,10 +30,12 @@ components: sinks: datadog_metrics: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "Datadog metrics"
-				thing:    "a \(name) account"
-				url:      urls.datadog_metrics
-				versions: null
+				service: {
+					name:     "Datadog metrics"
+					thing:    "a \(name) account"
+					url:      urls.datadog_metrics
+					versions: null
+				}
 
 				interface: {
 					socket: {
