@@ -3,9 +3,10 @@
 </p>
 <p align="center">
   <strong>
-    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/guides/getting-started/">Get Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/components/">Integrations<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://chat.vector.dev">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/releases/latest/download/">Download<a/>
   </strong>
@@ -21,6 +22,9 @@ tomorrow. Vector enables dramatic cost reduction, novel data enrichment, and
 data security when you need it, not when is most convenient for your vendors.
 100% open source, up to 10x faster than every alternative, and distributed for
 zero single points of failure.
+
+To get started, follow our [**getting started guides**][urls.getting_started]
+or [**install Vector**][docs.installation].
 
 ### Principles
 
@@ -202,6 +206,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.what-is-vector]: https://vector.dev/docs/about/what-is-vector/
 [guides.advanced.unit-testing]: https://vector.dev/guides/advanced/unit-testing/
 [pages.releases]: https://vector.dev/releases/
+[urls.getting_started]: https://vector.dev/guides/getting-started/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.latest]: https://vector.dev/releases/latest/
 [urls.mailing_list]: https://vector.dev/community/
