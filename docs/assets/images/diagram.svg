@@ -1,6 +1,6 @@
 <svg width="1144" height="560" viewBox="0 0 1144 560" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<rect width="1144" height="560" rx="10" fill="#0C0C0F"/>
-<rect width="1144" height="560" rx="10" fill="url(#paint0_radial)"/>
+<rect width="1144" height="560" rx="5" fill="#0C0C0F"/>
+<rect width="1144" height="560" rx="5" fill="url(#paint0_radial)"/>
 <g clip-path="url(#clip0)">
 <path opacity="0.7" d="M101.573 95.7248L162.204 95.7248C203.847 95.7248 243.617 113.037 271.992 143.517L348.508 225.708C376.883 256.188 416.653 273.5 458.297 273.5L570 273.5" stroke="#00D8D6" stroke-width="19"/>
 <path d="M101.573 95.7247L162.204 95.7248C203.847 95.7248 243.617 113.037 271.992 143.517L348.508 225.708C376.883 256.188 416.653 273.5 458.297 273.5L570 273.5" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="1 6"/>
