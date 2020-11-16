@@ -1,20 +1,25 @@
-use crate::{file_watcher::FileWatcher, FileFingerprint, FilePosition, FileSourceInternalEvents};
+use crate::{
+    checkpointer::Checkpointer,
+    file_watcher::FileWatcher,
+    fingerprinter::{FileFingerprint, Fingerprinter},
+    FileSourceInternalEvents,
+};
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use futures::{
     executor::block_on,
     future::{select, Either},
     stream, Future, Sink, SinkExt,
 };
-use glob::glob;
 use indexmap::IndexMap;
-use std::collections::{HashMap, HashSet};
-use std::fs::{self, remove_file, File};
-use std::io::{self, Read, Seek, Write};
-use std::path::{Path, PathBuf};
-use std::time::{self, Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs::{self, remove_file},
+    path::PathBuf,
+    time::{self, Duration},
+};
 use tokio::time::delay_for;
 
-use crate::metadata_ext::PortableFileExt;
 use crate::paths_provider::PathsProvider;
 
 /// `FileServer` is a Source which cooperatively schedules reads over files,
@@ -33,7 +38,7 @@ where
     pub paths_provider: PP,
     pub max_read_bytes: usize,
     pub start_at_beginning: bool,
-    pub ignore_before: Option<time::SystemTime>,
+    pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
@@ -65,10 +70,10 @@ where
         self,
         mut chans: C,
         mut shutdown: impl Future + Unpin,
-    ) -> Result<Shutdown, <C as Sink<(Bytes, String)>>::Error>
+    ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
     where
-        C: Sink<(Bytes, String)> + Unpin,
-        <C as Sink<(Bytes, String)>>::Error: std::error::Error,
+        C: Sink<Vec<(Bytes, String)>> + Unpin,
+        <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
     {
         let mut fingerprint_buffer = Vec::new();
 
@@ -97,8 +102,11 @@ where
         existing_files.sort_by_key(|(path, _file_id)| {
             fs::metadata(&path)
                 .and_then(|m| m.created())
-                .unwrap_or_else(|_| time::SystemTime::now())
+                .map(DateTime::<Utc>::from)
+                .unwrap_or_else(|_| Utc::now())
         });
+
+        checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
 
         for (path, file_id) in existing_files {
             self.watch_new_file(
@@ -109,6 +117,8 @@ where
                 self.start_at_beginning,
             );
         }
+
+        let mut stats = TimingStats::default();
 
         // Alright friends, how does this work?
         //
@@ -127,14 +137,25 @@ where
                 // Schedule the next glob time.
                 next_glob_time = now_time.checked_add(self.glob_minimum_cooldown).unwrap();
 
+                if stats.started_at.elapsed() > Duration::from_secs(1) {
+                    stats.report();
+                }
+
+                if stats.started_at.elapsed() > Duration::from_secs(10) {
+                    stats = TimingStats::default();
+                }
+
+                let start = time::Instant::now();
                 // Write any stored checkpoints (uses glob to find old checkpoints).
                 checkpointer
                     .write_checkpoints()
                     .map_err(|error| self.emitter.emit_file_checkpoint_write_failed(error))
                     .map(|count| self.emitter.emit_file_checkpointed(count))
                     .ok();
+                stats.record("checkpointing", start.elapsed());
 
                 // Search (glob) for files to detect major file changes.
+                let start = time::Instant::now();
                 for (_file_id, watcher) in &mut fp_map {
                     watcher.set_file_findable(false); // assume not findable until found
                 }
@@ -176,7 +197,7 @@ where
                                     ) {
                                         if old_modified_time < new_modified_time {
                                             info!(
-                                                message = "switching to watch most recently modified file.",
+                                                message = "Switching to watch most recently modified file.",
                                                 new_modified_time = ?new_modified_time,
                                                 old_modified_time = ?old_modified_time,
                                             );
@@ -191,6 +212,7 @@ where
                         }
                     }
                 }
+                stats.record("discovery", start.elapsed());
             }
 
             // Collect lines by polling files.
@@ -201,6 +223,7 @@ where
                     continue;
                 }
 
+                let start = time::Instant::now();
                 let mut bytes_read: usize = 0;
                 while let Ok(Some(line)) = watcher.read_line() {
                     if line.is_empty() {
@@ -209,10 +232,11 @@ where
 
                     let sz = line.len();
                     trace!(
-                        message = "read bytes.",
+                        message = "Read bytes.",
                         path = ?watcher.path,
                         bytes = ?sz
                     );
+                    stats.record_bytes(sz);
 
                     bytes_read += sz;
 
@@ -226,10 +250,11 @@ where
                         break;
                     }
                 }
+                stats.record("reading", start.elapsed());
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                    checkpointer.set_checkpoint(file_id, watcher.get_file_position());
+                    checkpointer.update_checkpoint(file_id, watcher.get_file_position());
                 } else {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {
@@ -266,16 +291,20 @@ where
                 }
             });
 
-            let mut stream = stream::iter(lines.drain(..).map(Ok));
+            let start = time::Instant::now();
+            let to_send = std::mem::take(&mut lines);
+            let mut stream = stream::once(futures::future::ok(to_send));
             let result = block_on(chans.send_all(&mut stream));
             match result {
                 Ok(()) => {}
                 Err(error) => {
-                    error!(message = "output channel closed.", ?error);
+                    error!(message = "Output channel closed.", error = ?error);
                     return Err(error);
                 }
             }
+            stats.record("sending", start.elapsed());
 
+            let start = time::Instant::now();
             // When no lines have been read we kick the backup_cap up by twice,
             // limited by the hard-coded cap. Else, we set the backup_cap to its
             // minimum on the assumption that next time through there will be
@@ -297,13 +326,17 @@ where
             // call. Also since we are using block_on here and in the above code,
             // this should be run in it's own thread. `spawn_blocking` fulfills
             // all of these requirements.
-            match block_on(select(
-                shutdown,
-                delay_for(Duration::from_millis(backoff as u64)),
-            )) {
+            let sleep = async move {
+                if backoff > 0 {
+                    delay_for(Duration::from_millis(backoff as u64)).await;
+                }
+            };
+            futures::pin_mut!(sleep);
+            match block_on(select(shutdown, sleep)) {
                 Either::Left((_, _)) => return Ok(Shutdown),
                 Either::Right((_, future)) => shutdown = future,
             }
+            stats.record("sleeping", start.elapsed());
         }
     }
 
@@ -348,330 +381,64 @@ where
 #[derive(Debug)]
 pub struct Shutdown;
 
-pub struct Checkpointer {
-    directory: PathBuf,
-    glob_string: String,
-    checkpoints: HashMap<FileFingerprint, FilePosition>,
+struct TimingStats {
+    started_at: time::Instant,
+    segments: BTreeMap<&'static str, Duration>,
+    events: usize,
+    bytes: usize,
 }
 
-impl Checkpointer {
-    pub fn new(data_dir: &Path) -> Checkpointer {
-        let directory = data_dir.join("checkpoints");
-        let glob_string = directory.join("*").to_string_lossy().into_owned();
-        Checkpointer {
-            directory,
-            glob_string,
-            checkpoints: HashMap::new(),
-        }
+impl TimingStats {
+    fn record(&mut self, key: &'static str, duration: Duration) {
+        let segment = self.segments.entry(key).or_default();
+        *segment += duration;
     }
 
-    fn encode(&self, fng: FileFingerprint, pos: FilePosition) -> PathBuf {
-        self.directory.join(format!("{:x}.{}", fng, pos))
-    }
-    fn decode(&self, path: &Path) -> (FileFingerprint, FilePosition) {
-        let file_name = &path.file_name().unwrap().to_string_lossy();
-        scan_fmt!(file_name, "{x}.{}", [hex FileFingerprint], FilePosition).unwrap()
+    fn record_bytes(&mut self, bytes: usize) {
+        self.events += 1;
+        self.bytes += bytes;
     }
 
-    pub fn set_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.insert(fng, pos);
-    }
-
-    pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
-        self.checkpoints.get(&fng).cloned()
-    }
-
-    pub fn write_checkpoints(&mut self) -> Result<usize, io::Error> {
-        fs::remove_dir_all(&self.directory).ok();
-        fs::create_dir_all(&self.directory)?;
-        for (&fng, &pos) in self.checkpoints.iter() {
-            fs::File::create(self.encode(fng, pos))?;
-        }
-        Ok(self.checkpoints.len())
-    }
-
-    pub fn read_checkpoints(&mut self, ignore_before: Option<time::SystemTime>) {
-        for path in glob(&self.glob_string).unwrap().flatten() {
-            if let Some(ignore_before) = ignore_before {
-                if let Ok(Ok(modified)) = fs::metadata(&path).map(|metadata| metadata.modified()) {
-                    if modified < ignore_before {
-                        fs::remove_file(path).ok();
-                        continue;
-                    }
-                }
-            }
-            let (fng, pos) = self.decode(&path);
-            self.checkpoints.insert(fng, pos);
-        }
-    }
-}
-
-#[derive(Clone)]
-pub enum Fingerprinter {
-    Checksum {
-        bytes: usize,
-        ignored_header_bytes: usize,
-    },
-    FirstLineChecksum {
-        max_line_length: usize,
-    },
-    DevInode,
-}
-
-impl Fingerprinter {
-    fn get_fingerprint_of_file(
-        &self,
-        path: &PathBuf,
-        buffer: &mut Vec<u8>,
-    ) -> Result<FileFingerprint, io::Error> {
-        match *self {
-            Fingerprinter::DevInode => {
-                let file_handle = File::open(path)?;
-                let dev = file_handle.portable_dev()?;
-                let ino = file_handle.portable_ino()?;
-                buffer.clear();
-                buffer.write_all(&dev.to_be_bytes())?;
-                buffer.write_all(&ino.to_be_bytes())?;
-            }
-            Fingerprinter::Checksum {
-                ignored_header_bytes,
-                bytes,
-            } => {
-                let i = ignored_header_bytes as u64;
-                let b = bytes;
-                buffer.resize(b, 0u8);
-                let mut fp = fs::File::open(path)?;
-                fp.seek(io::SeekFrom::Start(i))?;
-                fp.read_exact(&mut buffer[..b])?;
-            }
-            Fingerprinter::FirstLineChecksum { max_line_length } => {
-                buffer.resize(max_line_length, 0u8);
-                let fp = fs::File::open(path)?;
-                fingerprinter_read_until(fp, b'\n', buffer)?;
-            }
-        }
-        let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
-        Ok(fingerprint)
-    }
-
-    fn get_fingerprint_or_log_error(
-        &self,
-        path: &PathBuf,
-        buffer: &mut Vec<u8>,
-        known_small_files: &mut HashSet<PathBuf>,
-        emitter: &impl FileSourceInternalEvents,
-    ) -> Option<FileFingerprint> {
-        self.get_fingerprint_of_file(path, buffer)
-            .map_err(|err| {
-                if err.kind() == io::ErrorKind::UnexpectedEof {
-                    if !known_small_files.contains(path) {
-                        emitter.emit_file_checksum_failed(path);
-                        known_small_files.insert(path.clone());
-                    }
-                } else {
-                    emitter.emit_file_fingerprint_read_failed(path, err);
-                }
-            })
-            .ok()
-    }
-}
-
-fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> io::Result<()> {
-    while !buf.is_empty() {
-        let read = match r.read(buf) {
-            Ok(0) => return Err(io::Error::new(io::ErrorKind::UnexpectedEof, "EOF reached")),
-            Ok(n) => n,
-            Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-            Err(e) => return Err(e),
-        };
-
-        if let Some((pos, _)) = buf[..read].iter().enumerate().find(|(_, &c)| c == delim) {
-            for el in &mut buf[(pos + 1)..] {
-                *el = 0;
-            }
-            break;
-        }
-
-        buf = &mut buf[read..];
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use super::{Checkpointer, FileFingerprint, FilePosition, Fingerprinter};
-    use std::fs;
-    use tempfile::tempdir;
-
-    #[test]
-    fn test_checksum_fingerprint() {
-        let fingerprinter = Fingerprinter::Checksum {
-            bytes: 256,
-            ignored_header_bytes: 0,
-        };
-
-        let target_dir = tempdir().unwrap();
-        let enough_data = vec![b'x'; 256];
-        let not_enough_data = vec![b'x'; 199];
-        let empty_path = target_dir.path().join("empty.log");
-        let big_enough_path = target_dir.path().join("big_enough.log");
-        let duplicate_path = target_dir.path().join("duplicate.log");
-        let not_big_enough_path = target_dir.path().join("not_big_enough.log");
-        fs::write(&empty_path, &[]).unwrap();
-        fs::write(&big_enough_path, &enough_data).unwrap();
-        fs::write(&duplicate_path, &enough_data).unwrap();
-        fs::write(&not_big_enough_path, &not_enough_data).unwrap();
-
-        let mut buf = Vec::new();
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&empty_path, &mut buf)
-            .is_err());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&big_enough_path, &mut buf)
-            .is_ok());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&not_big_enough_path, &mut buf)
-            .is_err());
-        assert_eq!(
-            fingerprinter
-                .get_fingerprint_of_file(&big_enough_path, &mut buf)
-                .unwrap(),
-            fingerprinter
-                .get_fingerprint_of_file(&duplicate_path, &mut buf)
-                .unwrap(),
-        );
-    }
-
-    #[test]
-    fn test_first_line_checksum_fingerprint() {
-        let max_line_length = 64;
-        let fingerprinter = Fingerprinter::FirstLineChecksum { max_line_length };
-
-        let target_dir = tempdir().unwrap();
-        let prepare_test = |file: &str, contents: &[u8]| {
-            let path = target_dir.path().join(file);
-            fs::write(&path, contents).unwrap();
-            path
-        };
-        let prepare_test_long = |file: &str, amount| {
-            prepare_test(
-                file,
-                b"hello world "
-                    .iter()
-                    .cloned()
-                    .cycle()
-                    .clone()
-                    .take(amount)
-                    .collect::<Box<_>>()
-                    .as_ref(),
+    fn report(&self) {
+        let total = self.started_at.elapsed();
+        let counted = self.segments.values().sum();
+        let other = self.started_at.elapsed() - counted;
+        let mut ratios = self
+            .segments
+            .iter()
+            .map(|(k, v)| (*k, v.as_secs_f32() / total.as_secs_f32()))
+            .collect::<BTreeMap<_, _>>();
+        ratios.insert("other", other.as_secs_f32() / total.as_secs_f32());
+        let (event_throughput, bytes_throughput) = if total.as_secs() > 0 {
+            (
+                self.events as u64 / total.as_secs(),
+                self.bytes as u64 / total.as_secs(),
             )
+        } else {
+            (0, 0)
         };
-
-        let empty = prepare_test("empty.log", b"");
-        let incomlete_line = prepare_test("incomlete_line.log", b"missing newline char");
-        let one_line = prepare_test("one_line.log", b"hello world\n");
-        let one_line_duplicate = prepare_test("one_line_duplicate.log", b"hello world\n");
-        let one_line_continued =
-            prepare_test("one_line_continued.log", b"hello world\nthe next line\n");
-        let different_two_lines = prepare_test("different_two_lines.log", b"line one\nline two\n");
-
-        let exactly_max_line_length =
-            prepare_test_long("exactly_max_line_length.log", max_line_length);
-        let exceeding_max_line_length =
-            prepare_test_long("exceeding_max_line_length.log", max_line_length + 1);
-        let incomplete_under_max_line_length_by_one = prepare_test_long(
-            "incomplete_under_max_line_length_by_one.log",
-            max_line_length - 1,
-        );
-
-        let mut buf = Vec::new();
-        let mut run = move |path| fingerprinter.get_fingerprint_of_file(path, &mut buf);
-
-        assert!(run(&empty).is_err());
-        assert!(run(&incomlete_line).is_err());
-        assert!(run(&incomplete_under_max_line_length_by_one).is_err());
-
-        assert!(run(&one_line).is_ok());
-        assert!(run(&one_line_duplicate).is_ok());
-        assert!(run(&one_line_continued).is_ok());
-        assert!(run(&different_two_lines).is_ok());
-        assert!(run(&exactly_max_line_length).is_ok());
-        assert!(run(&exceeding_max_line_length).is_ok());
-
-        assert_eq!(run(&one_line).unwrap(), run(&one_line_duplicate).unwrap());
-        assert_eq!(run(&one_line).unwrap(), run(&one_line_continued).unwrap());
-
-        assert_ne!(run(&one_line).unwrap(), run(&different_two_lines).unwrap());
-
-        assert_eq!(
-            run(&exactly_max_line_length).unwrap(),
-            run(&exceeding_max_line_length).unwrap()
-        );
+        debug!(event_throughput = %scale(event_throughput), bytes_throughput = %scale(bytes_throughput), ?ratios);
     }
+}
 
-    #[test]
-    fn test_inode_fingerprint() {
-        let fingerprinter = Fingerprinter::DevInode;
-
-        let target_dir = tempdir().unwrap();
-        let small_data = vec![b'x'; 1];
-        let medium_data = vec![b'x'; 256];
-        let empty_path = target_dir.path().join("empty.log");
-        let small_path = target_dir.path().join("small.log");
-        let medium_path = target_dir.path().join("medium.log");
-        let duplicate_path = target_dir.path().join("duplicate.log");
-        fs::write(&empty_path, &[]).unwrap();
-        fs::write(&small_path, &small_data).unwrap();
-        fs::write(&medium_path, &medium_data).unwrap();
-        fs::write(&duplicate_path, &medium_data).unwrap();
-
-        let mut buf = Vec::new();
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&empty_path, &mut buf)
-            .is_ok());
-        assert!(fingerprinter
-            .get_fingerprint_of_file(&small_path, &mut buf)
-            .is_ok());
-        assert_ne!(
-            fingerprinter
-                .get_fingerprint_of_file(&medium_path, &mut buf)
-                .unwrap(),
-            fingerprinter
-                .get_fingerprint_of_file(&duplicate_path, &mut buf)
-                .unwrap()
-        );
+fn scale(bytes: u64) -> String {
+    let units = ["", "k", "m", "g"];
+    let mut bytes = bytes as f32;
+    let mut i = 0;
+    while bytes > 1000.0 && i <= 3 {
+        bytes /= 1000.0;
+        i += 1;
     }
+    format!("{:.3}{}/sec", bytes, units[i])
+}
 
-    #[test]
-    fn test_checkpointer_basics() {
-        let fingerprint: FileFingerprint = 0x1234567890abcdef;
-        let position: FilePosition = 1234;
-        let data_dir = tempdir().unwrap();
-        let mut chkptr = Checkpointer::new(&data_dir.path());
-        assert_eq!(
-            chkptr.decode(&chkptr.encode(fingerprint, position)),
-            (fingerprint, position)
-        );
-        chkptr.set_checkpoint(fingerprint, position);
-        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-    }
-
-    #[test]
-    fn test_checkpointer_restart() {
-        let fingerprint: FileFingerprint = 0x1234567890abcdef;
-        let position: FilePosition = 1234;
-        let data_dir = tempdir().unwrap();
-        {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
-            chkptr.set_checkpoint(fingerprint, position);
-            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-            chkptr.write_checkpoints().ok();
-        }
-        {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
-            assert_eq!(chkptr.get_checkpoint(fingerprint), None);
-            chkptr.read_checkpoints(None);
-            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+impl Default for TimingStats {
+    fn default() -> Self {
+        Self {
+            started_at: time::Instant::now(),
+            segments: Default::default(),
+            events: Default::default(),
+            bytes: Default::default(),
         }
     }
 }

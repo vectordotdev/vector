@@ -25,14 +25,12 @@ impl ConditionConfig for IsMetricConfig {
 
 //------------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct IsMetric {}
 
 impl Condition for IsMetric {
     fn check(&self, e: &Event) -> bool {
-        match e {
-            Event::Metric(_) => true,
-            _ => false,
-        }
+        matches!(e, Event::Metric(_))
     }
 
     fn check_with_context(&self, e: &Event) -> Result<(), String> {
@@ -67,6 +65,7 @@ mod test {
         assert_eq!(
             cond.check(&Event::from(Metric {
                 name: "test metric".to_string(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,

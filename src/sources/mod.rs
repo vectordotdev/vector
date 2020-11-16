@@ -5,6 +5,8 @@ use snafu::Snafu;
 pub mod apache_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub mod aws_kinesis_firehose;
+#[cfg(feature = "sources-aws_s3")]
+pub mod aws_s3;
 #[cfg(feature = "sources-docker")]
 pub mod docker;
 #[cfg(feature = "sources-file")]
@@ -12,7 +14,7 @@ pub mod file;
 #[cfg(feature = "sources-generator")]
 pub mod generator;
 #[cfg(feature = "sources-host_metrics")]
-mod host_metrics;
+pub mod host_metrics;
 #[cfg(feature = "sources-http")]
 pub mod http;
 #[cfg(feature = "sources-internal_metrics")]

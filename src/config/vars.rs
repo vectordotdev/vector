@@ -10,7 +10,7 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> String {
             .map(|name| {
                 vars.get(name).map(|val| val.as_str()).unwrap_or_else(|| {
                     caps.get(3).map(|m| m.as_str()).unwrap_or_else(|| {
-                        warn!("unknown env var in config: {:?}", name);
+                        warn!(message = "Unknown env var in config.", name = ?name);
                         ""
                     })
                 })

@@ -166,7 +166,7 @@ where
     ///                 println!("Expired: {}", val);
     ///                 break;
     ///             }
-    ///             Some(Err(err)) => panic!(format!("Timer error: {:?}", err)),
+    ///             Some(Err(error)) => panic!(format!("Timer error: {:?}", error)),
     ///         },
     ///         _ = tokio::time::delay_for(Duration::from_millis(100)) => map.insert(
     ///             "key".to_owned(),

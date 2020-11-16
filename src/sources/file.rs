@@ -9,22 +9,23 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
+use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, Fingerprinter,
+    FileServer, FingerprintStrategy, Fingerprinter,
 };
 use futures::{
-    compat::{Compat, Compat01As03, Compat01As03Sink, Future01CompatExt},
+    compat::{Compat, Future01CompatExt},
     future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
+    stream::{Stream, StreamExt},
 };
-use futures01::{future, Future, Sink, Stream};
+use futures01::{Future, Sink};
 use regex::bytes::Regex;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::convert::TryInto;
 use std::path::PathBuf;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use tokio::task::spawn_blocking;
 
 #[derive(Debug, Snafu)]
@@ -93,17 +94,17 @@ pub enum FingerprintConfig {
     DevInode,
 }
 
-impl From<FingerprintConfig> for Fingerprinter {
-    fn from(config: FingerprintConfig) -> Fingerprinter {
+impl From<FingerprintConfig> for FingerprintStrategy {
+    fn from(config: FingerprintConfig) -> FingerprintStrategy {
         match config {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
-            } => Fingerprinter::Checksum {
+            } => FingerprintStrategy::Checksum {
                 bytes,
                 ignored_header_bytes,
             },
-            FingerprintConfig::DevInode => Fingerprinter::DevInode,
+            FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
         }
     }
 }
@@ -193,7 +194,7 @@ pub fn file_source(
 ) -> super::Source {
     let ignore_before = config
         .ignore_older
-        .map(|secs| SystemTime::now() - Duration::from_secs(secs));
+        .map(|secs| Utc::now() - chrono::Duration::seconds(secs as i64));
     let glob_minimum_cooldown = Duration::from_millis(config.glob_minimum_cooldown);
 
     let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
@@ -207,7 +208,10 @@ pub fn file_source(
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: config.fingerprint.clone().into(),
+        fingerprinter: Fingerprinter {
+            strategy: config.fingerprint.clone().into(),
+            ignore_not_found: false,
+        },
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
@@ -225,25 +229,15 @@ pub fn file_source(
     let multiline_config = config.multiline.clone();
     let message_start_indicator = config.message_start_indicator.clone();
     let multi_line_timeout = config.multi_line_timeout;
-    Box::new(future::lazy(move || {
-        info!(message = "Starting file server.", ?include, ?exclude);
+
+    Box::new(futures01::future::lazy(move || {
+        info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
         // sizing here is just a guess
-        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
+        let rx = rx.map(futures::stream::iter).flatten();
 
-        // This closure is overcomplicated because of the compatibility layer.
-        let wrap_with_line_agg = |rx, config| {
-            let rx = StreamExt::filter_map(Compat01As03::new(rx), |val| {
-                futures::future::ready(val.ok())
-            });
-            let logic = line_agg::Logic::new(config);
-            Box::new(Compat::new(
-                LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
-                    .map(|(src, line, _context)| (line, src))
-                    .map(Ok),
-            ))
-        };
-        let messages: Box<dyn Stream<Item = (Bytes, String), Error = ()> + Send> =
+        let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
                 wrap_with_line_agg(
                     rx,
@@ -265,13 +259,15 @@ pub fn file_source(
         // logs in the queue.
         let span = current_span();
         let span2 = span.clone();
+        let messages01 = Compat::new(StreamExt::map(
+            messages,
+            move |(msg, file): (Bytes, String)| {
+                let _enter = span2.enter();
+                Ok::<_, ()>(create_event(msg, file, &host_key, &hostname, &file_key))
+            },
+        ));
         tokio::spawn(
-            messages
-                .map(move |(msg, file): (Bytes, String)| {
-                    let _enter = span2.enter();
-                    create_event(msg, file, &host_key, &hostname, &file_key)
-                })
-                .forward(out.sink_map_err(|e| error!(%e)))
+            futures01::Stream::forward(messages01, out.sink_map_err(|e| error!(%e)))
                 .map(|_| ())
                 .compat()
                 .instrument(span),
@@ -280,7 +276,7 @@ pub fn file_source(
         let span = info_span!("file_server");
         spawn_blocking(move || {
             let _enter = span.enter();
-            let result = file_server.run(Compat01As03Sink::new(tx), shutdown);
+            let result = file_server.run(tx, shutdown);
             // Panic if we encounter any error originating from the file server.
             // We're at the `spawn_blocking` call, the panic will be caught and
             // passed to the `JoinHandle` error, similar to the usual threads.
@@ -288,8 +284,19 @@ pub fn file_source(
         })
         .boxed()
         .compat()
-        .map_err(|error| error!(message="file server unexpectedly stopped.",%error))
+        .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
     }))
+}
+
+fn wrap_with_line_agg(
+    rx: impl Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static,
+    config: line_agg::Config,
+) -> Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin + 'static> {
+    let logic = line_agg::Logic::new(config);
+    Box::new(
+        LineAgg::new(rx.map(|(line, src)| (src, line, ())), logic)
+            .map(|(src, line, _context)| (line, src)),
+    )
 }
 
 fn create_event(

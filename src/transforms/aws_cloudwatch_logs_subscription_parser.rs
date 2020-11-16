@@ -1,14 +1,12 @@
 use super::Transform;
 use crate::{
-    config::{
-        log_schema, DataType, GenerateConfig, TransformConfig, TransformContext,
-        TransformDescription,
-    },
+    config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{
         AwsCloudwatchLogsSubscriptionParserEventProcessed,
         AwsCloudwatchLogsSubscriptionParserFailedParse,
     },
+    transforms::FunctionTransform,
 };
 use chrono::{serde::ts_milliseconds, DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,10 +26,10 @@ inventory::submit! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs_subscription_parser")]
 impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AwsCloudwatchLogsSubscriptionParser::from(
-            self.clone(),
-        )))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(
+            AwsCloudwatchLogsSubscriptionParser::from(self.clone()),
+        ))
     }
 
     fn input_type(&self) -> DataType {
@@ -47,9 +45,13 @@ impl TransformConfig for AwsCloudwatchLogsSubscriptionParserConfig {
     }
 }
 
-impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {}
+impl GenerateConfig for AwsCloudwatchLogsSubscriptionParserConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self { field: None }).unwrap()
+    }
+}
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AwsCloudwatchLogsSubscriptionParser {
     field: String,
 }
@@ -66,13 +68,8 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
     }
 }
 
-impl Transform for AwsCloudwatchLogsSubscriptionParser {
-    fn transform(&mut self, _event: Event) -> Option<Event> {
-        // required for trait, but transform_into is used instead
-        unimplemented!()
-    }
-
-    fn transform_into(&mut self, output: &mut Vec<Event>, event: Event) {
+impl FunctionTransform for AwsCloudwatchLogsSubscriptionParser {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         let log = event.as_log();
 
         emit!(AwsCloudwatchLogsSubscriptionParserEventProcessed);
@@ -156,10 +153,15 @@ struct AwsCloudWatchLogEvent {
 
 #[cfg(test)]
 mod test {
-    use super::{AwsCloudwatchLogsSubscriptionParser, AwsCloudwatchLogsSubscriptionParserConfig};
-    use crate::{event::Event, event::LogEvent, log_event, transforms::Transform};
+    use super::*;
+    use crate::{event::Event, log_event};
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AwsCloudwatchLogsSubscriptionParserConfig>();
+    }
 
     #[test]
     fn aws_cloudwatch_logs_subscription_parser_emits_events() {
@@ -198,7 +200,7 @@ mod test {
 
         let mut output: Vec<Event> = Vec::new();
 
-        parser.transform_into(&mut output, event);
+        parser.transform(&mut output, event);
 
         assert_eq!(
             output,
@@ -255,7 +257,7 @@ mod test {
 
         let mut output: Vec<Event> = Vec::new();
 
-        parser.transform_into(&mut output, event);
+        parser.transform(&mut output, event);
 
         assert_eq!(output, vec![]);
     }

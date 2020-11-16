@@ -1,14 +1,14 @@
-use super::Transform;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{AddTagsEventProcessed, AddTagsTagNotOverwritten, AddTagsTagOverwritten},
+    transforms::{FunctionTransform, Transform},
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::Entry, BTreeMap};
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct AddTagsConfig {
     pub tags: IndexMap<String, String>,
@@ -16,6 +16,7 @@ pub struct AddTagsConfig {
     pub overwrite: bool,
 }
 
+#[derive(Clone, Debug)]
 pub struct AddTags {
     tags: IndexMap<String, String>,
     overwrite: bool,
@@ -25,13 +26,24 @@ inventory::submit! {
     TransformDescription::new::<AddTagsConfig>("add_tags")
 }
 
-impl GenerateConfig for AddTagsConfig {}
+impl GenerateConfig for AddTagsConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            tags: std::iter::once(("name".to_owned(), "value".to_owned())).collect(),
+            overwrite: true,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "add_tags")]
 impl TransformConfig for AddTagsConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(AddTags::new(self.tags.clone(), self.overwrite)))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(AddTags::new(
+            self.tags.clone(),
+            self.overwrite,
+        )))
     }
 
     fn input_type(&self) -> DataType {
@@ -53,8 +65,8 @@ impl AddTags {
     }
 }
 
-impl Transform for AddTags {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for AddTags {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(AddTagsEventProcessed);
 
         if !self.tags.is_empty() {
@@ -83,25 +95,30 @@ impl Transform for AddTags {
             }
         }
 
-        Some(event)
+        output.push(event)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::AddTags;
+    use super::*;
     use crate::{
         event::metric::{Metric, MetricKind, MetricValue},
         event::Event,
-        transforms::Transform,
     };
     use indexmap::IndexMap;
     use std::collections::BTreeMap;
 
     #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AddTagsConfig>();
+    }
+
+    #[test]
     fn add_tags() {
         let event = Event::Metric(Metric {
             name: "bar".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Absolute,
@@ -116,7 +133,7 @@ mod tests {
         .collect();
 
         let mut transform = AddTags::new(map, true);
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.len(), 2);
@@ -130,6 +147,7 @@ mod tests {
         tags.insert("region".to_string(), "us-east-1".to_string());
         let event = Event::Metric(Metric {
             name: "bar".into(),
+            namespace: None,
             timestamp: None,
             tags: Some(tags),
             kind: MetricKind::Absolute,
@@ -142,7 +160,7 @@ mod tests {
 
         let mut transform = AddTags::new(map, false);
 
-        let metric = transform.transform(event).unwrap().into_metric();
+        let metric = transform.transform_one(event).unwrap().into_metric();
         let tags = metric.tags.unwrap();
 
         assert_eq!(tags.get("region"), Some(&"us-east-1".to_owned()));

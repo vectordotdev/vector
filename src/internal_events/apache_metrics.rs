@@ -11,7 +11,7 @@ pub struct ApacheMetricsEventReceived {
 
 impl InternalEvent for ApacheMetricsEventReceived {
     fn emit_logs(&self) {
-        debug!(message = "Scraped events.", ?self.count);
+        debug!(message = "Scraped events.", count = ?self.count);
     }
 
     fn emit_metrics(&self) {
@@ -45,7 +45,7 @@ pub struct ApacheMetricsParseError<'a> {
 
 impl InternalEvent for ApacheMetricsParseError<'_> {
     fn emit_logs(&self) {
-        error!(message = "Parsing error.", url = %self.url, error = %self.error);
+        error!(message = "Parsing error.", url = %self.url, error = ?self.error);
         debug!(
             message = %format!("Parse error:\n\n{}\n\n", self.error),
             url = %self.url,
@@ -76,13 +76,13 @@ impl InternalEvent for ApacheMetricsErrorResponse<'_> {
 
 #[derive(Debug)]
 pub struct ApacheMetricsHttpError<'a> {
-    pub error: hyper::Error,
+    pub error: crate::Error,
     pub url: &'a str,
 }
 
 impl InternalEvent for ApacheMetricsHttpError<'_> {
     fn emit_logs(&self) {
-        error!(message = "HTTP request processing error.", url = %self.url, error = %self.error);
+        error!(message = "HTTP request processing error.", url = %self.url, error = ?self.error);
     }
 
     fn emit_metrics(&self) {

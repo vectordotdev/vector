@@ -45,15 +45,6 @@ impl From<QueryValue> for Literal {
     }
 }
 
-#[cfg(test)]
-impl From<&str> for Literal {
-    fn from(value: &str) -> Self {
-        Self {
-            value: QueryValue::from_value(value),
-        }
-    }
-}
-
 impl Function for Literal {
     fn execute(&self, _: &Event) -> Result<query_value::QueryValue> {
         Ok(self.value.clone())

@@ -1,5 +1,5 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
@@ -56,19 +56,32 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
     fn source_type(&self) -> &'static str {
         "aws_kinesis_firehose"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
+    }
 }
 
 inventory::submit! {
     SourceDescription::new::<AwsKinesisFirehoseConfig>("aws_kinesis_firehose")
 }
 
-impl GenerateConfig for AwsKinesisFirehoseConfig {}
+impl GenerateConfig for AwsKinesisFirehoseConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: "0.0.0.0:443".parse().unwrap(),
+            access_key: None,
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, LogEvent},
+        event::Event,
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
     };
@@ -81,6 +94,11 @@ mod tests {
         io::{Cursor, Read},
         net::SocketAddr,
     };
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AwsKinesisFirehoseConfig>();
+    }
 
     async fn source(access_key: Option<String>) -> (mpsc::Receiver<Event>, SocketAddr) {
         let (sender, recv) = Pipeline::new_test();

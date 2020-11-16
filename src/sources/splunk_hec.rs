@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -134,6 +134,10 @@ impl SourceConfig for SplunkConfig {
 
     fn source_type(&self) -> &'static str {
         "splunk_hec"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 
@@ -734,7 +738,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
         Ok(string) => response_json(StatusCode::BAD_REQUEST, string),
         Err(error) => {
             // This should never happen.
-            error!("error encoding json body: {}.", error);
+            error!(message = "Error encoding json body.", %error);
             response_json(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 splunk_response::SERVER_ERROR.clone(),

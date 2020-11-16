@@ -25,7 +25,7 @@ fn bench(c: &mut Criterion) {
                 b.iter(|| {
                     for _ in 0..**n {
                         info!(
-                            message = "hello world",
+                            message = "Hello world!",
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
@@ -47,7 +47,7 @@ fn bench(c: &mut Criterion) {
                 b.iter(|| {
                     for _ in 0..**n {
                         info!(
-                            message = "hello world",
+                            message = "Hello world!",
                             foo = "foo",
                             bar = "bar",
                             baz = 3,

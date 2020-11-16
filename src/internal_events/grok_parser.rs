@@ -63,7 +63,7 @@ impl<'a> InternalEvent for GrokParserConversionFailed<'a> {
         warn!(
             message = "Could not convert types.",
             name = %self.name,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         );
     }

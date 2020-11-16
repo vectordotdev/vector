@@ -1,12 +1,12 @@
-use super::Transform;
 use crate::{
     conditions::{AnyCondition, Condition},
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
+    transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct FilterConfig {
     condition: AnyCondition,
@@ -16,13 +16,21 @@ inventory::submit! {
     TransformDescription::new::<FilterConfig>("filter")
 }
 
-impl GenerateConfig for FilterConfig {}
+impl GenerateConfig for FilterConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"condition.type = "check_fields"
+            condition."message.eq" = "value""#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
-    async fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Filter::new(self.condition.build()?)))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::function(Filter::new(self.condition.build()?)))
     }
 
     fn input_type(&self) -> DataType {
@@ -38,7 +46,10 @@ impl TransformConfig for FilterConfig {
     }
 }
 
+#[derive(Derivative, Clone)]
+#[derivative(Debug)]
 pub struct Filter {
+    #[derivative(Debug = "ignore")]
     condition: Box<dyn Condition>,
 }
 
@@ -48,12 +59,18 @@ impl Filter {
     }
 }
 
-impl Transform for Filter {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl FunctionTransform for Filter {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         if self.condition.check(&event) {
-            Some(event)
-        } else {
-            None
+            output.push(event);
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::FilterConfig>();
     }
 }

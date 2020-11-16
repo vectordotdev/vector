@@ -68,6 +68,17 @@ components: transforms: log_to_metric: {
 							templateable: true
 						}
 					}
+					namespace: {
+						description: "The namespace of the metric."
+						required:    false
+						common:      true
+						warnings: []
+						type: string: {
+							examples: ["service"]
+							default:      null
+							templateable: true
+						}
+					}
 					tags: {
 						description: "Key/value pairs representing [metric tags][docs.data-model.metric#tags]."
 						required:    false
@@ -102,9 +113,9 @@ components: transforms: log_to_metric: {
 							enum: {
 								counter:   "A [counter metric type][docs.data-model.metric#counter]."
 								gauge:     "A [gauge metric type][docs.data-model.metric#gauge]."
-								histogram: "A [distribution metric type with histogram statistic][docs.data-model.metric#distribution]."
+								histogram: "A [distribution metric type][docs.data-model.metric#distribution] with histogram statistic."
 								set:       "A [set metric type][docs.data-model.metric#set]."
-								summary:   "A [distribution metric type with summary statistic][docs.data-model.metric#distribution]."
+								summary:   "A [distribution metric type][docs.data-model.metric#distribution] with summary statistic."
 							}
 						}
 					}
@@ -132,9 +143,10 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type:  "counter"
-						field: "status"
-						name:  "response_total"
+						type:      "counter"
+						field:     "status"
+						name:      "response_total"
+						namespace: "service"
 						tags: {
 							status: "{{status}}"
 							host:   "{{host}}"
@@ -148,7 +160,9 @@ components: transforms: log_to_metric: {
 				status:  200
 			}
 			output: [{metric: {
-				name: "response_total"
+				kind:      "incremental"
+				name:      "response_total"
+				namespace: "service"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -180,6 +194,7 @@ components: transforms: log_to_metric: {
 				total:   122.2
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "order_total"
 				tags: {
 					host: "10.22.11.222"
@@ -220,6 +235,7 @@ components: transforms: log_to_metric: {
 			}
 			output: [
 				{metric: {
+					kind: "absolute"
 					name: "1m_load_avg"
 					tags: {
 						host: "10.22.11.222"
@@ -229,6 +245,7 @@ components: transforms: log_to_metric: {
 					}
 				}},
 				{metric: {
+					kind: "absolute"
 					name: "5m_load_avg"
 					tags: {
 						host: "10.22.11.222"
@@ -238,6 +255,7 @@ components: transforms: log_to_metric: {
 					}
 				}},
 				{metric: {
+					kind: "absolute"
 					name: "15m_load_avg"
 					tags: {
 						host: "10.22.11.222"
@@ -249,8 +267,8 @@ components: transforms: log_to_metric: {
 			]
 		},
 		{
-			title: "Histogram"
-			notes: "This example demonstrates capturing timings in your logs."
+			title: "Histogram distribution"
+			notes: "This example demonstrates capturing timings in your logs to compute histogram."
 			configuration: {
 				metrics: [
 					{
@@ -271,6 +289,7 @@ components: transforms: log_to_metric: {
 				time:    54.2
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "time_ms"
 				tags: {
 					status: "200"
@@ -278,13 +297,13 @@ components: transforms: log_to_metric: {
 				}
 				distribution: {
 					values: [54.2]
-					sample_rates: [1.0]
+					sample_rates: [1]
 					statistic: "histogram"
 				}
 			}}]
 		},
 		{
-			title: "Summary"
+			title: "Summary distribution"
 			notes: "This example demonstrates capturing timings in your logs to compute summary."
 			configuration: {
 				metrics: [
@@ -306,6 +325,7 @@ components: transforms: log_to_metric: {
 				time:    54.2
 			}
 			output: [{metric: {
+				kind: "incremental"
 				name: "time_ms"
 				tags: {
 					status: "200"
@@ -313,7 +333,7 @@ components: transforms: log_to_metric: {
 				}
 				distribution: {
 					values: [54.2]
-					sample_rates: [1.0]
+					sample_rates: [1]
 					statistic: "summary"
 				}
 			}}]
@@ -329,8 +349,9 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type:  "set"
-						field: "remote_addr"
+						type:      "set"
+						field:     "remote_addr"
+						namespace: "{{branch}}"
 						tags: {
 							host: "{{host}}"
 						}
@@ -341,9 +362,12 @@ components: transforms: log_to_metric: {
 				host:        "10.22.11.222"
 				message:     "Sent 200 in 54.2ms"
 				remote_addr: "233.221.232.22"
+				branch:      "dev"
 			}
 			output: [{metric: {
-				name: "remote_addr"
+				kind:      "incremental"
+				name:      "remote_addr"
+				namespace: "dev"
 				tags: {
 					host: "10.22.11.222"
 				}

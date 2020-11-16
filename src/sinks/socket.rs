@@ -31,7 +31,16 @@ inventory::submit! {
     SinkDescription::new::<SocketSinkConfig>("socket")
 }
 
-impl GenerateConfig for SocketSinkConfig {}
+impl GenerateConfig for SocketSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"address = "92.12.333.224:5000"
+            mode = "tcp"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
 
 impl SocketSinkConfig {
     pub fn make_tcp_config(
@@ -89,12 +98,17 @@ mod test {
         stream::{self, StreamExt},
     };
     use serde_json::Value;
-    use std::{
-        net::{SocketAddr, UdpSocket},
-        time::Duration,
+    use std::net::{SocketAddr, UdpSocket};
+    use tokio::{
+        net::TcpListener,
+        time::{delay_for, timeout, Duration},
     };
-    use tokio::{net::TcpListener, time::timeout};
     use tokio_util::codec::{FramedRead, LinesCodec};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SocketSinkConfig>();
+    }
 
     async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
@@ -184,7 +198,7 @@ mod test {
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt};
+        use futures::{future, FutureExt, StreamExt};
         use std::{
             net::Shutdown,
             pin::Pin,
@@ -197,6 +211,7 @@ mod test {
         use tokio::{
             io::AsyncRead,
             net::TcpStream,
+            sync::mpsc,
             task::yield_now,
             time::{interval, Duration},
         };
@@ -221,7 +236,14 @@ mod test {
         };
         let context = SinkContext::new_test();
         let (sink, _healthcheck) = config.build(context).await.unwrap();
-        let mut sink = sink.into_futures01sink().sink_compat();
+        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(1);
+        let jh1 = tokio::spawn(async move {
+            let stream = receiver
+                .take_while(|event| future::ready(event.is_some()))
+                .map(|event| event.unwrap())
+                .boxed();
+            let _ = sink.run(stream).await.unwrap();
+        });
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
         let msg_counter1 = Arc::clone(&msg_counter);
@@ -241,7 +263,7 @@ mod test {
         });
 
         // Only accept two connections.
-        let jh = tokio::spawn(async move {
+        let jh2 = tokio::spawn(async move {
             let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
             let listener = tls.bind(&addr).await.unwrap();
             listener
@@ -279,9 +301,10 @@ mod test {
                 .await;
         });
 
-        let (_, events) = random_lines_with_stream(10, 10);
-        let mut events = events.map(Ok);
-        sink.send_all(&mut events).await.unwrap();
+        let (_, mut events) = random_lines_with_stream(10, 10);
+        while let Some(event) = events.next().await {
+            let _ = sender.send(Some(event)).await.unwrap();
+        }
 
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
@@ -300,13 +323,15 @@ mod test {
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
-        let (_, events) = random_lines_with_stream(10, 10);
-        let mut events = events.map(Ok);
-        sink.send_all(&mut events).await.unwrap();
-        drop(sink);
+        let (_, mut events) = random_lines_with_stream(10, 10);
+        while let Some(event) = events.next().await {
+            let _ = sender.send(Some(event)).await.unwrap();
+        }
 
         // Wait for server task to be complete.
-        let _ = jh.await.unwrap();
+        let _ = sender.send(None).await.unwrap();
+        let _ = jh1.await.unwrap();
+        let _ = jh2.await.unwrap();
 
         // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
@@ -358,7 +383,7 @@ mod test {
         // Disconnect
         if cfg!(windows) {
             // Gives Windows time to release the addr port.
-            tokio::time::delay_for(Duration::from_secs(1)).await;
+            delay_for(Duration::from_secs(1)).await;
         }
 
         // Second listener

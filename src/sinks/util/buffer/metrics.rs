@@ -1,11 +1,13 @@
-use crate::event::metric::{Metric, MetricKind, MetricValue};
-use crate::event::Event;
-use crate::sinks::util::batch::{
-    Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult,
+use crate::{
+    event::metric::{Metric, MetricKind, MetricValue},
+    sinks::util::batch::{Batch, BatchConfig, BatchError, BatchSettings, BatchSize, PushResult},
+    Event,
 };
-use std::cmp::Ordering;
-use std::collections::{hash_map::DefaultHasher, HashSet};
-use std::hash::{Hash, Hasher};
+use std::{
+    cmp::Ordering,
+    collections::{hash_map::DefaultHasher, HashSet},
+    hash::{Hash, Hasher},
+};
 
 #[derive(Clone, Debug)]
 pub struct MetricEntry(pub Metric);
@@ -144,6 +146,7 @@ impl Batch for MetricBuffer {
                         // and emit the difference between previous and current as a Counter
                         let delta = MetricEntry(Metric {
                             name: item.name.to_string(),
+                            namespace: item.namespace.clone(),
                             timestamp: item.timestamp,
                             tags: item.tags.clone(),
                             kind: MetricKind::Incremental,
@@ -179,6 +182,7 @@ impl Batch for MetricBuffer {
                             // Otherwise we start from zero value
                             Metric {
                                 name: item.name.to_string(),
+                                namespace: item.namespace.clone(),
                                 timestamp: item.timestamp,
                                 tags: item.tags.clone(),
                                 kind: MetricKind::Absolute,
@@ -284,14 +288,12 @@ fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>,
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::sinks::util::BatchSink;
     use crate::{
         buffers::Acker,
-        event::metric::{Metric, MetricValue, StatisticKind},
-        Event,
+        event::metric::{MetricValue, StatisticKind},
+        sinks::util::BatchSink,
     };
-    use futures::{compat::Future01CompatExt, future};
-    use futures01::Sink;
+    use futures::{future, stream, Sink, SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
     use std::{
         collections::BTreeMap,
@@ -312,7 +314,7 @@ mod test {
     }
 
     fn sink() -> (
-        impl Sink<SinkItem = Event, SinkError = crate::Error>,
+        impl Sink<Event, Error = crate::Error>,
         Arc<Mutex<Vec<Vec<Metric>>>>,
     ) {
         let (acker, _) = Acker::new_for_testing();
@@ -343,6 +345,7 @@ mod test {
         for i in 0..4 {
             let event = Event::Metric(Metric {
                 name: "counter-0".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -354,6 +357,7 @@ mod test {
         for i in 0..4 {
             let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
@@ -365,6 +369,7 @@ mod test {
         for i in 0..4 {
             let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -375,8 +380,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -391,6 +395,7 @@ mod test {
             [
                 Metric {
                     name: "counter-0".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -398,6 +403,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-0".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Incremental,
@@ -405,6 +411,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-1".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -412,6 +419,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-1".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Incremental,
@@ -419,6 +427,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Incremental,
@@ -426,6 +435,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Incremental,
@@ -439,6 +449,7 @@ mod test {
             [
                 Metric {
                     name: "counter-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -446,6 +457,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -463,6 +475,7 @@ mod test {
         for i in 0..4 {
             let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Absolute,
@@ -474,6 +487,7 @@ mod test {
         for i in 0..4 {
             let event = Event::Metric(Metric {
                 name: format!("counter-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Absolute,
@@ -486,8 +500,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -501,6 +514,7 @@ mod test {
             [
                 Metric {
                     name: "counter-0".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -508,6 +522,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-1".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -515,6 +530,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -522,6 +538,7 @@ mod test {
                 },
                 Metric {
                     name: "counter-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -539,6 +556,7 @@ mod test {
         for i in 1..5 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
@@ -550,6 +568,7 @@ mod test {
         for i in 1..5 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
@@ -560,8 +579,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -575,6 +593,7 @@ mod test {
             [
                 Metric {
                     name: "gauge-1".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -582,6 +601,7 @@ mod test {
                 },
                 Metric {
                     name: "gauge-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -589,6 +609,7 @@ mod test {
                 },
                 Metric {
                     name: "gauge-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -596,6 +617,7 @@ mod test {
                 },
                 Metric {
                     name: "gauge-4".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -613,6 +635,7 @@ mod test {
         for i in 3..6 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Absolute,
@@ -626,6 +649,7 @@ mod test {
         for i in 1..4 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Incremental,
@@ -637,6 +661,7 @@ mod test {
         for i in 2..5 {
             let event = Event::Metric(Metric {
                 name: format!("gauge-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("staging")),
                 kind: MetricKind::Absolute,
@@ -649,8 +674,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -664,6 +688,7 @@ mod test {
             [
                 Metric {
                     name: "gauge-1".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -671,6 +696,7 @@ mod test {
                 },
                 Metric {
                     name: "gauge-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -678,6 +704,7 @@ mod test {
                 },
                 Metric {
                     name: "gauge-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -685,6 +712,7 @@ mod test {
                 },
                 Metric {
                     name: "gauge-4".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -692,6 +720,7 @@ mod test {
                 },
                 Metric {
                     name: "gauge-5".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("staging")),
                     kind: MetricKind::Absolute,
@@ -709,6 +738,7 @@ mod test {
         for i in 0..4 {
             let event = Event::Metric(Metric {
                 name: "set-0".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -722,6 +752,7 @@ mod test {
         for i in 0..4 {
             let event = Event::Metric(Metric {
                 name: "set-0".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -734,8 +765,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -747,6 +777,7 @@ mod test {
             sorted(&buffer[0].clone()),
             [Metric {
                 name: "set-0".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -767,6 +798,7 @@ mod test {
         for _ in 2..6 {
             let event = Event::Metric(Metric {
                 name: "dist-2".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -782,6 +814,7 @@ mod test {
         for i in 2..6 {
             let event = Event::Metric(Metric {
                 name: format!("dist-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -796,8 +829,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -810,6 +842,7 @@ mod test {
             [
                 Metric {
                     name: "dist-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -821,6 +854,7 @@ mod test {
                 },
                 Metric {
                     name: "dist-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -832,6 +866,7 @@ mod test {
                 },
                 Metric {
                     name: "dist-4".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -843,6 +878,7 @@ mod test {
                 },
                 Metric {
                     name: "dist-5".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -875,6 +911,7 @@ mod test {
         for _ in 2..5 {
             let event = Event::Metric(Metric {
                 name: "buckets-2".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Absolute,
@@ -891,6 +928,7 @@ mod test {
         for i in 2..5 {
             let event = Event::Metric(Metric {
                 name: format!("buckets-{}", i),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Absolute,
@@ -906,8 +944,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -920,6 +957,7 @@ mod test {
             [
                 Metric {
                     name: "buckets-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
@@ -932,6 +970,7 @@ mod test {
                 },
                 Metric {
                     name: "buckets-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
@@ -944,6 +983,7 @@ mod test {
                 },
                 Metric {
                     name: "buckets-4".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
@@ -966,6 +1006,7 @@ mod test {
         for _ in 0..3 {
             let event = Event::Metric(Metric {
                 name: "buckets-2".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -982,6 +1023,7 @@ mod test {
         for i in 1..4 {
             let event = Event::Metric(Metric {
                 name: "buckets-2".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(tag("production")),
                 kind: MetricKind::Incremental,
@@ -997,8 +1039,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -1011,6 +1052,7 @@ mod test {
             [
                 Metric {
                     name: "buckets-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -1023,6 +1065,7 @@ mod test {
                 },
                 Metric {
                     name: "buckets-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Incremental,
@@ -1046,6 +1089,7 @@ mod test {
             for i in 2..5 {
                 let event = Event::Metric(Metric {
                     name: format!("quantiles-{}", i),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
@@ -1062,8 +1106,7 @@ mod test {
 
         let _ = sink
             .sink_map_err(drop)
-            .send_all(futures01::stream::iter_ok(events.into_iter()))
-            .compat()
+            .send_all(&mut stream::iter(events.into_iter()).map(Ok))
             .await
             .unwrap();
 
@@ -1076,6 +1119,7 @@ mod test {
             [
                 Metric {
                     name: "quantiles-2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
@@ -1088,6 +1132,7 @@ mod test {
                 },
                 Metric {
                     name: "quantiles-3".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,
@@ -1100,6 +1145,7 @@ mod test {
                 },
                 Metric {
                     name: "quantiles-4".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tag("production")),
                     kind: MetricKind::Absolute,

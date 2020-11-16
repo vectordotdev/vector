@@ -15,18 +15,18 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{self, Event, Value},
+    http::{Auth, HttpClient},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, TowerRequestConfig, UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
 use derivative::Derivative;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -69,7 +69,15 @@ inventory::submit! {
     SinkDescription::new::<LokiConfig>("loki")
 }
 
-impl GenerateConfig for LokiConfig {}
+impl GenerateConfig for LokiConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "http://localhost:3100"
+            labels = {}"#,
+        )
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "loki")]
@@ -89,7 +97,7 @@ impl SinkConfig for LokiConfig {
             .timeout(1)
             .parse_config(self.batch)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls)?;
+        let client = HttpClient::new(tls)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -99,14 +107,11 @@ impl SinkConfig for LokiConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal loki sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -193,7 +198,7 @@ impl HttpSink for LokiConfig {
     }
 }
 
-async fn healthcheck(config: LokiConfig, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
     let uri = format!("{}ready", config.endpoint);
 
     let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
@@ -219,6 +224,11 @@ mod tests {
     use crate::test_util;
     use crate::Event;
     use futures::StreamExt;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<LokiConfig>();
+    }
 
     #[test]
     fn interpolate_labels() {
@@ -286,7 +296,7 @@ mod tests {
 
     #[tokio::test]
     async fn healthcheck_includes_auth() {
-        let (mut config, cx) = load_sink::<LokiConfig>(
+        let (mut config, _cx) = load_sink::<LokiConfig>(
             r#"
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
@@ -309,7 +319,7 @@ mod tests {
         tokio::spawn(server);
 
         let tls = TlsSettings::from_options(&config.tls).expect("could not create TLS settings");
-        let client = HttpClient::new(cx.resolver(), tls).expect("could not cerate HTTP client");
+        let client = HttpClient::new(tls).expect("could not cerate HTTP client");
 
         healthcheck(config.clone(), client)
             .await
@@ -334,8 +344,7 @@ mod integration_tests {
         test_util::random_lines, Event,
     };
     use bytes::Bytes;
-    use futures::compat::Future01CompatExt;
-    use futures01::Sink;
+    use futures::{stream, StreamExt};
     use std::convert::TryFrom;
 
     #[tokio::test]
@@ -362,9 +371,8 @@ mod integration_tests {
 
         let events = lines.clone().into_iter().map(Event::from);
         let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
             .await
             .unwrap();
 
@@ -400,9 +408,8 @@ mod integration_tests {
             .map(Event::from)
             .collect::<Vec<_>>();
         let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events.clone()))
-            .compat()
+            .into_sink()
+            .send_all(&mut stream::iter(events.clone()).map(Ok))
             .await
             .unwrap();
 
@@ -448,9 +455,8 @@ mod integration_tests {
         }
 
         let _ = sink
-            .into_futures01sink()
-            .send_all(futures01::stream::iter_ok(events))
-            .compat()
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
             .await
             .unwrap();
 
