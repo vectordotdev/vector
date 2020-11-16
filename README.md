@@ -24,7 +24,7 @@ zero single points of failure.
 ### Principles
 
 * **Reliability** - Built in [Rust][urls.rust], Vector's primary design goal is reliability & performance.
-* **Unified** - Deploys as an agent or aggregator. One tool. One workflow.
+* **End-to-end** - Deploys as an agent or aggregator. One tool. One workflow.
 * **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All data.
 
 ### Community
