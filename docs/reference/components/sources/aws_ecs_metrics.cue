@@ -55,13 +55,32 @@ components: sources: aws_ecs_metrics: {
 	configuration: {
 		endpoint: {
 			description: """
-				Endpoint to scrape metrics from.
-				If empty, the endpoint will be automatically discovered based on the latest version detected.
+					Base URI of the task metadata endpoint.
+					If empty, the URI will be automatically discovered based on the latest version detected.
+					The version 2 endpoint base URI is `169.254.170.2/v2/`.
+					The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
+					The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
 				"""
 			common:   false
 			required: false
 			type: string: {
-				default: "${ECS_CONTAINER_METADATA_URI_V4}/task/stats"
+				default: "${ECS_CONTAINER_METADATA_URI_V4}"
+			}
+		}
+		version: {
+			description: """
+					The version of the metadata endpoint.
+					If empty, the version will be automatically discovered based on envirionment variables.
+				"""
+			common:   false
+			required: false
+			type: string: {
+				default: "v4"
+				enum: {
+					v4: "When the environment variable `ECS_CONTAINER_METADATA_URI_V4` is defined."
+					v3: "When fails the v4 check, but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
+					v2: "When fails the v4 and v3 checks."
+				}
 			}
 		}
 		scrape_interval_secs: {
