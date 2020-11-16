@@ -30,7 +30,7 @@ or [**install Vector**][docs.installation].
 
 * **Reliability** - Built in [Rust][urls.rust], Vector's primary design goal is reliability & performance.
 * **End-to-end** - Deploys as an agent or aggregator. One tool. One workflow.
-* **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All your data.
+* **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All your data.
 
 ### Use cases
 
