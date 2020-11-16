@@ -14,14 +14,13 @@
 
 ## What is Vector?
 
-Vector is a high-performance observability data platform that puts you in
-control of your observability data. [Collect][docs.sources],
+Vector is a high-performance observability data platform (agent & aggregator)
+that puts you in control of your observability data. [Collect][docs.sources],
 [transform][docs.transforms], and [route][docs.sinks] all your logs, metrics,
 and traces to any vendors you want today and any other vendors you may want
-tomorrow. Vector enables dramatic cost reduction, novel data enrichment, and
-data security when you need it, not when is most convenient for your vendors.
-100% open source, up to 10x faster than every alternative, and distributed for
-zero single points of failure.
+tomorrow. Vector enables cost reduction, novel data enrichment, and data
+security when you need it, not when is most convenient for your vendors.
+100% open source and up to 10x faster than every alternative.
 
 To get started, follow our [**getting started guides**][urls.getting_started]
 or [**install Vector**][docs.installation].
@@ -130,7 +129,7 @@ Vector is an end-to-end, unified, open data platform.
 |             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |
 |              Traces |     🚧      |       |           |         |          |           |           |
 |            **Open** |   **✓**    |       |     ✓     |    ✓    |          |           |           |
-|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |           |
+|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |           |           |
 |      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |
 |     **Reliability** |   **✓**    |       |           |         |          |           |           |
 |         Memory-safe |   **✓**    |       |           |         |          |           |           |
