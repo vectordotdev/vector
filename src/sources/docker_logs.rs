@@ -113,7 +113,7 @@ inventory::submit! {
 impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "docker")]
+#[typetag::serde(name = "docker_logs")]
 impl SourceConfig for DockerLogsConfig {
     async fn build(
         &self,
@@ -156,6 +156,36 @@ impl SourceConfig for DockerLogsConfig {
 
     fn output_type(&self) -> DataType {
         DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "docker_logs"
+    }
+}
+
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DockerCompatConfig {
+    #[serde(flatten)]
+    config: DockerLogsConfig,
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "docker")]
+impl SourceConfig for DockerCompatConfig {
+    async fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        self.config.build(_name, _globals, shutdown, out).await
+    }
+
+    fn output_type(&self) -> DataType {
+        self.config.output_type()
     }
 
     fn source_type(&self) -> &'static str {
