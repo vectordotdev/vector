@@ -49,7 +49,6 @@ usage][urls.vector_performance].
 * Vector is **used by multiple fortune 500 companies** with stringent production requirements.
 * Vector has **over 15 active contributors** and growing.
 
-
 ## [Documentation](https://vector.dev/docs/)
 
 ### About
