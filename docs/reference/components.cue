@@ -1,6 +1,412 @@
 package metadata
 
 components: {
+	// `#Classes` represent various `#Components` classifications.
+	#Classes: {
+		_args: kind: string
+		let Args = _args
+
+		// `commonly_used` specifies if the component is commonly used or not.
+		// Setting this to `true` will surface the component from other,
+		// less commonly used, components.
+		commonly_used: bool
+
+		if Args.kind == "source" || Args.kind == "sink" {
+			delivery: #DeliveryStatus
+		}
+
+		if Args.kind == "source" {
+			// `deployment_roles` clarify when the component should be used under
+			// different deployment contexts.
+			deployment_roles: [...#DeploymentRole]
+		}
+		development: #DevelopmentStatus
+
+		// `egress_method` documents how the component outputs events.
+		egress_method: #EgressMethod
+
+		if Args.kind == "sink" {
+			// `service_providers` specify the service providers that support
+			// and host this service. This helps users find relevant sinks.
+			//
+			// For example, "AWS" is a service provider for many services, and
+			// a user on AWS can use this to filter for AWS supported
+			// components.
+			service_providers: [string, ...string] | *[]
+		}
+	}
+
+	#Component: {
+		// `kind` specified the component kind. This is set automatically.
+		kind: #ComponentKind
+		let Kind = kind
+
+		configuration: #Schema
+
+		// `description` describes the components with a single paragraph.
+		// It is used for SEO purposes and should be full of relevant keywords.
+		description?: =~"[.]$"
+
+		env_vars: #EnvVars
+
+		// `type` is the component identifier. This is set automatically.
+		type: string
+
+		// `classes` represent the various classifications for this component
+		classes: #Classes & {_args: kind: Kind}
+
+		// `examples` demonstrates various ways to use the component using an
+		// input, output, and example configuration.
+		#ExampleConfig: close({
+			title:    string
+			context?: string
+			"configuration": {
+				for k, v in configuration {
+					"\( k )"?: _ | *null
+				}
+			}
+
+			if Kind == "source" {
+				input: string
+			}
+
+			if Kind != "source" {
+				input: #Event | [#Event, ...#Event]
+			}
+
+			if Kind == "sink" {
+				output: string
+			}
+
+			if Kind != "sink" {
+				output: #Event | [#Event, ...#Event] | null
+			}
+
+			notes?: string
+		})
+
+		examples?: [#ExampleConfig, ...#ExampleConfig]
+
+		// `features` describes the various supported features of the component.
+		// Setting these helps to reduce boilerplate.
+		//
+		// For example, the `tls` feature will automatically add the appropriate
+		// `tls` options and `how_it_works` sections.
+		features: #Features & {_args: {egress_method: classes.egress_method, kind: Kind}}
+
+		// `how_it_works` contain sections that further describe the component's
+		// behavior. This is like a mini-manual for the component and should help
+		// answer any obvious questions the user might have. Options can link
+		// to these sections for deeper explanations of behavior.
+		how_it_works: #HowItWorks
+
+		if Kind != "source" {
+			input: #Input
+		}
+
+		if Kind != "sink" {
+			// `output` documents output of the component. This is very important
+			// as it communicate which events and fields are emitted.
+			output: #Output
+		}
+
+		// `support` communicates the varying levels of support of the component.
+		support: #Support & {_args: kind: Kind}
+
+		// `title` is the human friendly title for the component.
+		//
+		// For example, the `http` sink has a `HTTP` title.
+		title: string
+
+		// Telemetry produced by the component
+		telemetry: metrics: #MetricOutput
+	}
+
+	// `#ComponentKind` represent the kind of component.
+	#ComponentKind: "sink" | "source" | "transform"
+
+	#Components: [Type=string]: #Component & {
+		type: Type
+	}
+
+	// `#EgressMethod` specified how a component outputs events.
+	//
+	// * `batch` - one or more events at a time
+	// * `stream` - one event at a time
+	#EgressMethod: "batch" | "expose" | "stream"
+
+	#EnvVars: #Schema & {[Type=string]: {
+		common:   true
+		required: false
+	}}
+
+	#Features: {
+		_args: {
+			egress_method: string
+			kind:          string
+		}
+		let Args = _args
+
+		if Args.kind == "source" {
+			collect?:  #FeaturesCollect
+			generate?: #FeaturesGenerate
+			multiline: #FeaturesMultiline
+			receive?:  #FeaturesReceive
+		}
+
+		if Args.kind == "transform" {
+			convert?:  #FeaturesConvert
+			enrich?:   #FeaturesEnrich
+			filter?:   #FeaturesFilter
+			parse?:    #FeaturesParse
+			program?:  #FeaturesProgram
+			reduce?:   #FeaturesReduce
+			route?:    #FeaturesRoute
+			sanitize?: #FeaturesSanitize
+			shape?:    #FeaturesShape
+		}
+
+		if Args.kind == "sink" {
+			// `buffer` describes how the component buffers data.
+			buffer: close({
+				enabled: bool | string
+			})
+
+			// `healtcheck` notes if a component offers a healthcheck on boot.
+			healthcheck: close({
+				enabled: bool
+			})
+
+			exposes?: #FeaturesExpose
+			send?:    #FeaturesSend & {_args: Args}
+		}
+
+		descriptions: [Name=string]: string
+	}
+
+	#FeaturesCollect: {
+		checkpoint: close({
+			enabled: bool
+		})
+
+		from?: #Service
+		tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
+	}
+
+	#FeaturesConvert: {
+	}
+
+	#FeaturesEnrich: {
+		from: close({
+			name:     string
+			url:      string
+			versions: string | null
+		})
+	}
+
+	#FeaturesExpose: {
+		for: #Service
+	}
+
+	#FeaturesFilter: {
+	}
+
+	#FeaturesGenerate: {
+	}
+
+	#FeaturesMultiline: {
+		enabled: bool
+	}
+
+	#FeaturesParse: {
+		format: close({
+			name:     string
+			url:      string | null
+			versions: string | null
+		})
+	}
+
+	#FeaturesProgram: {
+		runtime: #Runtime
+	}
+
+	#FeaturesReceive: {
+		from?: #Service
+		tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+	}
+
+	#FeaturesReduce: {
+	}
+
+	#FeaturesRoute: {
+	}
+
+	#FeaturesSanitize: {
+	}
+
+	#FeaturesShape: {
+	}
+
+	#FeaturesSend: {
+		_args: {
+			egress_method: string
+			kind:          string
+		}
+		let Args = _args
+
+		if Args.egress_method == "batch" {
+			// `batch` describes how the component batches data. This is only
+			// relevant if a component has an `egress_method` of "batch".
+			batch: close({
+				enabled:      bool
+				common:       bool
+				max_bytes:    uint | null
+				max_events:   uint | null
+				timeout_secs: uint16
+			})
+		}
+
+		// `compression` describes how the component compresses data.
+		compression: {
+			enabled: bool
+
+			if enabled == true {
+				default: #CompressionAlgorithm
+				algorithms: [#CompressionAlgorithm, ...#CompressionAlgorithm]
+				levels: [#CompressionLevel, ...#CompressionLevel]
+			}
+		}
+
+		// `encoding` describes how the component encodes data.
+		encoding: {
+			enabled: bool
+
+			if enabled {
+				codec: {
+					enabled: bool
+
+					if enabled {
+						default: #EncodingCodec | null
+						enum:    [#EncodingCodec, ...#EncodingCodec] | null
+					}
+				}
+			}
+		}
+
+		// `request` describes how the component issues and manages external
+		// requests.
+		request: {
+			enabled: bool
+
+			if enabled {
+				auto_concurrency:           bool | *true
+				in_flight_limit:            uint8 | *5
+				rate_limit_duration_secs:   uint8
+				rate_limit_num:             uint16
+				retry_initial_backoff_secs: uint8
+				retry_max_duration_secs:    uint8
+				timeout_secs:               uint8
+			}
+		}
+
+		// `tls` describes if the component secures network communication
+		// via TLS.
+		tls: #FeaturesTLS & {_args: {mode: "connect"}}
+
+		to?: #Service
+	}
+
+	#FeaturesTLS: {
+		_args: {
+			mode: "accept" | "connect"
+		}
+		let Args = _args
+		enabled: bool
+
+		if enabled {
+			can_enable:             bool
+			can_verify_certificate: bool
+			if Args.mode == "connect" {
+				can_verify_hostname: bool
+			}
+			enabled_default: bool
+		}
+	}
+
+	#Input: {
+		logs:    bool
+		metrics: #MetricInput | null
+	}
+
+	#LogOutput: [Name=string]: close({
+		description: string
+		name:        Name
+		fields:      #Schema
+	})
+
+	#MetricInput: {
+		counter:      bool
+		distribution: bool
+		gauge:        bool
+		histogram:    bool
+		summary:      bool
+		set:          bool
+	}
+
+	#MetricOutput: [Name=string]: close({
+		description:    string
+		relevant_when?: string
+		tags:           #MetricTags
+		name:           Name
+		type:           #MetricType
+	})
+
+	#Output: {
+		logs?:    #LogOutput
+		metrics?: #MetricOutput
+	}
+
+	#Runtime: {
+		name:    string
+		url:     string
+		version: string | null
+	}
+
+	#Support: {
+		_args: kind: string
+
+		// `platforms` describes which platforms this component is available on.
+		//
+		// For example, the `journald` source is only available on Linux
+		// environments.
+		platforms: #Platforms
+
+		// `requirements` describes any external requirements that the component
+		// needs to function properly.
+		//
+		// For example, the `journald` source requires the presence of the
+		// `journalctl` binary.
+		requirements: [...string] | null // Allow for empty list
+
+		// `warnings` describes any warnings the user should know about the
+		// component.
+		//
+		// For example, the `grok_parser` might offer a performance warning
+		// since the `regex_parser` and other transforms are faster.
+		warnings: [...string] | null // Allow for empty list
+
+		// `notices` communicates useful information to the user that is neither
+		// a requirement or a warning.
+		//
+		// For example, the `lua` transform offers a Lua version notice that
+		// communicate which version of Lua is embedded.
+		notices: [...string] | null // Allow for empty list
+	}
+
+	sources:    #Components
+	transforms: #Components
+	sinks:      #Components
+
 	{[Kind=string]: [Name=string]: {
 		kind: string
 		let Kind = kind
