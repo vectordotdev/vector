@@ -8,7 +8,13 @@ use std::{
 };
 
 #[derive(Clone)]
-pub enum Fingerprinter {
+pub struct Fingerprinter {
+    pub strategy: FingerprintStrategy,
+    pub ignore_not_found: bool,
+}
+
+#[derive(Clone)]
+pub enum FingerprintStrategy {
     Checksum {
         bytes: usize,
         ignored_header_bytes: usize,
@@ -60,14 +66,14 @@ impl Fingerprinter {
     ) -> Result<FileFingerprint, io::Error> {
         use FileFingerprint::*;
 
-        match *self {
-            Fingerprinter::DevInode => {
+        match self.strategy {
+            FingerprintStrategy::DevInode => {
                 let file_handle = File::open(path)?;
                 let dev = file_handle.portable_dev()?;
                 let ino = file_handle.portable_ino()?;
                 Ok(DevInode(dev, ino))
             }
-            Fingerprinter::Checksum {
+            FingerprintStrategy::Checksum {
                 ignored_header_bytes,
                 bytes,
             } => {
@@ -78,7 +84,7 @@ impl Fingerprinter {
                 let fingerprint = crc::crc64::checksum_ecma(&buffer[..]);
                 Ok(Checksum(fingerprint))
             }
-            Fingerprinter::FirstLineChecksum {
+            FingerprintStrategy::FirstLineChecksum {
                 max_line_length,
                 ignored_header_bytes,
             } => {
@@ -100,13 +106,19 @@ impl Fingerprinter {
         emitter: &impl FileSourceInternalEvents,
     ) -> Option<FileFingerprint> {
         self.get_fingerprint_of_file(path, buffer)
-            .map_err(|error| {
-                if error.kind() == io::ErrorKind::UnexpectedEof {
+            .map_err(|error| match error.kind() {
+                io::ErrorKind::UnexpectedEof => {
                     if !known_small_files.contains(path) {
                         emitter.emit_file_checksum_failed(path);
                         known_small_files.insert(path.clone());
                     }
-                } else {
+                }
+                io::ErrorKind::NotFound => {
+                    if !self.ignore_not_found {
+                        emitter.emit_file_fingerprint_read_failed(path, error);
+                    }
+                }
+                _ => {
                     emitter.emit_file_fingerprint_read_failed(path, error);
                 }
             })
@@ -137,15 +149,18 @@ fn fingerprinter_read_until(mut r: impl Read, delim: u8, mut buf: &mut [u8]) -> 
 
 #[cfg(test)]
 mod test {
-    use super::Fingerprinter;
+    use super::{FingerprintStrategy, Fingerprinter};
     use std::fs;
     use tempfile::tempdir;
 
     #[test]
     fn test_checksum_fingerprint() {
-        let fingerprinter = Fingerprinter::Checksum {
-            bytes: 256,
-            ignored_header_bytes: 0,
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::Checksum {
+                bytes: 256,
+                ignored_header_bytes: 0,
+            },
+            ignore_not_found: false,
         };
 
         let target_dir = tempdir().unwrap();
@@ -183,9 +198,12 @@ mod test {
     #[test]
     fn test_first_line_checksum_fingerprint() {
         let max_line_length = 64;
-        let fingerprinter = Fingerprinter::FirstLineChecksum {
-            max_line_length,
-            ignored_header_bytes: 0,
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::FirstLineChecksum {
+                max_line_length,
+                ignored_header_bytes: 0,
+            },
+            ignore_not_found: false,
         };
 
         let target_dir = tempdir().unwrap();
@@ -252,7 +270,10 @@ mod test {
 
     #[test]
     fn test_inode_fingerprint() {
-        let fingerprinter = Fingerprinter::DevInode;
+        let fingerprinter = Fingerprinter {
+            strategy: FingerprintStrategy::DevInode,
+            ignore_not_found: false,
+        };
 
         let target_dir = tempdir().unwrap();
         let small_data = vec![b'x'; 1];

@@ -46,7 +46,11 @@ impl FloorFn {
 }
 
 impl Expression for FloorFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let precision =
             optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(state, object, self.value,
@@ -58,12 +62,68 @@ impl Expression for FloorFn {
 
         Ok(res.into())
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(vec![Integer, Float]);
+        let precision_def = self
+            .precision
+            .as_ref()
+            .map(|precision| precision.type_def(state).fallible_unless(Integer));
+
+        value_def
+            .clone()
+            .merge_optional(precision_def)
+            .with_constraint(match value_def.constraint {
+                v if v.is(Float) || v.is(Integer) => v,
+                _ => vec![Integer, Float].into(),
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_float {
+            expr: |_| FloorFn {
+                value: Literal::from(1.0).boxed(),
+                precision: None,
+            },
+            def: TypeDef { constraint: Float.into(), ..Default::default() },
+        }
+
+        value_integer {
+            expr: |_| FloorFn {
+                value: Literal::from(1).boxed(),
+                precision: None,
+            },
+            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+        }
+
+        value_float_or_integer {
+            expr: |_| FloorFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                precision: None,
+            },
+            def: TypeDef { fallible: true, constraint: vec![Integer, Float].into(), ..Default::default() },
+        }
+
+        fallible_precision {
+            expr: |_| FloorFn {
+                value: Literal::from(1).boxed(),
+                precision: Some(Variable::new("foo".to_owned()).boxed()),
+            },
+            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn floor() {
@@ -118,7 +178,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

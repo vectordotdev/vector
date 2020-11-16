@@ -49,7 +49,7 @@ pub async fn build_pieces(
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
         let (tx, rx) = mpsc::channel(1000);
-        let pipeline = Pipeline::from_sender(tx);
+        let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.source_type();
 

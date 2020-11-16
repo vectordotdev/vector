@@ -1,23 +1,24 @@
 mod error;
-mod expression;
-mod function;
 mod operator;
 mod parser;
 mod program;
 mod runtime;
-mod state;
-mod value;
+mod test_util;
+mod type_def;
 
-use expression::Expr;
-use operator::Operator;
-
+pub mod expression;
+pub mod function;
 pub mod prelude;
+pub mod state;
+pub mod value;
+
 pub use error::{Error, RemapError};
-pub use expression::{Expression, Literal, Noop, Path};
-pub use function::{Argument, ArgumentList, Function, Parameter};
+pub use expression::{Expr, Expression};
+pub use function::{Function, Parameter};
+pub use operator::Operator;
 pub use program::Program;
 pub use runtime::Runtime;
-pub use state::State;
+pub use type_def::TypeDef;
 pub use value::Value;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -129,6 +130,7 @@ fn vec_path_to_string(path: &[Vec<String>]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function::ArgumentList;
     use std::collections::HashMap;
 
     #[derive(Debug, Clone)]
@@ -154,8 +156,12 @@ mod tests {
     #[derive(Debug, Clone)]
     struct RegexPrinterFn(regex::Regex);
     impl Expression for RegexPrinterFn {
-        fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
+        fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
             Ok(Some(format!("regex: {:?}", self.0).into()))
+        }
+
+        fn type_def(&self, _: &state::Compiler) -> TypeDef {
+            TypeDef::default()
         }
     }
 
@@ -234,8 +240,14 @@ mod tests {
         ];
 
         for (script, expectation) in cases {
-            let program = Program::new(script, &[Box::new(RegexPrinter)]).unwrap();
-            let mut runtime = Runtime::new(State::default());
+            let accept = TypeDef {
+                fallible: true,
+                optional: true,
+                constraint: value::Constraint::Any,
+            };
+
+            let program = Program::new(script, &[Box::new(RegexPrinter)], accept).unwrap();
+            let mut runtime = Runtime::new(state::Program::default());
             let mut event = HashMap::default();
 
             let result = runtime.execute(&mut event, &program).map_err(|e| e.0);

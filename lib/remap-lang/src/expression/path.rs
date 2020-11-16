@@ -1,7 +1,7 @@
 use super::Error as E;
-use crate::{Expression, Object, Result, State, Value};
+use crate::{state, Expression, Object, Result, TypeDef, Value};
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("missing path: {0}")]
     Missing(String),
@@ -31,16 +31,29 @@ impl Path {
 }
 
 impl Expression for Path {
-    fn execute(&self, _: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
         object
             .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?
             .ok_or_else(|| E::from(Error::Missing(segments_to_path(&self.segments))).into())
             .map(Some)
     }
+
+    /// A path resolves to `Any` by default, but the script might assign
+    /// specific values to paths during its execution, which increases our exact
+    /// understanding of the value kind the path contains.
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        state
+            .path_query_type(&segments_to_path(&self.segments))
+            .cloned()
+            .unwrap_or(TypeDef {
+                fallible: true,
+                ..Default::default()
+            })
+    }
 }
 
-fn segments_to_path(segments: &[Vec<String>]) -> String {
+pub(crate) fn segments_to_path(segments: &[Vec<String>]) -> String {
     segments
         .iter()
         .map(|c| {
@@ -51,4 +64,60 @@ fn segments_to_path(segments: &[Vec<String>]) -> String {
         })
         .collect::<Vec<_>>()
         .join(".")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+
+    test_type_def![
+        ident_match {
+            expr: |state: &mut state::Compiler| {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeDef::default());
+                Path::from("foo")
+            },
+            def: TypeDef::default(),
+        }
+
+        exact_match {
+            expr: |state: &mut state::Compiler| {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
+                    fallible: true,
+                    optional: false,
+                    constraint: Exact(String)
+                });
+
+                Path::from("foo")
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(String),
+            },
+        }
+
+        ident_mismatch {
+            expr: |state: &mut state::Compiler| {
+                state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
+                    fallible: true,
+                    ..Default::default()
+                });
+
+                Path::from("bar")
+            },
+            def: TypeDef {
+                fallible: true,
+                ..Default::default()
+            },
+        }
+
+        empty_state {
+            expr: |_| Path::from("foo"),
+            def: TypeDef {
+                fallible: true,
+                ..Default::default()
+            },
+        }
+    ];
 }

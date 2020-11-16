@@ -141,7 +141,7 @@ impl HttpSink for ClickhouseConfig {
     }
 }
 
-async fn healthcheck(mut client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
     // TODO: check if table exists?
     let uri = format!("{}/?query=SELECT%201", config.endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();

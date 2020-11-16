@@ -1,4 +1,7 @@
-use crate::sinks::HealthcheckError;
+use crate::{
+    http::{HttpClient, HttpError},
+    sinks::HealthcheckError,
+};
 use futures::StreamExt;
 use goauth::scopes::Scope;
 use goauth::{
@@ -35,11 +38,13 @@ enum GcpError {
     #[snafu(display("Failed to get OAuth token text"))]
     GetTokenBytes { source: hyper::Error },
     #[snafu(display("Failed to get implicit GCP token"))]
-    GetImplicitToken { source: hyper::Error },
+    GetImplicitToken { source: HttpError },
     #[snafu(display("Failed to parse OAuth token JSON"))]
     TokenFromJson { source: TokenErr },
     #[snafu(display("Failed to parse OAuth token JSON text"))]
     TokenJsonFromStr { source: serde_json::Error },
+    #[snafu(display("Failed to build HTTP client"))]
+    BuildHttpClient { source: HttpError },
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -73,8 +78,9 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
         .body(hyper::Body::empty())
         .unwrap();
 
-    let res = hyper::Client::new()
-        .request(req)
+    let res = HttpClient::new(None)
+        .context(BuildHttpClient)?
+        .send(req)
         .await
         .context(GetImplicitToken)?;
 

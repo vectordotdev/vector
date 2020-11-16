@@ -35,7 +35,7 @@ dyn_clone::clone_trait_object!(CheckFieldsPredicate);
 //------------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
-struct EqualsPredicate {
+pub(crate) struct EqualsPredicate {
     target: String,
     arg: CheckFieldsPredicateArg,
 }
@@ -545,6 +545,13 @@ impl ConditionConfig for CheckFieldsConfig {
 #[derive(Clone)]
 pub struct CheckFields {
     predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>,
+}
+
+impl CheckFields {
+    #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]
+    pub(crate) fn new(predicates: IndexMap<String, Box<dyn CheckFieldsPredicate>>) -> Self {
+        Self { predicates }
+    }
 }
 
 impl Condition for CheckFields {

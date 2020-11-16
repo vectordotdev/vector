@@ -40,7 +40,11 @@ impl ParseUrlFn {
 }
 
 impl Expression for ParseUrlFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let bytes = required!(state, object, self.value, Value::String(v) => v);
 
         Url::parse(&String::from_utf8_lossy(&bytes))
@@ -48,6 +52,14 @@ impl Expression for ParseUrlFn {
             .map(event::Value::from)
             .map(Into::into)
             .map(Some)
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .into_fallible(true) // URL parsing error
+            .with_constraint(value::Kind::Map)
     }
 }
 
@@ -85,6 +97,18 @@ impl From<Url> for event::Value {
 mod tests {
     use super::*;
     use crate::map;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseUrlFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::Map.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| ParseUrlFn { value: Box::new(Noop) },
+            def: TypeDef { fallible: true, optional: true, constraint: value::Kind::Map.into() },
+        }
+    ];
 
     #[test]
     fn parse_url() {
@@ -132,7 +156,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

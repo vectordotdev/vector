@@ -80,7 +80,11 @@ impl FormatNumberFn {
 }
 
 impl Expression for FormatNumberFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = required!(state, object, self.value,
             Value::Integer(v) => Decimal::from_i64(v),
             Value::Float(v) => Decimal::from_f64(v),
@@ -149,12 +153,75 @@ impl Expression for FormatNumberFn {
                 .into(),
         ))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let scale_def = self
+            .scale
+            .as_ref()
+            .map(|scale| scale.type_def(state).fallible_unless(Integer));
+
+        let decimal_separator_def = self
+            .decimal_separator
+            .as_ref()
+            .map(|decimal_separator| decimal_separator.type_def(state).fallible_unless(String));
+
+        let grouping_separator_def = self
+            .grouping_separator
+            .as_ref()
+            .map(|grouping_separator| grouping_separator.type_def(state).fallible_unless(String));
+
+        self.value
+            .type_def(state)
+            .fallible_unless(vec![Integer, Float])
+            .merge_optional(scale_def)
+            .merge_optional(decimal_separator_def)
+            .merge_optional(grouping_separator_def)
+            .into_fallible(true) // `Decimal::from` can theoretically fail.
+            .with_constraint(String)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_integer {
+            expr: |_| FormatNumberFn {
+                value: Literal::from(1).boxed(),
+                scale: None,
+                decimal_separator: None,
+                grouping_separator: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_float {
+            expr: |_| FormatNumberFn {
+                value: Literal::from(1.0).boxed(),
+                scale: None,
+                decimal_separator: None,
+                grouping_separator: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        // TODO(jean): we should update the function to ignore `None` values,
+        // instead of aborting.
+        optional_scale {
+            expr: |_| FormatNumberFn {
+                value: Literal::from(1.0).boxed(),
+                scale: Some(Box::new(Noop)),
+                decimal_separator: None,
+                grouping_separator: None,
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+        }
+    ];
 
     #[test]
     fn format_number() {
@@ -221,7 +288,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

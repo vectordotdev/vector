@@ -187,7 +187,7 @@ impl HttpSink for PubsubSink {
 }
 
 async fn healthcheck(
-    mut client: HttpClient,
+    client: HttpClient,
     uri: Uri,
     creds: Option<GcpCredentials>,
 ) -> crate::Result<()> {
