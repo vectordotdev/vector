@@ -132,7 +132,7 @@ Vector is an end-to-end, unified, open data platform.
 * **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon).
 * **Customizable log schema** - [Change Vector's log schema][docs.global-options#log_schema] to anything you like.
 * **Rich type system** - Support for [JSON primitive types][docs.data-model.log#types] and [timestamps][docs.data-model.log#timestamps].
-* **Metrics interoperability** - A [sophisticated metrics data model][docs.data-model.metric] ensures _correct_ interoperability between systems.
+* **Metrics interoperability** - A [first-class metrics data model][docs.data-model.metric] ensures interoperability between systems.
 * **Metrics aggregation** - Aggregated [histograms][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] reduce volume without loss of precision.
 
 ### Control Flow
@@ -145,7 +145,7 @@ Vector is an end-to-end, unified, open data platform.
 
 * **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
 * **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
-* **Smart timestamp coercion** - All [parsing transforms][urls.vector_parsing_transforms] implement a [`types` option][docs.transforms.regex_parser#types] that can automatically parse timestamps.
+* **Smart timestamp coercion** - All [parsing transforms][urls.vector_parsing_transforms] implement a [`types` option][docs.transforms.regex_parser#types] for timestamp parsing.
 * **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
 * **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
 * **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
@@ -173,7 +173,7 @@ Vector is an end-to-end, unified, open data platform.
 ### UX
 
 * **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
-* **Config unit tests** - [Develop Vector config files like code][guides.advanced.unit-testing]. Avoid the frustrating dev style required by other tools.
+* **Config unit tests** - [Develop Vector configs like code][guides.advanced.unit-testing]. Avoid the frustrating dev style required by other tools.
 * **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
 * **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
 
