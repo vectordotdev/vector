@@ -1,6 +1,15 @@
 use remap::prelude::*;
 use sha2::{Digest, Sha224, Sha256, Sha384, Sha512, Sha512Trunc224, Sha512Trunc256};
 
+const VARIANTS: &[&str] = &[
+    "SHA-224",
+    "SHA-256",
+    "SHA-384",
+    "SHA-512",
+    "SHA-512/224",
+    "SHA-512/256",
+];
+
 #[derive(Clone, Copy, Debug)]
 pub struct Sha2;
 
@@ -10,16 +19,23 @@ impl Function for Sha2 {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "value",
+                accepts: |v| matches!(v, Value::String(_)),
+                required: true,
+            },
+            Parameter {
+                keyword: "variant",
+                accepts: |v| matches!(v, Value::String(_)),
+                required: false,
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
-        let variant = arguments.optional_expr("variant")?;
+        let variant = arguments.optional_enum("variant", &VARIANTS)?;
 
         Ok(Box::new(Sha2Fn { value, variant }))
     }
@@ -28,13 +44,13 @@ impl Function for Sha2 {
 #[derive(Debug, Clone)]
 struct Sha2Fn {
     value: Box<dyn Expression>,
-    variant: Option<Box<dyn Expression>>,
+    variant: Option<String>,
 }
 
 impl Sha2Fn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, variant: Option<&str>) -> Self {
-        let variant = variant.map(|v| Box::new(Literal::from(v)) as _);
+        let variant = variant.map(|v| v.to_owned());
 
         Self { value, variant }
     }
@@ -47,22 +63,15 @@ impl Expression for Sha2Fn {
         object: &mut dyn Object,
     ) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(v) => v);
-        let variant = optional!(state, object, self.variant, Value::String(v) => v);
 
-        let hash = match variant.as_deref() {
-            Some(b"SHA-224") => encode::<Sha224>(&value),
-            Some(b"SHA-256") => encode::<Sha256>(&value),
-            Some(b"SHA-384") => encode::<Sha384>(&value),
-            Some(b"SHA-512") => encode::<Sha512>(&value),
-            Some(b"SHA-512/224") => encode::<Sha512Trunc224>(&value),
-            Some(b"SHA-512/256") | None => encode::<Sha512Trunc256>(&value),
-            Some(v) => {
-                return Err(format!(
-                    "unknown SHA-2 algorithm variant: '{}'",
-                    String::from_utf8_lossy(v)
-                )
-                .into())
-            }
+        let hash = match self.variant.as_deref() {
+            Some("SHA-224") => encode::<Sha224>(&value),
+            Some("SHA-256") => encode::<Sha256>(&value),
+            Some("SHA-384") => encode::<Sha384>(&value),
+            Some("SHA-512") => encode::<Sha512>(&value),
+            Some("SHA-512/224") => encode::<Sha512Trunc224>(&value),
+            Some("SHA-512/256") | None => encode::<Sha512Trunc256>(&value),
+            _ => unreachable!("enum invariant"),
         };
 
         Ok(Some(hash.into()))
@@ -72,12 +81,6 @@ impl Expression for Sha2Fn {
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::String)
-            .merge_optional(
-                self.variant
-                    .as_ref()
-                    .map(|variant| variant.type_def(state).fallible_unless(value::Kind::String)),
-            )
-            .into_fallible(true) // unknown variant enum
             .with_constraint(value::Kind::String)
     }
 }
@@ -99,7 +102,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 variant: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { constraint: String.into(), ..Default::default() },
         }
 
         value_non_string {
@@ -117,14 +120,6 @@ mod tests {
             },
             def: TypeDef { fallible: true, optional: true, constraint: String.into() },
         }
-
-        variant_fallible {
-            expr: |_| Sha2Fn {
-                value: Literal::from("foo").boxed(),
-                variant: Some(Variable::new("foo".to_string()).boxed()),
-            },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
-        }
     ];
 
     #[test]
@@ -134,11 +129,6 @@ mod tests {
                 map![],
                 Err("path error: missing path: foo".into()),
                 Sha2Fn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
-                Err("function call error: unknown SHA-2 algorithm variant: 'bar'".into()),
-                Sha2Fn::new(Box::new(Literal::from("foo")), Some("bar")),
             ),
             (
                 map!["foo": "foo"],

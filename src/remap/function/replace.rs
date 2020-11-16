@@ -168,7 +168,7 @@ mod test {
         pattern_expression_infallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from("foo").boxed().into(),
+                pattern: Literal::from("foo").into(),
                 with: Literal::from("foo").boxed(),
                 count: None,
             },
@@ -181,7 +181,7 @@ mod test {
         pattern_expression_fallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from(10).boxed().into(),
+                pattern: Literal::from(10).into(),
                 with: Literal::from("foo").boxed(),
                 count: None,
             },
@@ -241,8 +241,8 @@ mod test {
                 map![],
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Box::new(Literal::from("a")).into(),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     None,
                 ),
@@ -251,8 +251,8 @@ mod test {
                 map![],
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Box::new(Literal::from("a")).into(),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(-1),
                 ),
@@ -261,8 +261,8 @@ mod test {
                 map![],
                 Ok(Some("I like apples and bananas".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Box::new(Literal::from("a")).into(),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(0),
                 ),
@@ -271,8 +271,8 @@ mod test {
                 map![],
                 Ok(Some("I like opples and bananas".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Box::new(Literal::from("a")).into(),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(1),
                 ),
@@ -281,8 +281,8 @@ mod test {
                 map![],
                 Ok(Some("I like opples ond bananas".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Box::new(Literal::from("a")).into(),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(2),
                 ),
@@ -307,7 +307,7 @@ mod test {
                 map![],
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
+                    Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
                     "o",
                     None,
@@ -317,7 +317,7 @@ mod test {
                 map![],
                 Ok(Some("I like opples ond bononos".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
+                    Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(-1),
@@ -327,7 +327,7 @@ mod test {
                 map![],
                 Ok(Some("I like apples and bananas".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
+                    Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(0),
@@ -337,7 +337,7 @@ mod test {
                 map![],
                 Ok(Some("I like opples and bananas".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
+                    Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(1),
@@ -347,7 +347,7 @@ mod test {
                 map![],
                 Ok(Some("I like opples ond bananas".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
+                    Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(2),
@@ -373,8 +373,8 @@ mod test {
                 map![],
                 Ok(Some("I like biscuits and bananas".into())),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Box::new(Literal::from("apples")).into(),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("apples").into(),
                     "biscuits",
                     None,
                 ),
