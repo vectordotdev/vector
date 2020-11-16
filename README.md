@@ -104,18 +104,20 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 ## Vector vs. others
 
-|                  | **Vector** | Logstash | Beats | Fluentd | Fluentbit | Splunk UF |
-|-----------------:|:----------:|:--------:|:-----:|:-------:|:---------:|:---------:|
-|   **End-to-end** |   **✓**    |          |       |         |           |           |
-|            Agent |   **✓**    |          |   ✓   |         |     ✓     |     ✓     |
-|         Pipeline |   **✓**    |    ✓     |       |    ✓    |           |           |
-|     **All data** |   **✓**    |          |       |         |           |           |
-|             Logs |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |
-|          Metrics |   **✓**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |
-|           Traces |     🚧      |          |       |         |           |           |
-| **Lock-in free** |   **✓**    |          |       |  **✓**  |   **✓**   |           |
-|      Open-source |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |
-|   Vendor-neutral |   **✓**    |          |       |    ✓    |     ✓     |           |
+Vector is an end-to-end, unified, open data platform.
+
+|                | **Vector** | Logstash | Beats | Fluentd | Fluentbit | Splunk UF |
+|---------------:|:----------:|:--------:|:-----:|:-------:|:---------:|:---------:|
+| **End-to-end** |   **✓**    |          |       |         |           |           |
+|          Agent |   **✓**    |          |   ✓   |         |     ✓     |     ✓     |
+|       Pipeline |   **✓**    |    ✓     |       |    ✓    |           |           |
+|   **All data** |   **✓**    |          |       |         |           |           |
+|           Logs |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |
+|        Metrics |   **✓**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |
+|         Traces |     🚧      |          |       |         |           |           |
+|       **Open** |   **✓**    |          |       |  **✓**  |   **✓**   |           |
+|    Open-source |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |
+| Vendor-neutral |   **✓**    |          |       |    ✓    |     ✓     |           |
 
 ⚠ = Not interoperable, metrics are represented as structured logs
 
