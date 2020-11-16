@@ -19,9 +19,9 @@
 Vector is a high-performance observability data platform that puts you in
 control of your observability data. [Collect][docs.sources],
 [transform][docs.transforms], and [route][docs.sinks] all your logs, metrics,
-and traces to any vendors you want today and any other vendors you want
+and traces to any vendors you may want today and any other vendors you want
 tomorrow. Vector enables dramatic cost reduction, novel data enrichment, and
-data security where you need it, not where is most convenient for your vendors.
+data security where you need it, not when is most convenient for your vendors.
 100% open source, up to 10x faster than every alternative, and distributed for
 zero single points of failure.
 
@@ -29,7 +29,7 @@ zero single points of failure.
 
 * **Reliability** - Built in [Rust][urls.rust], Vector's primary design goal is reliability & performance.
 * **End-to-end** - Deploys as an agent or aggregator. One tool. One workflow.
-* **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All data.
+* **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All your data.
 
 ### Community
 
@@ -115,7 +115,7 @@ Vector is an end-to-end, unified, open data platform.
 | **End-to-end** |   **✓**    |          |       |         |           |           |           |
 |          Agent |   **✓**    |          |   ✓   |         |     ✓     |     ✓     |           |
 |       Pipeline |   **✓**    |    ✓     |       |    ✓    |           |           |     ✓     |
-|   **Unified** |   **✓**    |          |       |         |           |           |           |
+|    **Unified** |   **✓**    |          |       |         |           |           |           |
 |           Logs |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |     ✓     |
 |        Metrics |   **✓**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |     ⚠     |
 |         Traces |     🚧      |          |       |         |           |           |           |
