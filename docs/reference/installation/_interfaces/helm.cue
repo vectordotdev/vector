@@ -15,7 +15,7 @@ installation: _interfaces: helm: {
 		config:      "configs/vector.{config_format}"
 	}
 	package_manager_name: installation.package_managers.helm.name
-	platform_name: installation.platforms.kubernetes.name
+	platform_name:        installation.platforms.kubernetes.name
 	roles: {
 		_commands: {
 			_role:     string

@@ -33,7 +33,7 @@ installation: _interfaces: kubectl: {
 		agent: {
 			commands: _commands & {
 				_role: "agent"
-				variables: config: sources: in: type: components.sources.kubernetes_logs.type
+				variables: config: sinks: out: inputs: ["internal_metrics", "kubernetes_logs"]
 			}
 			description: "test"
 			title:       "Agent"
@@ -41,7 +41,7 @@ installation: _interfaces: kubectl: {
 		aggregator: {
 			commands: _commands & {
 				_role: "aggregator"
-				variables: config: sources: in: type: components.sources.vector.type
+				variables: config: sources: in_upstream: type: components.sources.vector.type
 			}
 			description: "test"
 			title:       "Aggregator"

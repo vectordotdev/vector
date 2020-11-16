@@ -23,9 +23,12 @@ installation: close({
 					include?: [string, ...string]
 				}
 
+				sources: internal_metrics: type: "internal_metrics"
+
 				sinks: out: {
-					type: "console"
-					inputs: [ for id, _source in sources {id}]
+					type:   "console"
+					inputs: ["internal_metrics", ...string] | *[ for id, _source in sources {id}]
+					encoding: codec: "json"
 				}
 			}
 			config_format: ["toml"]
