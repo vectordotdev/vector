@@ -23,9 +23,9 @@ zero single points of failure.
 
 ### Principles
 
-* **Reliability** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
-* **One Tool. All Data.** - One simple tool gets your [logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon) from A to B.
-* **Single Responsibility.** - Vector is a _data router_, it does not plan to become a distributed processing framework.
+* **Reliability** - Built in [Rust][urls.rust], Vector's primary design goal is reliability & performance.
+* **Unified** - Deploys as an agent or aggregator. One tool. One workflow.
+* **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool for all data.
 
 ### Community
 
