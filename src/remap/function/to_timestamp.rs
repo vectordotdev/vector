@@ -127,34 +127,33 @@ mod tests {
 
         null_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(()).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
         }
 
         string_fallible {
             expr: |_| ToTimestampFn { value: Literal::from("foo").boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
         }
 
         map_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
         }
 
         array_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(vec![0]).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
         }
 
         boolean_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(true).boxed(), default: None},
-            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
         }
 
         fallible_value_without_default {
             expr: |_| ToTimestampFn { value: Variable::new("foo".to_owned()).boxed(), default: None},
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Timestamp,
             },
         }
@@ -166,7 +165,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Timestamp,
             },
         }
@@ -178,7 +176,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Timestamp,
             },
         }
@@ -190,7 +187,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Timestamp,
             },
         }
@@ -202,7 +198,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Timestamp,
             },
         }

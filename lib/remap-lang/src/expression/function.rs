@@ -147,8 +147,7 @@ mod tests {
         },
         def: TypeDef {
             fallible: false,
-            optional: true,
-            kind: Kind::all(),
+            kind: Kind::Null,
         },
     }];
 }

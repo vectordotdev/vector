@@ -1,4 +1,4 @@
-use crate::{state, Expression, Object, Result, TypeDef, Value};
+use crate::{state, value, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub struct Noop;
@@ -10,8 +10,8 @@ impl Expression for Noop {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            optional: true,
-            ..Default::default()
+            fallible: false,
+            kind: value::Kind::Null,
         }
     }
 }
@@ -24,8 +24,8 @@ mod tests {
     test_type_def![noop {
         expr: |_| Noop,
         def: TypeDef {
-            optional: true,
-            ..Default::default()
+            fallible: false,
+            kind: value::Kind::Null,
         },
     }];
 }
