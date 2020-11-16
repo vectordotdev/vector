@@ -9,7 +9,7 @@ use crate::{
 };
 use futures::{
     channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
-    Sink, Stream, TryFutureExt,
+    Sink, StreamExt, TryFutureExt,
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
@@ -26,7 +26,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tokio::time::{delay_for, Duration};
+use tokio::{sync::Notify, time::Duration};
 
 // Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
 const SEND_RESULT_LIMIT: usize = 5;
@@ -78,6 +78,7 @@ pub struct KafkaSink {
     topic: Template,
     key_field: Option<String>,
     encoding: EncodingConfig<Encoding>,
+    flush_signal: Arc<Notify>,
     delivery_fut: FuturesUnordered<BoxFuture<'static, (usize, Result<DeliveryFuture, KafkaError>)>>,
     in_flight: FuturesUnordered<
         BoxFuture<'static, (usize, Result<Result<(i32, i64), KafkaError>, Canceled>)>,
@@ -155,6 +156,7 @@ impl KafkaSink {
             topic: Template::try_from(config.topic).context(TopicTemplate)?,
             key_field: config.key_field,
             encoding: config.encoding.into(),
+            flush_signal: Arc::new(Notify::new()),
             delivery_fut: FuturesUnordered::new(),
             in_flight: FuturesUnordered::new(),
             acker,
@@ -165,23 +167,22 @@ impl KafkaSink {
     }
 
     fn poll_delivery_fut(&mut self, cx: &mut Context<'_>) -> Poll<()> {
-        while !self.delivery_fut.is_empty() {
-            let result = Pin::new(&mut self.delivery_fut).poll_next(cx);
-            let (seqno, result) = ready!(result).expect("`delivery_fut` is endless stream");
-            self.in_flight.push(Box::pin(async move {
-                let result = match result {
-                    Ok(fut) => {
-                        fut.map_ok(|result| result.map_err(|(error, _owned_message)| error))
-                            .await
-                    }
-                    Err(error) => Ok(Err(error)),
-                };
+        loop {
+            match ready!(self.delivery_fut.poll_next_unpin(cx)) {
+                Some((seqno, result)) => self.in_flight.push(Box::pin(async move {
+                    let result = match result {
+                        Ok(fut) => {
+                            fut.map_ok(|result| result.map_err(|(error, _owned_message)| error))
+                                .await
+                        }
+                        Err(error) => Ok(Err(error)),
+                    };
 
-                (seqno, result)
-            }));
+                    (seqno, result)
+                })),
+                None => return Poll::Ready(()),
+            }
         }
-
-        Poll::Ready(())
     }
 }
 
@@ -210,6 +211,7 @@ impl Sink<Event> for KafkaSink {
         self.seq_head += 1;
 
         let producer = Arc::clone(&self.producer);
+        let flush_signal = Arc::clone(&self.flush_signal);
         self.delivery_fut.push(Box::pin(async move {
             let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
             if let Some(Value::Timestamp(timestamp)) =
@@ -218,8 +220,8 @@ impl Sink<Event> for KafkaSink {
                 record = record.timestamp(timestamp.timestamp_millis());
             }
 
+            debug!(message = "Sending event.", count = 1);
             let result = loop {
-                debug!(message = "Sending event.", count = 1);
                 match producer.send_result(record) {
                     Ok(future) => break Ok(future),
                     // Try again if queue is full.
@@ -230,7 +232,7 @@ impl Sink<Event> for KafkaSink {
                     {
                         debug!(message = "The rdkafka queue full.", %error, %seqno, rate_limit_secs = 1);
                         record = future_record;
-                        delay_for(Duration::from_millis(10)).await;
+                        let _ = flush_signal.notified().await;
                     }
                     Err((error, _)) => break Err(error),
                 }
@@ -242,35 +244,38 @@ impl Sink<Event> for KafkaSink {
         Ok(())
     }
 
-    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        ready!(self.poll_delivery_fut(cx));
-
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let this = Pin::into_inner(self);
-        while !this.in_flight.is_empty() {
-            match ready!(Pin::new(&mut this.in_flight).poll_next(cx)) {
-                Some((seqno, Ok(result))) => {
-                    match result {
-                        Ok((partition, offset)) => {
-                            trace!(message = "Produced message.", ?partition, ?offset)
+
+        while !this.delivery_fut.is_empty() || !this.in_flight.is_empty() {
+            while let Poll::Ready(Some(item)) = this.in_flight.poll_next_unpin(cx) {
+                this.flush_signal.notify();
+                match item {
+                    (seqno, Ok(result)) => {
+                        match result {
+                            Ok((partition, offset)) => {
+                                trace!(message = "Produced message.", ?partition, ?offset)
+                            }
+                            Err(error) => error!(message = "Kafka error.", %error),
+                        };
+
+                        this.pending_acks.insert(seqno);
+
+                        let mut num_to_ack = 0;
+                        while this.pending_acks.remove(&this.seq_tail) {
+                            num_to_ack += 1;
+                            this.seq_tail += 1
                         }
-                        Err(error) => error!(message = "Kafka error.", %error),
-                    };
-
-                    this.pending_acks.insert(seqno);
-
-                    let mut num_to_ack = 0;
-                    while this.pending_acks.remove(&this.seq_tail) {
-                        num_to_ack += 1;
-                        this.seq_tail += 1
+                        this.acker.ack(num_to_ack);
                     }
-                    this.acker.ack(num_to_ack);
+                    (_seqno, Err(Canceled)) => {
+                        error!(message = "Request canceled.");
+                        return Poll::Ready(Err(()));
+                    }
                 }
-                Some((_, Err(Canceled))) => {
-                    error!(message = "Request canceled.");
-                    return Poll::Ready(Err(()));
-                }
-                None => break,
             }
+
+            ready!(this.poll_delivery_fut(cx));
         }
 
         Poll::Ready(Ok(()))

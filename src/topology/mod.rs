@@ -63,9 +63,7 @@ pub async fn start_validated(
     {
         return None;
     }
-    running_topology
-        .connect_diff(&diff, &mut pieces, &HashSet::new())
-        .await;
+    running_topology.connect_diff(&diff, &mut pieces).await;
     running_topology.spawn_diff(&diff, pieces);
 
     Some((running_topology, abort_rx))
@@ -220,19 +218,29 @@ impl RunningTopology {
         // conflicts in their resource usage. So if we combine their
         // resources, all found conflicts are between
         // to be removed and to be added components.
-        let remove = diff.sinks.removed_and_changed().map(|name| {
-            let value = self.config.sinks[name].inner.resources();
-            ((true, name.clone()), value)
-        });
-        let add = diff.sinks.changed_and_added().map(|name| {
-            let value = new_config.sinks[name].inner.resources();
-            ((false, name.clone()), value)
-        });
-        let conflicts = Resource::conflicts(remove.chain(add));
+        let remove_sink = diff
+            .sinks
+            .removed_and_changed()
+            .map(|name| (name, self.config.sinks[name].inner.resources()));
+        let add_source = diff
+            .sources
+            .changed_and_added()
+            .map(|name| (name, new_config.sources[name].resources()));
+        let add_sink = diff
+            .sinks
+            .changed_and_added()
+            .map(|name| (name, new_config.sinks[name].inner.resources()));
+        let conflicts = Resource::conflicts(
+            remove_sink.map(|(key, value)| ((true, key), value)).chain(
+                add_sink
+                    .chain(add_source)
+                    .map(|(key, value)| ((false, key), value)),
+            ),
+        );
         let wait_for_sinks = conflicts
             .into_iter()
-            .filter(|&(exist, _)| exist)
-            .map(|(_, name)| name)
+            .filter(|&(existing_sink, _)| existing_sink)
+            .map(|(_, name)| name.clone())
             .collect();
 
         // Checks passed so let's shutdown the difference.
@@ -252,8 +260,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces, &wait_for_sinks)
-                    .await;
+                self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
                 // We have successfully changed to new config.
@@ -269,8 +276,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces, &wait_for_sinks)
-                    .await;
+                self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 // We have successfully returned to old config.
                 return Ok(false);
@@ -384,6 +390,13 @@ impl RunningTopology {
             self.remove_inputs(&name);
         }
 
+        // Detach changed sinks that we have to wait for.
+        for name in &diff.sinks.to_change {
+            if wait_for_sinks.contains(name) {
+                self.detach_inputs(&name);
+            }
+        }
+
         // Second pass for final cleanup
         for name in &diff.sinks.to_remove {
             let previous = self.tasks.remove(name).unwrap();
@@ -393,15 +406,17 @@ impl RunningTopology {
                 drop(previous); // detach and forget
             }
         }
+
+        for name in &diff.sinks.to_change {
+            if wait_for_sinks.contains(name) {
+                let previous = self.tasks.remove(name).unwrap();
+                previous.await.unwrap().unwrap();
+            }
+        }
     }
 
     /// Rewires topology
-    async fn connect_diff(
-        &mut self,
-        diff: &ConfigDiff,
-        new_pieces: &mut Pieces,
-        wait_for_sinks: &HashSet<String>,
-    ) {
+    async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
         for name in diff.sources.changed_and_added() {
             self.setup_outputs(&name, new_pieces);
@@ -429,17 +444,6 @@ impl RunningTopology {
 
         for name in &diff.sinks.to_add {
             self.setup_inputs(&name, new_pieces);
-        }
-
-        // Since inputs of diff.sinks.to_change need to be replaced to avoid losing events
-        // that requires for new_pieces to be built, so waiting on changed sinks is done here
-        // instead of in fn shutdown_diff. A consequence of that is a strict requirement on
-        // the sinks with resources to not use their resources in the build method, but only
-        // once they have been run. Otherwise build will fail.
-        for name in wait_for_sinks {
-            if let Some(previous) = self.tasks.remove(name) {
-                previous.await.unwrap().unwrap();
-            }
         }
     }
 
@@ -629,11 +633,27 @@ impl RunningTopology {
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), tx.get()));
+            let _ = self.outputs[input].unbounded_send(fanout::ControlMessage::Replace(
+                name.to_string(),
+                Some(tx.get()),
+            ));
         }
 
         self.inputs.insert(name.to_string(), tx);
+    }
+
+    fn detach_inputs(&mut self, name: &str) {
+        self.inputs.remove(name);
+
+        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let old_inputs = sink_inputs.or(trans_inputs).unwrap();
+
+        for input in old_inputs {
+            // This can only fail if we are disconnected, which is a valid situation.
+            let _ = self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+        }
     }
 
     /// Borrows the Config
@@ -727,6 +747,7 @@ mod reload_tests {
     use crate::test_util::{next_addr, start_topology, wait_for_tcp};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use futures::{compat::Stream01CompatExt, StreamExt};
+    use std::net::{SocketAddr, TcpListener};
     use std::time::Duration;
     use tokio::time::delay_for;
 
@@ -765,10 +786,11 @@ mod reload_tests {
 
     #[tokio::test]
     async fn topology_rebuild_old() {
-        let address = next_addr();
+        let address_0 = next_addr();
+        let address_1 = next_addr();
 
         let mut old_config = Config::builder();
-        old_config.add_source("in1", SplunkConfig::on(address));
+        old_config.add_source("in1", SplunkConfig::on(address_0));
         old_config.add_sink(
             "out",
             &[&"in1"],
@@ -779,16 +801,18 @@ mod reload_tests {
         );
 
         let mut new_config = Config::builder();
-        new_config.add_source("in1", SplunkConfig::on(address));
-        new_config.add_source("in2", SplunkConfig::on(address));
+        new_config.add_source("in1", SplunkConfig::on(address_1));
         new_config.add_sink(
             "out",
-            &[&"in1", &"in2"],
+            &[&"in1"],
             ConsoleSinkConfig {
                 target: Target::Stdout,
                 encoding: Encoding::Text.into(),
             },
         );
+
+        // Will cause the new_config to fail on build
+        let _bind = TcpListener::bind(address_1).unwrap();
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
@@ -861,14 +885,82 @@ mod reload_tests {
             },
         );
 
-        let (mut topology, crash) = start_topology(old_config.build().unwrap(), false).await;
+        reload_sink_test(
+            old_config.build().unwrap(),
+            new_config.build().unwrap(),
+            address,
+            address,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn topology_reuse_old_port_cross_dependecy() {
+        // Reload with source that uses address of changed sink.
+        let address_0 = next_addr();
+        let address_1 = next_addr();
+
+        let transform = LogToMetricConfig {
+            metrics: vec![MetricConfig::Gauge(GaugeConfig {
+                field: "message".to_string(),
+                name: None,
+                namespace: None,
+                tags: None,
+            })],
+        };
+
+        let mut old_config = Config::builder();
+        old_config.add_source(
+            "in",
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001)),
+        );
+        old_config.add_transform("trans", &[&"in"], transform.clone());
+        old_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusExporterConfig {
+                address: address_0,
+                flush_period_secs: 1,
+                ..PrometheusExporterConfig::default()
+            },
+        );
+
+        let mut new_config = Config::builder();
+        new_config.add_source("in", SplunkConfig::on(address_0));
+        new_config.add_transform("trans", &[&"in"], transform.clone());
+        new_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusExporterConfig {
+                address: address_1,
+                flush_period_secs: 1,
+                ..PrometheusExporterConfig::default()
+            },
+        );
+
+        reload_sink_test(
+            old_config.build().unwrap(),
+            new_config.build().unwrap(),
+            address_0,
+            address_1,
+        )
+        .await;
+    }
+
+    async fn reload_sink_test(
+        old_config: Config,
+        new_config: Config,
+        old_address: SocketAddr,
+        new_address: SocketAddr,
+    ) {
+        let (mut topology, crash) = start_topology(old_config, false).await;
         let mut crash = crash.compat();
 
         // Wait for sink to come online
-        wait_for_tcp(address).await;
+        wait_for_tcp(old_address).await;
 
         assert!(topology
-            .reload_config_and_respawn(new_config.build().unwrap(), false)
+            .reload_config_and_respawn(new_config, false)
             .await
             .unwrap());
 
@@ -876,7 +968,7 @@ mod reload_tests {
         delay_for(Duration::from_secs(2)).await;
 
         tokio::select! {
-            _ = wait_for_tcp(address) => {}//Success
+            _ = wait_for_tcp(new_address) => {}//Success
             _ = crash.next() => panic!(),
         }
     }

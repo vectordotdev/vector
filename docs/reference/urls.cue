@@ -229,6 +229,7 @@ urls: {
 	mongodb_command_server_status:                            "https://docs.mongodb.com/manual/reference/command/serverStatus/"
 	mongodb_connection_string_uri_format:                     "https://docs.mongodb.com/manual/reference/connection-string/"
 	musl_builder_docker_image:                                "https://github.com/timberio/vector/blob/master/scripts/ci-docker-images/builder-x86_64-unknown-linux-musl/Dockerfile"
+	nats:                                                     "https://nats.io/"
 	new_bug_report:                                           "https://github.com/timberio/vector/issues/new?labels=type%3A+bug"
 	new_feature_request:                                      "https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature"
 	new_relic:                                                "https://newrelic.com/"
