@@ -47,7 +47,11 @@ impl ParseJsonFn {
 }
 
 impl Expression for ParseJsonFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let to_json = |value| match value {
             Value::String(bytes) => serde_json::from_slice(&bytes)
                 .map(|v: serde_json::Value| {
@@ -64,12 +68,79 @@ impl Expression for ParseJsonFn {
             to_json,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let default_def = self
+            .default
+            .as_ref()
+            .map(|default| default.type_def(state).fallible_unless(String));
+
+        self.value
+            .type_def(state)
+            .fallible_unless(String)
+            .merge_with_default_optional(default_def)
+            .into_fallible(true) // JSON parsing errors
+            .with_constraint(vec![String, Boolean, Integer, Float, Array, Map, Null])
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseJsonFn {
+                value: Literal::from("foo").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                ..Default::default()
+            },
+        }
+
+        optional_default {
+            expr: |_| ParseJsonFn {
+                value: Literal::from("foo").boxed(),
+                default: Some(Box::new(Noop)),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                ..Default::default()
+            },
+        }
+
+        optional_value {
+            expr: |_| ParseJsonFn {
+                value: Box::new(Noop),
+                default: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                ..Default::default()
+            },
+        }
+
+        optional_value_and_default {
+            expr: |_| ParseJsonFn {
+                value: Box::new(Noop),
+                default: Some(Box::new(Noop)),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: true,
+                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+            },
+        }
+    ];
 
     #[test]
     fn parse_json() {
@@ -106,7 +177,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -1,9 +1,10 @@
 use crate::{
     conditions::{Condition, ConditionConfig, ConditionDescription},
     emit,
-    internal_events::{RemapConditionExecutionFailed, RemapConditionNonBooleanReturned},
+    internal_events::RemapConditionExecutionFailed,
     Event,
 };
+use remap::{value, Program, RemapError, Runtime, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -20,7 +21,14 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let program = remap::Program::new(&self.source, &crate::remap::FUNCTIONS)?;
+        let expected_result = TypeDef {
+            fallible: true,
+            optional: true,
+            constraint: value::Constraint::Exact(value::Kind::Boolean),
+        };
+
+        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)
+            .map_err(|e| e.to_string())?;
 
         Ok(Box::new(Remap { program }))
     }
@@ -30,11 +38,11 @@ impl ConditionConfig for RemapConfig {
 
 #[derive(Clone)]
 pub struct Remap {
-    program: remap::Program,
+    program: Program,
 }
 
 impl Remap {
-    fn execute(&self, event: &Event) -> Result<Option<remap::Value>, remap::RemapError> {
+    fn execute(&self, event: &Event) -> Result<Option<remap::Value>, RemapError> {
         // TODO(jean): This clone exists until remap-lang has an "immutable"
         // mode.
         //
@@ -47,39 +55,38 @@ impl Remap {
         // program wants to mutate its events.
         //
         // see: https://github.com/timberio/vector/issues/4744
-        remap::Runtime::default().execute(&mut event.clone(), &self.program)
+        Runtime::default().execute(&mut event.clone(), &self.program)
     }
 }
 
 impl Condition for Remap {
     fn check(&self, event: &Event) -> bool {
         self.execute(&event)
-            .unwrap_or_else(|_| {
-                emit!(RemapConditionExecutionFailed);
-                None
+            .map(|opt| match opt {
+                Some(value) => value,
+                None => Value::Boolean(false),
             })
             .map(|value| match value {
-                remap::Value::Boolean(boolean) => boolean,
-                _ => {
-                    emit!(RemapConditionNonBooleanReturned);
-                    false
-                }
+                Value::Boolean(boolean) => boolean,
+                _ => unreachable!("boolean type constraint set"),
             })
-            .unwrap_or_else(|| {
-                emit!(RemapConditionNonBooleanReturned);
+            .unwrap_or_else(|_| {
+                emit!(RemapConditionExecutionFailed);
                 false
             })
     }
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        self.execute(event)
+        let result = self
+            .execute(event)
             .map_err(|err| format!("source execution failed: {:#}", err))?
-            .ok_or_else(|| "source execution resolved to no value".into())
-            .and_then(|value| match value {
-                remap::Value::Boolean(v) if v => Ok(()),
-                remap::Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
-                _ => Err("source execution resolved to non-boolean value".into()),
-            })
+            .unwrap_or_else(|| Value::Boolean(false));
+
+        match result {
+            Value::Boolean(v) if v => Ok(()),
+            Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
+            _ => unreachable!("boolean type constraint set"),
+        }
     }
 }
 
@@ -104,7 +111,7 @@ mod test {
             ),
             (
                 log_event!["foo" => true, "bar" => false],
-                ".bar || .foo",
+                "to_bool(.bar || .foo)",
                 Ok(()),
                 Ok(()),
             ),
@@ -117,14 +124,14 @@ mod test {
             (
                 log_event![],
                 "",
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
-                Err("source execution resolved to no value"),
             ),
             (
                 log_event!["foo" => "string"],
                 ".foo",
+                Err("remap error: program error: expected to resolve to boolean or no value, but instead resolves to any value"),
                 Ok(()),
-                Err("source execution resolved to non-boolean value"),
             ),
             (
                 log_event![],

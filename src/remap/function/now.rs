@@ -18,7 +18,27 @@ impl Function for Now {
 struct NowFn;
 
 impl Expression for NowFn {
-    fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
         Ok(Some(Utc::now().into()))
     }
+
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef {
+            constraint: value::Kind::Timestamp.into(),
+            ..Default::default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    remap::test_type_def![static_def {
+        expr: |_| NowFn,
+        def: TypeDef {
+            constraint: value::Kind::Timestamp.into(),
+            ..Default::default()
+        },
+    }];
 }

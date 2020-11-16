@@ -49,11 +49,29 @@ impl FormatTimestampFn {
 }
 
 impl Expression for FormatTimestampFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let format = required!(state, object, self.format, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let ts = required!(state, object, self.value, Value::Timestamp(ts) => ts);
 
         try_format(&ts, &format).map(Into::into).map(Some)
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let format_def = self
+            .format
+            .type_def(state)
+            .fallible_unless(value::Kind::String);
+
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::Timestamp)
+            .merge(format_def)
+            .into_fallible(true) // due to `try_format`
+            .with_constraint(value::Kind::String)
     }
 }
 
@@ -73,6 +91,25 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::TimeZone;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_and_format {
+            expr: |_| FormatTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("%s").boxed(),
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        optional_value {
+            expr: |_| FormatTimestampFn {
+                value: Box::new(Noop),
+                format: Literal::from("%s").boxed(),
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+        }
+    ];
 
     #[test]
     fn format_timestamp() {
@@ -108,7 +145,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

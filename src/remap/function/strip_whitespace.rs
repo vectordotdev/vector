@@ -36,10 +36,21 @@ impl StripWhitespaceFn {
 }
 
 impl Expression for StripWhitespaceFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
 
         Ok(Some(value.trim().into()))
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::String)
     }
 }
 
@@ -47,6 +58,18 @@ impl Expression for StripWhitespaceFn {
 mod tests {
     use super::*;
     use crate::map;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| StripWhitespaceFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+        }
+
+        fallible_expression {
+            expr: |_| StripWhitespaceFn { value: Literal::from(10).boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn strip_whitespace() {
@@ -83,7 +106,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

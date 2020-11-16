@@ -2,7 +2,7 @@ use crate::{Expression, Result, Value};
 use core::convert::TryInto;
 use std::collections::HashMap;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error(r#"expected expression argument, got regex"#)]
     ArgumentExprRegex,
@@ -86,6 +86,24 @@ impl ArgumentList {
 pub enum Argument {
     Expression(Box<dyn Expression>),
     Regex(regex::Regex),
+}
+
+impl From<Box<dyn Expression>> for Argument {
+    fn from(expr: Box<dyn Expression>) -> Self {
+        Argument::Expression(expr)
+    }
+}
+
+impl<T: Expression + 'static> From<Box<T>> for Argument {
+    fn from(expr: Box<T>) -> Self {
+        Argument::Expression(expr)
+    }
+}
+
+impl From<regex::Regex> for Argument {
+    fn from(regex: regex::Regex) -> Self {
+        Argument::Regex(regex)
+    }
 }
 
 impl TryInto<Box<dyn Expression>> for Argument {
