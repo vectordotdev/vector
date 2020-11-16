@@ -10,9 +10,6 @@ hide_on_release_notes: false
 tags: ["type: enhancement", "domain: sources", "source: vector"]
 ---
 
-import Alert from '@site/src/components/Alert';
-import Jump from '@site/src/components/Jump';
-
 v2 of our [`lua` transform][docs.transforms.lua] has been released! This is a
 complete overhaul that provides a new and improved API, better data processing
 ergonomics, and faster processing. Specific improvements include:

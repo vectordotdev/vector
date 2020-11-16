@@ -1,4 +1,4 @@
-use crate::tls::MaybeTlsSettings;
+use crate::{http::HttpError, tls::MaybeTlsSettings};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
@@ -186,7 +186,7 @@ impl<T> HttpClient<T> {
 
 impl<T> DispatchSignedRequest for HttpClient<T>
 where
-    T: Service<Request<RusotoBody>, Response = Response<Body>, Error = hyper::Error>
+    T: Service<Request<RusotoBody>, Response = Response<Body>, Error = HttpError>
         + Clone
         + Send
         + 'static,

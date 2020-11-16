@@ -151,7 +151,7 @@ impl Transform {
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a `TaskTransform` or vice versa.
-pub trait FunctionTransform: Send + dyn_clone::DynClone {
+pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event);
 
     /// A handy test function that inputs and outputs only one event.

@@ -1,7 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    http::{HttpClient, HttpClientFuture},
+    http::{HttpClient, HttpClientFuture, HttpError},
     serde::to_string,
     sinks::{
         util::{
@@ -233,7 +233,7 @@ impl GcsSink {
         Ok(VectorSink::Sink(Box::new(sink)))
     }
 
-    async fn healthcheck(mut self) -> crate::Result<()> {
+    async fn healthcheck(self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
@@ -251,7 +251,7 @@ impl GcsSink {
 
 impl Service<RequestWrapper> for GcsSink {
     type Response = Response<Body>;
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Future = HttpClientFuture;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {

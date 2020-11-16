@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
@@ -111,6 +112,10 @@ impl SourceConfig for SimpleHttpConfig {
 
     fn source_type(&self) -> &'static str {
         "http"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 

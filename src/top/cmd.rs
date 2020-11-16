@@ -31,7 +31,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     match client.health_query().await {
         Ok(_) => (),
         _ => {
-            eprintln!("Vector API server not reachable");
+            eprintln!("Vector API server not reachable. Have you enabled the API?");
             return exitcode::UNAVAILABLE;
         }
     }
@@ -43,7 +43,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     let sender = match metrics::init_components(&client).await {
         Ok(state) => state::updater(state, rx).await,
         _ => {
-            eprintln!("Couldn't query Vector components");
+            eprintln!("Couldn't query Vector components.");
             return exitcode::UNAVAILABLE;
         }
     };
@@ -60,7 +60,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     let subscription_client = match connect_subscription_client(ws_url).await {
         Ok(c) => c,
         _ => {
-            eprintln!("Couldn't connect to Vector API via WebSockets");
+            eprintln!("Couldn't connect to Vector API via WebSockets.");
             return exitcode::UNAVAILABLE;
         }
     };
