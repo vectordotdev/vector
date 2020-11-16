@@ -55,7 +55,11 @@ impl SliceFn {
 }
 
 impl Expression for SliceFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let start = required!(state, object, self.start, Value::Integer(v) => v);
         let end = optional!(state, object, self.end, Value::Integer(v) => v);
 
@@ -93,12 +97,65 @@ impl Expression for SliceFn {
                 .map(Some),
         }
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(vec![String, Array]);
+        let end_def = self
+            .end
+            .as_ref()
+            .map(|end| end.type_def(state).fallible_unless(Integer));
+
+        value_def
+            .clone()
+            .merge(self.start.type_def(state).fallible_unless(Integer))
+            .merge_optional(end_def)
+            .with_constraint(match value_def.constraint {
+                v if v.is(String) || v.is(Array) => v,
+                _ => vec![String, Array].into(),
+            })
+            .into_fallible(true) // can fail for invalid start..end ranges
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| SliceFn {
+                value: Literal::from("foo").boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_array {
+            expr: |_| SliceFn {
+                value: Literal::from(vec!["foo"]).boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, constraint: Array.into(), ..Default::default() },
+        }
+
+        value_unknown {
+            expr: |_| SliceFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, constraint: vec![String, Array].into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn bytes() {
@@ -163,7 +220,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -212,7 +269,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -248,7 +305,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

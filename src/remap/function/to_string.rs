@@ -46,7 +46,11 @@ impl ToStringFn {
 }
 
 impl Expression for ToStringFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let to_string = |value| match value {
             Value::String(_) => Ok(value),
             _ => Ok(value.as_string_lossy()),
@@ -58,12 +62,122 @@ impl Expression for ToStringFn {
             to_string,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .merge_with_default_optional(
+                self.default.as_ref().map(|default| default.type_def(state)),
+            )
+            .with_constraint(value::Kind::String)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use std::collections::BTreeMap;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        boolean_infallible {
+            expr: |_| ToStringFn { value: Literal::from(true).boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        integer_infallible {
+            expr: |_| ToStringFn { value: Literal::from(1).boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        float_infallible {
+            expr: |_| ToStringFn { value: Literal::from(1.0).boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        null_infallible {
+            expr: |_| ToStringFn { value: Literal::from(()).boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        string_infallible {
+            expr: |_| ToStringFn { value: Literal::from("foo").boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        map_infallible {
+            expr: |_| ToStringFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        array_infallible {
+            expr: |_| ToStringFn { value: Literal::from(vec![0]).boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        timestamp_infallible {
+            expr: |_| ToStringFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
+            def: TypeDef { constraint: String.into(), ..Default::default() },
+        }
+
+        fallible_value_without_default {
+            expr: |_| ToStringFn { value: Variable::new("foo".to_owned()).boxed(), default: None},
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: String.into(),
+            },
+        }
+
+        fallible_value_with_fallible_default {
+            expr: |_| ToStringFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                default: Some(Variable::new("foo".to_owned()).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: String.into(),
+            },
+        }
+
+       fallible_value_with_infallible_default {
+            expr: |_| ToStringFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                default: Some(Literal::from(true).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: String.into(),
+            },
+        }
+
+        infallible_value_with_fallible_default {
+            expr: |_| ToStringFn {
+                value: Literal::from(true).boxed(),
+                default: Some(Variable::new("foo".to_owned()).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: String.into(),
+            },
+        }
+
+        infallible_value_with_infallible_default {
+            expr: |_| ToStringFn {
+                value: Literal::from(true).boxed(),
+                default: Some(Literal::from(true).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: String.into(),
+            },
+        }
+    ];
 
     #[test]
     fn to_string() {
@@ -90,7 +204,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

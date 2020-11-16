@@ -122,8 +122,8 @@ fn is_scalar_value(value: &Value) -> bool {
     use Value::*;
 
     match value {
-        Integer(_) | Float(_) | String(_) | Boolean(_) => true,
-        Timestamp(_) | Map(_) | Array(_) | Null => false,
+        Integer(_) | Float(_) | String(_) | Boolean(_) | Null => true,
+        Timestamp(_) | Map(_) | Array(_) => false,
     }
 }
 
