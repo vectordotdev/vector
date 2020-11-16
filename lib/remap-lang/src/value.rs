@@ -332,33 +332,31 @@ impl Value {
         Ok(value)
     }
 
-    /// Try to "OR" (`||`) two values types.
+    /// "OR" (`||`) two values types.
     ///
-    /// A lhs value of `Null` delegates to the rhs value.
-    pub fn try_or(self, rhs: Self) -> Result<Self, Error> {
-        let err = || Error::Or(self.kind(), rhs.kind());
-
-        let value = match self {
+    /// A lhs value of `Null` or a `false` delegates to the rhs value,
+    /// everything else delegates to `lhs`.
+    pub fn or(self, rhs: Self) -> Self {
+        match self {
             Value::Null => rhs,
-            Value::Boolean(lhv) => match rhs {
-                Value::Boolean(rhv) => (lhv || rhv).into(),
-                _ => return Err(err()),
-            },
-            _ => return Err(err()),
-        };
-
-        Ok(value)
+            Value::Boolean(lhv) if lhv == false => rhs,
+            value => value,
+        }
     }
 
     /// Try to "AND" (`&&`) two values types.
     ///
-    /// A lhs value of `Null` returns `false`.
+    /// A lhs or rhs value of `Null` returns `false`.
+    ///
+    /// TODO: this should maybe work similar to `OR`, in that it supports any
+    /// rhs value kind, to support: `true && "foo"` to resolve to "foo".
     pub fn try_and(self, rhs: Self) -> Result<Self, Error> {
         let err = || Error::Or(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Null => Value::Boolean(false),
+            Value::Null => false.into(),
             Value::Boolean(lhv) => match rhs {
+                Value::Null => false.into(),
                 Value::Boolean(rhv) => (lhv && rhv).into(),
                 _ => return Err(err()),
             },

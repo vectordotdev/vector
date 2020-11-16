@@ -228,6 +228,15 @@ mod tests {
                 Err("remap error: function error: unknown enum variant: baz, must be one of: foo, bar"),
                 Ok("valid: baz".into()),
             ),
+            (r#"false || true"#, Ok(()), Ok(true.into())),
+            (r#"false || false"#, Ok(()), Ok(false.into())),
+            (r#"true || false"#, Ok(()), Ok(true.into())),
+            (r#"true || true"#, Ok(()), Ok(true.into())),
+            (r#"false || "foo""#, Ok(()), Ok("foo".into())),
+            (r#""foo" || false"#, Ok(()), Ok("foo".into())),
+            (r#"null || false"#, Ok(()), Ok(false.into())),
+            (r#"false || null"#, Ok(()), Ok(().into())),
+            (r#"null || "foo""#, Ok(()), Ok("foo".into())),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
