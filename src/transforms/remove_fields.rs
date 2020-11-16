@@ -1,10 +1,8 @@
-use super::Transform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::{Event, LookupBuf},
     internal_events::{RemoveFieldsEventProcessed, RemoveFieldsFieldMissing},
     transforms::{FunctionTransform, Transform},
-    Event,
 };
 use serde::{Deserialize, Serialize};
 

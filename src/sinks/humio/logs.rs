@@ -43,10 +43,6 @@ pub struct HumioLogsConfig {
     pub(in crate::sinks::humio) batch: BatchConfig,
 }
 
-fn default_host_key() -> LookupBuf {
-    crate::config::LogSchema::default().host_key().into_buf()
-}
-
 inventory::submit! {
     SinkDescription::new::<HumioLogsConfig>("humio_logs")
 }

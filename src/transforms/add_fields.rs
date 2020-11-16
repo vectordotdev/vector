@@ -1,6 +1,6 @@
 use crate::serde::Fields;
 use crate::{
-    config::{DataType, GenerateConfig, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::LookupBuf,
     event::{Event, Value},
     internal_events::{

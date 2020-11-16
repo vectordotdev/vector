@@ -1,7 +1,6 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::Event,
     http::HttpClient,
     event::{Event, Lookup, LookupBuf},
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},

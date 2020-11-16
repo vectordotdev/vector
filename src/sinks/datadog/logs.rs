@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
     http::HttpClient,
     event::{Event, Lookup, LookupBuf},
     sinks::{
