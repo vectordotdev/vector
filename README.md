@@ -1,29 +1,42 @@
 <p align="center">
+  <img src="docs/assets/images/diagram.svg" alt="Vector">
+</p>
+<p align="center">
   <strong>
-    <a href="https://vector.dev/components/">Components<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/guides/getting-started/">Get Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
+    <a href="https://vector.dev/components/">Integrations<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://chat.vector.dev">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/releases/latest/download/">Download<a/>
   </strong>
 </p>
 
----
-
-<p align="center">
-  <img src="https://vector.dev/img/readme_diagram.svg" alt="Vector">
-</p>
-
 ## What is Vector?
 
-Vector is a high-performance observability data platform that puts you in
-control of your observability data. [Collect][docs.sources],
+Vector is a high-performance observability data platform (agent & aggregator)
+that puts you in control of your observability data. [Collect][docs.sources],
 [transform][docs.transforms], and [route][docs.sinks] all your logs, metrics,
 and traces to any vendors you want today and any other vendors you may want
-tomorrow. Vector enables dramatic cost reduction, novel data enrichment, and
-data security when you need it, not when is most convenient for your vendors.
-100% open source, up to 10x faster than every alternative, and distributed for
-zero single points of failure.
+tomorrow. Vector enables cost reduction, novel data enrichment, and data
+security when you need it, not when is most convenient for your vendors.
+100% open source and up to 10x faster than every alternative.
+
+To get started, follow our [**getting started guides**][urls.getting_started]
+or [**install Vector**][docs.installation].
+
+### Principles
+
+* **Reliable** - Built in [Rust][urls.rust], Vector's primary design goal is reliability & performance.
+* **End-to-end** - Deploys as an agent or aggregator. One tool. One workflow.
+* **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All your data.
+
+### Use cases
+
+* Reduce total observability costs.
+* Transition vendors without disrupting workflows.
+* Improve data quality and insights.
+* Improve observability performance and reliability.
 
 ### Community
 
@@ -31,19 +44,10 @@ zero single points of failure.
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
   **Tuple**, **Douban**, and thousands of others.
 * Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 50TB daily**.
+* Vector's largest user **processes over 30TB daily**.
 * Vector partners, and works closely, with vendors like **Humio**, **AWS**,
   **New Relic**, **Chronosphere**, **Infux Data**, **Sematext**, and more.
 
-## Installation
-
-Run the following in your terminal, then follow the on-screen instructions.
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
-```
-
-Or use your own [preferred method][docs.installation].
 ## [Documentation](https://vector.dev/docs/)
 
 ### About
@@ -78,7 +82,9 @@ Or use your own [preferred method][docs.installation].
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
-## Performance
+## Comparisons
+
+### Performance
 
 The following performance tests demonstrate baseline performance between
 common protocols with the exception of the Regex Parsing test.
@@ -93,7 +99,7 @@ common protocols with the exception of the Regex Parsing test.
 
 To learn more about our performance tests, please see the [Vector test harness][urls.vector_test_harness].
 
-## Correctness
+### Correctness
 
 The following correctness tests are not exhaustive, but they demonstrate
 fundamental differences in quality and attention to detail:
@@ -109,76 +115,29 @@ fundamental differences in quality and attention to detail:
 
 To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
 
-## Comparison
+### Features
 
 Vector is an end-to-end, unified, open data platform.
 
-|                | **Vector** | Logstash | Beats | Fluentd | Fluentbit | Splunk UF | Splunk HF |
-|---------------:|:----------:|:--------:|:-----:|:-------:|:---------:|:---------:|:---------:|
-| **End-to-end** |   **✓**    |          |       |         |           |           |           |
-|          Agent |   **✓**    |          |   ✓   |         |     ✓     |     ✓     |           |
-|     Aggregator |   **✓**    |    ✓     |       |    ✓    |           |           |     ✓     |
-|    **Unified** |   **✓**    |          |       |         |           |           |           |
-|           Logs |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |     ✓     |
-|        Metrics |   **✓**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |     ⚠     |
-|         Traces |     🚧      |          |       |         |           |           |           |
-|       **Open** |   **✓**    |          |       |  **✓**  |   **✓**   |           |           |
-|    Open-source |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |           |
-| Vendor-neutral |   **✓**    |          |       |    ✓    |     ✓     |           |           |
+|                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF |
+|--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|
+|      **End-to-end** |   **✓**    |       |           |         |          |           |           |
+|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |
+|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |
+|         **Unified** |   **✓**    |       |           |         |          |           |           |
+|                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+|             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |
+|              Traces |     🚧      |       |           |         |          |           |           |
+|            **Open** |   **✓**    |       |     ✓     |    ✓    |          |           |           |
+|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |           |           |
+|      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |
+|     **Reliability** |   **✓**    |       |           |         |          |           |           |
+|         Memory-safe |   **✓**    |       |           |         |          |           |           |
+| Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |
+|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+
 
 ⚠ = Not interoperable, metrics are represented as structured logs
-
-## Features
-
-### Data Model
-
-* **All data types** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon).
-* **Customizable log schema** - [Change Vector's log schema][docs.global-options#log_schema] to anything you like.
-* **Rich type system** - Support for [JSON primitive types][docs.data-model.log#types] and [timestamps][docs.data-model.log#timestamps].
-* **Metrics interoperability** - A [first-class metrics data model][docs.data-model.metric] ensures interoperability between systems.
-* **Metrics aggregation** - Aggregated [histograms][docs.data-model.metric#aggregated_histogram] and [summaries][docs.data-model.metric#aggregated_summary] reduce volume without loss of precision.
-
-### Control Flow
-
-* **Pipelining** - A [directed acyclic graph processing model][docs.configuration] allows for flexible topologies.
-* **Control-flow** - Transforms like the [`swimlanes` transform][docs.transforms.swimlanes] allow for complex control-flow logic.
-* **Dynamic partitioning** - Create [dynamic partitions on the fly][docs.sinks.aws_s3#partitioning] with Vector's [templating syntax][docs.reference.templating].
-
-### Data Processing
-
-* **Programmable transforms** - [Lua][docs.transforms.lua], [Javascript (coming soon)][urls.pr_721], and [WASM (coming soon)][urls.issue_1802] transforms.
-* **Rich parsing** - [Regex][docs.transforms.regex_parser], [Grok][docs.transforms.grok_parser], and [more][urls.vector_parsing_transforms] allow for rich parsing.
-* **Smart timestamp coercion** - All [parsing transforms][urls.vector_parsing_transforms] implement a [`types` option][docs.transforms.regex_parser#types] for timestamp parsing.
-* **Context enrichment** - [Enrich data with environment context][urls.vector_enriching_transforms].
-* **Metrics derivation** - [Derive logs from metrics][docs.transforms.log_to_metric].
-* **Multi-line merging** - [Merge multi-line logs][docs.sources.file#multiline] into one event, such as stacktraces.
-
-### Operations
-
-* **Hot reload** - [Reload configuration on the fly][docs.process-management#reloading] without disrupting data flow.
-* **Zero delay start** - [Starts and restarts][docs.administration.process-management] without a delay.
-* **Multi-platform** - [Linux, MacOS, Windows, x86_64, ARM64][docs.installation].
-* **CI friendly** - [Config validating][docs.administration.validating] and [unit tests][guides.advanced.unit-testing] make Vector CI friendly.
-* **Configurable concurrency** - All CPU cores ([service][docs.strategies#service]) or just one ([daemon][docs.strategies#daemon]) via the [`--threads` flag][docs.process-management#starting].
-* **Optional static binary** - [Optional MUSL static binaries][pages.releases] mean zero required dependencies.
-* **TLS support** - All relevant Vector components offer TLS options for secure communication.
-
-### Reliability
-
-* **Memory safety** - Vector is built in Rust and is [memory safe][urls.rust_memory_safety], avoiding a large class of memory related errors.
-* **Decoupled buffer design** - Buffers are per-[sink][docs.sinks]; a bad sink won't bring the entire pipeline to a halt.
-* **Intelligent retries** - A fibonacci backoff algorithm with jitter makes Vector a good citizen during outages.
-* **Backpressure & load shedding** - Buffers can be configured to provide back-pressure or shed load.
-* **Rate-limited internal logging** - Vector's internal logging is rate-limited avoiding IO saturation if errors occur.
-* **Sink healthchecks** - Healthchecks provide startup safety and prevent deploys with bad configuration.
-* **Robust disk buffering** - Vector uses `leveldb` for robust data durability across restarts.
-
-### UX
-
-* **Clear Guarantees** - A [guarantee support matrix][docs.guarantees] helps you make the appropriate tradeoffs with components.
-* **Config unit tests** - [Develop Vector configs like code][guides.advanced.unit-testing]. Avoid the frustrating dev style required by other tools.
-* **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
-* **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
 
 ---
 
@@ -247,6 +206,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.what-is-vector]: https://vector.dev/docs/about/what-is-vector/
 [guides.advanced.unit-testing]: https://vector.dev/guides/advanced/unit-testing/
 [pages.releases]: https://vector.dev/releases/
+[urls.getting_started]: https://vector.dev/guides/getting-started/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.latest]: https://vector.dev/releases/latest/
 [urls.mailing_list]: https://vector.dev/community/
