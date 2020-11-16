@@ -1056,7 +1056,7 @@ mod tests {
     async fn partial() {
         trace_init();
 
-        let message = r#"{"event":"first"}{"event":"second""#;
+        let message = r#"{"event":"first"}{"event":"second"}{"event": ""#;
         let (source, address) = source().await;
 
         assert_eq!(
