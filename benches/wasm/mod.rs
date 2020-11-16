@@ -1,3 +1,4 @@
+use criterion::criterion_main;
 use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
@@ -211,3 +212,6 @@ fn bench_group_transforms_over_parameterized_event_sizes(
 }
 
 criterion_group!(benches, protobuf, drop, add_fields);
+criterion_main! {
+    benches,
+}

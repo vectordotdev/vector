@@ -1,17 +1,27 @@
 use criterion::criterion_main;
 
-mod default_benchmarks;
+mod batch;
+mod buffering;
+mod event;
+mod files;
+mod http;
+mod isolated_buffering;
+mod lua;
+mod regex;
+mod remap;
+mod template;
+mod topology;
 
 criterion_main!(
-    default_benchmarks::batch::benches,
-    default_benchmarks::buffering::benches,
-    default_benchmarks::event::benches,
-    default_benchmarks::files::benches,
-    default_benchmarks::http::benches,
-    default_benchmarks::isolated_buffering::benches,
-    default_benchmarks::lua::benches,
-    default_benchmarks::regex::benches,
-    default_benchmarks::remap::benches,
-    default_benchmarks::template::benches,
-    default_benchmarks::topology::benches,
+    batch::benches,
+    buffering::benches,
+    event::benches,
+    files::benches,
+    http::benches,
+    isolated_buffering::benches,
+    lua::benches,
+    regex::benches,
+    remap::benches,
+    template::benches,
+    topology::benches,
 );

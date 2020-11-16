@@ -145,7 +145,7 @@ end
     ];
 
     for (name, transform) in benchmarks {
-        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(num_events);
+        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(num_events as usize);
 
         let mut rx: Box<dyn Stream<Item = Result<Event, ()>> + Send + Unpin> = match transform {
             Transform::Function(t) => {

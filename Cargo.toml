@@ -535,6 +535,7 @@ required-features = ["default"]
 
 [[bench]]
 name = "wasm"
+path = "benches/wasm/mod.rs"
 harness = false
 required-features = ["wasm-benches"]
 
