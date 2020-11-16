@@ -4297,7 +4297,7 @@ version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0720e0b9ea9d52451cf29d3413ba8a9303f8815d9d9653ef70e03ff73e65566"
 dependencies = [
- "cfg-if",
+ "cfg-if 0.1.10",
  "libc",
  "log",
  "wepoll-sys-stjepang",
