@@ -25,12 +25,6 @@ data security when you need it, not when is most convenient for your vendors.
 100% open source, up to 10x faster than every alternative, and distributed for
 zero single points of failure.
 
-### Principles
-
-* **Reliability** - Built in [Rust][urls.rust], Vector's primary design goal is reliability & performance.
-* **End-to-end** - Deploys as an agent or aggregator. One tool. One workflow.
-* **All data** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All your data.
-
 ### Community
 
 * Vector is relied on by startups and enterprises like **T-Mobile**,
@@ -41,6 +35,15 @@ zero single points of failure.
 * Vector partners, and works closely, with vendors like **Humio**, **AWS**,
   **New Relic**, **Chronosphere**, **Infux Data**, **Sematext**, and more.
 
+## Installation
+
+Run the following in your terminal, then follow the on-screen instructions.
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
+```
+
+Or use your own [preferred method][docs.installation].
 ## [Documentation](https://vector.dev/docs/)
 
 ### About
@@ -176,16 +179,6 @@ Vector is an end-to-end, unified, open data platform.
 * **Config unit tests** - [Develop Vector configs like code][guides.advanced.unit-testing]. Avoid the frustrating dev style required by other tools.
 * **Config linting** - [Quickly lint][docs.administration.validating] Vector config files to spot errors and prevent bad configs in CI.
 * **Thoughtful docs** - [Quality documentation][docs.what-is-vector] that respects your time and reduces communication overhead.
-
-## Installation
-
-Run the following in your terminal, then follow the on-screen instructions.
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh
-```
-
-Or use your own [preferred method][docs.installation].
 
 ---
 
