@@ -67,18 +67,6 @@ impl Sink for Pipeline {
     }
 }
 
-impl Drop for Pipeline {
-    fn drop(&mut self) {
-        loop {
-            match self.close() {
-                Ok(Async::Ready(())) => break,
-                Ok(Async::NotReady) => {}
-                Err(err) => panic!(err),
-            }
-        }
-    }
-}
-
 impl Pipeline {
     #[cfg(test)]
     pub fn new_test() -> (Self, Receiver<Event>) {
