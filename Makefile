@@ -274,12 +274,11 @@ cross-image-%:
 test: ## Run the unit test suite
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --workspace --features ${DEFAULT_FEATURES} ${SCOPE} --all-targets -- --nocapture
 
-.PHONY: test-all-components
-test-all-components: ## Test with all components enabled
-# TODO(jesse): renable after the wasm transform builds again
-test-all-components: $(WASM_MODULE_OUTPUTS)
-test-all-components: export DEFAULT_FEATURES:="$(DEFAULT_FEATURES) wasm-benches"
-test-all-components: test
+.PHONY: test-components
+test-components: ## Test with all components enabled
+test-components: $(WASM_MODULE_OUTPUTS)
+test-components: export DEFAULT_FEATURES:="$(DEFAULT_FEATURES) wasm-benches"
+test-components: test
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
