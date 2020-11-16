@@ -1,5 +1,4 @@
 use remap::prelude::*;
-use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub struct OnlyFields;
@@ -10,37 +9,24 @@ impl Function for OnlyFields {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        // workaround for missing variable argument length.
-        //
-        // We'll come up with a nicer solution at some point. It took Rust five
-        // years to support [0; 34].
-        macro_rules! set_variable_params {
-            ($($n:tt),+ $(,)?) => (
-                &[$(Parameter {
-                        keyword: stringify!($n),
-                        accepts: |v| matches!(v, Value::String(_)),
-                        required: false,
-                    }),+]
-            );
+        generate_param_list! {
+            accepts = |_| true,
+            required = false,
+            keywords = [
+                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16",
+            ],
         }
-
-        set_variable_params!(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        macro_rules! get_variable_params {
-            ($n:tt) => {{
-                let mut a = vec![];
-                for i in 1..=$n {
-                    if let Some(arg) = arguments.optional_expr(&format!("{}", i))? {
-                        a.push(arg)
-                    }
-                }
-                a
-            }};
-        }
+        let mut paths = vec![];
+        paths.push(arguments.required_path("1")?);
 
-        let paths = get_variable_params!(16);
+        for i in 2..=16 {
+            if let Some(path) = arguments.optional_path(&format!("{}", i))? {
+                paths.push(path)
+            }
+        }
 
         Ok(Box::new(OnlyFieldsFn { paths }))
     }
@@ -48,21 +34,12 @@ impl Function for OnlyFields {
 
 #[derive(Debug, Clone)]
 pub struct OnlyFieldsFn {
-    paths: Vec<Box<dyn Expression>>,
+    paths: Vec<Path>,
 }
 
 impl Expression for OnlyFieldsFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let paths = self
-            .paths
-            .iter()
-            .filter_map(|expr| expr.execute(state, object).transpose())
-            .map(|r| r.and_then(|v| Ok(String::try_from(v)?.trim_start_matches('.').to_owned())))
-            .collect::<Result<Vec<String>>>()?;
+    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+        let paths = self.paths.iter().map(Path::as_string).collect::<Vec<_>>();
 
         object
             .paths()
@@ -73,18 +50,8 @@ impl Expression for OnlyFieldsFn {
         Ok(None)
     }
 
-    fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.paths
-            .iter()
-            .fold(TypeDef::default(), |acc, expression| {
-                acc.merge(
-                    expression
-                        .type_def(state)
-                        .fallible_unless(value::Kind::String),
-                )
-            })
-            .with_constraint(value::Constraint::Any)
-            .into_optional(true)
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef::default().into_optional(true)
     }
 }
 
@@ -92,15 +59,13 @@ impl Expression for OnlyFieldsFn {
 mod tests {
     use super::*;
 
-    remap::test_type_def![
-        value_string {
-            expr: |_| OnlyFieldsFn { paths: vec![Literal::from("foo").boxed()] },
-            def: TypeDef { optional: true, constraint: value::Constraint::Any, ..Default::default() },
-        }
-
-        fallible_expression {
-            expr: |_| OnlyFieldsFn { paths: vec![Variable::new("foo".to_owned()).boxed(), Literal::from("foo").boxed()] },
-            def: TypeDef { fallible: true, optional: true, constraint: value::Constraint::Any },
-        }
-    ];
+    test_type_def![static_type_def {
+        expr: |_| OnlyFieldsFn {
+            paths: vec![Path::from("foo")]
+        },
+        def: TypeDef {
+            optional: true,
+            ..Default::default()
+        },
+    }];
 }

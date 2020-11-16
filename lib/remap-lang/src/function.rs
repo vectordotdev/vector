@@ -1,6 +1,26 @@
-use crate::{expression, Expr, Expression, Result, Value};
+use crate::{
+    expression::{self, Path},
+    Expr, Expression, Result, Value,
+};
 use core::convert::{TryFrom, TryInto};
 use std::collections::HashMap;
+
+// workaround for missing variable argument length.
+//
+// We'll come up with a nicer solution at some point. It took Rust five
+// years to support [0; 34].
+#[macro_export]
+macro_rules! generate_param_list {
+    (accepts = $accepts:expr, required = $required:expr, keywords = [$($k:literal),+ $(,)?] $(,)?) => (
+        &[
+            $(Parameter {
+                keyword: $k,
+                accepts: $accepts,
+                required: $required,
+            }),+
+        ]
+    );
+}
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -112,6 +132,20 @@ impl ArgumentList {
         variants: &'static [&'static str],
     ) -> Result<String> {
         self.optional_enum(keyword, variants)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
+    pub fn optional_path(&mut self, keyword: &str) -> Result<Option<Path>> {
+        self.optional(keyword)
+            .map(Expr::try_from)
+            .transpose()?
+            .map(Path::try_from)
+            .transpose()
+            .map_err(Into::into)
+    }
+
+    pub fn required_path(&mut self, keyword: &str) -> Result<Path> {
+        self.optional_path(keyword)?
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 

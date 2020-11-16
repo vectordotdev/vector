@@ -20,6 +20,10 @@ impl Variable {
     pub fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
+
+    pub fn ident(&self) -> &str {
+        &self.ident
+    }
 }
 
 impl Expression for Variable {
