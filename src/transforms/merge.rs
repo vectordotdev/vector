@@ -1,13 +1,13 @@
-use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
     event::{self, Event},
+    transforms::{TaskTransform, Transform},
 };
+use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
 use std::collections::{hash_map, HashMap};
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -15,39 +15,44 @@ pub struct MergeConfig {
     /// The field that indicates that the event is partial. A consequent stream
     /// of partial events along with the first non-partial event will be merged
     /// together.
-    pub partial_event_marker_field: Atom,
+    pub partial_event_marker_field: String,
     /// Fields to merge. The values of these fields will be merged into the
     /// first partial event. Fields not specified here will be ignored.
     /// Merging process takes the first partial event and the base, then it
     /// merges in the fields from each successive partial event, until a
     /// non-partial event arrives. Finally, the non-partial event fields are
     /// merged in, producing the resulting merged event.
-    pub merge_fields: Vec<Atom>,
+    // Deprecated name is merge_fields
+    #[serde(alias = "merge_fields")]
+    pub fields: Vec<String>,
     /// An ordered list of fields to distinguish streams by. Each stream has a
     /// separate partial event merging state. Should be used to prevent events
     /// from unrelated sources from mixing together, as this affects partial
     /// event processing.
-    pub stream_discriminant_fields: Vec<Atom>,
+    pub stream_discriminant_fields: Vec<String>,
 }
 
 inventory::submit! {
     TransformDescription::new::<MergeConfig>("merge")
 }
 
+impl_generate_config_from_default!(MergeConfig);
+
 impl Default for MergeConfig {
     fn default() -> Self {
         Self {
-            partial_event_marker_field: event::PARTIAL.clone(),
-            merge_fields: vec![crate::config::log_schema().message_key().clone()],
+            partial_event_marker_field: event::PARTIAL.to_string(),
+            fields: vec![crate::config::log_schema().message_key().to_string()],
             stream_discriminant_fields: vec![],
         }
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "merge")]
 impl TransformConfig for MergeConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Merge::from(self.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::task(Merge::from(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -63,27 +68,15 @@ impl TransformConfig for MergeConfig {
     }
 }
 
-#[derive(Debug)]
 pub struct Merge {
-    partial_event_marker_field: Atom,
-    merge_fields: Vec<Atom>,
-    stream_discriminant_fields: Vec<Atom>,
+    partial_event_marker_field: String,
+    fields: Vec<String>,
+    stream_discriminant_fields: Vec<String>,
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
 
-impl From<MergeConfig> for Merge {
-    fn from(config: MergeConfig) -> Self {
-        Self {
-            partial_event_marker_field: config.partial_event_marker_field,
-            merge_fields: config.merge_fields,
-            stream_discriminant_fields: config.stream_discriminant_fields,
-            log_event_merge_states: HashMap::new(),
-        }
-    }
-}
-
-impl Transform for Merge {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl Merge {
+    fn transform_one(&mut self, event: Event) -> Option<Event> {
         let mut event = event.into_log();
 
         // Prepare an event's discriminant.
@@ -108,9 +101,7 @@ impl Transform for Merge {
                     entry.insert(LogEventMergeState::new(event));
                 }
                 hash_map::Entry::Occupied(mut entry) => {
-                    entry
-                        .get_mut()
-                        .merge_in_next_event(event, &self.merge_fields);
+                    entry.get_mut().merge_in_next_event(event, &self.fields);
                 }
             }
 
@@ -125,27 +116,56 @@ impl Transform for Merge {
         // then return the merged event.
         let log_event_merge_state = match self.log_event_merge_states.remove(&discriminant) {
             Some(log_event_merge_state) => log_event_merge_state,
-            None => return Some(Event::Log(event)),
+            None => {
+                return Some(Event::Log(event));
+            }
         };
 
         // Merge in the final non-partial event and consume the merge state in
         // exchange for the merged event.
-        let merged_event = log_event_merge_state.merge_in_final_event(event, &self.merge_fields);
+        let merged_event = log_event_merge_state.merge_in_final_event(event, &self.fields);
 
         // Return the merged event.
         Some(Event::Log(merged_event))
     }
 }
 
+impl From<MergeConfig> for Merge {
+    fn from(config: MergeConfig) -> Self {
+        Self {
+            partial_event_marker_field: config.partial_event_marker_field,
+            fields: config.fields,
+            stream_discriminant_fields: config.stream_discriminant_fields,
+            log_event_merge_states: HashMap::new(),
+        }
+    }
+}
+
+impl TaskTransform for Merge {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::{Merge, MergeConfig};
+    use super::*;
     use crate::event::{self, Event};
-    use crate::transforms::Transform;
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<MergeConfig>();
+    }
 
     fn make_partial(mut event: Event) -> Event {
-        event.as_mut_log().insert(event::PARTIAL.clone(), true);
+        event.as_mut_log().insert(event::PARTIAL, true);
         event
     }
 
@@ -157,7 +177,7 @@ mod test {
         let sample_event = Event::from("hello world");
 
         // Once processed by the transform.
-        let merged_event = merge.transform(sample_event.clone()).unwrap();
+        let merged_event = merge.transform_one(sample_event.clone()).unwrap();
 
         // Should be returned as is.
         assert_eq!(merged_event, sample_event);
@@ -171,14 +191,14 @@ mod test {
         let partial_event_2 = make_partial(Event::from("lo "));
         let non_partial_event = Event::from("world");
 
-        assert!(merge.transform(partial_event_1).is_none());
-        assert!(merge.transform(partial_event_2).is_none());
-        let merged_event = merge.transform(non_partial_event).unwrap();
+        assert!(merge.transform_one(partial_event_1).is_none());
+        assert!(merge.transform_one(partial_event_2).is_none());
+        let merged_event = merge.transform_one(non_partial_event).unwrap();
 
         assert_eq!(
             merged_event
                 .as_log()
-                .get(&Atom::from("message"))
+                .get("message")
                 .unwrap()
                 .as_bytes()
                 .as_ref(),
@@ -186,12 +206,12 @@ mod test {
         );
 
         // Merged event shouldn't contain partial event marker.
-        assert!(!merged_event.as_log().contains(&event::PARTIAL));
+        assert!(!merged_event.as_log().contains(&*event::PARTIAL));
     }
 
     #[test]
     fn merge_merges_partial_events_from_separate_streams() {
-        let stream_discriminant_field = Atom::from("stream_name");
+        let stream_discriminant_field = "stream_name".to_string();
 
         let mut merge = Merge::from(MergeConfig {
             stream_discriminant_fields: vec![stream_discriminant_field.clone()],
@@ -215,17 +235,17 @@ mod test {
         let s2_non_partial_event = make_event("sum", "s2");
 
         // Simulate events arriving in non-trivial order.
-        assert!(merge.transform(s1_partial_event_1).is_none());
-        assert!(merge.transform(s2_partial_event_1).is_none());
-        assert!(merge.transform(s1_partial_event_2).is_none());
-        let s1_merged_event = merge.transform(s1_non_partial_event).unwrap();
-        assert!(merge.transform(s2_partial_event_2).is_none());
-        let s2_merged_event = merge.transform(s2_non_partial_event).unwrap();
+        assert!(merge.transform_one(s1_partial_event_1).is_none());
+        assert!(merge.transform_one(s2_partial_event_1).is_none());
+        assert!(merge.transform_one(s1_partial_event_2).is_none());
+        let s1_merged_event = merge.transform_one(s1_non_partial_event).unwrap();
+        assert!(merge.transform_one(s2_partial_event_2).is_none());
+        let s2_merged_event = merge.transform_one(s2_non_partial_event).unwrap();
 
         assert_eq!(
             s1_merged_event
                 .as_log()
-                .get(&Atom::from("message"))
+                .get("message")
                 .unwrap()
                 .as_bytes()
                 .as_ref(),
@@ -235,7 +255,7 @@ mod test {
         assert_eq!(
             s2_merged_event
                 .as_log()
-                .get(&Atom::from("message"))
+                .get("message")
                 .unwrap()
                 .as_bytes()
                 .as_ref(),
@@ -243,7 +263,7 @@ mod test {
         );
 
         // Merged events shouldn't contain partial event marker.
-        assert!(!s1_merged_event.as_log().contains(&event::PARTIAL));
-        assert!(!s2_merged_event.as_log().contains(&event::PARTIAL));
+        assert!(!s1_merged_event.as_log().contains(&*event::PARTIAL));
+        assert!(!s2_merged_event.as_log().contains(&*event::PARTIAL));
     }
 }

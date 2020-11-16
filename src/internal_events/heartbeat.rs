@@ -13,6 +13,6 @@ impl InternalEvent for Heartbeat {
     }
 
     fn emit_metrics(&self) {
-        gauge!("uptime_seconds", self.since.elapsed().as_secs() as i64);
+        gauge!("uptime_seconds", self.since.elapsed().as_secs() as f64);
     }
 }

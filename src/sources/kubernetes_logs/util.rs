@@ -19,8 +19,8 @@ pub async fn run_file_server<PP, E, C, S>(
 where
     PP: PathsProvider + Send + 'static,
     E: FileSourceInternalEvents,
-    C: Sink<(Bytes, String)> + Unpin + Send + 'static,
-    <C as Sink<(Bytes, String)>>::Error: Error + Send,
+    C: Sink<Vec<(Bytes, String)>> + Unpin + Send + 'static,
+    <C as Sink<Vec<(Bytes, String)>>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,
 {
     let span = info_span!("file_server");

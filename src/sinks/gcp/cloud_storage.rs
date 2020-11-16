@@ -1,12 +1,11 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    http::{HttpClient, HttpClientFuture, HttpError},
     serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
-            http::{HttpClient, HttpClientFuture},
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -15,11 +14,11 @@ use crate::{
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
+    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::FutureExt;
-use futures01::{stream::iter_ok, Sink};
+use futures::{stream, FutureExt, SinkExt, StreamExt};
 use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -28,11 +27,8 @@ use hyper::{
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::task::Poll;
+use std::{collections::HashMap, convert::TryFrom, task::Poll};
 use tower::{Service, ServiceBuilder};
-use tracing::field;
 use uuid::Uuid;
 
 const NAME: &str = "gcp_cloud_storage";
@@ -88,7 +84,7 @@ fn default_config(e: Encoding) -> GcsSinkConfig {
         filename_append_uuid: Default::default(),
         filename_extension: Default::default(),
         encoding: e.into(),
-        compression: Compression::Gzip,
+        compression: Compression::gzip_default(),
         batch: Default::default(),
         request: Default::default(),
         auth: Default::default(),
@@ -145,17 +141,24 @@ impl Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<GcsSinkConfig>(NAME)
+    SinkDescription::new::<GcsSinkConfig>(NAME)
+}
+
+impl GenerateConfig for GcsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"bucket = "my-bucket"
+            credentials_path = "/path/to/credentials.json"
+            encoding.codec = "ndjson""#,
+        )
+        .unwrap()
+    }
 }
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let sink = GcsSink::new(self, &cx).await?;
         let healthcheck = sink.clone().healthcheck().boxed();
         let service = sink.service(self, &cx)?;
@@ -183,14 +186,14 @@ enum HealthcheckError {
 }
 
 impl GcsSink {
-    async fn new(config: &GcsSinkConfig, cx: &SinkContext) -> crate::Result<Self> {
+    async fn new(config: &GcsSinkConfig, _cx: &SinkContext) -> crate::Result<Self> {
         let creds = config
             .auth
             .make_credentials(Scope::DevStorageReadWrite)
             .await?;
         let settings = RequestSettings::new(config)?;
         let tls = TlsSettings::from_options(&config.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls)?;
+        let client = HttpClient::new(tls)?;
         let base_url = format!("{}{}/", BASE_URL, config.bucket);
         let bucket = config.bucket.clone();
         Ok(GcsSink {
@@ -224,13 +227,13 @@ impl GcsSink {
         let buffer = PartitionBuffer::new(Buffer::new(batch.size, config.compression));
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-            .sink_map_err(|e| error!("Fatal gcs sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+            .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))
+            .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok));
 
-        Ok(VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(VectorSink::Sink(Box::new(sink)))
     }
 
-    async fn healthcheck(mut self) -> crate::Result<()> {
+    async fn healthcheck(self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
@@ -248,7 +251,7 @@ impl GcsSink {
 
 impl Service<RequestWrapper> for GcsSink {
     type Response = Response<Body>;
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Future = HttpClientFuture;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -316,11 +319,7 @@ impl RequestWrapper {
             settings.extension
         );
 
-        debug!(
-            message = "sending events.",
-            bytes = &field::debug(body.len()),
-            key = &field::debug(&key)
-        );
+        debug!(message = "Sending events.", bytes = ?body.len(), key = ?key);
 
         Self {
             body,
@@ -423,7 +422,7 @@ fn encode_event(
             .expect("Failed to encode event as json, this is a bug!"),
         Encoding::Text => {
             let mut bytes = log
-                .get(&crate::config::log_schema().message_key())
+                .get(crate::config::log_schema().message_key())
                 .map(|v| v.as_bytes().to_vec())
                 .unwrap_or_default();
             bytes.push(b'\n');
@@ -442,8 +441,8 @@ impl RetryLogic for GcsRetryLogic {
     type Error = hyper::Error;
     type Response = Response<Body>;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_connect() || error.is_closed()
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
@@ -464,9 +463,11 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
 
-    use std::collections::HashMap;
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<GcsSinkConfig>();
+    }
 
     #[test]
     fn gcs_encode_event_text() {
@@ -552,11 +553,14 @@ mod tests {
 
         let req = RequestWrapper::new(
             buf.clone(),
-            request_settings(None, false, Compression::Gzip),
+            request_settings(None, false, Compression::gzip_default()),
         );
         assert_eq!(req.key, "key/date.log.gz".to_string());
 
-        let req = RequestWrapper::new(buf, request_settings(None, true, Compression::Gzip));
+        let req = RequestWrapper::new(
+            buf,
+            request_settings(None, true, Compression::gzip_default()),
+        );
         assert_ne!(req.key, "key/date.log.gz".to_string());
     }
 }

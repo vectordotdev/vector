@@ -42,6 +42,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for metric in vec {
                     let counter = Metric {
                         name: group.name.clone(),
+                        namespace: None,
                         timestamp: None,
                         tags: has_values_or_none(metric.labels),
                         kind: MetricKind::Absolute,
@@ -57,6 +58,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for metric in vec {
                     let gauge = Metric {
                         name: group.name.clone(),
+                        namespace: None,
                         timestamp: None,
                         tags: has_values_or_none(metric.labels),
                         kind: MetricKind::Absolute,
@@ -91,9 +93,13 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                     }
                 }
 
-                for (tags, aggregate) in aggregates {
+                for (tags, mut aggregate) in aggregates {
+                    for i in (1..aggregate.counts.len()).rev() {
+                        aggregate.counts[i] -= aggregate.counts[i - 1];
+                    }
                     let hist = Metric {
                         name: group.name.clone(),
+                        namespace: None,
                         timestamp: None,
                         tags: has_values_or_none(tags),
                         kind: MetricKind::Absolute,
@@ -132,6 +138,7 @@ pub fn parse(packet: &str) -> Result<Vec<Metric>, ParserError> {
                 for (tags, aggregate) in aggregates {
                     let summary = Metric {
                         name: group.name.clone(),
+                        namespace: None,
                         timestamp: None,
                         tags: has_values_or_none(tags),
                         kind: MetricKind::Absolute,
@@ -182,6 +189,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "uptime".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -234,6 +242,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "name".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(
                         vec![
@@ -248,6 +257,7 @@ mod test {
                 },
                 Metric {
                     name: "name2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(
                         vec![
@@ -264,6 +274,7 @@ mod test {
                 },
                 Metric {
                     name: "name2".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(
                         vec![("labelname".into(), "val1".into()),]
@@ -293,6 +304,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "http_requests_total".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(
                         vec![
@@ -307,6 +319,7 @@ mod test {
                 },
                 Metric {
                     name: "http_requests_total".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(
                         vec![
@@ -335,6 +348,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "latency".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -353,6 +367,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "metric_without_timestamp_and_labels".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -371,6 +386,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "no_labels".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
@@ -389,6 +405,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "msdos_file_access_time_seconds".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -417,6 +434,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "name".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(map! {"tag" => "}"}),
                 kind: MetricKind::Absolute,
@@ -436,6 +454,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "name".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(map! {"tag" => "a,b"}),
                 kind: MetricKind::Absolute,
@@ -455,6 +474,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "name".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(map! {"tag" => "\\n"}),
                 kind: MetricKind::Absolute,
@@ -474,6 +494,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "name".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(map! {"tag" => " * "}),
                 kind: MetricKind::Absolute,
@@ -492,6 +513,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "telemetry_scrape_size_bytes_count".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![
@@ -535,6 +557,7 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "something_weird".into(),
+                namespace: None,
                 timestamp: None,
                 tags: Some(
                     vec![("problem".into(), "division by zero".into())]
@@ -562,6 +585,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "latency".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(
                         vec![("env".into(), "production".into())]
@@ -573,6 +597,7 @@ mod test {
                 },
                 Metric {
                     name: "latency".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(vec![("env".into(), "testing".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
@@ -598,6 +623,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "uptime".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -605,6 +631,7 @@ mod test {
                 },
                 Metric {
                     name: "temperature".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -612,6 +639,7 @@ mod test {
                 },
                 Metric {
                     name: "launch_count".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -657,6 +685,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "uptime".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -664,6 +693,7 @@ mod test {
                 },
                 Metric {
                     name: "last_downtime".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -671,6 +701,7 @@ mod test {
                 },
                 Metric {
                     name: "temperature".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -678,6 +709,7 @@ mod test {
                 },
                 Metric {
                     name: "temperature_7_days_average".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -706,12 +738,13 @@ mod test {
             parse(exp),
             Ok(vec![Metric {
                 name: "http_request_duration_seconds".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,
                 value: MetricValue::AggregatedHistogram {
                     buckets: vec![0.05, 0.1, 0.2, 0.5, 1.0],
-                    counts: vec![24054, 33444, 100392, 129389, 133988],
+                    counts: vec![24054, 9390, 66948, 28997, 4599],
                     count: 144320,
                     sum: 53423.0,
                 },
@@ -770,6 +803,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "gitlab_runner_job_duration_seconds".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "z".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
@@ -778,13 +812,14 @@ mod test {
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
                             36000.0
                         ],
-                        counts: vec![327, 474, 535, 536, 536, 536, 536, 536, 536, 536],
+                        counts: vec![327, 147, 61, 1, 0, 0, 0, 0, 0, 0],
                         count: 536,
                         sum: 19690.129384881966,
                     },
                 },
                 Metric {
                     name: "gitlab_runner_job_duration_seconds".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "x".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
@@ -793,13 +828,14 @@ mod test {
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
                             36000.0
                         ],
-                        counts: vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                        counts: vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
                         count: 1,
                         sum: 28.975436316,
                     },
                 },
                 Metric {
                     name: "gitlab_runner_job_duration_seconds".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(vec![("runner".into(), "y".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
@@ -808,7 +844,7 @@ mod test {
                             30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0, 7200.0, 10800.0, 18000.0,
                             36000.0
                         ],
-                        counts: vec![285, 1165, 3071, 3151, 3252, 3255, 3255, 3255, 3255, 3255],
+                        counts: vec![285, 880, 1906, 80, 101, 3, 0, 0, 0, 0],
                         count: 3255,
                         sum: 381111.7498891335,
                     },
@@ -845,6 +881,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "rpc_duration_seconds".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(vec![("service".into(), "a".into())].into_iter().collect()),
                     kind: MetricKind::Absolute,
@@ -857,6 +894,7 @@ mod test {
                 },
                 Metric {
                     name: "go_gc_duration_seconds".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -904,6 +942,7 @@ mod test {
             Ok(vec![
                 Metric {
                     name: "nginx_server_bytes".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"direction" => "in", "host" => "*"}),
                     kind: MetricKind::Absolute,
@@ -911,6 +950,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_bytes".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"direction" => "in", "host" => "_"}),
                     kind: MetricKind::Absolute,
@@ -918,6 +958,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_bytes".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"direction" => "in", "host" => "nginx-vts-status"}),
                     kind: MetricKind::Absolute,
@@ -925,6 +966,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_bytes".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"direction" => "out", "host" => "*"}),
                     kind: MetricKind::Absolute,
@@ -932,6 +974,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_bytes".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"direction" => "out", "host" => "_"}),
                     kind: MetricKind::Absolute,
@@ -939,6 +982,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_bytes".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"direction" => "out", "host" => "nginx-vts-status"}),
                     kind: MetricKind::Absolute,
@@ -946,6 +990,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_cache".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"host" => "*", "status" => "bypass"}),
                     kind: MetricKind::Absolute,
@@ -953,6 +998,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_cache".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"host" => "*", "status" => "expired"}),
                     kind: MetricKind::Absolute,
@@ -960,6 +1006,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_cache".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"host" => "*", "status" => "hit"}),
                     kind: MetricKind::Absolute,
@@ -967,6 +1014,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_cache".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"host" => "*", "status" => "miss"}),
                     kind: MetricKind::Absolute,
@@ -974,6 +1022,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_cache".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"host" => "*", "status" => "revalidated"}),
                     kind: MetricKind::Absolute,
@@ -981,6 +1030,7 @@ mod test {
                 },
                 Metric {
                     name: "nginx_server_cache".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(map! {"host" => "*", "status" => "scarce"}),
                     kind: MetricKind::Absolute,

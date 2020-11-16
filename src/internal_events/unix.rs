@@ -12,31 +12,30 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_connections_established", 1,
-            "component_kind" => "sink",
-        );
+        counter!("connection_established_total", 1, "mode" => "unix");
     }
 }
 
 #[derive(Debug)]
-pub struct UnixSocketConnectionFailure<'a> {
-    pub error: tokio::io::Error,
+pub struct UnixSocketConnectionFailed<'a, E> {
+    pub error: E,
     pub path: &'a std::path::Path,
 }
 
-impl InternalEvent for UnixSocketConnectionFailure<'_> {
+impl<E> InternalEvent for UnixSocketConnectionFailed<'_, E>
+where
+    E: std::error::Error,
+{
     fn emit_logs(&self) {
         error!(
-            message = "Unix socket connection failure.",
+            message = "Unable to connect.",
             error = %self.error,
             path = ?self.path,
         );
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_connection_failures", 1,
-            "component_kind" => "sink",
-        );
+        counter!("connection_failed_total", 1, "mode" => "unix");
     }
 }
 
@@ -46,8 +45,9 @@ pub struct UnixSocketError<'a, E> {
     pub path: &'a std::path::Path,
 }
 
-impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEvent
-    for UnixSocketError<'_, E>
+impl<E> InternalEvent for UnixSocketError<'_, E>
+where
+    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
     fn emit_logs(&self) {
         debug!(
@@ -58,26 +58,6 @@ impl<E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display> InternalEven
     }
 
     fn emit_metrics(&self) {
-        counter!("unix_socket_errors", 1);
-    }
-}
-
-#[derive(Debug)]
-pub struct UnixSocketEventSent {
-    pub byte_size: usize,
-}
-
-impl InternalEvent for UnixSocketEventSent {
-    fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "sink",
-            "component_type" => "socket",
-            "mode" => "unix",
-        );
+        counter!("connection_errors_total", 1, "mode" => "unix");
     }
 }

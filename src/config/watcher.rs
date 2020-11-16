@@ -43,7 +43,7 @@ pub fn spawn_thread(
         if let Some((mut watcher, receiver)) = watcher.take() {
             while let Ok(RawEvent { op: Ok(event), .. }) = receiver.recv() {
                 if event.intersects(Op::CREATE | Op::REMOVE | Op::WRITE | Op::CLOSE_WRITE) {
-                    debug!(message = "Configuration file change detected.", ?event);
+                    debug!(message = "Configuration file change detected.", event = ?event);
 
                     // Consume events until delay amount of time has passed since the latest event.
                     while let Ok(..) = receiver.recv_timeout(delay) {}
@@ -51,14 +51,14 @@ pub fn spawn_thread(
                     // We need to read paths to resolve any inode changes that may have happened.
                     // And we need to do it before raising sighup to avoid missing any change.
                     if let Err(error) = add_paths(&mut watcher, &config_paths) {
-                        error!(message = "Failed to read files to watch.", ?error);
+                        error!(message = "Failed to read files to watch.", %error);
                         break;
                     }
 
                     info!("Configuration file changed.");
                     raise_sighup();
                 } else {
-                    debug!(message = "Ignoring event.", ?event)
+                    debug!(message = "Ignoring event.", event = ?event)
                 }
             }
         }
@@ -66,7 +66,7 @@ pub fn spawn_thread(
         thread::sleep(RETRY_TIMEOUT);
 
         watcher = create_watcher(&config_paths)
-            .map_err(|error| error!(message = "Failed to create file watcher.", ?error))
+            .map_err(|error| error!(message = "Failed to create file watcher.", %error))
             .ok();
 
         if watcher.is_some() {
@@ -94,7 +94,7 @@ pub fn spawn_thread(
 fn raise_sighup() {
     use nix::sys::signal;
     let _ = signal::raise(signal::Signal::SIGHUP).map_err(|error| {
-        error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = ?error)
+        error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
     });
 }
 
@@ -122,21 +122,18 @@ fn add_paths(watcher: &mut RecommendedWatcher, config_paths: &[PathBuf]) -> Resu
 mod tests {
     use super::*;
     use crate::test_util::{temp_file, trace_init};
-    use futures::compat::Future01CompatExt;
-    use futures01::{Future, Stream};
     use std::time::Duration;
     use std::{fs::File, io::Write};
     #[cfg(unix)]
-    use tokio_signal::unix::{Signal, SIGHUP};
+    use tokio::signal::unix::{signal, SignalKind};
 
     async fn test(file: &mut File, timeout: Duration) -> bool {
         file.write_all(&[0]).unwrap();
         file.sync_all().unwrap();
 
-        let signal = Signal::new(SIGHUP).flatten_stream();
-        let fut = signal.into_future().compat();
+        let mut signal = signal(SignalKind::hangup()).expect("Signal handlers should not panic.");
 
-        tokio::time::timeout(timeout, fut).await.is_ok()
+        tokio::time::timeout(timeout, signal.recv()).await.is_ok()
     }
 
     #[tokio::test]

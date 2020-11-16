@@ -12,14 +12,8 @@ impl InternalEvent for SyslogEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-        );
-        counter!("bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-        );
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -30,15 +24,11 @@ pub struct SyslogUdpReadError {
 
 impl InternalEvent for SyslogUdpReadError {
     fn emit_logs(&self) {
-        error!(message = "Error reading datagram.", error = %self.error, rate_limit_secs = 10);
+        error!(message = "Error reading datagram.", error = ?self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_read_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-            "mode" => "udp",
-        );
+        counter!("connection_read_errors_total", 1, "mode" => "udp");
     }
 }
 
@@ -49,14 +39,10 @@ pub struct SyslogUdpUtf8Error {
 
 impl InternalEvent for SyslogUdpUtf8Error {
     fn emit_logs(&self) {
-        error!(message = "Error converting bytes to UTF8 string in UDP mode.", error = %self.error, rate_limit_secs = 10);
+        error!(message = "Error converting bytes to UTF8 string in UDP mode.", error = ?self.error, rate_limit_secs = 10);
     }
 
     fn emit_metrics(&self) {
-        counter!("udp_utf8_convert_errors", 1,
-            "component_kind" => "source",
-            "component_type" => "syslog",
-            "mode" => "udp",
-        );
+        counter!("utf8_convert_errors_total", 1, "mode" => "udp");
     }
 }

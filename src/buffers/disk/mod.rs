@@ -1,7 +1,7 @@
 #![cfg(feature = "leveldb")]
 
 use crate::event::Event;
-use futures01::{Async, AsyncSink, Sink, Stream};
+use futures01::{Async, AsyncSink, Poll, Sink, Stream};
 use snafu::Snafu;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -54,6 +54,10 @@ impl Sink for Writer {
 
     fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
         self.inner.poll_complete()
+    }
+
+    fn close(&mut self) -> Poll<(), Self::SinkError> {
+        self.inner.close()
     }
 }
 

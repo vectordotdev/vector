@@ -12,7 +12,7 @@ mod task;
 
 use crate::{
     buffers,
-    config::{Config, ConfigDiff},
+    config::{Config, ConfigDiff, Resource},
     shutdown::SourceShutdownCoordinator,
     topology::{builder::Pieces, task::Task},
 };
@@ -50,7 +50,7 @@ pub async fn start_validated(
     let mut running_topology = RunningTopology {
         inputs: HashMap::new(),
         outputs: HashMap::new(),
-        config: Config::default(),
+        config,
         shutdown_coordinator: SourceShutdownCoordinator::default(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
@@ -63,9 +63,8 @@ pub async fn start_validated(
     {
         return None;
     }
-    running_topology.connect_diff(&diff, &mut pieces);
+    running_topology.connect_diff(&diff, &mut pieces).await;
     running_topology.spawn_diff(&diff, pieces);
-    running_topology.config = config;
 
     Some((running_topology, abort_rx))
 }
@@ -74,7 +73,7 @@ pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<P
     match builder::build_pieces(config, diff).await {
         Err(errors) => {
             for error in errors {
-                error!("Configuration error: {}", error);
+                error!(message = "Configuration error.", %error);
             }
             None
         }
@@ -96,7 +95,7 @@ pub fn take_healthchecks(diff: &ConfigDiff, pieces: &mut Pieces) -> Vec<(String,
 
 impl RunningTopology {
     /// Returned future will finish once all current sources have finished.
-    pub fn sources_finished(&self) -> impl Future<Item = (), Error = ()> {
+    pub fn sources_finished(&self) -> future::BoxFuture<'static, ()> {
         self.shutdown_coordinator.shutdown_tripwire()
     }
 
@@ -144,8 +143,8 @@ impl RunningTopology {
             let remaining_components = check_handles2.keys().cloned().collect::<Vec<_>>();
 
             error!(
-                "Failed to gracefully shut down in time. Killing: {}",
-                remaining_components.join(", ")
+              message = "Failed to gracefully shut down in time. Killing components.",
+                components = ?remaining_components.join(", ")
             );
 
             Ok(())
@@ -171,9 +170,7 @@ impl RunningTopology {
                 };
 
                 info!(
-                    "Shutting down... Waiting on: {}. {}",
-                    remaining_components.join(", "),
-                    time_remaining
+                    message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
                 );
             })
             .filter(|_| future::ready(false)) // Run indefinitely without emitting items
@@ -211,14 +208,51 @@ impl RunningTopology {
         require_healthy: bool,
     ) -> Result<bool, ()> {
         if self.config.global.data_dir != new_config.global.data_dir {
-            error!("data_dir cannot be changed while reloading config file; reload aborted. Current value: {:?}", self.config.global.data_dir);
+            error!(message = "The data_dir cannot be changed while reloading config file; reload aborted.", data_dir = ?self.config.global.data_dir);
             return Ok(false);
         }
 
         let diff = ConfigDiff::new(&self.config, &new_config);
 
+        // At this point both the old and the new config don't have
+        // conflicts in their resource usage. So if we combine their
+        // resources, all found conflicts are between
+        // to be removed and to be added components.
+        let remove_sink = diff
+            .sinks
+            .removed_and_changed()
+            .map(|name| (name, self.config.sinks[name].inner.resources()));
+        let add_source = diff
+            .sources
+            .changed_and_added()
+            .map(|name| (name, new_config.sources[name].resources()));
+        let add_sink = diff
+            .sinks
+            .changed_and_added()
+            .map(|name| (name, new_config.sinks[name].inner.resources()));
+        let conflicts = Resource::conflicts(
+            remove_sink.map(|(key, value)| ((true, key), value)).chain(
+                add_sink
+                    .chain(add_source)
+                    .map(|(key, value)| ((false, key), value)),
+            ),
+        );
+        let wait_for_sinks = conflicts
+            .into_iter()
+            .filter(|&(existing_sink, _)| existing_sink)
+            .map(|(_, name)| name.clone())
+            .collect();
+
         // Checks passed so let's shutdown the difference.
-        self.shutdown_diff(&diff).await;
+        self.shutdown_diff(&diff, &wait_for_sinks).await;
+
+        // Gives windows some time to make available any port
+        // released by shutdown componenets.
+        // Issue: https://github.com/timberio/vector/issues/3035
+        if cfg!(windows) {
+            // This value is guess work.
+            tokio::time::delay_for(Duration::from_millis(200)).await;
+        }
 
         // Now let's actually build the new pieces.
         if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff).await {
@@ -226,7 +260,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces);
+                self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
                 // We have successfully changed to new config.
@@ -242,7 +276,7 @@ impl RunningTopology {
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
             {
-                self.connect_diff(&diff, &mut new_pieces);
+                self.connect_diff(&diff, &mut new_pieces).await;
                 self.spawn_diff(&diff, new_pieces);
                 // We have successfully returned to old config.
                 return Ok(false);
@@ -284,7 +318,7 @@ impl RunningTopology {
     }
 
     /// Shutdowns removed and replaced pieces of topology.
-    async fn shutdown_diff(&mut self, diff: &ConfigDiff) {
+    async fn shutdown_diff(&mut self, diff: &ConfigDiff, wait_for_sinks: &HashSet<String>) {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -295,14 +329,13 @@ impl RunningTopology {
         // sources.
         if !diff.sources.to_remove.is_empty() {
             info!(
-                "Waiting for up to {} seconds for sources to finish shutting down",
-                timeout.as_secs()
+                message = "Waiting for sources to finish shutting down.", timeout = ?timeout.as_secs()
             );
         }
 
         let deadline = Instant::now() + timeout;
         for name in &diff.sources.to_remove {
-            info!("Removing source {:?}", name);
+            info!(message = "Removing source.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -322,7 +355,7 @@ impl RunningTopology {
         // Only log message if there are actual futures to check.
         if !source_shutdown_complete_futures.is_empty() {
             info!(
-                "Waiting for up to {} seconds for sources to finish shutting down",
+                "Waiting for up to {} seconds for sources to finish shutting down.",
                 timeout.as_secs()
             );
         }
@@ -333,12 +366,7 @@ impl RunningTopology {
             .unwrap();
 
         // Second pass now that all sources have shut down for final cleanup.
-        for name in &diff.sources.to_remove {
-            if let Some(task) = self.source_tasks.remove(name) {
-                task.await.unwrap().unwrap();
-            }
-        }
-        for name in &diff.sources.to_change {
+        for name in diff.sources.removed_and_changed() {
             if let Some(task) = self.source_tasks.remove(name) {
                 task.await.unwrap().unwrap();
             }
@@ -346,7 +374,7 @@ impl RunningTopology {
 
         // Transforms
         for name in &diff.transforms.to_remove {
-            info!("Removing transform {:?}", name);
+            info!(message = "Removing transform.", name = ?name);
 
             let previous = self.tasks.remove(name).unwrap();
             drop(previous); // detach and forget
@@ -356,18 +384,39 @@ impl RunningTopology {
         }
 
         // Sinks
+        // First pass to detach sinks
         for name in &diff.sinks.to_remove {
-            info!("Removing sink {:?}", name);
-
-            let previous = self.tasks.remove(name).unwrap();
-            drop(previous); // detach and forget
-
+            info!(message = "Removing sink.", name = ?name);
             self.remove_inputs(&name);
+        }
+
+        // Detach changed sinks that we have to wait for.
+        for name in &diff.sinks.to_change {
+            if wait_for_sinks.contains(name) {
+                self.detach_inputs(&name);
+            }
+        }
+
+        // Second pass for final cleanup
+        for name in &diff.sinks.to_remove {
+            let previous = self.tasks.remove(name).unwrap();
+            if wait_for_sinks.contains(name) {
+                previous.await.unwrap().unwrap();
+            } else {
+                drop(previous); // detach and forget
+            }
+        }
+
+        for name in &diff.sinks.to_change {
+            if wait_for_sinks.contains(name) {
+                let previous = self.tasks.remove(name).unwrap();
+                previous.await.unwrap().unwrap();
+            }
         }
     }
 
     /// Rewires topology
-    fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
+    async fn connect_diff(&mut self, diff: &ConfigDiff, new_pieces: &mut Pieces) {
         // Sources
         for name in diff.sources.changed_and_added() {
             self.setup_outputs(&name, new_pieces);
@@ -402,41 +451,46 @@ impl RunningTopology {
     fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: Pieces) {
         // Sources
         for name in &diff.sources.to_change {
-            info!("Rebuilding source {:?}", name);
+            info!(message = "Rebuilding source.", name = ?name);
             self.spawn_source(name, &mut new_pieces);
         }
 
         for name in &diff.sources.to_add {
-            info!("Starting source {:?}", name);
+            info!(message = "Starting source.", name = ?name);
             self.spawn_source(&name, &mut new_pieces);
         }
 
         // Transforms
         for name in &diff.transforms.to_change {
-            info!("Rebuilding transform {:?}", name);
+            info!(message = "Rebuilding transform.", name = ?name);
             self.spawn_transform(&name, &mut new_pieces);
         }
 
         for name in &diff.transforms.to_add {
-            info!("Starting transform {:?}", name);
+            info!(message = "Starting transform.", name = ?name);
             self.spawn_transform(&name, &mut new_pieces);
         }
 
         // Sinks
         for name in &diff.sinks.to_change {
-            info!("Rebuilding sink {:?}", name);
+            info!(message = "Rebuilding sink.", name = ?name);
             self.spawn_sink(&name, &mut new_pieces);
         }
 
         for name in &diff.sinks.to_add {
-            info!("Starting sink {:?}", name);
+            info!(message = "Starting sink.", name = ?name);
             self.spawn_sink(&name, &mut new_pieces);
         }
     }
 
     fn spawn_sink(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("sink", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "sink",
+            component_kind = "sink",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -446,7 +500,12 @@ impl RunningTopology {
 
     fn spawn_transform(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("transform", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "transform",
+            component_kind = "transform",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span);
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -456,7 +515,12 @@ impl RunningTopology {
 
     fn spawn_source(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
         let task = new_pieces.tasks.remove(name).unwrap();
-        let span = info_span!("source", name = %task.name(), r#type = %task.typetag());
+        let span = error_span!(
+            "source",
+            component_kind = "source",
+            component_name = %task.name(),
+            component_type = %task.typetag(),
+        );
         let task = handle_errors(task.compat(), self.abort_tx.clone()).instrument(span.clone());
         let spawned = tokio::spawn(task.compat());
         if let Some(previous) = self.tasks.insert(name.to_string(), spawned) {
@@ -569,11 +633,32 @@ impl RunningTopology {
 
         for &input in inputs_to_replace {
             // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), tx.get()));
+            let _ = self.outputs[input].unbounded_send(fanout::ControlMessage::Replace(
+                name.to_string(),
+                Some(tx.get()),
+            ));
         }
 
         self.inputs.insert(name.to_string(), tx);
+    }
+
+    fn detach_inputs(&mut self, name: &str) {
+        self.inputs.remove(name);
+
+        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let old_inputs = sink_inputs.or(trans_inputs).unwrap();
+
+        for input in old_inputs {
+            // This can only fail if we are disconnected, which is a valid situation.
+            let _ = self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+        }
+    }
+
+    /// Borrows the Config
+    pub fn config(&self) -> &Config {
+        &self.config
     }
 }
 
@@ -645,16 +730,27 @@ mod tests {
     }
 }
 
-#[cfg(all(test, feature = "sinks-console", feature = "sources-splunk_hec"))]
+#[cfg(all(
+    test,
+    feature = "sinks-console",
+    feature = "sources-splunk_hec",
+    feature = "sources-generator",
+    feature = "sinks-prometheus",
+    feature = "transforms-log_to_metric"
+))]
 mod reload_tests {
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
+    use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
+    use crate::sources::generator::GeneratorConfig;
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, start_topology};
+    use crate::test_util::{next_addr, start_topology, wait_for_tcp};
+    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use futures::{compat::Stream01CompatExt, StreamExt};
+    use std::net::{SocketAddr, TcpListener};
+    use std::time::Duration;
+    use tokio::time::delay_for;
 
-    // TODO: Run it only on Linux and Mac since it fails on Windows.
-    // TODO: Issue: https://github.com/timberio/vector/issues/3035
-    #[cfg(unix)]
     #[tokio::test]
     async fn topology_reuse_old_port() {
         let address = next_addr();
@@ -690,10 +786,11 @@ mod reload_tests {
 
     #[tokio::test]
     async fn topology_rebuild_old() {
-        let address = next_addr();
+        let address_0 = next_addr();
+        let address_1 = next_addr();
 
         let mut old_config = Config::builder();
-        old_config.add_source("in1", SplunkConfig::on(address));
+        old_config.add_source("in1", SplunkConfig::on(address_0));
         old_config.add_sink(
             "out",
             &[&"in1"],
@@ -704,16 +801,18 @@ mod reload_tests {
         );
 
         let mut new_config = Config::builder();
-        new_config.add_source("in1", SplunkConfig::on(address));
-        new_config.add_source("in2", SplunkConfig::on(address));
+        new_config.add_source("in1", SplunkConfig::on(address_1));
         new_config.add_sink(
             "out",
-            &[&"in1", &"in2"],
+            &[&"in1"],
             ConsoleSinkConfig {
                 target: Target::Stdout,
                 encoding: Encoding::Text.into(),
             },
         );
+
+        // Will cause the new_config to fail on build
+        let _bind = TcpListener::bind(address_1).unwrap();
 
         let (mut topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
         assert!(!topology
@@ -744,6 +843,135 @@ mod reload_tests {
             .await
             .unwrap());
     }
+
+    #[tokio::test]
+    async fn topology_reuse_old_port_sink() {
+        let address = next_addr();
+
+        let source =
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001));
+        let transform = LogToMetricConfig {
+            metrics: vec![MetricConfig::Gauge(GaugeConfig {
+                field: "message".to_string(),
+                name: None,
+                namespace: None,
+                tags: None,
+            })],
+        };
+
+        let mut old_config = Config::builder();
+        old_config.add_source("in", source.clone());
+        old_config.add_transform("trans", &[&"in"], transform.clone());
+        old_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusExporterConfig {
+                address,
+                flush_period_secs: 1,
+                ..PrometheusExporterConfig::default()
+            },
+        );
+
+        let mut new_config = Config::builder();
+        new_config.add_source("in", source.clone());
+        new_config.add_transform("trans", &[&"in"], transform.clone());
+        new_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusExporterConfig {
+                address,
+                flush_period_secs: 2,
+                ..PrometheusExporterConfig::default()
+            },
+        );
+
+        reload_sink_test(
+            old_config.build().unwrap(),
+            new_config.build().unwrap(),
+            address,
+            address,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn topology_reuse_old_port_cross_dependecy() {
+        // Reload with source that uses address of changed sink.
+        let address_0 = next_addr();
+        let address_1 = next_addr();
+
+        let transform = LogToMetricConfig {
+            metrics: vec![MetricConfig::Gauge(GaugeConfig {
+                field: "message".to_string(),
+                name: None,
+                namespace: None,
+                tags: None,
+            })],
+        };
+
+        let mut old_config = Config::builder();
+        old_config.add_source(
+            "in",
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001)),
+        );
+        old_config.add_transform("trans", &[&"in"], transform.clone());
+        old_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusExporterConfig {
+                address: address_0,
+                flush_period_secs: 1,
+                ..PrometheusExporterConfig::default()
+            },
+        );
+
+        let mut new_config = Config::builder();
+        new_config.add_source("in", SplunkConfig::on(address_0));
+        new_config.add_transform("trans", &[&"in"], transform.clone());
+        new_config.add_sink(
+            "out1",
+            &[&"trans"],
+            PrometheusExporterConfig {
+                address: address_1,
+                flush_period_secs: 1,
+                ..PrometheusExporterConfig::default()
+            },
+        );
+
+        reload_sink_test(
+            old_config.build().unwrap(),
+            new_config.build().unwrap(),
+            address_0,
+            address_1,
+        )
+        .await;
+    }
+
+    async fn reload_sink_test(
+        old_config: Config,
+        new_config: Config,
+        old_address: SocketAddr,
+        new_address: SocketAddr,
+    ) {
+        let (mut topology, crash) = start_topology(old_config, false).await;
+        let mut crash = crash.compat();
+
+        // Wait for sink to come online
+        wait_for_tcp(old_address).await;
+
+        assert!(topology
+            .reload_config_and_respawn(new_config, false)
+            .await
+            .unwrap());
+
+        // Give old time to shutdown if it didn't, and new one to come online.
+        delay_for(Duration::from_secs(2)).await;
+
+        tokio::select! {
+            _ = wait_for_tcp(new_address) => {}//Success
+            _ = crash.next() => panic!(),
+        }
+    }
 }
 
 #[cfg(all(test, feature = "sinks-console", feature = "sources-generator"))]
@@ -754,7 +982,6 @@ mod source_finished_tests {
         sources::generator::GeneratorConfig,
         test_util::start_topology,
     };
-    use futures::compat::Future01CompatExt;
     use tokio::time::{timeout, Duration};
 
     #[tokio::test]
@@ -773,9 +1000,8 @@ mod source_finished_tests {
 
         let (topology, _crash) = start_topology(old_config.build().unwrap(), false).await;
 
-        timeout(Duration::from_secs(2), topology.sources_finished().compat())
+        timeout(Duration::from_secs(2), topology.sources_finished())
             .await
-            .unwrap()
             .unwrap();
     }
 }
@@ -797,8 +1023,7 @@ mod transient_state_tests {
         transforms::json_parser::JsonParserConfig,
         Error, Pipeline,
     };
-    use futures::compat::Future01CompatExt;
-    use futures01::Future;
+    use futures::{future, FutureExt, TryFutureExt};
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
 
@@ -820,20 +1045,28 @@ mod transient_state_tests {
         }
     }
 
+    #[async_trait::async_trait]
     #[typetag::serde(name = "mock")]
     impl SourceConfig for MockSourceConfig {
-        fn build(
+        async fn build(
             &self,
             _name: &str,
             _globals: &GlobalOptions,
             shutdown: ShutdownSignal,
             out: Pipeline,
         ) -> Result<Source, Error> {
-            let source = shutdown
-                .map(|_| ())
-                .select(self.tripwire.clone().unwrap())
-                .map(|_| std::mem::drop(out))
-                .map_err(|_| ());
+            let source = future::select(
+                shutdown.map(|_| ()).boxed(),
+                self.tripwire
+                    .clone()
+                    .unwrap()
+                    .then(crate::stream::tripwire_handler)
+                    .boxed(),
+            )
+            .map(|_| std::mem::drop(out))
+            .unit_error()
+            .boxed()
+            .compat();
             Ok(Box::new(source))
         }
 
@@ -879,8 +1112,7 @@ mod transient_state_tests {
 
         trigger_old.cancel();
 
-        let finished = topology.sources_finished();
-        finished.compat().await.unwrap();
+        topology.sources_finished().await;
 
         assert!(topology
             .reload_config_and_respawn(new_config.build().unwrap(), false)

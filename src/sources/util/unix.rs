@@ -1,12 +1,14 @@
 use crate::{
-    async_read::VecAsyncReadExt, emit, event::Event, internal_events::UnixSocketError,
-    shutdown::ShutdownSignal, sources::Source, Pipeline,
+    async_read::VecAsyncReadExt,
+    emit,
+    event::Event,
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError},
+    shutdown::ShutdownSignal,
+    sources::Source,
+    Pipeline,
 };
 use bytes::Bytes;
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    future, FutureExt, SinkExt, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use std::path::PathBuf;
 use tokio::net::{UnixListener, UnixStream};
@@ -31,18 +33,19 @@ where
     D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
     E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display,
 {
-    let out = out.sink_map_err(|e| error!("Error sending line: {:?}", e));
+    let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     let fut = async move {
         let mut listener =
             UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
-        info!(message = "Listening.", ?listen_path, r#type = "unix");
+        info!(message = "Listening.", path = ?listen_path, r#type = "unix");
 
-        let mut stream = listener.incoming().take_until(shutdown.clone().compat());
+        let connection_open = OpenGauge::new();
+        let mut stream = listener.incoming().take_until(shutdown.clone());
         while let Some(socket) = stream.next().await {
             let socket = match socket {
                 Err(error) => {
-                    error!("Failed to accept socket; error = {:?}", error);
+                    error!(message = "Failed to accept socket.", %error);
                     continue;
                 }
                 Ok(socket) => socket,
@@ -67,7 +70,7 @@ where
             let received_from: Option<Bytes> =
                 path.map(|p| p.to_string_lossy().into_owned().into());
 
-            let stream = socket.allow_read_until(shutdown.clone().compat().map(|_| ()));
+            let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
                 future::ready(match line {
                     Ok(line) => build_event(&host_key, received_from.clone(), &line).map(Ok),
@@ -81,11 +84,13 @@ where
                 })
             });
 
+            let connection_open = connection_open.clone();
             let mut out = out.clone().sink_compat();
             tokio::spawn(
                 async move {
+                    let _open_token = connection_open.open(|count| emit!(ConnectionOpen { count }));
                     let _ = out.send_all(&mut stream).await;
-                    info!("Finished sending");
+                    info!("Finished sending.");
 
                     let socket: &UnixStream = stream.get_ref().get_ref().get_ref();
                     let _ = socket.shutdown(std::net::Shutdown::Both);

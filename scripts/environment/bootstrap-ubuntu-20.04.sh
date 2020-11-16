@@ -3,7 +3,14 @@ set -e -o verbose
 
 export DEBIAN_FRONTEND=noninteractive
 
+echo 'APT::Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
+
 apt update --yes
+
+apt install --yes \
+  software-properties-common \
+  apt-utils \
+  apt-transport-https
 
 # This is a workaround for GH https://github.com/actions/virtual-environments/issues/1605
 # This fix will be removed when GH addresses the issue.
@@ -28,9 +35,7 @@ apt install --yes \
     python3-pip \
     jq \
     shellcheck \
-    software-properties-common \
     locales \
-    apt-transport-https \
     ca-certificates \
     curl \
     gnupg-agent \
@@ -40,7 +45,22 @@ apt install --yes \
     libsasl2-dev \
     gnupg2 \
     wget \
-    gawk
+    gawk \
+    yarn \
+    sudo \
+    cmark-gfm \
+    rename \
+    rpm
+
+# Cue
+TEMP=$(mktemp -d)
+curl \
+    -L https://github.com/cuelang/cue/releases/download/v0.3.0-alpha4/cue_0.3.0-alpha4_Linux_x86_64.tar.gz \
+    -o "${TEMP}/cue_0.3.0-alpha4_Linux_x86_64.tar.gz"
+tar \
+    -xvf "${TEMP}/cue_0.3.0-alpha4_Linux_x86_64.tar.gz" \
+    -C "${TEMP}"
+cp "${TEMP}/cue" /usr/bin/cue
 
 # Grease
 # Grease is used for the `make release-github` task.
@@ -60,16 +80,17 @@ dpkg-reconfigure locales
 # Rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
 
-# Docker
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   xenial \
-   stable"
-
-# Install those new things
-apt update --yes
-apt install --yes yarn docker-ce docker-ce-cli containerd.io
+if ! [ -x "$(command -v docker)" ]; then
+    # Docker
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
+    add-apt-repository \
+        "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
+        xenial \
+        stable"
+    # Install those new things
+    apt update --yes
+    apt install --yes docker-ce docker-ce-cli containerd.io
+fi
 
 # Apt cleanup
 apt clean

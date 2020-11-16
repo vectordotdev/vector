@@ -1,13 +1,13 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::util::{
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig, UriSerde,
     },
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -32,19 +32,33 @@ pub struct HoneycombConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HoneycombConfig>("honeycomb")
+    SinkDescription::new::<HoneycombConfig>("honeycomb")
 }
 
+impl GenerateConfig for HoneycombConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"api_key = "${HONEYCOMB_API_KEY}"
+            dataset = "my-honeycomb-dataset""#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "honeycomb")]
 impl SinkConfig for HoneycombConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let request_settings = self.request.unwrap_with(&TowerRequestConfig::default());
         let batch_settings = BatchSettings::default()
             .bytes(bytesize::kib(100u64))
             .timeout(1)
             .parse_config(self.batch)?;
 
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let client = HttpClient::new(None)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -54,14 +68,11 @@ impl SinkConfig for HoneycombConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal honeycomb sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal honeycomb sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -113,7 +124,7 @@ impl HoneycombConfig {
     }
 }
 
-async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(config: HoneycombConfig, client: HttpClient) -> crate::Result<()> {
     let req = config
         .build_request(Vec::new())
         .await?
@@ -148,5 +159,12 @@ async fn healthcheck(config: HoneycombConfig, mut client: HttpClient) -> crate::
             status, body
         )
         .into())
+    }
+}
+#[cfg(test)]
+mod test {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::HoneycombConfig>();
     }
 }

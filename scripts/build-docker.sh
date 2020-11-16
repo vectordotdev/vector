@@ -35,11 +35,16 @@ build() {
     docker buildx create --use --name vector-builder
     docker buildx install
 
+    ARGS=()
+    if [[ -n "${PUSH:-}" ]]; then
+      ARGS+=(--push)
+    fi
+
     docker buildx build \
       --platform="$PLATFORM" \
       --tag "$TAG" \
       target/artifacts \
-      -f "$DOCKERFILE" ${PUSH:+--push}
+      -f "$DOCKERFILE" "${ARGS[@]}"
   else
     docker build \
       --tag "$TAG" \
@@ -68,12 +73,18 @@ if [[ "$CHANNEL" == "latest" ]]; then
   for VERSION_TAG in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" latest; do
     build alpine "$VERSION_TAG"
     build debian "$VERSION_TAG"
+    build distroless-static "$VERSION_TAG"
+    build distroless-libc "$VERSION_TAG"
   done
 elif [[ "$CHANNEL" == "nightly" ]]; then
   for VERSION_TAG in "nightly-$DATE" nightly; do
     build alpine "$VERSION_TAG"
     build debian "$VERSION_TAG"
+    build distroless-static "$VERSION_TAG"
+    build distroless-libc "$VERSION_TAG"
   done
 elif [[ "$CHANNEL" == "test" ]]; then
   build "${BASE:-"alpine"}" "${TAG:-"test"}"
+  build "${BASE:-"distroless-libc"}" "${TAG:-"test"}"
+  build "${BASE:-"distroless-static"}" "${TAG:-"test"}"
 fi

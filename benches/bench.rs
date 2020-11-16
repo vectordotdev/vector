@@ -1,22 +1,23 @@
 use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
 
 use approx::assert_relative_eq;
+use chrono::{DateTime, Utc};
 use futures::{compat::Future01CompatExt, future, stream, StreamExt};
 use indexmap::IndexMap;
-use rand::{
-    distributions::{Alphanumeric, Uniform},
-    prelude::*,
-};
+use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
+use rand_distr::{Alphanumeric, Distribution, Uniform};
 use std::convert::TryFrom;
-use string_cache::DefaultAtom as Atom;
+
 use vector::transforms::{
     add_fields::AddFields,
+    coercer::CoercerConfig,
+    json_parser::{JsonParser, JsonParserConfig},
     remap::{Remap, RemapConfig},
-    Transform,
+    FunctionTransform, Transform,
 };
 use vector::{
-    config::{self, log_schema, TransformConfig, TransformContext},
-    event::Event,
+    config::{self, log_schema, TransformConfig},
+    event::{Event, Value},
     sinks, sources,
     test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
     transforms,
@@ -421,28 +422,36 @@ fn benchmark_regex(c: &mut Criterion) {
     c.bench(
         "regex",
         Benchmark::new("regex", move |b| {
+            let mut rt = runtime();
             b.iter_with_setup(
                 || {
-                    let parser =transforms::regex_parser::RegexParserConfig {
-                        // Many captures to stress the regex parser
-                        patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
-                        field: None,
-                        drop_failed: true,
-                        ..Default::default()
-                    }.build(TransformContext::new_test()).unwrap();
+                    let parser = rt.block_on(async move {
+                        transforms::regex_parser::RegexParserConfig {
+                            // Many captures to stress the regex parser
+                            patterns: vec![r#"^(?P<addr>\d+\.\d+\.\d+\.\d+) (?P<user>\S+) (?P<auth>\S+) \[(?P<date>\d+/[A-Za-z]+/\d+:\d+:\d+:\d+ [+-]\d{4})\] "(?P<method>[A-Z]+) (?P<uri>[^"]+) HTTP/\d\.\d" (?P<code>\d+) (?P<size>\d+) "(?P<referrer>[^"]+)" "(?P<browser>[^"]+)""#.into()],
+                            field: None,
+                            drop_failed: true,
+                            ..Default::default()
+                        }
+                        .build()
+                        .await
+                        .unwrap()
+                    });
 
                     let src_lines = http_access_log_lines()
                         .take(num_lines)
                         .collect::<Vec<String>>();
 
-                    (parser, src_lines)
+                    let output = Vec::with_capacity(1);
+                    (parser, src_lines, output)
                 },
-                |(mut parser, src_lines)| {
-                    let out_lines = src_lines.iter()
-                        .filter_map(|line| parser.transform(Event::from(&line[..])))
-                        .fold(0, |accum, _| accum + 1);
-
-                    assert_eq!(out_lines, num_lines);
+                |(mut parser, src_lines, mut output)| {
+                    src_lines
+                        .into_iter()
+                        .for_each(|line| {
+                            parser.as_function().transform(&mut output, Event::from(&line[..]))
+                        });
+                    assert_eq!(output.len(), num_lines);
                 },
             );
         })
@@ -637,7 +646,6 @@ fn benchmark_complex(c: &mut Criterion) {
 }
 
 fn bench_elasticsearch_index(c: &mut Criterion) {
-    use chrono::Utc;
     use vector::template::Template;
 
     c.bench(
@@ -648,7 +656,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert(log_schema().timestamp_key().clone(), Utc::now());
+                        .insert(log_schema().timestamp_key(), Utc::now());
 
                     (Template::try_from("index-%Y.%m.%d").unwrap(), event)
                 },
@@ -665,7 +673,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
                     let mut event = Event::from("hello world");
                     event
                         .as_mut_log()
-                        .insert(log_schema().timestamp_key().clone(), Utc::now());
+                        .insert(log_schema().timestamp_key(), Utc::now());
 
                     (Template::try_from("index").unwrap(), event)
                 },
@@ -676,94 +684,161 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
 }
 
 fn benchmark_remap(c: &mut Criterion) {
-    let event = {
-        let mut event = Event::from("augment me");
-        event.as_mut_log().insert("copy_from", "buz".to_owned());
-        event
+    let mut rt = runtime();
+    let add_fields_runner = |mut tform: Box<dyn FunctionTransform>| {
+        let event = {
+            let mut event = Event::from("augment me");
+            event.as_mut_log().insert("copy_from", "buz".to_owned());
+            event
+        };
+
+        move || {
+            let mut result = Vec::with_capacity(1);
+            tform.transform(&mut result, event.clone());
+            let output_1 = result[0].as_log();
+            assert_eq!(output_1.get("foo").unwrap().to_string_lossy(), "bar");
+            assert_eq!(output_1.get("bar").unwrap().to_string_lossy(), "baz");
+            assert_eq!(output_1.get("copy").unwrap().to_string_lossy(), "buz");
+        }
     };
 
-    c.bench_function("add fields with remap", |b| {
-        let conf = RemapConfig {
-            mapping: r#".foo = "bar"
+    c.bench_function("remap: add fields with remap", |b| {
+        let tform = Remap::new(RemapConfig {
+            source: r#".foo = "bar"
             .bar = "baz"
             .copy = .copy_from"#
                 .to_string(),
             drop_on_err: true,
-        };
-        let mut tform = Remap::new(conf).unwrap();
+        });
 
-        b.iter(|| {
-            let result = tform.transform(event.clone()).unwrap();
-            assert_eq!(
-                result
-                    .as_log()
-                    .get(&Atom::from("foo"))
-                    .unwrap()
-                    .to_string_lossy(),
-                "bar"
-            );
-            assert_eq!(
-                result
-                    .as_log()
-                    .get(&Atom::from("bar"))
-                    .unwrap()
-                    .to_string_lossy(),
-                "baz"
-            );
-            assert_eq!(
-                result
-                    .as_log()
-                    .get(&Atom::from("copy"))
-                    .unwrap()
-                    .to_string_lossy(),
-                "buz"
-            );
-        })
+        b.iter(add_fields_runner(Box::new(tform.unwrap())))
     });
 
-    c.bench_function("add fields with add_fields", |b| {
+    c.bench_function("remap: add fields with add_fields", |b| {
         let mut fields = IndexMap::new();
-        fields.insert("foo".into(), "bar".into());
-        fields.insert("bar".into(), "baz".into());
-        fields.insert("copy".into(), "{{ copy_from }}".into());
+        fields.insert("foo".into(), String::from("bar").into());
+        fields.insert("bar".into(), String::from("baz").into());
+        fields.insert("copy".into(), String::from("{{ copy_from }}").into());
 
-        let mut tform = AddFields::new(fields, true);
+        let tform = AddFields::new(fields, true).unwrap();
 
-        b.iter(|| {
-            let result = tform.transform(event.clone()).unwrap();
+        b.iter(add_fields_runner(Box::new(tform)))
+    });
+
+    let json_parser_runner = |mut tform: Box<dyn FunctionTransform>| {
+        let event = {
+            let mut event = Event::from("parse me");
+            event
+                .as_mut_log()
+                .insert("foo", r#"{"key": "value"}"#.to_owned());
+            event
+        };
+
+        move || {
+            let mut result = Vec::with_capacity(1);
+            tform.transform(&mut result, event.clone());
+            let output_1 = result[0].as_log();
             assert_eq!(
-                result
-                    .as_log()
-                    .get(&Atom::from("foo"))
-                    .unwrap()
-                    .to_string_lossy(),
-                "bar"
+                output_1.get("foo").unwrap().to_string_lossy(),
+                r#"{"key": "value"}"#
             );
             assert_eq!(
-                result
-                    .as_log()
-                    .get(&Atom::from("bar"))
-                    .unwrap()
-                    .to_string_lossy(),
-                "baz"
+                output_1.get("bar").unwrap().to_string_lossy(),
+                r#"{"key":"value"}"#
             );
+        }
+    };
+
+    c.bench_function("remap: parse JSON with remap", |b| {
+        let tform = Remap::new(RemapConfig {
+            source: ".bar = parse_json(.foo)".to_owned(),
+            drop_on_err: false,
+        });
+
+        b.iter(json_parser_runner(Box::new(tform.unwrap())))
+    });
+
+    c.bench_function("remap: parse JSON with json_parser", |b| {
+        let tform = JsonParser::from(JsonParserConfig {
+            field: Some("foo".to_string()),
+            target_field: Some("bar".to_owned()),
+            drop_field: false,
+            drop_invalid: false,
+            overwrite_target: None,
+        });
+
+        b.iter(json_parser_runner(Box::new(tform)))
+    });
+
+    let coerce_runner = |mut tform: Transform| {
+        let mut event = Event::from("coerce me");
+        for &(key, value) in &[
+            ("number", "1234"),
+            ("bool", "yes"),
+            ("timestamp", "19/06/2019:17:20:49 -0400"),
+        ] {
+            event.as_mut_log().insert(key, value.to_owned());
+        }
+
+        let timestamp =
+            DateTime::parse_from_str("19/06/2019:17:20:49 -0400", "%d/%m/%Y:%H:%M:%S %z")
+                .unwrap()
+                .with_timezone(&Utc);
+
+        move || {
+            let mut result = Vec::with_capacity(1);
+            tform.as_function().transform(&mut result, event.clone());
+            let output_1 = result[0].as_log();
+            assert_eq!(output_1.get("number").unwrap(), &Value::Integer(1234));
+            assert_eq!(output_1.get("bool").unwrap(), &Value::Boolean(true));
             assert_eq!(
-                result
-                    .as_log()
-                    .get(&Atom::from("copy"))
-                    .unwrap()
-                    .to_string_lossy(),
-                "buz"
+                output_1.get("timestamp").unwrap(),
+                &Value::Timestamp(timestamp),
             );
+        }
+    };
+
+    c.bench_function("remap: coerce with remap", |b| {
+        let tform = Remap::new(RemapConfig {
+            source: r#".number = to_int(.number)
+                .bool = to_bool(.bool)
+                .timestamp = parse_timestamp(.timestamp, format = "%d/%m/%Y:%H:%M:%S %z")
+                "#
+            .to_owned(),
+            drop_on_err: true,
         })
+        .unwrap();
+
+        b.iter(coerce_runner(Transform::function(tform)))
+    });
+
+    c.bench_function("remap: coerce with coercer", |b| {
+        let tform = rt.block_on(async move {
+            toml::from_str::<CoercerConfig>(
+                r#"drop_unspecified = false
+
+                   [types]
+                   number = "int"
+                   bool = "bool"
+                   timestamp = "timestamp|%d/%m/%Y:%H:%M:%S %z"
+                   "#,
+            )
+            .unwrap()
+            .build()
+            .await
+            .unwrap()
+        });
+
+        b.iter(coerce_runner(tform))
     });
 }
 
 fn random_lines(size: usize) -> impl Iterator<Item = String> {
-    let mut rng = SmallRng::from_rng(thread_rng()).unwrap();
+    let rng = SmallRng::from_rng(thread_rng()).unwrap();
 
     std::iter::repeat(()).map(move |_| {
-        rng.sample_iter(&Alphanumeric)
+        rng.clone()
+            .sample_iter(&Alphanumeric)
             .take(size)
             .collect::<String>()
     })
@@ -785,9 +860,9 @@ fn http_access_log_lines() -> impl Iterator<Item = String> {
                 rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), rng.gen::<u8>(), // IP
                 year.sample(&mut rng), mday.sample(&mut rng), // date
                 hour.sample(&mut rng), minsec.sample(&mut rng), minsec.sample(&mut rng), // time
-                rng.sample_iter(&Alphanumeric).take(url_size).collect::<String>(), // URL
+                rng.clone().sample_iter(&Alphanumeric).take(url_size).collect::<String>(), // URL
                 code.sample(&mut rng), size.sample(&mut rng),
-                rng.sample_iter(&Alphanumeric).take(browser_size).collect::<String>(),
+                rng.clone().sample_iter(&Alphanumeric).take(browser_size).collect::<String>(),
         )
     })
 }

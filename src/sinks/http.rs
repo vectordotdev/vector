@@ -1,16 +1,16 @@
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        http::{Auth, BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
         UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::{future, FutureExt};
-use futures01::Sink;
+use futures::{future, FutureExt, SinkExt};
 use http::{
     header::{self, HeaderName, HeaderValue},
     Method, Request, StatusCode, Uri,
@@ -96,15 +96,29 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<HttpSinkConfig>("http")
+    SinkDescription::new::<HttpSinkConfig>("http")
 }
 
+impl GenerateConfig for HttpSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"uri = "https://10.22.212.22:9000/endpoint"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         validate_headers(&self.headers, &self.auth)?;
         let tls = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls)?;
+        let client = HttpClient::new(tls)?;
 
         let mut config = self.clone();
         config.uri = build_uri(config.uri.clone()).into();
@@ -124,9 +138,9 @@ impl SinkConfig for HttpSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal HTTP sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 
-        let sink = super::VectorSink::Futures01Sink(Box::new(sink));
+        let sink = super::VectorSink::Sink(Box::new(sink));
 
         match self.healthcheck_uri.clone() {
             Some(healthcheck_uri) => {
@@ -157,7 +171,7 @@ impl HttpSink for HttpSinkConfig {
 
         let body = match &self.encoding.codec() {
             Encoding::Text => {
-                if let Some(v) = event.get(&crate::config::log_schema().message_key()) {
+                if let Some(v) = event.get(crate::config::log_schema().message_key()) {
                     let mut b = v.to_string_lossy().into_bytes();
                     b.push(b'\n');
                     b
@@ -172,7 +186,7 @@ impl HttpSink for HttpSinkConfig {
 
             Encoding::Ndjson => {
                 let mut b = serde_json::to_vec(&event)
-                    .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 b.push(b'\n');
                 b
@@ -180,7 +194,7 @@ impl HttpSink for HttpSinkConfig {
 
             Encoding::Json => {
                 let mut b = serde_json::to_vec(&event)
-                    .map_err(|e| panic!("Unable to encode into JSON: {}", e))
+                    .map_err(|error| panic!("Unable to encode into JSON: {}", error))
                     .ok()?;
                 b.push(b',');
                 b
@@ -233,11 +247,7 @@ impl HttpSink for HttpSinkConfig {
     }
 }
 
-async fn healthcheck(
-    uri: UriSerde,
-    auth: Option<Auth>,
-    mut client: HttpClient,
-) -> crate::Result<()> {
+async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
     let uri = build_uri(uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
@@ -302,6 +312,11 @@ mod tests {
     use hyper::Method;
     use serde::Deserialize;
     use std::io::{BufRead, BufReader};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<HttpSinkConfig>();
+    }
 
     #[test]
     fn http_encode_event_text() {
@@ -369,9 +384,9 @@ mod tests {
 
     // TODO: Fix failure on GH Actions using macos-latest image.
     #[cfg(not(target_os = "macos"))]
-    #[test]
+    #[tokio::test]
     #[should_panic(expected = "Authorization header can not be used with defined auth options")]
-    fn http_headers_auth_conflict() {
+    async fn http_headers_auth_conflict() {
         let config = r#"
         uri = "http://$IN_ADDR/"
         encoding = "text"
@@ -386,7 +401,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let _ = config.build(cx).unwrap();
+        let _ = config.build(cx).await.unwrap();
     }
 
     #[tokio::test]
@@ -410,7 +425,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -465,7 +480,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);
@@ -517,7 +532,7 @@ mod tests {
 
         let cx = SinkContext::new_test();
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
         let (rx, trigger, server) = build_test_server(in_addr);
 
         let (input_lines, events) = random_lines_with_stream(100, num_lines);

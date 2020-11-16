@@ -12,16 +12,8 @@ impl InternalEvent for KafkaEventReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_processed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
-        counter!(
-            "bytes_processed", self.byte_size as u64,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("events_processed_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 
@@ -32,15 +24,11 @@ pub struct KafkaOffsetUpdateFailed {
 
 impl InternalEvent for KafkaOffsetUpdateFailed {
     fn emit_logs(&self) {
-        error!(message = "Unable to update consumer offset.", error = %self.error);
+        error!(message = "Unable to update consumer offset.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "consumer_offset_updates_failed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("consumer_offset_updates_failed_total", 1);
     }
 }
 
@@ -51,15 +39,11 @@ pub struct KafkaEventFailed {
 
 impl InternalEvent for KafkaEventFailed {
     fn emit_logs(&self) {
-        error!(message = "Failed to read message.", error = %self.error);
+        error!(message = "Failed to read message.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
-        counter!(
-            "events_failed", 1,
-            "component_kind" => "source",
-            "component_type" => "kafka",
-        );
+        counter!("events_failed_total", 1);
     }
 }
 

@@ -1,21 +1,21 @@
-use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::{Event, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
         RegexParserMissingField, RegexParserTargetExists,
     },
+    transforms::{FunctionTransform, Transform},
     types::{parse_check_conversion_map, Conversion},
 };
+use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::collections::HashMap;
 use std::str;
-use string_cache::DefaultAtom as Atom;
 
-#[derive(Debug, Derivative, Deserialize, Serialize)]
+#[derive(Debug, Derivative, Deserialize, Serialize, Clone)]
 #[derivative(Default)]
 #[serde(default, deny_unknown_fields)]
 pub struct RegexParserConfig {
@@ -24,23 +24,26 @@ pub struct RegexParserConfig {
     /// TODO: Remove at a future point in time.
     pub regex: Option<String>,
     pub patterns: Vec<String>,
-    pub field: Option<Atom>,
+    pub field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
     pub drop_failed: bool,
-    pub target_field: Option<Atom>,
+    pub target_field: Option<String>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
-    pub types: HashMap<Atom, String>,
+    pub types: HashMap<String, String>,
 }
 
 inventory::submit! {
     TransformDescription::new::<RegexParserConfig>("regex_parser")
 }
 
+impl_generate_config_from_default!(RegexParserConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "regex_parser")]
 impl TransformConfig for RegexParserConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
+    async fn build(&self) -> crate::Result<Transform> {
         RegexParser::build(&self)
     }
 
@@ -57,24 +60,26 @@ impl TransformConfig for RegexParserConfig {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct RegexParser {
     regexset: RegexSet,
     patterns: Vec<CompiledRegex>, // indexes correspend to RegexSet
-    field: Atom,
+    field: String,
     drop_field: bool,
     drop_failed: bool,
-    target_field: Option<Atom>,
+    target_field: Option<String>,
     overwrite_target: bool,
 }
 
+#[derive(Debug, Clone)]
 struct CompiledRegex {
     regex: Regex,
-    capture_names: Vec<(usize, Atom, Conversion)>,
+    capture_names: Vec<(usize, String, Conversion)>,
     capture_locs: CaptureLocations,
 }
 
 impl CompiledRegex {
-    fn new(regex: Regex, types: &HashMap<Atom, Conversion>) -> CompiledRegex {
+    fn new(regex: Regex, types: &HashMap<String, Conversion>) -> CompiledRegex {
         // Calculate the location (index into the capture locations) of
         // each named capture, and the required type coercion.
         let capture_names = regex
@@ -82,9 +87,9 @@ impl CompiledRegex {
             .enumerate()
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
-                    let cn = Atom::from(cn);
-                    let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
-                    (idx, cn, conv.clone())
+                    let conv = types.get(cn).unwrap_or(&Conversion::Bytes);
+                    let name = cn.to_string();
+                    (idx, name, conv.clone())
                 })
             })
             .collect::<Vec<_>>();
@@ -101,7 +106,7 @@ impl CompiledRegex {
     fn captures<'a>(
         &'a mut self,
         value: &'a [u8],
-    ) -> Option<impl Iterator<Item = (Atom, Value)> + 'a> {
+    ) -> Option<impl Iterator<Item = (String, Value)> + 'a> {
         match self.regex.captures_read(&mut self.capture_locs, value) {
             Some(_) => {
                 let capture_locs = &self.capture_locs;
@@ -110,7 +115,8 @@ impl CompiledRegex {
                         .iter()
                         .filter_map(move |(idx, name, conversion)| {
                             capture_locs.get(*idx).and_then(|(start, end)| {
-                                let capture: Value = value[start..end].to_vec().into();
+                                let capture: Value =
+                                    Value::from(Bytes::from(value[start..end].to_owned()));
 
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
@@ -132,16 +138,16 @@ impl CompiledRegex {
 }
 
 impl RegexParser {
-    pub fn build(config: &RegexParserConfig) -> crate::Result<Box<dyn Transform>> {
+    pub fn build(config: &RegexParserConfig) -> crate::Result<Transform> {
         let field = config
             .field
-            .as_ref()
-            .unwrap_or(&crate::config::log_schema().message_key());
+            .clone()
+            .unwrap_or_else(|| crate::config::log_schema().message_key().to_string());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
                 return Err(
-                    "At least one regular expression must be defined, but `patterns` is empty"
+                    "At least one regular expression must be defined, but `patterns` is empty."
                         .into(),
                 );
             }
@@ -153,7 +159,7 @@ impl RegexParser {
                     "Usage of `regex` is deprecated and will be removed in a future version. \
                      Please upgrade your config to use `patterns` instead: \
                      `patterns = ['{}']`. For more info, take a look at the documentation at \
-                     https://vector.dev/docs/reference/transforms/regex_parser/",
+                     https://vector.dev/docs/reference/transforms/regex_parser/.",
                     &regex
                 );
                 vec![regex.clone()]
@@ -175,21 +181,16 @@ impl RegexParser {
 
         let names = &patterns
             .iter()
-            .map(|regex| {
-                regex
-                    .capture_names()
-                    .filter_map(|s| s.map(Into::into))
-                    .collect::<Vec<_>>()
-            })
+            .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
             .flatten()
             .collect::<Vec<_>>();
 
         let types = parse_check_conversion_map(&config.types, names)?;
 
-        Ok(Box::new(RegexParser::new(
+        Ok(Transform::function(RegexParser::new(
             regexset,
             patterns,
-            field.clone(),
+            field,
             config.drop_field,
             config.drop_failed,
             config.target_field.clone(),
@@ -201,12 +202,12 @@ impl RegexParser {
     pub fn new(
         regexset: RegexSet,
         patterns: Vec<Regex>,
-        field: Atom,
+        field: String,
         mut drop_field: bool,
         drop_failed: bool,
-        target_field: Option<Atom>,
+        target_field: Option<String>,
         overwrite_target: bool,
-        types: HashMap<Atom, Conversion>,
+        types: HashMap<String, Conversion>,
     ) -> Self {
         // Build a buffer of the regex capture locations and names to avoid
         // repeated allocations.
@@ -235,8 +236,8 @@ impl RegexParser {
     }
 }
 
-impl Transform for RegexParser {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for RegexParser {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
         let value = log.get(&self.field).map(|s| s.as_bytes());
         emit!(RegexParserEventProcessed);
@@ -247,7 +248,12 @@ impl Transform for RegexParser {
                 Some(id) => id,
                 None => {
                     emit!(RegexParserFailedMatch { value });
-                    return if self.drop_failed { None } else { Some(event) };
+                    if self.drop_failed {
+                        return;
+                    } else {
+                        output.push(event);
+                        return;
+                    };
                 }
             };
 
@@ -266,30 +272,30 @@ impl Transform for RegexParser {
                             log.remove(target_field);
                         } else {
                             emit!(RegexParserTargetExists { target_field });
-                            return Some(event);
+                            output.push(event);
+                            return;
                         }
                     }
                 }
 
                 log.extend(captures.map(|(name, value)| {
                     let name = target_field
-                        .map(|target| Atom::from(format!("{}.{}", target, name)))
+                        .map(|target| format!("{}.{}", target, name))
                         .unwrap_or_else(|| name.clone());
                     (name, value)
                 }));
                 if self.drop_field {
                     log.remove(&self.field);
                 }
-                return Some(event);
+                output.push(event);
+                return;
             }
         } else {
             emit!(RegexParserMissingField { field: &self.field });
         }
 
-        if self.drop_failed {
-            None
-        } else {
-            Some(event)
+        if !self.drop_failed {
+            output.push(event);
         }
     }
 }
@@ -298,12 +304,14 @@ impl Transform for RegexParser {
 mod tests {
     use super::RegexParserConfig;
     use crate::event::{LogEvent, Value};
-    use crate::{
-        config::{TransformConfig, TransformContext},
-        Event,
-    };
+    use crate::{config::TransformConfig, Event};
 
-    fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RegexParserConfig>();
+    }
+
+    async fn do_transform(event: &str, patterns: &str, config: &str) -> Option<LogEvent> {
         let event = Event::from(event);
         let mut parser = toml::from_str::<RegexParserConfig>(&format!(
             r#"
@@ -313,80 +321,87 @@ mod tests {
             patterns, config
         ))
         .unwrap()
-        .build(TransformContext::new_test())
+        .build()
+        .await
         .unwrap();
+        let parser = parser.as_function();
 
-        parser.transform(event).map(|event| event.into_log())
+        parser.transform_one(event).map(|event| event.into_log())
     }
 
-    #[test]
-    fn adds_parsed_field_to_event() {
+    #[tokio::test]
+    async fn adds_parsed_field_to_event() {
         let log = do_transform(
             "status=1234 time=5678",
             r#"['status=(?P<status>\d+) time=(?P<time>\d+)']"#,
             "drop_field = false",
         )
+        .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_some());
     }
 
-    #[test]
-    fn doesnt_do_anything_if_no_match() {
+    #[tokio::test]
+    async fn doesnt_do_anything_if_no_match() {
         let log = do_transform(
             "asdf1234",
             r#"['status=(?P<status>\d+)']"#,
             "drop_field = false",
         )
+        .await
         .unwrap();
 
-        assert_eq!(log.get(&"status".into()), None);
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log.get("status"), None);
+        assert!(log.get("message").is_some());
     }
 
-    #[test]
-    fn does_drop_parsed_field() {
+    #[tokio::test]
+    async fn does_drop_parsed_field() {
         let log = do_transform(
             "status=1234 time=5678",
             r#"['status=(?P<status>\d+) time=(?P<time>\d+)']"#,
             r#"field = "message""#,
         )
+        .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"time".into()], "5678".into());
-        assert!(log.get(&"message".into()).is_none());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["time"], "5678".into());
+        assert!(log.get("message").is_none());
     }
 
-    #[test]
-    fn does_not_drop_same_name_parsed_field() {
+    #[tokio::test]
+    async fn does_not_drop_same_name_parsed_field() {
         let log = do_transform(
             "status=1234 message=yes",
             r#"['status=(?P<status>\d+) message=(?P<message>\S+)']"#,
             r#"field = "message""#,
         )
+        .await
         .unwrap();
 
-        assert_eq!(log[&"status".into()], "1234".into());
-        assert_eq!(log[&"message".into()], "yes".into());
+        assert_eq!(log["status"], "1234".into());
+        assert_eq!(log["message"], "yes".into());
     }
 
-    #[test]
-    fn does_not_drop_field_if_no_match() {
+    #[tokio::test]
+    async fn does_not_drop_field_if_no_match() {
         let log = do_transform(
             "asdf1234",
             r#"['status=(?P<message>\S+)']"#,
             r#"field = "message""#,
         )
+        .await
         .unwrap();
 
-        assert!(log.get(&"message".into()).is_some());
+        assert!(log.get(&"message").is_some());
     }
 
-    #[test]
-    fn respects_target_field() {
+    #[tokio::test]
+    async fn respects_target_field() {
         let mut log = do_transform(
             "status=1234 time=5678",
             r#"['status=(?P<status>\d+) time=(?P<time>\d+)']"#,
@@ -395,10 +410,11 @@ mod tests {
                drop_field = false
             "#,
         )
+        .await
         .unwrap();
 
         // timestamp is unpredictable, don't compare it
-        log.remove(&"timestamp".into());
+        log.remove("timestamp");
         let log = serde_json::to_value(log.all_fields()).unwrap();
         assert_eq!(
             log,
@@ -410,8 +426,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn preserves_target_field() {
+    #[tokio::test]
+    async fn preserves_target_field() {
         let message = "status=1234 time=5678";
         let log = do_transform(
             message,
@@ -421,15 +437,16 @@ mod tests {
                overwrite_target = false
             "#,
         )
+        .await
         .unwrap();
 
-        assert_eq!(log[&"message".into()], message.into());
-        assert_eq!(log.get(&"message.status".into()), None);
-        assert_eq!(log.get(&"message.time".into()), None);
+        assert_eq!(log["message"], message.into());
+        assert_eq!(log.get("message.status"), None);
+        assert_eq!(log.get("message.time"), None);
     }
 
-    #[test]
-    fn overwrites_target_field() {
+    #[tokio::test]
+    async fn overwrites_target_field() {
         let mut log = do_transform(
             "status=1234 time=5678",
             r#"['status=(?P<status>\d+) time=(?P<time>\d+)']"#,
@@ -438,10 +455,11 @@ mod tests {
                drop_field = false
             "#,
         )
+        .await
         .unwrap();
 
         // timestamp is unpredictable, don't compare it
-        log.remove(&"timestamp".into());
+        log.remove("timestamp");
         let log = serde_json::to_value(log.all_fields()).unwrap();
         assert_eq!(
             log,
@@ -452,32 +470,36 @@ mod tests {
         );
     }
 
-    #[test]
-    fn does_not_drop_event_if_match() {
-        let log = do_transform("asdf1234", r#"['asdf']"#, "drop_failed = true");
+    #[tokio::test]
+    async fn does_not_drop_event_if_match() {
+        let log = do_transform("asdf1234", r#"['asdf']"#, "drop_failed = true").await;
         assert!(log.is_some());
     }
 
-    #[test]
-    fn does_drop_event_if_no_match() {
-        let log = do_transform("asdf1234", r#"['something']"#, "drop_failed = true");
+    #[tokio::test]
+    async fn does_drop_event_if_no_match() {
+        let log = do_transform("asdf1234", r#"['something']"#, "drop_failed = true").await;
         assert!(log.is_none());
     }
 
-    #[test]
-    fn handles_valid_optional_capture() {
-        let log = do_transform("1234", r#"['(?P<status>\d+)?']"#, "").unwrap();
-        assert_eq!(log[&"status".into()], "1234".into());
+    #[tokio::test]
+    async fn handles_valid_optional_capture() {
+        let log = do_transform("1234", r#"['(?P<status>\d+)?']"#, "")
+            .await
+            .unwrap();
+        assert_eq!(log["status"], "1234".into());
     }
 
-    #[test]
-    fn handles_missing_optional_capture() {
-        let log = do_transform("none", r#"['(?P<status>\d+)?']"#, "").unwrap();
-        assert!(log.get(&"status".into()).is_none());
+    #[tokio::test]
+    async fn handles_missing_optional_capture() {
+        let log = do_transform("none", r#"['(?P<status>\d+)?']"#, "")
+            .await
+            .unwrap();
+        assert!(log.get("status").is_none());
     }
 
-    #[test]
-    fn coerces_fields_to_types() {
+    #[tokio::test]
+    async fn coerces_fields_to_types() {
         let log = do_transform(
             "1234 6789.01 false",
             r#"['(?P<status>\d+) (?P<time>[\d.]+) (?P<check>\S+)']"#,
@@ -488,14 +510,15 @@ mod tests {
             check = "boolean"
             "#,
         )
+        .await
         .expect("Failed to parse log");
-        assert_eq!(log[&"check".into()], Value::Boolean(false));
-        assert_eq!(log[&"status".into()], Value::Integer(1234));
-        assert_eq!(log[&"time".into()], Value::Float(6789.01));
+        assert_eq!(log["check"], Value::Boolean(false));
+        assert_eq!(log["status"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(6789.01));
     }
 
-    #[test]
-    fn chooses_first_of_multiple_matching_patterns() {
+    #[tokio::test]
+    async fn chooses_first_of_multiple_matching_patterns() {
         let log = do_transform(
             "1234 235.42 true",
             r#"[
@@ -511,18 +534,19 @@ mod tests {
             check = "boolean"
             "#,
         )
+        .await
         .unwrap();
 
-        assert_eq!(log[&"id1".into()], Value::Integer(1234));
-        assert_eq!(log.get(&"id2".into()), None);
-        assert_eq!(log.get(&"time".into()), None);
-        assert_eq!(log.get(&"check".into()), None);
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log["id1"], Value::Integer(1234));
+        assert_eq!(log.get("id2"), None);
+        assert_eq!(log.get("time"), None);
+        assert_eq!(log.get("check"), None);
+        assert!(log.get("message").is_some());
     }
 
-    #[test]
+    #[tokio::test]
     // https://github.com/timberio/vector/issues/3096
-    fn correctly_maps_capture_groups_if_matching_pattern_is_not_first() {
+    async fn correctly_maps_capture_groups_if_matching_pattern_is_not_first() {
         let log = do_transform(
             "match1234 235.42 true",
             r#"[
@@ -538,12 +562,13 @@ mod tests {
             check = "boolean"
             "#,
         )
+        .await
         .unwrap();
 
-        assert_eq!(log.get(&"id1".into()), None);
-        assert_eq!(log[&"id2".into()], Value::Integer(1234));
-        assert_eq!(log[&"time".into()], Value::Float(235.42));
-        assert_eq!(log[&"check".into()], Value::Boolean(true));
-        assert!(log.get(&"message".into()).is_some());
+        assert_eq!(log.get("id1"), None);
+        assert_eq!(log["id2"], Value::Integer(1234));
+        assert_eq!(log["time"], Value::Float(235.42));
+        assert_eq!(log["check"], Value::Boolean(true));
+        assert!(log.get("message").is_some());
     }
 }

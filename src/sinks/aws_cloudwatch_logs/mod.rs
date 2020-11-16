@@ -1,25 +1,19 @@
 mod request;
 
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
-    region::RegionOrEndpoint,
+    rusoto::{self, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
+        BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
     },
     template::Template,
 };
-use bytes::Bytes;
 use chrono::{Duration, Utc};
-use futures::{
-    future::{BoxFuture, FutureExt, TryFutureExt},
-    ready,
-};
-use futures01::{stream::iter_ok, Sink};
+use futures::{future::BoxFuture, ready, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rusoto_core::{request::BufferedHttpResponse, RusotoError};
 use rusoto_logs::{
@@ -82,10 +76,15 @@ pub struct CloudwatchLogsSinkConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
+    SinkDescription::new::<CloudwatchLogsSinkConfig>("aws_cloudwatch_logs")
 }
 
-#[cfg(test)]
+impl GenerateConfig for CloudwatchLogsSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(default_config(Encoding::Json)).unwrap()
+    }
+}
+
 fn default_config(e: Encoding) -> CloudwatchLogsSinkConfig {
     CloudwatchLogsSinkConfig {
         group_name: Default::default(),
@@ -155,10 +154,10 @@ pub enum CloudwatchError {
 }
 
 impl CloudwatchLogsSinkConfig {
-    fn create_client(&self, resolver: Resolver) -> crate::Result<CloudWatchLogsClient> {
+    fn create_client(&self) -> crate::Result<CloudWatchLogsClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -166,9 +165,13 @@ impl CloudwatchLogsSinkConfig {
     }
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "aws_cloudwatch_logs")]
 impl SinkConfig for CloudwatchLogsSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let batch = BatchSettings::default()
             .bytes(1_048_576)
             .events(10_000)
@@ -179,7 +182,7 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
         let log_group = self.group_name.clone();
         let log_stream = self.stream_name.clone();
 
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let svc = ServiceBuilder::new()
             .concurrency_limit(request.in_flight_limit.unwrap())
             .service(CloudwatchLogsPartitionSvc::new(
@@ -188,19 +191,16 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             ));
 
         let encoding = self.encoding.clone();
-        let sink = {
-            let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
-            let svc_sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
-                .sink_map_err(|e| error!("Fatal cloudwatchlogs sink error: {}", e))
-                .with_flat_map(move |event| {
-                    iter_ok(partition_encode(event, &encoding, &log_group, &log_stream))
-                });
-            Box::new(svc_sink)
-        };
+        let buffer = PartitionBuffer::new(VecBuffer::new(batch.size));
+        let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
+            .sink_map_err(|error| error!(message = "Fatal cloudwatchlogs sink error.", %error))
+            .with_flat_map(move |event| {
+                stream::iter(partition_encode(event, &encoding, &log_group, &log_stream)).map(Ok)
+            });
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((super::VectorSink::Futures01Sink(sink), healthcheck))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -277,8 +277,8 @@ impl CloudwatchLogsSvc {
         key: &CloudwatchKey,
         client: CloudWatchLogsClient,
     ) -> Self {
-        let group_name = String::from_utf8_lossy(&key.group[..]).into_owned();
-        let stream_name = String::from_utf8_lossy(&key.stream[..]).into_owned();
+        let group_name = key.group.clone();
+        let stream_name = key.stream.clone();
 
         let create_missing_group = config.create_missing_group.unwrap_or(true);
         let create_missing_stream = config.create_missing_stream.unwrap_or(true);
@@ -403,15 +403,15 @@ impl EncodedLength for InputLogEvent {
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct CloudwatchKey {
-    group: Bytes,
-    stream: Bytes,
+    group: String,
+    stream: String,
 }
 
 fn encode_log(
     mut log: LogEvent,
     encoding: &EncodingConfig<Encoding>,
 ) -> Result<InputLogEvent, CloudwatchLogsError> {
-    let timestamp = match log.remove(&log_schema().timestamp_key()) {
+    let timestamp = match log.remove(log_schema().timestamp_key()) {
         Some(Value::Timestamp(ts)) => ts.timestamp_millis(),
         _ => Utc::now().timestamp_millis(),
     };
@@ -419,7 +419,7 @@ fn encode_log(
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_else(|| "".into()),
     };
@@ -436,7 +436,7 @@ fn partition_encode(
     group: &Template,
     stream: &Template,
 ) -> Option<PartitionInnerBuffer<InputLogEvent, CloudwatchKey>> {
-    let group = match group.render(&event) {
+    let group = match group.render_string(&event) {
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
@@ -448,7 +448,7 @@ fn partition_encode(
         }
     };
 
-    let stream = match stream.render(&event) {
+    let stream = match stream.render_string(&event) {
         Ok(b) => b,
         Err(missing_keys) => {
             warn!(
@@ -464,7 +464,7 @@ fn partition_encode(
 
     encoding.apply_rules(&mut event);
     let event = encode_log(event.into_log(), encoding)
-        .map_err(|error| error!(message = "Could not encode event", %error, rate_limit_secs = 5))
+        .map_err(|error| error!(message = "Could not encode event.", %error, rate_limit_secs = 5))
         .ok()?;
 
     Some(PartitionInnerBuffer::new(event, key))
@@ -493,7 +493,7 @@ async fn healthcheck(
         return Ok(());
     }
 
-    let group_name = String::from_utf8_lossy(&config.group_name.get_ref()[..]).into_owned();
+    let group_name = config.group_name.get_ref().to_owned();
     let expected_group_name = group_name.clone();
 
     let request = DescribeLogGroupsRequest {
@@ -555,13 +555,13 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "Put logs HTTP error.", %status, %body);
+                    error!(message = "Put logs HTTP error.", status = %status, body = %body);
                     true
                 }
 
                 RusotoError::Unknown(res)
                     if rusoto_core::proto::json::Error::parse(&res)
-                        .filter(|err| err.typ.as_str() == "ThrottlingException")
+                        .filter(|error| error.typ.as_str() == "ThrottlingException")
                         .is_some() =>
                 {
                     true
@@ -584,7 +584,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "Describe streams HTTP error.", %status, %body);
+                    error!(message = "Describe streams HTTP error.", status = %status, body = %body);
                     true
                 }
 
@@ -610,7 +610,7 @@ impl RetryLogic for CloudwatchRetryLogic {
                     let body = String::from_utf8_lossy(&body[..]);
                     let body = &body[..body.len().min(50)];
 
-                    error!(message = "Create stream HTTP error.", %status, %body);
+                    error!(message = "Create stream HTTP error.", status = %status, body = %body);
                     true
                 }
 
@@ -629,10 +629,14 @@ impl RetryLogic for CloudwatchRetryLogic {
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CloudwatchError::Put(e) => write!(f, "CloudwatchError::Put: {}", e),
-            CloudwatchError::Describe(e) => write!(f, "CloudwatchError::Describe: {}", e),
-            CloudwatchError::CreateStream(e) => write!(f, "CloudwatchError::CreateStream: {}", e),
-            CloudwatchError::CreateGroup(e) => write!(f, "CloudwatchError::CreateGroup: {}", e),
+            CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {}", error),
+            CloudwatchError::Describe(error) => write!(f, "CloudwatchError::Describe: {}", error),
+            CloudwatchError::CreateStream(error) => {
+                write!(f, "CloudwatchError::CreateStream: {}", error)
+            }
+            CloudwatchError::CreateGroup(error) => {
+                write!(f, "CloudwatchError::CreateGroup: {}", error)
+            }
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::ServiceDropped => write!(
                 f,
@@ -649,14 +653,14 @@ impl fmt::Display for CloudwatchError {
 impl std::error::Error for CloudwatchError {}
 
 impl From<RusotoError<PutLogEventsError>> for CloudwatchError {
-    fn from(e: RusotoError<PutLogEventsError>) -> Self {
-        CloudwatchError::Put(e)
+    fn from(error: RusotoError<PutLogEventsError>) -> Self {
+        CloudwatchError::Put(error)
     }
 }
 
 impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
-    fn from(e: RusotoError<DescribeLogStreamsError>) -> Self {
-        CloudwatchError::Describe(e)
+    fn from(error: RusotoError<DescribeLogStreamsError>) -> Self {
+        CloudwatchError::Describe(error)
     }
 }
 
@@ -664,13 +668,16 @@ impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
 mod tests {
     use super::*;
     use crate::{
-        dns::Resolver,
         event::{Event, Value},
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
     };
     use std::collections::HashMap;
     use std::convert::{TryFrom, TryInto};
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<CloudwatchLogsSinkConfig>();
+    }
 
     #[test]
     fn partition_static() {
@@ -779,7 +786,7 @@ mod tests {
             stream: "stream".into(),
             group: "group".into(),
         };
-        let client = config.create_client(Resolver).unwrap();
+        let client = config.create_client().unwrap();
         CloudwatchLogsSvc::new(&config, &key, client)
     }
 
@@ -789,7 +796,7 @@ mod tests {
         event.insert("key", "value");
         let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
 
-        let ts = if let Value::Timestamp(ts) = event[&log_schema().timestamp_key()] {
+        let ts = if let Value::Timestamp(ts) = event[log_schema().timestamp_key()] {
             ts.timestamp_millis()
         } else {
             panic!()
@@ -803,8 +810,8 @@ mod tests {
         let mut event = Event::from("hello world").into_log();
         event.insert("key", "value");
         let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
-        let map: HashMap<Atom, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(&log_schema().timestamp_key()).is_none());
+        let map: HashMap<String, String> = serde_json::from_str(&encoded.message[..]).unwrap();
+        assert!(map.get(log_schema().timestamp_key()).is_none());
     }
 
     #[test]
@@ -824,7 +831,7 @@ mod tests {
                 let mut event = Event::new_empty_log();
                 event
                     .as_mut_log()
-                    .insert(&log_schema().timestamp_key(), timestamp);
+                    .insert(log_schema().timestamp_key(), timestamp);
                 encode_log(event.into_log(), &Encoding::Text.into()).unwrap()
             })
             .collect();
@@ -846,10 +853,10 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        region::RegionOrEndpoint,
+        rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
-    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
+    use futures::{stream, SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_logs::{CloudWatchLogs, CreateLogGroupRequest, GetLogEventsRequest};
@@ -877,7 +884,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -885,7 +892,7 @@ mod integration_tests {
         sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -921,7 +928,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
@@ -945,7 +952,7 @@ mod integration_tests {
         let _ = sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -984,7 +991,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let now = chrono::Utc::now();
 
@@ -1017,7 +1024,7 @@ mod integration_tests {
         sink.run(stream::iter(events)).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = GROUP_NAME.into();
         request.start_time = Some((now - Duration::days(30)).timestamp_millis());
 
@@ -1053,7 +1060,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1061,7 +1068,7 @@ mod integration_tests {
         sink.run(events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
+        request.log_stream_name = stream_name;
         request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
@@ -1102,22 +1109,17 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
         let (input_lines, events) = random_lines_with_stream(100, 11);
         let mut events = events.map(Ok);
-        let _ = sink
-            .into_futures01sink()
-            .sink_compat()
-            .send_all(&mut events)
-            .await
-            .unwrap();
+        let _ = sink.into_sink().send_all(&mut events).await.unwrap();
 
         let mut request = GetLogEventsRequest::default();
-        request.log_stream_name = stream_name.clone().into();
-        request.log_group_name = group_name.into();
+        request.log_stream_name = stream_name;
+        request.log_group_name = group_name;
         request.start_time = Some(timestamp.timestamp_millis());
 
         let response = create_client_test().get_log_events(request).await.unwrap();
@@ -1152,7 +1154,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let (sink, _) = config.build(SinkContext::new_test()).unwrap();
+        let (sink, _) = config.build(SinkContext::new_test()).await.unwrap();
 
         let timestamp = chrono::Utc::now();
 
@@ -1233,7 +1235,7 @@ mod integration_tests {
             assume_role: None,
         };
 
-        let client = config.create_client(Resolver).unwrap();
+        let client = config.create_client().unwrap();
         healthcheck(config, client).await.unwrap();
     }
 
@@ -1243,7 +1245,7 @@ mod integration_tests {
             endpoint: "http://localhost:6000".into(),
         };
 
-        let client = rusoto::client(Resolver).unwrap();
+        let client = rusoto::client().unwrap();
         let creds = rusoto::AwsCredentialsProvider::new(&region, None).unwrap();
         CloudWatchLogsClient::new_with(client, creds, region)
     }

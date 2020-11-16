@@ -1,19 +1,16 @@
-use super::auto_concurrency::{
-    AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings,
+use super::{
+    auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings},
+    retries::{FixedRetryPolicy, RetryLogic},
+    sink::Response,
+    Batch, BatchSink, Partition, PartitionBatchSink,
 };
-use super::retries::{FixedRetryPolicy, RetryLogic};
-use super::sink::Response;
-use super::{Batch, BatchSink};
 use crate::buffers::Acker;
 use futures::TryFutureExt;
 use serde::{
     de::{self, Unexpected, Visitor},
     Deserialize, Deserializer, Serialize,
 };
-use std::fmt;
-use std::sync::Arc;
-use std::task::Poll;
-use std::time::Duration;
+use std::{fmt, hash::Hash, sync::Arc, task::Poll, time::Duration};
 use tower::{
     layer::{util::Stack, Layer},
     limit::RateLimit,
@@ -25,6 +22,7 @@ use tower::{
 
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>, L>>>;
 pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
+pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<B, Svc<S, L>, K, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
@@ -129,6 +127,7 @@ impl<'de> Deserialize<'de> for InFlightLimit {
 
 pub trait InFlightLimitOption {
     fn parse_in_flight_limit(&self, default: &Self) -> Option<usize>;
+    fn is_none(&self) -> bool;
 }
 
 impl InFlightLimitOption for Option<usize> {
@@ -138,6 +137,10 @@ impl InFlightLimitOption for Option<usize> {
             Some(x) => Some(*x),
         };
         limit.or(Some(5))
+    }
+
+    fn is_none(&self) -> bool {
+        matches!(self, None)
     }
 }
 
@@ -149,12 +152,17 @@ impl InFlightLimitOption for InFlightLimit {
             InFlightLimit::Fixed(limit) => Some(limit),
         }
     }
+
+    fn is_none(&self) -> bool {
+        matches!(self, InFlightLimit::None)
+    }
 }
 
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct TowerRequestConfig<T = InFlightLimit> {
+pub struct TowerRequestConfig<T: InFlightLimitOption = InFlightLimit> {
     #[serde(default)]
+    #[serde(skip_serializing_if = "InFlightLimitOption::is_none")]
     pub in_flight_limit: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
@@ -217,6 +225,33 @@ impl TowerRequestSettings {
             self.retry_initial_backoff_secs,
             self.retry_max_duration_secs,
             logic,
+        )
+    }
+
+    pub fn partition_sink<B, L, S, K, Request>(
+        &self,
+        retry_logic: L,
+        service: S,
+        batch: B,
+        batch_timeout: Duration,
+        acker: Acker,
+    ) -> TowerPartitionSink<S, B, L, K, Request>
+    where
+        L: RetryLogic<Response = S::Response>,
+        S: Service<Request> + Clone + Send + 'static,
+        S::Error: Into<crate::Error> + Send + Sync + 'static,
+        S::Response: Send + Response,
+        S::Future: Send + 'static,
+        B: Batch<Output = Request>,
+        B::Input: Partition<K>,
+        K: Hash + Eq + Clone + Send + 'static,
+        Request: Send + Clone + 'static,
+    {
+        PartitionBatchSink::new(
+            self.service(retry_logic, service),
+            batch,
+            batch_timeout,
+            acker,
         )
     }
 
@@ -369,6 +404,10 @@ mod tests {
     #[test]
     fn in_flight_limit_works() {
         type TowerRequestConfigTest = TowerRequestConfig<InFlightLimit>;
+
+        let cfg = TowerRequestConfigTest::default();
+        let toml = toml::to_string(&cfg).unwrap();
+        toml::from_str::<TowerRequestConfigTest>(&toml).expect("Default config failed");
 
         let cfg = toml::from_str::<TowerRequestConfigTest>("").expect("Empty config failed");
         assert_eq!(cfg.in_flight_limit, InFlightLimit::None);

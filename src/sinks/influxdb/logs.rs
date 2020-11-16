@@ -1,20 +1,23 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         influxdb::{
-            encode_namespace, encode_timestamp, healthcheck, influx_line_protocol,
-            influxdb_settings, Field, InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
+            encode_timestamp, healthcheck, influx_line_protocol, influxdb_settings, Field,
+            InfluxDB1Settings, InfluxDB2Settings, ProtocolVersion,
         },
         util::{
+            encode_namespace,
             encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
+    tls::{TlsOptions, TlsSettings},
 };
-use futures01::Sink;
+use futures::SinkExt;
 use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -40,6 +43,7 @@ pub struct InfluxDBLogsConfig {
     pub batch: BatchConfig,
     #[serde(default)]
     pub request: TowerRequestConfig,
+    pub tls: Option<TlsOptions>,
 }
 
 #[derive(Debug)]
@@ -68,18 +72,34 @@ pub enum Encoding {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<InfluxDBLogsConfig>("influxdb_logs")
+    SinkDescription::new::<InfluxDBLogsConfig>("influxdb_logs")
 }
 
+impl GenerateConfig for InfluxDBLogsConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "http://localhost:8086/"
+            namespace = "my-namespace"
+            tags = []
+            org = "my-org"
+            bucket = "my-bucket"
+            token = "${INFLUXDB_TOKEN}""#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "influxdb_logs")]
 impl SinkConfig for InfluxDBLogsConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         // let mut config = self.clone();
         let mut tags: HashSet<String> = self.tags.clone().into_iter().collect();
         tags.insert(log_schema().host_key().to_string());
         tags.insert(log_schema().source_type_key().to_string());
 
-        let client = HttpClient::new(cx.resolver(), None)?;
+        let tls_settings = TlsSettings::from_options(&self.tls)?;
+        let client = HttpClient::new(tls_settings)?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = BatchSettings::default()
@@ -118,9 +138,9 @@ impl SinkConfig for InfluxDBLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal influxdb_logs sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -144,7 +164,12 @@ impl HttpSink for InfluxDBLogsSink {
         let mut event = event.into_log();
 
         // Measurement
-        let measurement = encode_namespace(Some(&self.namespace), '.', "vector");
+        let name = "vector";
+        let measurement = encode_namespace(
+            Some(self.namespace.as_str()).filter(|namespace| !namespace.is_empty()),
+            '.',
+            name,
+        );
 
         // Timestamp
         let timestamp = encode_timestamp(match event.remove(log_schema().timestamp_key()) {
@@ -201,7 +226,7 @@ impl InfluxDBLogsConfig {
 }
 
 impl Value {
-    pub fn to_field(&self) -> Field {
+    fn to_field(&self) -> Field {
         match self {
             Value::Integer(num) => Field::Int(*num),
             Value::Float(num) => Field::Float(*num),
@@ -225,7 +250,11 @@ mod tests {
     };
     use chrono::{offset::TimeZone, Utc};
     use futures::{stream, StreamExt};
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<InfluxDBLogsConfig>();
+    }
 
     #[test]
     fn test_config_without_tags() {
@@ -253,7 +282,7 @@ mod tests {
             "ns",
             vec![],
         );
-        sink.encoding.except_fields = Some(vec![Atom::from("host")]);
+        sink.encoding.except_fields = Some(vec!["host".into()]);
 
         let bytes = sink.encode_event(event).unwrap();
         let string = std::str::from_utf8(&bytes).unwrap();
@@ -468,7 +497,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).unwrap();
+        let _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it
@@ -476,7 +505,7 @@ mod tests {
         let host = format!("http://{}", addr);
         config.endpoint = host;
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
@@ -531,7 +560,7 @@ mod tests {
         .unwrap();
 
         // Make sure we can build the config
-        let _ = config.build(cx.clone()).unwrap();
+        let _ = config.build(cx.clone()).await.unwrap();
 
         let addr = next_addr();
         // Swap out the host so we can force send it
@@ -539,7 +568,7 @@ mod tests {
         let host = format!("http://{}", addr);
         config.endpoint = host;
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let (mut rx, _trigger, server) = build_test_server(addr);
         tokio::spawn(server);
@@ -656,9 +685,10 @@ mod integration_tests {
             encoding: Default::default(),
             batch: Default::default(),
             request: Default::default(),
+            tls: None,
         };
 
-        let (sink, _) = config.build(cx).unwrap();
+        let (sink, _) = config.build(cx).await.unwrap();
 
         let mut events = Vec::new();
 
@@ -694,10 +724,10 @@ mod integration_tests {
             .unwrap();
         let string = res.text().await.unwrap();
 
-        let lines = string.split("\n").collect::<Vec<&str>>();
-        let header = lines[0].split(",").collect::<Vec<&str>>();
-        let record1 = lines[1].split(",").collect::<Vec<&str>>();
-        let record2 = lines[2].split(",").collect::<Vec<&str>>();
+        let lines = string.split('\n').collect::<Vec<&str>>();
+        let header = lines[0].split(',').collect::<Vec<&str>>();
+        let record1 = lines[1].split(',').collect::<Vec<&str>>();
+        let record2 = lines[2].split(',').collect::<Vec<&str>>();
 
         // measurement
         assert_eq!(

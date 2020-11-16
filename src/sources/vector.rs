@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
@@ -37,12 +37,24 @@ impl VectorConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<VectorConfig>("vector")
+    SourceDescription::new::<VectorConfig>("vector")
 }
 
+impl GenerateConfig for VectorConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            address: SocketListenAddr::SocketAddr("0.0.0.0:9000".parse().unwrap()),
+            shutdown_timeout_secs: default_shutdown_timeout_secs(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "vector")]
 impl SourceConfig for VectorConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -60,6 +72,10 @@ impl SourceConfig for VectorConfig {
 
     fn source_type(&self) -> &'static str {
         "vector"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 
@@ -109,6 +125,11 @@ mod test {
     use std::net::SocketAddr;
     use tokio::time::{delay_for, Duration};
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<VectorConfig>();
+    }
+
     async fn stream_test(addr: SocketAddr, source: VectorConfig, sink: VectorSinkConfig) {
         let (tx, rx) = Pipeline::new_test();
 
@@ -119,13 +140,14 @@ mod test {
                 ShutdownSignal::noop(),
                 tx,
             )
+            .await
             .unwrap()
             .compat();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
         let cx = SinkContext::new_test();
-        let (sink, _) = sink.build(cx).unwrap();
+        let (sink, _) = sink.build(cx).await.unwrap();
 
         let events = vec![
             Event::from("test"),
@@ -138,6 +160,7 @@ mod test {
             Event::from("source"),
             Event::Metric(Metric {
                 name: String::from("also test a metric"),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Absolute,

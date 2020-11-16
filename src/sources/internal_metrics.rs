@@ -1,5 +1,6 @@
 use crate::{
     config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    metrics::Controller,
     metrics::{capture_metrics, get_controller},
     shutdown::ShutdownSignal,
     Pipeline,
@@ -10,28 +11,48 @@ use futures::{
     stream::StreamExt,
 };
 use futures01::Sink;
-use metrics_runtime::Controller;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tokio::{select, time::interval};
+use tokio::select;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct InternalMetricsConfig;
+#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct InternalMetricsConfig {
+    #[serde(default = "default_scrape_interval_secs")]
+    scrape_interval_secs: u64,
+}
+
+pub const fn default_scrape_interval_secs() -> u64 {
+    2
+}
+
+impl Default for InternalMetricsConfig {
+    fn default() -> Self {
+        Self {
+            scrape_interval_secs: default_scrape_interval_secs(),
+        }
+    }
+}
 
 inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
 }
 
+impl_generate_config_from_default!(InternalMetricsConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "internal_metrics")]
 impl SourceConfig for InternalMetricsConfig {
-    fn build(
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let fut = run(get_controller()?, out, shutdown).boxed().compat();
+        let fut = run(get_controller()?, self.scrape_interval_secs, out, shutdown)
+            .boxed()
+            .compat();
         Ok(Box::new(fut))
     }
 
@@ -45,12 +66,12 @@ impl SourceConfig for InternalMetricsConfig {
 }
 
 async fn run(
-    controller: Controller,
+    controller: &Controller,
+    interval: u64,
     mut out: Pipeline,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut interval = interval(Duration::from_secs(2)).map(|_| ());
-    let mut shutdown = shutdown.compat();
+    let mut interval = tokio::time::interval(Duration::from_secs(interval)).map(|_| ());
 
     let mut run = true;
     while run {
@@ -60,13 +81,13 @@ async fn run(
             else => false,
         };
 
-        let metrics = capture_metrics(&controller);
+        let metrics = capture_metrics(controller);
 
         let (sink, _) = out
             .send_all(futures01::stream::iter_ok(metrics))
             .compat()
             .await
-            .map_err(|error| error!(message = "Error sending internal metrics", %error))?;
+            .map_err(|error| error!(message = "Error sending internal metrics.", %error))?;
         out = sink;
     }
 
@@ -77,8 +98,13 @@ async fn run(
 mod tests {
     use crate::event::metric::{Metric, MetricValue, StatisticKind};
     use crate::metrics::{capture_metrics, get_controller};
-    use metrics::{counter, gauge, timing, value};
+    use metrics::{counter, gauge, histogram};
     use std::collections::BTreeMap;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<super::InternalMetricsConfig>();
+    }
 
     #[test]
     fn captures_internal_metrics() {
@@ -87,14 +113,14 @@ mod tests {
         // There *seems* to be a race condition here (CI was flaky), so add a slight delay.
         std::thread::sleep(std::time::Duration::from_millis(300));
 
-        gauge!("foo", 1);
-        gauge!("foo", 2);
+        gauge!("foo", 1.0);
+        gauge!("foo", 2.0);
         counter!("bar", 3);
         counter!("bar", 4);
-        timing!("baz", 5);
-        timing!("baz", 6);
-        value!("quux", 7, "host" => "foo");
-        value!("quux", 8, "host" => "foo");
+        histogram!("baz", 5);
+        histogram!("baz", 6);
+        histogram!("quux", 7, "host" => "foo");
+        histogram!("quux", 8, "host" => "foo");
 
         let controller = get_controller().expect("no controller");
 

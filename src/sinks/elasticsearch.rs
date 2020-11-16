@@ -2,20 +2,20 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
+    http::HttpClient,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
-    region::{region_from_endpoint, RegionOrEndpoint},
+    rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpClient, HttpSink},
+        http::{BatchedHttpSink, HttpSink},
         retries::{RetryAction, RetryLogic},
-        rusoto, BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
@@ -98,11 +98,17 @@ inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
 
+impl_generate_config_from_default!(ElasticSearchConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticSearchConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
+        let client = HttpClient::new(common.tls_settings.clone())?;
 
         let healthcheck = healthcheck(client.clone(), common).boxed();
 
@@ -123,12 +129,9 @@ impl SinkConfig for ElasticSearchConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -163,8 +166,6 @@ enum ParseError {
     HostMustIncludeHostname { host: String },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
-    #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
-    AWSCompressionNotAllowed,
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateError },
 }
@@ -179,7 +180,9 @@ impl HttpSink for ElasticSearchCommon {
             .index
             .render_string(&event)
             .map_err(|missing_keys| {
-                emit!(ElasticSearchMissingKeys { keys: missing_keys });
+                emit!(ElasticSearchMissingKeys {
+                    keys: &missing_keys
+                });
             })
             .ok()?;
 
@@ -287,8 +290,8 @@ impl RetryLogic for ElasticSearchRetryLogic {
     type Error = hyper::Error;
     type Response = hyper::Response<Bytes>;
 
-    fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.is_connect() || error.is_closed()
+    fn is_retriable_error(&self, _error: &Self::Error) -> bool {
+        true
     }
 
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
@@ -370,12 +373,7 @@ impl ElasticSearchCommon {
             ),
         };
 
-        // Only allow compression if we are running with no AWS credentials.
         let compression = config.compression;
-        if credentials.is_some() && compression != Compression::None {
-            return Err(ParseError::AWSCompressionNotAllowed.into());
-        }
-
         let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
         let index = Template::try_from(index).context(IndexTemplate)?;
 
@@ -426,7 +424,7 @@ impl ElasticSearchCommon {
     }
 }
 
-async fn healthcheck(mut client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
     let mut builder = Request::get(format!("{}/_cluster/health", common.base_url));
 
     match &common.credentials {
@@ -476,7 +474,7 @@ async fn finish_signer(
 }
 
 fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event: &mut Event) {
-    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(&k.as_ref().into())) {
+    if let Some(val) = key.and_then(|k| event.as_mut_log().remove(k)) {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()
@@ -492,7 +490,11 @@ mod tests {
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<ElasticSearchConfig>();
+    }
 
     #[test]
     fn removes_and_sets_id_from_custom_field() {
@@ -504,7 +506,7 @@ mod tests {
         maybe_set_id(id_key, &mut action, &mut event);
 
         assert_eq!(json!({"_id": "bar"}), action);
-        assert_eq!(None, event.as_log().get(&Atom::from("foo")));
+        assert_eq!(None, event.as_log().get("foo"));
     }
 
     #[test]
@@ -551,7 +553,7 @@ mod tests {
             index: Some(String::from("{{ idx }}")),
             encoding: EncodingConfigWithDefault {
                 codec: Encoding::Default,
-                except_fields: Some(vec![Atom::from("idx"), Atom::from("timestamp")]),
+                except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
                 ..Default::default()
             },
             endpoint: String::from("https://example.com"),
@@ -577,8 +579,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        dns::Resolver,
-        sinks::util::http::HttpClient,
+        http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
         Event,
@@ -597,7 +598,7 @@ mod integration_tests {
 
         let config = ElasticSearchConfig {
             endpoint: "http://localhost:9200".into(),
-            index: Some(index.clone()),
+            index: Some(index),
             pipeline: Some(pipeline.clone()),
             ..config()
         };
@@ -621,7 +622,7 @@ mod integration_tests {
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
-        let (sink, _hc) = config.build(cx.clone()).unwrap();
+        let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("my_id", "42");
@@ -632,7 +633,7 @@ mod integration_tests {
             .unwrap();
 
         // make sure writes all all visible
-        flush(cx.resolver(), common).await.unwrap();
+        flush(common).await.unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", base_url, index))
@@ -642,25 +643,33 @@ mod integration_tests {
             .send()
             .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
             .await
             .unwrap();
 
-        assert_eq!(1, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
+        assert_eq!(1, total);
 
-        let hit = response.into_hits().next().unwrap();
-        assert_eq!("42", hit.id());
+        let hits = response["hits"]["hits"]
+            .as_array()
+            .expect("Elasticsearch response does not include hits->hits");
 
-        let doc = hit.document().unwrap();
-        assert_eq!(None, doc["my_id"].as_str());
+        let hit = hits.iter().next().unwrap();
+        assert_eq!("42", hit["_id"]);
 
-        let value = hit.into_document().unwrap();
+        let value = hit
+            .get("_source")
+            .expect("Elasticsearch hit missing _source");
+        assert_eq!(None, value["my_id"].as_str());
+
         let expected = json!({
             "message": "raw log line",
             "foo": "bar",
-            "timestamp": input_event.as_log()[&crate::config::log_schema().timestamp_key()],
+            "timestamp": input_event.as_log()[crate::config::log_schema().timestamp_key()],
         });
-        assert_eq!(expected, value);
+        assert_eq!(&expected, value);
     }
 
     #[tokio::test]
@@ -737,34 +746,32 @@ mod integration_tests {
         let base_url = common.base_url.clone();
 
         let cx = SinkContext::new_test();
-        let (sink, healthcheck) = config.build(cx.clone()).expect("Building config failed");
+        let (sink, healthcheck) = config
+            .build(cx.clone())
+            .await
+            .expect("Building config failed");
 
         healthcheck.await.expect("Health check failed");
 
         let (input, events) = random_events_with_stream(100, 100);
-        match break_events {
-            true => {
-                // Break all but the first event to simulate some kind of partial failure
-                let mut doit = false;
-                sink.run(events.map(move |mut event| {
-                    if doit {
-                        event.as_mut_log().insert("_type", 1);
-                    }
-                    doit = true;
-                    event
-                }))
-                .await
-                .expect("Sending events failed");
-            }
-            false => {
-                sink.run(events).await.expect("Sending events failed");
-            }
-        };
+        if break_events {
+            // Break all but the first event to simulate some kind of partial failure
+            let mut doit = false;
+            sink.run(events.map(move |mut event| {
+                if doit {
+                    event.as_mut_log().insert("_type", 1);
+                }
+                doit = true;
+                event
+            }))
+            .await
+            .expect("Sending events failed");
+        } else {
+            sink.run(events).await.expect("Sending events failed");
+        }
 
         // make sure writes all all visible
-        flush(cx.resolver(), common)
-            .await
-            .expect("Flushing writes failed");
+        flush(common).await.expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -786,22 +793,31 @@ mod integration_tests {
             .send()
             .await
             .unwrap()
-            .json::<elastic_responses::search::SearchResponse<Value>>()
+            .json::<Value>()
             .await
             .unwrap();
 
-        if break_events {
-            assert_ne!(input.len() as u64, response.total());
-        } else {
-            assert_eq!(input.len() as u64, response.total());
+        let total = response["hits"]["total"]
+            .as_u64()
+            .expect("Elasticsearch response does not include hits->total");
 
+        if break_events {
+            assert_ne!(input.len() as u64, total);
+        } else {
+            assert_eq!(input.len() as u64, total);
+
+            let hits = response["hits"]["hits"]
+                .as_array()
+                .expect("Elasticsearch response does not include hits->hits");
             let input = input
                 .into_iter()
                 .map(|rec| serde_json::to_value(&rec.into_log()).unwrap())
                 .collect::<Vec<_>>();
-            for hit in response.into_hits() {
-                let event = hit.into_document().unwrap();
-                assert!(input.contains(&event));
+            for hit in hits {
+                let hit = hit
+                    .get("_source")
+                    .expect("Elasticsearch hit missing _source");
+                assert!(input.contains(&hit));
             }
         }
     }
@@ -810,12 +826,12 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    async fn flush(resolver: Resolver, common: ElasticSearchCommon) -> crate::Result<()> {
+    async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let mut client = HttpClient::new(resolver, common.tls_settings.clone())
-            .expect("Could not build client to flush");
+        let client =
+            HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
         let response = client.send(request).await?;
         match response.status() {
             StatusCode::OK => Ok(()),

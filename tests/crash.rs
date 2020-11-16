@@ -1,11 +1,17 @@
+#![allow(clippy::type_complexity)]
 #![cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
 
-use futures::{compat::Future01CompatExt, future, FutureExt};
-use futures01::{Async, AsyncSink, Sink, Stream};
+use async_trait::async_trait;
+use futures::{compat::Future01CompatExt, future, FutureExt, Sink};
+use futures01::Stream;
 use serde::{Deserialize, Serialize};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 use tokio::time::{delay_for, Duration};
 use vector::{
-    config::{self, GlobalOptions, SinkContext},
+    config::{self, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
     shutdown::ShutdownSignal,
     test_util::{next_addr, random_lines, send_lines, start_topology, wait_for_tcp, CountReceiver},
     Event, Pipeline,
@@ -18,11 +24,12 @@ use vector::{
 #[derive(Debug, Serialize, Deserialize)]
 struct PanicSink;
 
+#[async_trait]
 #[typetag::serde(name = "panic")]
-impl config::SinkConfig for PanicSink {
-    fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+impl SinkConfig for PanicSink {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Futures01Sink(Box::new(PanicSink)),
+            VectorSink::Sink(Box::new(PanicSink)),
             future::ok(()).boxed(),
         ))
     }
@@ -36,19 +43,23 @@ impl config::SinkConfig for PanicSink {
     }
 }
 
-impl Sink for PanicSink {
-    type SinkItem = Event;
-    type SinkError = ();
+impl Sink<Event> for PanicSink {
+    type Error = ();
 
-    fn start_send(
-        &mut self,
-        _item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
-        panic!();
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
     }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        panic!();
+    fn start_send(self: Pin<&mut Self>, _item: Event) -> Result<(), Self::Error> {
+        panic!()
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        panic!()
     }
 }
 
@@ -99,11 +110,12 @@ async fn test_sink_panic() {
 #[derive(Debug, Serialize, Deserialize)]
 struct ErrorSink;
 
+#[async_trait]
 #[typetag::serde(name = "panic")]
-impl config::SinkConfig for ErrorSink {
-    fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
+impl SinkConfig for ErrorSink {
+    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck), vector::Error> {
         Ok((
-            VectorSink::Futures01Sink(Box::new(ErrorSink)),
+            VectorSink::Sink(Box::new(ErrorSink)),
             future::ok(()).boxed(),
         ))
     }
@@ -117,19 +129,23 @@ impl config::SinkConfig for ErrorSink {
     }
 }
 
-impl Sink for ErrorSink {
-    type SinkItem = Event;
-    type SinkError = ();
+impl Sink<Event> for ErrorSink {
+    type Error = ();
 
-    fn start_send(
-        &mut self,
-        _item: Self::SinkItem,
-    ) -> Result<AsyncSink<Self::SinkItem>, Self::SinkError> {
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
+    }
+
+    fn start_send(self: Pin<&mut Self>, _item: Event) -> Result<(), Self::Error> {
         Err(())
     }
 
-    fn poll_complete(&mut self) -> Result<Async<()>, Self::SinkError> {
-        Err(())
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Err(()))
     }
 }
 
@@ -178,9 +194,10 @@ async fn test_sink_error() {
 #[derive(Deserialize, Serialize, Debug)]
 struct ErrorSourceConfig;
 
+#[async_trait]
 #[typetag::serde(name = "tcp")]
-impl config::SourceConfig for ErrorSourceConfig {
-    fn build(
+impl SourceConfig for ErrorSourceConfig {
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,
@@ -244,9 +261,10 @@ async fn test_source_error() {
 #[derive(Deserialize, Serialize, Debug)]
 struct PanicSourceConfig;
 
+#[async_trait]
 #[typetag::serde(name = "tcp")]
-impl config::SourceConfig for PanicSourceConfig {
-    fn build(
+impl SourceConfig for PanicSourceConfig {
+    async fn build(
         &self,
         _name: &str,
         _globals: &GlobalOptions,

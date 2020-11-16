@@ -1,5 +1,5 @@
 use crate::Event;
-use futures::{compat::Sink01CompatExt, future::BoxFuture, StreamExt};
+use futures::{future::BoxFuture, Sink, Stream, StreamExt};
 use snafu::Snafu;
 use std::fmt;
 
@@ -15,6 +15,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_kinesis_streams;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
+#[cfg(feature = "sinks-azure_monitor_logs")]
+pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]
@@ -33,9 +35,9 @@ pub mod gcp;
 pub mod honeycomb;
 #[cfg(feature = "sinks-http")]
 pub mod http;
-#[cfg(feature = "sinks-humio_logs")]
-pub mod humio_logs;
-#[cfg(feature = "sinks-influxdb")]
+#[cfg(feature = "sinks-humio")]
+pub mod humio;
+#[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
 pub mod influxdb;
 #[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
 pub mod kafka;
@@ -43,6 +45,8 @@ pub mod kafka;
 pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-nats")]
+pub mod nats;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
@@ -51,8 +55,8 @@ pub mod papertrail;
 pub mod prometheus;
 #[cfg(feature = "sinks-pulsar")]
 pub mod pulsar;
-#[cfg(feature = "sinks-sematext_logs")]
-pub mod sematext_logs;
+#[cfg(feature = "sinks-sematext")]
+pub mod sematext;
 #[cfg(feature = "sinks-socket")]
 pub mod socket;
 #[cfg(feature = "sinks-splunk_hec")]
@@ -63,7 +67,7 @@ pub mod statsd;
 pub mod vector;
 
 pub enum VectorSink {
-    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static>),
+    Sink(Box<dyn Sink<Event, Error = ()> + Send + Unpin>),
     Stream(Box<dyn util::StreamSink + Send>),
 }
 
@@ -92,20 +96,18 @@ pub enum HealthcheckError {
 impl VectorSink {
     pub async fn run<S>(mut self, input: S) -> Result<(), ()>
     where
-        S: futures::Stream<Item = Event> + Send + 'static,
+        S: Stream<Item = Event> + Send + 'static,
     {
         match self {
-            Self::Futures01Sink(sink) => input.map(Ok).forward(sink.sink_compat()).await,
+            Self::Sink(sink) => input.map(Ok).forward(sink).await,
             Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
         }
     }
 
-    pub fn into_futures01sink(
-        self,
-    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static> {
+    pub fn into_sink(self) -> Box<dyn Sink<Event, Error = ()> + Send + Unpin> {
         match self {
-            Self::Futures01Sink(sink) => sink,
-            _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+            Self::Sink(sink) => sink,
+            _ => panic!("Failed type coercion, {:?} is not a Sink", self),
         }
     }
 }

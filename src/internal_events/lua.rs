@@ -6,10 +6,7 @@ pub struct LuaEventProcessed;
 
 impl InternalEvent for LuaEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "lua",
-        );
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -20,10 +17,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit_metrics(&self) {
-        gauge!("memory_used", self.used_memory as i64,
-            "component_kind" => "transform",
-            "component_type" => "lua",
-        );
+        gauge!("memory_used", self.used_memory as f64);
     }
 }
 
@@ -34,14 +28,11 @@ pub struct LuaScriptError {
 
 impl InternalEvent for LuaScriptError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = %self.error, rate_limit_secs = 30);
+        error!(message = "Error in lua script; discarding event.", error = ?self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "lua",
-        );
+        counter!("processing_errors_total", 1);
     }
 }
 
@@ -52,13 +43,10 @@ pub struct LuaBuildError {
 
 impl InternalEvent for LuaBuildError {
     fn emit_logs(&self) {
-        error!(message = "Error in lua script; discarding event.", error = %self.error, rate_limit_secs = 30);
+        error!(message = "Error in lua script; discarding event.", error = ?self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "lua",
-        );
+        counter!("processing_errors_total", 1);
     }
 }

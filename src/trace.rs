@@ -1,3 +1,4 @@
+use metrics_tracing_context::MetricsLayer;
 use tracing::{
     dispatcher::{set_global_default, Dispatch},
     span::Span,
@@ -16,7 +17,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .json()
             .flatten_event(true)
             .finish()
-            .with(Limit::default());
+            .with(Limit::default())
+            .with(MetricsLayer::new());
 
         Dispatch::new(subscriber)
     } else {
@@ -24,7 +26,8 @@ pub fn init(color: bool, json: bool, levels: &str) {
             .with_ansi(color)
             .with_env_filter(levels)
             .finish()
-            .with(Limit::default());
+            .with(Limit::default())
+            .with(MetricsLayer::new());
 
         Dispatch::new(subscriber)
     };

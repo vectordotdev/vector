@@ -1,10 +1,14 @@
 use bytes::Bytes;
 use criterion::{criterion_group, Benchmark, Criterion};
+use futures::{compat::Stream01CompatExt, StreamExt};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
-    transforms::{self, Transform},
+    config::TransformConfig,
+    test_util::runtime,
+    transforms::{
+        self, util::runtime_transform::RuntimeTransform, FunctionTransform, TaskTransform,
+    },
     Event,
 };
 
@@ -14,11 +18,8 @@ fn add_fields(c: &mut Criterion) {
     let key = "the key";
     let value = "this is the value";
 
-    let key_atom_native = key.into();
     let value_bytes_native = Bytes::from(value).into();
-    let key_atom_v1 = key.into();
     let value_bytes_v1 = Bytes::from(value).into();
-    let key_atom_v2 = key.into();
     let value_bytes_v2 = Bytes::from(value).into();
 
     c.bench(
@@ -27,17 +28,15 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let mut map = IndexMap::new();
-                    map.insert(
-                        key.to_string().into(),
-                        toml::value::Value::String(value.to_string()),
-                    );
-                    transforms::add_fields::AddFields::new(map, true)
+                    map.insert(String::from(key), String::from(value).into());
+                    transforms::add_fields::AddFields::new(map, true).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_native], value_bytes_native);
+                        let mut output = vec![];
+                        transform.transform(&mut output, event);
+                        assert_eq!(output[0].as_log()[key], value_bytes_native);
                     }
                 },
             )
@@ -46,13 +45,13 @@ fn add_fields(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let source = format!("event['{}'] = '{}'", key, value);
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(source, vec![]).unwrap()
                 },
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_v1], value_bytes_v1);
+                        let output = transform.transform_one(event).unwrap();
+                        assert_eq!(output.as_log()[key], value_bytes_v1);
                     }
                 },
             )
@@ -76,8 +75,9 @@ fn add_fields(c: &mut Criterion) {
                 |mut transform| {
                     for _ in 0..num_events {
                         let event = Event::new_empty_log();
-                        let event = transform.transform(event).unwrap();
-                        assert_eq!(event.as_log()[&key_atom_v2], value_bytes_v2);
+                        let mut output = Vec::with_capacity(1);
+                        transform.transform(&mut output, event);
+                        assert_eq!(output[0].as_log()[key], value_bytes_v2);
                     }
                 },
             )
@@ -92,24 +92,33 @@ fn field_filter(c: &mut Criterion) {
     c.bench(
         "lua_field_filter",
         Benchmark::new("native", move |b| {
+            let mut rt = runtime();
             b.iter_with_setup(
                 || {
-                    transforms::field_filter::FieldFilterConfig {
-                        field: "the_field".to_string(),
-                        value: "0".to_string(),
-                    }
-                    .build(TransformContext::new_test())
-                    .unwrap()
+                    rt.block_on(async move {
+                        transforms::field_filter::FieldFilterConfig {
+                            field: "the_field".to_string(),
+                            value: "0".to_string(),
+                        }
+                        .build()
+                        .await
+                        .unwrap()
+                    })
                 },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                |transform| {
+                    let inputs = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
+                    let in_stream = futures01::stream::iter_ok(inputs);
+                    let out_stream = transform
+                        .into_task()
+                        .transform(Box::new(in_stream))
+                        .compat()
+                        .collect::<Vec<_>>();
+                    let blocked = futures::executor::block_on(out_stream);
+                    let num = blocked.len();
                     assert_eq!(num, num_events / 10);
                 },
             )
@@ -122,7 +131,7 @@ fn field_filter(c: &mut Criterion) {
                         event = nil
                       end
                     "#;
-                    transforms::lua::v1::Lua::new(&source, vec![]).unwrap()
+                    transforms::lua::v1::Lua::new(source.to_string(), vec![]).unwrap()
                 },
                 |mut transform| {
                     let num = (0..num_events)
@@ -131,8 +140,12 @@ fn field_filter(c: &mut Criterion) {
                             event.as_mut_log().insert("the_field", (i % 10).to_string());
                             event
                         })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                        .fold(Vec::new(), |mut acc, r| {
+                            let e = transform.transform_one(r);
+                            acc.push(e);
+                            acc
+                        })
+                        .len();
                     assert_eq!(num, num_events / 10);
                 },
             )
@@ -149,15 +162,19 @@ fn field_filter(c: &mut Criterion) {
                     "#;
                     transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap()
                 },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .filter_map(|r| transform.transform(r))
-                        .count();
+                |transform| {
+                    let inputs = (0..num_events).map(|i| {
+                        let mut event = Event::new_empty_log();
+                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event
+                    });
+                    let in_stream = futures01::stream::iter_ok(inputs);
+                    let out_stream =
+                        TaskTransform::transform(Box::new(transform), Box::new(in_stream))
+                            .compat()
+                            .collect::<Vec<_>>();
+                    let blocked = futures::executor::block_on(out_stream);
+                    let num = blocked.len();
                     assert_eq!(num, num_events / 10);
                 },
             )

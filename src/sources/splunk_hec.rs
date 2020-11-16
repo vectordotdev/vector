@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -9,14 +9,12 @@ use crate::{
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use async_trait::async_trait;
 use bytes::{buf::BufExt, Bytes};
 use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::GzDecoder;
 use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
 use futures01::{Async, Future, Sink, Stream};
 use http::StatusCode;
-use lazy_static::lazy_static;
 use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
@@ -24,16 +22,14 @@ use std::{
     io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
-use string_cache::DefaultAtom as Atom;
+
 use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
 
 // Event fields unique to splunk_hec source
-lazy_static! {
-    pub static ref CHANNEL: Atom = Atom::from("splunk_channel");
-    pub static ref INDEX: Atom = Atom::from("splunk_index");
-    pub static ref SOURCE: Atom = Atom::from("splunk_source");
-    pub static ref SOURCETYPE: Atom = Atom::from("splunk_sourcetype");
-}
+pub const CHANNEL: &str = "splunk_channel";
+pub const INDEX: &str = "splunk_index";
+pub const SOURCE: &str = "splunk_source";
+pub const SOURCETYPE: &str = "splunk_sourcetype";
 
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -48,8 +44,10 @@ pub struct SplunkConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new_without_default::<SplunkConfig>("splunk_hec")
+    SourceDescription::new::<SplunkConfig>("splunk_hec")
 }
+
+impl_generate_config_from_default!(SplunkConfig);
 
 impl SplunkConfig {
     #[cfg(test)]
@@ -75,20 +73,10 @@ fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::new(0, 0, 0, 0).into(), 8088)
 }
 
+#[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
-#[async_trait]
 impl SourceConfig for SplunkConfig {
-    fn build(
-        &self,
-        _name: &str,
-        _globals: &GlobalOptions,
-        _shutdown: ShutdownSignal,
-        _out: Pipeline,
-    ) -> crate::Result<super::Source> {
-        unimplemented!()
-    }
-
-    async fn build_async(
+    async fn build(
         &self,
         _: &str,
         _: &GlobalOptions,
@@ -124,13 +112,13 @@ impl SourceConfig for SplunkConfig {
             .or_else(finish_err);
 
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
-        let mut listener = tls.bind(&self.address).await?;
+        let listener = tls.bind(&self.address).await?;
 
         let fut = async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
-                    listener.incoming(),
-                    shutdown.clone().compat().map(|_| ()),
+                    listener.accept_stream(),
+                    shutdown.clone().map(|_| ()),
                 )
                 .await;
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
@@ -146,6 +134,10 @@ impl SourceConfig for SplunkConfig {
 
     fn source_type(&self) -> &'static str {
         "splunk_hec"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 
@@ -347,14 +339,10 @@ impl<R: Read> EventStream<R> {
         EventStream {
             data,
             events: 0,
-            channel: channel.map(|value| value.into_bytes().into()),
+            channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
-                DefaultExtractor::new_with(
-                    "host",
-                    &log_schema().host_key(),
-                    host.map(|value| value.into_bytes().into()),
-                ),
+                DefaultExtractor::new_with("host", log_schema().host_key(), host.map(Value::from)),
                 DefaultExtractor::new("index", &INDEX),
                 DefaultExtractor::new("source", &SOURCE),
                 DefaultExtractor::new("sourcetype", &SOURCETYPE),
@@ -413,7 +401,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(log_schema().message_key().clone(), string);
+                    log.insert(log_schema().message_key(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -444,9 +432,9 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Process channel field
         if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
-            log.insert(CHANNEL.clone(), guid);
+            log.insert(CHANNEL, guid);
         } else if let Some(guid) = self.channel.as_ref() {
-            log.insert(CHANNEL.clone(), guid.clone());
+            log.insert(CHANNEL, guid.clone());
         }
 
         // Process fields field
@@ -484,8 +472,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert(log_schema().timestamp_key().clone(), time),
-            Time::Now(time) => log.insert(log_schema().timestamp_key().clone(), time),
+            Time::Provided(time) => log.insert(log_schema().timestamp_key(), time),
+            Time::Now(time) => log.insert(log_schema().timestamp_key(), time),
         };
 
         // Extract default extracted fields
@@ -535,12 +523,12 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
 /// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
     field: &'static str,
-    to_field: &'static Atom,
+    to_field: &'static str,
     value: Option<Value>,
 }
 
 impl DefaultExtractor {
-    fn new(field: &'static str, to_field: &'static Atom) -> Self {
+    fn new(field: &'static str, to_field: &'static str) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -550,7 +538,7 @@ impl DefaultExtractor {
 
     fn new_with(
         field: &'static str,
-        to_field: &'static Atom,
+        to_field: &'static str,
         value: impl Into<Option<Value>>,
     ) -> Self {
         DefaultExtractor {
@@ -568,7 +556,7 @@ impl DefaultExtractor {
 
         // Add data field
         if let Some(index) = self.value.as_ref() {
-            log.insert(self.to_field.clone(), index.clone());
+            log.insert(self.to_field, index.clone());
         }
     }
 }
@@ -594,7 +582,7 @@ fn raw_event(
         let mut data = Vec::new();
         match GzDecoder::new(bytes.reader()).read_to_end(&mut data) {
             Ok(0) => return Err(ApiError::NoData.into()),
-            Ok(_) => data.into(),
+            Ok(_) => Value::from(Bytes::from(data)),
             Err(error) => {
                 emit!(SplunkHECRequestBodyInvalid { error });
                 return Err(ApiError::InvalidDataFormat { event: 0 }.into());
@@ -609,18 +597,18 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert(log_schema().message_key().clone(), message);
+    log.insert(log_schema().message_key(), message);
 
     // Add channel
-    log.insert(CHANNEL.clone(), channel.into_bytes());
+    log.insert(CHANNEL, channel);
 
     // Add host
     if let Some(host) = host {
-        log.insert(log_schema().host_key().clone(), host.into_bytes());
+        log.insert(log_schema().host_key(), host);
     }
 
     // Add timestamp
-    log.insert(log_schema().timestamp_key().clone(), Utc::now());
+    log.insert(log_schema().timestamp_key(), Utc::now());
 
     // Add source type
     event
@@ -750,7 +738,7 @@ fn event_error(text: &str, code: u16, event: usize) -> Response {
         Ok(string) => response_json(StatusCode::BAD_REQUEST, string),
         Err(error) => {
             // This should never happen.
-            error!("error encoding json body: {}.", error);
+            error!(message = "Error encoding json body.", %error);
             response_json(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 splunk_response::SERVER_ERROR.clone(),
@@ -780,6 +768,11 @@ mod tests {
     use futures01::sync::mpsc;
     use std::net::SocketAddr;
 
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SplunkConfig>();
+    }
+
     /// Splunk token
     const TOKEN: &str = "token";
 
@@ -796,7 +789,7 @@ mod tests {
                 token,
                 tls: None,
             }
-            .build_async(
+            .build(
                 "default",
                 &GlobalOptions::default(),
                 ShutdownSignal::noop(),
@@ -812,7 +805,7 @@ mod tests {
         (recv, address)
     }
 
-    fn sink(
+    async fn sink(
         address: SocketAddr,
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
         compression: Compression,
@@ -825,6 +818,7 @@ mod tests {
             ..HecSinkConfig::default()
         }
         .build(SinkContext::new_test())
+        .await
         .unwrap()
     }
 
@@ -833,7 +827,7 @@ mod tests {
         compression: Compression,
     ) -> (VectorSink, mpsc::Receiver<Event>) {
         let (source, address) = source().await;
-        let (sink, health) = sink(address, encoding, compression);
+        let (sink, health) = sink(address, encoding, compression).await;
         assert!(health.await.is_ok());
         (sink, source)
     }
@@ -883,8 +877,8 @@ mod tests {
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(event.as_log()[&log_schema().message_key()], message.into());
-        assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -896,12 +890,12 @@ mod tests {
         trace_init();
 
         let message = "one_simple_text_event";
-        let (sink, source) = start(Encoding::Text, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Text, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(event.as_log()[&log_schema().message_key()], message.into());
-        assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -921,8 +915,8 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[&log_schema().message_key()], msg.into());
-            assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -935,12 +929,12 @@ mod tests {
         trace_init();
 
         let message = "one_simple_json_event";
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(event.as_log()[&log_schema().message_key()], message.into());
-        assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -952,7 +946,7 @@ mod tests {
         trace_init();
 
         let n = 200;
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let messages = (0..n)
             .map(|i| format!("multiple_simple_json_event{}", i))
@@ -960,8 +954,8 @@ mod tests {
         let events = channel_n(messages.clone(), sink, source).await;
 
         for (msg, event) in messages.into_iter().zip(events.into_iter()) {
-            assert_eq!(event.as_log()[&log_schema().message_key()], msg.into());
-            assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+            assert_eq!(event.as_log()[log_schema().message_key()], msg.into());
+            assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
             assert_eq!(
                 event.as_log()[log_schema().source_type_key()],
                 "splunk_hec".into()
@@ -973,7 +967,7 @@ mod tests {
     async fn json_event() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("greeting", "hello");
@@ -981,9 +975,9 @@ mod tests {
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(event.as_log()[&"greeting".into()], "hello".into());
-        assert_eq!(event.as_log()[&"name".into()], "bob".into());
-        assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+        assert_eq!(event.as_log()["greeting"], "hello".into());
+        assert_eq!(event.as_log()["name"], "bob".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -994,14 +988,14 @@ mod tests {
     async fn line_to_message() {
         trace_init();
 
-        let (sink, source) = start(Encoding::Json, Compression::Gzip).await;
+        let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert("line", "hello");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(event.as_log()[&log_schema().message_key()], "hello".into());
+        assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
     }
 
     #[tokio::test]
@@ -1014,9 +1008,9 @@ mod tests {
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(event.as_log()[&log_schema().message_key()], message.into());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
-        assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1050,12 +1044,12 @@ mod tests {
 
         let message = "no_authorization";
         let (source, address) = source_with(None).await;
-        let (sink, health) = sink(address, Encoding::Text, Compression::Gzip);
+        let (sink, health) = sink(address, Encoding::Text, Compression::gzip_default()).await;
         assert!(health.await.is_ok());
 
         let event = channel_n(vec![message], sink, source).await.remove(0);
 
-        assert_eq!(event.as_log()[&log_schema().message_key()], message.into());
+        assert_eq!(event.as_log()[log_schema().message_key()], message.into());
     }
 
     #[tokio::test]
@@ -1071,8 +1065,8 @@ mod tests {
         );
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(event.as_log()[&log_schema().message_key()], "first".into());
-        assert!(event.as_log().get(&log_schema().timestamp_key()).is_some());
+        assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
+        assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "splunk_hec".into()
@@ -1094,19 +1088,19 @@ mod tests {
         let events = collect_n(source, 3).await.unwrap();
 
         assert_eq!(
-            events[0].as_log()[&log_schema().message_key()],
+            events[0].as_log()[log_schema().message_key()],
             "first".into()
         );
         assert_eq!(events[0].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(
-            events[1].as_log()[&log_schema().message_key()],
+            events[1].as_log()[log_schema().message_key()],
             "second".into()
         );
         assert_eq!(events[1].as_log()[&super::SOURCE], "main".into());
 
         assert_eq!(
-            events[2].as_log()[&log_schema().message_key()],
+            events[2].as_log()[log_schema().message_key()],
             "third".into()
         );
         assert_eq!(events[2].as_log()[&super::SOURCE], "secondary".into());

@@ -81,11 +81,11 @@ impl TlsSettings {
         if !for_server {
             if options.verify_certificate == Some(false) {
                 warn!(
-                    "`verify_certificate` is DISABLED, this may lead to security vulnerabilities"
+                    "The `verify_certificate` option is DISABLED, this may lead to security vulnerabilities."
                 );
             }
             if options.verify_hostname == Some(false) {
-                warn!("`verify_hostname` is DISABLED, this may lead to security vulnerabilities");
+                warn!("The `verify_hostname` option is DISABLED, this may lead to security vulnerabilities.");
             }
         }
 
@@ -202,9 +202,7 @@ impl TlsOptions {
                     .with_context(|| X509ParseError { filename: crt_file })?
                     .into_iter();
 
-                let crt = crt_stack
-                    .next()
-                    .ok_or_else(|| TlsError::MissingCertificate)?;
+                let crt = crt_stack.next().ok_or(TlsError::MissingCertificate)?;
                 let key = load_key(&key_file, &self.key_pass)?;
 
                 let mut ca_stack = Stack::new().context(NewCaStack)?;
@@ -427,6 +425,7 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::BoolAndSome;
 
     const TEST_PKCS12_PATH: &str = "tests/data/localhost.p12";
     const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
@@ -596,20 +595,10 @@ mod test {
         TlsConfig {
             enabled,
             options: TlsOptions {
-                crt_file: and_some(set_crt, TEST_PEM_CRT_PATH.into()),
-                key_file: and_some(set_key, TEST_PEM_KEY_PATH.into()),
+                crt_file: set_crt.and_some(TEST_PEM_CRT_PATH.into()),
+                key_file: set_key.and_some(TEST_PEM_KEY_PATH.into()),
                 ..Default::default()
             },
-        }
-    }
-
-    // This can be eliminated once the `bool_to_option` feature migrates
-    // out of nightly.
-    fn and_some<T>(src: bool, value: T) -> Option<T> {
-        if src {
-            Some(value)
-        } else {
-            None
         }
     }
 }

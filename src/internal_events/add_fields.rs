@@ -6,10 +6,7 @@ pub struct AddFieldsEventProcessed;
 
 impl InternalEvent for AddFieldsEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_fields",
-        );
+        counter!("events_processed_total", 1);
     }
 }
 
@@ -20,14 +17,11 @@ pub struct AddFieldsTemplateRenderingError<'a> {
 
 impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
     fn emit_logs(&self) {
-        error!(message = "Failed to render templated value; discarding value.", %self.field, rate_limit_secs = 30);
+        error!(message = "Failed to render templated value; discarding value.", field = %self.field, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_fields",
-        );
+        counter!("processing_errors_total", 1);
     }
 }
 
@@ -39,14 +33,11 @@ pub struct AddFieldsTemplateInvalid<'a> {
 
 impl<'a> InternalEvent for AddFieldsTemplateInvalid<'a> {
     fn emit_logs(&self) {
-        error!(message = "Invalid template; using as string.", %self.field, %self.error, rate_limit_secs = 30);
+        error!(message = "Invalid template; using as string.", field = %self.field, error = ?self.error, rate_limit_secs = 30);
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "add_fields",
-        );
+        counter!("processing_errors_total", 1);
     }
 }
 
@@ -57,7 +48,7 @@ pub struct AddFieldsFieldOverwritten<'a> {
 
 impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
     fn emit_logs(&self) {
-        error!(message = "Field overwritten.", %self.field, rate_limit_secs = 30);
+        debug!(message = "Field overwritten.", field = %self.field, rate_limit_secs = 30);
     }
 }
 
@@ -68,6 +59,6 @@ pub struct AddFieldsFieldNotOverwritten<'a> {
 
 impl<'a> InternalEvent for AddFieldsFieldNotOverwritten<'a> {
     fn emit_logs(&self) {
-        error!(message = "Field not overwritten.", %self.field, rate_limit_secs = 30);
+        debug!(message = "Field not overwritten.", field = %self.field, rate_limit_secs = 30);
     }
 }

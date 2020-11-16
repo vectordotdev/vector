@@ -1,17 +1,18 @@
-use super::Transform;
 use crate::{
-    config::{DataType, TransformConfig, TransformContext, TransformDescription},
+    config::{DataType, TransformConfig, TransformDescription},
     event::Event,
     internal_events::{RemapEventProcessed, RemapFailedMapping},
-    mapping::{parser::parse as parse_mapping, Mapping},
+    transforms::{FunctionTransform, Transform},
+    Result,
 };
+use remap::{Program, Runtime};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct RemapConfig {
-    pub mapping: String,
+    pub source: String,
     pub drop_on_err: bool,
 }
 
@@ -19,10 +20,13 @@ inventory::submit! {
     TransformDescription::new::<RemapConfig>("remap")
 }
 
+impl_generate_config_from_default!(RemapConfig);
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "remap")]
 impl TransformConfig for RemapConfig {
-    fn build(&self, _cx: TransformContext) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(Remap::new(self.clone())?))
+    async fn build(&self) -> Result<Transform> {
+        Remap::new(self.clone()).map(Transform::function)
     }
 
     fn input_type(&self) -> DataType {
@@ -38,51 +42,53 @@ impl TransformConfig for RemapConfig {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Remap {
-    mapping: Mapping,
+    program: Program,
     drop_on_err: bool,
 }
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
         Ok(Remap {
-            mapping: parse_mapping(&config.mapping)?,
+            program: Program::new(&config.source, &crate::remap::FUNCTIONS_MUT)?,
             drop_on_err: config.drop_on_err,
         })
     }
 }
 
-impl Transform for Remap {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+impl FunctionTransform for Remap {
+    fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(RemapEventProcessed);
 
-        if let Err(error) = self.mapping.execute(&mut event) {
+        let mut runtime = Runtime::default();
+
+        if let Err(error) = runtime.execute(&mut event, &self.program) {
             emit!(RemapFailedMapping {
                 event_dropped: self.drop_on_err,
-                error
+                error: error.to_string(),
             });
 
             if self.drop_on_err {
-                return None;
+                return;
             }
         }
 
-        Some(event)
+        output.push(event);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<RemapConfig>();
+    }
 
     fn get_field_string(event: &Event, field: &str) -> String {
-        event
-            .as_log()
-            .get(&Atom::from(field))
-            .unwrap()
-            .to_string_lossy()
+        event.as_log().get(field).unwrap().to_string_lossy()
     }
 
     #[test]
@@ -94,7 +100,7 @@ mod tests {
         };
 
         let conf = RemapConfig {
-            mapping: r#"  .foo = "bar"
+            source: r#"  .foo = "bar"
   .bar = "baz"
   .copy = .copy_from
 "#
@@ -103,7 +109,7 @@ mod tests {
         };
         let mut tform = Remap::new(conf).unwrap();
 
-        let result = tform.transform(event).unwrap();
+        let result = tform.transform_one(event).unwrap();
         assert_eq!(get_field_string(&result, "message"), "augment me");
         assert_eq!(get_field_string(&result, "copy_from"), "buz");
         assert_eq!(get_field_string(&result, "foo"), "bar");

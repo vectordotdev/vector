@@ -2,18 +2,18 @@ use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
     event::{Event, Value},
+    http::HttpClient,
     sinks::{
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            http::{BatchedHttpSink, HttpClient, HttpSink},
+            http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, map};
 use snafu::Snafu;
 use std::collections::HashMap;
-use string_cache::DefaultAtom as Atom;
 
 #[derive(Debug, Snafu)]
 enum HealthcheckError {
@@ -59,7 +58,7 @@ pub struct StackdriverConfig {
 struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
-    severity_key: Option<Atom>,
+    severity_key: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -96,6 +95,8 @@ inventory::submit! {
     SinkDescription::new::<StackdriverConfig>("gcp_stackdriver_logs")
 }
 
+impl_generate_config_from_default!(StackdriverConfig);
+
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         rate_limit_num: Some(1000),
@@ -110,11 +111,7 @@ lazy_static! {
 #[async_trait::async_trait]
 #[typetag::serde(name = "gcp_stackdriver_logs")]
 impl SinkConfig for StackdriverConfig {
-    fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        unimplemented!()
-    }
-
-    async fn build_async(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let creds = self.auth.make_credentials(Scope::LoggingWrite).await?;
 
         let batch = BatchSettings::default()
@@ -123,15 +120,12 @@ impl SinkConfig for StackdriverConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = StackdriverSink {
             config: self.clone(),
             creds,
-            severity_key: self
-                .severity_key
-                .as_ref()
-                .map(|key| Atom::from(key.as_str())),
+            severity_key: self.severity_key.clone(),
         };
 
         let healthcheck = healthcheck(client.clone(), sink.clone()).boxed();
@@ -144,9 +138,9 @@ impl SinkConfig for StackdriverConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -182,7 +176,7 @@ impl HttpSink for StackdriverSink {
         entry.insert("severity".into(), json!(severity));
 
         // If the event contains a timestamp, send it in the main message so gcp can pick it up.
-        if let Some(timestamp) = log.get(&log_schema().timestamp_key()) {
+        if let Some(timestamp) = log.get(log_schema().timestamp_key()) {
             entry.insert("timestamp".into(), json!(timestamp));
         }
 
@@ -233,7 +227,7 @@ fn remap_severity(severity: Value) -> Value {
                     s if s.starts_with("DEFAULT") => 0,
                     _ => {
                         warn!(
-                            message = "Unknown severity value string, using DEFAULT",
+                            message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
                             rate_limit_secs = 10
                         );
@@ -244,7 +238,7 @@ fn remap_severity(severity: Value) -> Value {
         }
         value => {
             warn!(
-                message = "Unknown severity value type, using DEFAULT",
+                message = "Unknown severity value type, using DEFAULT.",
                 ?value,
                 rate_limit_secs = 10
             );
@@ -254,7 +248,7 @@ fn remap_severity(severity: Value) -> Value {
     Value::Integer(n)
 }
 
-async fn healthcheck(mut client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;
@@ -280,6 +274,11 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<StackdriverConfig>();
+    }
 
     #[test]
     fn encode_valid() {
@@ -454,7 +453,7 @@ mod tests {
         "#,
         )
         .unwrap();
-        if config.build_async(SinkContext::new_test()).await.is_ok() {
+        if config.build(SinkContext::new_test()).await.is_ok() {
             panic!("config.build failed to error");
         }
     }

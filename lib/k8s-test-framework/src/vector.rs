@@ -1,7 +1,6 @@
 //! Manage Vector.
 
-use super::{resource_file::ResourceFile, Result};
-use crate::up_down;
+use crate::{helm_values_file::HelmValuesFile, resource_file::ResourceFile, up_down, Result};
 use std::process::{Command, Stdio};
 
 /// Parameters required to build a `kubectl` command to manage Vector in the
@@ -10,7 +9,9 @@ use std::process::{Command, Stdio};
 pub struct CommandBuilder {
     interface_command: String,
     namespace: String,
-    custom_resource_file: ResourceFile,
+    helm_chart: String,
+    custom_helm_values_file: Option<HelmValuesFile>,
+    custom_resource_file: Option<ResourceFile>,
 }
 
 impl up_down::CommandBuilder for CommandBuilder {
@@ -22,13 +23,31 @@ impl up_down::CommandBuilder for CommandBuilder {
                 up_down::CommandToBuild::Down => "down",
             })
             .arg(&self.namespace)
-            .env(
-                "CUSTOM_RESOURCE_CONFIGS_FILE",
-                self.custom_resource_file.path(),
-            )
+            .arg(&self.helm_chart)
             .stdin(Stdio::null());
+
+        if let Some(ref custom_helm_values_file) = self.custom_helm_values_file {
+            command.env("CUSTOM_HELM_VALUES_FILE", custom_helm_values_file.path());
+        }
+
+        if let Some(ref custom_resource_file) = self.custom_resource_file {
+            command.env("CUSTOM_RESOURCE_CONFIGS_FILE", custom_resource_file.path());
+        }
+
         command
     }
+}
+
+/// Vector configuration to deploy.
+#[derive(Debug, Default)]
+pub struct Config<'a> {
+    /// Custom Helm values to set, in the YAML format.
+    /// Set to empty to opt-out of passing any custom values.
+    pub custom_helm_values: &'a str,
+
+    /// Custom Kubernestes resource(s) to deploy together with Vector.
+    /// Set to empty to opt-out of deploying custom resources.
+    pub custom_resource: &'a str,
 }
 
 /// Takes care of deploying Vector into the Kubernetes cluster.
@@ -37,12 +56,28 @@ impl up_down::CommandBuilder for CommandBuilder {
 pub fn manager(
     interface_command: &str,
     namespace: &str,
-    custom_resource: &str,
+    helm_chart: &str,
+    config: Config<'_>,
 ) -> Result<up_down::Manager<CommandBuilder>> {
-    let custom_resource_file = ResourceFile::new(custom_resource)?;
+    let Config {
+        custom_helm_values,
+        custom_resource,
+    } = config;
+    let custom_helm_values_file = if custom_helm_values.is_empty() {
+        None
+    } else {
+        Some(HelmValuesFile::new(custom_helm_values)?)
+    };
+    let custom_resource_file = if custom_resource.is_empty() {
+        None
+    } else {
+        Some(ResourceFile::new(custom_resource)?)
+    };
     Ok(up_down::Manager::new(CommandBuilder {
         interface_command: interface_command.to_owned(),
         namespace: namespace.to_owned(),
+        helm_chart: helm_chart.to_owned(),
+        custom_helm_values_file,
         custom_resource_file,
     }))
 }

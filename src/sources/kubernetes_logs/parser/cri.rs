@@ -2,16 +2,13 @@ use crate::{
     event::{self, Event, LogEvent, Value},
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
-        Transform,
+        FunctionTransform,
     },
 };
-use lazy_static::lazy_static;
+use derivative::Derivative;
 use snafu::{OptionExt, Snafu};
-use string_cache::DefaultAtom as Atom;
 
-lazy_static! {
-    pub static ref MULTILINE_TAG: Atom = Atom::from("multiline_tag");
-}
+pub const MULTILINE_TAG: &str = "multiline_tag";
 
 /// Parser for the CRI log format.
 ///
@@ -23,9 +20,11 @@ lazy_static! {
 /// Normalizes parsed data for consistency.
 ///
 /// [cri_log_format]: https://github.com/kubernetes/community/blob/ee2abbf9dbfa4523b414f99a04ddc97bd38c74b2/contributors/design-proposals/node/kubelet-cri-logging.md
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub struct Cri {
-    // TODO: patch `RegexParser` to expose the concrete type on build.
-    regex_parser: Box<dyn Transform>,
+    #[derivative(Debug = "ignore")]
+    regex_parser: Box<dyn FunctionTransform>,
 }
 
 impl Cri {
@@ -38,29 +37,37 @@ impl Cri {
             rp_config.patterns = vec![pattern.to_owned()];
 
             rp_config.types.insert(
-                crate::config::log_schema().timestamp_key().clone(),
+                crate::config::log_schema().timestamp_key().to_string(),
                 "timestamp|%+".to_owned(),
             );
 
-            RegexParser::build(&rp_config).expect("regexp patterns are static, should never fail")
+            let parser = RegexParser::build(&rp_config)
+                .expect("regexp patterns are static, should never fail");
+            parser.into_function()
         };
 
         Self { regex_parser }
     }
 }
 
-impl Transform for Cri {
-    fn transform(&mut self, event: Event) -> Option<Event> {
-        let mut event = self.regex_parser.transform(event)?;
-        normalize_event(event.as_mut_log()).ok()?;
-        Some(event)
+impl FunctionTransform for Cri {
+    fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
+        let mut buf = Vec::with_capacity(1);
+        self.regex_parser.transform(&mut buf, event);
+        if let Some(mut event) = buf.into_iter().next() {
+            if normalize_event(event.as_mut_log()).ok().is_none() {
+                return;
+            } else {
+                output.push(event);
+            }
+        }
     }
 }
 
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Detect if this is a partial event.
     let multiline_tag = log
-        .remove(&MULTILINE_TAG)
+        .remove(MULTILINE_TAG)
         .context(MultilineTagFieldMissing)?;
     let multiline_tag = match multiline_tag {
         Value::Bytes(val) => val,
@@ -71,7 +78,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
 
     // For partial messages add a partial event indicator.
     if is_partial {
-        log.insert(event::PARTIAL_STR, true);
+        log.insert(event::PARTIAL, true);
     }
 
     Ok(())
@@ -86,8 +93,8 @@ enum NormalizationError {
 #[cfg(test)]
 pub mod tests {
     use super::super::test_util;
-    use super::Cri;
-    use crate::event::LogEvent;
+    use super::*;
+    use crate::{event::LogEvent, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -151,6 +158,6 @@ pub mod tests {
 
     #[test]
     fn test_parsing() {
-        test_util::test_parser(Cri::new, cases());
+        test_util::test_parser(|| Transform::function(Cri::new()), cases());
     }
 }

@@ -1,7 +1,5 @@
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use metrics_core::Key;
-use metrics_runtime::Measurement;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{self, Display, Formatter};
@@ -9,7 +7,11 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Metric {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub timestamp: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tags: Option<BTreeMap<String, String>>,
     pub kind: MetricKind,
     #[serde(flatten)]
@@ -18,6 +20,9 @@ pub struct Metric {
 
 #[derive(Debug, Hash, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
+/// A metric may be an incremental value, updating the previous value of
+/// the metric, or absolute, which sets the reference for future
+/// increments.
 pub enum MetricKind {
     Incremental,
     Absolute,
@@ -25,27 +30,39 @@ pub enum MetricKind {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, is_enum_variant)]
 #[serde(rename_all = "snake_case")]
+/// A MetricValue is the container for the actual value of a metric.
 pub enum MetricValue {
-    Counter {
-        value: f64,
-    },
-    Gauge {
-        value: f64,
-    },
-    Set {
-        values: BTreeSet<String>,
-    },
+    /// A Counter is a simple value that can not decrease except to
+    /// reset it to zero.
+    Counter { value: f64 },
+    /// A Gauge represents a sampled numerical value.
+    Gauge { value: f64 },
+    /// A Set contains a set of (unordered) unique values for a key.
+    Set { values: BTreeSet<String> },
+    /// A Distribution contains a set of sampled values paired with the
+    /// rate at which they were observed.
     Distribution {
         values: Vec<f64>,
         sample_rates: Vec<u32>,
         statistic: StatisticKind,
     },
+    /// An AggregatedHistogram contains a set of observations which are
+    /// counted into buckets. The value of the bucket is the upper bound
+    /// on the range of values within the bucket. The lower bound on the
+    /// range is just higher than the previous bucket, or zero for the
+    /// first bucket. It also contains the total count of all
+    /// observations and their sum to allow calculating the mean.
     AggregatedHistogram {
         buckets: Vec<f64>,
         counts: Vec<u32>,
         count: u32,
         sum: f64,
     },
+    /// An AggregatedSummary contains a set of observations which are
+    /// counted into a number of quantiles. Each quantile contains the
+    /// upper value of the quantile (0 <= φ <= 1). It also contains the
+    /// total count of all observations and their sum to allow
+    /// calculating the mean.
     AggregatedSummary {
         quantiles: Vec<f64>,
         values: Vec<f64>,
@@ -64,9 +81,11 @@ pub enum StatisticKind {
 }
 
 impl Metric {
+    /// Create a new Metric from this with all the data but marked as absolute.
     pub fn to_absolute(&self) -> Self {
         Self {
             name: self.name.clone(),
+            namespace: self.namespace.clone(),
             timestamp: self.timestamp,
             tags: self.tags.clone(),
             kind: MetricKind::Absolute,
@@ -74,6 +93,8 @@ impl Metric {
         }
     }
 
+    /// Add the data from the other metric to this one. The `other` must
+    /// be relative and contain the same value type as this one.
     pub fn add(&mut self, other: &Self) {
         if other.kind.is_absolute() {
             return;
@@ -87,9 +108,7 @@ impl Metric {
                 *value += value2;
             }
             (MetricValue::Set { ref mut values }, MetricValue::Set { values: values2 }) => {
-                for val in values2 {
-                    values.insert(val.to_string());
-                }
+                values.extend(values2.iter().map(Into::into));
             }
             (
                 MetricValue::Distribution {
@@ -132,6 +151,10 @@ impl Metric {
         }
     }
 
+    /// Set all the values of this metric to zero without emptying
+    /// it. This keeps all the bucket/value vectors for the histogram
+    /// and summary metric types intact while zeroing the
+    /// counts. Distribution metrics are emptied of all their values.
     pub fn reset(&mut self) {
         match &mut self.value {
             MetricValue::Counter { ref mut value } => {
@@ -178,16 +201,22 @@ impl Metric {
         }
     }
 
-    pub fn from_measurement(key: Key, measurement: Measurement) -> Self {
-        let value = match measurement {
-            Measurement::Counter(v) => MetricValue::Counter { value: v as f64 },
-            Measurement::Gauge(v) => MetricValue::Gauge { value: v as f64 },
-            Measurement::Histogram(packed) => {
-                let values = packed
-                    .decompress()
-                    .into_iter()
-                    .map(|i| i as f64)
-                    .collect::<Vec<_>>();
+    /// Convert the metrics_runtime::Measurement value plus the name and
+    /// labels from a Key into our internal Metric format.
+    pub fn from_metric_kv(key: metrics::Key, handle: metrics_util::Handle) -> Self {
+        let value = match handle {
+            metrics_util::Handle::Counter(_) => MetricValue::Counter {
+                value: handle.read_counter() as f64,
+            },
+            metrics_util::Handle::Gauge(_) => MetricValue::Gauge {
+                value: handle.read_gauge() as f64,
+            },
+            metrics_util::Handle::Histogram(_) => {
+                let values = handle.read_histogram();
+                let values = values.into_iter().map(|i| i as f64).collect::<Vec<_>>();
+                // Each sample in the source measurement has an
+                // effective sample rate of 1, so create an array of
+                // such of the same length as the values.
                 let sample_rates = vec![1; values.len()];
                 MetricValue::Distribution {
                     values,
@@ -204,6 +233,7 @@ impl Metric {
 
         Self {
             name: key.name().to_string(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(Utc::now()),
             tags: if labels.is_empty() {
                 None
@@ -214,12 +244,25 @@ impl Metric {
             value,
         }
     }
+
+    /// Returns `true` if `name` tag is present, and matches the provided `value`
+    pub fn tag_matches(&self, name: &str, value: &str) -> bool {
+        self.tags
+            .as_ref()
+            .filter(|t| t.get(name).filter(|v| *v == value).is_some())
+            .is_some()
+    }
+
+    /// Returns the string value of a tag, if it exists
+    pub fn tag_value(&self, name: &str) -> Option<String> {
+        self.tags.as_ref().and_then(|t| t.get(name).cloned())
+    }
 }
 
 impl Display for Metric {
     /// Display a metric using something like Prometheus' text format:
     ///
-    /// TIMESTAMP NAME{TAGS} KIND DATA
+    /// TIMESTAMP NAMESPACE_NAME{TAGS} KIND DATA
     ///
     /// TIMESTAMP is in ISO 8601 format with UTC time zone.
     ///
@@ -234,11 +277,15 @@ impl Display for Metric {
     ///
     /// example:
     /// ```text
-    /// 2020-08-12T20:23:37.248661343Z bytes_processed{component_kind="sink",component_type="blackhole"} = 6391
+    /// 2020-08-12T20:23:37.248661343Z vector_processed_bytes_total{component_kind="sink",component_type="blackhole"} = 6391
     /// ```
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         if let Some(timestamp) = &self.timestamp {
             write!(fmt, "{:?} ", timestamp)?;
+        }
+        if let Some(namespace) = &self.namespace {
+            write_word(fmt, namespace)?;
+            write!(fmt, "_")?;
         }
         write_word(fmt, &self.name)?;
         write!(fmt, "{{")?;
@@ -363,6 +410,7 @@ mod test {
     fn merge_counters() {
         let mut counter = Metric {
             name: "counter".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -371,6 +419,7 @@ mod test {
 
         let delta = Metric {
             name: "counter".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -382,6 +431,7 @@ mod test {
             counter,
             Metric {
                 name: "counter".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -394,6 +444,7 @@ mod test {
     fn merge_gauges() {
         let mut gauge = Metric {
             name: "gauge".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -402,6 +453,7 @@ mod test {
 
         let delta = Metric {
             name: "gauge".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -413,6 +465,7 @@ mod test {
             gauge,
             Metric {
                 name: "gauge".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -425,6 +478,7 @@ mod test {
     fn merge_sets() {
         let mut set = Metric {
             name: "set".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -435,6 +489,7 @@ mod test {
 
         let delta = Metric {
             name: "set".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -448,6 +503,7 @@ mod test {
             set,
             Metric {
                 name: "set".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -462,6 +518,7 @@ mod test {
     fn merge_histograms() {
         let mut dist = Metric {
             name: "hist".into(),
+            namespace: None,
             timestamp: None,
             tags: None,
             kind: MetricKind::Incremental,
@@ -474,6 +531,7 @@ mod test {
 
         let delta = Metric {
             name: "hist".into(),
+            namespace: Some("vector".to_string()),
             timestamp: Some(ts()),
             tags: Some(tags()),
             kind: MetricKind::Incremental,
@@ -489,6 +547,7 @@ mod test {
             dist,
             Metric {
                 name: "hist".into(),
+                namespace: None,
                 timestamp: None,
                 tags: None,
                 kind: MetricKind::Incremental,
@@ -508,6 +567,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "one".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: Some(tags()),
                     kind: MetricKind::Absolute,
@@ -522,6 +582,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "two word".into(),
+                    namespace: None,
                     timestamp: Some(ts()),
                     tags: None,
                     kind: MetricKind::Incremental,
@@ -529,6 +590,36 @@ mod test {
                 }
             ),
             r#"2018-11-14T08:09:10.000000011Z "two word"{} + 2"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "namespace".into(),
+                    namespace: Some("vector".to_string()),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 1.23 },
+                }
+            ),
+            r#"vector_namespace{} = 1.23"#
+        );
+
+        assert_eq!(
+            format!(
+                "{}",
+                Metric {
+                    name: "namespace".into(),
+                    namespace: Some("vector host".to_string()),
+                    timestamp: None,
+                    tags: None,
+                    kind: MetricKind::Absolute,
+                    value: MetricValue::Counter { value: 1.23 },
+                }
+            ),
+            r#""vector host"_namespace{} = 1.23"#
         );
 
         let mut values = BTreeSet::<String>::new();
@@ -541,6 +632,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "three".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -555,6 +647,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "four".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -573,6 +666,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "five".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,
@@ -592,6 +686,7 @@ mod test {
                 "{}",
                 Metric {
                     name: "six".into(),
+                    namespace: None,
                     timestamp: None,
                     tags: None,
                     kind: MetricKind::Absolute,

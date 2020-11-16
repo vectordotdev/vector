@@ -1,16 +1,16 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
-        tcp::TcpSink,
-        Encoding, StreamSinkOld, UriSerde,
+        tcp::TcpSinkConfig,
+        Encoding, UriSerde,
     },
-    tls::{MaybeTlsSettings, TlsConfig},
+    tls::TlsConfig,
     Event,
 };
 use bytes::Bytes;
-use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
+
 use syslog::{Facility, Formatter3164, LogFormat, Severity};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -22,12 +22,26 @@ pub struct PapertrailConfig {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<PapertrailConfig>("papertrail")
+    SinkDescription::new::<PapertrailConfig>("papertrail")
 }
 
+impl GenerateConfig for PapertrailConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"endpoint = "logs.papertrailapp.com:12345"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
+}
+
+#[async_trait::async_trait]
 #[typetag::serde(name = "papertrail")]
 impl SinkConfig for PapertrailConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let host = self
             .endpoint
             .host()
@@ -38,25 +52,14 @@ impl SinkConfig for PapertrailConfig {
             .port_u16()
             .ok_or_else(|| "A port is required for endpoint".to_string())?;
 
-        let tls = MaybeTlsSettings::from_config(
-            &Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled)),
-            false,
-        )?;
-
-        let sink = TcpSink::new(host, port, cx.resolver(), tls);
-        let healthcheck = sink.healthcheck();
+        let address = format!("{}:{}", host, port);
+        let tls = Some(self.tls.clone().unwrap_or_else(TlsConfig::enabled));
 
         let pid = std::process::id();
-
         let encoding = self.encoding.clone();
 
-        let sink = StreamSinkOld::new(sink, cx.acker())
-            .with_flat_map(move |e| iter_ok(encode_event(e, pid, &encoding)));
-
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        let sink_config = TcpSinkConfig::new(address, tls);
+        sink_config.build(cx, move |event| encode_event(event, pid, &encoding))
     }
 
     fn input_type(&self) -> DataType {
@@ -90,7 +93,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
     let message = match encoding.codec() {
         Encoding::Json => serde_json::to_string(&log).unwrap(),
         Encoding::Text => log
-            .get(&log_schema().message_key())
+            .get(log_schema().message_key())
             .map(|v| v.to_string_lossy())
             .unwrap_or_default(),
     };
@@ -107,7 +110,11 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use string_cache::DefaultAtom as Atom;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<PapertrailConfig>();
+    }
 
     #[test]
     fn encode_event_apply_rules() {
@@ -120,7 +127,7 @@ mod tests {
             &EncodingConfig {
                 codec: Encoding::Json,
                 only_fields: None,
-                except_fields: Some(vec![Atom::from("magic")]),
+                except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,
             },
         )

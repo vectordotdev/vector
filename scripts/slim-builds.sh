@@ -14,15 +14,36 @@ set -euo pipefail
 mkdir -p .cargo/
 
 cat <<-EOF >> ./.cargo/config
-# focus on fast, lean builds
 [build]
+# On the CI, where this script runs, we won't be caching build artifacts.
+# so we don't need to keep these around.
 incremental = false
 EOF
 
 cat <<-EOF >> ./Cargo.toml
-# focus on fast, lean builds
 [profile.dev]
+# See defaults https://doc.rust-lang.org/cargo/reference/profiles.html#dev
+opt-level = 0
+debug = true
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+# Disabled, see build.incremental
+# incremental = true
+codegen-units = 256
+rpath = false
+
+[profile.release]
+# See defaults https://doc.rust-lang.org/cargo/reference/profiles.html#release
+opt-level = 3
 debug = false
-opt-level = "s" # Binary size
-lto = false # Don't LTO on CI
+debug-assertions = false
+overflow-checks = false
+lto = false
+panic = 'unwind'
+# Disabled, see build.incremental
+# incremental = false
+codegen-units = 1
+rpath = false
 EOF

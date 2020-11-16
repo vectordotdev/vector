@@ -11,7 +11,6 @@ pub struct ApiStarted {
 impl InternalEvent for ApiStarted {
     fn emit_logs(&self) {
         let playground = &*format!("http://{}:{}/playground", self.addr.ip(), self.addr.port());
-
         info!(
             message="API server running.",
             bind = ?self.addr,

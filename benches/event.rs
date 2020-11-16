@@ -6,7 +6,7 @@ use vector::{
     event::{Event, LogEvent},
     transforms::{
         json_parser::{JsonParser, JsonParserConfig},
-        Transform,
+        FunctionTransform,
     },
 };
 
@@ -87,12 +87,12 @@ fn benchmark_event(c: &mut Criterion) {
 fn create_event(json: Value) -> LogEvent {
     let s = serde_json::to_string(&json).unwrap();
     let mut event = Event::new_empty_log();
-    event
-        .as_mut_log()
-        .insert(log_schema().message_key().clone(), s);
+    event.as_mut_log().insert(log_schema().message_key(), s);
 
     let mut parser = JsonParser::from(JsonParserConfig::default());
-    parser.transform(event).unwrap().into_log()
+    let mut output = Vec::with_capacity(1);
+    parser.transform(&mut output, event);
+    output.into_iter().next().unwrap().into_log()
 }
 
 criterion_group!(event, benchmark_event);

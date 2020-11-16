@@ -1,8 +1,10 @@
 #[cfg(unix)]
 use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
-    config::{DataType, SinkConfig, SinkContext, SinkDescription},
-    sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding},
+    config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    sinks::util::{
+        encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
+    },
     tls::TlsConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -13,6 +15,7 @@ use serde::{Deserialize, Serialize};
 pub struct SocketSinkConfig {
     #[serde(flatten)]
     pub mode: Mode,
+    pub encoding: EncodingConfig<Encoding>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -25,7 +28,18 @@ pub enum Mode {
 }
 
 inventory::submit! {
-    SinkDescription::new_without_default::<SocketSinkConfig>("socket")
+    SinkDescription::new::<SocketSinkConfig>("socket")
+}
+
+impl GenerateConfig for SocketSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::from_str(
+            r#"address = "92.12.333.224:5000"
+            mode = "tcp"
+            encoding.codec = "json""#,
+        )
+        .unwrap()
+    }
 }
 
 impl SocketSinkConfig {
@@ -34,43 +48,31 @@ impl SocketSinkConfig {
         encoding: EncodingConfig<Encoding>,
         tls: Option<TlsConfig>,
     ) -> Self {
-        TcpSinkConfig {
-            address,
+        SocketSinkConfig {
+            mode: Mode::Tcp(TcpSinkConfig { address, tls }),
             encoding,
-            tls,
         }
-        .into()
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
-        TcpSinkConfig::new(address, EncodingConfig::from(Encoding::Text)).into()
+        Self::make_tcp_config(address, EncodingConfig::from(Encoding::Text), None)
     }
 }
 
-impl From<TcpSinkConfig> for SocketSinkConfig {
-    fn from(config: TcpSinkConfig) -> Self {
-        Self {
-            mode: Mode::Tcp(config),
-        }
-    }
-}
-
-impl From<UdpSinkConfig> for SocketSinkConfig {
-    fn from(config: UdpSinkConfig) -> Self {
-        Self {
-            mode: Mode::Udp(config),
-        }
-    }
-}
-
+#[async_trait::async_trait]
 #[typetag::serde(name = "socket")]
 impl SinkConfig for SocketSinkConfig {
-    fn build(&self, cx: SinkContext) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+    async fn build(
+        &self,
+        cx: SinkContext,
+    ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
+        let encoding = self.encoding.clone();
+        let encode_event = move |event| encode_event(event, &encoding);
         match &self.mode {
-            Mode::Tcp(config) => config.build(cx),
-            Mode::Udp(config) => config.build(cx),
+            Mode::Tcp(config) => config.build(cx, encode_event),
+            Mode::Udp(config) => config.build(cx, encode_event),
             #[cfg(unix)]
-            Mode::Unix(config) => config.build(cx),
+            Mode::Unix(config) => config.build(cx, encode_event),
         }
     }
 
@@ -96,12 +98,17 @@ mod test {
         stream::{self, StreamExt},
     };
     use serde_json::Value;
-    use std::{
-        net::{SocketAddr, UdpSocket},
-        time::Duration,
+    use std::net::{SocketAddr, UdpSocket};
+    use tokio::{
+        net::TcpListener,
+        time::{delay_for, timeout, Duration},
     };
-    use tokio::{net::TcpListener, time::timeout};
     use tokio_util::codec::{FramedRead, LinesCodec};
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<SocketSinkConfig>();
+    }
 
     async fn test_udp(addr: SocketAddr) {
         let receiver = UdpSocket::bind(addr).unwrap();
@@ -109,11 +116,11 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Udp(UdpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
             }),
+            encoding: Encoding::Json.into(),
         };
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let event = Event::from("raw log line");
         sink.run(stream::once(future::ready(event))).await.unwrap();
@@ -153,13 +160,13 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Json.into(),
                 tls: None,
             }),
+            encoding: Encoding::Json.into(),
         };
 
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let mut receiver = CountReceiver::receive_lines(addr);
 
@@ -187,11 +194,11 @@ mod test {
     //
     // If this test hangs that means somewhere we are not collecting the correct
     // events.
-    #[cfg(all(feature = "sources-tls", feature = "listenfd"))]
+    #[cfg(all(feature = "tls", feature = "listenfd"))]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
         use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
-        use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt};
+        use futures::{future, FutureExt, StreamExt};
         use std::{
             net::Shutdown,
             pin::Pin,
@@ -204,6 +211,7 @@ mod test {
         use tokio::{
             io::AsyncRead,
             net::TcpStream,
+            sync::mpsc,
             task::yield_now,
             time::{interval, Duration},
         };
@@ -214,7 +222,6 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Text.into(),
                 tls: Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
@@ -225,10 +232,18 @@ mod test {
                     },
                 }),
             }),
+            encoding: Encoding::Text.into(),
         };
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
-        let mut sink = sink.into_futures01sink().sink_compat();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
+        let (mut sender, receiver) = mpsc::channel::<Option<Event>>(1);
+        let jh1 = tokio::spawn(async move {
+            let stream = receiver
+                .take_while(|event| future::ready(event.is_some()))
+                .map(|event| event.unwrap())
+                .boxed();
+            let _ = sink.run(stream).await.unwrap();
+        });
 
         let msg_counter = Arc::new(AtomicUsize::new(0));
         let msg_counter1 = Arc::clone(&msg_counter);
@@ -248,11 +263,11 @@ mod test {
         });
 
         // Only accept two connections.
-        let jh = tokio::spawn(async move {
+        let jh2 = tokio::spawn(async move {
             let tls = MaybeTlsSettings::from_config(&config, true).unwrap();
-            let mut listener = tls.bind(&addr).await.unwrap();
+            let listener = tls.bind(&addr).await.unwrap();
             listener
-                .incoming()
+                .accept_stream()
                 .take(2)
                 .for_each(|connection| {
                     let mut close_rx = close_rx.take();
@@ -286,9 +301,10 @@ mod test {
                 .await;
         });
 
-        let (_, events) = random_lines_with_stream(10, 10);
-        let mut events = events.map(Ok);
-        sink.send_all(&mut events).await.unwrap();
+        let (_, mut events) = random_lines_with_stream(10, 10);
+        while let Some(event) = events.next().await {
+            let _ = sender.send(Some(event)).await.unwrap();
+        }
 
         // Loop and check for 10 events, we should always get 10 events. Once,
         // we have 10 events we can tell the server to shutdown to simulate the
@@ -307,13 +323,15 @@ mod test {
         assert_eq!(conn_counter.load(Ordering::SeqCst), 1);
 
         // Send another 10 events
-        let (_, events) = random_lines_with_stream(10, 10);
-        let mut events = events.map(Ok);
-        sink.send_all(&mut events).await.unwrap();
-        drop(sink);
+        let (_, mut events) = random_lines_with_stream(10, 10);
+        while let Some(event) = events.next().await {
+            let _ = sender.send(Some(event)).await.unwrap();
+        }
 
         // Wait for server task to be complete.
-        let _ = jh.await.unwrap();
+        let _ = sender.send(None).await.unwrap();
+        let _ = jh1.await.unwrap();
+        let _ = jh2.await.unwrap();
 
         // Check that there are exactly 20 events.
         assert_eq!(msg_counter.load(Ordering::SeqCst), 20);
@@ -329,13 +347,13 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
-                encoding: Encoding::Text.into(),
                 tls: None,
             }),
+            encoding: Encoding::Text.into(),
         };
 
         let context = SinkContext::new_test();
-        let (sink, _healthcheck) = config.build(context).unwrap();
+        let (sink, _healthcheck) = config.build(context).await.unwrap();
 
         let (_, events) = random_lines_with_stream(1000, 10000);
         let _ = tokio::spawn(sink.run(events));
@@ -365,7 +383,7 @@ mod test {
         // Disconnect
         if cfg!(windows) {
             // Gives Windows time to release the addr port.
-            tokio::time::delay_for(Duration::from_secs(1)).await;
+            delay_for(Duration::from_secs(1)).await;
         }
 
         // Second listener

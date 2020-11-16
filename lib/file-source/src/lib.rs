@@ -3,16 +3,18 @@ extern crate scan_fmt;
 #[macro_use]
 extern crate tracing;
 
+mod checkpointer;
 mod file_server;
 mod file_watcher;
+mod fingerprinter;
 mod internal_events;
 mod metadata_ext;
 pub mod paths_provider;
 
-pub use self::file_server::{FileServer, Fingerprinter, Shutdown as FileServerShutdown};
+pub use self::file_server::{FileServer, Shutdown as FileServerShutdown};
+pub use self::fingerprinter::{FingerprintStrategy, Fingerprinter};
 pub use self::internal_events::FileSourceInternalEvents;
 
-type FileFingerprint = u64;
 type FilePosition = u64;
 
 #[cfg(test)]
@@ -20,6 +22,7 @@ mod test {
     use self::file_watcher::FileWatcher;
     use super::*;
     use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
+    use rand::{distributions::Alphanumeric, Rng};
     use std::fs;
     use std::io::Write;
     #[cfg(unix)]
@@ -174,7 +177,7 @@ mod test {
                 // These weights are more or less arbitrary. 'Pause' maybe
                 // doesn't have a use but we keep it in place to allow for
                 // variations in file-system flushes.
-                0..=50 => FWAction::WriteLine(g.gen_ascii_chars().take(ln_sz).collect()),
+                0..=50 => FWAction::WriteLine(g.sample_iter(&Alphanumeric).take(ln_sz).collect()),
                 51..=69 => FWAction::Read,
                 70..=75 => FWAction::Pause(pause),
                 76..=85 => FWAction::RotateFile,
@@ -203,7 +206,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
+        let mut fw =
+            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
 
         let mut writes = 0;
         let mut sut_reads = 0;
@@ -256,14 +260,17 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf, 100_000) {
+                        match fw.read_line() {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(0) => {
+                            Ok(Some(line)) if line.is_empty() => {
+                                attempts -= 1;
+                                continue;
+                            }
+                            Ok(None) => {
                                 attempts -= 1;
                                 continue;
                             }
@@ -295,7 +302,8 @@ mod test {
         let path = dir.path().join("a_file.log");
         let mut fp = fs::File::create(&path).expect("could not create");
         let mut rotation_count = 0;
-        let mut fw = FileWatcher::new(path.clone(), 0, None).expect("must be able to create");
+        let mut fw =
+            FileWatcher::new(path.clone(), 0, None, 100_000).expect("must be able to create");
 
         let mut fwfiles: Vec<FWFile> = vec![];
         fwfiles.push(FWFile::new());
@@ -327,24 +335,27 @@ mod test {
                     read_index += 1;
                 }
                 FWAction::Read => {
-                    let mut buf = Vec::new();
                     let mut attempts = 10;
                     while attempts > 0 {
-                        match fw.read_line(&mut buf, 100_000) {
+                        match fw.read_line() {
                             Err(_) => {
                                 unreachable!();
                             }
-                            Ok(0) => {
+                            Ok(Some(line)) if line.is_empty() => {
                                 attempts -= 1;
                                 assert!(fwfiles[read_index].read_line().is_none());
                                 continue;
                             }
-                            Ok(sz) => {
+                            Ok(None) => {
+                                attempts -= 1;
+                                assert!(fwfiles[read_index].read_line().is_none());
+                                continue;
+                            }
+                            Ok(Some(line)) => {
                                 let exp =
                                     fwfiles[read_index].read_line().expect("could not readline");
-                                assert_eq!(exp.into_bytes(), buf);
-                                assert_eq!(sz, buf.len() + 1);
-                                buf.clear();
+                                assert_eq!(exp.into_bytes(), line);
+                                // assert_eq!(sz, buf.len() + 1);
                                 break;
                             }
                         }

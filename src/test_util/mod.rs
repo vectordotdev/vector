@@ -1,5 +1,5 @@
 use crate::{
-    config::{Config, ConfigDiff},
+    config::{Config, ConfigDiff, GenerateConfig},
     topology::{self, RunningTopology},
     trace, Event,
 };
@@ -11,7 +11,8 @@ use futures::{
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
 use portpicker::pick_unused_port;
-use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use rand::{thread_rng, Rng};
+use rand_distr::Alphanumeric;
 use std::{
     collections::HashMap,
     convert::Infallible,
@@ -48,6 +49,38 @@ macro_rules! assert_downcast_matches {
             got => panic!("Assertion failed: got wrong error variant {:?}", got),
         }
     }};
+}
+
+#[macro_export]
+macro_rules! log_event {
+    ($($key:expr => $value:expr),*  $(,)?) => {
+        #[allow(unused_variables)]
+        {
+            let mut event = crate::event::Event::Log(crate::event::LogEvent::default());
+            let log = event.as_mut_log();
+            $(
+                log.insert($key, $value);
+            )*
+            event
+        }
+    };
+}
+
+pub fn test_generate_config<T>()
+where
+    for<'de> T: GenerateConfig + serde::Deserialize<'de>,
+{
+    let cfg = T::generate_config().to_string();
+    toml::from_str::<T>(&cfg).expect("Invalid config generated");
+}
+
+pub fn open_fixture(path: impl AsRef<Path>) -> crate::Result<serde_json::Value> {
+    let test_file = match File::open(path) {
+        Ok(file) => file,
+        Err(e) => return Err(e.into()),
+    };
+    let value: serde_json::Value = serde_json::from_reader(test_file)?;
+    Ok(value)
 }
 
 pub fn next_addr() -> SocketAddr {
@@ -295,10 +328,10 @@ where
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses
-pub async fn retry_until<F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
+pub async fn retry_until<'a, F, Fut, T, E>(mut f: F, retry: Duration, until: Duration) -> T
 where
     F: FnMut() -> Fut,
-    Fut: Future<Output = Result<T, E>> + Send + 'static,
+    Fut: Future<Output = Result<T, E>> + Send + 'a,
 {
     let started = Instant::now();
     while started.elapsed() < until {
@@ -479,4 +512,16 @@ pub async fn start_topology(
     topology::start_validated(config, diff, pieces, require_healthy)
         .await
         .unwrap()
+}
+
+#[macro_export]
+macro_rules! map {
+    () => (
+        ::std::collections::BTreeMap::new()
+    );
+    ($($k:tt: $v:expr),+ $(,)?) => {
+        vec![$(($k.into(), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>()
+    };
 }

@@ -1,13 +1,24 @@
+pub mod components;
 mod health;
+mod meta;
 mod metrics;
 
-use async_graphql::{EmptyMutation, GQLMergedObject, GQLMergedSubscription, Schema, SchemaBuilder};
+use async_graphql::{EmptyMutation, MergedObject, MergedSubscription, Schema, SchemaBuilder};
 
-#[derive(GQLMergedObject, Default)]
-pub struct Query(health::HealthQuery);
+#[derive(MergedObject, Default)]
+pub struct Query(
+    health::HealthQuery,
+    components::ComponentsQuery,
+    metrics::MetricsQuery,
+    meta::MetaQuery,
+);
 
-#[derive(GQLMergedSubscription, Default)]
-pub struct Subscription(health::HealthSubscription, metrics::MetricsSubscription);
+#[derive(MergedSubscription, Default)]
+pub struct Subscription(
+    health::HealthSubscription,
+    metrics::MetricsSubscription,
+    components::ComponentsSubscription,
+);
 
 /// Build a new GraphQL schema, comprised of Query, Mutation and Subscription types
 pub fn build_schema() -> SchemaBuilder<Query, EmptyMutation, Subscription> {
