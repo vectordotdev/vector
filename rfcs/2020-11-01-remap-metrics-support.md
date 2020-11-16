@@ -23,6 +23,26 @@ are useful, but limited. They cannot take into account any additional data aroun
 the metric to determine how to process the tags.
 
 
+## Internal Proposal
+
+Currently to access data via Paths, `Remap` requires an object that implements 
+the `remap::Object` trait. Currently, the implementation only works for log 
+events.
+
+In order to make this work with Metric events, this implementation will need
+to be updated. The paths that can be used for Metrics events are fairly fixed,
+luckily the core methods return a `Result`, so if an invalid path is specified
+the `Object` will just return `Error`.
+
+At first, this will happen at runtime. The compiler will not be able to catch
+an invalid path at compile.
+
+There are future plans for introducing 
+[schema metadata](https://github.com/timberio/vector/issues/4599). At this point
+we can introduce a schema for metadata events that will capture the usage of
+any invalid fields. This is out of scope for the current RFC, but should align
+with future work nicely.
+
 ## Doc-level Proposal
 
 The Remap language can work with the metadata around a metric.
@@ -54,7 +74,7 @@ To add a tag, or change an existing tag you can set it:
 To delete a tag, use the `del` function:
 
 ```
-del(".tags.host")
+del(.tags.host)
 ```
 
 Note variables (identifiers starting with a `$`) are available and there are
@@ -70,7 +90,7 @@ have been falling back to that for anything but the most complex manipulation.
 
 ## Drawbacks
 
-In order to maintain these functions there will be a slight maintenance burden.
+In order to maintain the metric paths there will be a slight maintenance burden.
 
 By exposing the metric data to Remap, it may place some restrictions should we 
 want to change the internal model in the future. The more we decide to expose to
