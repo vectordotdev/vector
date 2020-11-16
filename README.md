@@ -115,7 +115,7 @@ Vector is an end-to-end, unified, open data platform.
 | **End-to-end** |   **✓**    |          |       |         |           |           |           |
 |          Agent |   **✓**    |          |   ✓   |         |     ✓     |     ✓     |           |
 |       Pipeline |   **✓**    |    ✓     |       |    ✓    |           |           |     ✓     |
-|   **All data** |   **✓**    |          |       |         |           |           |           |
+|   **Unified** |   **✓**    |          |       |         |           |           |           |
 |           Logs |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |     ✓     |
 |        Metrics |   **✓**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |     ⚠     |
 |         Traces |     🚧      |          |       |         |           |           |           |
