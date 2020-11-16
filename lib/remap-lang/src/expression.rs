@@ -1,5 +1,7 @@
 use crate::{state, Object, Result, TypeDef, Value};
+use std::convert::TryFrom;
 
+mod argument;
 mod arithmetic;
 mod assignment;
 mod block;
@@ -11,6 +13,7 @@ mod not;
 pub(crate) mod path;
 mod variable;
 
+pub use argument::Argument;
 pub use arithmetic::Arithmetic;
 pub use assignment::{Assignment, Target};
 pub use block::Block;
@@ -26,6 +29,9 @@ pub use variable::Variable;
 pub enum Error {
     #[error("expected expression, got none")]
     Missing,
+
+    #[error("unexpected expression")]
+    Unexpected(#[from] ExprError),
 
     #[error(r#"error for function "{0}""#)]
     Function(String, #[source] function::Error),
@@ -71,6 +77,22 @@ macro_rules! expression_dispatch {
             $($expr($expr)),+
         }
 
+        impl Expr {
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $(Expr::$expr(_) => stringify!($expr)),+
+                }
+            }
+        }
+
+        #[derive(thiserror::Error, Clone, Debug, PartialEq)]
+        pub enum ExprError {
+            $(
+                #[error(r#"expected {}, got {0}"#, stringify!($expr))]
+                $expr(&'static str)
+            ),+
+        }
+
         impl Expression for Expr {
             fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
                 match self {
@@ -91,6 +113,17 @@ macro_rules! expression_dispatch {
                     Expr::$expr(expression)
                 }
             }
+
+            impl TryFrom<Expr> for $expr {
+                type Error = Error;
+
+                fn try_from(expr: Expr) -> std::result::Result<Self, Self::Error> {
+                    match expr {
+                        Expr::$expr(v) => Ok(v),
+                        _ => Err(Error::from(ExprError::$expr(expr.as_str()))),
+                    }
+                }
+            }
         )+
     );
 }
@@ -106,6 +139,7 @@ expression_dispatch![
     Not,
     Path,
     Variable,
+    Argument,
 ];
 
 #[cfg(test)]

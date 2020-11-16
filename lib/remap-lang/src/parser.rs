@@ -258,10 +258,8 @@ impl Parser<'_> {
                 R::ident => ident = Some(pair.as_str().to_owned()),
                 R::regex => return Ok((ident, Argument::Regex(self.regex_from_pair(pair)?))),
                 _ => {
-                    return Ok((
-                        ident,
-                        Argument::Expression(Box::new(self.expression_from_pair(pair)?)),
-                    ))
+                    let expr = self.expression_from_pair(pair)?;
+                    return Ok((ident, Argument::Expression(expr)));
                 }
             }
         }

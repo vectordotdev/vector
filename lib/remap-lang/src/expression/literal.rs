@@ -7,6 +7,10 @@ impl Literal {
     pub fn boxed(self) -> Box<dyn Expression> {
         Box::new(self)
     }
+
+    pub fn as_value(&self) -> &Value {
+        &self.0
+    }
 }
 
 impl<T: Into<Value>> From<T> for Literal {

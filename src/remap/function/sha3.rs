@@ -1,6 +1,8 @@
 use remap::prelude::*;
 use sha3::{Digest, Sha3_224, Sha3_256, Sha3_384, Sha3_512};
 
+const VARIANTS: &[&str] = &["SHA3-224", "SHA3-256", "SHA3-384", "SHA3-512"];
+
 #[derive(Clone, Copy, Debug)]
 pub struct Sha3;
 
@@ -10,16 +12,23 @@ impl Function for Sha3 {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "value",
+                accepts: |v| matches!(v, Value::String(_)),
+                required: true,
+            },
+            Parameter {
+                keyword: "variant",
+                accepts: |v| matches!(v, Value::String(_)),
+                required: false,
+            },
+        ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
-        let variant = arguments.optional_expr("variant")?;
+        let variant = arguments.optional_enum("variant", &VARIANTS)?;
 
         Ok(Box::new(Sha3Fn { value, variant }))
     }
@@ -28,13 +37,13 @@ impl Function for Sha3 {
 #[derive(Debug, Clone)]
 struct Sha3Fn {
     value: Box<dyn Expression>,
-    variant: Option<Box<dyn Expression>>,
+    variant: Option<String>,
 }
 
 impl Sha3Fn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>, variant: Option<&str>) -> Self {
-        let variant = variant.map(|v| Box::new(Literal::from(v)) as _);
+        let variant = variant.map(|v| v.to_owned());
 
         Self { value, variant }
     }
@@ -47,20 +56,13 @@ impl Expression for Sha3Fn {
         object: &mut dyn Object,
     ) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(v) => v);
-        let variant = optional!(state, object, self.variant, Value::String(v) => v);
 
-        let hash = match variant.as_deref() {
-            Some(b"SHA3-224") => encode::<Sha3_224>(&value),
-            Some(b"SHA3-256") => encode::<Sha3_256>(&value),
-            Some(b"SHA3-384") => encode::<Sha3_384>(&value),
-            Some(b"SHA3-512") | None => encode::<Sha3_512>(&value),
-            Some(v) => {
-                return Err(format!(
-                    "unknown SHA-3 algorithm variant: '{}'",
-                    String::from_utf8_lossy(v)
-                )
-                .into())
-            }
+        let hash = match self.variant.as_deref() {
+            Some("SHA3-224") => encode::<Sha3_224>(&value),
+            Some("SHA3-256") => encode::<Sha3_256>(&value),
+            Some("SHA3-384") => encode::<Sha3_384>(&value),
+            Some("SHA3-512") | None => encode::<Sha3_512>(&value),
+            _ => unreachable!("enum invariant"),
         };
 
         Ok(Some(hash.into()))
@@ -70,12 +72,6 @@ impl Expression for Sha3Fn {
         self.value
             .type_def(state)
             .fallible_unless(value::Kind::String)
-            .merge_optional(
-                self.variant
-                    .as_ref()
-                    .map(|variant| variant.type_def(state).fallible_unless(value::Kind::String)),
-            )
-            .into_fallible(true) // unknown variant enum
             .with_constraint(value::Kind::String)
     }
 }
@@ -97,7 +93,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 variant: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { constraint: String.into(), ..Default::default() },
         }
 
         value_non_string {
@@ -115,14 +111,6 @@ mod tests {
             },
             def: TypeDef { fallible: true, optional: true, constraint: String.into() },
         }
-
-        variant_fallible {
-            expr: |_| Sha3Fn {
-                value: Literal::from("foo").boxed(),
-                variant: Some(Variable::new("foo".to_string()).boxed()),
-            },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
-        }
     ];
 
     #[test]
@@ -132,11 +120,6 @@ mod tests {
                 map![],
                 Err("path error: missing path: foo".into()),
                 Sha3Fn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
-                Err("function call error: unknown SHA-3 algorithm variant: 'bar'".into()),
-                Sha3Fn::new(Box::new(Literal::from("foo")), Some("bar")),
             ),
             (
                 map!["foo": "foo"],
