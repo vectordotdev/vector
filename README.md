@@ -4,7 +4,7 @@
     <a href="https://vector.dev/guides/">Guides<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://chat.vector.dev">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
-    <a href="https://vector.dev/releases/latest/download/">Download v0.10.0<a/>
+    <a href="https://vector.dev/releases/latest/download/">Download<a/>
   </strong>
 </p>
 
@@ -71,7 +71,7 @@ zero single points of failure.
 ### Resources
 
 * [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
-* [**Releases**][urls.vector_releases] - [v0.10.0 (latest)][urls.v0.10.0]
+* [**Releases**][urls.vector_releases] - [latest][urls.latest]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
 
@@ -255,11 +255,11 @@ Or use your own [preferred method][docs.installation].
 [guides.advanced.unit-testing]: https://vector.dev/guides/advanced/unit-testing/
 [pages.releases]: https://vector.dev/releases/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
+[urls.latest]: https://vector.dev/releases/latest/
 [urls.mailing_list]: https://vector.dev/community/
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
-[urls.v0.10.0]: https://vector.dev/releases/0.10.0/download/
 [urls.vector_chat]: https://chat.vector.dev
 [urls.vector_code_of_conduct]: https://github.com/timberio/vector/blob/master/CODE_OF_CONDUCT.md
 [urls.vector_community]: https://vector.dev/community/
