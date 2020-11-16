@@ -47,18 +47,23 @@ impl ToFloatFn {
 }
 
 impl Expression for ToFloatFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         use Value::*;
 
         let to_float = |value| match value {
             Float(_) => Ok(value),
             Integer(v) => Ok(Float(v as f64)),
             Boolean(v) => Ok(Float(if v { 1.0 } else { 0.0 })),
+            Null => Ok(0.0.into()),
             String(_) => Conversion::Float
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            _ => Err("unable to convert value to float".into()),
+            Array(_) | Map(_) | Timestamp(_) => Err("unable to convert value to float".into()),
         };
 
         super::convert_value_or_default(
@@ -67,12 +72,127 @@ impl Expression for ToFloatFn {
             to_float,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind::*;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(vec![Float, Integer, Boolean, Null])
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(vec![Float, Integer, Boolean, Null])
+            }))
+            .with_constraint(Float)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use std::collections::BTreeMap;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        boolean_infallible {
+            expr: |_| ToFloatFn { value: Literal::from(true).boxed(), default: None },
+            def: TypeDef { constraint: Float.into(), ..Default::default() },
+        }
+
+        integer_infallible {
+            expr: |_| ToFloatFn { value: Literal::from(1).boxed(), default: None },
+            def: TypeDef { constraint: Float.into(), ..Default::default() },
+        }
+
+        float_infallible {
+            expr: |_| ToFloatFn { value: Literal::from(1.0).boxed(), default: None },
+            def: TypeDef { constraint: Float.into(), ..Default::default() },
+        }
+
+        null_infallible {
+            expr: |_| ToFloatFn { value: Literal::from(()).boxed(), default: None },
+            def: TypeDef { constraint: Float.into(), ..Default::default() },
+        }
+
+        string_fallible {
+            expr: |_| ToFloatFn { value: Literal::from("foo").boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+        }
+
+        map_fallible {
+            expr: |_| ToFloatFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+        }
+
+        array_fallible {
+            expr: |_| ToFloatFn { value: Literal::from(vec![0]).boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+        }
+
+        timestamp_infallible {
+            expr: |_| ToFloatFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
+            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+        }
+
+        fallible_value_without_default {
+            expr: |_| ToFloatFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Float.into(),
+            },
+        }
+
+       fallible_value_with_fallible_default {
+            expr: |_| ToFloatFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Float.into(),
+            },
+        }
+
+       fallible_value_with_infallible_default {
+            expr: |_| ToFloatFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Float.into(),
+            },
+        }
+
+        infallible_value_with_fallible_default {
+            expr: |_| ToFloatFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Float.into(),
+            },
+        }
+
+        infallible_value_with_infallible_default {
+            expr: |_| ToFloatFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                constraint: Float.into(),
+            },
+        }
+    ];
 
     #[test]
     fn to_float() {
@@ -99,7 +219,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

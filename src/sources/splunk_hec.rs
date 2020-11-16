@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::{Event, LogEvent, Value},
     internal_events::{
         SplunkHECEventReceived, SplunkHECRequestBodyInvalid, SplunkHECRequestError,
@@ -134,6 +134,10 @@ impl SourceConfig for SplunkConfig {
 
     fn source_type(&self) -> &'static str {
         "splunk_hec"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 

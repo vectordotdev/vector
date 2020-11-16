@@ -2,7 +2,7 @@ use std::convert::AsRef;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
-pub(crate) enum Operator {
+pub enum Operator {
     Multiply,
     Divide,
     Remainder,

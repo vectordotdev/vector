@@ -63,7 +63,11 @@ impl ContainsFn {
 }
 
 impl Expression for ContainsFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let substring = {
             let bytes = required!(state, object, self.substring, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -81,6 +85,23 @@ impl Expression for ContainsFn {
                 .any(|_| value.to_lowercase().contains(&substring.to_lowercase()));
 
         Ok(Some(contains.into()))
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .merge(
+                self.substring
+                    .type_def(state)
+                    .fallible_unless(value::Kind::String),
+            )
+            .merge_optional(self.case_sensitive.as_ref().map(|case_sensitive| {
+                case_sensitive
+                    .type_def(state)
+                    .fallible_unless(value::Kind::Boolean)
+            }))
+            .with_constraint(value::Kind::Boolean)
     }
 }
 
@@ -144,7 +165,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
