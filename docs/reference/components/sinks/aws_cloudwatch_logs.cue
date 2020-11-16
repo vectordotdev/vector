@@ -49,12 +49,7 @@ components: sinks: aws_cloudwatch_logs: {
 			}
 			tls: enabled: false
 			to: {
-				service: {
-					name:     "AWS Cloudwatch logs"
-					thing:    "an \(name) stream"
-					url:      urls.aws_cloudwatch_logs
-					versions: null
-				}
+				service: services.aws_cloudwatch
 
 				interface: {
 					socket: {

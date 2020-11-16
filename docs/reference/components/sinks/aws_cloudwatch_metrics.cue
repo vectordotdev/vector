@@ -33,12 +33,7 @@ components: sinks: aws_cloudwatch_metrics: {
 			request: enabled:  false
 			tls: enabled:      false
 			to: {
-				service: {
-					name:     "AWS Cloudwatch metrics"
-					thing:    "an \(name) namespace"
-					url:      urls.aws_cloudwatch_metrics
-					versions: null
-				}
+				service: services.aws_cloudwatch_metrics
 
 				interface: {
 					socket: {

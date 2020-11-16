@@ -49,6 +49,21 @@ components: sinks: elasticsearch: {
 				can_verify_hostname:    true
 				enabled_default:        false
 			}
+			to: {
+				service: services.elasticsearch
+
+				interface: {
+					socket: {
+						api: {
+							title: "Elasticsearch bulk API"
+							url:   urls.elasticsearch_bulk
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
 		}
 	}
 
