@@ -10,6 +10,7 @@ use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
 use std::fs::DirBuilder;
 use std::hash::Hash;
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 pub mod api;
@@ -161,6 +162,11 @@ pub trait SourceConfig: core::fmt::Debug + Send + Sync {
     fn output_type(&self) -> DataType;
 
     fn source_type(&self) -> &'static str;
+
+    /// Resources that the source is using.
+    fn resources(&self) -> Vec<Resource> {
+        Vec::new()
+    }
 }
 
 pub type SourceDescription = ComponentDescription<Box<dyn SourceConfig>>;
@@ -191,8 +197,6 @@ pub trait SinkConfig: core::fmt::Debug + Send + Sync {
     fn sink_type(&self) -> &'static str;
 
     /// Resources that the sink is using.
-    /// These resources shouldn't be used in the build method as that can result
-    /// in a build error. Only the sinks are constrained by this.
     fn resources(&self) -> Vec<Resource> {
         Vec::new()
     }
@@ -253,7 +257,9 @@ inventory::collect!(TransformDescription);
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum Resource {
-    Port(u16),
+    Port(SocketAddr),
+    SystemFdOffset(usize),
+    Stdin,
 }
 
 impl Resource {
@@ -262,8 +268,17 @@ impl Resource {
         components: impl IntoIterator<Item = (K, Vec<Resource>)>,
     ) -> HashSet<K> {
         let mut resource_map = HashMap::<Resource, HashSet<K>>::new();
+        let mut unspecified = Vec::new();
+
+        // Find equality based conflicts
         for (key, resources) in components {
             for resource in resources {
+                if let Resource::Port(address) = &resource {
+                    if address.ip().is_unspecified() {
+                        unspecified.push((key.clone(), address.port()));
+                    }
+                }
+
                 resource_map
                     .entry(resource)
                     .or_default()
@@ -271,11 +286,30 @@ impl Resource {
             }
         }
 
+        // Port with unspecified address will bind to all network interfaces
+        // so we have to check for all Port resources if they share the same
+        // port.
+        for (key, port) in unspecified {
+            for (resource, components) in resource_map.iter_mut() {
+                if let Resource::Port(address) = resource {
+                    if address.port() == port {
+                        components.insert(key.clone());
+                    }
+                }
+            }
+        }
+
         resource_map
             .into_iter()
-            .filter(|(_, componenets)| componenets.len() > 1)
-            .flat_map(|(_, componenets)| componenets)
+            .filter(|(_, components)| components.len() > 1)
+            .flat_map(|(_, components)| components)
             .collect()
+    }
+}
+
+impl From<SocketAddr> for Resource {
+    fn from(addr: SocketAddr) -> Self {
+        Self::Port(addr)
     }
 }
 
@@ -531,44 +565,94 @@ mod test {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
-    use super::Resource;
+    use super::{load_from_str, Resource};
     use std::collections::HashSet;
+    use std::net::{Ipv4Addr, SocketAddr};
+
+    fn localhost(port: u16) -> Resource {
+        SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port).into()
+    }
 
     #[test]
     fn valid() {
-        let componenets = vec![
-            ("sink_0", vec![Resource::Port(0)]),
-            ("sink_1", vec![Resource::Port(1)]),
-            ("sink_2", vec![Resource::Port(2)]),
+        let components = vec![
+            ("sink_0", vec![localhost(0)]),
+            ("sink_1", vec![localhost(1)]),
+            ("sink_2", vec![localhost(2)]),
         ];
-        let conflicting = Resource::conflicts(componenets);
+        let conflicting = Resource::conflicts(components);
         assert_eq!(conflicting, HashSet::new());
     }
 
     #[test]
     fn conflicting_pair() {
-        let componenets = vec![
-            ("sink_0", vec![Resource::Port(0)]),
-            ("sink_1", vec![Resource::Port(2)]),
-            ("sink_2", vec![Resource::Port(2)]),
+        let components = vec![
+            ("sink_0", vec![localhost(0)]),
+            ("sink_1", vec![localhost(2)]),
+            ("sink_2", vec![localhost(2)]),
         ];
-        let conflicting = Resource::conflicts(componenets);
+        let conflicting = Resource::conflicts(components);
         assert_eq!(conflicting, vec!["sink_1", "sink_2"].into_iter().collect());
     }
 
     #[test]
     fn conflicting_multi() {
-        let componenets = vec![
-            ("sink_0", vec![Resource::Port(0)]),
-            ("sink_1", vec![Resource::Port(2), Resource::Port(0)]),
-            ("sink_2", vec![Resource::Port(2)]),
+        let components = vec![
+            ("sink_0", vec![localhost(0)]),
+            ("sink_1", vec![localhost(2), localhost(0)]),
+            ("sink_2", vec![localhost(2)]),
         ];
-        let conflicting = Resource::conflicts(componenets);
+        let conflicting = Resource::conflicts(components);
         assert_eq!(
             conflicting,
             vec!["sink_0", "sink_1", "sink_2"].into_iter().collect()
         );
+    }
+
+    #[test]
+    fn different_network_interface() {
+        let components = vec![
+            ("sink_0", vec![localhost(0)]),
+            (
+                "sink_1",
+                vec![SocketAddr::new(Ipv4Addr::new(127, 0, 0, 2).into(), 0).into()],
+            ),
+        ];
+        let conflicting = Resource::conflicts(components);
+        assert_eq!(conflicting, HashSet::new());
+    }
+
+    #[test]
+    fn unspecified_network_interface() {
+        let components = vec![
+            ("sink_0", vec![localhost(0)]),
+            (
+                "sink_1",
+                vec![SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 0).into()],
+            ),
+        ];
+        let conflicting = Resource::conflicts(components);
+        assert_eq!(conflicting, vec!["sink_0", "sink_1"].into_iter().collect());
+    }
+
+    #[test]
+    fn config_conflict_detected() {
+        assert!(load_from_str(
+            r#"
+        [sources.in0]
+        type = "stdin"
+
+        [sources.in1]
+        type = "stdin"
+
+        [sinks.out]
+        type = "console"
+        inputs = ["in0","in1"]
+        encoding = "json"
+        "#
+        )
+        .is_err());
     }
 }

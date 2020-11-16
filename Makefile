@@ -293,19 +293,21 @@ test-behavior: ## Runs behaviorial test
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
-test-integration: test-integration-mongodb_metrics test-integration-pulsar test-integration-splunk
+test-integration: test-integration-mongodb_metrics test-integration-nats test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
 start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
-start-test-integration: start-integration-mongodb_metrics start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-mongodb_metrics start-integration-nats start-integration-pulsar
+start-test-integratino: start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
 stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
-stop-test-integration: stop-integration-mongodb_metrics stop-integration-pulsar stop-integration-splunk
+stop-test-integration: stop-integration-mongodb_metrics stop-integration-nats stop-integration-pulsar
+stop-test-integration: stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:
@@ -314,7 +316,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
@@ -324,7 +326,7 @@ else
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
 	 -p 4566:4566 -p 4571:4571 \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
@@ -677,6 +679,64 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features mongodb_metrics-integration-tests --lib ::mongodb_metrics:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-mongodb_metrics
+endif
+
+.PHONY: start-integration-nats
+start-integration-nats:
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-nats -p 4222:4222
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-nats  --name vector_nats \
+	 nats
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-nats
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-nats -p 4222:4222 --name vector_nats \
+	 nats
+endif
+
+.PHONY: stop-integration-nats
+stop-integration-nats:
+	$(CONTAINER_TOOL) rm --force vector_nats 2>/dev/null; true
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-nats 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-nats 2>/dev/null; true
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-nats 2>/dev/null; true
+endif
+
+.PHONY: test-integration-nats
+test-integration-nats: ## Runs NATS integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-nats
+	$(MAKE) start-integration-nats
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-nats
+endif
+
+.PHONY: start-integration-prometheus stop-integration-prometheus test-integration-prometheus
+start-integration-prometheus:
+	$(CONTAINER_TOOL) run -d --name vector_prometheus --net=host \
+	 --volume $(PWD)/tests/data:/etc/vector:ro \
+	 prom/prometheus --config.file=/etc/vector/prometheus.yaml
+
+stop-integration-prometheus:
+	$(CONTAINER_TOOL) rm --force vector_prometheus 2>/dev/null; true
+
+.PHONY: test-integration-prometheus
+test-integration-prometheus: ## Runs Prometheus integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-influxdb
+	-$(MAKE) -k stop-integration-prometheus
+	$(MAKE) start-integration-influxdb
+	$(MAKE) start-integration-prometheus
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-influxdb
+	$(MAKE) -k stop-integration-prometheus
 endif
 
 .PHONY: start-integration-pulsar

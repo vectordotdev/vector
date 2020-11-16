@@ -46,7 +46,11 @@ impl MatchFn {
 }
 
 impl Expression for MatchFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         required!(
             state, object, self.value,
 
@@ -56,12 +60,46 @@ impl Expression for MatchFn {
             }
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::Boolean)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| MatchFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| MatchFn {
+                value: Literal::from(1).boxed(),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| MatchFn {
+                value: Box::new(Noop),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: Boolean.into() },
+        }
+    ];
 
     #[test]
     fn r#match() {
@@ -92,7 +130,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

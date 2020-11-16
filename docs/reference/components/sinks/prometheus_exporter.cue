@@ -1,9 +1,9 @@
 package metadata
 
-components: sinks: prometheus: {
+components: sinks: prometheus_exporter: {
 	_port: 9598
 
-	title:       "Prometheus"
+	title:       "Prometheus Exporter"
 	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
 
 	classes: {
@@ -273,7 +273,7 @@ components: sinks: prometheus: {
 				\(_name)_count 6
 				\(_name)_min 0
 				\(_name)_max 4
-				\(_name)_avg 1				
+				\(_name)_avg 1
 				"""
 		},
 		{
@@ -301,7 +301,7 @@ components: sinks: prometheus: {
 				\(_name){host="\(_host)",quantile="0.5"} 2
 				\(_name){host="\(_host)",quantile="0.99"} 3
 				\(_name)_sum{host="\(_host)"} 12
-				\(_name)_count{host="\(_host)"} 6		
+				\(_name)_count{host="\(_host)"} 6
 				"""
 		},
 	]

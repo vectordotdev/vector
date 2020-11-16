@@ -64,16 +64,20 @@ impl ParseTimestampFn {
 }
 
 impl Expression for ParseTimestampFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let format = {
-            let bytes = required!(state, object, self.format, Value::String(v) => v);
-            format!("timestamp|{}", String::from_utf8_lossy(&bytes))
-        };
-
-        let conversion: Conversion = format.parse().map_err(|e| format!("{}", e))?;
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
+        let format = self.format.execute(state, object);
 
         let to_timestamp = |value| match value {
-            Value::String(_) => conversion
+            Value::String(_) => format
+                .clone()?
+                .ok_or_else(|| Error::from(function::Error::Required("format".to_owned())))
+                .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_string())))?
+                .parse::<Conversion>()
+                .map_err(|e| format!("{}", e))?
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
@@ -87,6 +91,43 @@ impl Expression for ParseTimestampFn {
             to_timestamp,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(value::Kind::Timestamp);
+
+        let default_def = self
+            .default
+            .as_ref()
+            .map(|v| v.type_def(state).fallible_unless(value::Kind::Timestamp));
+
+        // The `format` type definition is only relevant if:
+        //
+        // 1. `value` can resolve to a string, AND:
+        //   1. `default` is not defined, OR
+        //   2. `default` can also resolve to a string.
+        //
+        // The `format` type is _always_ fallible, because its string has to be
+        // parsed into a valid timestamp format.
+        let format_def = if value_def.constraint.contains(&value::Kind::String.into()) {
+            match &default_def {
+                Some(def) if def.constraint.contains(&value::Kind::String.into()) => {
+                    Some(self.format.type_def(state).into_fallible(true))
+                }
+                Some(_) => None,
+                None => Some(self.format.type_def(state).into_fallible(true)),
+            }
+        } else {
+            None
+        };
+
+        value_def
+            .merge_with_default_optional(default_def)
+            .merge_optional(format_def)
+            .with_constraint(value::Kind::Timestamp)
+    }
 }
 
 #[cfg(test)]
@@ -94,6 +135,82 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::{DateTime, Utc};
+
+    remap::test_type_def![
+        value_fallible_no_default {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_fallible_default_fallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from("<timestamp>").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_fallible_default_infallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from(chrono::Utc::now()).boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_infallible_no_default {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_infallible_default_fallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from("<timestamp>").boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+
+        value_infallible_default_infallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from(chrono::Utc::now()).boxed()),
+            },
+            def: TypeDef {
+                constraint: value::Kind::Timestamp.into(),
+                ..Default::default()
+            },
+        }
+    ];
 
     #[test]
     fn parse_timestamp() {
@@ -145,7 +262,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -1,5 +1,5 @@
-use super::{Expr, Expression, Object, Result, State, Value};
-use crate::Operator;
+use super::{Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{state, value, Operator};
 
 #[derive(Debug, Clone)]
 pub struct Arithmetic {
@@ -9,13 +9,17 @@ pub struct Arithmetic {
 }
 
 impl Arithmetic {
-    pub(crate) fn new(lhs: Box<Expr>, rhs: Box<Expr>, op: Operator) -> Self {
+    pub fn new(lhs: Box<Expr>, rhs: Box<Expr>, op: Operator) -> Self {
         Self { lhs, rhs, op }
     }
 }
 
 impl Expression for Arithmetic {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let lhs = self
             .lhs
             .execute(state, object)?
@@ -32,6 +36,9 @@ impl Expression for Arithmetic {
             Divide => lhs.try_div(rhs),
             Add => lhs.try_add(rhs),
             Subtract => lhs.try_sub(rhs),
+
+            // TODO: make `Or` infallible, `Null`, `false` and `None` resolve to
+            // rhs, everything else resolves to lhs
             Or => lhs.try_or(rhs),
             And => lhs.try_and(rhs),
             Remainder => lhs.try_rem(rhs),
@@ -45,4 +52,223 @@ impl Expression for Arithmetic {
 
         result.map(Some).map_err(Into::into)
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::{Constraint::*, Kind::*};
+        use Operator::*;
+
+        let constraint = match self.op {
+            Or => self
+                .lhs
+                .type_def(state)
+                .constraint
+                .merge(&self.rhs.type_def(state).constraint),
+            Multiply | Add => OneOf(vec![String, Integer, Float]),
+            Remainder | Subtract | Divide => OneOf(vec![Integer, Float]),
+            And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => {
+                Exact(Boolean)
+            }
+        };
+
+        TypeDef {
+            fallible: true,
+            optional: false,
+            constraint,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        expression::{Literal, Noop},
+        test_type_def,
+        value::Constraint::*,
+        value::Kind::*,
+    };
+
+    test_type_def![
+        or_exact {
+            expr: |_| Arithmetic::new(
+                Box::new(Literal::from("foo").into()),
+                Box::new(Literal::from(true).into()),
+                Operator::Or,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![String, Boolean])
+            },
+        }
+
+        or_any {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Literal::from(true).into()),
+                Operator::Or,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Any,
+            },
+        }
+
+        multiply {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Multiply,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![String, Integer, Float]),
+            },
+        }
+
+        add {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Add,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![String, Integer, Float]),
+            },
+        }
+
+        remainder {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Remainder,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![Integer, Float]),
+            },
+        }
+
+        subtract {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Subtract,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![Integer, Float]),
+            },
+        }
+
+        divide {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Divide,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: OneOf(vec![Integer, Float]),
+            },
+        }
+
+        and {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::And,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Equal,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        not_equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::NotEqual,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        greater {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Greater,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        greater_or_equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::GreaterOrEqual,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        less {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::Less,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+
+        less_or_equal {
+            expr: |_| Arithmetic::new(
+                Box::new(Noop.into()),
+                Box::new(Noop.into()),
+                Operator::LessOrEqual,
+            ),
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                constraint: Exact(Boolean),
+            },
+        }
+    ];
 }

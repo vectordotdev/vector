@@ -16,6 +16,8 @@ mod aws_ec2_metadata;
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
+#[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
+pub(crate) mod aws_s3;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -42,6 +44,8 @@ mod journald;
 mod json_parser;
 #[cfg(feature = "sources-kafka")]
 mod kafka;
+#[cfg(feature = "transforms-key_value_parser")]
+mod key_value_parser;
 #[cfg(feature = "sources-kubernetes-logs")]
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
@@ -55,6 +59,8 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+#[cfg(feature = "sinks-nats")]
+mod nats;
 mod open;
 mod process;
 #[cfg(feature = "sources-prometheus")]
@@ -142,6 +148,8 @@ pub(crate) use self::journald::*;
 pub(crate) use self::json_parser::*;
 #[cfg(feature = "sources-kafka")]
 pub use self::kafka::*;
+#[cfg(feature = "transforms-key_value_parser")]
+pub(crate) use self::key_value_parser::*;
 #[cfg(feature = "sources-kubernetes-logs")]
 pub use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
@@ -153,6 +161,8 @@ pub use self::logplex::*;
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(feature = "sinks-nats")]
+pub use self::nats::*;
 pub use self::open::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]

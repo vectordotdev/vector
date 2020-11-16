@@ -29,6 +29,8 @@ pub mod geoip;
 pub mod grok_parser;
 #[cfg(feature = "transforms-json_parser")]
 pub mod json_parser;
+#[cfg(feature = "transforms-key_value_parser")]
+pub mod key_value_parser;
 #[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-logfmt_parser")]
@@ -149,7 +151,7 @@ impl Transform {
 /// # Invariants
 ///
 /// * It is an illegal invariant to implement `FunctionTransform` for a `TaskTransform` or vice versa.
-pub trait FunctionTransform: Send + dyn_clone::DynClone {
+pub trait FunctionTransform: Send + dyn_clone::DynClone + Sync {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event);
 
     /// A handy test function that inputs and outputs only one event.

@@ -100,12 +100,23 @@ fn message_to_value(message: Message<&str>) -> Value {
 }
 
 impl Expression for ParseSyslogFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let message = required!(state, object, self.value, Value::String(v) => String::from_utf8_lossy(&v).into_owned());
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
 
         Ok(Some(message_to_value(parsed)))
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::Map)
     }
 }
 
@@ -114,6 +125,23 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::prelude::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { constraint: value::Kind::Map.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::Map.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| ParseSyslogFn { value: Box::new(Noop) },
+            def: TypeDef { fallible: true, optional: true, constraint: value::Kind::Map.into() },
+        }
+    ];
 
     #[test]
     fn parses() {
@@ -160,7 +188,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -182,7 +210,7 @@ mod tests {
             }
         }
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
         let mut object = map![];
 
         let msg = format!(
