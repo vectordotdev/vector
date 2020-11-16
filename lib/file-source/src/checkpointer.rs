@@ -1,11 +1,12 @@
 use super::{fingerprinter::FileFingerprint, FilePosition};
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use glob::glob;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     fs, io,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
@@ -35,8 +36,8 @@ pub struct Checkpointer {
     tmp_file_path: PathBuf,
     stable_file_path: PathBuf,
     glob_string: String,
-    checkpoints: HashMap<FileFingerprint, FilePosition>,
-    modified_times: HashMap<FileFingerprint, DateTime<Utc>>,
+    checkpoints: Arc<DashMap<FileFingerprint, FilePosition>>,
+    modified_times: Arc<DashMap<FileFingerprint, DateTime<Utc>>>,
 }
 
 impl Checkpointer {
@@ -51,8 +52,8 @@ impl Checkpointer {
             glob_string,
             tmp_file_path,
             stable_file_path,
-            checkpoints: HashMap::new(),
-            modified_times: HashMap::new(),
+            checkpoints: Arc::new(DashMap::new()),
+            modified_times: Arc::new(DashMap::new()),
         }
     }
 
@@ -112,7 +113,7 @@ impl Checkpointer {
     }
 
     pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
-        self.checkpoints.get(&fng).cloned()
+        self.checkpoints.get(&fng).map(|r| *r.value())
     }
 
     fn load_checkpoint(&mut self, checkpoint: Checkpoint) {
@@ -142,14 +143,18 @@ impl Checkpointer {
             checkpoints: self
                 .checkpoints
                 .iter()
-                .map(|(&fingerprint, &position)| Checkpoint {
-                    fingerprint,
-                    position,
-                    modified: self
-                        .modified_times
-                        .get(&fingerprint)
-                        .cloned()
-                        .unwrap_or_else(Utc::now),
+                .map(|entry| {
+                    let fingerprint = entry.key();
+                    let position = entry.value();
+                    Checkpoint {
+                        fingerprint: *fingerprint,
+                        position: *position,
+                        modified: self
+                            .modified_times
+                            .get(fingerprint)
+                            .map(|r| *r.value())
+                            .unwrap_or_else(Utc::now),
+                    }
                 })
                 .collect(),
         }
@@ -159,7 +164,7 @@ impl Checkpointer {
     /// match an existing legacy fingerprint. If so, upgrade the existing fingerprint.
     pub fn maybe_upgrade(&mut self, fresh: impl Iterator<Item = FileFingerprint>) {
         for fng in fresh {
-            if let Some(pos) = self
+            if let Some((fng, pos)) = self
                 .checkpoints
                 .remove(&FileFingerprint::Unknown(fng.to_legacy()))
             {
@@ -192,8 +197,8 @@ impl Checkpointer {
     pub fn write_legacy_checkpoints(&mut self) -> Result<usize, io::Error> {
         fs::remove_dir_all(&self.directory).ok();
         fs::create_dir_all(&self.directory)?;
-        for (&fng, &pos) in self.checkpoints.iter() {
-            fs::File::create(self.encode(fng, pos))?;
+        for c in self.checkpoints.iter() {
+            fs::File::create(self.encode(*c.key(), *c.value()))?;
         }
         Ok(self.checkpoints.len())
     }
