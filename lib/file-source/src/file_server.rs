@@ -1,5 +1,5 @@
 use crate::{
-    checkpointer::Checkpointer,
+    checkpointer::{Checkpointer, CheckpointsView},
     file_watcher::FileWatcher,
     fingerprinter::{FileFingerprint, Fingerprinter},
     FileSourceInternalEvents,
@@ -108,12 +108,14 @@ where
 
         checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
 
+        let checkpoints = checkpointer.view();
+
         for (path, file_id) in existing_files {
             self.watch_new_file(
                 path,
                 file_id,
                 &mut fp_map,
-                &checkpointer,
+                &checkpoints,
                 self.start_at_beginning,
             );
         }
@@ -208,7 +210,7 @@ where
                             }
                         } else {
                             // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpointer, false);
+                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
                         }
                     }
                 }
@@ -254,7 +256,7 @@ where
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                    checkpointer.update_checkpoint(file_id, watcher.get_file_position());
+                    checkpoints.update(file_id, watcher.get_file_position());
                 } else {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {
@@ -345,13 +347,13 @@ where
         path: PathBuf,
         file_id: FileFingerprint,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
-        checkpointer: &Checkpointer,
+        checkpoints: &CheckpointsView,
         read_from_beginning: bool,
     ) {
         let file_position = if read_from_beginning {
             0
         } else {
-            checkpointer.get_checkpoint(file_id).unwrap_or(0)
+            checkpoints.get(file_id).unwrap_or(0)
         };
         match FileWatcher::new(
             path.clone(),
