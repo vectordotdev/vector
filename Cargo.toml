@@ -180,6 +180,7 @@ pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runti
 task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "1.0.1"
+nats = { version = "0.8.3", optional = true }
 k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
 portpicker = "0.1.0"
 sha-1 = "0.9"
@@ -431,6 +432,7 @@ sinks = [
   "sinks-kafka",
   "sinks-logdna",
   "sinks-loki",
+  "sinks-nats",
   "sinks-new_relic_logs",
   "sinks-papertrail",
   "sinks-prometheus",
@@ -461,6 +463,7 @@ sinks-influxdb = ["bytesize"]
 sinks-kafka = []
 sinks-logdna = ["bytesize"]
 sinks-loki = ["bytesize"]
+sinks-nats = ["nats"]
 sinks-new_relic_logs = ["bytesize", "sinks-http"]
 sinks-prometheus = ["snap"]
 sinks-sematext = ["sinks-elasticsearch", "sinks-influxdb"]
@@ -488,6 +491,7 @@ all-integration-tests = [
   "kafka-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
+  "nats-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
@@ -518,6 +522,7 @@ influxdb-integration-tests = ["sinks-influxdb"]
 kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
+nats-integration-tests = ["sinks-nats"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
