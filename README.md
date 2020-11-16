@@ -118,20 +118,20 @@ Vector is an end-to-end, unified, open data platform.
 
 |                     | **Vector** | Logstash | Beats | Fluentd | Fluentbit | Splunk UF | Splunk HF |
 |--------------------:|:----------:|:--------:|:-----:|:-------:|:---------:|:---------:|:---------:|
-|      **End-to-end** |   **✓**    |          |       |         |           |           |           |
-|               Agent |   **✓**    |          |   ✓   |         |     ✓     |     ✓     |           |
-|          Aggregator |   **✓**    |    ✓     |       |    ✓    |           |           |     ✓     |
-|         **Unified** |   **✓**    |          |       |         |           |           |           |
-|                Logs |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |     ✓     |
-|             Metrics |   **✓**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |     ⚠     |
+|      **End-to-end** |   **✔**    |          |       |         |           |           |           |
+|               Agent |   **✔**    |          |   ✓   |         |     ✓     |     ✓     |           |
+|          Aggregator |   **✔**    |    ✓     |       |    ✓    |           |           |     ✓     |
+|         **Unified** |   **✔**    |          |       |         |           |           |           |
+|                Logs |   **✔**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |     ✓     |
+|             Metrics |   **✔**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |     ⚠     |
 |              Traces |     🚧      |          |       |         |           |           |           |
-|            **Open** |   **✓**    |          |       |    ✓    |     ✓     |           |           |
-|         Open-source |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |           |
-|      Vendor-neutral |   **✓**    |          |       |    ✓    |     ✓     |           |           |
-|     **Reliability** |   **✓**    |          |       |    ✓    |     ✓     |           |           |
-|         Memory-safe |   **✓**    |          |       |         |           |           |           |
-| Delivery guarantees |   **✓**    |          |       |         |           |     ✓     |     ✓     |
-|          Multi-core |   **✓**    |    ✓     |   ✓   |    ✓    |           |     ✓     |     ✓     |
+|            **Open** |   **✔**    |          |       |    ✓    |     ✓     |           |           |
+|         Open-source |   **✔**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |           |
+|      Vendor-neutral |   **✔**    |          |       |    ✓    |     ✓     |           |           |
+|     **Reliability** |   **✔**    |          |       |    ✓    |     ✓     |           |           |
+|         Memory-safe |   **✔**    |          |       |         |           |           |           |
+| Delivery guarantees |   **✔**    |          |       |         |           |     ✓     |     ✓     |
+|          Multi-core |   **✔**    |    ✓     |   ✓   |    ✓    |           |     ✓     |     ✓     |
 
 ⚠ = Not interoperable, metrics are represented as structured logs
 
