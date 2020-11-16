@@ -28,6 +28,23 @@ impl Path {
     pub(crate) fn new(segments: Vec<Vec<String>>) -> Self {
         Self { segments }
     }
+
+    pub fn segments(&self) -> &[Vec<String>] {
+        &self.segments
+    }
+
+    pub fn as_string(&self) -> String {
+        self.segments
+            .iter()
+            .map(|c| {
+                c.iter()
+                    .map(|p| p.replace(".", "\\."))
+                    .collect::<Vec<_>>()
+                    .join(".")
+            })
+            .collect::<Vec<_>>()
+            .join(".")
+    }
 }
 
 impl Expression for Path {
@@ -35,7 +52,7 @@ impl Expression for Path {
         object
             .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?
-            .ok_or_else(|| E::from(Error::Missing(segments_to_path(&self.segments))).into())
+            .ok_or_else(|| E::from(Error::Missing(self.as_string())).into())
             .map(Some)
     }
 
@@ -44,26 +61,13 @@ impl Expression for Path {
     /// understanding of the value kind the path contains.
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         state
-            .path_query_type(&segments_to_path(&self.segments))
+            .path_query_type(self.as_string())
             .cloned()
             .unwrap_or(TypeDef {
                 fallible: true,
                 ..Default::default()
             })
     }
-}
-
-pub(crate) fn segments_to_path(segments: &[Vec<String>]) -> String {
-    segments
-        .iter()
-        .map(|c| {
-            c.iter()
-                .map(|p| p.replace(".", "\\."))
-                .collect::<Vec<_>>()
-                .join(".")
-        })
-        .collect::<Vec<_>>()
-        .join(".")
 }
 
 #[cfg(test)]
