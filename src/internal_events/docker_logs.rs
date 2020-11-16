@@ -81,12 +81,12 @@ impl<'a> InternalEvent for DockerLogsContainerUnwatch<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerCommunicationError<'a> {
+pub struct DockerLogsCommunicationError<'a> {
     pub error: Error,
     pub container_id: Option<&'a str>,
 }
 
-impl<'a> InternalEvent for DockerCommunicationError<'a> {
+impl<'a> InternalEvent for DockerLogsCommunicationError<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Error in communication with Docker daemon.",
@@ -102,12 +102,12 @@ impl<'a> InternalEvent for DockerCommunicationError<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerContainerMetadataFetchFailed<'a> {
+pub struct DockerLogsContainerMetadataFetchFailed<'a> {
     pub error: Error,
     pub container_id: &'a str,
 }
 
-impl<'a> InternalEvent for DockerContainerMetadataFetchFailed<'a> {
+impl<'a> InternalEvent for DockerLogsContainerMetadataFetchFailed<'a> {
     fn emit_logs(&self) {
         error!(
             message = "Failed to fetch container metadata.",
@@ -144,12 +144,12 @@ impl<'a> InternalEvent for DockerLogsTimestampParseFailed<'a> {
 }
 
 #[derive(Debug)]
-pub struct DockerLoggingDriverUnsupported<'a> {
+pub struct DockerLogsLoggingDriverUnsupported<'a> {
     pub container_id: &'a str,
     pub error: Error,
 }
 
-impl<'a> InternalEvent for DockerLoggingDriverUnsupported<'a> {
+impl<'a> InternalEvent for DockerLogsLoggingDriverUnsupported<'a> {
     fn emit_logs(&self) {
         error!(
             message = r#"Docker engine is not using either the `jsonfile` or `journald`

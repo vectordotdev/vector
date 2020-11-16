@@ -4,9 +4,9 @@ use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, Value},
     internal_events::{
-        DockerCommunicationError, DockerContainerMetadataFetchFailed,
-        DockerLoggingDriverUnsupported, DockerLogsContainerEventReceived,
-        DockerLogsContainerUnwatch, DockerLogsContainerWatch, DockerLogsEventReceived,
+        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
+        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
+        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
         DockerLogsTimestampParseFailed,
     },
     line_agg::{self, LineAgg},
@@ -457,7 +457,7 @@ impl DockerLogsSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
+                        Some(Err(error)) => emit!(DockerLogsCommunicationError{error,container_id:None}),
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
                             error!(message = "Docker log event stream has ended unexpectedly.");
@@ -530,7 +530,7 @@ impl EventStreamBuilder {
                         container_id: id.as_str()
                     }),
                 },
-                Err(error) => emit!(DockerContainerMetadataFetchFailed {
+                Err(error) => emit!(DockerLogsContainerMetadataFetchFailed {
                     error,
                     container_id: id.as_str()
                 }),
@@ -586,12 +586,12 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(DockerLoggingDriverUnsupported {
+                                emit!(DockerLogsLoggingDriverUnsupported {
                                     error,
                                     container_id: info.id.as_str(),
                                 })
                             }
-                            _ => emit!(DockerCommunicationError {
+                            _ => emit!(DockerLogsCommunicationError {
                                 error,
                                 container_id: Some(info.id.as_str())
                             }),
