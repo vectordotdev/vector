@@ -114,8 +114,8 @@ impl MetricsSubscription {
         )
     }
 
-    /// Component events processed throughput, received in batches containing throughput over `interval`.
-    async fn component_events_processed_throughput_batch(
+    /// All component events processed throughput over `interval`.
+    async fn all_component_events_processed_throughputs(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentEventsProcessedThroughput>> {

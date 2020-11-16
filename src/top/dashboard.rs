@@ -77,6 +77,7 @@ struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
     opts: &'a super::Opts,
+    component_headers: [String; 8],
 }
 
 impl<'a> Widgets<'a> {
@@ -88,10 +89,23 @@ impl<'a> Widgets<'a> {
             Constraint::Length(3),
         ];
 
+        // Create component headers
+        let component_headers = [
+            "Name".to_string(),
+            "Kind".to_string(),
+            "Type".to_string(),
+            "Events".to_string(),
+            format!("I/O @ {}ms", opts.interval),
+            "Bytes".to_string(),
+            format!("I/O @ {}ms", opts.interval),
+            "Errors".to_string(),
+        ];
+
         Self {
             constraints,
             url_string,
             opts,
+            component_headers,
         }
     }
 
@@ -145,19 +159,27 @@ impl<'a> Widgets<'a> {
             Row::StyledData(data.into_iter(), Style::default().fg(Color::White))
         });
 
-        let w = Table::new(state::COMPONENT_HEADERS.iter(), items)
+        let w = Table::new(self.component_headers.iter(), items)
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .header_gap(1)
             .column_spacing(2)
             .widths(&[
-                Constraint::Percentage(20),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
+                // Constraint::Percentage(20),
+                // Constraint::Percentage(10),
+                // Constraint::Percentage(10),
+                // Constraint::Percentage(10),
+                // Constraint::Percentage(10),
+                // Constraint::Percentage(10),
+                // Constraint::Percentage(10),
+                // Constraint::Percentage(10),
+                Constraint::Length(20),
+                Constraint::Length(10),
+                Constraint::Length(10),
+                Constraint::Length(10),
+                Constraint::Length(10),
+                Constraint::Length(10),
+                Constraint::Length(10),
+                Constraint::Length(10),
             ]);
 
         f.render_widget(w, area);

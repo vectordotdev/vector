@@ -1,10 +1,6 @@
 use std::collections::btree_map::BTreeMap;
 use tokio::sync::mpsc;
 
-pub static COMPONENT_HEADERS: [&str; 8] = [
-    "Name", "Kind", "Type", "Events", "I/O", "Bytes", "I/O", "Errors",
-];
-
 type NamedMetric = (String, i64);
 
 #[derive(Debug)]
