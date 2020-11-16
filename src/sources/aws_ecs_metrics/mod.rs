@@ -19,22 +19,44 @@ use tokio::{select, time};
 
 mod parser;
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum Version {
+    V2,
+    V3,
+    V4,
+}
+
 #[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct AwsEcsMetricsSourceConfig {
     #[serde(default = "default_endpoint")]
     endpoint: String,
+    #[serde(default = "default_version")]
+    version: Version,
     #[serde(default = "default_scrape_interval_secs")]
     scrape_interval_secs: u64,
     #[serde(default = "default_namespace")]
     namespace: String,
 }
 
+const METADATA_URI_V4: &str = "ECS_CONTAINER_METADATA_URI";
+const METADATA_URI_V3: &str = "ECS_CONTAINER_METADATA_URI_V4";
+
 pub fn default_endpoint() -> String {
-    env::var("ECS_CONTAINER_METADATA_URI_V4")
-        .or_else(|_| env::var("ECS_CONTAINER_METADATA_URI"))
-        .map(|s| format!("{}/task/stats", s))
-        .unwrap_or_else(|_| "http://169.254.170.2/v2/stats".into())
+    env::var(METADATA_URI_V4)
+        .or_else(|_| env::var(METADATA_URI_V3))
+        .unwrap_or_else(|_| "http://169.254.170.2/v2".into())
+}
+
+pub fn default_version() -> Version {
+    if env::var(METADATA_URI_V4).is_ok() {
+        Version::V4
+    } else if env::var(METADATA_URI_V3).is_ok() {
+        Version::V3
+    } else {
+        Version::V2
+    }
 }
 
 pub const fn default_scrape_interval_secs() -> u64 {
@@ -49,10 +71,20 @@ inventory::submit! {
     SourceDescription::new::<AwsEcsMetricsSourceConfig>("aws_ecs_metrics")
 }
 
+impl AwsEcsMetricsSourceConfig {
+    fn stats_endpoint(&self) -> String {
+        match self.version {
+            Version::V2 => format!("{}/stats", self.endpoint),
+            _ => format!("{}/task/stats", self.endpoint),
+        }
+    }
+}
+
 impl GenerateConfig for AwsEcsMetricsSourceConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             endpoint: default_endpoint(),
+            version: default_version(),
             scrape_interval_secs: default_scrape_interval_secs(),
             namespace: default_namespace(),
         })
@@ -74,7 +106,7 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
 
         Ok(Box::new(
             aws_ecs_metrics(
-                self.endpoint.clone(),
+                self.stats_endpoint(),
                 self.scrape_interval_secs,
                 namespace,
                 out,
@@ -502,6 +534,7 @@ mod test {
 
         let source = AwsEcsMetricsSourceConfig {
             endpoint: format!("http://{}", in_addr),
+            version: Version::V4,
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
@@ -560,7 +593,8 @@ mod integration_tests {
         let (tx, rx) = Pipeline::new_test();
 
         let source = AwsEcsMetricsSourceConfig {
-            endpoint: "http://localhost:9088/v3/task/stats".into(),
+            endpoint: "http://localhost:9088/v3".into(),
+            version: Version::V3,
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
