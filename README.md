@@ -45,7 +45,7 @@ or [**install Vector**][docs.installation].
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
   **Tuple**, **Douban**, and thousands of others.
 * Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 50TB daily**.
+* Vector's largest user **processes over 30TB daily**.
 * Vector partners, and works closely, with vendors like **Humio**, **AWS**,
   **New Relic**, **Chronosphere**, **Infux Data**, **Sematext**, and more.
 
@@ -120,22 +120,23 @@ To learn more about our correctness tests, please see the [Vector test harness][
 
 Vector is an end-to-end, unified, open data platform.
 
-|                     | **Vector** | Logstash | Beats | Fluentd | Fluentbit | Splunk UF | Splunk HF |
-|--------------------:|:----------:|:--------:|:-----:|:-------:|:---------:|:---------:|:---------:|
-|      **End-to-end** |   **✓**    |          |       |         |           |           |           |
-|               Agent |   **✓**    |          |   ✓   |         |     ✓     |     ✓     |           |
-|          Aggregator |   **✓**    |    ✓     |       |    ✓    |           |           |     ✓     |
-|         **Unified** |   **✓**    |          |       |         |           |           |           |
-|                Logs |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |     ✓     |
-|             Metrics |   **✓**    |    ⚠     |   ⚠   |    ⚠    |     ⚠     |     ⚠     |     ⚠     |
-|              Traces |     🚧      |          |       |         |           |           |           |
-|            **Open** |   **✓**    |          |       |    ✓    |     ✓     |           |           |
-|         Open-source |   **✓**    |    ✓     |   ✓   |    ✓    |     ✓     |     ✓     |           |
-|      Vendor-neutral |   **✓**    |          |       |    ✓    |     ✓     |           |           |
-|     **Reliability** |   **✓**    |          |       |    ✓    |     ✓     |           |           |
-|         Memory-safe |   **✓**    |          |       |         |           |           |           |
-| Delivery guarantees |   **✓**    |          |       |         |           |     ✓     |     ✓     |
-|          Multi-core |   **✓**    |    ✓     |   ✓   |    ✓    |           |     ✓     |     ✓     |
+|                     | **Vector** | Beats | Fluentbit | Fluentd | Logstash | Splunk UF | Splunk HF |
+|--------------------:|:----------:|:-----:|:---------:|:-------:|:--------:|:---------:|:---------:|
+|      **End-to-end** |   **✓**    |       |           |         |          |           |           |
+|               Agent |   **✓**    |   ✓   |     ✓     |         |          |     ✓     |           |
+|          Aggregator |   **✓**    |       |           |    ✓    |    ✓     |           |     ✓     |
+|         **Unified** |   **✓**    |       |           |         |          |           |           |
+|                Logs |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+|             Metrics |   **✓**    |   ⚠   |     ⚠     |    ⚠    |    ⚠     |     ⚠     |     ⚠     |
+|              Traces |     🚧      |       |           |         |          |           |           |
+|            **Open** |   **✓**    |       |           |    ✓    |          |           |           |
+|         Open-source |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |           |
+|      Vendor-neutral |   **✓**    |       |     ✓     |    ✓    |          |           |           |
+|     **Reliability** |   **✓**    |       |           |         |          |           |           |
+|         Memory-safe |   **✓**    |       |           |         |          |           |           |
+| Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |
+|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+
 
 ⚠ = Not interoperable, metrics are represented as structured logs
 
