@@ -280,7 +280,7 @@ components: sources: docker_logs: {
 			tags:              telemetry.metrics._component_tags
 		}
 		container_metadata_fetch_errors_total: {
-			description:       "The total number of errors caused by failure to fetch container metadata."
+			description:       "The total number of errors encountered when fetching container metadata."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              telemetry.metrics._component_tags

@@ -124,7 +124,7 @@ components: sources: statsd: {
 	telemetry: metrics: {
 		connection_errors_total: telemetry.metrics._connection_errors_total
 		invalid_record_total: {
-			description:       "The total number of invalid StatsD records discarded."
+			description:       "The total number of discarded invalid StatsD records."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              telemetry.metrics._component_tags

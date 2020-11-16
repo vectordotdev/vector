@@ -977,7 +977,7 @@ components: {
 				}
 			}
 			_file_watch_errors: {
-				description:       "The total number of errors caused by failure to watch a file."
+				description:       "The total number of errors encountered when watching files."
 				type:              "counter"
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags & {
@@ -1017,7 +1017,7 @@ components: {
 				}
 			}
 			_fingerprint_read_errors: {
-				description:       "The total number of times failing to read a file for fingerprinting."
+				description:       "The total number of times Vector failed to read a file for fingerprinting."
 				type:              "counter"
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags & {
@@ -1138,42 +1138,6 @@ components: {
 			}
 			_connection_errors_total: {
 				description:       "The total number of connection errors for this Vector instance."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _internal_metrics_tags
-			}
-			_quit_total: {
-				description:       "The total number of times the Vector instance has quit."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _internal_metrics_tags
-			}
-			_recover_errors_total: {
-				description:       "The total number of errors caused by Vector failing to recover from a failed reload."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _internal_metrics_tags
-			}
-			_reload_errors_total: {
-				description:       "The total number of errors encountered when reloading Vector."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _internal_metrics_tags
-			}
-			_reloaded_total: {
-				description:       "The total number of times the Vector instance has been reloaded."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _internal_metrics_tags
-			}
-			_started_total: {
-				description:       "The total number of times the Vector instance has been started."
-				type:              "counter"
-				default_namespace: "vector"
-				tags:              _internal_metrics_tags
-			}
-			_stopped_total: {
-				description:       "The total number of times the Vector instance has been stopped."
 				type:              "counter"
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags
