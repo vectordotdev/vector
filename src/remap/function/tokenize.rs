@@ -37,7 +37,11 @@ impl TokenizeFn {
 }
 
 impl Expression for TokenizeFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = {
             let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -54,12 +58,31 @@ impl Expression for TokenizeFn {
 
         Ok(Some(tokens))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::Array)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| TokenizeFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { constraint: value::Kind::Array.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| TokenizeFn { value: Literal::from(10).boxed() },
+            def: TypeDef { fallible: true, constraint: value::Kind::Array.into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn tokenize() {
@@ -78,7 +101,7 @@ mod tests {
                     TokenizeFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
                 )];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

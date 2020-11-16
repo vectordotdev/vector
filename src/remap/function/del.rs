@@ -52,7 +52,11 @@ pub struct DelFn {
 }
 
 impl Expression for DelFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let paths = self
             .paths
             .iter()
@@ -66,4 +70,35 @@ impl Expression for DelFn {
 
         Ok(None)
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.paths
+            .iter()
+            .fold(TypeDef::default(), |acc, expression| {
+                acc.merge(
+                    expression
+                        .type_def(state)
+                        .fallible_unless(value::Kind::String),
+                )
+            })
+            .with_constraint(value::Constraint::Any)
+            .into_optional(true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| DelFn { paths: vec![Literal::from("foo").boxed()] },
+            def: TypeDef { optional: true, constraint: value::Constraint::Any, ..Default::default() },
+        }
+
+        fallible_expression {
+            expr: |_| DelFn { paths: vec![Variable::new("foo".to_owned()).boxed(), Literal::from("foo").boxed()] },
+            def: TypeDef { fallible: true, optional: true, constraint: value::Constraint::Any },
+        }
+    ];
 }

@@ -41,7 +41,11 @@ impl Sha3Fn {
 }
 
 impl Expression for Sha3Fn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = required!(state, object, self.value, Value::String(v) => v);
         let variant = optional!(state, object, self.variant, Value::String(v) => v);
 
@@ -61,6 +65,19 @@ impl Expression for Sha3Fn {
 
         Ok(Some(hash.into()))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .merge_optional(
+                self.variant
+                    .as_ref()
+                    .map(|variant| variant.type_def(state).fallible_unless(value::Kind::String)),
+            )
+            .into_fallible(true) // unknown variant enum
+            .with_constraint(value::Kind::String)
+    }
 }
 
 #[inline]
@@ -72,6 +89,41 @@ fn encode<T: Digest>(value: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind::*;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| Sha3Fn {
+                value: Literal::from("foo").boxed(),
+                variant: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| Sha3Fn {
+                value: Literal::from(1).boxed(),
+                variant: None,
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| Sha3Fn {
+                value: Box::new(Noop),
+                variant: None,
+            },
+            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+        }
+
+        variant_fallible {
+            expr: |_| Sha3Fn {
+                value: Literal::from("foo").boxed(),
+                variant: Some(Variable::new("foo".to_string()).boxed()),
+            },
+            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+        }
+    ];
 
     #[test]
     fn sha3() {
@@ -123,7 +175,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -1,29 +1,28 @@
-use crate::{Object, Result, State, Value};
+use crate::{state, Object, Result, TypeDef, Value};
 
-pub(super) mod arithmetic;
-pub(super) mod assignment;
+mod arithmetic;
+mod assignment;
 mod block;
-pub(super) mod function;
-pub(super) mod if_statement;
+pub(crate) mod function;
+mod if_statement;
 mod literal;
 mod noop;
-pub(super) mod not;
-pub(super) mod path;
-pub(super) mod variable;
+mod not;
+pub(crate) mod path;
+mod variable;
 
-pub(super) use arithmetic::Arithmetic;
-pub(super) use assignment::{Assignment, Target};
-pub(super) use block::Block;
-pub(super) use function::Function;
-pub(super) use if_statement::IfStatement;
-pub(super) use not::Not;
-pub(super) use variable::Variable;
-
+pub use arithmetic::Arithmetic;
+pub use assignment::{Assignment, Target};
+pub use block::Block;
+pub use function::Function;
+pub use if_statement::IfStatement;
 pub use literal::Literal;
 pub use noop::Noop;
+pub use not::Not;
 pub use path::Path;
+pub use variable::Variable;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("expected expression, got none")]
     Missing,
@@ -48,7 +47,9 @@ pub enum Error {
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object)
+        -> Result<Option<Value>>;
+    fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
 
 dyn_clone::clone_trait_object!(Expression);
@@ -66,14 +67,20 @@ macro_rules! expression_dispatch {
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
         #[derive(Debug, Clone)]
-        pub(crate) enum Expr {
+        pub enum Expr {
             $($expr($expr)),+
         }
 
         impl Expression for Expr {
-            fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+            fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
                 match self {
                     $(Expr::$expr(expression) => expression.execute(state, object)),+
+                }
+            }
+
+            fn type_def(&self, state: &state::Compiler) -> TypeDef {
+                match self {
+                    $(Expr::$expr(expression) => expression.type_def(state)),+
                 }
             }
         }
@@ -100,3 +107,53 @@ expression_dispatch![
     Path,
     Variable,
 ];
+
+#[cfg(test)]
+mod tests {
+    use crate::value;
+
+    #[test]
+    fn test_contains() {
+        use value::Constraint::*;
+        use value::Kind::*;
+
+        let cases = vec![
+            (true, Any, Any),
+            (true, Any, Exact(String)),
+            (true, Any, Exact(Integer)),
+            (true, Any, OneOf(vec![Float, Boolean])),
+            (true, Any, OneOf(vec![Map])),
+            (true, Exact(String), Exact(String)),
+            (true, Exact(String), OneOf(vec![String])),
+            (false, Exact(String), Exact(Array)),
+            (false, Exact(String), OneOf(vec![Integer])),
+            (false, Exact(String), OneOf(vec![Integer, Float])),
+        ];
+
+        for (expect, this, other) in cases {
+            assert_eq!(this.contains(&other), expect);
+        }
+    }
+
+    #[test]
+    fn test_merge() {
+        use value::Constraint::*;
+        use value::Kind::*;
+
+        let cases = vec![
+            (Any, Any, Any),
+            (Any, OneOf(vec![Integer, String]), Any),
+            (OneOf(vec![Integer, Float]), Exact(Integer), Exact(Float)),
+            (Exact(Integer), Exact(Integer), Exact(Integer)),
+            (
+                OneOf(vec![String, Integer, Float, Boolean]),
+                OneOf(vec![Integer, String]),
+                OneOf(vec![Float, Boolean]),
+            ),
+        ];
+
+        for (expect, this, other) in cases {
+            assert_eq!(this.merge(&other), expect);
+        }
+    }
+}

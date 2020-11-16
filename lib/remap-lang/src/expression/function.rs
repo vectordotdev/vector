@@ -1,7 +1,10 @@
 use super::Error as E;
-use crate::{Argument, ArgumentList, Expression, Function as Fn, Object, Result, State, Value};
+use crate::{
+    function::{Argument, ArgumentList},
+    state, value, Expression, Function as Fn, Object, Result, TypeDef, Value,
+};
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("undefined")]
     Undefined,
@@ -19,16 +22,16 @@ pub enum Error {
     Expression(&'static str),
 
     #[error(r#"incorrect value type for argument "{0}" (got "{0}")"#)]
-    Value(&'static str, &'static str),
+    Value(&'static str, value::Kind),
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Function {
+pub struct Function {
     function: Box<dyn Expression>,
 }
 
 impl Function {
-    pub(crate) fn new(
+    pub fn new(
         ident: String,
         arguments: Vec<(Option<String>, Argument)>,
         definitions: &[Box<dyn Fn>],
@@ -120,8 +123,16 @@ impl Function {
 }
 
 impl Expression for Function {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         self.function.execute(state, object)
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.function.type_def(state)
     }
 }
 
@@ -161,7 +172,11 @@ impl ArgumentValidator {
 }
 
 impl Expression for ArgumentValidator {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let value = self
             .expression
             .execute(state, object)?
@@ -177,4 +192,26 @@ impl Expression for ArgumentValidator {
 
         Ok(Some(value))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.expression.type_def(state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{expression::Noop, test_type_def, value::Constraint::*};
+
+    test_type_def![pass_through {
+        expr: |_| {
+            let function = Box::new(Noop);
+            Function { function }
+        },
+        def: TypeDef {
+            fallible: false,
+            optional: true,
+            constraint: Any
+        },
+    }];
 }
