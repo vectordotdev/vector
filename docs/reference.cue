@@ -238,7 +238,7 @@ _values: {
 		category: strings.ToTitle(name)
 	}
 
-	// `desription` describes the option in a succinct fashion. Usually 1 to
+	// `description` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
 	description: string
 
