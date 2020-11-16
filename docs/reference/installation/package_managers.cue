@@ -11,6 +11,11 @@ installation: package_managers: {
 		description: installation._interfaces.dpkg.description
 	}
 
+	helm: {
+		title:       "Helm"
+		description: installation._interfaces.helm.description
+	}
+
 	homebrew: {
 		title:       "Homebrew"
 		description: installation._interfaces.homebrew.description
