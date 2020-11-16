@@ -106,7 +106,7 @@ fundamental differences in quality and attention to detail:
 
 To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
 
-## Vector vs. others
+## Comparison
 
 Vector is an end-to-end, unified, open data platform.
 
