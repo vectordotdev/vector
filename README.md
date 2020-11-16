@@ -21,7 +21,7 @@ control of your observability data. [Collect][docs.sources],
 [transform][docs.transforms], and [route][docs.sinks] all your logs, metrics,
 and traces to any vendors you want today and any other vendors you may want
 tomorrow. Vector enables dramatic cost reduction, novel data enrichment, and
-data security where you need it, not when is most convenient for your vendors.
+data security when you need it, not when is most convenient for your vendors.
 100% open source, up to 10x faster than every alternative, and distributed for
 zero single points of failure.
 
