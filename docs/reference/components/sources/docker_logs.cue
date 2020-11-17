@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: docker: {
+components: sources: docker_logs: {
 	title:       "Docker"
 	description: """
 		[Docker](\(urls.docker)) is an open platform for developing, shipping, and running
@@ -257,7 +257,7 @@ components: sources: docker: {
 			body: """
 				Docker, by default, will split log messages that exceed 16kb. This can be a
 				rather frustrating problem because it produces malformed log messages that are
-				difficult to work with. Vector's `docker` source solves this by default,
+				difficult to work with. Vector's `docker_logs` source solves this by default,
 				automatically merging these messages into a single message. You can turn this
 				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the

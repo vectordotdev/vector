@@ -1,4 +1,5 @@
 use crate::{
+    config::Resource,
     internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
@@ -246,6 +247,15 @@ impl From<SocketAddr> for SocketListenAddr {
     }
 }
 
+impl From<SocketListenAddr> for Resource {
+    fn from(addr: SocketListenAddr) -> Resource {
+        match addr {
+            SocketListenAddr::SocketAddr(addr) => addr.into(),
+            SocketListenAddr::SystemdFd(offset) => Self::SystemFdOffset(offset),
+        }
+    }
+}
+
 fn parse_systemd_fd<'de, D>(des: D) -> Result<usize, D::Error>
 where
     D: Deserializer<'de>,
@@ -253,9 +263,11 @@ where
     let s: &'de str = Deserialize::deserialize(des)?;
     match s {
         "systemd" => Ok(0),
-        s if s.starts_with("systemd#") => {
-            Ok(s[8..].parse::<usize>().map_err(de::Error::custom)? - 1)
-        }
+        s if s.starts_with("systemd#") => s[8..]
+            .parse::<usize>()
+            .map_err(de::Error::custom)?
+            .checked_sub(1)
+            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
         _ => Err(de::Error::custom("must start with \"systemd\"")),
     }
 }

@@ -12,6 +12,8 @@ mod auto_concurrency;
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
@@ -27,11 +29,13 @@ mod concat;
 mod console;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
-#[cfg(feature = "sources-docker")]
-mod docker;
+#[cfg(feature = "sources-docker_logs")]
+mod docker_logs;
 mod elasticsearch;
 #[cfg(feature = "sources-generator")]
 mod generator;
+#[cfg(feature = "transforms-geoip")]
+mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
@@ -59,6 +63,8 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+#[cfg(feature = "sinks-nats")]
+mod nats;
 mod open;
 mod process;
 #[cfg(feature = "sources-prometheus")]
@@ -114,6 +120,8 @@ pub use self::auto_concurrency::*;
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub use self::aws_ec2_metadata::*;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+pub use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
@@ -127,13 +135,15 @@ pub use self::concat::*;
 pub use self::console::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
-#[cfg(feature = "sources-docker")]
-pub use self::docker::*;
+#[cfg(feature = "sources-docker_logs")]
+pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
+#[cfg(feature = "transforms-geoip")]
+pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
@@ -159,6 +169,8 @@ pub use self::logplex::*;
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(feature = "sinks-nats")]
+pub use self::nats::*;
 pub use self::open::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]

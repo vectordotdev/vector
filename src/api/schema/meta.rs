@@ -6,7 +6,7 @@ pub struct Meta;
 #[Object]
 impl Meta {
     /// Vector version
-    async fn version(&self) -> String {
+    async fn version_string(&self) -> String {
         crate::get_version()
     }
 

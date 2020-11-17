@@ -1,6 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::Event,
+    internal_events::{GeoipEventProcessed, GeoipFieldDoesNotExist, GeoipIpAddressParseError},
     transforms::{FunctionTransform, Transform},
     Result,
 };
@@ -180,16 +181,14 @@ impl FunctionTransform for Geoip {
                     }
                 }
             } else {
-                debug!(
-                    message = "IP Address not parsed correctly.",
-                    ipaddr = %ipaddress,
-                );
+                emit!(GeoipIpAddressParseError {
+                    address: &ipaddress
+                });
             }
         } else {
-            debug!(
-                message = "Field does not exist.",
-                field = %self.source,
-            );
+            emit!(GeoipFieldDoesNotExist {
+                field: &self.source
+            });
         };
 
         let json_value = if self.has_isp_db() {
@@ -200,6 +199,8 @@ impl FunctionTransform for Geoip {
         if let Ok(json_value) = json_value {
             event.as_mut_log().insert(target_field, json_value);
         }
+
+        emit!(GeoipEventProcessed);
 
         output.push(event);
     }

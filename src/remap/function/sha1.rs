@@ -1,3 +1,4 @@
+use ::sha1::Digest;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -36,15 +37,17 @@ impl Sha1Fn {
 }
 
 impl Expression for Sha1Fn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        use ::sha1::{Digest, Sha1};
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let value = self.value.execute(state, object)?.try_string()?;
 
-        self.value.execute(state, object).map(|r| {
-            r.map(|v| match v.as_string_lossy() {
-                Value::String(bytes) => Value::String(hex::encode(Sha1::digest(&bytes)).into()),
-                _ => unreachable!(),
-            })
-        })
+        Ok(hex::encode(sha1::Sha1::digest(&value)).into())
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::String)
     }
 }
 
@@ -52,6 +55,24 @@ impl Expression for Sha1Fn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| Sha1Fn { value: Literal::from("foo").boxed() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| Sha1Fn { value: Literal::from(1).boxed() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+        }
+
+        value_optional {
+            expr: |_| Sha1Fn { value: Box::new(Noop) },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
+        }
+    ];
 
     #[test]
     fn sha1() {
@@ -63,14 +84,12 @@ mod tests {
             ),
             (
                 map!["foo": "foo"],
-                Ok(Some(Value::from(
-                    "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33",
-                ))),
+                Ok(Value::from("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")),
                 Sha1Fn::new(Box::new(Path::from("foo"))),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
