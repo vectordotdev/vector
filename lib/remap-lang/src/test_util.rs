@@ -16,3 +16,79 @@ macro_rules! test_type_def {
         }
     };
 }
+
+#[macro_export]
+macro_rules! func_args {
+    () => (
+        ::std::collections::HashMap::<&'static str, $crate::function::Argument>::default()
+    );
+    ($($k:tt: $v:expr),+ $(,)?) => {
+        vec![$((stringify!($k), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::HashMap<&'static str, $crate::function::Argument>>()
+    };
+}
+
+#[macro_export]
+macro_rules! bench_function {
+    ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))? $(,)* })+) => {
+        fn $name(c: &mut criterion::Criterion) {
+            $(
+                c.bench_function(&format!("{}: {}", stringify!($name), stringify!($case)), |b| {
+                    let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+                    let mut state = $crate::state::Program::default();
+                    let mut object = ::std::collections::HashMap::default();
+
+                    b.iter(|| {
+                        let got = expression.execute(&mut state, &mut object).map_err(|e| e.to_string());
+                        assert_eq!(got, want);
+                    })
+                });
+            )+
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! test_function {
+    ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))? $(,)* })+) => {
+        paste::paste!{$(
+        #[test]
+        fn [<$name _ $case:snake:lower>]() {
+            let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
+            let mut state = $crate::state::Program::default();
+            let mut object = ::std::collections::HashMap::default();
+
+            let got = expression.execute(&mut state, &mut object).map_err(|e| e.to_string());
+            assert_eq!(got, want);
+        }
+        )+}
+    };
+}
+
+#[macro_export]
+macro_rules! map {
+    () => (
+        ::std::collections::BTreeMap::new()
+    );
+    ($($k:tt: $v:expr),+ $(,)?) => {
+        vec![$(($k.into(), $v.into())),+]
+            .into_iter()
+            .collect::<::std::collections::BTreeMap<_, _>>()
+    };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __prep_bench_or_test {
+    ($func:path, $args:expr, $want:expr) => {{
+        let args: ::std::collections::HashMap<&str, $crate::function::Argument> = $args;
+
+        let mut arguments = $crate::function::ArgumentList::default();
+        for (k, v) in args {
+            arguments.insert(k, v)
+        }
+
+        ($func.compile(arguments).unwrap(), $want)
+    }};
+}
