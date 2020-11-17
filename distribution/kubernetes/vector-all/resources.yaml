@@ -228,8 +228,8 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             
-            - name: LOG
-              value: info
+            - name: "LOG"
+              value: "info"
           ports:
           resources:
             {}
@@ -313,13 +313,15 @@ spec:
         - name: vector
           securityContext:
             {}
-          image: "timberio/vector:0.0.0-debian"
+          image: "timberio/vector:latest-debian"
           imagePullPolicy: "IfNotPresent"
           args:
             - --config
             - /etc/vector/*.toml
           env:
             
+            - name: "LOG"
+              value: "info"
           ports:
           resources:
             {}
@@ -344,17 +346,13 @@ spec:
         - name: config-dir
           projected:
             sources:
-              # Managed `ConfigMap`.
               - configMap:
                   name: vector-aggregator
                   optional: true
-              # Custom `ConfigMap`.
               - configMap:
                   name: vector-aggregator-config
                   optional: true
-              # Custom `Secret`.
               - secret:
                   name: vector-aggregator-config
                   optional: true
-        # Extra volumes.
   volumeClaimTemplates:
