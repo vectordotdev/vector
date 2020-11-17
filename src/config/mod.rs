@@ -8,6 +8,7 @@ use indexmap::IndexMap; // IndexMap preserves insertion order, allowing us to ou
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::collections::{HashMap, HashSet};
+use std::fmt::{self, Display, Formatter};
 use std::fs::DirBuilder;
 use std::hash::Hash;
 use std::net::SocketAddr;
@@ -266,7 +267,7 @@ impl Resource {
     /// From given components returns all that have a resource conflict with any other component.
     pub fn conflicts<K: Eq + Hash + Clone>(
         components: impl IntoIterator<Item = (K, Vec<Resource>)>,
-    ) -> HashSet<K> {
+    ) -> HashMap<Resource, HashSet<K>> {
         let mut resource_map = HashMap::<Resource, HashSet<K>>::new();
         let mut unspecified = Vec::new();
 
@@ -299,17 +300,25 @@ impl Resource {
             }
         }
 
+        resource_map.retain(|_, components| components.len() > 1);
+
         resource_map
-            .into_iter()
-            .filter(|(_, components)| components.len() > 1)
-            .flat_map(|(_, components)| components)
-            .collect()
     }
 }
 
 impl From<SocketAddr> for Resource {
     fn from(addr: SocketAddr) -> Self {
         Self::Port(addr)
+    }
+}
+
+impl Display for Resource {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
+        match self {
+            Resource::Port(address) => write!(fmt, "{}", address),
+            Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
+            Resource::Stdin => write!(fmt, "stdin"),
+        }
     }
 }
 
@@ -568,11 +577,18 @@ mod test {
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
     use super::{load_from_str, Resource};
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
     use std::net::{Ipv4Addr, SocketAddr};
 
     fn localhost(port: u16) -> Resource {
         SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port).into()
+    }
+
+    fn hashmap(conflicts: Vec<(Resource, Vec<&str>)>) -> HashMap<Resource, HashSet<&str>> {
+        conflicts
+            .into_iter()
+            .map(|(key, values)| (key, values.into_iter().collect()))
+            .collect()
     }
 
     #[test]
@@ -583,7 +599,7 @@ mod resource_tests {
             ("sink_2", vec![localhost(2)]),
         ];
         let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, HashSet::new());
+        assert_eq!(conflicting, HashMap::new());
     }
 
     #[test]
@@ -594,7 +610,10 @@ mod resource_tests {
             ("sink_2", vec![localhost(2)]),
         ];
         let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, vec!["sink_1", "sink_2"].into_iter().collect());
+        assert_eq!(
+            conflicting,
+            hashmap(vec![(localhost(2), vec!["sink_1", "sink_2"])])
+        );
     }
 
     #[test]
@@ -607,7 +626,10 @@ mod resource_tests {
         let conflicting = Resource::conflicts(components);
         assert_eq!(
             conflicting,
-            vec!["sink_0", "sink_1", "sink_2"].into_iter().collect()
+            hashmap(vec![
+                (localhost(0), vec!["sink_0", "sink_1"]),
+                (localhost(2), vec!["sink_1", "sink_2"])
+            ])
         );
     }
 
@@ -621,7 +643,7 @@ mod resource_tests {
             ),
         ];
         let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, HashSet::new());
+        assert_eq!(conflicting, HashMap::new());
     }
 
     #[test]
@@ -634,7 +656,10 @@ mod resource_tests {
             ),
         ];
         let conflicting = Resource::conflicts(components);
-        assert_eq!(conflicting, vec!["sink_0", "sink_1"].into_iter().collect());
+        assert_eq!(
+            conflicting,
+            hashmap(vec![(localhost(0), vec!["sink_0", "sink_1"])])
+        );
     }
 
     #[test]
