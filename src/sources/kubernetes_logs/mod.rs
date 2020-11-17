@@ -19,7 +19,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, Fingerprinter};
+use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -274,11 +274,14 @@ impl Source {
             // The shape of the log files is well-known in the Kubernetes
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
-            fingerprinter: Fingerprinter::FirstLineChecksum {
-                // Max line length to expect during fingerprinting, see the
-                // explanation above.
-                max_line_length: max_line_bytes,
-                ignored_header_bytes: 0,
+            fingerprinter: Fingerprinter {
+                strategy: FingerprintStrategy::FirstLineChecksum {
+                    // Max line length to expect during fingerprinting, see the
+                    // explanation above.
+                    max_line_length: max_line_bytes,
+                    ignored_header_bytes: 0,
+                },
+                ignore_not_found: true,
             },
             // We expect the files distribution to not be a concern because of
             // the way we pick files for gathering: for each container, only the

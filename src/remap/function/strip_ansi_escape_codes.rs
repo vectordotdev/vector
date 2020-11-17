@@ -37,8 +37,8 @@ impl StripAnsiEscapeCodesFn {
 }
 
 impl Expression for StripAnsiEscapeCodesFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let bytes = required!(state, object, self.value, Value::String(v) => v);
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_string()?;
 
         strip_ansi_escapes::strip(&bytes)
             .map(Bytes::from)
@@ -46,12 +46,34 @@ impl Expression for StripAnsiEscapeCodesFn {
             .map(Into::into)
             .map_err(|e| e.to_string().into())
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            // TODO: Can probably remove this, as it only fails if writing to
+            //       the buffer fails.
+            .into_fallible(true)
+            .with_constraint(value::Kind::String)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| StripAnsiEscapeCodesFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
+        }
+
+        fallible_expression {
+            expr: |_| StripAnsiEscapeCodesFn { value: Literal::from(10).boxed() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
+        }
+    ];
 
     #[test]
     fn strip_ansi_escape_codes() {
@@ -63,27 +85,27 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("foo bar"))),
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[3;4Hfoo bar"))),
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[46mfoo\x1b[0m bar"))),
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[=3lfoo bar"))),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
