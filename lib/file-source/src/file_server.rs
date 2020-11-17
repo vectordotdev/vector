@@ -8,7 +8,7 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use futures::{
     executor::block_on,
-    future::{select, Either},
+    future::{select, Either, FutureExt},
     stream, Future, Sink, SinkExt,
 };
 use indexmap::IndexMap;
@@ -16,6 +16,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, remove_file},
     path::PathBuf,
+    sync::Arc,
     time::{self, Duration},
 };
 use tokio::time::delay_for;
@@ -46,6 +47,7 @@ where
     pub oldest_first: bool,
     pub remove_after: Option<Duration>,
     pub emitter: E,
+    pub handle: tokio::runtime::Handle,
 }
 
 /// `FileServer` as Source
@@ -66,14 +68,16 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
-    pub fn run<C>(
+    pub fn run<C, S>(
         self,
         mut chans: C,
-        mut shutdown: impl Future + Unpin,
+        shutdown: S,
     ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
     where
         C: Sink<Vec<(Bytes, String)>> + Unpin,
         <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
+        S: Future + Unpin + Send + 'static,
+        <S as Future>::Output: Clone + Send + Sync,
     {
         let mut fingerprint_buffer = Vec::new();
 
@@ -122,6 +126,42 @@ where
 
         let mut stats = TimingStats::default();
 
+        // Spawn the checkpoint writer task
+        //
+        // We have to do a lot of cloning here to convince the compiler that we aren't going to get
+        // away with anything, but none of it should have any perf impact.
+        let mut shutdown = shutdown.shared();
+        let shutdown2 = shutdown.clone();
+        let emitter = self.emitter.clone();
+        let checkpointer = Arc::new(checkpointer);
+        let sleep_duration = self.glob_minimum_cooldown;
+        self.handle.spawn(async move {
+            let mut done = false;
+            loop {
+                let sleep = tokio::time::delay_for(sleep_duration);
+                match select(shutdown2.clone(), sleep).await {
+                    Either::Left((_, _)) => done = true,
+                    Either::Right((_, _)) => {}
+                }
+
+                let emitter = emitter.clone();
+                let checkpointer = Arc::clone(&checkpointer);
+                tokio::task::spawn_blocking(move || {
+                    checkpointer
+                        .write_checkpoints()
+                        .map_err(|error| emitter.emit_file_checkpoint_write_failed(error))
+                        .map(|count| emitter.emit_file_checkpointed(count))
+                        .ok()
+                })
+                .await
+                .ok();
+
+                if done {
+                    break;
+                }
+            }
+        });
+
         // Alright friends, how does this work?
         //
         // We want to avoid burning up users' CPUs. To do this we sleep after
@@ -146,15 +186,6 @@ where
                 if stats.started_at.elapsed() > Duration::from_secs(10) {
                     stats = TimingStats::default();
                 }
-
-                let start = time::Instant::now();
-                // Write any stored checkpoints (uses glob to find old checkpoints).
-                checkpointer
-                    .write_checkpoints()
-                    .map_err(|error| self.emitter.emit_file_checkpoint_write_failed(error))
-                    .map(|count| self.emitter.emit_file_checkpointed(count))
-                    .ok();
-                stats.record("checkpointing", start.elapsed());
 
                 // Search (glob) for files to detect major file changes.
                 let start = time::Instant::now();

@@ -200,7 +200,7 @@ impl Checkpointer {
 
     /// Persist the current checkpoints state to disk, making our best effort to do so in an atomic
     /// way that allow for recovering the previous state in the event of a crash.
-    pub fn write_checkpoints(&mut self) -> Result<usize, io::Error> {
+    pub fn write_checkpoints(&self) -> Result<usize, io::Error> {
         // First write the new checkpoints to a tmp file and flush it fully to disk. If vector
         // dies anywhere during this section, the existing stable file will still be in its current
         // valid state and we'll be able to recover.
@@ -361,7 +361,7 @@ mod test {
 
         // load and persist the checkpoints
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let chkptr = Checkpointer::new(&data_dir.path());
 
             for (fingerprint, modified) in &[&newer, &newish, &oldish, &older] {
                 chkptr.checkpoints.load(Checkpoint {

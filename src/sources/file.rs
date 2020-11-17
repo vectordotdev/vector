@@ -215,6 +215,7 @@ pub fn file_source(
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,
+        handle: tokio::runtime::Handle::current(),
     };
 
     let file_key = config.file_key.clone();
