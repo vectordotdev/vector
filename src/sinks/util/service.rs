@@ -263,10 +263,6 @@ impl TowerRequestSettings {
         batch_timeout: Duration,
         acker: Acker,
     ) -> TowerBatchedSink<S, B, L, Request>
-    // Would like to return `impl Sink + SinkExt<T>` here, but that
-    // doesn't work with later calls to `batched_with_min` etc (via
-    // `trait SinkExt` above), as it is missing a bound on the
-    // associated types that cannot be expressed in stable Rust.
     where
         L: RetryLogic<Response = S::Response>,
         S: Service<Request> + Clone + Send + 'static,

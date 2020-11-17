@@ -11,7 +11,7 @@
 //! For each of these types this module provides one external type
 //! that can be used within sinks. The simplest type being the `StreamSink`
 //! type should be used when you do not want to batch events but you want
-//! to _stream_ them to the downstream service. `BatchSink` and `PartitonBatchSink`
+//! to _stream_ them to the downstream service. `BatchSink` and `PartitionBatchSink`
 //! are similar in the sense that they both take some `tower::Service`, `Batch` and
 //! `Acker` and will provide full batching, request dispatching and acking based on
 //! the settings passed.
@@ -433,7 +433,7 @@ where
     B: Batch<Output = Request> + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PartitionedBatchSink")
+        f.debug_struct("PartitionBatchSink")
             .field("service", &self.service)
             .field("batch", &self.batch)
             .field("timeout", &self.timeout)
