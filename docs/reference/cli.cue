@@ -120,7 +120,12 @@ cli: {
 			description: """
 				Read configuration from one or more files. Wildcard paths are
 				supported. If zero files are specified the default config path
-				`/etc/vector/vector.toml` will be targeted
+				`/etc/vector/vector.toml` will be targeted.
+				TOML, YAML and JSON file formats are supported.
+				The format to interpret the file with is determined from
+				the file extension (.toml, .yaml, .json).
+				We will fallback to TOML if we are unable to detect
+				a supported format.
 				"""
 			type:    "string"
 			default: "/etc/vector/vector.toml"
