@@ -419,7 +419,7 @@ mod tests {
 
         let server = api::Server::start(topology.config());
         let client = new_subscription_client(server.addr()).await;
-        let subscription = client.all_component_events_processed_totals_subscription(500);
+        let subscription = client.component_events_processed_totals_subscription(500);
 
         tokio::pin! {
             let stream = subscription.stream();
@@ -432,7 +432,7 @@ mod tests {
             .unwrap()
             .data
             .unwrap()
-            .all_component_events_processed_totals;
+            .component_events_processed_totals;
 
         assert_eq!(data[0].name, "events_processed_total_batch_source");
         assert_eq!(data[1].name, "events_processed_total_batch_sink");
@@ -533,7 +533,7 @@ mod tests {
 
         let server = api::Server::start(topology.config());
         let client = new_subscription_client(server.addr()).await;
-        let subscription = client.all_component_bytes_processed_totals_subscription(500);
+        let subscription = client.component_bytes_processed_totals_subscription(500);
 
         tokio::pin! {
             let stream = subscription.stream();
@@ -546,7 +546,7 @@ mod tests {
             .unwrap()
             .data
             .unwrap()
-            .all_component_bytes_processed_totals;
+            .component_bytes_processed_totals;
 
         // Bytes are currently only relevant on sinks
         assert_eq!(data[0].name, "bytes_processed_total_batch_sink");

@@ -1,6 +1,0 @@
-subscription AllComponentEventsProcessedThroughputsSubscription($interval: Int!) {
-    allComponentEventsProcessedThroughputs(interval: $interval) {
-        name
-        throughput
-    }
-}

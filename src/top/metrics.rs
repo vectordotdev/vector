@@ -49,12 +49,12 @@ async fn component_removed(client: Arc<SubscriptionClient>, mut tx: state::Event
     }
 }
 
-async fn all_events_processed_totals(
+async fn events_processed_totals(
     client: Arc<SubscriptionClient>,
     mut tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.all_component_events_processed_totals_subscription(interval);
+    let res = client.component_events_processed_totals_subscription(interval);
 
     tokio::pin! {
         let stream = res.stream();
@@ -62,9 +62,9 @@ async fn all_events_processed_totals(
 
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
-            let c = d.all_component_events_processed_totals;
+            let c = d.component_events_processed_totals;
             let _ = tx
-                .send(state::EventType::AllEventsProcessedTotals(
+                .send(state::EventType::EventsProcessedTotals(
                     c.into_iter()
                         .map(|c| (c.name, c.metric.events_processed_total as i64))
                         .collect(),
@@ -74,12 +74,12 @@ async fn all_events_processed_totals(
     }
 }
 
-async fn all_events_processed_throughputs(
+async fn events_processed_throughputs(
     client: Arc<SubscriptionClient>,
     mut tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.all_component_events_processed_throughputs_subscription(interval);
+    let res = client.component_events_processed_throughputs_subscription(interval);
 
     tokio::pin! {
         let stream = res.stream();
@@ -87,9 +87,9 @@ async fn all_events_processed_throughputs(
 
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
-            let c = d.all_component_events_processed_throughputs;
+            let c = d.component_events_processed_throughputs;
             let _ = tx
-                .send(state::EventType::AllEventsProcessedThroughputs(
+                .send(state::EventType::EventsProcessedThroughputs(
                     c.into_iter().map(|c| (c.name, c.throughput)).collect(),
                 ))
                 .await;
@@ -97,12 +97,12 @@ async fn all_events_processed_throughputs(
     }
 }
 
-async fn all_bytes_processed_totals(
+async fn bytes_processed_totals(
     client: Arc<SubscriptionClient>,
     mut tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.all_component_bytes_processed_totals_subscription(interval);
+    let res = client.component_bytes_processed_totals_subscription(interval);
 
     tokio::pin! {
         let stream = res.stream();
@@ -110,9 +110,9 @@ async fn all_bytes_processed_totals(
 
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
-            let c = d.all_component_bytes_processed_totals;
+            let c = d.component_bytes_processed_totals;
             let _ = tx
-                .send(state::EventType::AllBytesProcessedTotals(
+                .send(state::EventType::BytesProcessedTotals(
                     c.into_iter()
                         .map(|c| (c.name, c.metric.bytes_processed_total as i64))
                         .collect(),
@@ -122,12 +122,12 @@ async fn all_bytes_processed_totals(
     }
 }
 
-async fn all_bytes_processed_throughputs(
+async fn bytes_processed_throughputs(
     client: Arc<SubscriptionClient>,
     mut tx: state::EventTx,
     interval: i64,
 ) {
-    let res = client.all_component_bytes_processed_throughputs_subscription(interval);
+    let res = client.component_bytes_processed_throughputs_subscription(interval);
 
     tokio::pin! {
         let stream = res.stream();
@@ -135,9 +135,9 @@ async fn all_bytes_processed_throughputs(
 
     while let Some(Some(res)) = stream.next().await {
         if let Some(d) = res.data {
-            let c = d.all_component_bytes_processed_throughputs;
+            let c = d.component_bytes_processed_throughputs;
             let _ = tx
-                .send(state::EventType::AllBytesProcessedThroughputs(
+                .send(state::EventType::BytesProcessedThroughputs(
                     c.into_iter().map(|c| (c.name, c.throughput)).collect(),
                 ))
                 .await;
@@ -152,22 +152,22 @@ pub fn subscribe(client: SubscriptionClient, tx: state::EventTx, interval: i64) 
 
     tokio::spawn(component_added(Arc::clone(&client), tx.clone()));
     tokio::spawn(component_removed(Arc::clone(&client), tx.clone()));
-    tokio::spawn(all_events_processed_totals(
+    tokio::spawn(events_processed_totals(
         Arc::clone(&client),
         tx.clone(),
         interval,
     ));
-    tokio::spawn(all_events_processed_throughputs(
+    tokio::spawn(events_processed_throughputs(
         Arc::clone(&client),
         tx.clone(),
         interval,
     ));
-    tokio::spawn(all_bytes_processed_totals(
+    tokio::spawn(bytes_processed_totals(
         Arc::clone(&client),
         tx.clone(),
         interval,
     ));
-    tokio::spawn(all_bytes_processed_throughputs(
+    tokio::spawn(bytes_processed_throughputs(
         Arc::clone(&client),
         tx,
         interval,

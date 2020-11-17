@@ -5,10 +5,10 @@ type NamedMetric = (String, i64);
 
 #[derive(Debug)]
 pub enum EventType {
-    AllEventsProcessedTotals(Vec<NamedMetric>),
-    AllEventsProcessedThroughputs(Vec<NamedMetric>),
-    AllBytesProcessedTotals(Vec<NamedMetric>),
-    AllBytesProcessedThroughputs(Vec<NamedMetric>),
+    EventsProcessedTotals(Vec<NamedMetric>),
+    EventsProcessedThroughputs(Vec<NamedMetric>),
+    BytesProcessedTotals(Vec<NamedMetric>),
+    BytesProcessedThroughputs(Vec<NamedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(String),
 }
@@ -43,28 +43,28 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
         loop {
             if let Some(event_type) = event_rx.recv().await {
                 match event_type {
-                    EventType::AllEventsProcessedTotals(rows) => {
+                    EventType::EventsProcessedTotals(rows) => {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
                                 r.events_processed_total = v;
                             }
                         }
                     }
-                    EventType::AllEventsProcessedThroughputs(rows) => {
+                    EventType::EventsProcessedThroughputs(rows) => {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
                                 r.events_processed_throughput = v;
                             }
                         }
                     }
-                    EventType::AllBytesProcessedTotals(rows) => {
+                    EventType::BytesProcessedTotals(rows) => {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
                                 r.bytes_processed_total = v;
                             }
                         }
                     }
-                    EventType::AllBytesProcessedThroughputs(rows) => {
+                    EventType::BytesProcessedThroughputs(rows) => {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
                                 r.bytes_processed_throughput = v;

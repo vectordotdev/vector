@@ -1816,37 +1816,6 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component events processed metrics. Streams new data as the metric increases.",
-              "isDeprecated": false,
-              "name": "componentEventsProcessedTotal",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ComponentEventsProcessedTotal",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [
-                {
-                  "defaultValue": "1000",
-                  "description": null,
-                  "name": "interval",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  }
-                }
-              ],
-              "deprecationReason": null,
               "description": "Events processed throughput, sampled over a provided millisecond `interval`.",
               "isDeprecated": false,
               "name": "eventsProcessedThroughput",
@@ -1878,40 +1847,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component events processed throughput, sampled over a provided millisecond `interval`.",
+              "description": "Component events processed throughputs over `interval`.",
               "isDeprecated": false,
-              "name": "componentEventsProcessedThroughput",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ComponentEventsProcessedThroughput",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [
-                {
-                  "defaultValue": "1000",
-                  "description": null,
-                  "name": "interval",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  }
-                }
-              ],
-              "deprecationReason": null,
-              "description": "All component events processed throughput over `interval`.",
-              "isDeprecated": false,
-              "name": "allComponentEventsProcessedThroughputs",
+              "name": "componentEventsProcessedThroughputs",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1948,9 +1886,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "All component events processed metrics over `interval`.",
+              "description": "Component events processed metrics over `interval`.",
               "isDeprecated": false,
-              "name": "allComponentEventsProcessedTotals",
+              "name": "componentEventsProcessedTotals",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2049,40 +1987,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component bytes processed metrics. Streams new data as the metric increases.",
+              "description": "Component bytes processed metrics, over `interval`.",
               "isDeprecated": false,
-              "name": "componentBytesProcessedTotal",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ComponentBytesProcessedTotal",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [
-                {
-                  "defaultValue": "1000",
-                  "description": null,
-                  "name": "interval",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  }
-                }
-              ],
-              "deprecationReason": null,
-              "description": "All component bytes processed metrics, over `interval`.",
-              "isDeprecated": false,
-              "name": "allComponentBytesProcessedTotals",
+              "name": "componentBytesProcessedTotals",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2119,40 +2026,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component bytes processed throughput, sampled over a provided millisecond `interval`.",
+              "description": "Component bytes processed throughputs, over `interval`",
               "isDeprecated": false,
-              "name": "componentBytesProcessedThroughput",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ComponentBytesProcessedThroughput",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [
-                {
-                  "defaultValue": "1000",
-                  "description": null,
-                  "name": "interval",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  }
-                }
-              ],
-              "deprecationReason": null,
-              "description": "All component bytes processed throughputs, over `interval`",
-              "isDeprecated": false,
-              "name": "allComponentBytesProcessedThroughputs",
+              "name": "componentBytesProcessedThroughputs",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2220,40 +2096,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component errors metrics. Streams new data as the metric increases.",
+              "description": "Component errors metrics, over `interval`.",
               "isDeprecated": false,
-              "name": "componentErrorsTotal",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "OBJECT",
-                  "name": "ComponentErrorsTotal",
-                  "ofType": null
-                }
-              }
-            },
-            {
-              "args": [
-                {
-                  "defaultValue": "1000",
-                  "description": null,
-                  "name": "interval",
-                  "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "Int",
-                      "ofType": null
-                    }
-                  }
-                }
-              ],
-              "deprecationReason": null,
-              "description": "All component errors metrics, over `interval`.",
-              "isDeprecated": false,
-              "name": "allComponentErrorsTotals",
+              "name": "componentErrorsTotals",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
