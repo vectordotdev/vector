@@ -1,3 +1,4 @@
+use crate::event;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -39,14 +40,13 @@ struct ParseJsonFn {
 
 impl Expression for ParseJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let to_json = |value| match value {
-            Value::Bytes(bytes) => serde_json::from_slice(&bytes)
-                .map(|v: serde_json::Value| {
-                    let v: crate::event::Value = v.into();
-                    v.into()
-                })
-                .map_err(|err| format!("unable to parse json {}", err).into()),
-            _ => Err(format!(r#"unable to convert value "{}" to json"#, value.kind()).into()),
+        let to_json = |value: Value| {
+            let bytes = value.unwrap_bytes();
+            let value = serde_json::from_slice(&bytes)
+                .map(|v: serde_json::Value| event::Value::from(v))
+                .map_err(|e| format!("unable to parse json: {}", e))?;
+
+            Ok(value.into())
         };
 
         super::convert_value_or_default(
