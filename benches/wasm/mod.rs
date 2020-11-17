@@ -57,51 +57,6 @@ pub fn protobuf(c: &mut Criterion) {
     });
 }
 
-pub fn drop(criterion: &mut Criterion) {
-    let transforms: Vec<(&str, Transform)> = vec![
-        (
-            "lua",
-            Transform::task(
-                vector::transforms::lua::v2::Lua::new(
-                    &toml::from_str(
-                        r#"
-hooks.process = """
-function (event, emit)
-end
-"""
-"#,
-                    )
-                    .unwrap(),
-                )
-                .unwrap(),
-            ),
-        ),
-        (
-            "wasm",
-            Transform::task(
-                Wasm::new(
-                    toml::from_str(
-                        r#"
-module = "target/wasm32-wasi/release/drop.wasm"
-artifact_cache = "target/artifacts/"
-"#,
-                    )
-                    .unwrap(),
-                )
-                .unwrap(),
-            ),
-        ),
-    ];
-    let parameters = vec![0, 2, 8, 16];
-
-    bench_group_transforms_over_parameterized_event_sizes(
-        criterion,
-        "wasm/drop",
-        transforms,
-        parameters,
-    );
-}
-
 pub fn add_fields(criterion: &mut Criterion) {
     let transforms: Vec<(&str, Transform)> = vec![
         (
@@ -211,7 +166,7 @@ fn bench_group_transforms_over_parameterized_event_sizes(
     group.finish();
 }
 
-criterion_group!(benches, protobuf, drop, add_fields);
+criterion_group!(benches, protobuf, add_fields);
 criterion_main! {
     benches,
 }
