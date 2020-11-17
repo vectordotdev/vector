@@ -126,11 +126,7 @@ impl Function {
 }
 
 impl Expression for Function {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.function.execute(state, object)
     }
 

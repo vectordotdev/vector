@@ -27,12 +27,11 @@ impl Variable {
 }
 
 impl Expression for Variable {
-    fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
         state
             .variable(&self.ident)
             .cloned()
             .ok_or_else(|| E::from(Error::Undefined(self.ident.to_owned())).into())
-            .map(Some)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

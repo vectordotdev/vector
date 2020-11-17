@@ -27,9 +27,6 @@ pub use variable::Variable;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error("expected expression, got none")]
-    Missing,
-
     #[error("unexpected expression")]
     Unexpected(#[from] ExprError),
 
@@ -53,8 +50,7 @@ pub enum Error {
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object)
-        -> Result<Option<Value>>;
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value>;
     fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
 
@@ -94,7 +90,7 @@ macro_rules! expression_dispatch {
         }
 
         impl Expression for Expr {
-            fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+            fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
                 match self {
                     $(Expr::$expr(expression) => expression.execute(state, object)),+
                 }

@@ -55,11 +55,7 @@ impl SliceFn {
 }
 
 impl Expression for SliceFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let start = required!(state, object, self.start, Value::Integer(v) => v);
         let end = optional!(state, object, self.end, Value::Integer(v) => v);
 
@@ -89,12 +85,10 @@ impl Expression for SliceFn {
             state, object, self.value,
             Value::String(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
-                .map(Value::from)
-                .map(Some),
+                .map(Value::from),
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
-                .map(Value::from)
-                .map(Some),
+                .map(Value::from),
         }
     }
 
@@ -162,47 +156,47 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some("foo".into())),
+                Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, None),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, None),
             ),
             (
                 map![],
-                Ok(Some("o".into())),
+                Ok("o".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, None),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), -2, None),
             ),
             (
                 map![],
-                Ok(Some("".into())),
+                Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 3, None),
             ),
             (
                 map![],
-                Ok(Some("".into())),
+                Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, Some(2)),
             ),
             (
                 map![],
-                Ok(Some("foo".into())),
+                Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, Some(4)),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, Some(5)),
             ),
             (
                 map![],
-                Ok(Some("docious".into())),
+                Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     -7,
@@ -211,7 +205,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("cali".into())),
+                Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     5,
@@ -236,22 +230,22 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some(vec![0, 1, 2].into())),
+                Ok(vec![0, 1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 0, None),
             ),
             (
                 map![],
-                Ok(Some(vec![1, 2].into())),
+                Ok(vec![1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 1, None),
             ),
             (
                 map![],
-                Ok(Some(vec![1, 2].into())),
+                Ok(vec![1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), -2, None),
             ),
             (
                 map![],
-                Ok(Some("docious".into())),
+                Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     -7,
@@ -260,7 +254,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("cali".into())),
+                Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     5,

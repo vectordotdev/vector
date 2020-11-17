@@ -37,19 +37,12 @@ impl DowncaseFn {
 }
 
 impl Expression for DowncaseFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.value
-            .execute(state, object)?
-            .map(String::try_from)
-            .transpose()?
+            .execute(state, object)
+            .and_then(|v| String::try_from(v).map_err(Into::into))
             .map(|v| v.to_lowercase())
             .map(Into::into)
-            .map(Ok)
-            .transpose()
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -75,7 +68,7 @@ mod tests {
             ),
             (
                 map!["foo": "FOO 2 bar"],
-                Ok(Some(Value::from("foo 2 bar"))),
+                Ok(Value::from("foo 2 bar")),
                 DowncaseFn::new(Box::new(Path::from("foo"))),
             ),
         ];

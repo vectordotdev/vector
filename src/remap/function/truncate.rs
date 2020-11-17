@@ -66,11 +66,7 @@ impl TruncateFn {
 }
 
 impl Expression for TruncateFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let mut value = {
             let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -104,7 +100,7 @@ impl Expression for TruncateFn {
             }
         }
 
-        Ok(Some(value.into()))
+        Ok(value.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -194,7 +190,7 @@ mod tests {
         let cases = vec![
             (
                 map!["foo": "Super"],
-                Ok(Some("".into())),
+                Ok("".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(0.0)),
@@ -203,7 +199,7 @@ mod tests {
             ),
             (
                 map!["foo": "Super"],
-                Ok(Some("...".into())),
+                Ok("...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(0.0)),
@@ -212,7 +208,7 @@ mod tests {
             ),
             (
                 map!["foo": "Super"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(10.0)),
@@ -221,7 +217,7 @@ mod tests {
             ),
             (
                 map!["foo": "Super"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),
@@ -230,7 +226,7 @@ mod tests {
             ),
             (
                 map!["foo": "Supercalifragilisticexpialidocious"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),
@@ -239,7 +235,7 @@ mod tests {
             ),
             (
                 map!["foo": "♔♕♖♗♘♙♚♛♜♝♞♟"],
-                Ok(Some("♔♕♖♗♘♙...".into())),
+                Ok("♔♕♖♗♘♙...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(6.0)),
@@ -248,7 +244,7 @@ mod tests {
             ),
             (
                 map!["foo": "Supercalifragilisticexpialidocious"],
-                Ok(Some("Super...".into())),
+                Ok("Super...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),
@@ -257,7 +253,7 @@ mod tests {
             ),
             (
                 map!["foo": "Supercalifragilisticexpialidocious"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),

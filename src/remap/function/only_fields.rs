@@ -38,7 +38,7 @@ pub struct OnlyFieldsFn {
 }
 
 impl Expression for OnlyFieldsFn {
-    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let paths = self.paths.iter().map(Path::as_string).collect::<Vec<_>>();
 
         object
@@ -47,7 +47,7 @@ impl Expression for OnlyFieldsFn {
             .filter(|k| paths.iter().find(|p| k.starts_with(p.as_str())).is_none())
             .for_each(|path| object.remove(&path, true));
 
-        Ok(None)
+        Ok(Value::Null)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

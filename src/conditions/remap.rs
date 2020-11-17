@@ -42,7 +42,7 @@ pub struct Remap {
 }
 
 impl Remap {
-    fn execute(&self, event: &Event) -> Result<Option<remap::Value>, RemapError> {
+    fn execute(&self, event: &Event) -> Result<remap::Value, RemapError> {
         // TODO(jean): This clone exists until remap-lang has an "immutable"
         // mode.
         //
@@ -62,10 +62,6 @@ impl Remap {
 impl Condition for Remap {
     fn check(&self, event: &Event) -> bool {
         self.execute(&event)
-            .map(|opt| match opt {
-                Some(value) => value,
-                None => Value::Boolean(false),
-            })
             .map(|value| match value {
                 Value::Boolean(boolean) => boolean,
                 _ => unreachable!("boolean type constraint set"),
@@ -77,12 +73,11 @@ impl Condition for Remap {
     }
 
     fn check_with_context(&self, event: &Event) -> Result<(), String> {
-        let result = self
+        let value = self
             .execute(event)
-            .map_err(|err| format!("source execution failed: {:#}", err))?
-            .unwrap_or_else(|| Value::Boolean(false));
+            .map_err(|err| format!("source execution failed: {:#}", err))?;
 
-        match result {
+        match value {
             Value::Boolean(v) if v => Ok(()),
             Value::Boolean(v) if !v => Err("source execution resolved to false".into()),
             _ => unreachable!("boolean type constraint set"),
