@@ -3,6 +3,8 @@ global:
   vector:
     image:
       # Use the latest release image.
+      # We should recommend users to pin to a particular release rather than
+      # using a sliding tag, as sliding tags *will* cause issues.
       version: latest
 
     commonEnvKV:
