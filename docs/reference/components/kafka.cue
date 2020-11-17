@@ -1,7 +1,7 @@
 package metadata
 
 components: _kafka: {
-	description: "[Apache Kafka][urls.kafka] is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
+	description: "[Apache Kafka](\(urls.kafka)) is an open-source project for a distributed publish-subscribe messaging system rethought as a distributed commit log. Kafka stores messages in topics that are partitioned and replicated across multiple brokers in a cluster. Producers send messages to topics from which consumers read. These features make it an excellent candidate for durably storing logs and metrics data."
 
 	features: {
 		_service: {
@@ -57,7 +57,7 @@ components: _kafka: {
 		}
 		librdkafka_options: {
 			common:      false
-			description: "Advanced options. See [librdkafka documentation][urls.librdkafka_config] for details.\n"
+			description: "Advanced options. See [librdkafka documentation](\(urls.librdkafka_config)) for details.\n"
 			required:    false
 			warnings: []
 			type: object: {
@@ -88,7 +88,7 @@ components: _kafka: {
 		librdkafka: {
 			title: "librdkafka"
 			body: """
-				The `kafka` sink uses [`librdkafka`][urls.librdkafka] under the hood. This
+				The `kafka` sink uses [`librdkafka`](\(urls.librdkafka)) under the hood. This
 				is a battle tested, high performance, and reliable library that facilitates
 				communication with Kafka. And because Vector produces static MUSL builds,
 				this dependency is packaged with Vector, meaning you do not need to install it.

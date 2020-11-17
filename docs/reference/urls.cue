@@ -171,6 +171,7 @@ urls: {
 	influxdb_line_protocol:                                   "https://v2.docs.influxdata.com/v2.0/reference/syntax/line-protocol/"
 	inode:                                                    "https://en.wikipedia.org/wiki/Inode"
 	iso3166_2:                                                "https://en.wikipedia.org/wiki/ISO_3166-2"
+	issue_1694: "https://github.com/timberio/vector/issues/1694"
 	jemalloc:                                                 "https://github.com/jemalloc/jemalloc"
 	journald:                                                 "https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html"
 	json:                                                     "https://en.wikipedia.org/wiki/JSON"

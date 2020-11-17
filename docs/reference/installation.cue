@@ -60,11 +60,11 @@ installation: close({
 		roles: {
 			_file_agent: {
 				commands: variables: config: sources: {
-					in_logs: {
+					logs: {
 						type:    components.sources.file.type
 						include: [string, ...string] | *["/var/log/**/*.log"]
 					}
-					in_metrics: type: components.sources.host_metrics.type
+					host_metrics: type: components.sources.host_metrics.type
 				}
 				description: #"""
 							The agent role is designed to collect all data on
@@ -82,11 +82,11 @@ installation: close({
 			}
 			_file_sidecar: {
 				commands: variables: config: sources: {
-					in_logs: {
+					logs: {
 						type:    components.sources.file.type
 						include: [string, ...string] | *["/var/log/my-app*.log"]
 					}
-					in_metrics: type: components.sources.host_metrics.type
+					host_metrics: type: components.sources.host_metrics.type
 				}
 				description: #"""
 							The sidecar role is designed to collect data from
@@ -105,8 +105,8 @@ installation: close({
 			}
 			_journald_agent: {
 				commands: variables: config: sources: {
-					in_logs: type:    components.sources.journald.type
-					in_metrics: type: components.sources.host_metrics.type
+					logs: type:    components.sources.journald.type
+					host_metrics: type: components.sources.host_metrics.type
 				}
 				description: #"""
 							The agent role is designed to collect all data on
@@ -123,8 +123,20 @@ installation: close({
 							"""#
 				title:       "Agent"
 			}
+			_systemd_commands: {
+				_config_path: string
+				configure: #"""
+						cat <<-VECTORCFG > \#(_config_path)
+						{config}
+						VECTORCFG
+						"""#
+				logs:      "sudo journalctl -fu vector"
+				reload:    "systemctl kill -s HUP --kill-who=main vector.service"
+				start:     "sudo systemctl start vector"
+				stop:      "sudo systemctl stop vector"
+			}
 			_vector_aggregator: {
-				commands: variables: config: sources: in: type: components.sources.vector.type
+				commands: variables: config: sources: vector: type: components.sources.vector.type
 				description: #"""
 							The aggregator role is designed to receive and
 							process data from multiple upstream agents.

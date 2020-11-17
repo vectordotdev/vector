@@ -14,20 +14,12 @@ installation: _interfaces: dpkg: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 	roles: {
-		_commands: {
-			configure: #"""
-						cat <<-VECTORCFG > \#(paths.config)
-						{config}
-						VECTORCFG
-						"""#
+		_commands: roles._systemd_commands & {
+			_config_path: paths.config,
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{arch}.deb && \
 					sudo dpkg -i vector-{arch}.deb
 				"""#
-			logs:      "sudo journalctl -fu vector"
-			reload:    "systemctl kill -s HUP --kill-who=main vector.service"
-			start:     "sudo systemctl start vector"
-			stop:      "sudo systemctl stop vector"
 			uninstall: "sudo dpkg -r vector"
 			variables: {
 				arch: ["amd64", "arm64", "armhf"]

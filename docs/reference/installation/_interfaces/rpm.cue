@@ -17,17 +17,9 @@ installation: _interfaces: rpm: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 	roles: {
-		_commands: {
-			configure: #"""
-				cat <<-VECTORCFG > \#(paths.config)
-				{config}
-				VECTORCFG
-				"""#
+		_commands: roles._systemd_commands & {
+			_config_path: paths.config
 			install:   "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm"
-			logs:      "sudo journalctl -fu vector"
-			reload:    "systemctl kill -s HUP --kill-who=main vector.service"
-			start:     "sudo systemctl start vector"
-			stop:      "sudo systemctl stop vector"
 			uninstall: "sudo rpm -e vector"
 			variables: {
 				arch: ["x86_64", "aarch64", "armv7"]

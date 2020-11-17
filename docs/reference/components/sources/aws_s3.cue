@@ -65,7 +65,7 @@ components: sources: aws_s3: {
 			type: string: {
 				default: "sqs"
 				enum: {
-					sqs: "Consume S3 objects by polling for bucket notifications sent to an [SQS queue][urls.sqs]."
+					sqs: "Consume S3 objects by polling for bucket notifications sent to an [AWS SQS queue](\(urls.aws_sqs))."
 				}
 			}
 		}

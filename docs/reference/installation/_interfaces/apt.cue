@@ -16,21 +16,13 @@ installation: _interfaces: apt: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 	roles: {
-		_commands: {
-			configure: #"""
-						cat <<-VECTORCFG > \#(paths.config)
-						{config}
-						VECTORCFG
-						"""#
+		_commands: roles._systemd_commands & {
+			_config_path: paths.config
 			install: #"""
 				curl -1sLf \
 				  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
 				  | sudo -E bash
 				"""#
-			logs:      "sudo journalctl -fu vector"
-			reload:    "systemctl kill -s HUP --kill-who=main vector.service"
-			start:     "sudo systemctl start vector"
-			stop:      "sudo systemctl stop vector"
 			uninstall: "sudo apt remove vector"
 		}
 		agent:      roles._journald_agent & {commands:    _commands}

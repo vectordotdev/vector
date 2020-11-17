@@ -71,7 +71,7 @@ installation: _interfaces: "docker-cli": {
 						"""#
 
 			commands: _commands & {
-				variables: config: sources: in: type: components.sources.docker.type
+				variables: config: sources: logs: type: components.sources.docker.type
 			}
 		}
 		sidecar:    roles._file_sidecar & {commands:      _commands}
