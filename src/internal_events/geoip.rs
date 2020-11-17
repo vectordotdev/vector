@@ -6,10 +6,7 @@ pub struct GeoipEventProcessed;
 
 impl InternalEvent for GeoipEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed", 1,
-            "component_kind" => "transform",
-            "component_type" => "geoip",
-        );
+        counter!("events_processed", 1);
     }
 }
 
@@ -28,11 +25,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "geoip",
-            "error_type" => "type_ip_address_parse_error",
-        );
+        counter!("processing_errors", 1, "error_type" => "type_ip_address_parse_error");
     }
 }
 
@@ -51,10 +44,6 @@ impl<'a> InternalEvent for GeoipFieldDoesNotExist<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
-            "component_kind" => "transform",
-            "component_type" => "geoip",
-            "error_type" => "type_field_does_not_exist",
-        );
+        counter!("processing_errors", 1, "error_type" => "type_field_does_not_exist");
     }
 }
