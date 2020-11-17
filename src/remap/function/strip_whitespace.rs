@@ -36,14 +36,10 @@ impl StripWhitespaceFn {
 }
 
 impl Expression for StripWhitespaceFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
 
-        Ok(Some(value.trim().into()))
+        Ok(value.trim().into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -81,27 +77,27 @@ mod tests {
             ),
             (
                 map!["foo": ""],
-                Ok(Some("".into())),
+                Ok("".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "     "],
-                Ok(Some("".into())),
+                Ok("".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "hi there"],
-                Ok(Some("hi there".into())),
+                Ok("hi there".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "           hi there        "],
-                Ok(Some("hi there".into())),
+                Ok("hi there".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": " \u{3000}\u{205F}\u{202F}\u{A0}\u{9} ❤❤ hi there ❤❤  \u{9}\u{A0}\u{202F}\u{205F}\u{3000} "],
-                Ok(Some("❤❤ hi there ❤❤".into())),
+                Ok("❤❤ hi there ❤❤".into()),
                 StripWhitespaceFn::new(Box::new(Path::from("foo"))),
             ),
         ];

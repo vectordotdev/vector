@@ -40,30 +40,21 @@ impl Assignment {
 }
 
 impl Expression for Assignment {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
 
-        match value {
-            None => Ok(None),
-            Some(value) => {
-                match &self.target {
-                    Target::Variable(variable) => {
-                        state
-                            .variables_mut()
-                            .insert(variable.ident().to_owned(), value.clone());
-                    }
-                    Target::Path(path) => object
-                        .insert(path.segments(), value.clone())
-                        .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
-                }
-
-                Ok(Some(value))
+        match &self.target {
+            Target::Variable(variable) => {
+                state
+                    .variables_mut()
+                    .insert(variable.ident().to_owned(), value.clone());
             }
+            Target::Path(path) => object
+                .insert(path.segments(), value.clone())
+                .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
         }
+
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

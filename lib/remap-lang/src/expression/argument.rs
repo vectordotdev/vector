@@ -58,15 +58,8 @@ impl Argument {
 }
 
 impl Expression for Argument {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let value = match self.expression.execute(state, object)? {
-            Some(value) => value,
-            None => return Ok(None),
-        };
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let value = self.expression.execute(state, object)?;
 
         if !(self.validator)(&value) {
             return Err(E::Function(
@@ -79,7 +72,7 @@ impl Expression for Argument {
             .into());
         }
 
-        Ok(Some(value))
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

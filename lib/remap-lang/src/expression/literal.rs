@@ -20,8 +20,8 @@ impl<T: Into<Value>> From<T> for Literal {
 }
 
 impl Expression for Literal {
-    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
-        Ok(Some(self.0.clone()))
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+        Ok(self.0.clone())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

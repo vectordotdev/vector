@@ -49,15 +49,11 @@ impl FormatTimestampFn {
 }
 
 impl Expression for FormatTimestampFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let format = required!(state, object, self.format, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let ts = required!(state, object, self.value, Value::Timestamp(ts) => ts);
 
-        try_format(&ts, &format).map(Into::into).map(Some)
+        try_format(&ts, &format).map(Into::into)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -129,7 +125,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("10".into())),
+                Ok("10".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
                     "%s",
@@ -137,7 +133,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("1970-01-01T00:00:10+00:00".into())),
+                Ok("1970-01-01T00:00:10+00:00".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
                     "%+",

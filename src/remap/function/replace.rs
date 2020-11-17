@@ -72,11 +72,7 @@ impl ReplaceFn {
 }
 
 impl Expression for ReplaceFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let with = required!(state, object, self.with, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let count = optional!(state, object, self.count, Value::Integer(v) => v).unwrap_or(-1);
@@ -90,7 +86,7 @@ impl Expression for ReplaceFn {
                     _ => value,
                 };
 
-                Ok(Some(replaced.into()))
+                Ok(replaced.into())
             }
             Argument::Regex(regex) => {
                 let replaced = match count {
@@ -102,7 +98,7 @@ impl Expression for ReplaceFn {
                     _ => value.into(),
                 };
 
-                Ok(Some(replaced))
+                Ok(replaced)
             }
         }
     }
@@ -239,7 +235,7 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -249,7 +245,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -259,7 +255,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like apples and bananas".into())),
+                Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -269,7 +265,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -279,7 +275,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bananas".into())),
+                Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -305,7 +301,7 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -315,7 +311,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -325,7 +321,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like apples and bananas".into())),
+                Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -335,7 +331,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -345,7 +341,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bananas".into())),
+                Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -371,7 +367,7 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like biscuits and bananas".into())),
+                Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("apples").into(),
@@ -381,7 +377,7 @@ mod test {
             ),
             (
                 map!["foo": "I like apples and bananas"],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
                     regex::Regex::new("a").unwrap().into(),
@@ -391,7 +387,7 @@ mod test {
             ),
             (
                 map!["foo": "I like [apples] and bananas"],
-                Ok(Some("I like biscuits and bananas".into())),
+                Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
                     regex::Regex::new("\\[apples\\]").unwrap().into(),

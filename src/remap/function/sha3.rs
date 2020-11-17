@@ -50,11 +50,7 @@ impl Sha3Fn {
 }
 
 impl Expression for Sha3Fn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = required!(state, object, self.value, Value::String(v) => v);
 
         let hash = match self.variant.as_deref() {
@@ -65,7 +61,7 @@ impl Expression for Sha3Fn {
             _ => unreachable!("enum invariant"),
         };
 
-        Ok(Some(hash.into()))
+        Ok(hash.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -123,37 +119,27 @@ mod tests {
             ),
             (
                 map!["foo": "foo"],
-                Ok(Some(
-                    "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7".into()
-                )),
+                Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7".into()),
                 Sha3Fn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map![],
-                Ok(Some(
-                    "f4f6779e153c391bbd29c95e72b0708e39d9166c7cea51d1f10ef58a".into()
-                )),
+                Ok("f4f6779e153c391bbd29c95e72b0708e39d9166c7cea51d1f10ef58a".into()),
                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-224")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "76d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01".into()
-                )),
+                Ok("76d3bc41c9f588f7fcd0d5bf4718f8f84b1c41b20882703100b9eb9413807c01".into()),
                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-256")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "665551928d13b7d84ee02734502b018d896a0fb87eed5adb4c87ba91bbd6489410e11b0fbcc06ed7d0ebad559e5d3bb5".into()
-                )),
+                Ok("665551928d13b7d84ee02734502b018d896a0fb87eed5adb4c87ba91bbd6489410e11b0fbcc06ed7d0ebad559e5d3bb5".into()),
                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-384")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7".into()
-                )),
+                Ok("4bca2b137edc580fe50a88983ef860ebaca36c857b1f492839d6d7392452a63c82cbebc68e3b70a2a1480b4bb5d437a7cba6ecf9d89f9ff3ccd14cd6146ea7e7".into()),
                 Sha3Fn::new(Box::new(Literal::from("foo")), Some("SHA3-512")),
             ),
         ];

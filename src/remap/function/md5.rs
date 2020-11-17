@@ -36,19 +36,15 @@ impl Md5Fn {
 }
 
 impl Expression for Md5Fn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use md5::{Digest, Md5};
 
-        self.value.execute(state, object).map(|r| {
-            r.map(|v| match v.as_string_lossy() {
-                Value::String(bytes) => Value::String(hex::encode(Md5::digest(&bytes)).into()),
+        self.value
+            .execute(state, object)
+            .map(|v| match v.as_string_lossy() {
+                Value::String(b) => Value::String(hex::encode(Md5::digest(&b)).into()),
                 _ => unreachable!(),
             })
-        })
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -92,7 +88,7 @@ mod tests {
             ),
             (
                 map!["foo": "foo"],
-                Ok(Some(Value::from("acbd18db4cc2f85cedef654fccc4a4d8"))),
+                Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
                 Md5Fn::new(Box::new(Path::from("foo"))),
             ),
         ];

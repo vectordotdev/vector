@@ -47,11 +47,7 @@ impl ToFloatFn {
 }
 
 impl Expression for ToFloatFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_float = |value| match value {
@@ -204,17 +200,17 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Float(10.0))),
+                Ok(Value::Float(10.0)),
                 ToFloatFn::new(Box::new(Path::from("foo")), Some(Value::Float(10.0))),
             ),
             (
                 map!["foo": "20.5"],
-                Ok(Some(Value::Float(20.5))),
+                Ok(Value::Float(20.5)),
                 ToFloatFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20],
-                Ok(Some(Value::Float(20.0))),
+                Ok(Value::Float(20.0)),
                 ToFloatFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

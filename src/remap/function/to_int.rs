@@ -47,11 +47,7 @@ impl ToIntFn {
 }
 
 impl Expression for ToIntFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_int = |value| match value {
@@ -204,17 +200,17 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Integer(10))),
+                Ok(Value::Integer(10)),
                 ToIntFn::new(Box::new(Path::from("foo")), Some(10.into())),
             ),
             (
                 map!["foo": "20"],
-                Ok(Some(Value::Integer(20))),
+                Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20.5],
-                Ok(Some(Value::Integer(20))),
+                Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

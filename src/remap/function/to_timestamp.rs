@@ -64,11 +64,7 @@ impl ToTimestampFn {
 }
 
 impl Expression for ToTimestampFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_timestamp = |value| match value {
@@ -222,12 +218,12 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Utc.timestamp(10, 0).into())),
+                Ok(Utc.timestamp(10, 0).into()),
                 ToTimestampFn::new(Box::new(Path::from("foo")), Some(10.into())),
             ),
             (
                 map![],
-                Ok(Some(Utc.timestamp(10, 0).into())),
+                Ok(Utc.timestamp(10, 0).into()),
                 ToTimestampFn::new(
                     Box::new(Path::from("foo")),
                     Some(Utc.timestamp(10, 0).into()),
@@ -235,12 +231,12 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Timestamp(Utc.timestamp(10, 0)))),
+                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
                 ToTimestampFn::new(Box::new(Path::from("foo")), Some("10".into())),
             ),
             (
                 map!["foo": Utc.timestamp(10, 0)],
-                Ok(Some(Value::Timestamp(Utc.timestamp(10, 0)))),
+                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
                 ToTimestampFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

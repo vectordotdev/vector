@@ -47,11 +47,7 @@ impl ToBoolFn {
 }
 
 impl Expression for ToBoolFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_bool = |value| match value {
@@ -204,17 +200,17 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), Some(Value::Boolean(true))),
             ),
             (
                 map!["foo": "true"],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

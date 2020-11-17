@@ -47,11 +47,7 @@ impl ParseJsonFn {
 }
 
 impl Expression for ParseJsonFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_json = |value| match value {
             Value::String(bytes) => serde_json::from_slice(&bytes)
                 .map(|v: serde_json::Value| {
@@ -155,22 +151,22 @@ mod tests {
         let cases = vec![
             (
                 map!["foo": "42"],
-                Ok(Some(42.into())),
+                Ok(42.into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": "\"hello\""],
-                Ok(Some("hello".into())),
+                Ok("hello".into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": r#"{"field":"value"}"#],
-                Ok(Some(map!["field": "value"].into())),
+                Ok(map!["field": "value"].into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": r#"{ INVALID }"#],
-                Ok(Some(42.into())),
+                Ok(42.into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), Some("42".into())),
             ),
             (

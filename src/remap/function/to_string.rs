@@ -46,11 +46,7 @@ impl ToStringFn {
 }
 
 impl Expression for ToStringFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_string = |value| match value {
             Value::String(_) => Ok(value),
             _ => Ok(value.as_string_lossy()),
@@ -189,17 +185,17 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::from("default"))),
+                Ok(Value::from("default")),
                 ToStringFn::new(Box::new(Path::from("foo")), Some(Value::from("default"))),
             ),
             (
                 map!["foo": 20],
-                Ok(Some(Value::from("20"))),
+                Ok(Value::from("20")),
                 ToStringFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20.5],
-                Ok(Some(Value::from("20.5"))),
+                Ok(Value::from("20.5")),
                 ToStringFn::new(Box::new(Path::from("foo")), None),
             ),
         ];
