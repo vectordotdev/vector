@@ -73,17 +73,25 @@ impl ReplaceFn {
 
 impl Expression for ReplaceFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
-        let with = required!(state, object, self.with, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
-        let count = optional!(state, object, self.count, Value::Integer(v) => v).unwrap_or(-1);
+        let value_bytes = self.value.execute(state, object)?.try_string()?;
+        let value = String::from_utf8_lossy(&value_bytes);
+
+        let with_bytes = self.with.execute(state, object)?.try_string()?;
+        let with = String::from_utf8_lossy(&with_bytes);
+
+        let count = match &self.count {
+            Some(expr) => expr.execute(state, object)?.try_integer()?,
+            None => -1,
+        };
 
         match &self.pattern {
             Argument::Expression(expr) => {
-                let pattern = required!(state, object, expr, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+                let bytes = expr.execute(state, object)?.try_string()?;
+                let pattern = String::from_utf8_lossy(&bytes);
                 let replaced = match count {
-                    i if i > 0 => value.replacen(&pattern, &with, i as usize),
-                    i if i < 0 => value.replace(&pattern, &with),
-                    _ => value,
+                    i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
+                    i if i < 0 => value.replace(pattern.as_ref(), &with),
+                    _ => value.into_owned(),
                 };
 
                 Ok(replaced.into())
@@ -91,10 +99,10 @@ impl Expression for ReplaceFn {
             Argument::Regex(regex) => {
                 let replaced = match count {
                     i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_str())
+                        .replacen(&value, i as usize, with.as_ref())
                         .as_bytes()
                         .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_str()).as_bytes().into(),
+                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
                     _ => value.into(),
                 };
 

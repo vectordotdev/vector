@@ -1,3 +1,4 @@
+use md5::Digest;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -37,14 +38,9 @@ impl Md5Fn {
 
 impl Expression for Md5Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        use md5::{Digest, Md5};
+        let value = self.value.execute(state, object)?.try_string()?;
 
-        self.value
-            .execute(state, object)
-            .map(|v| match v.as_string_lossy() {
-                Value::String(b) => Value::String(hex::encode(Md5::digest(&b)).into()),
-                _ => unreachable!(),
-            })
+        Ok(hex::encode(md5::Md5::digest(&value)).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

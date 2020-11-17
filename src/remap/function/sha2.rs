@@ -58,7 +58,7 @@ impl Sha2Fn {
 
 impl Expression for Sha2Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = required!(state, object, self.value, Value::String(v) => v);
+        let value = self.value.execute(state, object)?.try_string()?;
 
         let hash = match self.variant.as_deref() {
             Some("SHA-224") => encode::<Sha224>(&value),

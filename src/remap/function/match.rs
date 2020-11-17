@@ -47,14 +47,10 @@ impl MatchFn {
 
 impl Expression for MatchFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        required!(
-            state, object, self.value,
+        let bytes = self.value.execute(state, object)?.try_string()?;
+        let value = String::from_utf8_lossy(&bytes);
 
-            Value::String(b) => {
-                let value = String::from_utf8_lossy(&b);
-                Ok(self.pattern.is_match(&value).into())
-            }
-        )
+        Ok(self.pattern.is_match(&value).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

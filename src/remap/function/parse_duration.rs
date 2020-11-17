@@ -80,18 +80,16 @@ impl ParseDurationFn {
 
 impl Expression for ParseDurationFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
-        };
+        let bytes = self.value.execute(state, object)?.try_string()?;
+        let value = String::from_utf8_lossy(&bytes);
 
         let conversion_factor = {
-            let bytes = required!(state, object, self.output, Value::String(v) => v);
-            let output = String::from_utf8_lossy(&bytes).into_owned();
+            let bytes = self.output.execute(state, object)?.try_string()?;
+            let string = String::from_utf8_lossy(&bytes);
 
             UNITS
-                .get(&output)
-                .ok_or(format!("unknown output format: '{}'", output))?
+                .get(string.as_ref())
+                .ok_or(format!("unknown output format: '{}'", string))?
         };
 
         let captures = RE

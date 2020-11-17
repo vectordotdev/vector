@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use remap::prelude::*;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 
@@ -81,18 +80,26 @@ impl FormatNumberFn {
 
 impl Expression for FormatNumberFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = required!(state, object, self.value,
-            Value::Integer(v) => Decimal::from_i64(v),
-            Value::Float(v) => Decimal::from_f64(v),
-        )
-        .ok_or("unable to parse number")?;
+        let value: Decimal = match self.value.execute(state, object)? {
+            Value::Integer(v) => v.into(),
+            Value::Float(v) => Decimal::from_f64(v).expect("not NaN"),
+            _ => unreachable!(),
+        };
 
-        let scale = optional!(state, object, self.scale, Value::Integer(v) => v);
-        let grouping_separator =
-            optional!(state, object, self.grouping_separator, Value::String(v) => v);
-        let decimal_separator =
-            optional!(state, object, self.decimal_separator, Value::String(v) => v)
-                .unwrap_or_else(|| Bytes::from("."));
+        let scale = match &self.scale {
+            Some(expr) => Some(expr.execute(state, object)?.try_integer()?),
+            None => None,
+        };
+
+        let grouping_separator = match &self.grouping_separator {
+            Some(expr) => Some(expr.execute(state, object)?.try_string()?),
+            None => None,
+        };
+
+        let decimal_separator = match &self.decimal_separator {
+            Some(expr) => expr.execute(state, object)?.try_string()?,
+            None => ".".into(),
+        };
 
         // Split integral and fractional part of float.
         let mut parts = value

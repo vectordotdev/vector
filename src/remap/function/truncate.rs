@@ -67,21 +67,20 @@ impl TruncateFn {
 
 impl Expression for TruncateFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let mut value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+        let bytes = self.value.execute(state, object)?.try_string()?;
+        let mut value = String::from_utf8_lossy(&bytes).into_owned();
+
+        let limit = match self.limit.execute(state, object)? {
+            Value::Float(f) => f.floor() as i64,
+            Value::Integer(i) => i,
+            _ => unreachable!(),
         };
 
-        let limit = required!(
-            state, object, self.limit,
-            Value::Float(f) => f.floor() as i64,
-            Value::Integer(i) => i as i64,
-        );
-
         let limit = if limit < 0 { 0 } else { limit as usize };
-
-        let ellipsis =
-            optional!(state, object, self.ellipsis, Value::Boolean(v) => v).unwrap_or_default();
+        let ellipsis = match &self.ellipsis {
+            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            None => false,
+        };
 
         let pos = if let Some((pos, chr)) = value.char_indices().take(limit).last() {
             // char_indices gives us the starting position of the character at limit,

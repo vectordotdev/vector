@@ -101,7 +101,8 @@ fn message_to_value(message: Message<&str>) -> Value {
 
 impl Expression for ParseSyslogFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let message = required!(state, object, self.value, Value::String(v) => String::from_utf8_lossy(&v).into_owned());
+        let bytes = self.value.execute(state, object)?.try_string()?;
+        let message = String::from_utf8_lossy(&bytes);
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
 
