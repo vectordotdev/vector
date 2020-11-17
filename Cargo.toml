@@ -66,7 +66,7 @@ async-trait = "0.1"
 # Tracing
 tracing = "0.1.15"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
-tracing-subscriber = "0.2.14"
+tracing-subscriber = "0.2.15"
 tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
@@ -100,7 +100,7 @@ prost = "0.6.1"
 prost-types = "0.6.1"
 
 # GCP
-goauth = { version = "0.7.1", optional = true }
+goauth = { version = "0.8.1", optional = true }
 smpl_jwt = { version = "0.5.0", optional = true }
 
 # API
@@ -174,7 +174,7 @@ logfmt = { version = "0.0.2", optional = true }
 notify = "4.0.14"
 once_cell = "1.3"
 getset = "0.1.1"
-lru = "0.4.3"
+lru = "0.6.0"
 bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 task-compat = "0.1"
