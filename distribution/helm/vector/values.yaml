@@ -6,20 +6,21 @@
 # them in each chart.
 # Note: these values are also respected by all charts, so you can keep using
 # them if you switch from the `vector` chart the specific role oriented charts.
-global:
-  # vector:
-  #   image:
-  #     repository: <docker repo>
-  #     #  Overrides the image tag, the default is `{image.version}-{image.base}`
-  #     tag: <tag>
-  #     # Overrides the image version, the default is the Chart appVersion.
-  #     version: <version>
-  #     # Sets the image base OS
-  #     base: <base>
-  # # Sets common environment variables for use globally
-  # commonEnvKV:
-  #   - name: "CHIQUITA"
-  #     value: "banana"
+#
+# global:
+#   vector:
+#     image:
+#       repository: <docker repo>
+#       #  Overrides the image tag, the default is `{image.version}-{image.base}`
+#       tag: <tag>
+#       # Overrides the image version, the default is the Chart appVersion.
+#       version: <version>
+#       # Sets the image base OS
+#       base: <base>
+#   # Sets common environment variables for use globally
+#   commonEnvKV:
+#     - name: "CHIQUITA"
+#       value: "banana"
 
 vector-agent:
   # See the possible settings at the `vector-agent` chart.
