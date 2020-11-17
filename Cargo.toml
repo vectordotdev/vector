@@ -131,7 +131,7 @@ hyper-openssl = "0.8"
 openssl = "0.10.30"
 openssl-probe = "0.1.2"
 flate2 = "1.0.19"
-async-compression = { version = "0.3.5", features = ["tokio-02", "gzip", "zstd"] }
+async-compression = { version = "0.3.6", features = ["tokio-02", "gzip", "zstd"] }
 structopt = "0.3.19"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
