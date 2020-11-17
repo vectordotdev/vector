@@ -15,3 +15,12 @@ vector-agent:
     - secret:
         name: vector-agent-config
         optional: true
+
+vector-aggregator:
+  extraConfigDirSources:
+    - configMap:
+        name: vector-aggregator-config
+        optional: true
+    - secret:
+        name: vector-aggregator-config
+        optional: true
