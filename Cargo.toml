@@ -301,7 +301,7 @@ sources = [
   "sources-apache_metrics",
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
-  "sources-docker",
+  "sources-docker_logs",
   "sources-file",
   "sources-generator",
   "sources-host_metrics",
@@ -323,7 +323,7 @@ sources = [
 sources-apache_metrics = []
 sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
-sources-docker = ["bollard"]
+sources-docker_logs = ["bollard"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
 sources-host_metrics = ["heim", "uom"]
@@ -481,7 +481,7 @@ nightly = []
 all-integration-tests = [
   "aws-integration-tests",
   "clickhouse-integration-tests",
-  "docker-integration-tests",
+  "docker-logs-integration-tests",
   "es-integration-tests",
   "gcp-integration-tests",
   "gcp-pubsub-integration-tests",
@@ -512,7 +512,7 @@ aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-e
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sources-aws_s3", "sinks-aws_s3"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
-docker-integration-tests = ["sources-docker", "unix"]
+docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
 gcp-integration-tests = ["sinks-gcp"]
 gcp-pubsub-integration-tests = ["sinks-gcp"]
