@@ -104,8 +104,8 @@ spec:
               {{- with .Values.extraConfigDirSources }}
               {{- toYaml . | nindent 14 }}
               {{- end }}
-        # Extra volumes.
         {{- with .Values.extraVolumes }}
+        # Extra volumes.
         {{- toYaml . | nindent 8 }}
         {{- end }}
   volumeClaimTemplates:
