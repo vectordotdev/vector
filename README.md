@@ -1,7 +1,4 @@
 <p align="center">
-  <img src="docs/assets/images/diagram.svg" alt="Vector">
-</p>
-<p align="center">
   <strong>
     <a href="https://vector.dev/guides/getting-started/">Get Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -10,6 +7,9 @@
     <a href="https://chat.vector.dev">Chat<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/releases/latest/download/">Download<a/>
   </strong>
+</p>
+<p align="center">
+  <img src="docs/assets/images/diagram.svg" alt="Vector">
 </p>
 
 ## What is Vector?
