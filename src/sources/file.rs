@@ -12,7 +12,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use file_source::{
     paths_provider::glob::{Glob, MatchOptions},
-    FileServer, Fingerprinter,
+    FileServer, FingerprintStrategy, Fingerprinter,
 };
 use futures::{
     compat::{Compat, Future01CompatExt},
@@ -94,17 +94,17 @@ pub enum FingerprintConfig {
     DevInode,
 }
 
-impl From<FingerprintConfig> for Fingerprinter {
-    fn from(config: FingerprintConfig) -> Fingerprinter {
+impl From<FingerprintConfig> for FingerprintStrategy {
+    fn from(config: FingerprintConfig) -> FingerprintStrategy {
         match config {
             FingerprintConfig::Checksum {
                 bytes,
                 ignored_header_bytes,
-            } => Fingerprinter::Checksum {
+            } => FingerprintStrategy::Checksum {
                 bytes,
                 ignored_header_bytes,
             },
-            FingerprintConfig::DevInode => Fingerprinter::DevInode,
+            FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
         }
     }
 }
@@ -208,7 +208,10 @@ pub fn file_source(
         max_line_bytes: config.max_line_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: config.fingerprint.clone().into(),
+        fingerprinter: Fingerprinter {
+            strategy: config.fingerprint.clone().into(),
+            ignore_not_found: false,
+        },
         oldest_first: config.oldest_first,
         remove_after: config.remove_after.map(Duration::from_secs),
         emitter: FileSourceInternalEventsEmitter,

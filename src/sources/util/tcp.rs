@@ -1,4 +1,5 @@
 use crate::{
+    config::Resource,
     internal_events::{ConnectionOpen, OpenGauge, TcpSocketConnectionError},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
@@ -243,6 +244,15 @@ impl fmt::Display for SocketListenAddr {
 impl From<SocketAddr> for SocketListenAddr {
     fn from(addr: SocketAddr) -> Self {
         Self::SocketAddr(addr)
+    }
+}
+
+impl From<SocketListenAddr> for Resource {
+    fn from(addr: SocketListenAddr) -> Resource {
+        match addr {
+            SocketListenAddr::SocketAddr(addr) => addr.into(),
+            SocketListenAddr::SystemdFd(offset) => Self::SystemFdOffset(offset),
+        }
     }
 }
 

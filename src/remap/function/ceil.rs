@@ -46,7 +46,11 @@ impl CeilFn {
 }
 
 impl Expression for CeilFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let precision =
             optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(state, object, self.value,
@@ -58,12 +62,68 @@ impl Expression for CeilFn {
 
         Ok(res.into())
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(Kind::Integer | Kind::Float);
+        let precision_def = self
+            .precision
+            .as_ref()
+            .map(|precision| precision.type_def(state).fallible_unless(Kind::Integer));
+
+        value_def
+            .clone()
+            .merge_optional(precision_def)
+            .with_constraint(match value_def.kind {
+                v if v.is_float() || v.is_integer() => v,
+                _ => Kind::Integer | Kind::Float,
+            })
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    remap::test_type_def![
+        value_float {
+            expr: |_| CeilFn {
+                value: Literal::from(1.0).boxed(),
+                precision: None,
+            },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
+        }
+
+        value_integer {
+            expr: |_| CeilFn {
+                value: Literal::from(1).boxed(),
+                precision: None,
+            },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        }
+
+        value_float_or_integer {
+            expr: |_| CeilFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                precision: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
+        }
+
+        fallible_precision {
+            expr: |_| CeilFn {
+                value: Literal::from(1).boxed(),
+                precision: Some(Variable::new("foo".to_owned()).boxed()),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+    ];
 
     #[test]
     fn ceil() {
@@ -118,7 +178,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -1,19 +1,18 @@
 use crate::{
     config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
-    dns::Resolver,
     http::Auth,
+    http::HttpClient,
     internal_events::{
         PrometheusErrorResponse, PrometheusEventReceived, PrometheusHttpError,
         PrometheusParseError, PrometheusRequestCompleted,
     },
     shutdown::ShutdownSignal,
-    tls::{tls_connector_builder, TlsOptions, TlsSettings},
+    tls::{TlsOptions, TlsSettings},
     Event, Pipeline,
 };
 use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
-use hyper::{client::HttpConnector, Body, Client, Request};
-use hyper_openssl::HttpsConnector;
+use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 use std::time::{Duration, Instant};
@@ -104,12 +103,7 @@ fn prometheus(
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
         .map(move |url| {
-            let mut http = HttpConnector::new_with_resolver(Resolver);
-            http.enforce_http(false);
-
-            let tls = tls_connector_builder(&tls.clone().into()).expect("Building TLS connector failed");
-            let https = HttpsConnector::with_connector(http, tls).expect("TLS initialization failed");
-            let client = Client::builder().build(https);
+            let client = HttpClient::new(tls.clone()).expect("Building HTTP client failed");
 
             let mut request = Request::get(&url)
                 .body(Body::empty())
@@ -120,7 +114,8 @@ fn prometheus(
 
             let start = Instant::now();
             client
-                .request(request)
+                .send(request)
+                .map_err(crate::Error::from)
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
                     let body = hyper::body::to_bytes(body).await?;

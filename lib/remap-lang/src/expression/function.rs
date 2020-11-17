@@ -1,7 +1,11 @@
 use super::Error as E;
-use crate::{Argument, ArgumentList, Expression, Function as Fn, Object, Result, State, Value};
+use crate::{
+    expression,
+    function::{Argument, ArgumentList},
+    state, Expression, Function as Fn, Object, Result, TypeDef, Value,
+};
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("undefined")]
     Undefined,
@@ -15,20 +19,20 @@ pub enum Error {
     #[error(r#"missing required argument "{0}" (position {1})"#)]
     Required(String, usize),
 
-    #[error(r#"unexpected non-value argument "{0}""#)]
-    Expression(&'static str),
+    #[error(r#"unknown keyword "{0}""#)]
+    Unknown(&'static str),
 
-    #[error(r#"incorrect value type for argument "{0}" (got "{0}")"#)]
-    Value(&'static str, &'static str),
+    #[error(r#"error for argument "{0}""#)]
+    Argument(String, #[source] expression::argument::Error),
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Function {
+pub struct Function {
     function: Box<dyn Expression>,
 }
 
 impl Function {
-    pub(crate) fn new(
+    pub fn new(
         ident: String,
         arguments: Vec<(Option<String>, Argument)>,
         definitions: &[Box<dyn Fn>],
@@ -89,14 +93,16 @@ impl Function {
             let argument = match argument {
                 // Wrap expression argument to validate its value type at
                 // runtime.
-                Argument::Expression(expr) => {
-                    Argument::Expression(Box::new(ArgumentValidator::new(
-                        expr,
+                Argument::Expression(expr) => Argument::Expression(
+                    expression::Argument::new(
+                        Box::new(expr),
                         definition.identifier(),
                         param.keyword,
                         param.accepts,
-                    )))
-                }
+                        ident,
+                    )
+                    .into(),
+                ),
                 Argument::Regex(_) => argument,
             };
 
@@ -120,61 +126,33 @@ impl Function {
 }
 
 impl Expression for Function {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         self.function.execute(state, object)
     }
-}
 
-#[derive(Clone)]
-struct ArgumentValidator {
-    expression: Box<dyn Expression>,
-    ident: &'static str,
-    keyword: &'static str,
-    validator: fn(&Value) -> bool,
-}
-
-impl std::fmt::Debug for ArgumentValidator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ArgumentValidator")
-            .field("expression", &self.expression)
-            .field("ident", &self.ident)
-            .field("keyword", &self.keyword)
-            .field("validator", &"fn(&Value) -> bool".to_owned())
-            .finish()
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.function.type_def(state)
     }
 }
 
-impl ArgumentValidator {
-    pub fn new(
-        expression: Box<dyn Expression>,
-        ident: &'static str,
-        keyword: &'static str,
-        validator: fn(&Value) -> bool,
-    ) -> Self {
-        Self {
-            expression,
-            ident,
-            keyword,
-            validator,
-        }
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{expression::Noop, test_type_def, value::Kind};
 
-impl Expression for ArgumentValidator {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let value = self
-            .expression
-            .execute(state, object)?
-            .ok_or_else(|| E::Function(self.ident.to_owned(), Error::Expression(self.keyword)))?;
-
-        if !(self.validator)(&value) {
-            return Err(E::Function(
-                self.ident.to_owned(),
-                Error::Value(self.keyword, value.kind()),
-            )
-            .into());
-        }
-
-        Ok(Some(value))
-    }
+    test_type_def![pass_through {
+        expr: |_| {
+            let function = Box::new(Noop);
+            Function { function }
+        },
+        def: TypeDef {
+            fallible: false,
+            optional: true,
+            kind: Kind::all(),
+        },
+    }];
 }

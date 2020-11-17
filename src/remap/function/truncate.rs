@@ -66,7 +66,11 @@ impl TruncateFn {
 }
 
 impl Expression for TruncateFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(
+        &self,
+        state: &mut state::Program,
+        object: &mut dyn Object,
+    ) -> Result<Option<Value>> {
         let mut value = {
             let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -74,9 +78,11 @@ impl Expression for TruncateFn {
 
         let limit = required!(
             state, object, self.limit,
-            Value::Float(f) if f >= 0.0 => f.floor() as usize,
-            Value::Integer(i) if i >= 0 => i as usize,
+            Value::Float(f) => f.floor() as i64,
+            Value::Integer(i) => i as i64,
         );
+
+        let limit = if limit < 0 { 0 } else { limit as usize };
 
         let ellipsis =
             optional!(state, object, self.ellipsis, Value::Boolean(v) => v).unwrap_or_default();
@@ -100,12 +106,88 @@ impl Expression for TruncateFn {
 
         Ok(Some(value.into()))
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::String)
+            .merge(
+                self.limit
+                    .type_def(state)
+                    .fallible_unless(Kind::Integer | Kind::Float),
+            )
+            .merge_optional(
+                self.ellipsis
+                    .as_ref()
+                    .map(|ellipsis| ellipsis.type_def(state).fallible_unless(Kind::Boolean)),
+            )
+            .with_constraint(Kind::String)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    remap::test_type_def![
+        infallible {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from(1).boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| TruncateFn {
+                value: Literal::from(false).boxed(),
+                limit: Literal::from(1).boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+        }
+
+        limit_float {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from(1.0).boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
+        }
+
+        limit_non_number {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from("bar").boxed(),
+                ellipsis: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+        }
+
+        ellipsis_boolean {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from(10).boxed(),
+                ellipsis: Some(Literal::from(true).boxed()),
+            },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
+        }
+
+        ellipsis_non_boolean {
+            expr: |_| TruncateFn {
+                value: Literal::from("foo").boxed(),
+                limit: Literal::from("bar").boxed(),
+                ellipsis: Some(Literal::from("baz").boxed()),
+            },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+        }
+    ];
 
     #[test]
     fn truncate() {
@@ -184,7 +266,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -499,7 +499,8 @@ impl remap::Object for Event {
     }
 
     fn remove(&mut self, path: &str, compact: bool) {
-        self.as_mut_log().remove_prune(path, compact);
+        self.as_mut_log()
+            .remove_prune(path.trim_start_matches('.'), compact);
     }
 }
 
