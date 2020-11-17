@@ -32,6 +32,8 @@ mod docker_logs;
 mod elasticsearch;
 #[cfg(feature = "sources-generator")]
 mod generator;
+#[cfg(feature = "transforms-geoip")]
+mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
@@ -136,6 +138,8 @@ pub use self::elasticsearch::*;
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
+#[cfg(feature = "transforms-geoip")]
+pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
