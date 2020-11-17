@@ -27,8 +27,8 @@ mod concat;
 mod console;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
-#[cfg(feature = "sources-docker")]
-mod docker;
+#[cfg(feature = "sources-docker_logs")]
+mod docker_logs;
 mod elasticsearch;
 #[cfg(feature = "sources-generator")]
 mod generator;
@@ -129,8 +129,8 @@ pub use self::concat::*;
 pub use self::console::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
-#[cfg(feature = "sources-docker")]
-pub use self::docker::*;
+#[cfg(feature = "sources-docker_logs")]
+pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
