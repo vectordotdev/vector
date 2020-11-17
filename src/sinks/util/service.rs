@@ -5,7 +5,6 @@ use super::{
     Batch, BatchSink, Partition, PartitionBatchSink,
 };
 use crate::buffers::Acker;
-use futures::TryFutureExt;
 use serde::{
     de::{self, Unexpected, Visitor},
     Deserialize, Deserializer, Serialize,
@@ -366,21 +365,18 @@ pub struct Map<S, R1, R2> {
 impl<S, R1, R2> Service<R1> for Map<S, R1, R2>
 where
     S: Service<R2>,
-    crate::Error: From<S::Error>,
 {
     type Response = S::Response;
-    type Error = crate::Error;
-    type Future = futures::future::MapErr<S::Future, fn(S::Error) -> crate::Error>;
+    type Error = S::Error;
+    type Future = S::Future;
 
     fn poll_ready(&mut self, cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner
-            .poll_ready(cx)
-            .map(|result| result.map_err(|e| e.into()))
+        self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: R1) -> Self::Future {
         let req = (self.f)(req);
-        self.inner.call(req).map_err(Into::into)
+        self.inner.call(req)
     }
 }
 
