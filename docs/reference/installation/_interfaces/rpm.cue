@@ -17,10 +17,11 @@ installation: _interfaces: rpm: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 	roles: {
-		_commands: roles._systemd_commands & {
+		_commands: roles._systemd_commands & roles._bash_configure & {
 			_config_path: paths.config
-			install:   "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm"
-			uninstall: "sudo rpm -e vector"
+			install:      "sudo rpm -i https://packages.timber.io/vector/{version}/vector-{arch}.rpm"
+			uninstall:    "sudo rpm -e vector"
+			upgrade:      null
 			variables: {
 				arch: ["x86_64", "aarch64", "armv7"]
 				version: true

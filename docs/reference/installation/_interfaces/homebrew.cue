@@ -16,12 +16,8 @@ installation: _interfaces: homebrew: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 	roles: {
-		_commands: {
-			configure: #"""
-						cat <<-VECTORCFG > \#(paths.config)
-						{config}
-						VECTORCFG
-						"""#
+		_commands: roles._bash_configure & {
+			_config_path: paths.config
 			install: #"""
 				curl -1sLf \
 				  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
@@ -32,6 +28,7 @@ installation: _interfaces: homebrew: {
 			start:     "sudo systemctl start vector"
 			stop:      "sudo systemctl stop vector"
 			uninstall: "brew remove vector"
+			upgrade:   "brew update && brew upgrade vector"
 		}
 		agent:      roles._file_agent & {commands:        _commands}
 		aggregator: roles._vector_aggregator & {commands: _commands}

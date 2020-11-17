@@ -16,14 +16,10 @@ installation: _interfaces: "docker-cli": {
 	}
 	platform_name: installation.platforms.docker.name
 	roles: {
-		_commands: {
+		_commands: roles._bash_configure & {
 			_api_port:         8383
+			_config_path:      paths.config
 			_docker_sock_path: "/var/run/docker.sock"
-			configure:         #"""
-								cat <<-VECTORCFG > \#(paths.config)
-								{config}
-								VECTORCFG
-								"""#
 			install:           null
 			logs:              "docker logs -f $(docker ps -aqf \"name=vector\")"
 			reload:            "docker kill --signal=HUP timberio/vector"
@@ -35,6 +31,7 @@ installation: _interfaces: "docker-cli": {
 								"""#
 			stop:              "docker stop timberio/vector"
 			uninstall:         "docker rm timberio/vector timberio/vector"
+			upgrade:           null
 			variables: {
 				flags: {
 					// TODO: Use Cue field comprehensions to generate this list.

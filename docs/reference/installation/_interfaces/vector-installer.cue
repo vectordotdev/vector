@@ -16,18 +16,15 @@ installation: _interfaces: "vector-installer": {
 		config:      "./vector.{config_format}"
 	}
 	roles: {
-		_commands: {
-			configure: #"""
-						cat <<-VECTORCFG > \#(paths.config)
-						{config}
-						VECTORCFG
-						"""#
-			install:   "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
-			logs:      null
-			reload:    #"ps axf | grep vector | grep -v grep | awk '{print "kill -SIGHUP " $1}' | sh"#
-			start:     "vector --config \(paths.config)"
-			stop:      null
-			uninstall: "rm -rf ./vector"
+		_commands: roles._bash_configure & {
+			_config_path: paths.config
+			install:      "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
+			logs:         null
+			reload:       #"ps axf | grep vector | grep -v grep | awk '{print "kill -SIGHUP " $1}' | sh"#
+			start:        "vector --config \(paths.config)"
+			stop:         null
+			uninstall:    "rm -rf ./vector"
+			upgrade:      null
 		}
 		agent: {commands: _commands}
 		sidecar:    roles._file_sidecar & {commands:      _commands}

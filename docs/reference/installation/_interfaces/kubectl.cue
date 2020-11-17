@@ -17,22 +17,27 @@ installation: _interfaces: kubectl: {
 	platform_name: installation.platforms.kubernetes.name
 	roles: {
 		_commands: {
-			_role:     string
-			configure: #"""
+			_resource_type: string
+			_role:          string
+			configure:      #"""
 						cat <<-VECTORCFG > \#(paths.config)
 						{config}
 						VECTORCFG
 						"""#
-			install:   "kubectl apply -k ."
-			logs:      #"kubectl logs -n vector daemonset/vector-\#(_role)"#
-			reload:    #"kubectl rollout restart daemonset/vector-\#(_role)"#
-			start:     null
-			stop:      null
-			uninstall: "kubectl delete -k ."
+			install:        "kubectl apply -k ."
+			logs:           #"kubectl logs -n vector \#(_resource_type)/vector-\#(_role)"#
+			reconfigure:    #"kubectl edit \#(_resource_type) vector-\#(_role)"#
+			reload:         #"kubectl rollout restart \#(_resource_type)/vector-\#(_role)"#
+			start:          null
+			stop:           null
+			top:            null
+			uninstall:      "kubectl delete -k ."
+			upgrade:        null
 		}
 		agent: {
 			commands: _commands & {
-				_role: "agent"
+				_resource_type: "daemonset"
+				_role:          "agent"
 				variables: config: sinks: out: inputs: ["internal_metrics", "kubernetes_logs"]
 			}
 			description: "test"
@@ -40,7 +45,8 @@ installation: _interfaces: kubectl: {
 		}
 		aggregator: {
 			commands: _commands & {
-				_role: "aggregator"
+				_resource_type: "statefulset"
+				_role:          "aggregator"
 				variables: config: sources: in_upstream: type: components.sources.vector.type
 			}
 			description: "test"

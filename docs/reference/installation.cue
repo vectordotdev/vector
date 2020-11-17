@@ -2,13 +2,16 @@ package metadata
 
 installation: close({
 	#Commands: {
-		configure: string
-		install:   string | null
-		logs:      string | null
-		reload:    string | null
-		start:     string | null
-		stop:      string | null
-		uninstall: string
+		configure:   string
+		install:     string | null
+		logs:        string | null
+		reconfigure: string | null
+		reload:      string | null
+		start:       string | null
+		stop:        string | null
+		top:         string | null | *"vector top"
+		uninstall:   string
+		upgrade:     string | null
 		variables: {
 			arch?: [string, ...string]
 			flags?: {
@@ -20,8 +23,12 @@ installation: close({
 				sources: [Name=string]: {
 					type: string
 
-					include?: [string, ...string]
+					if type == "file" {
+						include: [string, ...string]
+					}
 				}
+
+				api: enabled: true
 
 				sources: internal_metrics: type: "internal_metrics"
 
@@ -58,6 +65,15 @@ installation: close({
 			config:      string
 		}
 		roles: {
+			_bash_configure: {
+				_config_path: string
+				configure:    #"""
+						cat <<-VECTORCFG > \#(_config_path)
+						{config}
+						VECTORCFG
+						"""#
+				reconfigure:  "vi \(_config_path)"
+			}
 			_file_agent: {
 				commands: variables: config: sources: {
 					logs: {
@@ -105,7 +121,7 @@ installation: close({
 			}
 			_journald_agent: {
 				commands: variables: config: sources: {
-					logs: type:    components.sources.journald.type
+					logs: type:         components.sources.journald.type
 					host_metrics: type: components.sources.host_metrics.type
 				}
 				description: #"""
@@ -124,16 +140,10 @@ installation: close({
 				title:       "Agent"
 			}
 			_systemd_commands: {
-				_config_path: string
-				configure: #"""
-						cat <<-VECTORCFG > \#(_config_path)
-						{config}
-						VECTORCFG
-						"""#
-				logs:      "sudo journalctl -fu vector"
-				reload:    "systemctl kill -s HUP --kill-who=main vector.service"
-				start:     "sudo systemctl start vector"
-				stop:      "sudo systemctl stop vector"
+				logs:   "sudo journalctl -fu vector"
+				reload: "systemctl kill -s HUP --kill-who=main vector.service"
+				start:  "sudo systemctl start vector"
+				stop:   "sudo systemctl stop vector"
 			}
 			_vector_aggregator: {
 				commands: variables: config: sources: vector: type: components.sources.vector.type

@@ -14,13 +14,14 @@ installation: _interfaces: dpkg: {
 		config:      "/etc/vector/vector.{config_format}"
 	}
 	roles: {
-		_commands: roles._systemd_commands & {
-			_config_path: paths.config,
+		_commands: roles._systemd_commands & roles._bash_configure & {
+			_config_path: paths.config
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{arch}.deb && \
 					sudo dpkg -i vector-{arch}.deb
 				"""#
 			uninstall: "sudo dpkg -r vector"
+			upgrade:   null
 			variables: {
 				arch: ["amd64", "arm64", "armhf"]
 				version: true

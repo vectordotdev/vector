@@ -87,7 +87,7 @@ components: _kafka: {
 	how_it_works: {
 		librdkafka: {
 			title: "librdkafka"
-			body: """
+			body:  """
 				The `kafka` sink uses [`librdkafka`](\(urls.librdkafka)) under the hood. This
 				is a battle tested, high performance, and reliable library that facilitates
 				communication with Kafka. And because Vector produces static MUSL builds,

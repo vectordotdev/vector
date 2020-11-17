@@ -288,7 +288,7 @@ components: sinks: aws_s3: {
 
 		object_acl: {
 			title: "Object Access Control List (ACL)"
-			body: """
+			body:  """
 				AWS S3 supports [access control lists (ACL)](\(urls.aws_s3_acl)) for buckets and
 				objects. In the context of Vector, only object ACLs are relevant (Vector does
 				not create or modify buckets). You can set the object level ACL by using one
@@ -298,7 +298,7 @@ components: sinks: aws_s3: {
 			sub_sections: [
 				{
 					title: "`acl.*` vs `grant_*` options"
-					body: """
+					body:  """
 						The `grant_*` options name a specific entity to grant access to. The `acl`
 						options is one of a set of [specific canned ACLs](\(urls.aws_s3_canned_acl)) that
 						can only name the owner or world.
@@ -309,7 +309,7 @@ components: sinks: aws_s3: {
 
 		object_naming: {
 			title: "Object Naming"
-			body: """
+			body:  """
 				By default, Vector will name your S3 objects in the following format:
 
 				<Tabs
@@ -360,7 +360,7 @@ components: sinks: aws_s3: {
 
 		server_side_encryption: {
 			title: "Server-side Encryption"
-			body: """
+			body:  """
 				AWS S3 offers [server-side encryption](\(urls.aws_s3_sse)). You can apply defaults
 				at the bucket level or set the encryption at the object level. In the context,
 				of Vector only the object level is relevant (Vector does not create or modify
@@ -372,7 +372,7 @@ components: sinks: aws_s3: {
 
 		storage_class: {
 			title: "Storage Class"
-			body: """
+			body:  """
 				AWS S3 offers [storage classes](\(urls.aws_s3_storage_classes)). You can apply
 				defaults, and rules, at the bucket level or set the storage class at the object
 				level. In the context of Vector only the object level is relevant (Vector does
@@ -383,7 +383,7 @@ components: sinks: aws_s3: {
 
 		tags_and_metadata: {
 			title: "Tags & Metadata"
-			body: """
+			body:  """
 				Vector currently only supports [AWS S3 object tags](\(urls.aws_s3_tags)) and does
 				_not_ support [object metadata](\(urls.aws_s3_metadata)). If you require metadata
 				support see [issue #1694](\(urls.issue_1694)).

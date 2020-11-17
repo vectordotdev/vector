@@ -18,18 +18,20 @@ installation: _interfaces: helm: {
 	platform_name:        installation.platforms.kubernetes.name
 	roles: {
 		_commands: {
-			_role:     string
-			configure: #"""
+			_role:       string
+			configure:   #"""
 						cat <<-VECTORCFG > \#(paths.config)
 						{config}
 						VECTORCFG
 						"""#
-			install:   "kubectl apply -k ."
-			logs:      #"kubectl logs -n vector daemonset/vector-\#(_role)"#
-			reload:    #"kubectl rollout restart daemonset/vector-\#(_role)"#
-			start:     null
-			stop:      null
-			uninstall: "kubectl delete -k ."
+			install:     "kubectl apply -k ."
+			logs:        #"kubectl logs -n vector daemonset/vector-\#(_role)"#
+			reconfigure: #"kubectl edit daemonset vector-\#(_role)"#
+			reload:      #"kubectl rollout restart daemonset/vector-\#(_role)"#
+			start:       null
+			stop:        null
+			uninstall:   "kubectl delete -k ."
+			upgrade:     "helm upgrade vector timberio/vector --version {version}"
 		}
 		agent: {
 			title:       "Agent"
