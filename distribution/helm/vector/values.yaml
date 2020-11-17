@@ -17,10 +17,9 @@
 #       version: <version>
 #       # Sets the image base OS
 #       base: <base>
-#   # Sets common environment variables for use globally
-#   commonEnvKV:
-#     - name: "CHIQUITA"
-#       value: "banana"
+#     # Sets common environment variables for use in all `Pod`s.
+#     commonEnvKV:
+#       LOG: info
 
 vector-agent:
   # See the possible settings at the `vector-agent` chart.
