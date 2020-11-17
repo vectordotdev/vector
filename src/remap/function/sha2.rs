@@ -118,7 +118,7 @@ mod tests {
                 value: Box::new(Noop),
                 variant: None,
             },
-            def: TypeDef { fallible: true, optional: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
         }
     ];
 
