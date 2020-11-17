@@ -1,13 +1,15 @@
+global:
+
+  vector:
+    image:
+      # Use the latest release image.
+      version: latest
+
+    commonEnvKV:
+      # Set the log level reasonably high.
+      LOG: info
+
 vector-agent:
-  image:
-    # Use the latest release image.
-    version: latest
-
-  env:
-    # Set the log level reasonably high.
-    - name: LOG
-      value: info
-
   extraConfigDirSources:
     - configMap:
         name: vector-agent-config
