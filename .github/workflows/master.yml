@@ -185,7 +185,7 @@ jobs:
       - run: make slim-builds
       - run: make test-integration-clickhouse
 
-  test-integration-docker:
+  test-integration-docker-logs:
     name: Integration - Linux, Docker
     runs-on: ubuntu-20.04
     steps:
@@ -201,7 +201,7 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make test-integration-docker
+      - run: make test-integration-docker-logs
 
   test-integration-elasticsearch:
     name: Integration - Linux, ES
@@ -426,7 +426,7 @@ jobs:
       - test-misc
       - test-integration-aws
       - test-integration-clickhouse
-      - test-integration-docker
+      - test-integration-docker-logs
       - test-integration-elasticsearch
       - test-integration-gcp
       - test-integration-humio

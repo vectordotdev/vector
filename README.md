@@ -42,11 +42,11 @@ or [**install Vector**][docs.installation].
 
 * Vector is relied on by startups and enterprises like **T-Mobile**,
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
-  **Tuple**, **Douban**, and thousands of others.
+  **Tuple**, **Douban**, and many more.
 * Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 30TB daily**.
-* Vector partners, and works closely, with vendors like **Humio**, **AWS**,
-  **New Relic**, **Chronosphere**, **Infux Data**, **Sematext**, and more.
+* Vector's largest user **processes over 10TB daily**.
+* Vector is **used by multiple fortune 500 companies** with stringent production requirements.
+* Vector has **over 15 active contributors** and growing.
 
 ## [Documentation](https://vector.dev/docs/)
 
@@ -106,12 +106,12 @@ fundamental differences in quality and attention to detail:
 
 |                                                                                                                             Test | Vector | Filebeat | FluentBit | FluentD | Logstash | Splunk UF | Splunk HF |
 |---------------------------------------------------------------------------------------------------------------------------------:|:------:|:--------:|:---------:|:-------:|:--------:|:---------:|:---------:|
-| [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  |    ✓     |     X     |    X    |    ⚠     |     ✓     |     ✓     |
+| [Disk Buffer Persistence](https://github.com/timberio/vector-test-harness/tree/master/cases/disk_buffer_persistence_correctness) | **✓**  |    ✓     |           |         |    ⚠     |     ✓     |     ✓     |
 |         [File Rotate (create)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_create_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-| [File Rotate (copytruncate)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |    X     |     X     |    X    |    X     |     ✓     |     ✓     |
+| [File Rotate (copytruncate)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          |     ✓     |     ✓     |
 |                   [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
-|                         [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | **✓**  |    X     |     X     |    X    |    ⚠     |     ✓     |     ✓     |
-|                     [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | **✓**  |    ✓     |     X     |    ✓    |    ✓     |     ✓     |     ✓     |
+|                         [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | **✓**  |          |           |         |    ⚠     |     ✓     |     ✓     |
+|                     [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | **✓**  |    ✓     |           |    ✓    |    ✓     |     ✓     |     ✓     |
 
 To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
 
@@ -134,7 +134,7 @@ Vector is an end-to-end, unified, open data platform.
 |     **Reliability** |   **✓**    |       |           |         |          |           |           |
 |         Memory-safe |   **✓**    |       |           |         |          |           |           |
 | Delivery guarantees |   **✓**    |       |           |         |          |     ✓     |     ✓     |
-|          Multi-core |   **✓**    |   ✓   |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
+|          Multi-core |   **✓**    |   ✓   |           |    ✓    |    ✓     |     ✓     |     ✓     |
 
 
 ⚠ = Not interoperable, metrics are represented as structured logs
