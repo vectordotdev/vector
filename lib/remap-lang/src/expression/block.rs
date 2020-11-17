@@ -83,7 +83,7 @@ mod tests {
             ]),
             def: TypeDef {
                 fallible: true,
-                kind: Kind::String | Kind::Integer | Kind::Float,
+                kind: Kind::Bytes | Kind::Integer | Kind::Float,
                 ..Default::default()
             },
         }

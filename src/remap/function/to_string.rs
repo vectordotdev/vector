@@ -48,7 +48,7 @@ impl ToStringFn {
 impl Expression for ToStringFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_string = |value| match value {
-            Value::String(_) => Ok(value),
+            Value::Bytes(_) => Ok(value),
             _ => Ok(value.as_string_lossy()),
         };
 
@@ -65,7 +65,7 @@ impl Expression for ToStringFn {
             .merge_with_default_optional(
                 self.default.as_ref().map(|default| default.type_def(state)),
             )
-            .with_constraint(value::Kind::String)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -79,42 +79,42 @@ mod tests {
     remap::test_type_def![
         boolean_infallible {
             expr: |_| ToStringFn { value: Literal::from(true).boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToStringFn { value: Literal::from(1).boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToStringFn { value: Literal::from(1.0).boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         null_infallible {
             expr: |_| ToStringFn { value: Literal::from(()).boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         string_infallible {
             expr: |_| ToStringFn { value: Literal::from("foo").boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         map_infallible {
             expr: |_| ToStringFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         array_infallible {
             expr: |_| ToStringFn { value: Literal::from(vec![0]).boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         timestamp_infallible {
             expr: |_| ToStringFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -122,7 +122,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
 
@@ -134,7 +134,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
 
@@ -146,7 +146,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
 
@@ -158,7 +158,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
 
@@ -170,7 +170,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
     ];

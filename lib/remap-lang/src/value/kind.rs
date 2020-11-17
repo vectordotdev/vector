@@ -6,7 +6,7 @@ use std::ops::Deref;
 
 bitflags::bitflags! {
     pub struct Kind: u16 {
-        const String = 1 << 1;
+        const Bytes = 1 << 1;
         const Integer = 1 << 2;
         const Float = 1 << 3;
         const Boolean = 1 << 4;
@@ -57,7 +57,9 @@ macro_rules! impl_kind {
 
         impl Kind {
             pub fn as_str(self) -> &'static str {
+                #[allow(unreachable_patterns)]
                 match self {
+                    Kind::Bytes => "string", // special-cased
                     $(Kind::$kind => stringify!($name)),+,
                     _ if self.is_all() => "any",
                     _ if self.is_empty() => "none",
@@ -103,7 +105,7 @@ macro_rules! impl_kind {
 }
 
 impl_kind![
-    (String, string),
+    (Bytes, bytes),
     (Integer, integer),
     (Float, float),
     (Boolean, boolean),
@@ -124,7 +126,7 @@ impl Deref for Kind {
 impl From<&Value> for Kind {
     fn from(value: &Value) -> Self {
         match value {
-            Value::String(_) => Kind::String,
+            Value::Bytes(_) => Kind::Bytes,
             Value::Integer(_) => Kind::Integer,
             Value::Float(_) => Kind::Float,
             Value::Boolean(_) => Kind::Boolean,

@@ -12,7 +12,7 @@ impl Function for Downcase {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -48,8 +48,8 @@ impl Expression for DowncaseFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
-            .with_constraint(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -87,12 +87,12 @@ mod tests {
     remap::test_type_def![
         string {
             expr: |_| DowncaseFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: value::Kind::String, ..Default::default() },
+            def: TypeDef { kind: value::Kind::Bytes, ..Default::default() },
         }
 
         non_string {
             expr: |_| DowncaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
     ];
 }

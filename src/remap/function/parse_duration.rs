@@ -44,12 +44,12 @@ impl Function for ParseDuration {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "output",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
         ]
@@ -80,11 +80,11 @@ impl ParseDurationFn {
 
 impl Expression for ParseDurationFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_string()?;
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
         let conversion_factor = {
-            let bytes = self.output.execute(state, object)?.try_string()?;
+            let bytes = self.output.execute(state, object)?.try_bytes()?;
             let string = String::from_utf8_lossy(&bytes);
 
             UNITS
@@ -115,11 +115,11 @@ impl Expression for ParseDurationFn {
         let output_def = self
             .output
             .type_def(state)
-            .fallible_unless(value::Kind::String);
+            .fallible_unless(value::Kind::Bytes);
 
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .merge(output_def)
             .into_fallible(true) // parsing errors
             .with_constraint(value::Kind::Float)
