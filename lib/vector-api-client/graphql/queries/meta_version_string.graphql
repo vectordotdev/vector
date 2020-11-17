@@ -1,0 +1,5 @@
+query MetaVersionStringQuery {
+    meta {
+        versionString
+    }
+}

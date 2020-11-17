@@ -24,10 +24,12 @@ mod tests {
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
-    use vector_api_client::gql::ComponentsSubscriptionExt;
     use vector_api_client::{
         connect_subscription_client,
-        gql::{HealthQueryExt, HealthSubscriptionExt, MetricsSubscriptionExt},
+        gql::{
+            ComponentsSubscriptionExt, HealthQueryExt, HealthSubscriptionExt, MetaQueryExt,
+            MetricsSubscriptionExt,
+        },
         Client, SubscriptionClient,
     };
 
@@ -281,6 +283,17 @@ mod tests {
 
         assert!(res.data.unwrap().health);
         assert_eq!(res.errors, None);
+    }
+
+    #[tokio::test]
+    /// tests that version_string meta matches the current Vector version
+    async fn api_graphql_meta_version_string() {
+        let server = start_server();
+        let client = make_client(server.addr());
+
+        let res = client.meta_version_string().await.unwrap();
+
+        assert_eq!(res.data.unwrap().meta.version_string, vector::get_version());
     }
 
     #[tokio::test]
