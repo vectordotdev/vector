@@ -66,11 +66,7 @@ impl TruncateFn {
 }
 
 impl Expression for TruncateFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let mut value = {
             let bytes = required!(state, object, self.value, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -104,26 +100,26 @@ impl Expression for TruncateFn {
             }
         }
 
-        Ok(Some(value.into()))
+        Ok(value.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         self.value
             .type_def(state)
-            .fallible_unless(String)
+            .fallible_unless(Kind::String)
             .merge(
                 self.limit
                     .type_def(state)
-                    .fallible_unless(vec![Integer, Float]),
+                    .fallible_unless(Kind::Integer | Kind::Float),
             )
             .merge_optional(
                 self.ellipsis
                     .as_ref()
-                    .map(|ellipsis| ellipsis.type_def(state).fallible_unless(Boolean)),
+                    .map(|ellipsis| ellipsis.type_def(state).fallible_unless(Kind::Boolean)),
             )
-            .with_constraint(String)
+            .with_constraint(Kind::String)
     }
 }
 
@@ -131,6 +127,7 @@ impl Expression for TruncateFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
 
     remap::test_type_def![
         infallible {
@@ -139,7 +136,7 @@ mod tests {
                 limit: Literal::from(1).boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         value_non_string {
@@ -148,7 +145,7 @@ mod tests {
                 limit: Literal::from(1).boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         limit_float {
@@ -157,7 +154,7 @@ mod tests {
                 limit: Literal::from(1.0).boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         limit_non_number {
@@ -166,7 +163,7 @@ mod tests {
                 limit: Literal::from("bar").boxed(),
                 ellipsis: None,
             },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         ellipsis_boolean {
@@ -175,7 +172,7 @@ mod tests {
                 limit: Literal::from(10).boxed(),
                 ellipsis: Some(Literal::from(true).boxed()),
             },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         ellipsis_non_boolean {
@@ -184,7 +181,7 @@ mod tests {
                 limit: Literal::from("bar").boxed(),
                 ellipsis: Some(Literal::from("baz").boxed()),
             },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
     ];
 
@@ -193,7 +190,7 @@ mod tests {
         let cases = vec![
             (
                 map!["foo": "Super"],
-                Ok(Some("".into())),
+                Ok("".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(0.0)),
@@ -202,7 +199,7 @@ mod tests {
             ),
             (
                 map!["foo": "Super"],
-                Ok(Some("...".into())),
+                Ok("...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(0.0)),
@@ -211,7 +208,7 @@ mod tests {
             ),
             (
                 map!["foo": "Super"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(10.0)),
@@ -220,7 +217,7 @@ mod tests {
             ),
             (
                 map!["foo": "Super"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),
@@ -229,7 +226,7 @@ mod tests {
             ),
             (
                 map!["foo": "Supercalifragilisticexpialidocious"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),
@@ -238,7 +235,7 @@ mod tests {
             ),
             (
                 map!["foo": "♔♕♖♗♘♙♚♛♜♝♞♟"],
-                Ok(Some("♔♕♖♗♘♙...".into())),
+                Ok("♔♕♖♗♘♙...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(6.0)),
@@ -247,7 +244,7 @@ mod tests {
             ),
             (
                 map!["foo": "Supercalifragilisticexpialidocious"],
-                Ok(Some("Super...".into())),
+                Ok("Super...".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),
@@ -256,7 +253,7 @@ mod tests {
             ),
             (
                 map!["foo": "Supercalifragilisticexpialidocious"],
-                Ok(Some("Super".into())),
+                Ok("Super".into()),
                 TruncateFn::new(
                     Box::new(Path::from("foo")),
                     Box::new(Literal::from(5.0)),

@@ -37,19 +37,12 @@ impl UpcaseFn {
 }
 
 impl Expression for UpcaseFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.value
-            .execute(state, object)?
-            .map(String::try_from)
-            .transpose()?
+            .execute(state, object)
+            .and_then(|v| String::try_from(v).map_err(Into::into))
             .map(|v| v.to_uppercase())
             .map(Into::into)
-            .map(Ok)
-            .transpose()
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -64,16 +57,17 @@ impl Expression for UpcaseFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
 
     remap::test_type_def![
         string {
             expr: |_| UpcaseFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         non_string {
             expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
     ];
 
@@ -87,7 +81,7 @@ mod tests {
             ),
             (
                 map!["foo": "foo 2 bar"],
-                Ok(Some(Value::from("FOO 2 BAR"))),
+                Ok(Value::from("FOO 2 BAR")),
                 UpcaseFn::new(Box::new(Path::from("foo"))),
             ),
         ];

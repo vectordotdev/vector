@@ -29,15 +29,11 @@ impl IfStatement {
 }
 
 impl Expression for IfStatement {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         match self.conditional.execute(state, object)? {
-            Some(Value::Boolean(true)) => self.true_expression.execute(state, object),
-            Some(Value::Boolean(false)) | None => self.false_expression.execute(state, object),
-            Some(v) => Err(E::from(Error::from(value::Error::Expected(
+            Value::Boolean(true) => self.true_expression.execute(state, object),
+            Value::Boolean(false) => self.false_expression.execute(state, object),
+            v => Err(E::from(Error::from(value::Error::Expected(
                 value::Kind::Boolean,
                 v.kind(),
             )))
@@ -60,8 +56,7 @@ mod tests {
     use crate::{
         expression::{Literal, Noop},
         test_type_def,
-        value::Constraint::*,
-        value::Kind::*,
+        value::Kind,
     };
 
     test_type_def![
@@ -76,7 +71,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -91,7 +86,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: true,
-                constraint: Any,
+                kind: Kind::all(),
             },
         }
     ];

@@ -37,11 +37,7 @@ impl StripAnsiEscapeCodesFn {
 }
 
 impl Expression for StripAnsiEscapeCodesFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let bytes = required!(state, object, self.value, Value::String(v) => v);
 
         strip_ansi_escapes::strip(&bytes)
@@ -70,12 +66,12 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
         }
 
         fallible_expression {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
         }
     ];
 
@@ -89,22 +85,22 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("foo bar"))),
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[3;4Hfoo bar"))),
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[46mfoo\x1b[0m bar"))),
             ),
             (
                 map![],
-                Ok(Some("foo bar".into())),
+                Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("\x1b[=3lfoo bar"))),
             ),
         ];

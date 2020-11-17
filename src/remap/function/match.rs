@@ -46,17 +46,13 @@ impl MatchFn {
 }
 
 impl Expression for MatchFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         required!(
             state, object, self.value,
 
             Value::String(b) => {
                 let value = String::from_utf8_lossy(&b);
-                Ok(Some(self.pattern.is_match(&value).into()))
+                Ok(self.pattern.is_match(&value).into())
             }
         )
     }
@@ -73,7 +69,7 @@ impl Expression for MatchFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -81,7 +77,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         value_non_string {
@@ -89,7 +85,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         value_optional {
@@ -97,7 +93,7 @@ mod tests {
                 value: Box::new(Noop),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, optional: true, constraint: Boolean.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::Boolean },
         }
     ];
 
@@ -111,22 +107,16 @@ mod tests {
             ),
             (
                 map!["foo": "foobar"],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 MatchFn::new(Box::new(Path::from("foo")), Regex::new("\\s\\w+").unwrap()),
             ),
             (
                 map!["foo": "foo 2 bar"],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 MatchFn::new(
                     Box::new(Path::from("foo")),
                     Regex::new("foo \\d bar").unwrap(),
                 ),
-            ),
-            // `Noop` returns `Ok(None)`, which is passed-through
-            (
-                map![],
-                Ok(None),
-                MatchFn::new(Box::new(Noop), Regex::new("true").unwrap()),
             ),
         ];
 

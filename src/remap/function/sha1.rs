@@ -36,19 +36,15 @@ impl Sha1Fn {
 }
 
 impl Expression for Sha1Fn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use ::sha1::{Digest, Sha1};
 
-        self.value.execute(state, object).map(|r| {
-            r.map(|v| match v.as_string_lossy() {
-                Value::String(bytes) => Value::String(hex::encode(Sha1::digest(&bytes)).into()),
+        self.value
+            .execute(state, object)
+            .map(|v| match v.as_string_lossy() {
+                Value::String(b) => Value::String(hex::encode(Sha1::digest(&b)).into()),
                 _ => unreachable!(),
             })
-        })
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -63,22 +59,22 @@ impl Expression for Sha1Fn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
             expr: |_| Sha1Fn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         value_non_string {
             expr: |_| Sha1Fn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         value_optional {
             expr: |_| Sha1Fn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
         }
     ];
 
@@ -92,9 +88,7 @@ mod tests {
             ),
             (
                 map!["foo": "foo"],
-                Ok(Some(Value::from(
-                    "0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33",
-                ))),
+                Ok(Value::from("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")),
                 Sha1Fn::new(Box::new(Path::from("foo"))),
             ),
         ];

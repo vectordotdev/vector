@@ -1,5 +1,7 @@
 use crate::{state, Object, Result, TypeDef, Value};
+use std::convert::TryFrom;
 
+mod argument;
 mod arithmetic;
 mod assignment;
 mod block;
@@ -11,6 +13,7 @@ mod not;
 pub(crate) mod path;
 mod variable;
 
+pub use argument::Argument;
 pub use arithmetic::Arithmetic;
 pub use assignment::{Assignment, Target};
 pub use block::Block;
@@ -24,8 +27,8 @@ pub use variable::Variable;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error("expected expression, got none")]
-    Missing,
+    #[error("unexpected expression")]
+    Unexpected(#[from] ExprError),
 
     #[error(r#"error for function "{0}""#)]
     Function(String, #[source] function::Error),
@@ -47,8 +50,7 @@ pub enum Error {
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
-    fn execute(&self, state: &mut state::Program, object: &mut dyn Object)
-        -> Result<Option<Value>>;
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value>;
     fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
 
@@ -71,8 +73,24 @@ macro_rules! expression_dispatch {
             $($expr($expr)),+
         }
 
+        impl Expr {
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $(Expr::$expr(_) => stringify!($expr)),+
+                }
+            }
+        }
+
+        #[derive(thiserror::Error, Clone, Debug, PartialEq)]
+        pub enum ExprError {
+            $(
+                #[error(r#"expected {}, got {0}"#, stringify!($expr))]
+                $expr(&'static str)
+            ),+
+        }
+
         impl Expression for Expr {
-            fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+            fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
                 match self {
                     $(Expr::$expr(expression) => expression.execute(state, object)),+
                 }
@@ -91,6 +109,19 @@ macro_rules! expression_dispatch {
                     Expr::$expr(expression)
                 }
             }
+
+            impl TryFrom<Expr> for $expr {
+                type Error = Error;
+
+                fn try_from(expr: Expr) -> std::result::Result<Self, Self::Error> {
+                    #[allow(unreachable_patterns)]
+                    match expr {
+                        Expr::$expr(v) => Ok(v),
+                        Expr::Argument(v) => $expr::try_from(v.into_expr()),
+                        _ => Err(Error::from(ExprError::$expr(expr.as_str()))),
+                    }
+                }
+            }
         )+
     );
 }
@@ -106,54 +137,50 @@ expression_dispatch![
     Not,
     Path,
     Variable,
+    Argument,
 ];
 
 #[cfg(test)]
 mod tests {
     use crate::value;
+    use value::Kind;
 
     #[test]
     fn test_contains() {
-        use value::Constraint::*;
-        use value::Kind::*;
-
         let cases = vec![
-            (true, Any, Any),
-            (true, Any, Exact(String)),
-            (true, Any, Exact(Integer)),
-            (true, Any, OneOf(vec![Float, Boolean])),
-            (true, Any, OneOf(vec![Map])),
-            (true, Exact(String), Exact(String)),
-            (true, Exact(String), OneOf(vec![String])),
-            (false, Exact(String), Exact(Array)),
-            (false, Exact(String), OneOf(vec![Integer])),
-            (false, Exact(String), OneOf(vec![Integer, Float])),
+            (true, Kind::all(), Kind::all()),
+            (true, Kind::all(), Kind::String),
+            (true, Kind::all(), Kind::Integer),
+            (true, Kind::all(), Kind::Float | Kind::Boolean),
+            (true, Kind::all(), Kind::Map),
+            (true, Kind::String, Kind::String),
+            (true, Kind::String, Kind::String),
+            (false, Kind::String, Kind::Array),
+            (false, Kind::String, Kind::Integer),
+            (false, Kind::String, Kind::Integer | Kind::Float),
         ];
 
         for (expect, this, other) in cases {
-            assert_eq!(this.contains(&other), expect);
+            assert_eq!(this.contains(other), expect);
         }
     }
 
     #[test]
     fn test_merge() {
-        use value::Constraint::*;
-        use value::Kind::*;
-
         let cases = vec![
-            (Any, Any, Any),
-            (Any, OneOf(vec![Integer, String]), Any),
-            (OneOf(vec![Integer, Float]), Exact(Integer), Exact(Float)),
-            (Exact(Integer), Exact(Integer), Exact(Integer)),
+            (Kind::all(), Kind::all(), Kind::all()),
+            (Kind::all(), Kind::Integer | Kind::String, Kind::all()),
+            (Kind::Integer | Kind::Float, Kind::Integer, Kind::Float),
+            (Kind::Integer, Kind::Integer, Kind::Integer),
             (
-                OneOf(vec![String, Integer, Float, Boolean]),
-                OneOf(vec![Integer, String]),
-                OneOf(vec![Float, Boolean]),
+                Kind::String | Kind::Integer | Kind::Float | Kind::Boolean,
+                Kind::Integer | Kind::String,
+                Kind::Float | Kind::Boolean,
             ),
         ];
 
         for (expect, this, other) in cases {
-            assert_eq!(this.merge(&other), expect);
+            assert_eq!(this | other, expect);
         }
     }
 }

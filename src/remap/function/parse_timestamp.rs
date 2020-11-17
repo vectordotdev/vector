@@ -64,17 +64,12 @@ impl ParseTimestampFn {
 }
 
 impl Expression for ParseTimestampFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let format = self.format.execute(state, object);
 
         let to_timestamp = |value| match value {
             Value::String(_) => format
-                .clone()?
-                .ok_or_else(|| Error::from(function::Error::Required("format".to_owned())))
+                .clone()
                 .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_string())))?
                 .parse::<Conversion>()
                 .map_err(|e| format!("{}", e))?
@@ -111,9 +106,9 @@ impl Expression for ParseTimestampFn {
         //
         // The `format` type is _always_ fallible, because its string has to be
         // parsed into a valid timestamp format.
-        let format_def = if value_def.constraint.contains(&value::Kind::String.into()) {
+        let format_def = if value_def.kind.contains(value::Kind::String) {
             match &default_def {
-                Some(def) if def.constraint.contains(&value::Kind::String.into()) => {
+                Some(def) if def.kind.contains(value::Kind::String) => {
                     Some(self.format.type_def(state).into_fallible(true))
                 }
                 Some(_) => None,
@@ -145,7 +140,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -158,7 +153,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -170,7 +165,7 @@ mod tests {
                 default: Some(Literal::from(chrono::Utc::now()).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -182,7 +177,7 @@ mod tests {
                 default: None,
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -194,7 +189,7 @@ mod tests {
                 default: Some(Literal::from("<timestamp>").boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -206,7 +201,7 @@ mod tests {
                 default: Some(Literal::from(chrono::Utc::now()).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Timestamp.into(),
+                kind: value::Kind::Timestamp,
                 ..Default::default()
             },
         }
@@ -222,14 +217,14 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Timestamp(
+                Ok(Value::Timestamp(
                     DateTime::parse_from_str(
                         "1983 Apr 13 12:09:14.274 +0000",
                         "%Y %b %d %H:%M:%S%.3f %z",
                     )
                     .unwrap()
                     .with_timezone(&Utc),
-                ))),
+                )),
                 ParseTimestampFn::new(
                     "%Y %b %d %H:%M:%S%.3f %z",
                     Box::new(Path::from("foo")),
@@ -242,22 +237,22 @@ mod tests {
                             .unwrap()
                             .with_timezone(&Utc),
                 ],
-                Ok(Some(
+                Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()
                         .with_timezone(&Utc)
                         .into(),
-                )),
+                ),
                 ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": "16/10/2019:12:00:00 +0000"],
-                Ok(Some(
+                Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()
                         .with_timezone(&Utc)
                         .into(),
-                )),
+                ),
                 ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo")), None),
             ),
         ];

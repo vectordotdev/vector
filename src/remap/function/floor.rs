@@ -46,11 +46,7 @@ impl FloorFn {
 }
 
 impl Expression for FloorFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let precision =
             optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(state, object, self.value,
@@ -60,27 +56,27 @@ impl Expression for FloorFn {
                             v@Value::Integer(_) => v
         );
 
-        Ok(res.into())
+        Ok(res)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         let value_def = self
             .value
             .type_def(state)
-            .fallible_unless(vec![Integer, Float]);
+            .fallible_unless(Kind::Integer | Kind::Float);
         let precision_def = self
             .precision
             .as_ref()
-            .map(|precision| precision.type_def(state).fallible_unless(Integer));
+            .map(|precision| precision.type_def(state).fallible_unless(Kind::Integer));
 
         value_def
             .clone()
             .merge_optional(precision_def)
-            .with_constraint(match value_def.constraint {
-                v if v.is(Float) || v.is(Integer) => v,
-                _ => vec![Integer, Float].into(),
+            .with_constraint(match value_def.kind {
+                v if v.is_float() || v.is_integer() => v,
+                _ => Kind::Integer | Kind::Float,
             })
     }
 }
@@ -89,7 +85,7 @@ impl Expression for FloorFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_float {
@@ -97,7 +93,7 @@ mod tests {
                 value: Literal::from(1.0).boxed(),
                 precision: None,
             },
-            def: TypeDef { constraint: Float.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         value_integer {
@@ -105,7 +101,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 precision: None,
             },
-            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         value_float_or_integer {
@@ -113,7 +109,7 @@ mod tests {
                 value: Variable::new("foo".to_owned()).boxed(),
                 precision: None,
             },
-            def: TypeDef { fallible: true, constraint: vec![Integer, Float].into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
         }
 
         fallible_precision {
@@ -121,7 +117,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 precision: Some(Variable::new("foo".to_owned()).boxed()),
             },
-            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
     ];
 
@@ -135,22 +131,22 @@ mod tests {
             ),
             (
                 map!["foo": 1234.2],
-                Ok(Some(1234.0.into())),
+                Ok(1234.0.into()),
                 FloorFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map![],
-                Ok(Some(1234.0.into())),
+                Ok(1234.0.into()),
                 FloorFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
             ),
             (
                 map![],
-                Ok(Some(1234.into())),
+                Ok(1234.into()),
                 FloorFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
             ),
             (
                 map![],
-                Ok(Some(1234.3.into())),
+                Ok(1234.3.into()),
                 FloorFn::new(
                     Box::new(Literal::from(Value::Float(1234.39429))),
                     Some(Box::new(Literal::from(1))),
@@ -158,7 +154,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(3.1415.into())),
+                Ok(3.1415.into()),
                 FloorFn::new(
                     Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
                     Some(Box::new(Literal::from(4))),
@@ -166,9 +162,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(
-                    9876543210123456789098765432101234567890987654321.98765.into(),
-                )),
+                Ok(9876543210123456789098765432101234567890987654321.98765.into()),
                 FloorFn::new(
                     Box::new(Literal::from(
                         9876543210123456789098765432101234567890987654321.987654321,

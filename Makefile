@@ -291,7 +291,7 @@ test-behavior: ## Runs behaviorial test
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-aws test-integration-clickhouse test-integration-docker test-integration-elasticsearch
+test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
 test-integration: test-integration-mongodb_metrics test-integration-nats test-integration-pulsar test-integration-splunk
 
@@ -386,9 +386,9 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-clickhouse
 endif
 
-.PHONY: test-integration-docker
-test-integration-docker: ## Runs Docker integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
+.PHONY: test-integration-docker-logs
+test-integration-docker-logs: ## Runs Docker Logs integration tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs:: -- --nocapture
 
 .PHONY: start-integration-elasticsearch
 start-integration-elasticsearch:

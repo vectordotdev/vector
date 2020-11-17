@@ -36,19 +36,15 @@ impl Md5Fn {
 }
 
 impl Expression for Md5Fn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use md5::{Digest, Md5};
 
-        self.value.execute(state, object).map(|r| {
-            r.map(|v| match v.as_string_lossy() {
-                Value::String(bytes) => Value::String(hex::encode(Md5::digest(&bytes)).into()),
+        self.value
+            .execute(state, object)
+            .map(|v| match v.as_string_lossy() {
+                Value::String(b) => Value::String(hex::encode(Md5::digest(&b)).into()),
                 _ => unreachable!(),
             })
-        })
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -63,22 +59,22 @@ impl Expression for Md5Fn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
             expr: |_| Md5Fn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         value_non_string {
             expr: |_| Md5Fn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         value_optional {
             expr: |_| Md5Fn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
         }
     ];
 
@@ -92,7 +88,7 @@ mod tests {
             ),
             (
                 map!["foo": "foo"],
-                Ok(Some(Value::from("acbd18db4cc2f85cedef654fccc4a4d8"))),
+                Ok(Value::from("acbd18db4cc2f85cedef654fccc4a4d8")),
                 Md5Fn::new(Box::new(Path::from("foo"))),
             ),
         ];

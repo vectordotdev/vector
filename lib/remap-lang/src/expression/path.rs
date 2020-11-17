@@ -28,15 +28,31 @@ impl Path {
     pub(crate) fn new(segments: Vec<Vec<String>>) -> Self {
         Self { segments }
     }
+
+    pub fn segments(&self) -> &[Vec<String>] {
+        &self.segments
+    }
+
+    pub fn as_string(&self) -> String {
+        self.segments
+            .iter()
+            .map(|c| {
+                c.iter()
+                    .map(|p| p.replace(".", "\\."))
+                    .collect::<Vec<_>>()
+                    .join(".")
+            })
+            .collect::<Vec<_>>()
+            .join(".")
+    }
 }
 
 impl Expression for Path {
-    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         object
             .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?
-            .ok_or_else(|| E::from(Error::Missing(segments_to_path(&self.segments))).into())
-            .map(Some)
+            .ok_or_else(|| E::from(Error::Missing(self.as_string())).into())
     }
 
     /// A path resolves to `Any` by default, but the script might assign
@@ -44,7 +60,7 @@ impl Expression for Path {
     /// understanding of the value kind the path contains.
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         state
-            .path_query_type(&segments_to_path(&self.segments))
+            .path_query_type(self.as_string())
             .cloned()
             .unwrap_or(TypeDef {
                 fallible: true,
@@ -53,23 +69,10 @@ impl Expression for Path {
     }
 }
 
-pub(crate) fn segments_to_path(segments: &[Vec<String>]) -> String {
-    segments
-        .iter()
-        .map(|c| {
-            c.iter()
-                .map(|p| p.replace(".", "\\."))
-                .collect::<Vec<_>>()
-                .join(".")
-        })
-        .collect::<Vec<_>>()
-        .join(".")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{test_type_def, value::Kind};
 
     test_type_def![
         ident_match {
@@ -85,7 +88,7 @@ mod tests {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    constraint: Exact(String)
+                    kind: Kind::String
                 });
 
                 Path::from("foo")
@@ -93,7 +96,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(String),
+                kind: Kind::String,
             },
         }
 

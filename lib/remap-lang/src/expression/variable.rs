@@ -20,15 +20,18 @@ impl Variable {
     pub fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
+
+    pub fn ident(&self) -> &str {
+        &self.ident
+    }
 }
 
 impl Expression for Variable {
-    fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
         state
             .variable(&self.ident)
             .cloned()
             .ok_or_else(|| E::from(Error::Undefined(self.ident.to_owned())).into())
-            .map(Some)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -47,7 +50,7 @@ impl Expression for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{test_type_def, value::Kind};
 
     test_type_def![
         ident_match {
@@ -63,7 +66,7 @@ mod tests {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    constraint: Exact(String)
+                    kind: Kind::String
                 });
 
                 Variable::new("foo".to_owned())
@@ -71,7 +74,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(String),
+                kind: Kind::String,
             },
         }
 

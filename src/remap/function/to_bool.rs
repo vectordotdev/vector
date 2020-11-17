@@ -47,11 +47,7 @@ impl ToBoolFn {
 }
 
 impl Expression for ToBoolFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_bool = |value| match value {
@@ -74,17 +70,17 @@ impl Expression for ToBoolFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         self.value
             .type_def(state)
-            .fallible_unless(vec![Boolean, Integer, Float, Null])
+            .fallible_unless(Kind::Boolean | Kind::Integer | Kind::Float | Kind::Null)
             .merge_with_default_optional(self.default.as_ref().map(|default| {
                 default
                     .type_def(state)
-                    .fallible_unless(vec![Boolean, Integer, Float, Null])
+                    .fallible_unless(Kind::Boolean | Kind::Integer | Kind::Float | Kind::Null)
             }))
-            .with_constraint(Boolean)
+            .with_constraint(Kind::Boolean)
     }
 }
 
@@ -93,47 +89,47 @@ mod tests {
     use super::*;
     use crate::map;
     use std::collections::BTreeMap;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         boolean_infallible {
             expr: |_| ToBoolFn { value: Literal::from(true).boxed(), default: None },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToBoolFn { value: Literal::from(1).boxed(), default: None },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToBoolFn { value: Literal::from(1.0).boxed(), default: None },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         null_infallible {
             expr: |_| ToBoolFn { value: Literal::from(()).boxed(), default: None },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         string_fallible {
             expr: |_| ToBoolFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         map_fallible {
             expr: |_| ToBoolFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         array_fallible {
             expr: |_| ToBoolFn { value: Literal::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         timestamp_fallible {
             expr: |_| ToBoolFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -141,7 +137,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Boolean.into(),
+                kind: Kind::Boolean,
             },
         }
 
@@ -153,7 +149,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Boolean.into(),
+                kind: Kind::Boolean,
             },
         }
 
@@ -165,7 +161,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Boolean.into(),
+                kind: Kind::Boolean,
             },
         }
 
@@ -177,7 +173,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Boolean.into(),
+                kind: Kind::Boolean,
             },
         }
 
@@ -189,7 +185,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Boolean.into(),
+                kind: Kind::Boolean,
             },
         }
     ];
@@ -204,17 +200,17 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), Some(Value::Boolean(true))),
             ),
             (
                 map!["foo": "true"],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

@@ -47,11 +47,7 @@ impl ToIntFn {
 }
 
 impl Expression for ToIntFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_int = |value| match value {
@@ -74,17 +70,17 @@ impl Expression for ToIntFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         self.value
             .type_def(state)
-            .fallible_unless(vec![Integer, Float, Boolean, Null])
+            .fallible_unless(Kind::Integer | Kind::Float | Kind::Boolean | Kind::Null)
             .merge_with_default_optional(self.default.as_ref().map(|default| {
                 default
                     .type_def(state)
-                    .fallible_unless(vec![Integer, Float, Boolean, Null])
+                    .fallible_unless(Kind::Integer | Kind::Float | Kind::Boolean | Kind::Null)
             }))
-            .with_constraint(Integer)
+            .with_constraint(Kind::Integer)
     }
 }
 
@@ -93,47 +89,47 @@ mod tests {
     use super::*;
     use crate::map;
     use std::collections::BTreeMap;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         boolean_infallible {
             expr: |_| ToIntFn { value: Literal::from(true).boxed(), default: None },
-            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToIntFn { value: Literal::from(1).boxed(), default: None },
-            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToIntFn { value: Literal::from(1.0).boxed(), default: None },
-            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         null_infallible {
             expr: |_| ToIntFn { value: Literal::from(()).boxed(), default: None },
-            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         string_fallible {
             expr: |_| ToIntFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
 
         map_fallible {
             expr: |_| ToIntFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
 
         array_fallible {
             expr: |_| ToIntFn { value: Literal::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
 
         timestamp_infallible {
             expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -141,7 +137,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Integer.into(),
+                kind: Kind::Integer,
             },
         }
 
@@ -153,7 +149,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Integer.into(),
+                kind: Kind::Integer,
             },
         }
 
@@ -165,7 +161,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Integer.into(),
+                kind: Kind::Integer,
             },
         }
 
@@ -177,7 +173,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Integer.into(),
+                kind: Kind::Integer,
             },
         }
 
@@ -189,7 +185,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Integer.into(),
+                kind: Kind::Integer,
             },
         }
     ];
@@ -204,17 +200,17 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Integer(10))),
+                Ok(Value::Integer(10)),
                 ToIntFn::new(Box::new(Path::from("foo")), Some(10.into())),
             ),
             (
                 map!["foo": "20"],
-                Ok(Some(Value::Integer(20))),
+                Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20.5],
-                Ok(Some(Value::Integer(20))),
+                Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

@@ -50,16 +50,12 @@ pub(crate) struct SplitFn {
 }
 
 impl Expression for SplitFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
         let limit: usize = self
             .limit
             .as_ref()
-            .and_then(|expr| expr.execute(state, object).transpose())
+            .map(|expr| expr.execute(state, object))
             .transpose()?
             .map(i64::try_from)
             .transpose()?
@@ -78,28 +74,29 @@ impl Expression for SplitFn {
             }
         };
 
-        Ok(Some(value))
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
-        let limit_def = self
-            .limit
-            .as_ref()
-            .map(|limit| limit.type_def(state).fallible_unless(vec![Integer, Float]));
+        let limit_def = self.limit.as_ref().map(|limit| {
+            limit
+                .type_def(state)
+                .fallible_unless(Kind::Integer | Kind::Float)
+        });
 
         let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(String)),
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::String)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
         };
 
         self.value
             .type_def(state)
-            .fallible_unless(String)
+            .fallible_unless(Kind::String)
             .merge_optional(limit_def)
             .merge_optional(pattern_def)
-            .with_constraint(Array)
+            .with_constraint(Kind::Array)
     }
 }
 
@@ -115,7 +112,7 @@ mod test {
                 limit: None,
             },
             def: TypeDef {
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -128,7 +125,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -136,11 +133,11 @@ mod test {
         pattern_expression_infallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from("foo").boxed().into(),
+                pattern: Literal::from("foo").into(),
                 limit: None,
             },
             def: TypeDef {
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -148,12 +145,12 @@ mod test {
         pattern_expression_fallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from(10).boxed().into(),
+                pattern: Literal::from(10).into(),
                 limit: None,
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -165,7 +162,7 @@ mod test {
                 limit: Some(Literal::from(10).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -178,7 +175,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
