@@ -56,7 +56,7 @@ impl Expression for CeilFn {
                             v@Value::Integer(_) => v
         );
 
-        Ok(res.into())
+        Ok(res)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
