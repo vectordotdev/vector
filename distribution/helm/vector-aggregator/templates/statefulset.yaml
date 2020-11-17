@@ -98,18 +98,12 @@ spec:
         - name: config-dir
           projected:
             sources:
-              # Managed `ConfigMap`.
               - configMap:
                   name: {{ include "libvector.configMapName" . }}
                   optional: true
-              # Custom `ConfigMap`.
-              - configMap:
-                  name: vector-aggregator-config
-                  optional: true
-              # Custom `Secret`.
-              - secret:
-                  name: vector-aggregator-config
-                  optional: true
+              {{- with .Values.extraConfigDirSources }}
+              {{- toYaml . | nindent 14 }}
+              {{- end }}
         # Extra volumes.
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}

@@ -78,6 +78,10 @@ affinity: {}
 # managed by `StatefulSet`.
 extraContainersPorts: []
 
+# Additional sources to include at the `config-dir` projection of the `Pod`s
+# managed by `StatefulSet`.
+extraConfigDirSources: []
+
 # Additional volumes to pass to the `Pod`s managed by `StatefulSet`.
 extraVolumes: []
 
