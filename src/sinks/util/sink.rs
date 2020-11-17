@@ -117,6 +117,7 @@ where
     }
 }
 
+#[cfg(test)]
 impl<S, B, Request> BatchSink<S, B, Request>
 where
     B: Batch<Output = Request>,
