@@ -27,16 +27,17 @@ or [**install Vector**][docs.installation].
 
 ### Principles
 
-* **Reliable** - Built in [Rust][urls.rust], Vector's primary design goal is reliability & performance.
-* **End-to-end** - Deploys as an agent or aggregator. One tool. One workflow.
-* **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool. All your data.
+* **Reliable** - Built in [Rust][urls.rust], Vector's primary design goal is reliability.
+* **End-to-end** - Deploys as an agent or aggregator. Vector is a complete platform.
+* **Unified** - [Logs][docs.data-model.log], [metrics][docs.data-model.metric], and traces (coming soon). One tool for all of your data.
 
 ### Use cases
 
 * Reduce total observability costs.
 * Transition vendors without disrupting workflows.
-* Improve data quality and insights.
-* Improve observability performance and reliability.
+* Enhance data quality and improve insights.
+* Consolidate agents and eliminate agent fatigue.
+* Improve overall observability performance and reliability.
 
 ### Community
 
