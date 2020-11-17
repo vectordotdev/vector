@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::sinks::splunk_hec;
+use crate::{sinks::splunk_hec, event::LookupBuf};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
@@ -22,6 +22,6 @@ impl From<Encoding> for splunk_hec::Encoding {
     }
 }
 
-fn default_host_key() -> String {
-    crate::config::LogSchema::default().host_key().to_string()
+fn default_host_key() -> LookupBuf {
+    crate::config::LogSchema::default().host_key().into_buf()
 }

@@ -1,5 +1,5 @@
 use crate::{
-    event::{PathIter, LookupBuf},
+    event::{LookupBuf},
     sinks::util::encoding::{
         with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
     },

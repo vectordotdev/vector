@@ -37,11 +37,11 @@ impl UnixConfig {
 * Function to pass to build_unix_source, specific to the basic unix source.
 * Takes a single line of a received message and builds an Event object.
 **/
-fn build_event(host_key: &LookupBuf, received_from: Option<Bytes>, line: &str) -> Option<Event> {
+fn build_event(host_key: LookupBuf, received_from: Option<Bytes>, line: &str) -> Option<Event> {
     let byte_size = line.len();
     let mut event = Event::from(line);
     event.as_mut_log().insert(
-        crate::config::log_schema().source_type_key().clone(),
+        crate::config::log_schema().source_type_key().into_buf(),
         Bytes::from("socket"),
     );
     if let Some(host) = received_from {

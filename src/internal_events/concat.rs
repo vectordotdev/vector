@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use crate::event::{LookupBuf, LookupBuf};
 
 #[derive(Debug)]
 pub struct ConcatEventProcessed;
@@ -12,7 +13,7 @@ impl InternalEvent for ConcatEventProcessed {
 
 #[derive(Debug)]
 pub struct ConcatSubstringError<'a> {
-    pub source: &'a str,
+    pub source: Lookup<'a>,
     pub condition: &'a str,
     pub start: usize,
     pub end: usize,

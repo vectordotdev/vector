@@ -236,7 +236,7 @@ impl Function for Arithmetic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::{path::Path, regex::Regex, Literal};
+    use crate::{mapping::query::{path::Path, regex::Regex, Literal}, event::LookupBuf};
 
     #[test]
     fn check_compare_query() {
@@ -262,8 +262,8 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert("foo", Value::Integer(5));
-                    event.as_mut_log().insert("bar", Value::Integer(10));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::Integer(5));
+                    event.as_mut_log().insert(LookupBuf::from("bar"), Value::Integer(10));
                     event
                 },
                 Ok(Value::Float(2.0)),

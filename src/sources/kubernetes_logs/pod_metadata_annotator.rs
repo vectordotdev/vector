@@ -4,7 +4,7 @@
 
 use super::path_helpers::{parse_log_file_path, LogFileInfo};
 use crate::{
-    event::{LogEvent, LookupBuf, Lookup, Segment},
+    event::{LogEvent, LookupBuf, Segment},
     kubernetes as k8s, Event,
 };
 use evmap::ReadHandle;
@@ -20,8 +20,8 @@ pub struct FieldsSpec {
     pub pod_name: LookupBuf,
     pub pod_namespace: LookupBuf,
     pub pod_uid: LookupBuf,
-    pub pod_ip: String,
-    pub pod_ips: String,
+    pub pod_ip: LookupBuf,
+    pub pod_ips: LookupBuf,
     pub pod_labels: LookupBuf,
     pub pod_node_name: LookupBuf,
     pub container_name: LookupBuf,
@@ -31,15 +31,15 @@ pub struct FieldsSpec {
 impl Default for FieldsSpec {
     fn default() -> Self {
         Self {
-            pod_name: LookupBuf::from("kubernetes.pod_name"),
-            pod_namespace: LookupBuf::from("kubernetes.pod_namespace"),
-            pod_uid: LookupBuf::from("kubernetes.pod_uid"),
-            pod_ip: "kubernetes.pod_ip".to_owned(),
-            pod_ips: "kubernetes.pod_ips".to_owned(),
-            pod_labels: LookupBuf::from("kubernetes.pod_labels"),
-            pod_node_name: LookupBuf::from("kubernetes.pod_node_name"),
-            container_name: LookupBuf::from("kubernetes.container_name"),
-            container_image: LookupBuf::from("kubernetes.container_image"),
+            pod_name: LookupBuf::from_str("kubernetes.pod_name").unwrap(),
+            pod_namespace: LookupBuf::from_str("kubernetes.pod_namespace").unwrap(),
+            pod_uid: LookupBuf::from_str("kubernetes.pod_uid").unwrap(),
+            pod_ip: LookupBuf::from_str("kubernetes.pod_ip").unwrap(),
+            pod_ips: LookupBuf::from_str("kubernetes.pod_ips").unwrap(),
+            pod_labels: LookupBuf::from_str("kubernetes.pod_labels").unwrap(),
+            pod_node_name: LookupBuf::from_str("kubernetes.pod_node_name").unwrap(),
+            container_name: LookupBuf::from_str("kubernetes.container_name").unwrap(),
+            container_image: LookupBuf::from_str("kubernetes.container_image").unwrap(),
         }
     }
 }
@@ -140,19 +140,19 @@ fn annotate_from_pod_spec(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_spec
 }
 
 fn annotate_from_pod_status(log: &mut LogEvent, fields_spec: &FieldsSpec, pod_status: &PodStatus) {
-    for (ref key, ref val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
+    for (&key, val) in [(&fields_spec.pod_ip, &pod_status.pod_ip)].iter() {
         if let Some(val) = val {
-            log.insert(key, val.to_owned());
+            log.insert(key.to_owned(), val.to_owned());
         }
     }
 
-    for (ref key, ref val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
+    for (&key, val) in [(&fields_spec.pod_ips, &pod_status.pod_ips)].iter() {
         if let Some(val) = val {
             let inner: Vec<String> = val
                 .iter()
                 .filter_map(|v| v.ip.clone())
                 .collect::<Vec<String>>();
-            log.insert(key, inner);
+            log.insert(key.clone(), inner);
         }
     }
 }

@@ -87,6 +87,7 @@ impl Condition for Remap {
 mod test {
     use super::*;
     use crate::log_event;
+    use crate::event::LookupBuf;
 
     #[test]
     fn generate_config() {
@@ -103,7 +104,7 @@ mod test {
                 Ok(()),         // check result
             ),
             (
-                log_event!["foo" => true, "bar" => false],
+                log_event![LookupBuf::from("foo") => true, LookupBuf::from("bar") => false],
                 ".bar || .foo",
                 Ok(()),
                 Ok(()),
@@ -121,7 +122,7 @@ mod test {
                 Err("source execution resolved to no value"),
             ),
             (
-                log_event!["foo" => "string"],
+                log_event![LookupBuf::from("foo") => "string"],
                 ".foo",
                 Ok(()),
                 Err("source execution resolved to non-boolean value"),

@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Lookup, LookupBuf},
+    event::{Event, LookupBuf},
     internal_events::AwsKinesisStreamsEventSent,
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{

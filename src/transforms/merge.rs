@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, TransformConfig, TransformDescription},
     event::discriminant::Discriminant,
     event::merge_state::LogEventMergeState,
-    event::{self, Event, LookupBuf, Lookup},
+    event::{self, Event, LookupBuf},
     transforms::{TaskTransform, Transform},
 };
 use futures01::Stream as Stream01;

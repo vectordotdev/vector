@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{
         KeyValueEventProcessed, KeyValueFieldDoesNotExist, KeyValueParseFailed,
         KeyValueTargetExists,
@@ -18,15 +18,15 @@ use std::str;
 pub struct KeyValueConfig {
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
-    pub field: Option<String>,
+    pub field: Option<LookupBuf>,
     pub field_split: Option<String>,
     #[derivative(Default(value = "true"))]
     pub overwrite_target: bool,
     pub separator: Option<String>,
-    pub target_field: Option<String>,
+    pub target_field: Option<LookupBuf>,
     pub trim_key: Option<String>,
     pub trim_value: Option<String>,
-    pub types: HashMap<String, String>,
+    pub types: HashMap<LookupBuf, String>,
 }
 
 inventory::submit! {
@@ -43,7 +43,7 @@ impl TransformConfig for KeyValueConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| log_schema().message_key().to_string());
+            .unwrap_or_else(|| log_schema().message_key().into_buf());
 
         let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
@@ -92,13 +92,13 @@ impl TransformConfig for KeyValueConfig {
 
 #[derive(Debug, Clone)]
 pub struct KeyValue {
-    conversions: HashMap<String, Conversion>,
+    conversions: HashMap<LookupBuf, Conversion>,
     drop_field: bool,
-    field: String,
+    field: LookupBuf,
     field_split: String,
     overwrite_target: bool,
     separator: String,
-    target_field: Option<String>,
+    target_field: Option<LookupBuf>,
     trim_key: Option<Vec<char>>,
     trim_value: Option<Vec<char>>,
 }
@@ -189,7 +189,7 @@ mod tests {
     use super::KeyValueConfig;
     use crate::{
         config::TransformConfig,
-        event::{LogEvent, Value},
+        event::{LogEvent, Value, LookupBuf},
         Event,
     };
 
@@ -199,7 +199,7 @@ mod tests {
         field_split: Option<String>,
         drop_field: bool,
         types: &[(&str, &str)],
-        target_field: Option<String>,
+        target_field: Option<LookupBuf>,
         trim_key: Option<String>,
         trim_value: Option<String>,
     ) -> LogEvent {

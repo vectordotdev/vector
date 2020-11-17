@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
-    event::{Event, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{DedupeEventDiscarded, DedupeEventProcessed},
     transforms::{TaskTransform, Transform},
 };
@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub enum FieldMatchConfig {
     #[serde(rename = "match")]
-    MatchFields(Vec<String>),
+    MatchFields(Vec<LookupBuf>),
     #[serde(rename = "ignore")]
-    IgnoreFields(Vec<String>),
+    IgnoreFields(Vec<LookupBuf>),
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -116,7 +116,7 @@ type TypeId = u8;
 #[derive(PartialEq, Eq, Hash)]
 enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
-    Ignore(Vec<(String, TypeId, Bytes)>),
+    Ignore(Vec<(LookupBuf, TypeId, Bytes)>),
 }
 
 /// Assigns a unique number to each of the types supported by Event::Value.
@@ -163,7 +163,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
             for field_name in fields.iter() {
-                if let Some(value) = event.as_log().get(&field_name) {
+                if let Some(value) = event.as_log().get(field_name) {
                     entry.push(Some((type_id_for_value(&value), value.as_bytes())));
                 } else {
                     entry.push(None);
@@ -175,7 +175,7 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
             let mut entry = Vec::new();
 
             for (field_name, value) in event.as_log().all_fields() {
-                if !fields.contains(&field_name) {
+                if !fields.contains(&field_name.into_buf()) {
                     entry.push((field_name, type_id_for_value(&value), value.as_bytes()));
                 }
             }

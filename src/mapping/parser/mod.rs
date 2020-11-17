@@ -469,7 +469,7 @@ fn log_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
 fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => {
-            let paths = paths_from_pair(pair).and_then(|pairs| { 
+            let paths = paths_from_pair(pair).and_then(|pairs| {
                 pairs.into_iter()
                     .map(|v| LookupBuf::from_str(&v))
                     .collect::<crate::Result<Vec<_>>>().map_err(|e| format!("{}", e))
@@ -477,7 +477,7 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
             Ok(Box::new(Deletion::new(paths)))
         },
         Rule::only_fields => {
-            let paths = paths_from_pair(pair).and_then(|pairs| { 
+            let paths = paths_from_pair(pair).and_then(|pairs| {
                 pairs.into_iter()
                     .map(|v| LookupBuf::from_str(&v))
                     .collect::<crate::Result<Vec<_>>>().map_err(|e| format!("{}", e))
@@ -581,98 +581,98 @@ mod tests {
             (
                 ".v3ctor = \"bar\"",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "v3ctor".to_string(),
+                    LookupBuf::from_str("v3ctor").unwrap(),
                     Box::new(Literal::from(Value::from("bar"))),
                 ))]),
             ),
             (
                 ".123 = 38",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "123".to_string(),
+                    LookupBuf::from_str("123").unwrap(),
                     Box::new(Literal::from(Value::from(38))),
                 ))]),
             ),
             (
                 ".foo = \"bar\"",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from("bar"))),
                 ))]),
             ),
             (
                 r#".foo = "bar\t\n\\\n and also \\n""#,
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from("bar\t\n\\\n and also \\n"))),
                 ))]),
             ),
             (
                 ".foo.\"bar baz\".\"buz.bev\"[5].quz = \"bar\"",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo.bar baz.buz\\.bev[5].quz".to_string(),
+                    LookupBuf::from_str("foo.bar baz.buz\\.bev[5].quz").unwrap(),
                     Box::new(Literal::from(Value::from("bar"))),
                 ))]),
             ),
             (
                 ".foo = (\"bar\")",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from("bar"))),
                 ))]),
             ),
             (
                 ".foo = \"bar\\\"escaped\\\" stuff\"",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from("bar\"escaped\" stuff"))),
                 ))]),
             ),
             (
                 ".foo = true",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from(true))),
                 ))]),
             ),
             (
                 ".foo = false",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from(false))),
                 ))]),
             ),
             (
                 ".foo = null",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::Null)),
                 ))]),
             ),
             (
                 ".foo = 50.5",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from(50.5))),
                 ))]),
             ),
             (
                 ".foo = .bar",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(QueryPath::from(vec![vec!["bar"]])),
                 ))]),
             ),
             (
                 ".foo = .bar[0].baz",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(QueryPath::from(vec![vec!["bar[0]"], vec!["baz"]])),
                 ))]),
             ),
             (
                 ".foo = .foo.\"bar baz\".\"buz.bev\"[5].quz",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(QueryPath::from(vec![
                         vec!["foo"],
                         vec!["bar baz"],
@@ -685,11 +685,11 @@ mod tests {
                 ".foo = .bar\n.bar.buz = .qux.quz",
                 Mapping::new(vec![
                     Box::new(Assignment::new(
-                        "foo".to_string(),
+                        LookupBuf::from_str("foo").unwrap(),
                         Box::new(QueryPath::from(vec![vec!["bar"]])),
                     )),
                     Box::new(Assignment::new(
-                        "bar.buz".to_string(),
+                        LookupBuf::from_str("bar.buz").unwrap(),
                         Box::new(QueryPath::from(vec![vec!["qux"], vec!["quz"]])),
                     )),
                 ]),
@@ -698,15 +698,15 @@ mod tests {
                 ".foo = .bar\n\t\n.bar.buz = .qux.quz\n.qux = .bev",
                 Mapping::new(vec![
                     Box::new(Assignment::new(
-                        "foo".to_string(),
+                        LookupBuf::from_str("foo").unwrap(),
                         Box::new(QueryPath::from(vec![vec!["bar"]])),
                     )),
                     Box::new(Assignment::new(
-                        "bar.buz".to_string(),
+                        LookupBuf::from_str("bar.buz").unwrap(),
                         Box::new(QueryPath::from(vec![vec!["qux"], vec!["quz"]])),
                     )),
                     Box::new(Assignment::new(
-                        "qux".to_string(),
+                        LookupBuf::from_str("qux").unwrap(),
                         Box::new(QueryPath::from(vec![vec!["bev"]])),
                     )),
                 ]),
@@ -714,28 +714,28 @@ mod tests {
             (
                 ".foo = .(bar | baz)\n",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(QueryPath::from(vec![vec!["bar", "baz"]])),
                 ))]),
             ),
             (
                 ".foo = .(bar | \"baz buz\")\n",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(QueryPath::from(vec![vec!["bar", "baz buz"]])),
                 ))]),
             ),
             (
                 ".foo = .foo.(bar | baz)\n \n",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(QueryPath::from(vec![vec!["foo"], vec!["bar", "baz"]])),
                 ))]),
             ),
             (
                 ".foo = .(foo | zap).(bar | baz | buz)",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(QueryPath::from(vec![
                         vec!["foo", "zap"],
                         vec!["bar", "baz", "buz"],
@@ -745,14 +745,14 @@ mod tests {
             (
                 ".foo = !.bar",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(NotFn::new(Box::new(QueryPath::from(vec![vec!["bar"]])))),
                 ))]),
             ),
             (
                 ".foo = !!.bar",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(NotFn::new(Box::new(NotFn::new(Box::new(QueryPath::from(
                         vec![vec!["bar"]],
                     )))))),
@@ -761,7 +761,7 @@ mod tests {
             (
                 ".foo = 5 + 15 / 10",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Arithmetic::new(
                         Box::new(Literal::from(Value::from(5))),
                         Box::new(Arithmetic::new(
@@ -776,7 +776,7 @@ mod tests {
             (
                 ".foo = (5 + 15) / 10",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Arithmetic::new(
                         Box::new(Arithmetic::new(
                             Box::new(Literal::from(Value::from(5))),
@@ -791,7 +791,7 @@ mod tests {
             (
                 ".foo = 1 || 2 > 3 * 4 + 5",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Arithmetic::new(
                         Box::new(Literal::from(Value::from(1))),
                         Box::new(Arithmetic::new(
@@ -814,45 +814,45 @@ mod tests {
             (
                 ".foo = 5.0e2",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from(500.0))),
                 ))]),
             ),
             (
                 ".foo = 5e2",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from(500.0))),
                 ))]),
             ),
             (
                 ".foo = -5e-2",
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(Literal::from(Value::from(-0.05))),
                 ))]),
             ),
             // function: del
             (
                 "del(.foo)",
-                Mapping::new(vec![Box::new(Deletion::new(vec!["foo".to_string()]))]),
+                Mapping::new(vec![Box::new(Deletion::new(vec![LookupBuf::from("foo")]))]),
             ),
             (
                 "del(.\"foo bar\")",
-                Mapping::new(vec![Box::new(Deletion::new(vec!["foo bar".to_string()]))]),
+                Mapping::new(vec![Box::new(Deletion::new(vec![LookupBuf::from("foo bar")]))]),
             ),
             (
                 "del(.foo)\ndel(.bar.baz)",
                 Mapping::new(vec![
-                    Box::new(Deletion::new(vec!["foo".to_string()])),
-                    Box::new(Deletion::new(vec!["bar.baz".to_string()])),
+                    Box::new(Deletion::new(vec![LookupBuf::from_str("foo").unwrap()])),
+                    Box::new(Deletion::new(vec![LookupBuf::from_str("bar.baz").unwrap()])),
                 ]),
             ),
             (
                 "del(.foo, .bar.baz)",
                 Mapping::new(vec![Box::new(Deletion::new(vec![
-                    "foo".to_string(),
-                    "bar.baz".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
+                    LookupBuf::from_str("bar.baz").unwrap(),
                 ]))]),
             ),
             //
@@ -869,10 +869,10 @@ mod tests {
                         Operator::Equal,
                     )),
                     Box::new(Assignment::new(
-                        "foo".to_string(),
+                        LookupBuf::from_str("foo").unwrap(),
                         Box::new(QueryPath::from("bar")),
                     )),
-                    Box::new(Deletion::new(vec!["buz".to_string()])),
+                    Box::new(Deletion::new(vec![LookupBuf::from_str("buz").unwrap()])),
                 ))]),
             ),
             (
@@ -884,7 +884,7 @@ mod tests {
                         Operator::Greater,
                     )),
                     Box::new(Assignment::new(
-                        "thing".to_string(),
+                        LookupBuf::from_str("thing").unwrap(),
                         Box::new(QueryPath::from("foo")),
                     )),
                     Box::new(Noop {}),
@@ -893,13 +893,13 @@ mod tests {
             // function: only_fields
             (
                 "only_fields(.foo)",
-                Mapping::new(vec![Box::new(OnlyFields::new(vec!["foo".to_string()]))]),
+                Mapping::new(vec![Box::new(OnlyFields::new(vec![LookupBuf::from_str("foo").unwrap()]))]),
             ),
             (
                 "only_fields(.foo.bar, .baz)",
                 Mapping::new(vec![Box::new(OnlyFields::new(vec![
-                    "foo.bar".to_string(),
-                    "baz".to_string(),
+                    LookupBuf::from_str("foo.bar").unwrap(),
+                    LookupBuf::from_str("baz").unwrap(),
                 ]))]),
             ),
             (
@@ -943,7 +943,7 @@ mod tests {
             (
                 r#".foo = split(.bar, /a/i, 2)"#,
                 Mapping::new(vec![Box::new(Assignment::new(
-                    "foo".to_string(),
+                    LookupBuf::from_str("foo").unwrap(),
                     Box::new(SplitFn::new(
                         Box::new(QueryPath::from("bar")),
                         Box::new(Literal::from(QueryValue::from(

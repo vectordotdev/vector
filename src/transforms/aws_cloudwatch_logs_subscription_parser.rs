@@ -16,7 +16,7 @@ use std::iter;
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct AwsCloudwatchLogsSubscriptionParserConfig {
-    pub field: Option<String>,
+    pub field: Option<LookupBuf>,
 }
 
 inventory::submit! {
@@ -71,7 +71,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
         AwsCloudwatchLogsSubscriptionParser {
             field: config
                 .field
-                .unwrap_or_else(|| log_schema().message_key().to_string()),
+                .unwrap_or_else(|| log_schema().message_key().into_buf()),
         }
     }
 }

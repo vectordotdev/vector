@@ -40,7 +40,7 @@ impl LogEventMergeState {
 #[cfg(test)]
 mod test {
     use super::LogEventMergeState;
-    use crate::event::{Event, LogEvent};
+    use crate::event::{Event, LogEvent, Lookup};
 
     fn log_event_with_message(message: &str) -> LogEvent {
         Event::from(message).into_log()
@@ -48,14 +48,14 @@ mod test {
 
     #[test]
     fn log_event_merge_state_example() {
-        let fields = vec!["message".to_string()];
+        let fields = vec![Lookup::from("message")];
 
         let mut state = LogEventMergeState::new(log_event_with_message("hel"));
         state.merge_in_next_event(log_event_with_message("lo "), &fields);
         let merged_event = state.merge_in_final_event(log_event_with_message("world"), &fields);
 
         assert_eq!(
-            merged_event.get("message").unwrap().as_bytes().as_ref(),
+            merged_event.get(Lookup::from("message")).unwrap().as_bytes().as_ref(),
             b"hello world"
         );
     }

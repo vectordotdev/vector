@@ -35,6 +35,7 @@ pub fn merge_value(current: &mut Value, incoming: Value) {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::event::LookupBuf;
 
     fn assert_merge_value(
         current: impl Into<Value>,
@@ -65,23 +66,23 @@ mod test {
         // Only the ones listed will be merged from the `incoming` event
         // to the `current`.
         let fields_to_merge = vec![
-            "merge".to_string(),
-            "merge_a".to_string(),
-            "merge_b".to_string(),
-            "merge_c".to_string(),
+            Lookup::from("merge"),
+            Lookup::from("merge_a"),
+            Lookup::from("merge_b"),
+            Lookup::from("merge_c"),
         ];
 
         let current = {
             let mut log = LogEvent::default();
 
-            log.insert("merge", "hello "); // will be concatenated with the `merged` from `incoming`.
-            log.insert("do_not_merge", "my_first_value"); // will remain as is, since it's not selected for merging.
+            log.insert(LookupBuf::from("merge"), "hello "); // will be concatenated with the `merged` from `incoming`.
+            log.insert(LookupBuf::from("do_not_merge"), "my_first_value"); // will remain as is, since it's not selected for merging.
 
-            log.insert("merge_a", true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
-            log.insert("merge_b", 123); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
+            log.insert(LookupBuf::from("merge_a"), true); // will be overwritten with the `merge_a` from `incoming` (since it's a non-bytes kind).
+            log.insert(LookupBuf::from("merge_b"), 123); // will be overwritten with the `merge_b` from `incoming` (since it's a non-bytes kind).
 
-            log.insert("a", true); // will remain as is since it's not selected for merge.
-            log.insert("b", 123); // will remain as is since it's not selected for merge.
+            log.insert(LookupBuf::from("a"), true); // will remain as is since it's not selected for merge.
+            log.insert(LookupBuf::from("b"), 123); // will remain as is since it's not selected for merge.
 
             // `c` is not present in the `current`, and not selected for merge,
             // so it won't be included in the final event.
@@ -92,16 +93,16 @@ mod test {
         let incoming = {
             let mut log = LogEvent::default();
 
-            log.insert("merge", "world"); // will be concatenated to the `merge` from `current`.
-            log.insert("do_not_merge", "my_second_value"); // will be ignored, since it's not selected for merge.
+            log.insert(LookupBuf::from("merge"), "world"); // will be concatenated to the `merge` from `current`.
+            log.insert(LookupBuf::from("do_not_merge"), "my_second_value"); // will be ignored, since it's not selected for merge.
 
-            log.insert("merge_b", 456); // will be merged in as `456`.
-            log.insert("merge_c", false); // will be merged in as `false`.
+            log.insert(LookupBuf::from("merge_b"), 456); // will be merged in as `456`.
+            log.insert(LookupBuf::from("merge_c"), false); // will be merged in as `false`.
 
             // `a` will remain as-is, since it's not marked for merge and
             // neither is it specified in the `incoming` event.
-            log.insert("b", 456); // `b` not marked for merge, will not change.
-            log.insert("c", true); // `c` not marked for merge, will be ignored.
+            log.insert(LookupBuf::from("b"), 456); // `b` not marked for merge, will not change.
+            log.insert(LookupBuf::from("c"), true); // `c` not marked for merge, will be ignored.
 
             log
         };
@@ -111,13 +112,13 @@ mod test {
 
         let expected = {
             let mut log = LogEvent::default();
-            log.insert("merge", "hello world");
-            log.insert("do_not_merge", "my_first_value");
-            log.insert("a", true);
-            log.insert("b", 123);
-            log.insert("merge_a", true);
-            log.insert("merge_b", 456);
-            log.insert("merge_c", false);
+            log.insert(LookupBuf::from("merge"), "hello world");
+            log.insert(LookupBuf::from("do_not_merge"), "my_first_value");
+            log.insert(LookupBuf::from("a"), true);
+            log.insert(LookupBuf::from("b"), 123);
+            log.insert(LookupBuf::from("merge_a"), true);
+            log.insert(LookupBuf::from("merge_b"), 456);
+            log.insert(LookupBuf::from("merge_c"), false);
             log
         };
 

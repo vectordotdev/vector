@@ -1,5 +1,5 @@
 use crate::{
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{SocketEventReceived, SocketMode, SocketReceiveError},
     shutdown::ShutdownSignal,
     sources::Source,
@@ -22,7 +22,7 @@ pub struct UdpConfig {
     pub address: SocketAddr,
     #[serde(default = "default_max_length")]
     pub max_length: usize,
-    pub host_key: Option<String>,
+    pub host_key: Option<LookupBuf>,
 }
 
 fn default_max_length() -> usize {
@@ -42,7 +42,7 @@ impl UdpConfig {
 pub fn udp(
     address: SocketAddr,
     max_length: usize,
-    host_key: String,
+    host_key: LookupBuf,
     mut shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
@@ -77,7 +77,7 @@ pub fn udp(
 
                             event
                                 .as_mut_log()
-                                .insert(crate::config::log_schema().source_type_key().clone(), Bytes::from("socket"));
+                                .insert(crate::config::log_schema().source_type_key().into_buf(), Bytes::from("socket"));
                             event
                                 .as_mut_log()
                                 .insert(host_key.clone(), address.to_string());

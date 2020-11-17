@@ -717,7 +717,7 @@ mod integration_tests {
 
     async fn config(
         encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
-        indexed_fields: Vec<String>,
+        indexed_fields: Vec<LookupBuf>,
     ) -> HecSinkConfig {
         HecSinkConfig {
             endpoint: "http://localhost:8088/".into(),

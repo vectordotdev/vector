@@ -1,7 +1,7 @@
 use super::util::MultilineConfig;
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{Event, Lookup, LookupBuf},
+    event::{Event, LookupBuf},
     internal_events::{FileEventReceived, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,

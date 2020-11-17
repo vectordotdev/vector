@@ -65,10 +65,10 @@ impl FunctionTransform for Coercer {
             let mut new_event = Event::new_empty_log();
             let new_log = new_event.as_mut_log();
             for (field, conv) in &self.types {
-                if let Some(value) = log.remove(field) {
+                if let Some(value) = log.remove(field, false) {
                     match conv.convert(value) {
                         Ok(converted) => {
-                            new_log.insert(field, converted);
+                            new_log.insert(field.clone(), converted);
                         }
                         Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
@@ -78,10 +78,10 @@ impl FunctionTransform for Coercer {
             return;
         } else {
             for (field, conv) in &self.types {
-                if let Some(value) = log.remove(field) {
+                if let Some(value) = log.remove(field, false) {
                     match conv.convert(value) {
                         Ok(converted) => {
-                            log.insert(field, converted);
+                            log.insert(field.clone(), converted);
                         }
                         Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
@@ -94,7 +94,7 @@ impl FunctionTransform for Coercer {
 
 #[cfg(test)]
 mod tests {
-    use super::CoercerConfig;
+    use super::*;
     use crate::event::{LogEvent, Value};
     use crate::{config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
@@ -112,7 +112,7 @@ mod tests {
             ("other", "no"),
             ("float", "broken"),
         ] {
-            event.as_mut_log().insert(key, value);
+            event.as_mut_log().insert(LookupBuf::from(key), value);
         }
 
         let mut coercer = toml::from_str::<CoercerConfig>(&format!(

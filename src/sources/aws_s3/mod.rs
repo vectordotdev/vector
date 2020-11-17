@@ -267,6 +267,7 @@ mod integration_tests {
         sources::util::MultilineConfig,
         test_util::{collect_n, random_lines},
         Pipeline,
+        event::Lookup,
     };
     use futures::compat::Future01CompatExt;
     use pretty_assertions::assert_eq;
@@ -389,10 +390,10 @@ mod integration_tests {
             let message = expected_lines[i].as_str();
 
             let log = event.as_log();
-            assert_eq!(log["message"], message.into());
-            assert_eq!(log["bucket"], bucket.clone().into());
-            assert_eq!(log["object"], key.clone().into());
-            assert_eq!(log["region"], "us-east-1".into());
+            assert_eq!(log[Lookup::from("message")], message.into());
+            assert_eq!(log[Lookup::from("bucket")], bucket.clone().into());
+            assert_eq!(log[Lookup::from("object")], key.clone().into());
+            assert_eq!(log[Lookup::from("region")], "us-east-1".into());
         }
     }
 

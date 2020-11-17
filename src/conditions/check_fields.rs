@@ -659,23 +659,23 @@ mod test {
             )
         );
 
-        event.as_mut_log().insert("message", "foo");
+        event.as_mut_log().insert(LookupBuf::from("message"), "foo");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.eq: \"bar\", third_thing.eq: [\"hello\", \"world\"] ]".to_owned())
         );
 
-        event.as_mut_log().insert("other_thing", "bar");
-        event.as_mut_log().insert("third_thing", "hello");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "bar");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "hello");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("third_thing", "world");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "world");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("message", "not foo");
+        event.as_mut_log().insert(LookupBuf::from("message"), "not foo");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -711,32 +711,32 @@ mod test {
             )
         );
 
-        event.as_mut_log().insert("message", "hello foo world");
-        event.as_mut_log().insert("third_thing", "hello world");
+        event.as_mut_log().insert(LookupBuf::from("message"), "hello foo world");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "hello world");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.contains: \"bar\" ]".to_owned())
         );
 
-        event.as_mut_log().insert("other_thing", "hello bar world");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "hello bar world");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert("third_thing", "not hell0 or w0rld");
+            .insert(LookupBuf::from("third_thing"), "not hell0 or w0rld");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.contains: [\"hello\", \"world\"] ]".to_owned()),
         );
 
-        event.as_mut_log().insert("third_thing", "world");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "world");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("message", "not fo0");
+        event.as_mut_log().insert(LookupBuf::from("message"), "not fo0");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -768,18 +768,18 @@ mod test {
             )
         );
 
-        event.as_mut_log().insert("message", "foo hello world");
+        event.as_mut_log().insert(LookupBuf::from("message"), "foo hello world");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.prefix: \"bar\" ]".to_owned())
         );
 
-        event.as_mut_log().insert("other_thing", "bar hello world");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "bar hello world");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("message", "not prefixed");
+        event.as_mut_log().insert(LookupBuf::from("message"), "not prefixed");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -815,21 +815,21 @@ mod test {
             )
         );
 
-        event.as_mut_log().insert("third_thing", "hello world");
-        event.as_mut_log().insert("message", "foo hello world");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "hello world");
+        event.as_mut_log().insert(LookupBuf::from("message"), "foo hello world");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.starts_with: \"bar\" ]".to_owned())
         );
 
-        event.as_mut_log().insert("other_thing", "bar hello world");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "bar hello world");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
         event
             .as_mut_log()
-            .insert("third_thing", "wrong hello world");
+            .insert(LookupBuf::from("third_thing"), "wrong hello world");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -838,11 +838,11 @@ mod test {
             ),
         );
 
-        event.as_mut_log().insert("third_thing", "world");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "world");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("message", "not prefixed");
+        event.as_mut_log().insert(LookupBuf::from("message"), "not prefixed");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -878,30 +878,30 @@ mod test {
             )
         );
 
-        event.as_mut_log().insert("message", "hello world foo");
-        event.as_mut_log().insert("third_thing", "hello world");
+        event.as_mut_log().insert(LookupBuf::from("message"), "hello world foo");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "hello world");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.ends_with: \"bar\" ]".to_owned())
         );
 
-        event.as_mut_log().insert("other_thing", "hello world bar");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "hello world bar");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("third_thing", "hello world bad");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "hello world bad");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.ends_with: [\"hello\", \"world\"] ]".to_owned()),
         );
 
-        event.as_mut_log().insert("third_thing", "world hello");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "world hello");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("message", "not suffixed");
+        event.as_mut_log().insert(LookupBuf::from("message"), "not suffixed");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -934,36 +934,36 @@ mod test {
             Err("predicates failed: [ other_thing.neq: \"bar\", third_thing.neq: [\"hello\", \"world\"] ]".to_owned())
         );
 
-        event.as_mut_log().insert("other_thing", "not bar");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "not bar");
         event
             .as_mut_log()
-            .insert("third_thing", "not hello or world");
+            .insert(LookupBuf::from("third_thing"), "not hello or world");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("third_thing", "world");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "world");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
         );
 
-        event.as_mut_log().insert("third_thing", "hello");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "hello");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ third_thing.neq: [\"hello\", \"world\"] ]".to_owned()),
         );
 
-        event.as_mut_log().insert("third_thing", "safe");
-        event.as_mut_log().insert("other_thing", "bar");
+        event.as_mut_log().insert(LookupBuf::from("third_thing"), "safe");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "bar");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ other_thing.neq: \"bar\" ]".to_owned())
         );
 
-        event.as_mut_log().insert("message", "foo");
+        event.as_mut_log().insert(LookupBuf::from("message"), "foo");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -995,18 +995,18 @@ mod test {
             Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
         );
 
-        event.as_mut_log().insert("other_thing", "at the end");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "at the end");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("other_thing", "end up here");
+        event.as_mut_log().insert(LookupBuf::from("other_thing"), "end up here");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err(r#"predicates failed: [ other_thing.regex: "end$" ]"#.to_owned())
         );
 
-        event.as_mut_log().insert("message", "foo");
+        event.as_mut_log().insert(LookupBuf::from("message"), "foo");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1038,7 +1038,7 @@ mod test {
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\", bar.ip_cidr_contains: [\"2000::/3\", \"192.168.0.0/16\"] ]".to_owned()),
         );
 
-        event.as_mut_log().insert("foo", "10.1.2.3");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "10.1.2.3");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1048,22 +1048,22 @@ mod test {
             ),
         );
 
-        event.as_mut_log().insert("bar", "2000::");
+        event.as_mut_log().insert(LookupBuf::from("bar"), "2000::");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("bar", "192.168.255.255");
+        event.as_mut_log().insert(LookupBuf::from("bar"), "192.168.255.255");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("foo", "192.200.200.200");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "192.200.200.200");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ foo.ip_cidr_contains: \"10.0.0.0/8\" ]".to_owned()),
         );
 
-        event.as_mut_log().insert("foo", "not an ip");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "not an ip");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1086,11 +1086,11 @@ mod test {
             Err("predicates failed: [ foo.exists: true ]".to_owned())
         );
 
-        event.as_mut_log().insert("foo", "not ignored");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "not ignored");
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("bar", "also not ignored");
+        event.as_mut_log().insert(LookupBuf::from("bar"), "also not ignored");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
@@ -1113,14 +1113,14 @@ mod test {
             Err("predicates failed: [ foo.length_eq: 10, bar.length_eq: 4 ]".to_owned())
         );
 
-        event.as_mut_log().insert("foo", "helloworld");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "helloworld");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),
             Err("predicates failed: [ bar.length_eq: 4 ]".to_owned())
         );
 
-        event.as_mut_log().insert("bar", vec![0, 1, 2, 3]);
+        event.as_mut_log().insert(LookupBuf::from("bar"), vec![0, 1, 2, 3]);
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
     }
@@ -1138,7 +1138,7 @@ mod test {
         assert_eq!(cond.check(&event), true);
         assert_eq!(cond.check_with_context(&event), Ok(()));
 
-        event.as_mut_log().insert("foo", "not ignored");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "not ignored");
         assert_eq!(cond.check(&event), false);
         assert_eq!(
             cond.check_with_context(&event),

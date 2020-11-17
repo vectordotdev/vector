@@ -469,8 +469,8 @@ async fn build_unit_test(
                     errors.push(format!(
                         "failed to build transform '{}': {:#}",
                         name,
-                        anyhow::anyhow!(err)
-                    .into()));
+                        anyhow::anyhow!(err),
+                    ).into());
                 }
             }
         }

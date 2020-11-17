@@ -37,7 +37,7 @@ impl TransformConfig for TokenizerConfig {
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.field_names.iter().any(|f| *f == field);
+        let drop_field = self.drop_field && !self.types.iter().any(|(f, c)| *f == field);
 
         Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
@@ -62,7 +62,7 @@ impl TransformConfig for TokenizerConfig {
 
 #[derive(Clone, Debug)]
 pub struct Tokenizer {
-    field_names: Vec<(LookupBuf, Conversion)>,
+    types: Vec<(LookupBuf, Conversion)>,
     field: LookupBuf,
     drop_field: bool,
 }
@@ -74,7 +74,7 @@ impl Tokenizer {
         drop_field: bool,
         types: HashMap<LookupBuf, Conversion>,
     ) -> Self {
-        let field_names = field_names
+        let types = field_names
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
@@ -83,9 +83,9 @@ impl Tokenizer {
             .collect();
 
         Self {
-            field_names,
             field,
             drop_field,
+            types,
         }
     }
 }
@@ -95,7 +95,7 @@ impl FunctionTransform for Tokenizer {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            for ((name, conversion), value) in self.field_names.iter().zip(parse(value).into_iter())
+            for ((name, conversion), value) in self.types.iter().zip(parse(value).into_iter())
             {
                 match conversion.convert(Value::from(value.to_owned())) {
                     Ok(value) => {
@@ -126,7 +126,7 @@ impl FunctionTransform for Tokenizer {
 
 #[cfg(test)]
 mod tests {
-    use super::TokenizerConfig;
+    use super::*;
     use crate::event::{LogEvent, Value};
     use crate::{config::TransformConfig, Event};
 
@@ -138,14 +138,14 @@ mod tests {
     async fn parse_log(
         text: &str,
         fields: &str,
-        field: Option<&str>,
+        field: Option<LookupBuf>,
         drop_field: bool,
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<String>>();
-        let field = field.map(|f| f.into());
+        let field_names = fields.split(' ').map(|s| LookupBuf::from(s)).collect::<Vec<_>>();
         let mut parser = TokenizerConfig {
+            field_names,
             field,
             drop_field,
             types: types.iter().map(|&(k, v)| (k.into(), v.into())).collect(),

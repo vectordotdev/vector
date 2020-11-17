@@ -1,5 +1,5 @@
 use crate::{
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf},
     internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -29,7 +29,7 @@ pub fn add_query_parameters(
         let value = query_parameters.get(query_parameter_name);
         for event in events.iter_mut() {
             event.as_mut_log().insert(
-                query_parameter_name as &str,
+                LookupBuf::from(query_parameter_name.clone()),
                 Value::from(value.map(String::to_owned)),
             );
         }

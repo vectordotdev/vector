@@ -177,7 +177,7 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<String>>();
+        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<LookupBuf>>();
         let field = field.map(|f| f.into());
         let mut parser = SplitConfig {
             field_names,

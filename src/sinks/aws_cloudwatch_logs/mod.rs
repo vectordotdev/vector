@@ -668,7 +668,7 @@ impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, Value},
+        event::{Event, Value, LookupBuf},
         rusoto::RegionOrEndpoint,
     };
     use std::collections::HashMap;
@@ -702,7 +702,7 @@ mod tests {
     fn partition_event() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert("log_stream", "stream");
+        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
 
         let stream = Template::try_from("{{log_stream}}").unwrap();
         let group = "group".try_into().unwrap();
@@ -724,7 +724,7 @@ mod tests {
     fn partition_event_with_prefix() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert("log_stream", "stream");
+        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
 
         let stream = Template::try_from("abcd-{{log_stream}}").unwrap();
         let group = "group".try_into().unwrap();
@@ -746,7 +746,7 @@ mod tests {
     fn partition_event_with_postfix() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert("log_stream", "stream");
+        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
 
         let stream = Template::try_from("{{log_stream}}-abcd").unwrap();
         let group = "group".try_into().unwrap();
@@ -808,16 +808,16 @@ mod tests {
     #[test]
     fn cloudwatch_encode_log_as_json() {
         let mut event = Event::from("hello world").into_log();
-        event.insert("key", "value");
+        event.insert(LookupBuf::from("key"), "value");
         let encoded = encode_log(event, &Encoding::Json.into()).unwrap();
         let map: HashMap<String, String> = serde_json::from_str(&encoded.message[..]).unwrap();
-        assert!(map.get(log_schema().timestamp_key()).is_none());
+        assert!(map.get(&log_schema().timestamp_key().to_string()).is_none());
     }
 
     #[test]
     fn cloudwatch_encode_log_as_text() {
         let mut event = Event::from("hello world").into_log();
-        event.insert("key", "value");
+        event.insert(LookupBuf::from("key"), "value");
         let encoded = encode_log(event, &Encoding::Text.into()).unwrap();
         assert_eq!(encoded.message, "hello world");
     }

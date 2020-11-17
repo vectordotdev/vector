@@ -5,7 +5,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, Value, LookupBuf},
+    event::{Event, Value, LookupBuf, SegmentBuf},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -161,7 +161,7 @@ impl TcpSource for SyslogTcpSource {
     }
 
     fn build_event(&self, frame: String, host: Bytes) -> Option<Event> {
-        event_from_str(&self.host_key, Some(host), &frame)
+        event_from_str(self.host_key.clone(), Some(host), &frame)
     }
 }
 
@@ -414,7 +414,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
         let element_lookup = LookupBuf::from(element.id);
         for (name, value) in element.params.into_iter() {
             let mut key_lookup = element_lookup.clone();
-            key_lookup.push(name);
+            key_lookup.push(SegmentBuf::from(name.to_string()));
             log.insert(key_lookup, value.to_string());
         }
     }
@@ -422,7 +422,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 
 #[cfg(test)]
 mod test {
-    use super::{event_from_str, SyslogConfig};
+    use super::*;
     use crate::{config::log_schema, event::Event};
     use chrono::prelude::*;
 

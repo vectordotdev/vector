@@ -347,10 +347,10 @@ impl<R: Read> EventStream<R> {
             channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
-                DefaultExtractor::new_with(&*HOST_LOOKUP, log_schema().host_key(), host.map(Value::from)),
-                DefaultExtractor::new(&*INDEX_LOOKUP, &*SPLUNK_INDEX_LOOKUP),
-                DefaultExtractor::new(&*SOURCE_LOOKUP, &*SPLUNK_SOURCE_LOOKUP),
-                DefaultExtractor::new(&*SOURCETYPE_LOOKUP, &*SPLUNK_SOURCETYPE_LOOKUP),
+                DefaultExtractor::new_with(*HOST_LOOKUP, log_schema().host_key().into_buf(), host.map(Value::from)),
+                DefaultExtractor::new(*INDEX_LOOKUP, *SPLUNK_INDEX_LOOKUP),
+                DefaultExtractor::new(*SOURCE_LOOKUP, *SPLUNK_SOURCE_LOOKUP),
+                DefaultExtractor::new(*SOURCETYPE_LOOKUP, *SPLUNK_SOURCETYPE_LOOKUP),
             ],
         }
     }
@@ -414,7 +414,7 @@ impl<R: Read> Stream for EventStream<R> {
                     }
 
                     // Add 'line' value as 'event::schema().message_key'
-                    if let Some(line) = object.remove(&LINE_LOOKUP) {
+                    if let Some(line) = object.remove("line") {
                         match line {
                             // This don't quite fit the meaning of a event::schema().message_key
                             JsonValue::Array(_) | JsonValue::Object(_) => {
@@ -439,7 +439,7 @@ impl<R: Read> Stream for EventStream<R> {
         if let Some(JsonValue::String(guid)) = json.get_mut("channel").map(JsonValue::take) {
             log.insert(SPLUNK_CHANNEL_LOOKUP.clone(), guid);
         } else if let Some(guid) = self.channel.as_ref() {
-            log.insert(SPLUNK_CHANNEL_LOOKUP, guid.clone());
+            log.insert(SPLUNK_CHANNEL_LOOKUP.clone(), guid.clone());
         }
 
         // Process fields field
@@ -555,7 +555,7 @@ impl DefaultExtractor {
 
     fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue) {
         // Process json_field
-        if let Some(JsonValue::String(new_value)) = value.get_mut(self.field).map(JsonValue::take) {
+        if let Some(JsonValue::String(new_value)) = value.get_mut(&self.field).map(JsonValue::take) {
             self.value = Some(new_value.into());
         }
 
@@ -605,7 +605,7 @@ fn raw_event(
     log.insert(log_schema().message_key().into_buf(), message);
 
     // Add channel
-    log.insert(*SPLUNK_CHANNEL_LOOKUP.clone(), channel);
+    log.insert(SPLUNK_CHANNEL_LOOKUP.clone(), channel);
 
     // Add host
     if let Some(host) = host {
@@ -618,7 +618,7 @@ fn raw_event(
     // Add source type
     event
         .as_mut_log()
-        .insert(log_schema().source_type_key().clone(), Bytes::from("splunk_hec"));
+        .insert(log_schema().source_type_key().into_buf(), Bytes::from("splunk_hec"));
 
     emit!(SplunkHECEventReceived);
 

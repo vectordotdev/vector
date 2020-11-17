@@ -142,7 +142,7 @@ impl LogEvent {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn all_fields(&self) -> impl Iterator<Item = (String, &Value)> + Serialize {
+    pub fn all_fields(&self) -> impl Iterator<Item = (Lookup, &Value)> + Serialize {
         util::log::all_fields(&self.fields)
     }
 

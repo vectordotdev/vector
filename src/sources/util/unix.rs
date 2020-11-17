@@ -26,7 +26,7 @@ pub fn build_unix_source<D, E>(
     host_key: LookupBuf,
     shutdown: ShutdownSignal,
     out: Pipeline,
-    build_event: impl Fn(&LookupBuf, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
+    build_event: impl Fn(LookupBuf, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
 ) -> Source
 where
     D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
@@ -72,7 +72,7 @@ where
             let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
                 future::ready(match line {
-                    Ok(line) => build_event(host_key, received_from.clone(), &line).map(Ok),
+                    Ok(line) => build_event(host_key.clone(), received_from.clone(), &line).map(Ok),
                     Err(error) => {
                         emit!(UnixSocketError {
                             error,

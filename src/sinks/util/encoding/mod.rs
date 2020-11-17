@@ -35,7 +35,7 @@ mod with_default;
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
-    event::{PathComponent, PathIter, Value, Lookup, LookupBuf},
+    event::{Value, LookupBuf},
     Event, Result,
 };
 use serde::{Deserialize, Serialize};
@@ -105,9 +105,7 @@ pub trait EncodingConfiguration<E> {
                             for (k, v) in unix_timestamps {
                                 // TODO: Fixed in https://github.com/timberio/vector/issues/2845
                                 log_event.insert(
-                                    LookupBuf::from_str(&k).expect(
-                                        "While iterating over fields in an event, found one which was not a valid lookup. This is an invariant, please report this."
-                                    ),
+                                    k.into_buf(),
                                     v
                                 );
                             }
@@ -162,7 +160,7 @@ pub enum TimestampFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::log_schema;
+    use crate::{config::log_schema, event::Lookup};
 
     #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
     enum TestEncoding {
@@ -173,11 +171,6 @@ mod tests {
     #[serde(deny_unknown_fields)]
     struct TestConfig {
         encoding: EncodingConfig<TestEncoding>,
-    }
-
-    // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    fn as_path_components(a: &str) -> Vec<PathComponent> {
-        PathIter::new(a).collect()
     }
 
     const TOML_SIMPLE_STRING: &str = r#"
@@ -203,7 +196,7 @@ mod tests {
         assert_eq!(config.encoding.except_fields, Some(vec!["Doop".into()]));
         assert_eq!(
             config.encoding.only_fields,
-            Some(vec![as_path_components("Boop")])
+            Some(vec![LookupBuf::from("Boop")])
         );
     }
 
@@ -229,23 +222,23 @@ mod tests {
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert("a", 1);
-            log.insert("a.b", 1);
-            log.insert("a.b.c", 1);
-            log.insert("a.b.d", 1);
-            log.insert("b[0]", 1);
-            log.insert("b[1].x", 1);
-            log.insert("c[0].x", 1);
-            log.insert("c[0].y", 1);
+            log.insert(LookupBuf::from_str("a").unwrap(), 1);
+            log.insert(LookupBuf::from_str("a.b").unwrap(), 1);
+            log.insert(LookupBuf::from_str("a.b.c").unwrap(), 1);
+            log.insert(LookupBuf::from_str("a.b.d").unwrap(), 1);
+            log.insert(LookupBuf::from_str("b[0]").unwrap(), 1);
+            log.insert(LookupBuf::from_str("b[1].x").unwrap(), 1);
+            log.insert(LookupBuf::from_str("c[0].x").unwrap(), 1);
+            log.insert(LookupBuf::from_str("c[0].y").unwrap(), 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(!event.as_mut_log().contains("a.b.c"));
-        assert!(!event.as_mut_log().contains("b"));
-        assert!(!event.as_mut_log().contains("b[1].x"));
-        assert!(!event.as_mut_log().contains("c[0].y"));
+        assert!(!event.as_mut_log().contains(Lookup::from_str("a.b.c").unwrap()));
+        assert!(!event.as_mut_log().contains(Lookup::from_str("b").unwrap()));
+        assert!(!event.as_mut_log().contains(Lookup::from_str("b[1].x").unwrap()));
+        assert!(!event.as_mut_log().contains(Lookup::from_str("c[0].y").unwrap()));
 
-        assert!(event.as_mut_log().contains("a.b.d"));
-        assert!(event.as_mut_log().contains("c[0].x"));
+        assert!(event.as_mut_log().contains(Lookup::from_str("a.b.d").unwrap()));
+        assert!(event.as_mut_log().contains(Lookup::from_str("c[0].x").unwrap()));
     }
 
     const TOML_ONLY_FIELD: &str = r#"
@@ -259,23 +252,23 @@ mod tests {
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert("a", 1);
-            log.insert("a.b", 1);
-            log.insert("a.b.c", 1);
-            log.insert("a.b.d", 1);
-            log.insert("b[0]", 1);
-            log.insert("b[1].x", 1);
-            log.insert("c[0].x", 1);
-            log.insert("c[0].y", 1);
+            log.insert(LookupBuf::from_str("a").unwrap(), 1);
+            log.insert(LookupBuf::from_str("a.b").unwrap(), 1);
+            log.insert(LookupBuf::from_str("a.b.c").unwrap(), 1);
+            log.insert(LookupBuf::from_str("a.b.d").unwrap(), 1);
+            log.insert(LookupBuf::from_str("b[0]").unwrap(), 1);
+            log.insert(LookupBuf::from_str("b[1].x").unwrap(), 1);
+            log.insert(LookupBuf::from_str("c[0].x").unwrap(), 1);
+            log.insert(LookupBuf::from_str("c[0].y").unwrap(), 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(event.as_mut_log().contains("a.b.c"));
-        assert!(event.as_mut_log().contains("b"));
-        assert!(event.as_mut_log().contains("b[1].x"));
-        assert!(event.as_mut_log().contains("c[0].y"));
+        assert!(event.as_mut_log().contains(Lookup::from_str("a.b.c").unwrap()));
+        assert!(event.as_mut_log().contains(Lookup::from_str("b").unwrap()));
+        assert!(event.as_mut_log().contains(Lookup::from_str("b[1].x").unwrap()));
+        assert!(event.as_mut_log().contains(Lookup::from_str("c[0].y").unwrap()));
 
-        assert!(!event.as_mut_log().contains("a.b.d"));
-        assert!(!event.as_mut_log().contains("c[0].x"));
+        assert!(!event.as_mut_log().contains(Lookup::from_str("a.b.d").unwrap()));
+        assert!(!event.as_mut_log().contains(Lookup::from_str("c[0].x").unwrap()));
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = r#"
@@ -295,7 +288,7 @@ mod tests {
         let timestamp = timestamp.as_timestamp().unwrap();
         event
             .as_mut_log()
-            .insert("another", Value::Timestamp(*timestamp));
+            .insert(LookupBuf::from("another"), Value::Timestamp(*timestamp));
 
         config.encoding.apply_rules(&mut event);
 
@@ -310,7 +303,7 @@ mod tests {
                 e
             ),
         }
-        match event.as_mut_log().get("another").unwrap() {
+        match event.as_mut_log().get(Lookup::from("another")).unwrap() {
             Value::Integer(_) => {}
             e => panic!(
                 "Timestamp was not transformed into a Unix timestamp. Was {:?}",

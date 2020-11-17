@@ -1,7 +1,7 @@
 use super::BuildError;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
 };
@@ -68,7 +68,7 @@ impl TransformConfig for ConcatConfig {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Substring {
-    source: String,
+    source: LookupBuf,
     start: Option<i32>,
     end: Option<i32>,
 }
@@ -90,7 +90,7 @@ impl Substring {
         };
 
         let source = match cap.name("source") {
-            Some(source) => String::from_utf8_lossy(source.as_bytes()).into(),
+            Some(source) => LookupBuf::from(String::from_utf8_lossy(source.as_bytes())),
             None => {
                 return Err(BuildError::InvalidSubstring {
                     name: "invalid format, use 'source[start..end]' or 'source'".into(),
@@ -118,13 +118,13 @@ impl Substring {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Concat {
-    target: String,
+    target: LookupBuf,
     joiner: String,
     items: Vec<Substring>,
 }
 
 impl Concat {
-    pub fn new(target: String, joiner: String, items: Vec<Substring>) -> Self {
+    pub fn new(target: LookupBuf, joiner: String, items: Vec<Substring>) -> Self {
         Self {
             target,
             joiner,
@@ -165,7 +165,7 @@ impl FunctionTransform for Concat {
                 if start >= end {
                     emit!(ConcatSubstringError {
                         condition: "start >= end",
-                        source: substring.source.as_ref(),
+                        source: substring.source.as_lookup(),
                         start,
                         end,
                         length: b.len()
@@ -175,7 +175,7 @@ impl FunctionTransform for Concat {
                 if start > b.len() {
                     emit!(ConcatSubstringError {
                         condition: "start > len",
-                        source: substring.source.as_ref(),
+                        source: substring.source.as_lookup(),
                         start,
                         end,
                         length: b.len()
@@ -185,7 +185,7 @@ impl FunctionTransform for Concat {
                 if end > b.len() {
                     emit!(ConcatSubstringError {
                         condition: "end > len",
-                        source: substring.source.as_ref(),
+                        source: substring.source.as_lookup(),
                         start,
                         end,
                         length: b.len()
@@ -195,7 +195,7 @@ impl FunctionTransform for Concat {
                 content_vec.push(b.slice(start..end));
             } else {
                 emit!(ConcatSubstringSourceMissing {
-                    source: substring.source.as_ref()
+                    source: substring.source.as_lookup()
                 });
             }
         }

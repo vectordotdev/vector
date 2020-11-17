@@ -2,7 +2,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, Value, LookupBuf, LogEvent},
+    event::{Event, Value, LookupBuf},
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -79,7 +79,7 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event.as_mut_log().insert(key.clone(), Bytes::from("http"));
+                    event.as_mut_log().insert(key.into_buf(), Bytes::from("http"));
                 }
                 events
             })
@@ -123,7 +123,7 @@ fn add_headers(
 
         for event in events.iter_mut() {
             event.as_mut_log().insert(
-                LookupBuf::from(header_name),
+                LookupBuf::from(header_name.clone()),
                 Value::from(value.map(Bytes::copy_from_slice)),
             );
         }

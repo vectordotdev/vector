@@ -7,6 +7,7 @@ use crate::{
     sinks::{Healthcheck, VectorSink},
     template::Template,
     transforms::metric_to_log::MetricToLogConfig,
+    event::LookupBuf,
 };
 use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -30,7 +31,7 @@ pub struct HumioMetricsConfig {
     event_type: Option<Template>,
 
     #[serde(default = "default_host_key")]
-    host_key: String,
+    host_key: LookupBuf,
 
     #[serde(default)]
     compression: Compression,

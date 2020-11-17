@@ -7,7 +7,7 @@ use crate::{
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,
-    event::{Lookup, LookupBuf},
+    event::{LookupBuf},
 };
 use serde::{Deserialize, Serialize};
 

@@ -1,5 +1,6 @@
 use crate::{
     shutdown::ShutdownSignal, sources::util::build_unix_source, sources::Source, Event, Pipeline,
+    event::LookupBuf,
 };
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
@@ -11,7 +12,7 @@ pub struct UnixConfig {
     pub path: PathBuf,
 }
 
-fn build_event(_: &str, _: Option<Bytes>, line: &str) -> Option<Event> {
+fn build_event(_: LookupBuf, _: Option<Bytes>, line: &str) -> Option<Event> {
     super::parse_event(line)
 }
 
