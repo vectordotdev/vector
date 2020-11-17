@@ -3377,9 +3377,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.13.0-alpha.4"
+version = "0.13.0-alpha.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de7e68e5386ca1883535512584aa1f41bd8129fc38f6ce6b252eb4325f0ed5f6"
+checksum = "8f059a62fe88c33ee501116c762d8d1da5a69b8ea33a938ac6918af9b135b56a"
 dependencies = [
  "metrics-macros",
  "once_cell",

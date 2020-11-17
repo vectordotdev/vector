@@ -71,7 +71,7 @@ tracing-log = "0.1.0"
 tracing-tower = { git = "https://github.com/tokio-rs/tracing", rev = "f470db1b0354b368f62f9ee4d763595d16373231" }
 
 # Metrics
-metrics = { version = "0.13.0-alpha" }
+metrics = { version = "0.13.0-alpha.8" }
 metrics-util = { version = "0.4.0-alpha"  }
 metrics-tracing-context = { version = "0.1.0-alpha"  }
 
