@@ -867,10 +867,8 @@ bench: ## Run benchmarks in /benches
 
 .PHONY: bench-all
 bench-all: ### Run default and WASM benches
-	# bench-all: $(WASM_MODULE_OUTPUTS) # TODO(jesse): renable after wasm transform builds again
-	# ${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm-benches"
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}"
-
+bench-all: $(WASM_MODULE_OUTPUTS)
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm-benches"
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
