@@ -47,16 +47,16 @@ impl CeilFn {
 
 impl Expression for CeilFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let precision =
-            optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
-        let res = required!(state, object, self.value,
-                            Value::Float(f) => {
-                                Value::Float(round_to_precision(f, precision, f64::ceil))
-                            },
-                            v@Value::Integer(_) => v
-        );
+        let precision = match &self.precision {
+            Some(expr) => expr.execute(state, object)?.try_integer()?,
+            None => 0,
+        };
 
-        Ok(res)
+        match self.value.execute(state, object)? {
+            Value::Float(f) => Ok(round_to_precision(f, precision, f64::ceil).into()),
+            v @ Value::Integer(_) => Ok(v),
+            _ => unreachable!(),
+        }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

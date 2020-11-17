@@ -1,3 +1,4 @@
+use ::sha1::Digest;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -37,14 +38,9 @@ impl Sha1Fn {
 
 impl Expression for Sha1Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        use ::sha1::{Digest, Sha1};
+        let value = self.value.execute(state, object)?.try_string()?;
 
-        self.value
-            .execute(state, object)
-            .map(|v| match v.as_string_lossy() {
-                Value::String(b) => Value::String(hex::encode(Sha1::digest(&b)).into()),
-                _ => unreachable!(),
-            })
+        Ok(hex::encode(sha1::Sha1::digest(&value)).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

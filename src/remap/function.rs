@@ -1,26 +1,5 @@
 #![macro_use]
 
-macro_rules! required {
-    ($state:expr, $object:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
-        match $fn.execute($state, $object)? {
-            $($pattern $(if $if)? => $then,)+
-            v => panic!(v),
-        }
-    }
-}
-
-macro_rules! optional {
-    ($state:expr, $object:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
-        $fn.as_ref()
-            .map(|v| v.execute($state, $object))
-            .transpose()?
-            .map(|value| match value {
-                $($pattern $(if $if)? => $then,)+
-                v => panic!(v),
-            })
-    }
-}
-
 mod ceil;
 mod contains;
 mod del;

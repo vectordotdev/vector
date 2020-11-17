@@ -2,6 +2,7 @@ mod kind;
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::string::String as StdString;
@@ -86,6 +87,12 @@ impl From<Bytes> for Value {
     }
 }
 
+impl From<Cow<'_, str>> for Value {
+    fn from(v: Cow<'_, str>) -> Self {
+        v.as_ref().into()
+    }
+}
+
 impl From<Vec<u8>> for Value {
     fn from(v: Vec<u8>) -> Self {
         v.as_slice().into()
@@ -118,7 +125,7 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 
 impl From<&str> for Value {
     fn from(v: &str) -> Self {
-        Value::String(Vec::from(v.as_bytes()).into())
+        Value::String(Bytes::copy_from_slice(v.as_bytes()))
     }
 }
 

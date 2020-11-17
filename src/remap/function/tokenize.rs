@@ -38,10 +38,8 @@ impl TokenizeFn {
 
 impl Expression for TokenizeFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
-        };
+        let bytes = self.value.execute(state, object)?.try_string()?;
+        let value = String::from_utf8_lossy(&bytes);
 
         let tokens: Value = tokenize::parse(&value)
             .into_iter()

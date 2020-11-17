@@ -56,8 +56,11 @@ impl SliceFn {
 
 impl Expression for SliceFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let start = required!(state, object, self.start, Value::Integer(v) => v);
-        let end = optional!(state, object, self.end, Value::Integer(v) => v);
+        let start = self.start.execute(state, object)?.try_integer()?;
+        let end = match &self.end {
+            Some(expr) => Some(expr.execute(state, object)?.try_integer()?),
+            None => None,
+        };
 
         let range = |len: i64| -> Result<std::ops::Range<usize>> {
             let start = match start {
@@ -81,14 +84,14 @@ impl Expression for SliceFn {
             }
         };
 
-        required! {
-            state, object, self.value,
+        match self.value.execute(state, object)? {
             Value::String(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
                 .map(Value::from),
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
                 .map(Value::from),
+            _ => unreachable!(),
         }
     }
 
