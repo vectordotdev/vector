@@ -63,7 +63,7 @@ impl ContainsFn {
 }
 
 impl Expression for ContainsFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let substring = {
             let bytes = required!(state, object, self.substring, Value::String(v) => v);
             String::from_utf8_lossy(&bytes).into_owned()
@@ -80,7 +80,24 @@ impl Expression for ContainsFn {
                 .filter(|&case_sensitive| !case_sensitive)
                 .any(|_| value.to_lowercase().contains(&substring.to_lowercase()));
 
-        Ok(Some(contains.into()))
+        Ok(contains.into())
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .merge(
+                self.substring
+                    .type_def(state)
+                    .fallible_unless(value::Kind::String),
+            )
+            .merge_optional(self.case_sensitive.as_ref().map(|case_sensitive| {
+                case_sensitive
+                    .type_def(state)
+                    .fallible_unless(value::Kind::Boolean)
+            }))
+            .with_constraint(value::Kind::Boolean)
     }
 }
 
@@ -99,52 +116,52 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 ContainsFn::new(Box::new(Literal::from("foo")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 ContainsFn::new(Box::new(Literal::from("foo")), "foobar", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foo")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "oba", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("fooBAR")), "BAR", true),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "BAR", true),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 ContainsFn::new(Box::new(Literal::from("foobar")), "BAR", false),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

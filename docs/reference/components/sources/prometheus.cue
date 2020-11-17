@@ -31,6 +31,13 @@ components: sources: prometheus: {
 					ssl: "optional"
 				}
 			}
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
+			}
 		}
 		multiline: enabled: false
 	}
@@ -69,6 +76,10 @@ components: sources: prometheus: {
 				unit:    "seconds"
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${PROMETHEUS_PASSWORD}"
+			username_example: "${PROMETHEUS_USERNAME}"
+		}}
 	}
 
 	output: metrics: {

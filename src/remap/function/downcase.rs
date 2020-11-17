@@ -37,15 +37,19 @@ impl DowncaseFn {
 }
 
 impl Expression for DowncaseFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.value
-            .execute(state, object)?
-            .map(String::try_from)
-            .transpose()?
+            .execute(state, object)
+            .and_then(|v| String::try_from(v).map_err(Into::into))
             .map(|v| v.to_lowercase())
             .map(Into::into)
-            .map(Ok)
-            .transpose()
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::String)
     }
 }
 
@@ -64,12 +68,12 @@ mod tests {
             ),
             (
                 map!["foo": "FOO 2 bar"],
-                Ok(Some(Value::from("foo 2 bar"))),
+                Ok(Value::from("foo 2 bar")),
                 DowncaseFn::new(Box::new(Path::from("foo"))),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -79,4 +83,16 @@ mod tests {
             assert_eq!(got, exp);
         }
     }
+
+    remap::test_type_def![
+        string {
+            expr: |_| DowncaseFn { value: Literal::from("foo").boxed() },
+            def: TypeDef { kind: value::Kind::String, ..Default::default() },
+        }
+
+        non_string {
+            expr: |_| DowncaseFn { value: Literal::from(true).boxed() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
+        }
+    ];
 }

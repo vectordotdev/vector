@@ -49,15 +49,3 @@ impl InternalEvent for RemapConditionExecutionFailed {
         )
     }
 }
-
-#[derive(Debug, Copy, Clone)]
-pub struct RemapConditionNonBooleanReturned;
-
-impl InternalEvent for RemapConditionNonBooleanReturned {
-    fn emit_logs(&self) {
-        warn!(
-            message = "Remap condition non-boolean value returned.",
-            rate_limit_secs = 120
-        )
-    }
-}

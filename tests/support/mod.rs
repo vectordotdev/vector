@@ -35,7 +35,7 @@ use vector::{
 };
 
 pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
@@ -43,7 +43,7 @@ pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) 
 pub fn sink_failing_healthcheck(
     channel_size: usize,
 ) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
@@ -53,14 +53,14 @@ pub fn sink_dead() -> MockSinkConfig<DeadSink<Event>> {
 }
 
 pub fn source() -> (Pipeline, MockSourceConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(0);
+    let (tx, rx) = Pipeline::new_with_buffer(0, vec![]);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
 
 pub fn source_with_event_counter() -> (Pipeline, MockSourceConfig, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = Pipeline::new_with_buffer(0);
+    let (tx, rx) = Pipeline::new_with_buffer(0, vec![]);
     let source = MockSourceConfig::new_with_event_counter(rx, event_counter.clone());
     (tx, source, event_counter)
 }

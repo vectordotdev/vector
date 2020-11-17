@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -85,6 +86,10 @@ impl SourceConfig for LogplexConfig {
 
     fn source_type(&self) -> &'static str {
         "logplex"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 

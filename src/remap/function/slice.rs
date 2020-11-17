@@ -55,7 +55,7 @@ impl SliceFn {
 }
 
 impl Expression for SliceFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let start = required!(state, object, self.start, Value::Integer(v) => v);
         let end = optional!(state, object, self.end, Value::Integer(v) => v);
 
@@ -85,13 +85,34 @@ impl Expression for SliceFn {
             state, object, self.value,
             Value::String(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
-                .map(Value::from)
-                .map(Some),
+                .map(Value::from),
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
-                .map(Value::from)
-                .map(Some),
+                .map(Value::from),
         }
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(Kind::String | Kind::Array);
+        let end_def = self
+            .end
+            .as_ref()
+            .map(|end| end.type_def(state).fallible_unless(Kind::Integer));
+
+        value_def
+            .clone()
+            .merge(self.start.type_def(state).fallible_unless(Kind::Integer))
+            .merge_optional(end_def)
+            .with_constraint(match value_def.kind {
+                v if v.is_string() || v.is_array() => v,
+                _ => Kind::String | Kind::Array,
+            })
+            .into_fallible(true) // can fail for invalid start..end ranges
     }
 }
 
@@ -99,53 +120,83 @@ impl Expression for SliceFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| SliceFn {
+                value: Literal::from("foo").boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+        }
+
+        value_array {
+            expr: |_| SliceFn {
+                value: Literal::from(vec!["foo"]).boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
+        }
+
+        value_unknown {
+            expr: |_| SliceFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                start: Literal::from(0).boxed(),
+                end: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::String | Kind::Array, ..Default::default() },
+        }
+    ];
 
     #[test]
     fn bytes() {
         let cases = vec![
             (
                 map![],
-                Ok(Some("foo".into())),
+                Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, None),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, None),
             ),
             (
                 map![],
-                Ok(Some("o".into())),
+                Ok("o".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, None),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), -2, None),
             ),
             (
                 map![],
-                Ok(Some("".into())),
+                Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 3, None),
             ),
             (
                 map![],
-                Ok(Some("".into())),
+                Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, Some(2)),
             ),
             (
                 map![],
-                Ok(Some("foo".into())),
+                Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, Some(4)),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, Some(5)),
             ),
             (
                 map![],
-                Ok(Some("docious".into())),
+                Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     -7,
@@ -154,7 +205,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("cali".into())),
+                Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     5,
@@ -163,7 +214,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -179,22 +230,22 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some(vec![0, 1, 2].into())),
+                Ok(vec![0, 1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 0, None),
             ),
             (
                 map![],
-                Ok(Some(vec![1, 2].into())),
+                Ok(vec![1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 1, None),
             ),
             (
                 map![],
-                Ok(Some(vec![1, 2].into())),
+                Ok(vec![1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), -2, None),
             ),
             (
                 map![],
-                Ok(Some("docious".into())),
+                Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     -7,
@@ -203,7 +254,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("cali".into())),
+                Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     5,
@@ -212,7 +263,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -248,7 +299,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

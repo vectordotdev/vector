@@ -46,7 +46,7 @@ impl RoundFn {
 }
 
 impl Expression for RoundFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let precision =
             optional!(state, object, self.precision, Value::Integer(v) => v).unwrap_or(0);
         let res = required!(state, object, self.value,
@@ -56,7 +56,28 @@ impl Expression for RoundFn {
                             v@Value::Integer(_) => v
         );
 
-        Ok(res.into())
+        Ok(res)
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(Kind::Integer | Kind::Float);
+        let precision_def = self
+            .precision
+            .as_ref()
+            .map(|precision| precision.type_def(state).fallible_unless(Kind::Integer));
+
+        value_def
+            .clone()
+            .merge_optional(precision_def)
+            .with_constraint(match value_def.kind {
+                v if v.is_float() || v.is_integer() => v,
+                _ => Kind::Integer | Kind::Float,
+            })
     }
 }
 
@@ -64,6 +85,41 @@ impl Expression for RoundFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    remap::test_type_def![
+        value_float {
+            expr: |_| RoundFn {
+                value: Literal::from(1.0).boxed(),
+                precision: None,
+            },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
+        }
+
+        value_integer {
+            expr: |_| RoundFn {
+                value: Literal::from(1).boxed(),
+                precision: None,
+            },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        }
+
+        value_float_or_integer {
+            expr: |_| RoundFn {
+                value: Variable::new("foo".to_owned()).boxed(),
+                precision: None,
+            },
+            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
+        }
+
+        fallible_precision {
+            expr: |_| RoundFn {
+                value: Literal::from(1).boxed(),
+                precision: Some(Variable::new("foo".to_owned()).boxed()),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+    ];
 
     #[test]
     fn round() {
@@ -75,22 +131,22 @@ mod tests {
             ),
             (
                 map!["foo": 1234.2],
-                Ok(Some(1234.0.into())),
+                Ok(1234.0.into()),
                 RoundFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map![],
-                Ok(Some(1235.0.into())),
+                Ok(1235.0.into()),
                 RoundFn::new(Box::new(Literal::from(Value::Float(1234.8))), None),
             ),
             (
                 map![],
-                Ok(Some(1234.into())),
+                Ok(1234.into()),
                 RoundFn::new(Box::new(Literal::from(Value::Integer(1234))), None),
             ),
             (
                 map![],
-                Ok(Some(1234.4.into())),
+                Ok(1234.4.into()),
                 RoundFn::new(
                     Box::new(Literal::from(Value::Float(1234.39429))),
                     Some(Box::new(Literal::from(1))),
@@ -98,7 +154,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(3.1416.into())),
+                Ok(3.1416.into()),
                 RoundFn::new(
                     Box::new(Literal::from(Value::Float(std::f64::consts::PI))),
                     Some(Box::new(Literal::from(4))),
@@ -106,9 +162,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(
-                    9876543210123456789098765432101234567890987654321.98765.into(),
-                )),
+                Ok(9876543210123456789098765432101234567890987654321.98765.into()),
                 RoundFn::new(
                     Box::new(Literal::from(
                         9876543210123456789098765432101234567890987654321.987654321,
@@ -118,7 +172,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -17,7 +17,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures01::Sink;
+use futures::SinkExt;
 use http::{Request, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -140,7 +140,7 @@ impl SinkConfig for InfluxDBLogsConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
