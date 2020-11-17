@@ -278,7 +278,7 @@ test: ## Run the unit test suite
 test-components: ## Test with all components enabled
 test-components: $(WASM_MODULE_OUTPUTS)
 # excluing API client due to running out of memory during linking in Github Actions
-test-components: export DEFAULT_FEATURES:="default-no-api-client wasm-benches"
+test-components: export DEFAULT_FEATURES:="default-no-api wasm-benches"
 test-components: test
 
 .PHONY: test-all
