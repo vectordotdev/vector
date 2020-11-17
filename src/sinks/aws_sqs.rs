@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    internal_events::AwsSqsEventSent,
+    internal_events::{AwsSqsEventSent, AwsSqsMessageGroupIdMissingKeys},
     rusoto,
     sinks::util::{
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -30,7 +30,9 @@ use tracing_futures::Instrument;
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("`message_group_id` should be defined for FIFO queue."))]
-    MessageGroupIdWithFifo,
+    MessageGroupIdMissing,
+    #[snafu(display("`message_group_id` is not allowed with non-FIFO queue."))]
+    MessageGroupIdNotAllowed,
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateError },
 }
@@ -150,10 +152,11 @@ impl SqsSink {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
         let encoding = config.encoding;
         let fifo = config.queue_url.ends_with(".fifo");
-        let message_group_id = match config.message_group_id {
-            Some(value) => Some(Template::try_from(value).context(TopicTemplate)?),
-            None if fifo => return Err(Box::new(BuildError::MessageGroupIdWithFifo)),
-            None => None,
+        let message_group_id = match (config.message_group_id, fifo) {
+            (Some(value), true) => Some(Template::try_from(value).context(TopicTemplate)?),
+            (Some(_), false) => return Err(Box::new(BuildError::MessageGroupIdNotAllowed)),
+            (None, true) => return Err(Box::new(BuildError::MessageGroupIdMissing)),
+            (None, false) => None,
         };
 
         let sqs = SqsSink {
@@ -253,16 +256,18 @@ fn encode_event(
 ) -> Option<SendMessageEntry> {
     encoding.apply_rules(&mut event);
 
-    let message_group_id = message_group_id.and_then(|tpl| match tpl.render_string(&event) {
-        Ok(value) => Some(value),
-        Err(missing_keys) => {
-            error!(
-                message = "Missing keys for `message_group_id`.",
-                ?missing_keys
-            );
-            None
-        }
-    });
+    let message_group_id = match message_group_id {
+        Some(tpl) => match tpl.render_string(&event) {
+            Ok(value) => Some(value),
+            Err(missing_keys) => {
+                emit!(AwsSqsMessageGroupIdMissingKeys {
+                    keys: &missing_keys
+                });
+                return None;
+            }
+        },
+        None => None,
+    };
 
     let log = event.into_log();
     let message_body = match encoding.codec() {
