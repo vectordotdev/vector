@@ -212,7 +212,7 @@ impl<'a> Widgets<'a> {
         self.title(f, rects[0]);
 
         // Require a minimum of 80 chars of line width to display the table
-        if size.width > 80 {
+        if size.width >= 80 {
             self.components_table(f, &state, rects[1]);
         } else {
             self.components_resize_window(f, rects[1]);
