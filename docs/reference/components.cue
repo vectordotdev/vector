@@ -354,11 +354,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: close({
-		description:    string
-		relevant_when?: string
-		tags:           #MetricTags
-		name:           Name
-		type:           #MetricType
+		description:       string
+		relevant_when?:    string
+		tags:              #MetricTags
+		name:              Name
+		type:              #MetricType
+		default_namespace: string
 	})
 
 	#Output: {
