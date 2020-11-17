@@ -14,9 +14,6 @@ set -euo pipefail
 mkdir -p .cargo/
 
 cat <<-EOF >> ./.cargo/config
-[target.'cfg(unix)']
-rustflags = ["-C", "link-arg=-fuse-ld=gold"]
-
 [build]
 # On the CI, where this script runs, we won't be caching build artifacts.
 # so we don't need to keep these around.
