@@ -1,0 +1,18 @@
+image:
+  # Use the latest release image.
+  version: latest
+  # Use the alpine flavor of vector image.
+  base: alpine
+
+env:
+  # Set the log level reasonably high.
+  - name: LOG
+    value: info
+
+extraConfigDirSources:
+  - configMap:
+      name: vector-agent-config
+      optional: true
+  - secret:
+      name: vector-agent-config
+      optional: true
