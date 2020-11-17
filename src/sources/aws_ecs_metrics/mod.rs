@@ -588,13 +588,12 @@ mod integration_tests {
     use crate::test_util::collect_ready;
     use tokio::time::{delay_for, Duration};
 
-    #[tokio::test]
-    async fn scrapes_metrics() {
+    async fn scrape_metrics(endpoint: String, version: Version) {
         let (tx, rx) = Pipeline::new_test();
 
         let source = AwsEcsMetricsSourceConfig {
-            endpoint: "http://localhost:9088/v3".into(),
-            version: Version::V3,
+            endpoint,
+            version,
             scrape_interval_secs: 1,
             namespace: default_namespace(),
         }
@@ -614,5 +613,22 @@ mod integration_tests {
         let metrics = collect_ready(rx).await.unwrap();
 
         assert!(!metrics.is_empty());
+    }
+
+    #[tokio::test]
+    async fn scrapes_metrics_v2() {
+        scrape_metrics("http://localhost:9088/v2".into(), Version::V2).await;
+    }
+
+    #[tokio::test]
+    async fn scrapes_metrics_v3() {
+        scrape_metrics("http://localhost:9088/v3".into(), Version::V3).await;
+    }
+
+    #[tokio::test]
+    async fn scrapes_metrics_v4() {
+        // mock uses same endpoint for v4 as v3
+        // https://github.com/awslabs/amazon-ecs-local-container-endpoints/blob/mainline/docs/features.md#task-metadata-v4
+        scrape_metrics("http://localhost:9088/v3".into(), Version::V4).await;
     }
 }
