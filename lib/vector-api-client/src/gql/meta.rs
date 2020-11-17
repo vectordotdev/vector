@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use graphql_client::GraphQLQuery;
 
-/// MetaVersionStringQuery returns the version string of queried Vector instance
+/// MetaVersionStringQuery returns the version string of the queried Vector instance
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
