@@ -11,11 +11,11 @@
 #   vector:
 #     image:
 #       repository: <docker repo>
-#       #  Overrides the image tag, the default is `{image.version}-{image.base}`
+#       # Overrides the image tag, the default is `{image.version}-{image.base}`.
 #       tag: <tag>
 #       # Overrides the image version, the default is the Chart appVersion.
 #       version: <version>
-#       # Sets the image base OS
+#       # Overrides the image flavor, the default is `debian`.
 #       base: <base>
 #     # Sets common environment variables for use in all `Pod`s.
 #     commonEnvKV:
