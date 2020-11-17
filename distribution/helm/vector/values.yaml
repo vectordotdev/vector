@@ -1,3 +1,7 @@
+# Default values for vector.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
 vector-agent:
   # See the possible settings at the `vector-agent` chart.
 
