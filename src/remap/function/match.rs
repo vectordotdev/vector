@@ -73,7 +73,7 @@ impl Expression for MatchFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -81,7 +81,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         value_non_string {
@@ -89,7 +89,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         value_optional {
@@ -97,7 +97,7 @@ mod tests {
                 value: Box::new(Noop),
                 pattern: Regex::new("").unwrap(),
             },
-            def: TypeDef { fallible: true, optional: true, constraint: Boolean.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::Boolean },
         }
     ];
 

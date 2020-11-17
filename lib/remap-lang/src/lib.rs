@@ -229,7 +229,7 @@ mod tests {
             let accept = TypeDef {
                 fallible: true,
                 optional: true,
-                constraint: value::Constraint::Any,
+                kind: value::Kind::all(),
             };
 
             let program = Program::new(

@@ -70,12 +70,12 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
         }
 
         fallible_expression {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
         }
     ];
 

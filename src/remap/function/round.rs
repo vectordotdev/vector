@@ -64,23 +64,23 @@ impl Expression for RoundFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         let value_def = self
             .value
             .type_def(state)
-            .fallible_unless(vec![Integer, Float]);
+            .fallible_unless(Kind::Integer | Kind::Float);
         let precision_def = self
             .precision
             .as_ref()
-            .map(|precision| precision.type_def(state).fallible_unless(Integer));
+            .map(|precision| precision.type_def(state).fallible_unless(Kind::Integer));
 
         value_def
             .clone()
             .merge_optional(precision_def)
-            .with_constraint(match value_def.constraint {
-                v if v.is(Float) || v.is(Integer) => v,
-                _ => vec![Integer, Float].into(),
+            .with_constraint(match value_def.kind {
+                v if v.is_float() || v.is_integer() => v,
+                _ => Kind::Integer | Kind::Float,
             })
     }
 }
@@ -89,7 +89,7 @@ impl Expression for RoundFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_float {
@@ -97,7 +97,7 @@ mod tests {
                 value: Literal::from(1.0).boxed(),
                 precision: None,
             },
-            def: TypeDef { constraint: Float.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         value_integer {
@@ -105,7 +105,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 precision: None,
             },
-            def: TypeDef { constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         value_float_or_integer {
@@ -113,7 +113,7 @@ mod tests {
                 value: Variable::new("foo".to_owned()).boxed(),
                 precision: None,
             },
-            def: TypeDef { fallible: true, constraint: vec![Integer, Float].into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float, ..Default::default() },
         }
 
         fallible_precision {
@@ -121,7 +121,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 precision: Some(Variable::new("foo".to_owned()).boxed()),
             },
-            def: TypeDef { fallible: true, constraint: Integer.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
         }
     ];
 

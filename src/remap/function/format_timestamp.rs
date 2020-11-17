@@ -91,7 +91,7 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::TimeZone;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_and_format {
@@ -99,7 +99,7 @@ mod tests {
                 value: Literal::from(chrono::Utc::now()).boxed(),
                 format: Literal::from("%s").boxed(),
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         optional_value {
@@ -107,7 +107,7 @@ mod tests {
                 value: Box::new(Noop),
                 format: Literal::from("%s").boxed(),
             },
-            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
         }
     ];
 

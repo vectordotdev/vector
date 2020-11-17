@@ -109,7 +109,7 @@ impl Expression for StartsWithFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -118,7 +118,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         value_non_string {
@@ -127,7 +127,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         substring_non_string {
@@ -136,7 +136,7 @@ mod tests {
                 substring: Literal::from(true).boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         case_sensitive_non_boolean {
@@ -145,7 +145,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: Some(Literal::from(1).boxed()),
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
     ];
 

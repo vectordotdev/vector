@@ -24,7 +24,7 @@ impl ConditionConfig for RemapConfig {
         let expected_result = TypeDef {
             fallible: true,
             optional: true,
-            constraint: value::Constraint::Exact(value::Kind::Boolean),
+            kind: value::Kind::Boolean,
         };
 
         let program = Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)
