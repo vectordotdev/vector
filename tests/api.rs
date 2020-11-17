@@ -422,17 +422,17 @@ mod tests {
         let subscription = client.all_component_events_processed_totals_subscription(500);
 
         tokio::pin! {
-            let component_events_processed_total_batch = subscription.stream();
+            let stream = subscription.stream();
         }
 
-        let data = component_events_processed_total_batch
+        let data = stream
             .next()
             .await
             .unwrap()
             .unwrap()
             .data
             .unwrap()
-            .component_events_processed_total_batch;
+            .all_component_events_processed_totals;
 
         assert_eq!(data[0].name, "events_processed_total_batch_source");
         assert_eq!(data[1].name, "events_processed_total_batch_sink");
@@ -536,17 +536,17 @@ mod tests {
         let subscription = client.all_component_bytes_processed_totals_subscription(500);
 
         tokio::pin! {
-            let component_bytes_processed_total_batch = subscription.stream();
+            let stream = subscription.stream();
         }
 
-        let data = component_bytes_processed_total_batch
+        let data = stream
             .next()
             .await
             .unwrap()
             .unwrap()
             .data
             .unwrap()
-            .component_bytes_processed_total_batch;
+            .all_component_bytes_processed_totals;
 
         // Bytes are currently only relevant on sinks
         assert_eq!(data[0].name, "bytes_processed_total_batch_sink");
