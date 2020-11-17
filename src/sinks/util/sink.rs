@@ -260,7 +260,7 @@ where
 /// and r3 are dispatched and r2 and r3 complete, all events contained
 /// in all requests will not be acked until r1 has completed.
 #[pin_project]
-pub struct PartitionBatchSink<B, S, K, Request>
+pub struct PartitionBatchSink<S, B, K, Request>
 where
     B: Batch<Output = Request>,
 {
@@ -273,7 +273,7 @@ where
     closing: bool,
 }
 
-impl<B, S, K, Request> PartitionBatchSink<B, S, K, Request>
+impl<S, B, K, Request> PartitionBatchSink<S, B, K, Request>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -298,7 +298,7 @@ where
     }
 }
 
-impl<B, S, K, Request> Sink<B::Input> for PartitionBatchSink<B, S, K, Request>
+impl<S, B, K, Request> Sink<B::Input> for PartitionBatchSink<S, B, K, Request>
 where
     B: Batch<Output = Request>,
     B::Input: Partition<K>,
@@ -427,7 +427,7 @@ where
     }
 }
 
-impl<B, S, K, Request> fmt::Debug for PartitionBatchSink<B, S, K, Request>
+impl<S, B, K, Request> fmt::Debug for PartitionBatchSink<S, B, K, Request>
 where
     S: fmt::Debug,
     B: Batch<Output = Request> + fmt::Debug,

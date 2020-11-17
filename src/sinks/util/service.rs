@@ -22,7 +22,7 @@ use tower::{
 
 pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>, L>>>;
 pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
-pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<B, Svc<S, L>, K, Request>;
+pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<Svc<S, L>, B, K, Request>;
 
 pub trait ServiceBuilderExt<L> {
     fn map<R1, R2, F>(self, f: F) -> ServiceBuilder<Stack<MapLayer<R1, R2>, L>>
