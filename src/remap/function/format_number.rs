@@ -23,12 +23,12 @@ impl Function for FormatNumber {
             },
             Parameter {
                 keyword: "decimal_separator",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
             Parameter {
                 keyword: "grouping_separator",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
         ]
@@ -92,12 +92,12 @@ impl Expression for FormatNumberFn {
         };
 
         let grouping_separator = match &self.grouping_separator {
-            Some(expr) => Some(expr.execute(state, object)?.try_string()?),
+            Some(expr) => Some(expr.execute(state, object)?.try_bytes()?),
             None => None,
         };
 
         let decimal_separator = match &self.decimal_separator {
-            Some(expr) => expr.execute(state, object)?.try_string()?,
+            Some(expr) => expr.execute(state, object)?.try_bytes()?,
             None => ".".into(),
         };
 
@@ -166,13 +166,13 @@ impl Expression for FormatNumberFn {
         let decimal_separator_def = self.decimal_separator.as_ref().map(|decimal_separator| {
             decimal_separator
                 .type_def(state)
-                .fallible_unless(Kind::String)
+                .fallible_unless(Kind::Bytes)
         });
 
         let grouping_separator_def = self.grouping_separator.as_ref().map(|grouping_separator| {
             grouping_separator
                 .type_def(state)
-                .fallible_unless(Kind::String)
+                .fallible_unless(Kind::Bytes)
         });
 
         self.value
@@ -182,7 +182,7 @@ impl Expression for FormatNumberFn {
             .merge_optional(decimal_separator_def)
             .merge_optional(grouping_separator_def)
             .into_fallible(true) // `Decimal::from` can theoretically fail.
-            .with_constraint(Kind::String)
+            .with_constraint(Kind::Bytes)
     }
 }
 
@@ -200,7 +200,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_float {
@@ -210,7 +210,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         // TODO(jean): we should update the function to ignore `None` values,
@@ -222,7 +222,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::Bytes },
         }
     ];
 

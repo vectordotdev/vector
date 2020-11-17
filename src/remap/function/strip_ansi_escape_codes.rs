@@ -12,7 +12,7 @@ impl Function for StripAnsiEscapeCodes {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -38,7 +38,7 @@ impl StripAnsiEscapeCodesFn {
 
 impl Expression for StripAnsiEscapeCodesFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_string()?;
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
 
         strip_ansi_escapes::strip(&bytes)
             .map(Bytes::from)
@@ -50,11 +50,11 @@ impl Expression for StripAnsiEscapeCodesFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             // TODO: Can probably remove this, as it only fails if writing to
             //       the buffer fails.
             .into_fallible(true)
-            .with_constraint(value::Kind::String)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -66,12 +66,12 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
 
         fallible_expression {
             expr: |_| StripAnsiEscapeCodesFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
     ];
 

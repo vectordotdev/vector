@@ -19,7 +19,7 @@ impl Function for ToTimestamp {
                         v,
                         Value::Integer(_) |
                         Value::Float(_) |
-                        Value::String(_) |
+                        Value::Bytes(_) |
                         Value::Timestamp(_)
                     )
                 },
@@ -32,7 +32,7 @@ impl Function for ToTimestamp {
                         v,
                         Value::Integer(_) |
                         Value::Float(_) |
-                        Value::String(_) |
+                        Value::Bytes(_) |
                         Value::Timestamp(_)
                     )
                 },
@@ -71,7 +71,7 @@ impl Expression for ToTimestampFn {
             Timestamp(_) => Ok(value),
             Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
             Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
-            String(_) => Conversion::Timestamp
+            Bytes(_) => Conversion::Timestamp
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),

@@ -14,7 +14,7 @@ impl Function for ParseSyslog {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -101,7 +101,7 @@ fn message_to_value(message: Message<&str>) -> Value {
 
 impl Expression for ParseSyslogFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_string()?;
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
         let message = String::from_utf8_lossy(&bytes);
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
@@ -112,7 +112,7 @@ impl Expression for ParseSyslogFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .with_constraint(value::Kind::Map)
     }
 }

@@ -13,17 +13,17 @@ impl Function for ParseTimestamp {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::String(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
                 required: false,
             },
         ]
@@ -68,9 +68,9 @@ impl Expression for ParseTimestampFn {
         let format = self.format.execute(state, object);
 
         let to_timestamp = |value| match value {
-            Value::String(_) => format
+            Value::Bytes(_) => format
                 .clone()
-                .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_string())))?
+                .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_bytes())))?
                 .parse::<Conversion>()
                 .map_err(|e| format!("{}", e))?
                 .convert(value.into())
@@ -106,9 +106,9 @@ impl Expression for ParseTimestampFn {
         //
         // The `format` type is _always_ fallible, because its string has to be
         // parsed into a valid timestamp format.
-        let format_def = if value_def.kind.contains(value::Kind::String) {
+        let format_def = if value_def.kind.contains(value::Kind::Bytes) {
             match &default_def {
-                Some(def) if def.kind.contains(value::Kind::String) => {
+                Some(def) if def.kind.contains(value::Kind::Bytes) => {
                     Some(self.format.type_def(state).into_fallible(true))
                 }
                 Some(_) => None,

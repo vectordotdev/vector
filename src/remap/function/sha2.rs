@@ -22,12 +22,12 @@ impl Function for Sha2 {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "variant",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
         ]
@@ -58,7 +58,7 @@ impl Sha2Fn {
 
 impl Expression for Sha2Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = self.value.execute(state, object)?.try_string()?;
+        let value = self.value.execute(state, object)?.try_bytes()?;
 
         let hash = match self.variant.as_deref() {
             Some("SHA-224") => encode::<Sha224>(&value),
@@ -76,8 +76,8 @@ impl Expression for Sha2Fn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
-            .with_constraint(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -98,7 +98,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 variant: None,
             },
-            def: TypeDef { kind: Kind::String, ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         value_non_string {
@@ -106,7 +106,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 variant: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_optional {
@@ -114,7 +114,7 @@ mod tests {
                 value: Box::new(Noop),
                 variant: None,
             },
-            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::Bytes },
         }
     ];
 

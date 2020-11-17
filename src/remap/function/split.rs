@@ -13,12 +13,12 @@ impl Function for Split {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -51,7 +51,7 @@ pub(crate) struct SplitFn {
 
 impl Expression for SplitFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_string()?;
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
         let limit: usize = self
             .limit
@@ -69,7 +69,7 @@ impl Expression for SplitFn {
                 .collect::<Vec<_>>()
                 .into(),
             Argument::Expression(expr) => {
-                let bytes = expr.execute(state, object)?.try_string()?;
+                let bytes = expr.execute(state, object)?.try_bytes()?;
                 let pattern = String::from_utf8_lossy(&bytes);
 
                 value
@@ -92,13 +92,13 @@ impl Expression for SplitFn {
         });
 
         let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::String)),
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
         };
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::String)
+            .fallible_unless(Kind::Bytes)
             .merge_optional(limit_def)
             .merge_optional(pattern_def)
             .with_constraint(Kind::Array)

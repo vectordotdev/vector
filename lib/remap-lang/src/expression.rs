@@ -149,15 +149,15 @@ mod tests {
     fn test_contains() {
         let cases = vec![
             (true, Kind::all(), Kind::all()),
-            (true, Kind::all(), Kind::String),
+            (true, Kind::all(), Kind::Bytes),
             (true, Kind::all(), Kind::Integer),
             (true, Kind::all(), Kind::Float | Kind::Boolean),
             (true, Kind::all(), Kind::Map),
-            (true, Kind::String, Kind::String),
-            (true, Kind::String, Kind::String),
-            (false, Kind::String, Kind::Array),
-            (false, Kind::String, Kind::Integer),
-            (false, Kind::String, Kind::Integer | Kind::Float),
+            (true, Kind::Bytes, Kind::Bytes),
+            (true, Kind::Bytes, Kind::Bytes),
+            (false, Kind::Bytes, Kind::Array),
+            (false, Kind::Bytes, Kind::Integer),
+            (false, Kind::Bytes, Kind::Integer | Kind::Float),
         ];
 
         for (expect, this, other) in cases {
@@ -169,12 +169,12 @@ mod tests {
     fn test_merge() {
         let cases = vec![
             (Kind::all(), Kind::all(), Kind::all()),
-            (Kind::all(), Kind::Integer | Kind::String, Kind::all()),
+            (Kind::all(), Kind::Integer | Kind::Bytes, Kind::all()),
             (Kind::Integer | Kind::Float, Kind::Integer, Kind::Float),
             (Kind::Integer, Kind::Integer, Kind::Integer),
             (
-                Kind::String | Kind::Integer | Kind::Float | Kind::Boolean,
-                Kind::Integer | Kind::String,
+                Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean,
+                Kind::Integer | Kind::Bytes,
                 Kind::Float | Kind::Boolean,
             ),
         ];
