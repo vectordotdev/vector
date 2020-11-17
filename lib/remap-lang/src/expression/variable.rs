@@ -51,7 +51,7 @@ impl Expression for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{test_type_def, value::Kind};
 
     test_type_def![
         ident_match {
@@ -67,7 +67,7 @@ mod tests {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    constraint: Exact(String)
+                    kind: Kind::String
                 });
 
                 Variable::new("foo".to_owned())
@@ -75,7 +75,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(String),
+                kind: Kind::String,
             },
         }
 

@@ -94,12 +94,12 @@ mod tests {
     remap::test_type_def![
         string {
             expr: |_| DowncaseFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: value::Kind::String, ..Default::default() },
         }
 
         non_string {
             expr: |_| DowncaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
         }
     ];
 }

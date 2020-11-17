@@ -35,8 +35,8 @@ impl fmt::Display for ResolvesToError {
             }
         }
 
-        want_str.push_str(&want.constraint.to_string());
-        got_str.push_str(&got.constraint.to_string());
+        want_str.push_str(&want.kind.to_string());
+        got_str.push_str(&got.kind.to_string());
 
         if optional_diff {
             if want.is_optional() {
@@ -51,14 +51,14 @@ impl fmt::Display for ResolvesToError {
         want_str.push_str(" value");
         got_str.push_str(" value");
 
-        let want_kinds = want.constraint.value_kinds();
-        let got_kinds = got.constraint.value_kinds();
+        let want_kinds: Vec<_> = want.kind.into_iter().collect();
+        let got_kinds: Vec<_> = got.kind.into_iter().collect();
 
-        if !want.constraint.is_any() && want_kinds.len() > 1 {
+        if !want.kind.is_all() && want_kinds.len() > 1 {
             want_str.push('s');
         }
 
-        if !got.constraint.is_any() && got_kinds.len() > 1 {
+        if !got.kind.is_all() && got_kinds.len() > 1 {
             got_str.push('s');
         }
 
@@ -133,8 +133,7 @@ mod tests {
 
     #[test]
     fn program_test() {
-        use value::Constraint::*;
-        use value::Kind::*;
+        use value::Kind;
 
         let cases = vec![
             (".foo", TypeDef { fallible: true, ..Default::default()}, Ok(())),
@@ -156,7 +155,7 @@ mod tests {
                 TypeDef {
                     fallible: false,
                     optional: false,
-                    constraint: Exact(String),
+                    kind: Kind::String,
                 },
                 Err("expected to resolve to string value, but instead resolves to an error, or any value".to_owned()),
             ),
@@ -166,7 +165,7 @@ mod tests {
                 TypeDef {
                     fallible: false,
                     optional: false,
-                    constraint: OneOf(vec![String, Float]),
+                    kind: Kind::String | Kind::Float,
                 },
                 Err("expected to resolve to string or float values, but instead resolves to an error, or integer or boolean values".to_owned()),
             ),

@@ -83,7 +83,7 @@ impl Expression for Assignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression::Literal, test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{expression::Literal, test_type_def, value::Kind};
 
     test_type_def![
         variable {
@@ -94,7 +94,7 @@ mod tests {
                 Assignment::new(target, value, state)
             },
             def: TypeDef {
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -107,7 +107,7 @@ mod tests {
                 Assignment::new(target, value, state)
             },
             def: TypeDef {
-                constraint: Exact(String),
+                kind: Kind::String,
                 ..Default::default()
             },
         }

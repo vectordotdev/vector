@@ -54,26 +54,20 @@ impl Expression for Arithmetic {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::{Constraint::*, Kind::*};
+        use value::Kind;
         use Operator::*;
 
-        let constraint = match self.op {
-            Or => self
-                .lhs
-                .type_def(state)
-                .constraint
-                .merge(&self.rhs.type_def(state).constraint),
-            Multiply | Add => OneOf(vec![String, Integer, Float]),
-            Remainder | Subtract | Divide => OneOf(vec![Integer, Float]),
-            And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => {
-                Exact(Boolean)
-            }
+        let kind = match self.op {
+            Or => self.lhs.type_def(state).kind | self.rhs.type_def(state).kind,
+            Multiply | Add => Kind::String | Kind::Integer | Kind::Float,
+            Remainder | Subtract | Divide => Kind::Integer | Kind::Float,
+            And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => Kind::Boolean,
         };
 
         TypeDef {
             fallible: true,
             optional: false,
-            constraint,
+            kind,
         }
     }
 }
@@ -84,8 +78,7 @@ mod tests {
     use crate::{
         expression::{Literal, Noop},
         test_type_def,
-        value::Constraint::*,
-        value::Kind::*,
+        value::Kind,
     };
 
     test_type_def![
@@ -98,7 +91,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: OneOf(vec![String, Boolean])
+                kind: Kind::String | Kind::Boolean,
             },
         }
 
@@ -111,7 +104,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Any,
+                kind: Kind::all(),
             },
         }
 
@@ -124,7 +117,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: OneOf(vec![String, Integer, Float]),
+                kind: Kind::String | Kind::Integer | Kind::Float,
             },
         }
 
@@ -137,7 +130,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: OneOf(vec![String, Integer, Float]),
+                kind: Kind::String | Kind::Integer | Kind::Float,
             },
         }
 
@@ -150,7 +143,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: OneOf(vec![Integer, Float]),
+                kind: Kind::Integer | Kind::Float,
             },
         }
 
@@ -163,7 +156,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: OneOf(vec![Integer, Float]),
+                kind: Kind::Integer | Kind::Float,
             },
         }
 
@@ -176,7 +169,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: OneOf(vec![Integer, Float]),
+                kind: Kind::Integer | Kind::Float,
             },
         }
 
@@ -189,7 +182,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -202,7 +195,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -215,7 +208,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -228,7 +221,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -241,7 +234,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -254,7 +247,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
 
@@ -267,7 +260,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
             },
         }
     ];

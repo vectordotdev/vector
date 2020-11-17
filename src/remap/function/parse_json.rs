@@ -70,19 +70,27 @@ impl Expression for ParseJsonFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         let default_def = self
             .default
             .as_ref()
-            .map(|default| default.type_def(state).fallible_unless(String));
+            .map(|default| default.type_def(state).fallible_unless(Kind::String));
 
         self.value
             .type_def(state)
-            .fallible_unless(String)
+            .fallible_unless(Kind::String)
             .merge_with_default_optional(default_def)
             .into_fallible(true) // JSON parsing errors
-            .with_constraint(vec![String, Boolean, Integer, Float, Array, Map, Null])
+            .with_constraint(
+                Kind::String
+                    | Kind::Boolean
+                    | Kind::Integer
+                    | Kind::Float
+                    | Kind::Array
+                    | Kind::Map
+                    | Kind::Null,
+            )
     }
 }
 
@@ -90,7 +98,7 @@ impl Expression for ParseJsonFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -100,7 +108,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -112,7 +120,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -124,7 +132,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -137,7 +145,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
             },
         }
     ];

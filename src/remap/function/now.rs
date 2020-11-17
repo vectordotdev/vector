@@ -24,7 +24,7 @@ impl Expression for NowFn {
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            constraint: value::Kind::Timestamp.into(),
+            kind: value::Kind::Timestamp,
             ..Default::default()
         }
     }
@@ -37,7 +37,7 @@ mod tests {
     remap::test_type_def![static_def {
         expr: |_| NowFn,
         def: TypeDef {
-            constraint: value::Kind::Timestamp.into(),
+            kind: value::Kind::Timestamp,
             ..Default::default()
         },
     }];

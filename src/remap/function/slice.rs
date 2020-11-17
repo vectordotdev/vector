@@ -99,24 +99,24 @@ impl Expression for SliceFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         let value_def = self
             .value
             .type_def(state)
-            .fallible_unless(vec![String, Array]);
+            .fallible_unless(Kind::String | Kind::Array);
         let end_def = self
             .end
             .as_ref()
-            .map(|end| end.type_def(state).fallible_unless(Integer));
+            .map(|end| end.type_def(state).fallible_unless(Kind::Integer));
 
         value_def
             .clone()
-            .merge(self.start.type_def(state).fallible_unless(Integer))
+            .merge(self.start.type_def(state).fallible_unless(Kind::Integer))
             .merge_optional(end_def)
-            .with_constraint(match value_def.constraint {
-                v if v.is(String) || v.is(Array) => v,
-                _ => vec![String, Array].into(),
+            .with_constraint(match value_def.kind {
+                v if v.is_string() || v.is_array() => v,
+                _ => Kind::String | Kind::Array,
             })
             .into_fallible(true) // can fail for invalid start..end ranges
     }
@@ -126,7 +126,7 @@ impl Expression for SliceFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -135,7 +135,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         value_array {
@@ -144,7 +144,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, constraint: Array.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
         }
 
         value_unknown {
@@ -153,7 +153,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, constraint: vec![String, Array].into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String | Kind::Array, ..Default::default() },
         }
     ];
 

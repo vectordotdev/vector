@@ -1,4 +1,3 @@
-mod constraint;
 mod kind;
 
 use bytes::Bytes;
@@ -7,7 +6,6 @@ use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::string::String as StdString;
 
-pub use constraint::Constraint;
 pub use kind::Kind;
 
 #[derive(Debug, Clone, PartialEq)]

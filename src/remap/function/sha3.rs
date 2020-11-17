@@ -85,7 +85,7 @@ fn encode<T: Digest>(value: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -93,7 +93,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 variant: None,
             },
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::String, ..Default::default() },
         }
 
         value_non_string {
@@ -101,7 +101,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 variant: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         value_optional {
@@ -109,7 +109,7 @@ mod tests {
                 value: Box::new(Noop),
                 variant: None,
             },
-            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
         }
     ];
 

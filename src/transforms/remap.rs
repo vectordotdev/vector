@@ -53,7 +53,7 @@ impl Remap {
         let accepts = TypeDef {
             fallible: true,
             optional: true,
-            constraint: value::Constraint::Any,
+            kind: value::Kind::all(),
         };
 
         let program = Program::new(&config.source, &crate::remap::FUNCTIONS_MUT, accepts)?;

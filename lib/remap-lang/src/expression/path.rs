@@ -73,7 +73,7 @@ impl Expression for Path {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{test_type_def, value::Kind};
 
     test_type_def![
         ident_match {
@@ -89,7 +89,7 @@ mod tests {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    constraint: Exact(String)
+                    kind: Kind::String
                 });
 
                 Path::from("foo")
@@ -97,7 +97,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(String),
+                kind: Kind::String,
             },
         }
 

@@ -74,17 +74,17 @@ impl Expression for ToFloatFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         self.value
             .type_def(state)
-            .fallible_unless(vec![Float, Integer, Boolean, Null])
+            .fallible_unless(Kind::Float | Kind::Integer | Kind::Boolean | Kind::Null)
             .merge_with_default_optional(self.default.as_ref().map(|default| {
                 default
                     .type_def(state)
-                    .fallible_unless(vec![Float, Integer, Boolean, Null])
+                    .fallible_unless(Kind::Float | Kind::Integer | Kind::Boolean | Kind::Null)
             }))
-            .with_constraint(Float)
+            .with_constraint(Kind::Float)
     }
 }
 
@@ -93,47 +93,47 @@ mod tests {
     use super::*;
     use crate::map;
     use std::collections::BTreeMap;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         boolean_infallible {
             expr: |_| ToFloatFn { value: Literal::from(true).boxed(), default: None },
-            def: TypeDef { constraint: Float.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToFloatFn { value: Literal::from(1).boxed(), default: None },
-            def: TypeDef { constraint: Float.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToFloatFn { value: Literal::from(1.0).boxed(), default: None },
-            def: TypeDef { constraint: Float.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         null_infallible {
             expr: |_| ToFloatFn { value: Literal::from(()).boxed(), default: None },
-            def: TypeDef { constraint: Float.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         string_fallible {
             expr: |_| ToFloatFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         map_fallible {
             expr: |_| ToFloatFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         array_fallible {
             expr: |_| ToFloatFn { value: Literal::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         timestamp_infallible {
             expr: |_| ToFloatFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, constraint: Float.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -141,7 +141,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Float.into(),
+                kind: Kind::Float,
             },
         }
 
@@ -153,7 +153,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Float.into(),
+                kind: Kind::Float,
             },
         }
 
@@ -165,7 +165,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Float.into(),
+                kind: Kind::Float,
             },
         }
 
@@ -177,7 +177,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Float.into(),
+                kind: Kind::Float,
             },
         }
 
@@ -189,7 +189,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Float.into(),
+                kind: Kind::Float,
             },
         }
     ];

@@ -155,31 +155,33 @@ impl Expression for FormatNumberFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         let scale_def = self
             .scale
             .as_ref()
-            .map(|scale| scale.type_def(state).fallible_unless(Integer));
+            .map(|scale| scale.type_def(state).fallible_unless(Kind::Integer));
 
-        let decimal_separator_def = self
-            .decimal_separator
-            .as_ref()
-            .map(|decimal_separator| decimal_separator.type_def(state).fallible_unless(String));
+        let decimal_separator_def = self.decimal_separator.as_ref().map(|decimal_separator| {
+            decimal_separator
+                .type_def(state)
+                .fallible_unless(Kind::String)
+        });
 
-        let grouping_separator_def = self
-            .grouping_separator
-            .as_ref()
-            .map(|grouping_separator| grouping_separator.type_def(state).fallible_unless(String));
+        let grouping_separator_def = self.grouping_separator.as_ref().map(|grouping_separator| {
+            grouping_separator
+                .type_def(state)
+                .fallible_unless(Kind::String)
+        });
 
         self.value
             .type_def(state)
-            .fallible_unless(vec![Integer, Float])
+            .fallible_unless(Kind::Integer | Kind::Float)
             .merge_optional(scale_def)
             .merge_optional(decimal_separator_def)
             .merge_optional(grouping_separator_def)
             .into_fallible(true) // `Decimal::from` can theoretically fail.
-            .with_constraint(String)
+            .with_constraint(Kind::String)
     }
 }
 
@@ -187,7 +189,7 @@ impl Expression for FormatNumberFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_integer {
@@ -197,7 +199,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         value_float {
@@ -207,7 +209,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
         }
 
         // TODO(jean): we should update the function to ignore `None` values,
@@ -219,7 +221,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
         }
     ];
 

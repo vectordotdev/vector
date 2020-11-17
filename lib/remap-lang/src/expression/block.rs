@@ -54,8 +54,7 @@ mod tests {
     use crate::{
         expression::{Arithmetic, Literal},
         test_type_def,
-        value::Constraint::*,
-        value::Kind::*,
+        value::Kind,
         Operator,
     };
 
@@ -67,7 +66,7 @@ mod tests {
 
         one_expression {
             expr: |_| Block::new(vec![Literal::from(true).into()]),
-            def: TypeDef { constraint: Exact(Boolean), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         multiple_expressions {
@@ -76,7 +75,7 @@ mod tests {
                         Literal::from(true).into(),
                         Literal::from(1234).into(),
             ]),
-            def: TypeDef { constraint: Exact(Integer), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         last_one_fallible {
@@ -90,7 +89,7 @@ mod tests {
             ]),
             def: TypeDef {
                 fallible: true,
-                constraint: OneOf(vec![String, Integer, Float]),
+                kind: Kind::String | Kind::Integer | Kind::Float,
                 ..Default::default()
             },
         }
@@ -107,7 +106,7 @@ mod tests {
             ]),
             def: TypeDef {
                 fallible: true,
-                constraint: Exact(Array),
+                kind: Kind::Array,
                 ..Default::default()
             },
         }

@@ -108,27 +108,27 @@ impl Expression for ReplaceFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
-        let with_def = self.with.type_def(state).fallible_unless(String);
+        let with_def = self.with.type_def(state).fallible_unless(Kind::String);
 
         let count_def = self
             .count
             .as_ref()
-            .map(|count| count.type_def(state).fallible_unless(Integer));
+            .map(|count| count.type_def(state).fallible_unless(Kind::Integer));
 
         let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(String)),
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::String)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
         };
 
         self.value
             .type_def(state)
-            .fallible_unless(String)
+            .fallible_unless(Kind::String)
             .merge(with_def)
             .merge_optional(pattern_def)
             .merge_optional(count_def)
-            .with_constraint(String)
+            .with_constraint(Kind::String)
     }
 }
 
@@ -146,7 +146,7 @@ mod test {
                 count: None,
             },
             def: TypeDef {
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::String,
                 ..Default::default()
             },
         }
@@ -160,7 +160,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::String,
                 ..Default::default()
             },
         }
@@ -173,7 +173,7 @@ mod test {
                 count: None,
             },
             def: TypeDef {
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::String,
                 ..Default::default()
             },
         }
@@ -187,7 +187,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::String,
                 ..Default::default()
             },
         }
@@ -201,7 +201,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::String,
                 ..Default::default()
             },
         }
@@ -214,7 +214,7 @@ mod test {
                 count: Some(Literal::from(10).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::String,
                 ..Default::default()
             },
         }
@@ -228,7 +228,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::String,
                 ..Default::default()
             },
         }
