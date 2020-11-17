@@ -49,6 +49,10 @@ components: {
 
 		env_vars: #EnvVars
 
+		// `alias` is used to register a component's former name when it
+		// undergoes a name change.
+		alias?: !=""
+
 		// `type` is the component identifier. This is set automatically.
 		type: string
 

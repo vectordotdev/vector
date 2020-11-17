@@ -12,6 +12,8 @@ components: sources: docker_logs: {
 		production.
 		"""
 
+	alias: "docker"
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
