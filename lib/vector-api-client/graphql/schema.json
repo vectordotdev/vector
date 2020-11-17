@@ -978,7 +978,7 @@
               "deprecationReason": null,
               "description": "Vector version",
               "isDeprecated": false,
-              "name": "version",
+              "name": "versionString",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
