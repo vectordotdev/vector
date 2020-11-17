@@ -359,7 +359,7 @@ where
 
 pub struct Map<S, R1, R2> {
     f: Arc<dyn Fn(R1) -> R2 + Send + Sync + 'static>,
-    inner: S,
+    pub(crate) inner: S,
 }
 
 impl<S, R1, R2> Service<R1> for Map<S, R1, R2>
@@ -380,12 +380,24 @@ where
     }
 }
 
-impl<S: Clone, R1, R2> Clone for Map<S, R1, R2> {
+impl<S, R1, R2> Clone for Map<S, R1, R2>
+where
+    S: Clone,
+{
     fn clone(&self) -> Self {
         Self {
             f: Arc::clone(&self.f),
             inner: self.inner.clone(),
         }
+    }
+}
+
+impl<S, R1, R2> fmt::Debug for Map<S, R1, R2>
+where
+    S: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Map").field("inner", &self.inner).finish()
     }
 }
 
