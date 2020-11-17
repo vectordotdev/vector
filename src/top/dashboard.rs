@@ -164,23 +164,25 @@ impl<'a> Widgets<'a> {
             .header_gap(1)
             .column_spacing(2)
             .widths(&[
-                // Constraint::Percentage(20),
-                // Constraint::Percentage(10),
-                // Constraint::Percentage(10),
-                // Constraint::Percentage(10),
-                // Constraint::Percentage(10),
-                // Constraint::Percentage(10),
-                // Constraint::Percentage(10),
-                // Constraint::Percentage(10),
-                Constraint::Length(20),
-                Constraint::Length(10),
-                Constraint::Length(10),
-                Constraint::Length(10),
-                Constraint::Length(10),
-                Constraint::Length(10),
-                Constraint::Length(10),
-                Constraint::Length(10),
+                Constraint::Percentage(20),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
             ]);
+
+        f.render_widget(w, area);
+    }
+
+    /// Alerts the user to resize the window to view columns
+    fn components_resize_window<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+        let block = Block::default().borders(Borders::ALL).title("Components");
+        let w = Paragraph::new("Expand the window to > 80 chars to view metrics")
+            .block(block)
+            .wrap(Wrap { trim: true });
 
         f.render_widget(w, area);
     }
@@ -202,12 +204,20 @@ impl<'a> Widgets<'a> {
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
     fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
+        let size = f.size();
         let rects = Layout::default()
             .constraints(self.constraints.as_ref())
-            .split(f.size());
+            .split(size);
 
         self.title(f, rects[0]);
-        self.components_table(f, &state, rects[1]);
+
+        // Require a minimum of 80 chars of line width to display the table
+        if size.width > 80 {
+            self.components_table(f, &state, rects[1]);
+        } else {
+            self.components_resize_window(f, rects[1]);
+        }
+
         self.quit_box(f, rects[2]);
     }
 }

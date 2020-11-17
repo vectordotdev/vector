@@ -1,6 +1,0 @@
-subscription ComponentEventsProcessedThroughputBatchSubscription($interval: Int!) {
-    componentEventsProcessedThroughputBatch(interval: $interval) {
-        name
-        throughput
-    }
-}

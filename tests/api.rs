@@ -419,7 +419,7 @@ mod tests {
 
         let server = api::Server::start(topology.config());
         let client = new_subscription_client(server.addr()).await;
-        let subscription = client.component_events_processed_total_batch_subscription(500);
+        let subscription = client.all_component_events_processed_totals_subscription(500);
 
         tokio::pin! {
             let component_events_processed_total_batch = subscription.stream();
@@ -533,7 +533,7 @@ mod tests {
 
         let server = api::Server::start(topology.config());
         let client = new_subscription_client(server.addr()).await;
-        let subscription = client.component_bytes_processed_total_batch_subscription(500);
+        let subscription = client.all_component_bytes_processed_totals_subscription(500);
 
         tokio::pin! {
             let component_bytes_processed_total_batch = subscription.stream();

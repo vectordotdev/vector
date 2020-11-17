@@ -1754,7 +1754,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Metrics for how long the Vector instance has been running",
+              "description": "Metrics for how long the Vector instance has been running.",
               "isDeprecated": false,
               "name": "uptime",
               "type": {
@@ -1785,7 +1785,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics",
+              "description": "Events processed metrics.",
               "isDeprecated": false,
               "name": "eventsProcessedTotal",
               "type": {
@@ -1816,7 +1816,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component events processed metrics. Streams new data as the metric increases",
+              "description": "Component events processed metrics. Streams new data as the metric increases.",
               "isDeprecated": false,
               "name": "componentEventsProcessedTotal",
               "type": {
@@ -1847,7 +1847,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed throughput, sampled over a provided millisecond `interval`",
+              "description": "Events processed throughput, sampled over a provided millisecond `interval`.",
               "isDeprecated": false,
               "name": "eventsProcessedThroughput",
               "type": {
@@ -1909,9 +1909,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component events processed throughput, received in batches containing metrics over `interval`",
+              "description": "All component events processed throughput over `interval`.",
               "isDeprecated": false,
-              "name": "componentEventsProcessedThroughputBatch",
+              "name": "allComponentEventsProcessedThroughputs",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1948,9 +1948,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component events processed metrics, received in batches containing metrics over `interval`",
+              "description": "All component events processed metrics over `interval`.",
               "isDeprecated": false,
-              "name": "componentEventsProcessedTotalBatch",
+              "name": "allComponentEventsProcessedTotals",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1987,7 +1987,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Bytes processed metrics",
+              "description": "Bytes processed metrics.",
               "isDeprecated": false,
               "name": "bytesProcessedTotal",
               "type": {
@@ -2018,7 +2018,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Bytes processed throughput, sampled over a provided millisecond `interval`",
+              "description": "Bytes processed throughput, sampled over a provided millisecond `interval`.",
               "isDeprecated": false,
               "name": "bytesProcessedThroughput",
               "type": {
@@ -2049,7 +2049,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component bytes processed metrics. Streams new data as the metric increases",
+              "description": "Component bytes processed metrics. Streams new data as the metric increases.",
               "isDeprecated": false,
               "name": "componentBytesProcessedTotal",
               "type": {
@@ -2080,9 +2080,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component bytes processed metrics, received in batches containing metrics over `interval`",
+              "description": "All component bytes processed metrics, over `interval`.",
               "isDeprecated": false,
-              "name": "componentBytesProcessedTotalBatch",
+              "name": "allComponentBytesProcessedTotals",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2150,9 +2150,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component bytes processed throughput, received in batches containing metrics over `interval`",
+              "description": "All component bytes processed throughputs, over `interval`",
               "isDeprecated": false,
-              "name": "componentBytesProcessedThroughputBatch",
+              "name": "allComponentBytesProcessedThroughputs",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2189,7 +2189,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Total error metrics",
+              "description": "Total error metrics.",
               "isDeprecated": false,
               "name": "errorsTotal",
               "type": {
@@ -2220,7 +2220,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component errors metrics. Streams new data as the metric increases",
+              "description": "Component errors metrics. Streams new data as the metric increases.",
               "isDeprecated": false,
               "name": "componentErrorsTotal",
               "type": {
@@ -2251,9 +2251,9 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component errors metrics, received in batches containing metrics over `interval`",
+              "description": "All component errors metrics, over `interval`.",
               "isDeprecated": false,
-              "name": "componentErrorsTotalBatch",
+              "name": "allComponentErrorsTotals",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -2290,7 +2290,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "All metrics",
+              "description": "All metrics.",
               "isDeprecated": false,
               "name": "metrics",
               "type": {

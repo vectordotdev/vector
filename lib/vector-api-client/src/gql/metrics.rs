@@ -64,25 +64,25 @@ pub struct ComponentEventsProcessedTotalSubscription;
 
 pub struct ComponentEventsProcessedThroughputSubscription;
 
-/// ComponentEventsProcessedThroughputBatchSubscription contains metrics on the number of events
+/// AllComponentEventsProcessedThroughputsSubscription contains metrics on the number of events
 /// that have been processed between `interval` samples, against specific components
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_events_processed_throughput_batch.graphql",
+    query_path = "graphql/subscriptions/all_component_events_processed_throughputs.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentEventsProcessedThroughputBatchSubscription;
+pub struct AllComponentEventsProcessedThroughputsSubscription;
 
-/// ComponentEventsProcessedTotalSubscription contains metrics on the number of events
+/// AllComponentEventsProcessedTotalsSubscription contains metrics on the number of events
 /// that have been processed by a Vector instance, against specific components
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_events_processed_total_batch.graphql",
+    query_path = "graphql/subscriptions/all_component_events_processed_totals.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentEventsProcessedTotalBatchSubscription;
+pub struct AllComponentEventsProcessedTotalsSubscription;
 
 /// ComponentBytesProcessedTotalSubscription contains metrics on the number of bytes
 /// that have been processed by a Vector instance, against a specific component
@@ -104,25 +104,25 @@ pub struct ComponentBytesProcessedTotalSubscription;
 )]
 pub struct ComponentBytesProcessedThroughputSubscription;
 
-/// ComponentBytesProcessedThroughputBatchSubscription contains metrics on the number of bytes
+/// AllComponentBytesProcessedThroughputsSubscription contains metrics on the number of bytes
 /// that have been processed between `interval` samples, against specific components
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_bytes_processed_throughput_batch.graphql",
+    query_path = "graphql/subscriptions/all_component_bytes_processed_throughputs.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentBytesProcessedThroughputBatchSubscription;
+pub struct AllComponentBytesProcessedThroughputsSubscription;
 
-/// ComponentBytesProcessedTotalSubscription contains metrics on the number of bytes
+/// AllComponentBytesProcessedTotalsSubscription contains metrics on the number of bytes
 /// that have been processed by a Vector instance, against a specific component
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_bytes_processed_total_batch.graphql",
+    query_path = "graphql/subscriptions/all_component_bytes_processed_totals.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentBytesProcessedTotalBatchSubscription;
+pub struct AllComponentBytesProcessedTotalsSubscription;
 
 /// Extension methods for metrics subscriptions
 pub trait MetricsSubscriptionExt {
@@ -153,11 +153,11 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsProcessedTotalSubscription>;
 
-    /// Executes a component events processed total metrics batch subscription
-    fn component_events_processed_total_batch_subscription(
+    /// Executes an all component events processed totals subscription
+    fn all_component_events_processed_totals_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentEventsProcessedTotalBatchSubscription>;
+    ) -> crate::BoxedSubscription<AllComponentEventsProcessedTotalsSubscription>;
 
     /// Executes a component events processed throughput metrics subscription
     fn component_events_processed_throughput_subscription(
@@ -165,11 +165,11 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentEventsProcessedThroughputSubscription>;
 
-    /// Executes a component events processed throughput batch metrics subscription
-    fn component_events_processed_throughput_batch_subscription(
+    /// Executes an all component events processed throughputs subscription
+    fn all_component_events_processed_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentEventsProcessedThroughputBatchSubscription>;
+    ) -> crate::BoxedSubscription<AllComponentEventsProcessedThroughputsSubscription>;
 
     /// Executes a component bytes processed total metrics subscription
     fn component_bytes_processed_total_subscription(
@@ -177,11 +177,11 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentBytesProcessedTotalSubscription>;
 
-    /// Executes a component bytes processed total batch metrics subscription
-    fn component_bytes_processed_total_batch_subscription(
+    /// Executes an all component bytes processed totals subscription
+    fn all_component_bytes_processed_totals_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentBytesProcessedTotalBatchSubscription>;
+    ) -> crate::BoxedSubscription<AllComponentBytesProcessedTotalsSubscription>;
 
     /// Executes a component bytes processed throughput metrics subscription
     fn component_bytes_processed_throughput_subscription(
@@ -189,11 +189,11 @@ pub trait MetricsSubscriptionExt {
         interval: i64,
     ) -> crate::BoxedSubscription<ComponentBytesProcessedThroughputSubscription>;
 
-    /// Executes a component bytes processed throughput batch metrics subscription
-    fn component_bytes_processed_throughput_batch_subscription(
+    /// Executes an all component bytes processed throughputs subscription
+    fn all_component_bytes_processed_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentBytesProcessedThroughputBatchSubscription>;
+    ) -> crate::BoxedSubscription<AllComponentBytesProcessedThroughputsSubscription>;
 }
 
 impl MetricsSubscriptionExt for crate::SubscriptionClient {
@@ -252,16 +252,16 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsProcessedTotalSubscription>(&request_body)
     }
 
-    /// Executes a component events processed total batch metrics subscription
-    fn component_events_processed_total_batch_subscription(
+    /// Executes an all component events processed totals subscription
+    fn all_component_events_processed_totals_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentEventsProcessedTotalBatchSubscription> {
-        let request_body = ComponentEventsProcessedTotalBatchSubscription::build_query(
-            component_events_processed_total_batch_subscription::Variables { interval },
+    ) -> BoxedSubscription<AllComponentEventsProcessedTotalsSubscription> {
+        let request_body = AllComponentEventsProcessedTotalsSubscription::build_query(
+            all_component_events_processed_totals_subscription::Variables { interval },
         );
 
-        self.start::<ComponentEventsProcessedTotalBatchSubscription>(&request_body)
+        self.start::<AllComponentEventsProcessedTotalsSubscription>(&request_body)
     }
 
     /// Executes a component events processed throughput subscription
@@ -276,16 +276,16 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentEventsProcessedThroughputSubscription>(&request_body)
     }
 
-    /// Executes a component events processed throughput batch metrics subscription
-    fn component_events_processed_throughput_batch_subscription(
+    /// Executes an all component events processed throughputs subscription
+    fn all_component_events_processed_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentEventsProcessedThroughputBatchSubscription> {
-        let request_body = ComponentEventsProcessedThroughputBatchSubscription::build_query(
-            component_events_processed_throughput_batch_subscription::Variables { interval },
+    ) -> BoxedSubscription<AllComponentEventsProcessedThroughputsSubscription> {
+        let request_body = AllComponentEventsProcessedThroughputsSubscription::build_query(
+            all_component_events_processed_throughputs_subscription::Variables { interval },
         );
 
-        self.start::<ComponentEventsProcessedThroughputBatchSubscription>(&request_body)
+        self.start::<AllComponentEventsProcessedThroughputsSubscription>(&request_body)
     }
     /// Executes a component bytes processed total metrics subscription
     fn component_bytes_processed_total_subscription(
@@ -299,16 +299,16 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentBytesProcessedTotalSubscription>(&request_body)
     }
 
-    /// Executes a component bytes processed total batch metrics subscription
-    fn component_bytes_processed_total_batch_subscription(
+    /// Executes an all component bytes processed totals subscription
+    fn all_component_bytes_processed_totals_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentBytesProcessedTotalBatchSubscription> {
-        let request_body = ComponentBytesProcessedTotalBatchSubscription::build_query(
-            component_bytes_processed_total_batch_subscription::Variables { interval },
+    ) -> BoxedSubscription<AllComponentBytesProcessedTotalsSubscription> {
+        let request_body = AllComponentBytesProcessedTotalsSubscription::build_query(
+            all_component_bytes_processed_totals_subscription::Variables { interval },
         );
 
-        self.start::<ComponentBytesProcessedTotalBatchSubscription>(&request_body)
+        self.start::<AllComponentBytesProcessedTotalsSubscription>(&request_body)
     }
 
     /// Executes a bytes processed throughput subscription
@@ -323,15 +323,15 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
         self.start::<ComponentBytesProcessedThroughputSubscription>(&request_body)
     }
 
-    /// Executes a component bytes processed throughput batch metrics subscription
-    fn component_bytes_processed_throughput_batch_subscription(
+    /// Executes an all component bytes processed throughputs subscription
+    fn all_component_bytes_processed_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentBytesProcessedThroughputBatchSubscription> {
-        let request_body = ComponentBytesProcessedThroughputBatchSubscription::build_query(
-            component_bytes_processed_throughput_batch_subscription::Variables { interval },
+    ) -> BoxedSubscription<AllComponentBytesProcessedThroughputsSubscription> {
+        let request_body = AllComponentBytesProcessedThroughputsSubscription::build_query(
+            all_component_bytes_processed_throughputs_subscription::Variables { interval },
         );
 
-        self.start::<ComponentBytesProcessedThroughputBatchSubscription>(&request_body)
+        self.start::<AllComponentBytesProcessedThroughputsSubscription>(&request_body)
     }
 }
