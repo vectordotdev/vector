@@ -244,7 +244,7 @@ mod test {
     use super::*;
     use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
-    use futures::{compat::Sink01CompatExt, TryStreamExt};
+    use futures::{compat::Sink01CompatExt, SinkExt, TryStreamExt};
     use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
@@ -452,15 +452,17 @@ mod test {
 
         let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {
-            UdpFramed::new(socket, BytesCodec::new())
+            let stream = UdpFramed::new(socket, BytesCodec::new())
                 .map_err(|error| error!(message = "Error reading line.", %error))
-                .map_ok(|(bytes, _addr)| bytes.freeze())
-                .forward(
-                    tx.sink_compat()
-                        .sink_map_err(|error| error!(message = "Error sending event.", %error)),
-                )
-                .await
-                .unwrap()
+                .map_ok(|(bytes, _addr)| bytes.freeze());
+
+            let mut tx = tx
+                .sink_compat()
+                .sink_map_err(|error| error!(message = "Error sending event.", %error));
+
+            stream.forward(&mut tx).await.unwrap();
+
+            tx.flush().await.unwrap();
         });
 
         sink.run(stream::iter(events)).await.unwrap();
