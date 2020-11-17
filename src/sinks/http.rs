@@ -229,13 +229,16 @@ impl HttpSink for HttpSinkConfig {
             .uri(uri)
             .header("Content-Type", ct);
 
-        if let Compression::Gzip(level) = self.compression {
-            builder = builder.header("Content-Encoding", "gzip");
+        match self.compression {
+            Compression::Gzip(level) => {
+                builder = builder.header("Content-Encoding", "gzip");
 
-            let level = level.unwrap_or(GZIP_DEFAULT) as u32;
-            let mut w = GzEncoder::new(Vec::new(), flate2::Compression::new(level));
-            w.write_all(&body).expect("Writing to Vec can't fail");
-            body = w.finish().expect("Writing to Vec can't fail");
+                let level = level.unwrap_or(GZIP_DEFAULT) as u32;
+                let mut w = GzEncoder::new(Vec::new(), flate2::Compression::new(level));
+                w.write_all(&body).expect("Writing to Vec can't fail");
+                body = w.finish().expect("Writing to Vec can't fail");
+            }
+            Compression::None => {}
         }
 
         if let Some(headers) = &self.headers {
