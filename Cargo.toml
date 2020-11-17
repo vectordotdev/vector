@@ -299,6 +299,7 @@ api-client = [
 # Sources
 sources = [
   "sources-apache_metrics",
+  "sources-aws_ecs_metrics",
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
   "sources-docker_logs",
@@ -321,6 +322,7 @@ sources = [
   "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
+sources-aws_ecs_metrics = []
 sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
 sources-docker_logs = ["bollard"]
@@ -501,6 +503,7 @@ aws-integration-tests = [
   "aws-cloudwatch-logs-integration-tests",
   "aws-cloudwatch-metrics-integration-tests",
   "aws-ec2-metadata-integration-tests",
+  "aws-ecs-metrics-integration-tests",
   "aws-kinesis-firehose-integration-tests",
   "aws-kinesis-streams-integration-tests",
   "aws-s3-integration-tests",
@@ -508,6 +511,7 @@ aws-integration-tests = [
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
 aws-ec2-metadata-integration-tests = ["transforms-aws_ec2_metadata"]
+aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
 aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch", "rusoto_es"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sources-aws_s3", "sinks-aws_s3"]

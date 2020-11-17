@@ -12,6 +12,8 @@ mod auto_concurrency;
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
@@ -118,6 +120,8 @@ pub use self::auto_concurrency::*;
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub use self::aws_ec2_metadata::*;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+pub use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]

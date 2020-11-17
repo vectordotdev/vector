@@ -14,6 +14,8 @@ urls: {
 	aws_canonical_user_id:                                    "https://docs.aws.amazon.com/general/latest/gr/acct-identifiers.html#FindingCanonicalId"
 	aws_cloudwatch_logs_sink_source:                          "https://github.com/timberio/vector/blob/master/src/sinks/aws_cloudwatch_logs/"
 	aws_ec2_instance_metadata:                                "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html"
+	aws_ecs:                                                  "https://aws.amazon.com/ecs/"
+	aws_ecs_task_metadata:                                    "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-metadata-endpoint.html"
 	aws_elb:                                                  "https://aws.amazon.com/elasticloadbalancing/"
 	aws_cloudwatch:                                           "https://aws.amazon.com/cloudwatch/"
 	aws_cloudwatch_logs:                                      "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/WhatIsCloudWatchLogs.html"
