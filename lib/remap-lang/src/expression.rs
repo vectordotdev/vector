@@ -118,8 +118,10 @@ macro_rules! expression_dispatch {
                 type Error = Error;
 
                 fn try_from(expr: Expr) -> std::result::Result<Self, Self::Error> {
+                    #[allow(unreachable_patterns)]
                     match expr {
                         Expr::$expr(v) => Ok(v),
+                        Expr::Argument(v) => $expr::try_from(v.into_expr()),
                         _ => Err(Error::from(ExprError::$expr(expr.as_str()))),
                     }
                 }
