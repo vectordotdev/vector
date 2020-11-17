@@ -16,8 +16,8 @@ impl Expression for Block {
         self.expressions
             .iter()
             .map(|expr| expr.execute(state, object))
-            .last()
-            .unwrap_or(Ok(Value::Null))
+            .collect::<Result<Vec<_>>>()
+            .map(|mut v| v.pop().unwrap_or(Value::Null))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
