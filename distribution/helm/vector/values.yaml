@@ -2,23 +2,24 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-# Global values can be consumed by both Parent and Child Helm Charts
-# Each chart yml file can leverage each of these values where applicable
-#  global:
-#    vector:
-#      image:
-#        repository: <docker repo>
-#        #  Overrides the image tag, the default is `{image.version}-{image.base}`
-#        tag: <tag>
-#        # Overrides the image version, the default is the Chart appVersion.
-#        version: <version>
-#        # Sets the image base OS
-#        base: <base>
-#    # Sets common environment variables for use globally
-#    commonEnvKV:
-#      - name: "CHIQUITA"
-#        value: "banana"
-
+# Override some values globally from a single location instead of specifying
+# them in each chart.
+# Note: these values are also respected by all charts, so you can keep using
+# them if you switch from the `vector` chart the specific role oriented charts.
+global:
+  # vector:
+  #   image:
+  #     repository: <docker repo>
+  #     #  Overrides the image tag, the default is `{image.version}-{image.base}`
+  #     tag: <tag>
+  #     # Overrides the image version, the default is the Chart appVersion.
+  #     version: <version>
+  #     # Sets the image base OS
+  #     base: <base>
+  # # Sets common environment variables for use globally
+  # commonEnvKV:
+  #   - name: "CHIQUITA"
+  #     value: "banana"
 
 vector-agent:
   # See the possible settings at the `vector-agent` chart.
