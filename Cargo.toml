@@ -247,7 +247,6 @@ default-cmake = ["api", "api-client", "sources", "transforms", "sinks", "vendor-
 # TODO: Enable SASL https://github.com/timberio/vector/pull/3081#issuecomment-659298042
 default-msvc = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "leveldb", "rdkafka-cmake"]
 default-no-api-client = ["api", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-no-api = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
@@ -540,12 +539,14 @@ shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole"
 disable-resolv-conf = []
 
 # grouping together features for benchmarks
+# excluing API client due to running out of memory during linking in Github Actions
+benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 
 [[bench]]
 name = "default"
 harness = false
-required-features = ["default"]
+required-features = ["benches"]
 
 [[bench]]
 name = "wasm"
