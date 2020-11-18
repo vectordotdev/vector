@@ -164,9 +164,7 @@ impl PulsarSink {
                     None
                 }
             }
-            _ => {
-                None
-            }
+            _ => None,
         };
 
         Self {
@@ -273,7 +271,11 @@ impl Sink<Event> for PulsarSink {
     }
 }
 
-fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>, avro_schema: &Option<avro_rs::Schema>) -> crate::Result<Vec<u8>> {
+fn encode_event(
+    mut item: Event,
+    encoding: &EncodingConfig<Encoding>,
+    avro_schema: &Option<avro_rs::Schema>,
+) -> crate::Result<Vec<u8>> {
     encoding.apply_rules(&mut item);
     let log = item.into_log();
 
@@ -285,7 +287,8 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>, avro_schem
             .unwrap_or_default(),
         Encoding::Avro => {
             let value = avro_rs::to_value(log).unwrap();
-            let resolved_value = avro_rs::types::Value::resolve(value, avro_schema.as_ref().unwrap())?;
+            let resolved_value =
+                avro_rs::types::Value::resolve(value, avro_schema.as_ref().unwrap())?;
             avro_rs::to_avro_datum(avro_schema.as_ref().unwrap(), resolved_value)?
         }
     })
