@@ -277,7 +277,8 @@ test: ## Run the unit test suite
 .PHONY: test-components
 test-components: ## Test with all components enabled
 test-components: $(WASM_MODULE_OUTPUTS)
-test-components: export DEFAULT_FEATURES:="benches wasm-benches"
+# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches"
 test-components: test
 
 .PHONY: test-all
@@ -861,13 +862,13 @@ test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
 
 .PHONY: bench
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}"
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches"
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: bench-all
 bench-all: ### Run default and WASM benches
 bench-all: $(WASM_MODULE_OUTPUTS)
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} wasm-benches"
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches wasm-benches"
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
