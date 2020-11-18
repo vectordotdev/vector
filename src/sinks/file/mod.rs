@@ -341,9 +341,12 @@ impl StreamSink for FileSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::{
-        lines_from_file, lines_from_gzip_file, random_events_with_stream, random_lines_with_stream,
-        temp_dir, temp_file, trace_init,
+    use crate::{
+        event::LookupBuf,
+        test_util::{
+            lines_from_file, lines_from_gzip_file, random_events_with_stream,
+            random_lines_with_stream, temp_dir, temp_file, trace_init,
+        },
     };
     use futures::stream;
     use std::convert::TryInto;
@@ -424,22 +427,54 @@ mod tests {
         let mut sink = FileSink::new(&config, Acker::Null);
 
         let (mut input, _events) = random_events_with_stream(32, 8);
-        input[0].as_mut_log().insert("date", "2019-26-07");
-        input[0].as_mut_log().insert("level", "warning");
-        input[1].as_mut_log().insert("date", "2019-26-07");
-        input[1].as_mut_log().insert("level", "error");
-        input[2].as_mut_log().insert("date", "2019-26-07");
-        input[2].as_mut_log().insert("level", "warning");
-        input[3].as_mut_log().insert("date", "2019-27-07");
-        input[3].as_mut_log().insert("level", "error");
-        input[4].as_mut_log().insert("date", "2019-27-07");
-        input[4].as_mut_log().insert("level", "warning");
-        input[5].as_mut_log().insert("date", "2019-27-07");
-        input[5].as_mut_log().insert("level", "warning");
-        input[6].as_mut_log().insert("date", "2019-28-07");
-        input[6].as_mut_log().insert("level", "warning");
-        input[7].as_mut_log().insert("date", "2019-29-07");
-        input[7].as_mut_log().insert("level", "error");
+        input[0]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-26-07");
+        input[0]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "warning");
+        input[1]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-26-07");
+        input[1]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "error");
+        input[2]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-26-07");
+        input[2]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "warning");
+        input[3]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-27-07");
+        input[3]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "error");
+        input[4]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-27-07");
+        input[4]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "warning");
+        input[5]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-27-07");
+        input[5]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "warning");
+        input[6]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-28-07");
+        input[6]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "warning");
+        input[7]
+            .as_mut_log()
+            .insert(LookupBuf::from("date"), "2019-29-07");
+        input[7]
+            .as_mut_log()
+            .insert(LookupBuf::from("level"), "error");
 
         let events = Box::pin(stream::iter(input.clone().into_iter()));
         sink.run(events).await.unwrap();

@@ -1,7 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     http::HttpClient,
     sinks::{
         util::{
@@ -300,9 +300,12 @@ mod tests {
         };
 
         let log = LogEvent::from_iter(
-            [("message", "hello world"), ("anumber", "100")]
-                .iter()
-                .copied(),
+            [
+                (LookupBuf::from("message"), "hello world"),
+                (LookupBuf::from("anumber"), "100"),
+            ]
+            .iter()
+            .cloned(),
         );
         let json = sink.encode_event(Event::from(log)).unwrap();
         let body = serde_json::to_string(&json).unwrap();
@@ -331,10 +334,13 @@ mod tests {
         };
 
         let mut log = LogEvent::default();
-        log.insert("message", Value::Bytes("hello world".into()));
-        log.insert("anumber", Value::Bytes("100".into()));
         log.insert(
-            "timestamp",
+            LookupBuf::from("message"),
+            Value::Bytes("hello world".into()),
+        );
+        log.insert(LookupBuf::from("anumber"), Value::Bytes("100".into()));
+        log.insert(
+            LookupBuf::from("timestamp"),
             Value::Timestamp(Utc.ymd(2020, 1, 1).and_hms(12, 30, 0)),
         );
 
@@ -392,8 +398,8 @@ mod tests {
             severity_key: None,
         };
 
-        let log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
-        let log2 = LogEvent::from_iter([("message", "world")].iter().copied());
+        let log1 = LogEvent::from_iter([(LookupBuf::from("message"), "hello")].iter().cloned());
+        let log2 = LogEvent::from_iter([(LookupBuf::from("message"), "world")].iter().cloned());
         let event1 = sink.encode_event(Event::from(log1)).unwrap();
         let event2 = sink.encode_event(Event::from(log2)).unwrap();
 

@@ -261,13 +261,13 @@ mod integration_tests {
     use super::{sqs, AwsS3Config, Compression, Strategy};
     use crate::{
         config::{GlobalOptions, SourceConfig},
+        event::Lookup,
         line_agg,
         rusoto::RegionOrEndpoint,
         shutdown::ShutdownSignal,
         sources::util::MultilineConfig,
         test_util::{collect_n, random_lines},
         Pipeline,
-        event::Lookup,
     };
     use futures::compat::Future01CompatExt;
     use pretty_assertions::assert_eq;

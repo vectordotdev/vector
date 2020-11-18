@@ -13,11 +13,11 @@ use crate::internal_events::{
 use crate::kubernetes as k8s;
 use crate::{
     config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    event::LookupBuf,
     shutdown::ShutdownSignal,
     sources,
     transforms::{FunctionTransform, TaskTransform},
     Pipeline,
-    event::{LookupBuf},
 };
 use bytes::Bytes;
 use file_source::{FileServer, FileServerShutdown, Fingerprinter};

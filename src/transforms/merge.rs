@@ -69,9 +69,9 @@ impl TransformConfig for MergeConfig {
 }
 
 pub struct Merge {
-    partial_event_marker_field: String,
-    fields: Vec<String>,
-    stream_discriminant_fields: Vec<String>,
+    partial_event_marker_field: LookupBuf,
+    fields: Vec<LookupBuf>,
+    stream_discriminant_fields: Vec<LookupBuf>,
     log_event_merge_states: HashMap<Discriminant, LogEventMergeState>,
 }
 
@@ -80,7 +80,7 @@ impl Merge {
         let mut event = event.into_log();
 
         // Prepare an event's discriminant.
-        let discriminant = Discriminant::from_log_event(&event, self.stream_discriminant_fields.as_slice());
+        let discriminant = Discriminant::from_log_event(&event, &self.stream_discriminant_fields);
 
         // TODO: `lua` transform doesn't support assigning non-string values.
         // Normally we'd check for the field value to be `true`, and only then
@@ -92,7 +92,10 @@ impl Merge {
 
         // If current event has the partial marker, consider it partial.
         // Remove the partial marker from the event and stash it.
-        if event.remove(&self.partial_event_marker_field).is_some() {
+        if event
+            .remove(&self.partial_event_marker_field, false)
+            .is_some()
+        {
             // We got a partial event. Initialize a partial event merging state
             // if there's none available yet, or extend the existing one by
             // merging the incoming partial event in.

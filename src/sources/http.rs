@@ -2,7 +2,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -79,7 +79,9 @@ impl HttpSource for SimpleHttpSource {
                 // Add source type
                 let key = log_schema().source_type_key();
                 for event in events.iter_mut() {
-                    event.as_mut_log().insert(key.into_buf(), Bytes::from("http"));
+                    event
+                        .as_mut_log()
+                        .insert(key.into_buf(), Bytes::from("http"));
                 }
                 events
             })
@@ -162,15 +164,13 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
                 serde_json::from_slice(&j?)
-                    .and_then(|parsed_json| serde_json::from_value(parsed_json))
+                    .and_then(|parsed_json| serde_json::from_value(parsed_json).map(Event::Log))
                     .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))
             })
             .collect::<Result<_, _>>(),
-        Encoding::Json => {
-            serde_json::from_slice(&body)
-                .and_then(|parsed_json| serde_json::from_value(parsed_json))
-                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))
-        }
+        Encoding::Json => serde_json::from_slice(&body)
+            .and_then(|parsed_json| serde_json::from_value(parsed_json).map(Event::Log))
+            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))),
     }
 }
 
@@ -196,7 +196,7 @@ mod tests {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        event::{Event, Value},
+        event::{Event, Value, Lookup},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -428,14 +428,14 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log[Lookup::from("key1")], "value1".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["key2"], "value2".into());
+            assert_eq!(log[Lookup::from("key2")], "value2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
@@ -469,10 +469,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["key1"], "value1".into());
-            assert_eq!(log["User-Agent"], "test_client".into());
-            assert_eq!(log["Upgrade-Insecure-Requests"], "false".into());
-            assert_eq!(log["AbsentHeader"], Value::Null);
+            assert_eq!(log[Lookup::from("key1")], "value1".into());
+            assert_eq!(log[Lookup::from("User-Agent")], "test_client".into());
+            assert_eq!(log[Lookup::from("Upgrade-Insecure-Requests")], "false".into());
+            assert_eq!(log[Lookup::from("AbsentHeader")], Value::Null);
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
@@ -501,10 +501,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["key1"], "value1".into());
-            assert_eq!(log["source"], "staging".into());
-            assert_eq!(log["region"], "gb".into());
-            assert_eq!(log["absent"], Value::Null);
+            assert_eq!(log[Lookup::from("key1")], "value1".into());
+            assert_eq!(log[Lookup::from("source")], "staging".into());
+            assert_eq!(log[Lookup::from("region")], "gb".into());
+            assert_eq!(log[Lookup::from("absent")], Value::Null);
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }

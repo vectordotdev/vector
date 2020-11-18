@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf, Lookup, Value},
+    event::{Event, Lookup, LookupBuf, Value},
     internal_events::{
         RegexParserConversionFailed, RegexParserEventProcessed, RegexParserFailedMatch,
         RegexParserMissingField, RegexParserTargetExists,
@@ -12,7 +12,7 @@ use bytes::Bytes;
 use regex::bytes::{CaptureLocations, Regex, RegexSet};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::{collections::HashMap, str, borrow::BorrowMut};
+use std::{collections::HashMap, str};
 
 #[derive(Debug, Derivative, Deserialize, Serialize, Clone)]
 #[derivative(Default)]
@@ -87,7 +87,7 @@ impl CompiledRegex {
             .filter_map(|(idx, cn)| {
                 cn.map(|cn| {
                     let name = Lookup::from(cn).into_buf();
-                    let conv = types.get(&cn).unwrap_or(&Conversion::Bytes);
+                    let conv = types.get(&name).unwrap_or(&Conversion::Bytes);
                     (idx, name, conv.clone())
                 })
             })
@@ -120,7 +120,10 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(RegexParserConversionFailed { name: name.as_lookup(), error });
+                                        emit!(RegexParserConversionFailed {
+                                            name: name.as_lookup(),
+                                            error
+                                        });
                                         None
                                     }
                                 }
@@ -183,7 +186,7 @@ impl RegexParser {
             .map(|regex| regex.capture_names().filter_map(|s| s).collect::<Vec<_>>())
             .flatten()
             .map(LookupBuf::from_str)
-            .collect::<crate::Result<Vec<_>>>();
+            .collect::<crate::Result<Vec<_>>>()?;
 
         let types = parse_check_conversion_map(&config.types, names)?;
 
@@ -269,7 +272,7 @@ impl FunctionTransform for RegexParser {
                     let target_field = target_field.as_lookup();
                     if log.contains(target_field) {
                         if self.overwrite_target {
-                            log.remove(target_field, false);
+                            log.remove(target_field.clone(), false);
                         } else {
                             emit!(RegexParserTargetExists { target_field });
                             output.push(event);
@@ -279,8 +282,10 @@ impl FunctionTransform for RegexParser {
                 }
 
                 log.extend(captures.map(|(name, value)| {
-                    let mut final_name = self.target_field.clone();
-                    final_name.borrow_mut().push(name)
+                    let final_name = self.target_field.clone().map(|mut v| {
+                        v.push(name);
+                        v
+                    });
                     (final_name, value)
                 }));
                 if self.drop_field {
@@ -290,7 +295,9 @@ impl FunctionTransform for RegexParser {
                 return;
             }
         } else {
-            emit!(RegexParserMissingField { field: self.field.as_lookup() });
+            emit!(RegexParserMissingField {
+                field: self.field.as_lookup()
+            });
         }
 
         if !self.drop_failed {

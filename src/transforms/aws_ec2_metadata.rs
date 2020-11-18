@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     http::HttpClient,
     internal_events::{
         AwsEc2MetadataEventProcessed, AwsEc2MetadataRefreshFailed, AwsEc2MetadataRefreshSuccessful,
@@ -177,7 +177,10 @@ impl FunctionTransform for Ec2MetadataTransform {
         if let Some(read_ref) = self.state.read() {
             read_ref.into_iter().for_each(|(k, v)| {
                 if let Some(value) = v.get_one() {
-                    log.insert(k.clone(), value.clone());
+                    log.insert(
+                        LookupBuf::from_str(k).unwrap_or(LookupBuf::from(k.clone())),
+                        value.clone(),
+                    );
                 }
             });
         }

@@ -113,9 +113,10 @@ fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> E
     let mut event = Event::from(line);
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key().into_buf(), Bytes::from("stdin"));
+    event.as_mut_log().insert(
+        log_schema().source_type_key().into_buf(),
+        Bytes::from("stdin"),
+    );
 
     if let Some(hostname) = hostname {
         event.as_mut_log().insert(host_key, hostname);
@@ -127,7 +128,7 @@ fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> E
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_util::trace_init, Pipeline};
+    use crate::{test_util::trace_init, Pipeline, event::{LookupBuf, Lookup}};
     use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
@@ -140,13 +141,13 @@ mod tests {
     #[test]
     fn stdin_create_event() {
         let line = Bytes::from("hello world");
-        let host_key = "host".to_string();
+        let host_key = LookupBuf::from("host");
         let hostname = Some("Some.Machine".to_string());
 
-        let event = create_event(line, &host_key, &hostname);
+        let event = create_event(line, host_key, hostname);
         let log = event.into_log();
 
-        assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log[Lookup::from("host")], "Some.Machine".into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "stdin".into());
     }

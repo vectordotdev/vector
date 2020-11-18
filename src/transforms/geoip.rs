@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     transforms::{FunctionTransform, Transform},
     Result,
 };
@@ -10,10 +10,10 @@ use std::str::FromStr;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct GeoipConfig {
-    pub source: String,
+    pub source: LookupBuf,
     pub database: String,
     #[serde(default = "default_geoip_target_field")]
-    pub target: String,
+    pub target: LookupBuf,
 }
 
 #[derive(Derivative)]
@@ -22,8 +22,8 @@ pub struct Geoip {
     #[derivative(Debug = "ignore")]
     pub dbreader: maxminddb::Reader<Vec<u8>>,
     pub database: String,
-    pub source: String,
-    pub target: String,
+    pub source: LookupBuf,
+    pub target: LookupBuf,
 }
 
 impl Clone for Geoip {
@@ -38,8 +38,8 @@ impl Clone for Geoip {
     }
 }
 
-fn default_geoip_target_field() -> String {
-    "geoip".to_string()
+fn default_geoip_target_field() -> LookupBuf {
+    LookupBuf::from("geoip")
 }
 
 inventory::submit! {
@@ -50,7 +50,7 @@ impl GenerateConfig for GeoipConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             database: "/path/to/GeoLite2-City.mmdb".to_string(),
-            source: "ip address".to_owned(),
+            source: LookupBuf::from("ip address"),
             target: default_geoip_target_field(),
         })
         .unwrap()
@@ -88,7 +88,7 @@ const ASN_DATABASE_TYPE: &str = "GeoLite2-ASN";
 const ISP_DATABASE_TYPE: &str = "GeoIP2-ISP";
 
 impl Geoip {
-    pub fn new(database: String, source: String, target: String) -> crate::Result<Self> {
+    pub fn new(database: String, source: LookupBuf, target: LookupBuf) -> crate::Result<Self> {
         Ok(Geoip {
             dbreader: maxminddb::Reader::open_readfile(database.clone())?,
             database,
@@ -210,7 +210,7 @@ impl FunctionTransform for Geoip {
 mod tests {
     use super::*;
     use crate::{
-        event::Event,
+        event::{Event, Lookup, LookupBuf},
         transforms::json_parser::{JsonParser, JsonParserConfig},
     };
     use std::collections::HashMap;
@@ -258,8 +258,8 @@ mod tests {
 
         let mut augment = Geoip::new(
             "tests/data/GeoIP2-City-Test.mmdb".to_string(),
-            "remote_addr".into(),
-            "geo".to_string(),
+            LookupBuf::from("remote_addr"),
+            LookupBuf::from("geo"),
         )
         .unwrap();
         let new_event = augment.transform_one(event).unwrap();
@@ -348,8 +348,8 @@ mod tests {
 
         let mut augment = Geoip::new(
             "tests/data/GeoLite2-ASN-Test.mmdb".to_string(),
-            "remote_addr".to_string(),
-            "geo".to_string(),
+            LookupBuf::from("remote_addr"),
+            LookupBuf::from("geo"),
         )
         .unwrap();
         let new_event = augment.transform_one(event).unwrap();
@@ -361,8 +361,8 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
-            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
+            let k = Lookup::from(format!("geo.{}", field).to_string());
+            let geodata = new_event.as_log().get(k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -375,8 +375,8 @@ mod tests {
 
         let mut augment = Geoip::new(
             "tests/data/GeoLite2-ASN-Test.mmdb".to_string(),
-            "remote_addr".to_string(),
-            "geo".to_string(),
+            LookupBuf::from("remote_addr"),
+            LookupBuf::from("geo"),
         )
         .unwrap();
         let new_event = augment.transform_one(event).unwrap();

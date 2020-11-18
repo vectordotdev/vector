@@ -124,7 +124,10 @@ fn subscription_event_to_events<'a>(
                 log.insert(ID_LOOKUP.clone(), log_event.id);
                 log.insert(LOG_GROUP_LOOKUP.clone(), log_group.clone());
                 log.insert(LOG_STREAM_LOOKUP.clone(), log_stream.clone());
-                log.insert(SUBSCRIPTION_FILTERS_LOOKUP.clone(), subscription_filters.clone());
+                log.insert(
+                    SUBSCRIPTION_FILTERS_LOOKUP.clone(),
+                    subscription_filters.clone(),
+                );
                 log.insert(OWNER_LOOKUP.clone(), owner.clone());
 
                 event

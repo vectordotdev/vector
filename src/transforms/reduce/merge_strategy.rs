@@ -1,4 +1,4 @@
-use crate::event::{LogEvent, Value, LookupBuf};
+use crate::event::{LogEvent, LookupBuf, Value};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -161,7 +161,10 @@ impl ReduceValueMerger for TimestampWindowMerger {
     }
 
     fn insert_into(self: Box<Self>, k: LookupBuf, v: &mut LogEvent) -> Result<(), String> {
-        v.insert(LookupBuf::from(format!("{}_end", k)), Value::Timestamp(self.latest));
+        v.insert(
+            LookupBuf::from(format!("{}_end", k)),
+            Value::Timestamp(self.latest),
+        );
         v.insert(k, Value::Timestamp(self.started));
         Ok(())
     }

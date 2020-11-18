@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::event::Lookup;
 use metrics::counter;
 use std::num::ParseFloatError;
 
@@ -15,7 +16,7 @@ impl InternalEvent for LogToMetricEventProcessed {
 }
 
 pub(crate) struct LogToMetricFieldNotFound<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
@@ -35,7 +36,7 @@ impl<'a> InternalEvent for LogToMetricFieldNotFound<'a> {
 }
 
 pub(crate) struct LogToMetricParseFloatError<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
     pub error: ParseFloatError,
 }
 

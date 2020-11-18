@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
 };
@@ -11,11 +11,11 @@ use serde_json::Value;
 #[serde(deny_unknown_fields, default)]
 #[derivative(Default)]
 pub struct JsonParserConfig {
-    pub field: Option<String>,
+    pub field: Option<LookupBuf>,
     pub drop_invalid: bool,
     #[derivative(Default(value = "true"))]
     pub drop_field: bool,
-    pub target_field: Option<String>,
+    pub target_field: Option<LookupBuf>,
     pub overwrite_target: Option<bool>,
 }
 
@@ -47,10 +47,10 @@ impl TransformConfig for JsonParserConfig {
 
 #[derive(Debug, Clone)]
 pub struct JsonParser {
-    field: String,
+    field: LookupBuf,
     drop_invalid: bool,
     drop_field: bool,
-    target_field: Option<String>,
+    target_field: Option<LookupBuf>,
     overwrite_target: bool,
 }
 
@@ -58,7 +58,7 @@ impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
         let field = config
             .field
-            .unwrap_or_else(|| log_schema().message_key().to_string());
+            .unwrap_or_else(|| log_schema().message_key().into_buf());
 
         JsonParser {
             field,
@@ -83,7 +83,7 @@ impl FunctionTransform for JsonParser {
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
                         emit!(JsonParserFailedParse {
-                            field: &self.field,
+                            field: self.field.as_lookup(),
                             value: value.to_string_lossy().as_str(),
                             error
                         })
@@ -101,25 +101,27 @@ impl FunctionTransform for JsonParser {
         if let Some(object) = parsed {
             match self.target_field {
                 Some(ref target_field) => {
-                    let contains_target = log.contains(&target_field);
+                    let contains_target = log.contains(&*target_field);
 
                     if contains_target && !self.overwrite_target {
-                        emit!(JsonParserTargetExists { target_field })
+                        emit!(JsonParserTargetExists {
+                            target_field: target_field.as_lookup()
+                        })
                     } else {
                         if self.drop_field {
-                            log.remove(&self.field);
+                            log.remove(&self.field, false);
                         }
 
-                        log.insert(&target_field, Value::Object(object));
+                        log.insert(target_field.clone(), Value::Object(object));
                     }
                 }
                 None => {
                     if self.drop_field {
-                        log.remove(&self.field);
+                        log.remove(&self.field, false);
                     }
 
                     for (key, value) in object {
-                        log.insert_flat(key, value);
+                        log.insert(LookupBuf::from(key), value);
                     }
                 }
             }

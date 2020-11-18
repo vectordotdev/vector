@@ -1,7 +1,8 @@
 use crate::{
     async_read::VecAsyncReadExt,
     emit,
-    event::{Event, LookupBuf}, internal_events::{ConnectionOpen, OpenGauge, UnixSocketError},
+    event::{Event, LookupBuf},
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
@@ -26,7 +27,11 @@ pub fn build_unix_source<D, E>(
     host_key: LookupBuf,
     shutdown: ShutdownSignal,
     out: Pipeline,
-    build_event: impl Fn(LookupBuf, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
+    build_event: impl Fn(LookupBuf, Option<Bytes>, &str) -> Option<Event>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
 ) -> Source
 where
     D: Decoder<Item = String, Error = E> + Clone + Send + 'static,

@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    event::Event,
+    event::{Event, LookupBuf},
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
@@ -55,12 +55,12 @@ impl TransformConfig for FieldFilterConfig {
 
 #[derive(Debug, Clone)]
 pub struct FieldFilter {
-    field_name: String,
+    field_name: LookupBuf,
     value: String,
 }
 
 impl FieldFilter {
-    pub fn new(field_name: String, value: String) -> Self {
+    pub fn new(field_name: LookupBuf, value: String) -> Self {
         Self { field_name, value }
     }
 }

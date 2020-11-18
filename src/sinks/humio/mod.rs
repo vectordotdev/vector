@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::{sinks::splunk_hec, event::LookupBuf};
+use crate::{event::LookupBuf, sinks::splunk_hec};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]

@@ -1,5 +1,5 @@
 use crate::{
-    event::{LookupBuf},
+    event::LookupBuf,
     sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat},
 };
 use serde::{

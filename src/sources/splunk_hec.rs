@@ -39,7 +39,6 @@ lazy_static::lazy_static! {
     pub static ref LINE_LOOKUP: LookupBuf = LookupBuf::from("line");
 }
 
-
 /// Accepts HTTP requests.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
@@ -347,7 +346,11 @@ impl<R: Read> EventStream<R> {
             channel: channel.map(Value::from),
             time: Time::Now(Utc::now()),
             extractors: [
-                DefaultExtractor::new_with(*HOST_LOOKUP, log_schema().host_key().into_buf(), host.map(Value::from)),
+                DefaultExtractor::new_with(
+                    *HOST_LOOKUP,
+                    log_schema().host_key().into_buf(),
+                    host.map(Value::from),
+                ),
                 DefaultExtractor::new(*INDEX_LOOKUP, *SPLUNK_INDEX_LOOKUP),
                 DefaultExtractor::new(*SOURCE_LOOKUP, *SPLUNK_SOURCE_LOOKUP),
                 DefaultExtractor::new(*SOURCETYPE_LOOKUP, *SPLUNK_SOURCETYPE_LOOKUP),
@@ -397,7 +400,10 @@ impl<R: Read> Stream for EventStream<R> {
         let log = event.as_mut_log();
 
         // Add source type
-        log.insert(log_schema().source_type_key().into_buf(), Bytes::from("splunk_hec"));
+        log.insert(
+            log_schema().source_type_key().into_buf(),
+            Bytes::from("splunk_hec"),
+        );
 
         // Process event field
         match json.get_mut("event") {
@@ -541,11 +547,7 @@ impl DefaultExtractor {
         }
     }
 
-    fn new_with(
-        field: LookupBuf,
-        to_field: LookupBuf,
-        value: impl Into<Option<Value>>,
-    ) -> Self {
+    fn new_with(field: LookupBuf, to_field: LookupBuf, value: impl Into<Option<Value>>) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -555,7 +557,9 @@ impl DefaultExtractor {
 
     fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue) {
         // Process json_field
-        if let Some(JsonValue::String(new_value)) = value.get_mut(&self.field).map(JsonValue::take) {
+        if let Some(JsonValue::String(new_value)) =
+            value.get_mut(&self.field.to_string()).map(JsonValue::take)
+        {
             self.value = Some(new_value.into());
         }
 
@@ -616,9 +620,10 @@ fn raw_event(
     log.insert(log_schema().timestamp_key().into_buf(), Utc::now());
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key().into_buf(), Bytes::from("splunk_hec"));
+    event.as_mut_log().insert(
+        log_schema().source_type_key().into_buf(),
+        Bytes::from("splunk_hec"),
+    );
 
     emit!(SplunkHECEventReceived);
 
@@ -758,7 +763,7 @@ mod tests {
     use super::{parse_timestamp, SplunkConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
-        event::Event,
+        event::{Event, LookupBuf, Lookup},
         shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
@@ -975,13 +980,13 @@ mod tests {
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("greeting", "hello");
-        event.as_mut_log().insert("name", "bob");
+        event.as_mut_log().insert(LookupBuf::from("greeting"), "hello");
+        event.as_mut_log().insert(LookupBuf::from("name"), "bob");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
-        assert_eq!(event.as_log()["greeting"], "hello".into());
-        assert_eq!(event.as_log()["name"], "bob".into());
+        assert_eq!(event.as_log()[Lookup::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[Lookup::from("name")], "bob".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
@@ -996,7 +1001,7 @@ mod tests {
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("line", "hello");
+        event.as_mut_log().insert(LookupBuf::from("line"), "hello");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
@@ -1014,7 +1019,7 @@ mod tests {
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(event.as_log()[&super::SPLUNK_CHANNEL_LOOKUP], "guid".into());
+        assert_eq!(event.as_log()[&*super::SPLUNK_CHANNEL_LOOKUP], "guid".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
@@ -1096,19 +1101,22 @@ mod tests {
             events[0].as_log()[log_schema().message_key()],
             "first".into()
         );
-        assert_eq!(events[0].as_log()[&super::SOURCE_LOOKUP], "main".into());
+        assert_eq!(events[0].as_log()[&*super::SOURCE_LOOKUP], "main".into());
 
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
             "second".into()
         );
-        assert_eq!(events[1].as_log()[&super::SOURCE_LOOKUP], "main".into());
+        assert_eq!(events[1].as_log()[&*super::SOURCE_LOOKUP], "main".into());
 
         assert_eq!(
             events[2].as_log()[log_schema().message_key()],
             "third".into()
         );
-        assert_eq!(events[2].as_log()[&super::SOURCE_LOOKUP], "secondary".into());
+        assert_eq!(
+            events[2].as_log()[&*super::SOURCE_LOOKUP],
+            "secondary".into()
+        );
     }
 
     #[test]

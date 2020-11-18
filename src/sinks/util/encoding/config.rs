@@ -1,5 +1,5 @@
 use crate::{
-    event::{LookupBuf},
+    event::LookupBuf,
     sinks::util::encoding::{
         with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
     },
@@ -8,11 +8,11 @@ use serde::{
     de::{self, DeserializeOwned, IntoDeserializer, MapAccess, Visitor},
     Deserialize, Deserializer, Serialize,
 };
+use std::borrow::Borrow;
 use std::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
-use std::borrow::Borrow;
 
 /// A structure to wrap sink encodings and enforce field privacy.
 ///

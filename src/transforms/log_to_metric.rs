@@ -1,14 +1,13 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::{LogEvent, Value, LookupBuf},
+    event::{Event, LogEvent, LookupBuf, Value},
     internal_events::{
         LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseFloatError,
         LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
     },
     template::{Template, TemplateError},
     transforms::{FunctionTransform, Transform},
-    Event,
 };
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -91,7 +90,7 @@ impl GenerateConfig for LogToMetricConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             metrics: vec![MetricConfig::Counter(CounterConfig {
-                field: "field_name".to_string(),
+                field: LookupBuf::from("field_name"),
                 name: None,
                 namespace: None,
                 increment_by_value: false,
@@ -130,14 +129,14 @@ impl LogToMetric {
 
 enum TransformError {
     FieldNotFound {
-        field: String,
+        field: LookupBuf,
     },
     TemplateParseError(TemplateError),
     TemplateRenderError {
         missing_keys: Vec<String>,
     },
     ParseFloatError {
-        field: String,
+        field: LookupBuf,
         error: ParseFloatError,
     },
 }
@@ -177,17 +176,17 @@ fn render_tags(
     })
 }
 
-fn parse_field(log: &LogEvent, field: &str) -> Result<f64, TransformError> {
+fn parse_field(log: &LogEvent, field: &LookupBuf) -> Result<f64, TransformError> {
     let value = log
         .get(field)
         .ok_or_else(|| TransformError::FieldNotFound {
-            field: field.to_string(),
+            field: field.clone(),
         })?;
     value
         .to_string_lossy()
         .parse()
         .map_err(|error| TransformError::ParseFloatError {
-            field: field.to_string(),
+            field: field.clone(),
             error,
         })
 }
@@ -218,7 +217,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 1.0
             };
 
-            let name = counter.name.as_ref().unwrap_or(&counter.field);
+            let name = counter.name.as_ref().unwrap_or(&counter.field.to_string());
             let name = render_template(&name, &event)?;
 
             let namespace = counter.namespace.as_ref();
@@ -238,9 +237,10 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Histogram(hist) => {
+            let field_string = hist.field.to_string();
             let value = parse_field(&log, &hist.field)?;
 
-            let name = hist.name.as_ref().unwrap_or(&hist.field);
+            let name = hist.name.as_ref().unwrap_or(&field_string);
             let name = render_template(&name, &event)?;
 
             let namespace = hist.namespace.as_ref();
@@ -264,9 +264,10 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Summary(summary) => {
+            let field_string = summary.field.to_string();
             let value = parse_field(&log, &summary.field)?;
 
-            let name = summary.name.as_ref().unwrap_or(&summary.field);
+            let name = summary.name.as_ref().unwrap_or(&field_string);
             let name = render_template(&name, &event)?;
 
             let namespace = summary.namespace.as_ref();
@@ -290,9 +291,10 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
             })
         }
         MetricConfig::Gauge(gauge) => {
+            let field_string = gauge.field.to_string();
             let value = parse_field(&log, &gauge.field)?;
 
-            let name = gauge.name.as_ref().unwrap_or(&gauge.field);
+            let name = gauge.name.as_ref().unwrap_or(&field_string);
             let name = render_template(&name, &event)?;
 
             let namespace = gauge.namespace.as_ref();
@@ -319,7 +321,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 })?;
             let value = value.to_string_lossy();
 
-            let name = set.name.as_ref().unwrap_or(&set.field);
+            let name = set.name.as_ref().unwrap_or(&set.field.to_string());
             let name = render_template(&name, &event)?;
 
             let namespace = set.namespace.as_ref();
@@ -352,11 +354,11 @@ impl FunctionTransform for LogToMetric {
                     output.push(Event::Metric(metric));
                 }
                 Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
-                    field: field.as_ref()
+                    field: field.as_lookup()
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError {
-                        field: field.as_ref(),
+                        field: field.as_lookup(),
                         error
                     })
                 }

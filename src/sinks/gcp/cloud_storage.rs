@@ -463,6 +463,7 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LookupBuf;
 
     #[test]
     fn generate_config() {
@@ -489,7 +490,7 @@ mod tests {
     fn gcs_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
@@ -510,7 +511,7 @@ mod tests {
 
         let message = "hello world".to_string();
         let mut event = Event::from(message);
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let key_format = Template::try_from("key: {{ key }}").unwrap();
         let bytes = encode_event(event, &key_format, &Encoding::Text.into()).unwrap();

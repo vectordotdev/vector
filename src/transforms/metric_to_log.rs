@@ -22,7 +22,7 @@ inventory::submit! {
 impl GenerateConfig for MetricToLogConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            host_tag: Some("host-tag".to_string()),
+            host_tag: Some(LookupBuf::from("host-tag")),
         })
         .unwrap()
     }

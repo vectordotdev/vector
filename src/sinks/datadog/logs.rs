@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    http::HttpClient,
     event::{Event, LookupBuf},
+    http::HttpClient,
     sinks::{
         util::{
             batch::{Batch, BatchError},

@@ -95,8 +95,7 @@ impl FunctionTransform for Tokenizer {
         let value = event.as_log().get(&self.field).map(|s| s.to_string_lossy());
 
         if let Some(value) = &value {
-            for ((name, conversion), value) in self.types.iter().zip(parse(value).into_iter())
-            {
+            for ((name, conversion), value) in self.types.iter().zip(parse(value).into_iter()) {
                 match conversion.convert(Value::from(value.to_owned())) {
                     Ok(value) => {
                         event.as_mut_log().insert(name.clone(), value);
@@ -143,7 +142,10 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| LookupBuf::from(s)).collect::<Vec<_>>();
+        let field_names = fields
+            .split(' ')
+            .map(|s| LookupBuf::from(s))
+            .collect::<Vec<_>>();
         let mut parser = TokenizerConfig {
             field_names,
             field,

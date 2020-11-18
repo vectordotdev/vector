@@ -1,5 +1,5 @@
 use crate::event::merge::merge_log_event;
-use crate::event::{LogEvent, Lookup};
+use crate::event::{LogEvent, LookupBuf};
 
 /// Encapsulates the inductive events merging algorithm.
 ///
@@ -21,7 +21,7 @@ impl LogEventMergeState {
     }
 
     /// Merge the incoming (partial) event in.
-    pub fn merge_in_next_event<'a>(&mut self, incoming: LogEvent, fields: &[Lookup<'a>]) {
+    pub fn merge_in_next_event(&mut self, incoming: LogEvent, fields: &Vec<LookupBuf>) {
         merge_log_event(&mut self.intermediate_merged_event, incoming, fields);
     }
 
@@ -30,7 +30,7 @@ impl LogEventMergeState {
     pub fn merge_in_final_event<'a>(
         mut self,
         incoming: LogEvent,
-        fields: &[Lookup<'a>],
+        fields: &Vec<LookupBuf>,
     ) -> LogEvent {
         self.merge_in_next_event(incoming, fields);
         self.intermediate_merged_event
@@ -40,7 +40,7 @@ impl LogEventMergeState {
 #[cfg(test)]
 mod test {
     use super::LogEventMergeState;
-    use crate::event::{Event, LogEvent, Lookup};
+    use crate::event::{Event, LogEvent, Lookup, LookupBuf};
 
     fn log_event_with_message(message: &str) -> LogEvent {
         Event::from(message).into_log()
@@ -48,14 +48,18 @@ mod test {
 
     #[test]
     fn log_event_merge_state_example() {
-        let fields = vec![Lookup::from("message")];
+        let fields = vec![LookupBuf::from("message")];
 
         let mut state = LogEventMergeState::new(log_event_with_message("hel"));
         state.merge_in_next_event(log_event_with_message("lo "), &fields);
         let merged_event = state.merge_in_final_event(log_event_with_message("world"), &fields);
 
         assert_eq!(
-            merged_event.get(Lookup::from("message")).unwrap().as_bytes().as_ref(),
+            merged_event
+                .get(Lookup::from("message"))
+                .unwrap()
+                .as_bytes()
+                .as_ref(),
             b"hello world"
         );
     }

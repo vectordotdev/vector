@@ -1,8 +1,8 @@
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
-    http::HttpClient,
     event::{Event, LookupBuf},
+    http::HttpClient,
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
@@ -498,37 +498,37 @@ mod tests {
 
     #[test]
     fn removes_and_sets_id_from_custom_field() {
-        let id_key = Some("foo");
+        let id_key = Some(LookupBuf::from("foo"));
         let mut event = Event::from("butts");
-        event.as_mut_log().insert("foo", "bar");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut event);
+        maybe_set_id(&id_key, &mut action, &mut event);
 
         assert_eq!(json!({"_id": "bar"}), action);
-        assert_eq!(None, event.as_log().get("foo"));
+        assert_eq!(None, event.as_log().get(Lookup::from("foo")));
     }
 
     #[test]
     fn doesnt_set_id_when_field_missing() {
-        let id_key = Some("foo");
+        let id_key = Some(LookupBuf::from("foo"));
         let mut event = Event::from("butts");
-        event.as_mut_log().insert("not_foo", "bar");
+        event.as_mut_log().insert(LookupBuf::from("not_foo"), "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut event);
+        maybe_set_id(&id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
     }
 
     #[test]
     fn doesnt_set_id_when_not_configured() {
-        let id_key: Option<&str> = None;
+        let id_key: Option<&LookupBuf> = None;
         let mut event = Event::from("butts");
-        event.as_mut_log().insert("foo", "bar");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         let mut action = json!({});
 
-        maybe_set_id(id_key, &mut action, &mut event);
+        maybe_set_id(&id_key, &mut action, &mut event);
 
         assert_eq!(json!({}), action);
     }
@@ -553,7 +553,10 @@ mod tests {
             index: Some(String::from("{{ idx }}")),
             encoding: EncodingConfigWithDefault {
                 codec: Encoding::Default,
-                except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
+                except_fields: Some(vec![
+                    LookupBuf::from_str("idx").unwrap(),
+                    LookupBuf::from_str("timestamp").unwrap(),
+                ]),
                 ..Default::default()
             },
             endpoint: String::from("https://example.com"),
@@ -562,8 +565,12 @@ mod tests {
         let es = ElasticSearchCommon::parse_config(&config).unwrap();
 
         let mut event = Event::from("hello there");
-        event.as_mut_log().insert("foo", "bar");
-        event.as_mut_log().insert("idx", "purple");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("foo").unwrap(), "bar");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("idx").unwrap(), "purple");
 
         let encoded = es.encode_event(event).unwrap();
         let expected = r#"{"index":{"_index":"purple","_type":"_doc"}}
@@ -625,8 +632,12 @@ mod integration_tests {
         let (sink, _hc) = config.build(cx.clone()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("my_id", "42");
-        input_event.as_mut_log().insert("foo", "bar");
+        input_event
+            .as_mut_log()
+            .insert(LookupBuf::from("my_id"), "42");
+        input_event
+            .as_mut_log()
+            .insert(LookupBuf::from("foo"), "bar");
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await

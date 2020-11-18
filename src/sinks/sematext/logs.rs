@@ -1,12 +1,12 @@
 use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::{Event, LookupBuf},
     sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
-    event::{Event, LookupBuf},
 };
 use futures::{
     future::{self, BoxFuture},

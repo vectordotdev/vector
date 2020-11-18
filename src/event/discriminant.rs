@@ -1,5 +1,5 @@
 use super::{LogEvent, Value};
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use std::{
     collections::BTreeMap,
     hash::{Hash, Hasher},
@@ -24,10 +24,10 @@ pub struct Discriminant {
 impl Discriminant {
     /// Create a new Discriminant from the `LogEvent` and an ordered slice of
     /// fields to include into a discriminant value.
-    pub fn from_log_event<'a>(event: &LogEvent, discriminant_fields: &[Lookup<'a>]) -> Self {
+    pub fn from_log_event<'a>(event: &LogEvent, discriminant_fields: &Vec<LookupBuf>) -> Self {
         let values: Vec<Option<Value>> = discriminant_fields
             .iter()
-            .map(|discriminant_field| event.get(discriminant_field).cloned())
+            .map(|discriminant_field| event.get(&*discriminant_field).cloned())
             .collect();
         Self { values }
     }
@@ -172,9 +172,13 @@ mod tests {
         event_1.insert(LookupBuf::from("hostname"), "localhost");
         event_1.insert(LookupBuf::from("irrelevant"), "not even used");
         let mut event_2 = event_1.clone();
-        event_2.insert(LookupBuf::from("irrelevant"), "does not matter if it's different");
+        event_2.insert(
+            LookupBuf::from("irrelevant"),
+            "does not matter if it's different",
+        );
 
-        let discriminant_fields = vec![Lookup::from("hostname"), Lookup::from("container_id")];
+        let discriminant_fields =
+            vec![LookupBuf::from("hostname"), LookupBuf::from("container_id")];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -191,7 +195,8 @@ mod tests {
         let mut event_2 = event_1.clone();
         event_2.insert(LookupBuf::from("container_id"), "def");
 
-        let discriminant_fields = vec![Lookup::from("hostname"), Lookup::from("container_id")];
+        let discriminant_fields =
+            vec![LookupBuf::from("hostname"), LookupBuf::from("container_id")];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -209,7 +214,7 @@ mod tests {
         event_2.insert(LookupBuf::from("b"), "b");
         event_2.insert(LookupBuf::from("a"), "a");
 
-        let discriminant_fields = vec![Lookup::from("a"), Lookup::from("b")];
+        let discriminant_fields = vec![LookupBuf::from("a"), LookupBuf::from("b")];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -227,7 +232,7 @@ mod tests {
         event_2.insert(LookupBuf::from_str("nested.b").unwrap(), "b");
         event_2.insert(LookupBuf::from_str("nested.a").unwrap(), "a");
 
-        let discriminant_fields = vec![Lookup::from("nested")];
+        let discriminant_fields = vec![LookupBuf::from("nested")];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -245,7 +250,7 @@ mod tests {
         event_2.insert(LookupBuf::from_str("array[1]").unwrap(), "b");
         event_2.insert(LookupBuf::from_str("array[0]").unwrap(), "a");
 
-        let discriminant_fields = vec![Lookup::from("array")];
+        let discriminant_fields = vec![LookupBuf::from("array")];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -260,7 +265,7 @@ mod tests {
         event_1.insert(LookupBuf::from_str("nested.a").unwrap(), "a"); // `nested` is a `Value::Map`
         let event_2 = LogEvent::default(); // empty event
 
-        let discriminant_fields = vec![Lookup::from("nested")];
+        let discriminant_fields = vec![LookupBuf::from("nested")];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -276,7 +281,7 @@ mod tests {
         let mut event_2 = LogEvent::default();
         event_2.insert(LookupBuf::from_str("nested").unwrap(), "x"); // `nested` is a `Value::String`
 
-        let discriminant_fields = vec![Lookup::from("nested")];
+        let discriminant_fields = vec![LookupBuf::from("nested")];
 
         let discriminant_1 = Discriminant::from_log_event(&event_1, &discriminant_fields);
         let discriminant_2 = Discriminant::from_log_event(&event_2, &discriminant_fields);
@@ -308,7 +313,8 @@ mod tests {
             LogEvent::default()
         };
 
-        let discriminant_fields = vec![Lookup::from("hostname"), Lookup::from("container_id")];
+        let discriminant_fields =
+            vec![LookupBuf::from("hostname"), LookupBuf::from("container_id")];
 
         let mut process_event = |event| {
             let discriminant = Discriminant::from_log_event(&event, &discriminant_fields);

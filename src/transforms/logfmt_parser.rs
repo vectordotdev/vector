@@ -1,6 +1,6 @@
 use crate::{
     config::{DataType, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf, Lookup, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{
         LogfmtParserConversionFailed, LogfmtParserEventProcessed, LogfmtParserMissingField,
     },
@@ -74,7 +74,7 @@ impl FunctionTransform for Logfmt {
                 .filter_map(|logfmt::Pair { key, val }| val.map(|val| (key, val)));
 
             for (key, val) in pairs {
-                let key = Lookup::from(key);
+                let key = LookupBuf::from_str(&*key).unwrap_or(LookupBuf::from(key));
                 if key == self.field {
                     drop_field = false;
                 }
@@ -86,7 +86,7 @@ impl FunctionTransform for Logfmt {
                         }
                         Err(error) => {
                             emit!(LogfmtParserConversionFailed {
-                                name: key.as_ref(),
+                                name: key.as_lookup(),
                                 error
                             });
                         }
@@ -100,7 +100,9 @@ impl FunctionTransform for Logfmt {
                 event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            emit!(LogfmtParserMissingField { field: &self.field });
+            emit!(LogfmtParserMissingField {
+                field: self.field.as_lookup()
+            });
         };
 
         emit!(LogfmtParserEventProcessed {});

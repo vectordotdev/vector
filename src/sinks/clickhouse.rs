@@ -249,7 +249,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{log_schema, SinkConfig, SinkContext},
-        event::Event,
+        event::{Event, LookupBuf},
         sinks::util::encoding::TimestampFormat,
         test_util::{random_string, trace_init},
     };
@@ -297,7 +297,9 @@ mod integration_tests {
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        input_event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "example.com");
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await
@@ -346,7 +348,9 @@ mod integration_tests {
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        input_event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "example.com");
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await
@@ -357,7 +361,7 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key(),
+            log_schema().timestamp_key().into_buf(),
             format!(
                 "{}",
                 exp_event
@@ -406,7 +410,9 @@ timestamp_format = "unix""#,
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        input_event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "example.com");
 
         sink.run(stream::once(future::ready(input_event.clone())))
             .await
@@ -417,7 +423,7 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key(),
+            log_schema().timestamp_key().into_buf(),
             format!(
                 "{}",
                 exp_event
@@ -461,7 +467,7 @@ timestamp_format = "unix""#,
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        input_event.as_mut_log().insert(LookupBuf::from("host"), "example.com");
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.
@@ -505,7 +511,9 @@ timestamp_format = "unix""#,
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert("host", "example.com");
+        input_event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "example.com");
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.

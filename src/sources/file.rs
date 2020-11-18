@@ -311,16 +311,19 @@ fn create_event<'a>(
     let mut event = Event::from(line);
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key().into_buf(), Bytes::from("file"));
+    event.as_mut_log().insert(
+        log_schema().source_type_key().into_buf(),
+        Bytes::from("file"),
+    );
 
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);
     }
 
     if let Some(hostname) = &hostname {
-        event.as_mut_log().insert(host_key.clone(), hostname.clone());
+        event
+            .as_mut_log()
+            .insert(host_key.clone(), hostname.clone());
     }
 
     event
@@ -329,7 +332,7 @@ fn create_event<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Config, shutdown::ShutdownSignal, sources::file};
+    use crate::{config::Config, shutdown::ShutdownSignal, sources::file, event::{LookupBuf, Lookup}};
     use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
@@ -444,15 +447,15 @@ mod tests {
     fn file_create_event() {
         let line = Bytes::from("hello world");
         let file = "some_file.rs".to_string();
-        let host_key = "host".to_string();
+        let host_key = LookupBuf::from("host");
         let hostname = Some("Some.Machine".to_string());
-        let file_key = Some("file".to_string());
+        let file_key = Some(LookupBuf::from("file"));
 
         let event = create_event(line, file, &host_key, &hostname, &file_key);
         let log = event.into_log();
 
-        assert_eq!(log["file"], "some_file.rs".into());
-        assert_eq!(log["host"], "Some.Machine".into());
+        assert_eq!(log[Lookup::from("file")], "some_file.rs".into());
+        assert_eq!(log[Lookup::from("host")], "Some.Machine".into());
         assert_eq!(log[log_schema().message_key()], "hello world".into());
         assert_eq!(log[log_schema().source_type_key()], "file".into());
     }
@@ -498,14 +501,14 @@ mod tests {
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
-                    event.as_log()["file"].to_string_lossy(),
+                    event.as_log()[LookupBuf::from("file")].to_string_lossy(),
                     path1.to_str().unwrap()
                 );
                 hello_i += 1;
             } else {
                 assert_eq!(line, format!("goodbye {}", goodbye_i));
                 assert_eq!(
-                    event.as_log()["file"].to_string_lossy(),
+                    event.as_log()[Lookup::from("file")].to_string_lossy(),
                     path2.to_str().unwrap()
                 );
                 goodbye_i += 1;
@@ -560,7 +563,7 @@ mod tests {
 
         for event in received {
             assert_eq!(
-                event.as_log()["file"].to_string_lossy(),
+                event.as_log()[LookupBuf::from("file")].to_string_lossy(),
                 path.to_str().unwrap()
             );
 
@@ -626,7 +629,7 @@ mod tests {
 
         for event in received {
             assert_eq!(
-                event.as_log()["file"].to_string_lossy(),
+                event.as_log()[Lookup::from("file")].to_string_lossy(),
                 path.to_str().unwrap()
             );
 
@@ -735,7 +738,7 @@ mod tests {
                 .0
                 .unwrap();
             assert_eq!(
-                received.as_log()["file"].to_string_lossy(),
+                received.as_log()[Lookup::from("file")].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -748,7 +751,7 @@ mod tests {
             let dir = tempdir().unwrap();
             let config = file::FileConfig {
                 include: vec![dir.path().join("*")],
-                file_key: Some("source".to_string()),
+                file_key: Some(LookupBuf::from("source")),
                 ..test_default_file_config(&dir)
             };
 
@@ -772,7 +775,7 @@ mod tests {
                 .0
                 .unwrap();
             assert_eq!(
-                received.as_log()["source"].to_string_lossy(),
+                received.as_log()[Lookup::from("source")].to_string_lossy(),
                 path.to_str().unwrap()
             );
         }
@@ -1034,12 +1037,12 @@ mod tests {
         let received = wait_with_timeout(rx.collect().compat()).await;
         let before_lines = received
             .iter()
-            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("before"))
+            .filter(|event| event.as_log()[Lookup::from("file")].to_string_lossy().ends_with("before"))
             .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|event| event.as_log()["file"].to_string_lossy().ends_with("after"))
+            .filter(|event| event.as_log()[Lookup::from("file")].to_string_lossy().ends_with("after"))
             .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);

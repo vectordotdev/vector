@@ -384,9 +384,7 @@ fn start_journalctl(
 }
 
 fn create_event(record: Record) -> Event {
-    let mut log = LogEvent::from_iter(
-        record.into_iter().map(|(k, v)| (LookupBuf::from(k), v))
-    );
+    let mut log = LogEvent::from_iter(record.into_iter().map(|(k, v)| (LookupBuf::from(k), v)));
     // Convert some journald-specific field names into Vector standard ones.
     if let Some(message) = log.remove(MESSAGE.as_lookup(), false) {
         log.insert(log_schema().message_key().into_buf(), message);
@@ -405,12 +403,18 @@ fn create_event(record: Record) -> Event {
                     (timestamp / 1_000_000) as i64,
                     (timestamp % 1_000_000) as u32 * 1_000,
                 );
-                log.insert(log_schema().timestamp_key().into_buf(), Value::Timestamp(timestamp));
+                log.insert(
+                    log_schema().timestamp_key().into_buf(),
+                    Value::Timestamp(timestamp),
+                );
             }
         }
     }
     // Add source type
-    log.insert(log_schema().source_type_key().into(), Bytes::from("journald"));
+    log.insert(
+        log_schema().source_type_key().into(),
+        Bytes::from("journald"),
+    );
 
     log.into()
 }
@@ -592,6 +596,7 @@ mod tests {
         io,
         time::{delay_for, timeout, Duration},
     };
+    use crate::event::Lookup;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}
@@ -754,7 +759,7 @@ mod tests {
         let received = run_journal(&["syslog.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(
-            received[0].as_log()["SYSLOG_RAW"],
+            received[0].as_log()[LookupBuf::from("SYSLOG_RAW")],
             Value::Bytes("¿World?".into())
         );
     }
@@ -802,6 +807,6 @@ mod tests {
     }
 
     fn priority(event: &Event) -> Value {
-        event.as_log()["PRIORITY"].clone()
+        event.as_log()[Lookup::from("PRIORITY")].clone()
     }
 }

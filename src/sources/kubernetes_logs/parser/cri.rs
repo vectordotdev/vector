@@ -1,5 +1,5 @@
 use crate::{
-    event::{self, Event, LookupBuf, LogEvent, Value},
+    event::{self, Event, LogEvent, LookupBuf, Value},
     transforms::{
         regex_parser::{RegexParser, RegexParserConfig},
         FunctionTransform,
@@ -11,7 +11,6 @@ use snafu::{OptionExt, Snafu};
 lazy_static::lazy_static! {
     pub static ref MULTILINE_TAG: LookupBuf = LookupBuf::from("multiline_tag");
 }
-
 
 /// Parser for the CRI log format.
 ///

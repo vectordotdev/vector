@@ -86,8 +86,8 @@ impl Condition for Remap {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::log_event;
     use crate::event::LookupBuf;
+    use crate::log_event;
 
     #[test]
     fn generate_config() {

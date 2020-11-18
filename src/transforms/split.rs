@@ -110,7 +110,10 @@ impl FunctionTransform for Split {
                         event.as_mut_log().insert(name.clone(), value);
                     }
                     Err(error) => {
-                        emit!(SplitConvertFailed { field: name.as_lookup(), error });
+                        emit!(SplitConvertFailed {
+                            field: name.as_lookup(),
+                            error
+                        });
                     }
                 }
             }
@@ -118,7 +121,9 @@ impl FunctionTransform for Split {
                 event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            emit!(SplitFieldMissing { field: self.field.as_lookup() });
+            emit!(SplitFieldMissing {
+                field: self.field.as_lookup()
+            });
         };
 
         emit!(SplitEventProcessed);
@@ -177,7 +182,10 @@ mod tests {
         types: &[(&str, &str)],
     ) -> LogEvent {
         let event = Event::from(text);
-        let field_names = fields.split(' ').map(|s| s.into()).collect::<Vec<LookupBuf>>();
+        let field_names = fields
+            .split(' ')
+            .map(|s| s.into())
+            .collect::<Vec<LookupBuf>>();
         let field = field.map(|f| f.into());
         let mut parser = SplitConfig {
             field_names,

@@ -151,7 +151,9 @@ impl HttpSink for LokiConfig {
         };
 
         if self.remove_timestamp {
-            event.as_mut_log().remove(log_schema().timestamp_key(), false);
+            event
+                .as_mut_log()
+                .remove(log_schema().timestamp_key(), false);
         }
 
         self.encoding.apply_rules(&mut event);
@@ -219,10 +221,10 @@ async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{Event, LookupBuf};
     use crate::sinks::util::http::HttpSink;
     use crate::sinks::util::test::{build_test_server, load_sink};
     use crate::test_util;
-    use crate::Event;
     use futures::StreamExt;
 
     #[test]
@@ -244,7 +246,8 @@ mod tests {
 
         let mut e1 = Event::from("hello world");
 
-        e1.as_mut_log().insert("foo", "bar");
+        e1.as_mut_log()
+            .insert(LookupBuf::from_str("foo").unwrap(), "bar");
 
         let mut record = config.encode_event(e1).unwrap();
 
@@ -280,7 +283,8 @@ mod tests {
 
         let mut e1 = Event::from("hello world");
 
-        e1.as_mut_log().insert("foo", "bar");
+        e1.as_mut_log()
+            .insert(LookupBuf::from_str("foo").unwrap(), "bar");
 
         let record = config.encode_event(e1).unwrap();
 
@@ -340,8 +344,11 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        config::SinkConfig, sinks::util::test::load_sink, template::Template,
-        test_util::random_lines, Event,
+        config::SinkConfig,
+        event::{Event, LookupBuf},
+        sinks::util::test::load_sink,
+        template::Template,
+        test_util::random_lines,
     };
     use bytes::Bytes;
     use futures::{stream, StreamExt};
@@ -448,9 +455,15 @@ mod integration_tests {
             let event = events.get_mut(i).unwrap();
 
             if i % 2 == 0 {
-                event.as_mut_log().insert("stream_id", stream1.to_string());
+                event.as_mut_log().insert(
+                    LookupBuf::from_str("stream_id").unwrap(),
+                    stream1.to_string(),
+                );
             } else {
-                event.as_mut_log().insert("stream_id", stream2.to_string());
+                event.as_mut_log().insert(
+                    LookupBuf::from_str("stream_id").unwrap(),
+                    stream2.to_string(),
+                );
             }
         }
 

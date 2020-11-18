@@ -1,4 +1,4 @@
-use crate::event::{LogEvent, Value, LookupBuf};
+use crate::event::{LogEvent, LookupBuf, Value};
 use rlua::prelude::*;
 
 impl<'a> ToLua<'a> for LogEvent {

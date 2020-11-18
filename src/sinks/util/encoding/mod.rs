@@ -35,7 +35,7 @@ mod with_default;
 pub use with_default::EncodingConfigWithDefault;
 
 use crate::{
-    event::{Value, LookupBuf},
+    event::{LookupBuf, Value},
     Event, Result,
 };
 use serde::{Deserialize, Serialize};
@@ -104,10 +104,7 @@ pub trait EncodingConfiguration<E> {
                             }
                             for (k, v) in unix_timestamps {
                                 // TODO: Fixed in https://github.com/timberio/vector/issues/2845
-                                log_event.insert(
-                                    k.into_buf(),
-                                    v
-                                );
+                                log_event.insert(k.into_buf(), v);
                             }
                         }
                         // RFC3339 is the default serialization of a timestamp.
@@ -128,9 +125,10 @@ pub trait EncodingConfiguration<E> {
         if let (Some(only_fields), Some(except_fields)) =
             (&self.only_fields(), &self.except_fields())
         {
-            if except_fields.iter().any(|f| {
-                only_fields.iter().any(|v| v == f)
-            }) {
+            if except_fields
+                .iter()
+                .any(|f| only_fields.iter().any(|v| v == f))
+            {
                 return Err(
                     "`except_fields` and `only_fields` should be mutually exclusive.".into(),
                 );
@@ -232,13 +230,23 @@ mod tests {
             log.insert(LookupBuf::from_str("c[0].y").unwrap(), 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(!event.as_mut_log().contains(Lookup::from_str("a.b.c").unwrap()));
+        assert!(!event
+            .as_mut_log()
+            .contains(Lookup::from_str("a.b.c").unwrap()));
         assert!(!event.as_mut_log().contains(Lookup::from_str("b").unwrap()));
-        assert!(!event.as_mut_log().contains(Lookup::from_str("b[1].x").unwrap()));
-        assert!(!event.as_mut_log().contains(Lookup::from_str("c[0].y").unwrap()));
+        assert!(!event
+            .as_mut_log()
+            .contains(Lookup::from_str("b[1].x").unwrap()));
+        assert!(!event
+            .as_mut_log()
+            .contains(Lookup::from_str("c[0].y").unwrap()));
 
-        assert!(event.as_mut_log().contains(Lookup::from_str("a.b.d").unwrap()));
-        assert!(event.as_mut_log().contains(Lookup::from_str("c[0].x").unwrap()));
+        assert!(event
+            .as_mut_log()
+            .contains(Lookup::from_str("a.b.d").unwrap()));
+        assert!(event
+            .as_mut_log()
+            .contains(Lookup::from_str("c[0].x").unwrap()));
     }
 
     const TOML_ONLY_FIELD: &str = r#"
@@ -262,13 +270,23 @@ mod tests {
             log.insert(LookupBuf::from_str("c[0].y").unwrap(), 1);
         }
         config.encoding.apply_rules(&mut event);
-        assert!(event.as_mut_log().contains(Lookup::from_str("a.b.c").unwrap()));
+        assert!(event
+            .as_mut_log()
+            .contains(Lookup::from_str("a.b.c").unwrap()));
         assert!(event.as_mut_log().contains(Lookup::from_str("b").unwrap()));
-        assert!(event.as_mut_log().contains(Lookup::from_str("b[1].x").unwrap()));
-        assert!(event.as_mut_log().contains(Lookup::from_str("c[0].y").unwrap()));
+        assert!(event
+            .as_mut_log()
+            .contains(Lookup::from_str("b[1].x").unwrap()));
+        assert!(event
+            .as_mut_log()
+            .contains(Lookup::from_str("c[0].y").unwrap()));
 
-        assert!(!event.as_mut_log().contains(Lookup::from_str("a.b.d").unwrap()));
-        assert!(!event.as_mut_log().contains(Lookup::from_str("c[0].x").unwrap()));
+        assert!(!event
+            .as_mut_log()
+            .contains(Lookup::from_str("a.b.d").unwrap()));
+        assert!(!event
+            .as_mut_log()
+            .contains(Lookup::from_str("c[0].x").unwrap()));
     }
 
     const TOML_TIMESTAMP_FORMAT: &str = r#"

@@ -111,13 +111,16 @@ impl FunctionTransform for GrokParser {
 
         if let Some(value) = value {
             if let Some(matches) = self.pattern_built.match_against(&value) {
-                let drop_field = self.drop_field && matches.get(&self.field).is_none();
+                let drop_field = self.drop_field && matches.get(&self.field.to_string()).is_none();
                 for (name, value) in matches.iter() {
-                    let conv = self.types.get(name).unwrap_or(&Conversion::Bytes);
+                    let conv = self
+                        .types
+                        .get(&LookupBuf::from_str(name).unwrap_or(LookupBuf::from(name)))
+                        .unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.to_string().into()) {
                         Ok(value) => {
                             if let Some(path) = self.paths.get(name) {
-                                event.insert(path, value.clone());
+                                event.insert(path.clone(), value.clone());
                             } else {
                                 event.insert(LookupBuf::from(name), value);
                             }
@@ -127,16 +130,16 @@ impl FunctionTransform for GrokParser {
                 }
 
                 if drop_field {
-                    event.remove(&self.field);
+                    event.remove(&self.field, false);
                 }
             } else {
                 emit!(GrokParserFailedMatch {
-                    value: value.as_ref()
+                    value: value.as_ref(),
                 });
             }
         } else {
             emit!(GrokParserMissingField {
-                field: self.field.as_ref()
+                field: self.field.as_lookup(),
             });
         }
 

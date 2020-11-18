@@ -61,7 +61,9 @@ impl FunctionTransform for AnsiStripper {
         let log = event.as_mut_log();
 
         match log.get_mut(&self.field) {
-            None => emit!(ANSIStripperFieldMissing { field: self.field.as_lookup() }),
+            None => emit!(ANSIStripperFieldMissing {
+                field: self.field.as_lookup()
+            }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
@@ -71,7 +73,9 @@ impl FunctionTransform for AnsiStripper {
                     }),
                 };
             }
-            _ => emit!(ANSIStripperFieldInvalid { field: self.field.as_lookup() }),
+            _ => emit!(ANSIStripperFieldInvalid {
+                field: self.field.as_lookup()
+            }),
         }
 
         emit!(ANSIStripperEventProcessed);

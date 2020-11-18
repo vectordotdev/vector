@@ -196,20 +196,35 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_name", "sandbox0-name");
-                    log.insert("kubernetes.pod_namespace", "sandbox0-ns");
-                    log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert("kubernetes.pod_labels.sandbox0-label0", "val0");
-                    log.insert("kubernetes.pod_labels.sandbox0-label1", "val1");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_name").unwrap(),
+                        "sandbox0-name",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_namespace").unwrap(),
+                        "sandbox0-ns",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_uid").unwrap(),
+                        "sandbox0-uid",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_labels.sandbox0-label0").unwrap(),
+                        "val0",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_labels.sandbox0-label1").unwrap(),
+                        "val1",
+                    );
                     log
                 },
             ),
             (
                 FieldsSpec {
-                    pod_name: "name".to_owned(),
-                    pod_namespace: "ns".to_owned(),
-                    pod_uid: "uid".to_owned(),
-                    pod_labels: "labels".to_owned(),
+                    pod_name: LookupBuf::from("name"),
+                    pod_namespace: LookupBuf::from("ns"),
+                    pod_uid: LookupBuf::from("uid"),
+                    pod_labels: LookupBuf::from("labels"),
                     ..Default::default()
                 },
                 ObjectMeta {
@@ -228,11 +243,17 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("name", "sandbox0-name");
-                    log.insert("ns", "sandbox0-ns");
-                    log.insert("uid", "sandbox0-uid");
-                    log.insert("labels.sandbox0-label0", "val0");
-                    log.insert("labels.sandbox0-label1", "val1");
+                    log.insert(LookupBuf::from_str("name").unwrap(), "sandbox0-name");
+                    log.insert(LookupBuf::from_str("ns").unwrap(), "sandbox0-ns");
+                    log.insert(LookupBuf::from_str("uid").unwrap(), "sandbox0-uid");
+                    log.insert(
+                        LookupBuf::from_str("labels.sandbox0-label0").unwrap(),
+                        "val0",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("labels.sandbox0-label1").unwrap(),
+                        "val1",
+                    );
                     log
                 },
             ),
@@ -257,13 +278,35 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_name", "sandbox0-name");
-                    log.insert("kubernetes.pod_namespace", "sandbox0-ns");
-                    log.insert("kubernetes.pod_uid", "sandbox0-uid");
-                    log.insert("kubernetes.pod_labels.nested0\\.label0", "val0");
-                    log.insert("kubernetes.pod_labels.nested0\\.label1", "val1");
-                    log.insert("kubernetes.pod_labels.nested1\\.label0", "val2");
-                    log.insert("kubernetes.pod_labels.nested2\\.label0\\.deep0", "val3");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_name").unwrap(),
+                        "sandbox0-name",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_namespace").unwrap(),
+                        "sandbox0-ns",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_uid").unwrap(),
+                        "sandbox0-uid",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_labels.nested0\\.label0").unwrap(),
+                        "val0",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_labels.nested0\\.label1").unwrap(),
+                        "val1",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_labels.nested1\\.label0").unwrap(),
+                        "val2",
+                    );
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_labels.nested2\\.label0\\.deep0")
+                            .unwrap(),
+                        "val3",
+                    );
                     log
                 },
             ),
@@ -283,18 +326,18 @@ mod tests {
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
                 let mut log = LogEvent::default();
-                log.insert("kubernetes.container_name", "sandbox0-container0-name");
+                log.insert(LookupBuf::from_str("kubernetes.container_name").unwrap(), "sandbox0-container0-name");
                 log
             },
         ),(
             FieldsSpec{
-                container_name: "container_name".to_owned(),
+                container_name: LookupBuf::from("container_name"),
                 ..Default::default()
             },
             "/var/log/pods/sandbox0-ns_sandbox0-name_sandbox0-uid/sandbox0-container0-name/1.log",
             {
                 let mut log = LogEvent::default();
-                log.insert("container_name", "sandbox0-container0-name");
+                log.insert(LookupBuf::from_str("container_name").unwrap(), "sandbox0-container0-name");
                 log
             },
         )];
@@ -323,13 +366,16 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_node_name", "sandbox0-node-name");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_node_name").unwrap(),
+                        "sandbox0-node-name",
+                    );
                     log
                 },
             ),
             (
                 FieldsSpec {
-                    pod_node_name: "node_name".to_owned(),
+                    pod_node_name: LookupBuf::from("node_name"),
                     ..Default::default()
                 },
                 PodSpec {
@@ -338,7 +384,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("node_name", "sandbox0-node-name");
+                    log.insert(
+                        LookupBuf::from_str("node_name").unwrap(),
+                        "sandbox0-node-name",
+                    );
                     log
                 },
             ),
@@ -367,7 +416,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_ip").unwrap(),
+                        "192.168.1.2",
+                    );
                     log
                 },
             ),
@@ -383,14 +435,14 @@ mod tests {
                     let mut log = LogEvent::default();
                     let mut ips_vec = Vec::new();
                     ips_vec.push("192.168.1.2");
-                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log.insert(LookupBuf::from_str("kubernetes.pod_ips").unwrap(), ips_vec);
                     log
                 },
             ),
             (
                 FieldsSpec {
-                    pod_ip: "kubernetes.custom_pod_ip".to_owned(),
-                    pod_ips: "kubernetes.custom_pod_ips".to_owned(),
+                    pod_ip: LookupBuf::from_str("kubernetes.custom_pod_ip").unwrap(),
+                    pod_ips: LookupBuf::from_str("kubernetes.custom_pod_ips").unwrap(),
                     ..FieldsSpec::default()
                 },
                 PodStatus {
@@ -407,17 +459,23 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.custom_pod_ip", "192.168.1.2");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.custom_pod_ip").unwrap(),
+                        "192.168.1.2",
+                    );
                     let mut ips_vec = Vec::new();
                     ips_vec.push("192.168.1.2");
                     ips_vec.push("192.168.1.3");
-                    log.insert("kubernetes.custom_pod_ips", ips_vec);
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.custom_pod_ips").unwrap(),
+                        ips_vec,
+                    );
                     log
                 },
             ),
             (
                 FieldsSpec {
-                    pod_node_name: "node_name".to_owned(),
+                    pod_node_name: LookupBuf::from("node_name"),
                     ..FieldsSpec::default()
                 },
                 PodStatus {
@@ -434,11 +492,14 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.pod_ip", "192.168.1.2");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.pod_ip").unwrap(),
+                        "192.168.1.2",
+                    );
                     let mut ips_vec = Vec::new();
                     ips_vec.push("192.168.1.2");
                     ips_vec.push("192.168.1.3");
-                    log.insert("kubernetes.pod_ips", ips_vec);
+                    log.insert(LookupBuf::from_str("kubernetes.pod_ips").unwrap(), ips_vec);
                     log
                 },
             ),
@@ -467,13 +528,16 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("kubernetes.container_image", "sandbox0-container-image");
+                    log.insert(
+                        LookupBuf::from_str("kubernetes.container_image").unwrap(),
+                        "sandbox0-container-image",
+                    );
                     log
                 },
             ),
             (
                 FieldsSpec {
-                    container_image: "container_image".to_owned(),
+                    container_image: LookupBuf::from("container_image").to_owned(),
                     ..Default::default()
                 },
                 Container {
@@ -482,7 +546,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert("container_image", "sandbox0-container-image");
+                    log.insert(
+                        LookupBuf::from("container_image"),
+                        "sandbox0-container-image",
+                    );
                     log
                 },
             ),

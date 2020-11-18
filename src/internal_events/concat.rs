@@ -1,6 +1,6 @@
 use super::InternalEvent;
+use crate::event::Lookup;
 use metrics::counter;
-use crate::event::{LookupBuf, LookupBuf};
 
 #[derive(Debug)]
 pub struct ConcatEventProcessed;
@@ -25,7 +25,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
         error!(
             message = "Substring error.",
             self.condition,
-            self.source,
+            %self.source,
             self.start,
             self.end,
             self.length,
@@ -40,14 +40,14 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
 
 #[derive(Debug)]
 pub struct ConcatSubstringSourceMissing<'a> {
-    pub source: &'a str,
+    pub source: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for ConcatSubstringSourceMissing<'a> {
     fn emit_logs(&self) {
         debug!(
             message = "Substring source missing.",
-            self.source,
+            %self.source,
             rate_limit_secs = 30
         );
     }

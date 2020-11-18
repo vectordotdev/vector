@@ -1,13 +1,13 @@
 use super::{default_host_key, logs::HumioLogsConfig, Encoding};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
+    event::LookupBuf,
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,
     transforms::metric_to_log::MetricToLogConfig,
-    event::LookupBuf,
 };
 use futures::{stream, SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};

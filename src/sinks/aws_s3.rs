@@ -418,6 +418,7 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LookupBuf;
 
     #[test]
     fn generate_config() {
@@ -444,7 +445,7 @@ mod tests {
     fn s3_encode_event_ndjson() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let batch_time_format = Template::try_from("date=%F").unwrap();
         let bytes = encode_event(event, &batch_time_format, &Encoding::Ndjson.into()).unwrap();
@@ -460,7 +461,7 @@ mod tests {
     fn s3_encode_event_with_removed_key() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let key_prefix = Template::try_from("{{ key }}").unwrap();
 
@@ -536,6 +537,7 @@ mod integration_tests {
     use crate::{
         assert_downcast_matches,
         test_util::{random_lines_with_stream, random_string},
+        event::{LookupBuf},
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;
@@ -595,7 +597,8 @@ mod integration_tests {
             } else {
                 3
             };
-            e.as_mut_log().insert("i", format!("{}", i));
+            e.as_mut_log()
+                .insert(LookupBuf::from("i"), format!("{}", i));
             e
         });
         sink.run(stream::iter(events)).await.unwrap();

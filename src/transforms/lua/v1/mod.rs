@@ -1,6 +1,6 @@
 use crate::{
     config::DataType,
-    event::{Event, Lookup, Value},
+    event::{Event, LookupBuf, Value},
     internal_events::{LuaEventProcessed, LuaGcTriggered, LuaScriptError},
     transforms::{FunctionTransform, Transform},
 };
@@ -157,40 +157,40 @@ impl rlua::UserData for LuaEvent {
         methods.add_meta_method_mut(
             rlua::MetaMethod::NewIndex,
             |_ctx, this, (key, value): (String, Option<rlua::Value<'lua>>)| {
-                let key = Lookup::from(key.as_str());
+                let key = LookupBuf::from(key);
                 match value {
                     Some(rlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
-                            key,
+                            key.clone(),
                             Value::from(string.to_str().expect("Expected UTF-8.").to_owned()),
                         );
                     }
                     Some(rlua::Value::Integer(integer)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key, Value::Integer(integer));
+                            .insert(key.clone(), Value::Integer(integer));
                     }
                     Some(rlua::Value::Number(number)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key, Value::Float(number));
+                            .insert(key.clone(), Value::Float(number));
                     }
                     Some(rlua::Value::Boolean(boolean)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key, Value::Boolean(boolean));
+                            .insert(key.clone(), Value::Boolean(boolean));
                     }
                     Some(rlua::Value::Nil) | None => {
-                        this.inner.as_mut_log().remove(key, false);
+                        this.inner.as_mut_log().remove(&key, false);
                     }
                     _ => {
                         info!(
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
-                            field = key.as_str(),
+                            field = %key,
                             rate_limit_secs = 30
                         );
-                        this.inner.as_mut_log().remove(key, false);
+                        this.inner.as_mut_log().remove(&key, false);
                     }
                 }
 
@@ -199,8 +199,8 @@ impl rlua::UserData for LuaEvent {
         );
 
         methods.add_meta_method(rlua::MetaMethod::Index, |ctx, this, key: String| {
-            let key = Lookup::from(key);
-            if let Some(value) = this.inner.as_log().get(key) {
+            let key = LookupBuf::from(key);
+            if let Some(value) = this.inner.as_log().get(&key) {
                 let string = ctx.create_string(&value.as_bytes())?;
                 Ok(Some(string))
             } else {
@@ -223,7 +223,7 @@ impl rlua::UserData for LuaEvent {
                     let key: Option<String> = next.call((keys, prev))?;
                     match key
                         .clone()
-                        .and_then(|k| event.inner.as_log().get(Lookup::from(k)))
+                        .and_then(|k| event.inner.as_log().get(&LookupBuf::from(k)))
                     {
                         Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes())?))),
                         None => Ok((None, None)),

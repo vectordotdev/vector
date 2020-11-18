@@ -1,14 +1,14 @@
 use crate::event::{
     lookup::{Segment, SegmentBuf},
-    util, Lookup, LookupBuf, Value,
+    Lookup, LookupBuf, Value,
 };
 use serde::{Serialize, Serializer};
 use std::{
+    borrow::Borrow,
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
     iter::FromIterator,
-    borrow::Borrow,
 };
 
 #[derive(PartialEq, Debug, Clone, Default)]
@@ -123,27 +123,27 @@ impl LogEvent {
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn insert(
+    pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
+        unimplemented!()
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn remove<'a>(
         &mut self,
-        lookup: LookupBuf,
-        value: impl Into<Value> + Debug,
+        lookup: impl Borrow<Lookup<'a>> + Debug,
+        prune: bool,
     ) -> Option<Value> {
+        unimplemented!()
+    }
+
+    #[instrument(level = "trace", skip(self))]
+    pub fn keys<'a>(&'a self) -> impl Iterator<Item = Lookup<'a>> + 'a {
         unimplemented!();
     }
 
     #[instrument(level = "trace", skip(self))]
-    pub fn remove<'a>(&mut self, lookup: impl Borrow<Lookup<'a>> + Debug, prune: bool) -> Option<Value> {
+    pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> + Serialize {
         unimplemented!();
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = String> + 'a {
-        util::log::keys(&self.fields)
-    }
-
-    #[instrument(level = "trace", skip(self))]
-    pub fn all_fields(&self) -> impl Iterator<Item = (Lookup, &Value)> + Serialize {
-        util::log::all_fields(&self.fields)
     }
 
     #[instrument(level = "trace", skip(self))]

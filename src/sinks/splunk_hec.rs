@@ -307,8 +307,10 @@ mod tests {
     #[test]
     fn splunk_encode_event_json() {
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert("key", "value");
-        event.as_mut_log().insert("magic", "vector");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("magic"), "vector");
 
         let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
@@ -360,7 +362,7 @@ mod tests {
     #[test]
     fn splunk_encode_event_text() {
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let (config, _cx) = load_sink::<HecSinkConfig>(
             r#"
@@ -491,7 +493,7 @@ mod integration_tests {
         let cx = SinkContext::new_test();
 
         let mut config = config(Encoding::Text, vec![]).await;
-        config.index = Some("custom_index".to_string());
+        config.index = Some(LookupBuf::from("custom_index"));
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
@@ -543,7 +545,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
+        event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
@@ -563,8 +565,10 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
-        event.as_mut_log().insert("host", "example.com:1234");
+        event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "example.com:1234");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
@@ -580,7 +584,7 @@ mod integration_tests {
     async fn splunk_sourcetype() {
         let cx = SinkContext::new_test();
 
-        let indexed_fields = vec!["asdf".to_string()];
+        let indexed_fields = vec![LookupBuf::from("asdf")];
         let mut config = config(Encoding::Json, indexed_fields).await;
         config.sourcetype = Template::try_from("_json".to_string()).ok();
 
@@ -588,7 +592,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
+        event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
@@ -606,16 +610,20 @@ mod integration_tests {
 
         let config = HecSinkConfig {
             host_key: "roast".into(),
-            ..config(Encoding::Json, vec!["asdf".to_string()]).await
+            ..config(Encoding::Json, vec![LookupBuf::from("asdf")]).await
         };
 
         let (sink, _) = config.build(cx).await.unwrap();
 
         let message = random_string(100);
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("asdf", "hello");
-        event.as_mut_log().insert("host", "example.com:1234");
-        event.as_mut_log().insert("roast", "beef.example.com:1234");
+        event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "example.com:1234");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("roast"), "beef.example.com:1234");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;

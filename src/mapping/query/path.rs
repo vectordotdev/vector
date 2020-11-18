@@ -93,7 +93,7 @@ impl Function for Path {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Value, LookupBuf};
+    use crate::event::{LookupBuf, Value};
     use serde_json::json;
 
     #[test]
@@ -107,7 +107,9 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
                     event
                 },
                 Ok(Value::from(json!("bar"))),
@@ -116,9 +118,10 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("foo\\.bar.baz").unwrap(), Value::Integer(20));
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("foo\\.bar.baz").unwrap(),
+                        Value::Integer(20),
+                    );
                     event
                 },
                 Ok(Value::Integer(20)),
@@ -127,7 +130,34 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from_str("foo bar.baz").unwrap(), Value::Integer(20));
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("foo bar.baz").unwrap(),
+                        Value::Integer(20),
+                    );
+                    event
+                },
+                Ok(Value::Integer(20)),
+                Path::from(vec![vec!["foo bar"], vec!["baz"]]),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("foo\\.bar[0].baz").unwrap(),
+                        Value::Integer(20),
+                    );
+                    event
+                },
+                Ok(Value::Integer(20)),
+                Path::from(vec![vec!["foo.bar[0]"], vec!["baz"]]),
+            ),
+            (
+                {
+                    let mut event = Event::from("");
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("foo bar.baz").unwrap(),
+                        Value::Integer(20),
+                    );
                     event
                 },
                 Ok(Value::Integer(20)),
@@ -138,25 +168,7 @@ mod tests {
                     let mut event = Event::from("");
                     event
                         .as_mut_log()
-                        .insert(LookupBuf::from_str("foo\\.bar[0].baz").unwrap(), Value::Integer(20));
-                    event
-                },
-                Ok(Value::Integer(20)),
-                Path::from(vec![vec!["foo.bar[0]"], vec!["baz"]]),
-            ),
-            (
-                {
-                    let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from_str("foo bar.baz").unwrap(), Value::Integer(20));
-                    event
-                },
-                Ok(Value::Integer(20)),
-                Path::from(vec![vec!["foo bar"], vec!["baz"]]),
-            ),
-            (
-                {
-                    let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
+                        .insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
                     event
                 },
                 Err("path .foo.bar not found in event".to_string()),
@@ -165,7 +177,9 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from_str("foo").unwrap(), Value::from("bar"));
                     event
                 },
                 Ok(Value::from(json!("bar"))),
@@ -174,7 +188,9 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from_str("foo.baz").unwrap(), Value::from("buz"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from_str("foo.baz").unwrap(), Value::from("buz"));
                     event
                 },
                 Ok(Value::from(json!("buz"))),

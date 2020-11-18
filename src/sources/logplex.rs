@@ -184,9 +184,10 @@ fn line_to_event(line: String) -> Event {
     };
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key().into_buf(), Bytes::from("logplex"));
+    event.as_mut_log().insert(
+        log_schema().source_type_key().into_buf(),
+        Bytes::from("logplex"),
+    );
 
     event
 }
@@ -197,7 +198,7 @@ mod tests {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        event::{Event, Value},
+        event::{Event, Value, Lookup},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -302,8 +303,8 @@ mod tests {
         );
         assert_eq!(log[&log_schema().host_key()], "host".into());
         assert_eq!(log[log_schema().source_type_key()], "logplex".into());
-        assert_eq!(log["appname"], "lumberjack-store".into());
-        assert_eq!(log["absent"], Value::Null);
+        assert_eq!(log[Lookup::from("appname")], "lumberjack-store".into());
+        assert_eq!(log[Lookup::from("absent")], Value::Null);
     }
 
     #[test]

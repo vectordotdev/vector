@@ -1,7 +1,7 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    http::{Auth, HttpClient},
     event::{Event, LookupBuf},
+    http::{Auth, HttpClient},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
@@ -120,8 +120,8 @@ const LINE_STR: &str = "line";
 const TIMESTAMP_STR: &str = "timestamp";
 const ENV_STR: &str = "env";
 const APP_STR: &str = "app";
-const FILE_STR: &str =  "file";
-const META_STR: &str =  "meta";
+const FILE_STR: &str = "file";
+const META_STR: &str = "meta";
 
 lazy_static::lazy_static! {
     static ref LINE_LOOKUP: LookupBuf = LookupBuf::from(LINE_STR);
@@ -325,16 +325,24 @@ mod tests {
         .unwrap();
 
         let mut event1 = Event::from("hello world");
-        event1.as_mut_log().insert("app", "notvector");
-        event1.as_mut_log().insert("magic", "vector");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("app"), "notvector");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("magic"), "vector");
 
         let mut event2 = Event::from("hello world");
-        event2.as_mut_log().insert("file", "log.txt");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("file"), "log.txt");
 
         let event3 = Event::from("hello world");
 
         let mut event4 = Event::from("hello world");
-        event4.as_mut_log().insert("env", "staging");
+        event4
+            .as_mut_log()
+            .insert(LookupBuf::from("env"), "staging");
 
         let event1_out = config.encode_event(event1).unwrap().into_parts().0;
         let event1_out = event1_out.as_object().unwrap();
@@ -391,7 +399,9 @@ mod tests {
         for (i, line) in lines.iter().enumerate() {
             let mut event = Event::from(line.as_str());
             let p = i % 2;
-            event.as_mut_log().insert("hostname", hosts[p]);
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from("hostname"), hosts[p]);
 
             partitions[p].push(line);
             events.push(event);

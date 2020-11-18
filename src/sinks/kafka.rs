@@ -1,7 +1,7 @@
 use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
@@ -364,8 +364,8 @@ mod tests {
     fn kafka_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
-        event.as_mut_log().insert("foo", "bar");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
+        event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
 
         let (key, bytes) = encode_event(
             event,
@@ -384,7 +384,7 @@ mod tests {
     #[test]
     fn kafka_encode_event_apply_rules() {
         let mut event = Event::from("hello");
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let (key, bytes) = encode_event(
             event,

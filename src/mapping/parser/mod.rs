@@ -1,7 +1,7 @@
 extern crate pest;
 
 use crate::{
-    event::{Value, LookupBuf},
+    event::{LookupBuf, Value},
     mapping::{
         query::{
             self,
@@ -445,7 +445,8 @@ fn if_statement_from_pairs(mut pairs: Pairs<Rule>) -> Result<Box<dyn Function>> 
 
 fn merge_function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     let (first, mut other) = split_inner_rules_from_pair(pair)?;
-    let to_path = target_path_from_pair(first).and_then(|v| LookupBuf::from_str(&v).map_err(|e| format!("{}", e)))?;
+    let to_path = target_path_from_pair(first)
+        .and_then(|v| LookupBuf::from_str(&v).map_err(|e| format!("{}", e)))?;
     let query2 = query_arithmetic_from_pair(other.next().ok_or(TOKEN_ERR)?)?;
     let deep = match other.next() {
         None => None,
@@ -470,20 +471,24 @@ fn function_from_pair(pair: Pair<Rule>) -> Result<Box<dyn Function>> {
     match pair.as_rule() {
         Rule::deletion => {
             let paths = paths_from_pair(pair).and_then(|pairs| {
-                pairs.into_iter()
+                pairs
+                    .into_iter()
                     .map(|v| LookupBuf::from_str(&v))
-                    .collect::<crate::Result<Vec<_>>>().map_err(|e| format!("{}", e))
+                    .collect::<crate::Result<Vec<_>>>()
+                    .map_err(|e| format!("{}", e))
             })?;
             Ok(Box::new(Deletion::new(paths)))
-        },
+        }
         Rule::only_fields => {
             let paths = paths_from_pair(pair).and_then(|pairs| {
-                pairs.into_iter()
+                pairs
+                    .into_iter()
                     .map(|v| LookupBuf::from_str(&v))
-                    .collect::<crate::Result<Vec<_>>>().map_err(|e| format!("{}", e))
+                    .collect::<crate::Result<Vec<_>>>()
+                    .map_err(|e| format!("{}", e))
             })?;
             Ok(Box::new(OnlyFields::new(paths)))
-        },
+        }
         Rule::merge => merge_function_from_pair(pair),
         Rule::log => log_function_from_pair(pair),
         _ => unexpected_parser_sytax!(pair),
@@ -839,7 +844,9 @@ mod tests {
             ),
             (
                 "del(.\"foo bar\")",
-                Mapping::new(vec![Box::new(Deletion::new(vec![LookupBuf::from("foo bar")]))]),
+                Mapping::new(vec![Box::new(Deletion::new(vec![LookupBuf::from(
+                    "foo bar",
+                )]))]),
             ),
             (
                 "del(.foo)\ndel(.bar.baz)",
@@ -893,7 +900,10 @@ mod tests {
             // function: only_fields
             (
                 "only_fields(.foo)",
-                Mapping::new(vec![Box::new(OnlyFields::new(vec![LookupBuf::from_str("foo").unwrap()]))]),
+                Mapping::new(vec![Box::new(OnlyFields::new(vec![LookupBuf::from_str(
+                    "foo",
+                )
+                .unwrap()]))]),
             ),
             (
                 "only_fields(.foo.bar, .baz)",

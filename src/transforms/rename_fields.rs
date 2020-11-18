@@ -79,11 +79,15 @@ impl FunctionTransform for RenameFields {
             match log.remove(old_key, self.drop_empty) {
                 Some(v) => {
                     if event.as_mut_log().insert(new_key.clone(), v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten { field: old_key.as_lookup() });
+                        emit!(RenameFieldsFieldOverwritten {
+                            field: old_key.as_lookup()
+                        });
                     }
                 }
                 None => {
-                    emit!(RenameFieldsFieldDoesNotExist { field: old_key.as_lookup() });
+                    emit!(RenameFieldsFieldDoesNotExist {
+                        field: old_key.as_lookup()
+                    });
                 }
             }
         }

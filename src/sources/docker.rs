@@ -112,11 +112,7 @@ impl SourceConfig for DockerConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let source = DockerSource::new(
-            self.clone(),
-            out,
-            shutdown.clone(),
-        )?;
+        let source = DockerSource::new(self.clone(), out, shutdown.clone())?;
 
         // Capture currently running containers, and do main future(run)
         let fut = async move {
@@ -810,7 +806,10 @@ impl ContainerLogInfo {
             let mut log_event = LogEvent::default();
 
             // Source type
-            log_event.insert(log_schema().source_type_key().into_buf(), Bytes::from("docker"));
+            log_event.insert(
+                log_schema().source_type_key().into_buf(),
+                Bytes::from("docker"),
+            );
 
             // The log message.
             log_event.insert(log_schema().message_key().into_buf(), bytes_message);
@@ -858,8 +857,10 @@ impl ContainerLogInfo {
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
-                    partial_event_merge_state
-                        .merge_in_next_event(log_event, &[log_schema().message_key()]);
+                    partial_event_merge_state.merge_in_next_event(
+                        log_event,
+                        &vec![log_schema().message_key().into_buf()],
+                    );
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -872,7 +873,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &[log_schema().message_key()]),
+                    .merge_in_final_event(log_event, &vec![log_schema().message_key().into_buf()]),
                 None => log_event,
             }
         } else {
@@ -995,6 +996,7 @@ mod integration_tests {
     use crate::{
         test_util::{collect_n, trace_init},
         Pipeline,
+        event::Lookup,
     };
     use bollard::{
         container::{
@@ -1256,8 +1258,8 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(format!("label.{}", label)).is_some());
-        assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert!(log.get(Lookup::from(format!("label.{}", label))).is_some());
+        assert_eq!(events[0].as_log()[&*super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
             "docker".into()
@@ -1359,8 +1361,8 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(format!("label.{}", label)).is_some());
-        assert_eq!(events[0].as_log()[&super::NAME], name.into());
+        assert!(log.get(Lookup::from_str(&*format!("label.{}", label)).unwrap()).is_some());
+        assert_eq!(events[0].as_log()[&*super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
             "docker".into()
@@ -1515,7 +1517,7 @@ mod integration_tests {
             .map(|event| {
                 event
                     .into_log()
-                    .remove(&*crate::config::log_schema().message_key())
+                    .remove(crate::config::log_schema().message_key(), false)
                     .unwrap()
                     .to_string_lossy()
             })

@@ -1,4 +1,4 @@
-use crate::event::{Event, Value, LookupBuf};
+use crate::event::{Event, LookupBuf, Value};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
@@ -318,7 +318,7 @@ mod tests {
         path::Path as QueryPath, Literal,
     };
     use super::*;
-    use crate::event::{Event, Value, Lookup};
+    use crate::event::{Event, Lookup, Value};
 
     #[test]
     fn check_mapping() {
@@ -331,7 +331,9 @@ mod tests {
                 },
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from("bar"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("foo"), Value::from("bar"));
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
@@ -349,9 +351,10 @@ mod tests {
                 },
                 {
                     let mut event = Event::from("foo body");
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("foo bar\\.baz.buz").unwrap(), Value::from("quack"));
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("foo bar\\.baz.buz").unwrap(),
+                        Value::from("quack"),
+                    );
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
@@ -365,7 +368,9 @@ mod tests {
                 {
                     let mut event = Event::from("foo body");
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
-                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from("bar"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("foo"), Value::from("bar"));
                     event
                 },
                 {
@@ -379,13 +384,17 @@ mod tests {
             (
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("bar"), Value::from("baz"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("bar"), Value::from("baz"));
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from("bar"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("foo"), Value::from("bar"));
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
@@ -401,40 +410,20 @@ mod tests {
             (
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("bar"), Value::from("baz"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("bar"), Value::from("baz"));
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("bar"), Value::from("baz"));
-                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from("bar is baz"));
-                    event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
-                },
-                Mapping::new(vec![Box::new(IfStatement::new(
-                    Box::new(Arithmetic::new(
-                        Box::new(QueryPath::from("bar")),
-                        Box::new(Literal::from(Value::from("baz"))),
-                        ArithmeticOperator::Equal,
-                    )),
-                    Box::new(Assignment::new(
-                        LookupBuf::from("foo"),
-                        Box::new(Literal::from(Value::from("bar is baz"))),
-                    )),
-                    Box::new(Deletion::new(vec![LookupBuf::from("bar")])),
-                ))]),
-                Ok(()),
-            ),
-            (
-                {
-                    let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("bar"), Value::from("buz"));
-                    event.as_mut_log().remove(Lookup::from("timestamp"), false);
+                        .as_mut_log()
+                        .insert(LookupBuf::from("bar"), Value::from("baz"));
                     event
-                },
-                {
-                    let mut event = Event::from("foo body");
+                        .as_mut_log()
+                        .insert(LookupBuf::from("foo"), Value::from("bar is baz"));
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
@@ -455,13 +444,45 @@ mod tests {
             (
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("bar"), Value::from("buz"));
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("bar"), Value::from("buz"));
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
-                    event.as_mut_log().insert(LookupBuf::from("bar"), Value::from("buz"));
+                    event.as_mut_log().remove(Lookup::from("timestamp"), false);
+                    event
+                },
+                Mapping::new(vec![Box::new(IfStatement::new(
+                    Box::new(Arithmetic::new(
+                        Box::new(QueryPath::from("bar")),
+                        Box::new(Literal::from(Value::from("baz"))),
+                        ArithmeticOperator::Equal,
+                    )),
+                    Box::new(Assignment::new(
+                        LookupBuf::from("foo"),
+                        Box::new(Literal::from(Value::from("bar is baz"))),
+                    )),
+                    Box::new(Deletion::new(vec![LookupBuf::from("bar")])),
+                ))]),
+                Ok(()),
+            ),
+            (
+                {
+                    let mut event = Event::from("foo body");
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("bar"), Value::from("buz"));
+                    event.as_mut_log().remove(Lookup::from("timestamp"), false);
+                    event
+                },
+                {
+                    let mut event = Event::from("foo body");
+                    event
+                        .as_mut_log()
+                        .insert(LookupBuf::from("bar"), Value::from("buz"));
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
@@ -478,36 +499,48 @@ mod tests {
             (
                 {
                     let mut event = Event::from("foo body");
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("bar.baz.buz").unwrap(),
+                        Value::from("first"),
+                    );
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("bar.baz.remove_this").unwrap(),
+                        Value::from("second"),
+                    );
                     event
                         .as_mut_log()
-                        .insert(LookupBuf::from_str("bar.baz.buz").unwrap(), Value::from("first"));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("bar.baz.remove_this").unwrap(), Value::from("second"));
-                    event.as_mut_log().insert(LookupBuf::from_str("bev").unwrap(), Value::from("third"));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("and.remove_this").unwrap(), Value::from("fourth"));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("nested.stuff.here").unwrap(), Value::from("fifth"));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("nested.and_here").unwrap(), Value::from("sixth"));
+                        .insert(LookupBuf::from_str("bev").unwrap(), Value::from("third"));
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("and.remove_this").unwrap(),
+                        Value::from("fourth"),
+                    );
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("nested.stuff.here").unwrap(),
+                        Value::from("fifth"),
+                    );
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("nested.and_here").unwrap(),
+                        Value::from("sixth"),
+                    );
                     event
                 },
                 {
                     let mut event = Event::from("foo body");
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("bar.baz.buz").unwrap(),
+                        Value::from("first"),
+                    );
                     event
                         .as_mut_log()
-                        .insert(LookupBuf::from_str("bar.baz.buz").unwrap(), Value::from("first"));
-                    event.as_mut_log().insert(LookupBuf::from_str("bev").unwrap(), Value::from("third"));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("nested.stuff.here").unwrap(), Value::from("fifth"));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from_str("nested.and_here").unwrap(), Value::from("sixth"));
+                        .insert(LookupBuf::from_str("bev").unwrap(), Value::from("third"));
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("nested.stuff.here").unwrap(),
+                        Value::from("fifth"),
+                    );
+                    event.as_mut_log().insert(
+                        LookupBuf::from_str("nested.and_here").unwrap(),
+                        Value::from("sixth"),
+                    );
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event.as_mut_log().remove(Lookup::from("message"), false);
                     event
@@ -534,19 +567,25 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::Boolean(true));
                     event
                         .as_mut_log()
-                        .insert(LookupBuf::from("bar"), serde_json::json!({ "key2": "val2" }));
+                        .insert(LookupBuf::from("foo"), Value::Boolean(true));
+                    event.as_mut_log().insert(
+                        LookupBuf::from("bar"),
+                        serde_json::json!({ "key2": "val2" }),
+                    );
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::Boolean(true));
                     event
                         .as_mut_log()
-                        .insert(LookupBuf::from("bar"), serde_json::json!({ "key2": "val2" }));
+                        .insert(LookupBuf::from("foo"), Value::Boolean(true));
+                    event.as_mut_log().insert(
+                        LookupBuf::from("bar"),
+                        serde_json::json!({ "key2": "val2" }),
+                    );
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event
                 },
@@ -563,24 +602,28 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from("foo"), serde_json::json!({ "key1": "val1" }));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from("bar"), serde_json::json!({ "key2": "val2" }));
+                    event.as_mut_log().insert(
+                        LookupBuf::from("foo"),
+                        serde_json::json!({ "key1": "val1" }),
+                    );
+                    event.as_mut_log().insert(
+                        LookupBuf::from("bar"),
+                        serde_json::json!({ "key2": "val2" }),
+                    );
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event.as_mut_log().remove(Lookup::from("message"), false);
                     event
                 },
                 {
                     let mut event = Event::from("");
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from("foo"), serde_json::json!({ "key1": "val1", "key2": "val2" }));
-                    event
-                        .as_mut_log()
-                        .insert(LookupBuf::from("bar"), serde_json::json!({ "key2": "val2" }));
+                    event.as_mut_log().insert(
+                        LookupBuf::from("foo"),
+                        serde_json::json!({ "key1": "val1", "key2": "val2" }),
+                    );
+                    event.as_mut_log().insert(
+                        LookupBuf::from("bar"),
+                        serde_json::json!({ "key2": "val2" }),
+                    );
                     event.as_mut_log().remove(Lookup::from("timestamp"), false);
                     event.as_mut_log().remove(Lookup::from("message"), false);
                     event

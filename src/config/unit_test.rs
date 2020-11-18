@@ -2,7 +2,7 @@ use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, Tes
 use crate::config::TransformConfig;
 use crate::{
     conditions::{Condition, ConditionConfig},
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     transforms::Transform,
 };
 use indexmap::IndexMap;
@@ -42,9 +42,10 @@ async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<S
             Ok(t) => tests.push(t),
             Err(errs) => {
                 let mut test_err = errs
-                  .iter()
-                  .map(|v| format!("{:?}", v))
-                  .collect::<Vec<String>>().join("\n");
+                    .iter()
+                    .map(|v| format!("{:?}", v))
+                    .collect::<Vec<String>>()
+                    .join("\n");
                 // Indent all line breaks
                 test_err = test_err.replace("\n", "\n  ");
                 test_err.insert_str(0, &format!("Failed to build test '{}':\n  ", test.name));
@@ -352,7 +353,8 @@ fn build_input(config: &Config, input: &TestInput) -> Result<(Vec<String>, Event
         _ => Err(format!(
             "unrecognized input type '{}', expected one of: 'raw', 'log' or 'metric'",
             input.type_str
-        ).into()),
+        )
+        .into()),
     }
 }
 
@@ -418,10 +420,13 @@ async fn build_unit_test(
     for (i, (input_target, _)) in inputs.iter().enumerate() {
         for target in input_target {
             if !transform_outputs.contains_key(target) {
-                errors.push(format!(
-                    "inputs[{}]: unable to locate target transform '{}'",
-                    i, target
-                ).into());
+                errors.push(
+                    format!(
+                        "inputs[{}]: unable to locate target transform '{}'",
+                        i, target
+                    )
+                    .into(),
+                );
             }
         }
     }
@@ -466,11 +471,14 @@ async fn build_unit_test(
                     );
                 }
                 Err(err) => {
-                    errors.push(format!(
-                        "failed to build transform '{}': {:#}",
-                        name,
-                        anyhow::anyhow!(err),
-                    ).into());
+                    errors.push(
+                        format!(
+                            "failed to build transform '{}': {:#}",
+                            name,
+                            anyhow::anyhow!(err),
+                        )
+                        .into(),
+                    );
                 }
             }
         }
@@ -549,9 +557,8 @@ async fn build_unit_test(
         .collect();
 
     if definition.outputs.is_empty() && definition.no_outputs_from.is_empty() {
-        errors.push(
-            "unit test must contain at least one of `outputs` or `no_outputs_from`.".into(),
-        );
+        errors
+            .push("unit test must contain at least one of `outputs` or `no_outputs_from`.".into());
     }
 
     if !errors.is_empty() {

@@ -77,7 +77,7 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     use super::*;
     use crate::{
-        event::Event,
+        event::{Event, LookupBuf},
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
     };
@@ -236,10 +236,10 @@ mod tests {
         assert_eq!(
             events,
             vec![log_event! {
-                "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                "message"=> record,
-                "request_id" => request_id,
-                "source_arn" => source_arn,
+                LookupBuf::from("timestamp") => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
+                LookupBuf::from("message") => record,
+                LookupBuf::from("request_id") => request_id,
+                LookupBuf::from("source_arn") => source_arn,
             },]
         );
 
@@ -297,10 +297,10 @@ mod tests {
         assert_eq!(
             events,
             vec![log_event! {
-                "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                "message"=> record,
-                "request_id" => request_id,
-                "source_arn" => source_arn,
+                LookupBuf::from("timestamp") => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
+                LookupBuf::from("message") => record,
+                LookupBuf::from("request_id") => request_id,
+                LookupBuf::from("source_arn") => source_arn,
             },]
         );
 

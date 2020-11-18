@@ -142,9 +142,11 @@ impl FunctionTransform for KeyValue {
             if let Some(target_field) = &self.target_field {
                 if log.contains(target_field) {
                     if self.overwrite_target {
-                        log.remove(target_field);
+                        log.remove(target_field, false);
                     } else {
-                        emit!(KeyValueTargetExists { target_field });
+                        emit!(KeyValueTargetExists {
+                            target_field: target_field.as_lookup()
+                        });
                         return output.push(event);
                     }
                 }
@@ -156,27 +158,31 @@ impl FunctionTransform for KeyValue {
                 if let Some(target_field) = self.target_field.to_owned() {
                     key = format!("{}.{}", target_field, key);
                 }
+                let key_lookup_buf = LookupBuf::from(key);
 
-                if let Some(conv) = self.conversions.get(&key) {
+                if let Some(conv) = self.conversions.get(&key_lookup_buf) {
                     match conv.convert(val.to_string().into()) {
                         Ok(value) => {
-                            log.insert(key, value);
+                            log.insert(key_lookup_buf, value);
                         }
                         Err(error) => {
-                            emit!(KeyValueParseFailed { key, error });
+                            emit!(KeyValueParseFailed {
+                                key: key_lookup_buf.as_lookup(),
+                                error
+                            });
                         }
                     }
                 } else {
-                    log.insert(key, val);
+                    log.insert(key_lookup_buf, val);
                 }
             }
 
             if self.drop_field {
-                log.remove(&self.field);
+                log.remove(&self.field, false);
             }
         } else {
             emit!(KeyValueFieldDoesNotExist {
-                field: self.field.to_string()
+                field: self.field.as_lookup()
             });
         };
 
@@ -189,7 +195,7 @@ mod tests {
     use super::KeyValueConfig;
     use crate::{
         config::TransformConfig,
-        event::{LogEvent, Value, LookupBuf},
+        event::{LogEvent, LookupBuf, Value},
         Event,
     };
 

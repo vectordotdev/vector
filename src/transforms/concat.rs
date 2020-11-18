@@ -1,7 +1,7 @@
 use super::BuildError;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     internal_events::{ConcatEventProcessed, ConcatSubstringError, ConcatSubstringSourceMissing},
     transforms::{FunctionTransform, Transform},
 };
@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct ConcatConfig {
-    pub target: String,
+    pub target: LookupBuf,
     pub joiner: Option<String>,
     pub items: Vec<String>,
 }
@@ -25,7 +25,7 @@ inventory::submit! {
 impl GenerateConfig for ConcatConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            target: String::new(),
+            target: LookupBuf::from("target"),
             joiner: None,
             items: Vec::new(),
         })
@@ -90,7 +90,7 @@ impl Substring {
         };
 
         let source = match cap.name("source") {
-            Some(source) => LookupBuf::from(String::from_utf8_lossy(source.as_bytes())),
+            Some(source) => LookupBuf::from(String::from_utf8_lossy(source.as_bytes()).to_string()),
             None => {
                 return Err(BuildError::InvalidSubstring {
                     name: "invalid format, use 'source[start..end]' or 'source'".into(),
@@ -195,7 +195,7 @@ impl FunctionTransform for Concat {
                 content_vec.push(b.slice(start..end));
             } else {
                 emit!(ConcatSubstringSourceMissing {
-                    source: substring.source.as_lookup()
+                    source: substring.source.as_lookup(),
                 });
             }
         }

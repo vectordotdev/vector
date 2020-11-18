@@ -1,8 +1,8 @@
-use crate::event::{LogEvent, Lookup, Value};
+use crate::event::{LogEvent, LookupBuf, Value};
 use bytes::BytesMut;
 
 /// Merges all fields specified at `fields` from `incoming` to `current`.
-pub fn merge_log_event<'a>(current: &mut LogEvent, mut incoming: LogEvent, fields: &[Lookup<'a>]) {
+pub fn merge_log_event<'a>(current: &mut LogEvent, mut incoming: LogEvent, fields: &[LookupBuf]) {
     for field in fields {
         let incoming_val = match incoming.remove(field, false) {
             None => continue,
@@ -10,7 +10,7 @@ pub fn merge_log_event<'a>(current: &mut LogEvent, mut incoming: LogEvent, field
         };
         match current.get_mut(field) {
             None => {
-                current.insert(field.into_buf(), incoming_val);
+                current.insert(field.clone(), incoming_val);
             }
             Some(current_val) => merge_value(current_val, incoming_val),
         }
@@ -66,10 +66,10 @@ mod test {
         // Only the ones listed will be merged from the `incoming` event
         // to the `current`.
         let fields_to_merge = vec![
-            Lookup::from("merge"),
-            Lookup::from("merge_a"),
-            Lookup::from("merge_b"),
-            Lookup::from("merge_c"),
+            LookupBuf::from("merge"),
+            LookupBuf::from("merge_a"),
+            LookupBuf::from("merge_b"),
+            LookupBuf::from("merge_c"),
         ];
 
         let current = {

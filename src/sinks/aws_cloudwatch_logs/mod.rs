@@ -668,7 +668,7 @@ impl From<RusotoError<DescribeLogStreamsError>> for CloudwatchError {
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, Value, LookupBuf},
+        event::{Event, LookupBuf, Value},
         rusoto::RegionOrEndpoint,
     };
     use std::collections::HashMap;
@@ -702,7 +702,9 @@ mod tests {
     fn partition_event() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("log_stream"), "stream");
 
         let stream = Template::try_from("{{log_stream}}").unwrap();
         let group = "group".try_into().unwrap();
@@ -724,7 +726,9 @@ mod tests {
     fn partition_event_with_prefix() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("log_stream"), "stream");
 
         let stream = Template::try_from("abcd-{{log_stream}}").unwrap();
         let group = "group".try_into().unwrap();
@@ -746,7 +750,9 @@ mod tests {
     fn partition_event_with_postfix() {
         let mut event = Event::from("hello world");
 
-        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("log_stream"), "stream");
 
         let stream = Template::try_from("{{log_stream}}-abcd").unwrap();
         let group = "group".try_into().unwrap();
@@ -793,7 +799,7 @@ mod tests {
     #[test]
     fn cloudwatch_encoded_event_retains_timestamp() {
         let mut event = Event::from("hello world").into_log();
-        event.insert("key", "value");
+        event.insert(LookupBuf::from("key"), "value");
         let encoded = encode_log(event.clone(), &Encoding::Json.into()).unwrap();
 
         let ts = if let Value::Timestamp(ts) = event[log_schema().timestamp_key()] {
@@ -831,7 +837,7 @@ mod tests {
                 let mut event = Event::new_empty_log();
                 event
                     .as_mut_log()
-                    .insert(log_schema().timestamp_key(), timestamp);
+                    .insert(log_schema().timestamp_key().into_buf(), timestamp);
                 encode_log(event.into_log(), &Encoding::Text.into()).unwrap()
             })
             .collect();
@@ -853,6 +859,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
+        event::LookupBuf,
         rusoto::RegionOrEndpoint,
         test_util::{random_lines, random_lines_with_stream, random_string, trace_init},
     };
@@ -941,9 +948,10 @@ mod integration_tests {
             if doit {
                 let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
-                event
-                    .as_mut_log()
-                    .insert(log_schema().timestamp_key(), Value::Timestamp(timestamp));
+                event.as_mut_log().insert(
+                    log_schema().timestamp_key().into_buf(),
+                    Value::Timestamp(timestamp),
+                );
             }
             doit = true;
 
@@ -1004,7 +1012,7 @@ mod integration_tests {
             let mut event = Event::from(line.clone());
             event
                 .as_mut_log()
-                .insert(log_schema().timestamp_key(), now + offset);
+                .insert(log_schema().timestamp_key().into_buf(), now + offset);
             events.push(event);
             line
         };
@@ -1167,7 +1175,7 @@ mod integration_tests {
             .map(|(i, e)| {
                 let mut event = Event::from(e);
                 let stream = format!("{}", (i % 2));
-                event.as_mut_log().insert("key", stream);
+                event.as_mut_log().insert(LookupBuf::from("key"), stream);
                 event
             })
             .collect::<Vec<_>>();

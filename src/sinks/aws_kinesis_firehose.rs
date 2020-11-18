@@ -259,6 +259,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Option
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LookupBuf;
     use std::collections::BTreeMap;
 
     #[test]
@@ -278,7 +279,7 @@ mod tests {
     fn firehose_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &Encoding::Json.into()).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_slice(&event.data[..]).unwrap();

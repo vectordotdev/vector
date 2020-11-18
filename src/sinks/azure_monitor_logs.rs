@@ -307,7 +307,7 @@ async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
+    use crate::event::{LogEvent, LookupBuf};
     use serde_json::value::RawValue;
     use std::iter::FromIterator;
 
@@ -316,12 +316,12 @@ mod tests {
         crate::test_util::test_generate_config::<AzureMonitorLogsConfig>();
     }
 
-    fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
+    fn insert_timestamp_kv(log: &mut LogEvent) -> (LookupBuf, String) {
         let now = chrono::Utc::now();
 
-        let timestamp_key = log_schema().timestamp_key().to_string();
+        let timestamp_key = log_schema().timestamp_key().into_buf();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(&timestamp_key, now);
+        log.insert(timestamp_key, now);
 
         (timestamp_key, timestamp_value)
     }
@@ -339,13 +339,17 @@ mod tests {
         .unwrap();
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
-        let mut log = LogEvent::from_iter([("message", "hello world")].iter().copied());
+        let mut log = LogEvent::from_iter(
+            [(LookupBuf::from("message"), "hello world")]
+                .iter()
+                .cloned(),
+        );
         let (timestamp_key, timestamp_value) = insert_timestamp_kv(&mut log);
 
         let event = Event::from(log);
         let json = sink.encode_event(event).unwrap();
         let expected_json = serde_json::json!({
-            timestamp_key: timestamp_value,
+            timestamp_key.to_string(): timestamp_value,
             "message": "hello world"
         });
         assert_eq!(json, expected_json);
@@ -366,10 +370,10 @@ mod tests {
 
         let sink = AzureMonitorLogsSink::new(&config).unwrap();
 
-        let mut log1 = LogEvent::from_iter([("message", "hello")].iter().copied());
+        let mut log1 = LogEvent::from_iter([(LookupBuf::from("message"), "hello")].iter().cloned());
         let (timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
 
-        let mut log2 = LogEvent::from_iter([("message", "world")].iter().copied());
+        let mut log2 = LogEvent::from_iter([(LookupBuf::from("message"), "world")].iter().cloned());
         let (timestamp_key2, timestamp_value2) = insert_timestamp_kv(&mut log2);
 
         let event1 = sink.encode_event(Event::from(log1)).unwrap();
@@ -390,11 +394,11 @@ mod tests {
         let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
         let expected_json = serde_json::json!([
             {
-                timestamp_key1: timestamp_value1,
+                timestamp_key1.to_string(): timestamp_value1,
                 "message": "hello"
             },
             {
-                timestamp_key2: timestamp_value2,
+                timestamp_key2.to_string(): timestamp_value2,
                 "message": "world"
             }
         ]);
@@ -415,7 +419,10 @@ mod tests {
 
         let time_generated_field = headers.get("time-generated-field").unwrap();
         let timestamp_key = log_schema().timestamp_key();
-        assert_eq!(time_generated_field.to_str().unwrap(), timestamp_key);
+        assert_eq!(
+            time_generated_field.to_str().unwrap(),
+            timestamp_key.to_string()
+        );
 
         let azure_resource_id = headers.get("x-ms-azureresourceid").unwrap();
         assert_eq!(

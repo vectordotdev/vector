@@ -256,6 +256,7 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 mod tests {
     use super::*;
     use std::collections::HashMap;
+    use crate::event::LookupBuf;
 
     #[test]
     fn generate_config() {
@@ -266,7 +267,7 @@ mod tests {
     fn pulsar_event_json() {
         let msg = "hello_world".to_owned();
         let mut evt = Event::from(msg.clone());
-        evt.as_mut_log().insert("key", "value");
+        evt.as_mut_log().insert(LookupBuf::from("key"), "value");
         let result = encode_event(evt, &EncodingConfig::from(Encoding::Json)).unwrap();
         let map: HashMap<String, String> = serde_json::from_slice(&result[..]).unwrap();
         assert_eq!(msg, map[&log_schema().message_key().to_string()]);
@@ -286,7 +287,7 @@ mod tests {
         let msg = "hello_world";
 
         let mut evt = Event::from(msg);
-        evt.as_mut_log().insert("key", "value");
+        evt.as_mut_log().insert(LookupBuf::from("key"), "value");
 
         let event = encode_event(
             evt,

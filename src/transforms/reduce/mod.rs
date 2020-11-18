@@ -32,10 +32,10 @@ pub struct ReduceConfig {
     /// An ordered list of fields to distinguish reduces by. Each
     /// reduce has a separate event merging state.
     #[serde(default)]
-    pub group_by: Vec<String>,
+    pub group_by: Vec<LookupBuf>,
 
     #[serde(default)]
-    pub merge_strategies: IndexMap<String, MergeStrategy>,
+    pub merge_strategies: IndexMap<LookupBuf, MergeStrategy>,
 
     /// An optional condition that determines when an event is the end of a
     /// reduce.
@@ -82,16 +82,17 @@ impl ReduceState {
             fields: e
                 .into_iter()
                 .filter_map(|(k, v)| {
-                    if let Some(strat) = strategies.get(&k) {
+                    let k_lookup = LookupBuf::from_str(&k).unwrap_or(LookupBuf::from(k));
+                    if let Some(strat) = strategies.get(&k_lookup) {
                         match get_value_merger(v, strat) {
-                            Ok(m) => Some((k, m)),
+                            Ok(m) => Some((k_lookup, m)),
                             Err(error) => {
                                 warn!(message = "Failed to create merger.", field = ?k, %error);
                                 None
                             }
                         }
                     } else {
-                        Some((k, v.into()))
+                        Some((k_lookup, v.into()))
                     }
                 })
                 .collect(),
@@ -100,8 +101,9 @@ impl ReduceState {
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<LookupBuf, MergeStrategy>) {
         for (k, v) in e.into_iter() {
-            let strategy = strategies.get(&k);
-            match self.fields.entry(k) {
+            let k_lookup = LookupBuf::from_str(&k).unwrap_or(LookupBuf::from(k));
+            let strategy = strategies.get(&k_lookup);
+            match self.fields.entry(k_lookup) {
                 hash_map::Entry::Vacant(entry) => {
                     if let Some(strat) = strategy {
                         match get_value_merger(v, strat) {
@@ -215,7 +217,7 @@ impl Reduce {
             .unwrap_or(false);
 
         let event = event.into_log();
-        let discriminant = Discriminant::from_log_event(&event, self.group_by.as_ref().as_slice());
+        let discriminant = Discriminant::from_log_event(&event, &self.group_by);
 
         if starts_here {
             if let Some(state) = self.reduce_merge_states.remove(&discriminant) {

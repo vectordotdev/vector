@@ -5,7 +5,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, Value, LookupBuf, SegmentBuf},
+    event::{Event, LookupBuf, SegmentBuf, Value},
     internal_events::{SyslogEventReceived, SyslogUdpReadError, SyslogUdpUtf8Error},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -346,12 +346,15 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
     let mut event = Event::from(&parsed.msg[..]);
 
     // Add source type
-    event
-        .as_mut_log()
-        .insert(log_schema().source_type_key().into_buf(), Bytes::from("syslog"));
+    event.as_mut_log().insert(
+        log_schema().source_type_key().into_buf(),
+        Bytes::from("syslog"),
+    );
 
     if let Some(default_host) = default_host.clone() {
-        event.as_mut_log().insert(SOURCE_IP_LOOKUP.clone(), default_host);
+        event
+            .as_mut_log()
+            .insert(SOURCE_IP_LOOKUP.clone(), default_host);
     }
 
     let parsed_hostname = parsed.hostname.map(|x| Bytes::from(x.to_owned()));
@@ -423,7 +426,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::Event};
+    use crate::{config::log_schema, event::{Event, Lookup}};
     use chrono::prelude::*;
 
     #[test]
@@ -485,10 +488,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                log_schema().timestamp_key().into_buf(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(log_schema().source_type_key(), "syslog");
+            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
             expected.insert(LookupBuf::from("host"), "74794bfb6795");
             expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
 
@@ -506,7 +509,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, &raw).unwrap(),
+            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
             expected
         );
     }
@@ -544,7 +547,7 @@ mod test {
             r#"[incorrect x=]"#, msg
         );
 
-        let event = event_from_str(&"host".to_string(), None, &raw);
+        let event = event_from_str(LookupBuf::from("host"), None, &raw);
         assert_eq!(event, Some(expected));
     }
 
@@ -554,7 +557,7 @@ mod test {
             event
                 .as_log()
                 .all_fields()
-                .find(|(key, _)| (&key[..]).starts_with("empty"))
+                .find(|(key, _)| (&key[..]).starts_with([Segment::field(String::from("empty"))].as_ref()))
                 == None
         }
 
@@ -563,7 +566,7 @@ mod test {
             r#"[empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -571,7 +574,7 @@ mod test {
             r#"[non_empty x="1"][empty]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -579,7 +582,7 @@ mod test {
             r#"[empty][non_empty x="1"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
         assert!(there_is_map_called_empty(event));
 
         let msg = format!(
@@ -587,7 +590,7 @@ mod test {
             r#"[empty not_really="testing the test"]"#
         );
 
-        let event = event_from_str(&"host".to_string(), None, &msg).unwrap();
+        let event = event_from_str(LookupBuf::from("host"), None, &msg).unwrap();
         assert!(!there_is_map_called_empty(event));
     }
 
@@ -600,8 +603,8 @@ mod test {
         let cleaned = r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar"#;
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, raw).unwrap(),
-            event_from_str(&"host".to_string(), None, cleaned).unwrap()
+            event_from_str(LookupBuf::from("host"), None, raw).unwrap(),
+            event_from_str(LookupBuf::from("host"), None, cleaned).unwrap()
         );
     }
 
@@ -658,7 +661,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, &raw).unwrap(),
+            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
             expected
         );
     }
@@ -675,7 +678,7 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key(),
+                log_schema().timestamp_key().into_buf(),
                 chrono::Utc
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),
@@ -693,7 +696,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, &raw).unwrap(),
+            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
             expected
         );
     }

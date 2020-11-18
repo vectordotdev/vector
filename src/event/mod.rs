@@ -479,7 +479,9 @@ mod test {
         event.as_mut_log().insert(LookupBuf::from("int"), 4);
         event.as_mut_log().insert(LookupBuf::from("float"), 5.5);
         event.as_mut_log().insert(LookupBuf::from("bool"), true);
-        event.as_mut_log().insert(LookupBuf::from("string"), "thisisastring");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("string"), "thisisastring");
 
         let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
         assert_eq!(map["float"], json!(5.5));
@@ -492,12 +494,14 @@ mod test {
     fn event_iteration() {
         let mut event = Event::new_empty_log();
 
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("Ke$ha"), "It's going down, I'm yelling timber");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from("Pitbull"), "The bigger they are, the harder they fall");
+        event.as_mut_log().insert(
+            LookupBuf::from("Ke$ha"),
+            "It's going down, I'm yelling timber",
+        );
+        event.as_mut_log().insert(
+            LookupBuf::from("Pitbull"),
+            "The bigger they are, the harder they fall",
+        );
 
         let all = event
             .as_log()
@@ -508,11 +512,11 @@ mod test {
             all,
             vec![
                 (
-                    LookupBuf::from("Ke$ha"),
+                    Lookup::from("Ke$ha"),
                     "It's going down, I'm yelling timber".to_string()
                 ),
                 (
-                    LookupBuf::from("Pitbull"),
+                    Lookup::from("Pitbull"),
                     "The bigger they are, the harder they fall".to_string()
                 ),
             ]
@@ -533,9 +537,9 @@ mod test {
         assert_eq!(
             collected,
             vec![
-                (LookupBuf::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
-                (LookupBuf::from("lZDfzKIL"), &Value::from("tOVrjveM")),
-                (LookupBuf::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
+                (Lookup::from("YRjhxXcg"), &Value::from("nw8iM5Jr")),
+                (Lookup::from("lZDfzKIL"), &Value::from("tOVrjveM")),
+                (Lookup::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
             ]
         );
     }

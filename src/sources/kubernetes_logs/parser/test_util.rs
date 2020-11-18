@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use crate::{
-    event::{Event, LogEvent},
+    event::{Event, LogEvent, LookupBuf},
     transforms::Transform,
 };
 use chrono::{DateTime, Utc};
@@ -13,17 +13,17 @@ use chrono::{DateTime, Utc};
 pub fn make_log_event(message: &str, timestamp: &str, stream: &str, is_partial: bool) -> LogEvent {
     let mut log = LogEvent::default();
 
-    log.insert("message", message);
+    log.insert(LookupBuf::from("message"), message);
 
     let timestamp = DateTime::parse_from_rfc3339(timestamp)
         .expect("invalid test case")
         .with_timezone(&Utc);
-    log.insert("timestamp", timestamp);
+    log.insert(LookupBuf::from("timestamp"), timestamp);
 
-    log.insert("stream", stream);
+    log.insert(LookupBuf::from("stream"), stream);
 
     if is_partial {
-        log.insert("_partial", true);
+        log.insert(LookupBuf::from("_partial"), true);
     }
     log
 }

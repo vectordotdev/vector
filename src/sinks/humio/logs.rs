@@ -1,13 +1,13 @@
 use super::{default_host_key, Encoding};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
+    event::LookupBuf,
     sinks::splunk_hec::HecSinkConfig,
     sinks::util::{
         encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,
-    event::{LookupBuf},
 };
 use serde::{Deserialize, Serialize};
 
@@ -159,7 +159,7 @@ mod integration_tests {
         let host = "192.168.1.1".to_string();
         let mut event = Event::from(message.clone());
         let log = event.as_mut_log();
-        log.insert(log_schema().host_key(), host.clone());
+        log.insert(log_schema().host_key().into_buf(), host.clone());
 
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
@@ -228,7 +228,7 @@ mod integration_tests {
             // https://docs.humio.com/ingesting-data/parsers/built-in-parsers/#json
             event
                 .as_mut_log()
-                .insert("@timestamp", Utc::now().to_rfc3339());
+                .insert(LookupBuf::from("@timestamp"), Utc::now().to_rfc3339());
 
             sink.run(stream::once(future::ready(event))).await.unwrap();
 
@@ -272,7 +272,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
-            host_key: log_schema().host_key().to_string(),
+            host_key: log_schema().host_key().into_buf(),
             ..Default::default()
         }
     }

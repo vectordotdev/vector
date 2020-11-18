@@ -1,6 +1,6 @@
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     internal_events::{KafkaEventFailed, KafkaEventReceived, KafkaOffsetUpdateFailed},
     kafka::KafkaAuthConfig,
     shutdown::ShutdownSignal,
@@ -148,7 +148,10 @@ fn kafka_source(
                             log.insert(log_schema().timestamp_key().into_buf(), timestamp);
 
                             // Add source type
-                            log.insert(log_schema().source_type_key().into_buf(), Bytes::from("kafka"));
+                            log.insert(
+                                log_schema().source_type_key().into_buf(),
+                                Bytes::from("kafka"),
+                            );
 
                             if let Some(key_field) = key_field {
                                 match msg.key() {
@@ -230,7 +233,7 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
-    use crate::{shutdown::ShutdownSignal, Pipeline};
+    use crate::{shutdown::ShutdownSignal, Pipeline, event::LookupBuf};
 
     #[test]
     fn generate_config() {
@@ -245,7 +248,7 @@ mod test {
             auto_offset_reset: "earliest".to_string(),
             session_timeout_ms: 10000,
             commit_interval_ms: 5000,
-            key_field: Some("message_key".to_string()),
+            key_field: Some(LookupBuf::from("message_key")),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -320,7 +323,7 @@ mod integration_test {
             auto_offset_reset: "beginning".into(),
             session_timeout_ms: 6000,
             commit_interval_ms: 5000,
-            key_field: Some("message_key".to_string()),
+            key_field: Some(LookupBuf::from("message_key")),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -348,7 +351,7 @@ mod integration_test {
             events[0].as_log()[log_schema().message_key()],
             "my message".into()
         );
-        assert_eq!(events[0].as_log()["message_key"], "my key".into());
+        assert_eq!(events[0].as_log()[Lookup::from("message_key")], "my key".into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()

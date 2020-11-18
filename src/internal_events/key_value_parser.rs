@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::event::Lookup;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -14,12 +15,12 @@ impl InternalEvent for KeyValueEventProcessed {
 }
 
 #[derive(Debug)]
-pub(crate) struct KeyValueParseFailed {
-    pub key: String,
+pub(crate) struct KeyValueParseFailed<'a> {
+    pub key: Lookup<'a>,
     pub error: crate::types::Error,
 }
 
-impl InternalEvent for KeyValueParseFailed {
+impl<'a> InternalEvent for KeyValueParseFailed<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Event failed to parse as key/value.",
@@ -40,7 +41,7 @@ impl InternalEvent for KeyValueParseFailed {
 
 #[derive(Debug)]
 pub(crate) struct KeyValueTargetExists<'a> {
-    pub target_field: &'a String,
+    pub target_field: Lookup<'a>,
 }
 
 impl<'a> InternalEvent for KeyValueTargetExists<'a> {
@@ -62,11 +63,11 @@ impl<'a> InternalEvent for KeyValueTargetExists<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) struct KeyValueFieldDoesNotExist {
-    pub field: String,
+pub(crate) struct KeyValueFieldDoesNotExist<'a> {
+    pub field: Lookup<'a>,
 }
 
-impl InternalEvent for KeyValueFieldDoesNotExist {
+impl<'a> InternalEvent for KeyValueFieldDoesNotExist<'a> {
     fn emit_logs(&self) {
         warn!(
             message = "Field specified does not exist.",

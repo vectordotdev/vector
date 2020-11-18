@@ -240,7 +240,7 @@ impl Value {
 mod tests {
     use super::*;
     use crate::{
-        event::Event,
+        event::{Event, LookupBuf},
         sinks::influxdb::test_util::{assert_fields, split_line_protocol, ts},
         sinks::util::{
             http::HttpSink,
@@ -272,8 +272,12 @@ mod tests {
     #[test]
     fn test_encode_event_apply_rules() {
         let mut event = Event::from("hello");
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("timestamp", ts());
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "aws.cloud.eur");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("timestamp"), ts());
 
         let mut sink = create_sink(
             "http://localhost:9999",
@@ -297,14 +301,22 @@ mod tests {
     #[test]
     fn test_encode_event_v1() {
         let mut event = Event::from("hello");
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "aws.cloud.eur");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("source_type"), "file");
 
-        event.as_mut_log().insert("int", 4i32);
-        event.as_mut_log().insert("float", 5.5);
-        event.as_mut_log().insert("bool", true);
-        event.as_mut_log().insert("string", "thisisastring");
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(LookupBuf::from("int"), 4i32);
+        event.as_mut_log().insert(LookupBuf::from("float"), 5.5);
+        event.as_mut_log().insert(LookupBuf::from("bool"), true);
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("string"), "thisisastring");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -341,14 +353,22 @@ mod tests {
     #[test]
     fn test_encode_event() {
         let mut event = Event::from("hello");
-        event.as_mut_log().insert("host", "aws.cloud.eur");
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "aws.cloud.eur");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("source_type"), "file");
 
-        event.as_mut_log().insert("int", 4i32);
-        event.as_mut_log().insert("float", 5.5);
-        event.as_mut_log().insert("bool", true);
-        event.as_mut_log().insert("string", "thisisastring");
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(LookupBuf::from("int"), 4i32);
+        event.as_mut_log().insert(LookupBuf::from("float"), 5.5);
+        event.as_mut_log().insert(LookupBuf::from("bool"), true);
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("string"), "thisisastring");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -386,8 +406,8 @@ mod tests {
     fn test_encode_event_without_tags() {
         let mut event = Event::from("hello");
 
-        event.as_mut_log().insert("value", 100);
-        event.as_mut_log().insert("timestamp", ts());
+        event.as_mut_log().insert(LookupBuf::from("value"), 100);
+        event.as_mut_log().insert(LookupBuf::from("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -415,16 +435,22 @@ mod tests {
     fn test_encode_nested_fields() {
         let mut event = Event::new_empty_log();
 
-        event.as_mut_log().insert("a", 1);
-        event.as_mut_log().insert("nested.field", "2");
-        event.as_mut_log().insert("nested.bool", true);
+        event.as_mut_log().insert(LookupBuf::from_str("a").unwrap(), 1);
         event
             .as_mut_log()
-            .insert("nested.array[0]", "example-value");
+            .insert(LookupBuf::from_str("nested.field").unwrap(), "2");
         event
             .as_mut_log()
-            .insert("nested.array[2]", "another-value");
-        event.as_mut_log().insert("nested.array[3]", 15);
+            .insert(LookupBuf::from_str("nested.bool").unwrap(), true);
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("nested.array[0]").unwrap(), "example-value");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("nested.array[2]").unwrap(), "another-value");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("nested.array[3]").unwrap(), 15);
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -458,10 +484,16 @@ mod tests {
     #[test]
     fn test_add_tag() {
         let mut event = Event::from("hello");
-        event.as_mut_log().insert("source_type", "file");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("source_type").unwrap(), "file");
 
-        event.as_mut_log().insert("as_a_tag", 10);
-        event.as_mut_log().insert("timestamp", ts());
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("as_a_tag").unwrap(), 10);
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("timestamp").unwrap(), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -519,13 +551,18 @@ mod tests {
         // Create 5 events with custom field
         for (i, line) in lines.iter().enumerate() {
             let mut event = Event::from(line.to_string());
-            event
-                .as_mut_log()
-                .insert(format!("key{}", i), format!("value{}", i));
+            event.as_mut_log().insert(
+                LookupBuf::from_str(&format!("key{}", i)).unwrap(),
+                format!("value{}", i),
+            );
 
             let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
-            event.as_mut_log().insert("timestamp", timestamp);
-            event.as_mut_log().insert("source_type", "file");
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from_str("timestamp").unwrap(), timestamp);
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from_str("source_type").unwrap(), "file");
 
             events.push(event);
         }
@@ -584,11 +621,15 @@ mod tests {
             let mut event = Event::from(line.to_string());
             event
                 .as_mut_log()
-                .insert(format!("key{}", i), format!("value{}", i));
+                .insert(LookupBuf::from(format!("key{}", i)), format!("value{}", i));
 
             let timestamp = Utc.ymd(1970, 1, 1).and_hms_nano(0, 0, (i as u32) + 1, 0);
-            event.as_mut_log().insert("timestamp", timestamp);
-            event.as_mut_log().insert("source_type", "file");
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from("timestamp"), timestamp);
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from("source_type"), "file");
 
             events.push(event);
         }
@@ -660,6 +701,7 @@ mod integration_tests {
             test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDB2Settings,
         },
+        event::LookupBuf,
     };
     use chrono::Utc;
     use futures::stream;
@@ -693,12 +735,20 @@ mod integration_tests {
         let mut events = Vec::new();
 
         let mut event1 = Event::from("message_1");
-        event1.as_mut_log().insert("host", "aws.cloud.eur");
-        event1.as_mut_log().insert("source_type", "file");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "aws.cloud.eur");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("source_type"), "file");
 
         let mut event2 = Event::from("message_2");
-        event2.as_mut_log().insert("host", "aws.cloud.eur");
-        event2.as_mut_log().insert("source_type", "file");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "aws.cloud.eur");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("source_type"), "file");
 
         events.push(event1);
         events.push(event2);

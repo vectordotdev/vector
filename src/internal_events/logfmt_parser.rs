@@ -1,4 +1,5 @@
 use super::InternalEvent;
+use crate::event::Lookup;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -16,7 +17,7 @@ impl InternalEvent for LogfmtParserEventProcessed {
 
 #[derive(Debug)]
 pub struct LogfmtParserMissingField<'a> {
-    pub field: &'a str,
+    pub field: Lookup<'a>,
 }
 
 impl InternalEvent for LogfmtParserMissingField<'_> {
@@ -33,7 +34,7 @@ impl InternalEvent for LogfmtParserMissingField<'_> {
 
 #[derive(Debug)]
 pub struct LogfmtParserConversionFailed<'a> {
-    pub name: &'a str,
+    pub name: Lookup<'a>,
     pub error: crate::types::Error,
 }
 

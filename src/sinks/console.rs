@@ -157,7 +157,7 @@ impl StreamSink for WriterSink {
 mod test {
     use super::{encode_event, ConsoleSinkConfig, Encoding, EncodingConfig};
     use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
-    use crate::event::{Event, Value};
+    use crate::event::{Event, LookupBuf, Value};
     use chrono::{offset::TimeZone, Utc};
 
     #[test]
@@ -178,9 +178,9 @@ mod test {
     fn encodes_log_events() {
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
-        log.insert("x", Value::from("23"));
-        log.insert("z", Value::from(25));
-        log.insert("a", Value::from("0"));
+        log.insert(LookupBuf::from("x"), Value::from("23"));
+        log.insert(LookupBuf::from("z"), Value::from(25));
+        log.insert(LookupBuf::from("a"), Value::from("0"));
 
         let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
         let expected = r#"{"a":"0","x":"23","z":25}"#;
