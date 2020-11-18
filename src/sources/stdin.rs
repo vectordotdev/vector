@@ -110,7 +110,7 @@ where
                 create_event(Bytes::from(line), &host_key, &hostname)
             })
             .forward(&mut out)
-            .inspect(|_| info!("Finished sending"))
+            .inspect(|_| info!("Finished sending."))
             .await;
 
         let _ = out.flush().await; // error emitted by sink_map_err
