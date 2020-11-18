@@ -155,7 +155,7 @@ mod tests {
                 TypeDef {
                     fallible: false,
                     optional: false,
-                    kind: Kind::String,
+                    kind: Kind::Bytes,
                 },
                 Err("expected to resolve to string value, but instead resolves to an error, or any value".to_owned()),
             ),
@@ -165,7 +165,7 @@ mod tests {
                 TypeDef {
                     fallible: false,
                     optional: false,
-                    kind: Kind::String | Kind::Float,
+                    kind: Kind::Bytes | Kind::Float,
                 },
                 Err("expected to resolve to string or float values, but instead resolves to an error, or integer or boolean values".to_owned()),
             ),

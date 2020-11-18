@@ -23,6 +23,15 @@ trait ThousandsFormatter {
     fn thousands_format(&self) -> String;
 }
 
+impl ThousandsFormatter for u64 {
+    fn thousands_format(&self) -> String {
+        match self {
+            0 => "--".into(),
+            _ => self.to_formatted_string(&Locale::en),
+        }
+    }
+}
+
 impl ThousandsFormatter for i64 {
     fn thousands_format(&self) -> String {
         match self {
@@ -67,28 +76,48 @@ impl HumanFormatter for i64 {
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
-    human_metrics: bool,
+    opts: &'a super::Opts,
+    component_headers: [String; 8],
 }
 
 impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(url_string: &'a str, human_metrics: bool) -> Self {
+    pub fn new(url_string: &'a str, opts: &'a super::Opts) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
             Constraint::Length(3),
         ];
 
+        // Create component headers
+        let component_headers = [
+            "Name".to_string(),
+            "Kind".to_string(),
+            "Type".to_string(),
+            "Events".to_string(),
+            format!("I/O @ {}ms", opts.interval),
+            "Bytes".to_string(),
+            format!("I/O @ {}ms", opts.interval),
+            "Errors".to_string(),
+        ];
+
         Self {
             constraints,
             url_string,
-            human_metrics,
+            opts,
+            component_headers,
         }
     }
 
     /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
     fn title<B: Backend>(&'a self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![Spans::from(self.url_string)];
+        let text = vec![Spans::from(vec![
+            Span::from(self.url_string),
+            Span::styled(
+                format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
+                Style::default().fg(Color::Gray),
+            ),
+        ])];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
             "Vector",
@@ -108,16 +137,20 @@ impl<'a> Widgets<'a> {
             let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
 
             // Build metric stats
-            let formatted_metrics = if self.human_metrics {
+            let formatted_metrics = if self.opts.human_metrics {
                 [
                     r.events_processed_total.human_format(),
+                    r.events_processed_throughput.human_format(),
                     r.bytes_processed_total.human_format_bytes(),
+                    r.bytes_processed_throughput.human_format_bytes(),
                     r.errors.human_format(),
                 ]
             } else {
                 [
                     r.events_processed_total.thousands_format(),
+                    r.events_processed_throughput.thousands_format(),
                     r.bytes_processed_total.thousands_format(),
+                    r.bytes_processed_throughput.thousands_format(),
                     r.errors.thousands_format(),
                 ]
             };
@@ -126,18 +159,30 @@ impl<'a> Widgets<'a> {
             Row::StyledData(data.into_iter(), Style::default().fg(Color::White))
         });
 
-        let w = Table::new(state::COMPONENT_HEADERS.iter(), items)
+        let w = Table::new(self.component_headers.iter(), items)
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .header_gap(1)
             .column_spacing(2)
             .widths(&[
-                Constraint::Percentage(15),
-                Constraint::Percentage(15),
-                Constraint::Percentage(15),
-                Constraint::Percentage(15),
-                Constraint::Percentage(15),
-                Constraint::Percentage(15),
+                Constraint::Percentage(20),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
             ]);
+
+        f.render_widget(w, area);
+    }
+
+    /// Alerts the user to resize the window to view columns
+    fn components_resize_window<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+        let block = Block::default().borders(Borders::ALL).title("Components");
+        let w = Paragraph::new("Expand the window to > 80 chars to view metrics")
+            .block(block)
+            .wrap(Wrap { trim: true });
 
         f.render_widget(w, area);
     }
@@ -159,12 +204,20 @@ impl<'a> Widgets<'a> {
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
     fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
+        let size = f.size();
         let rects = Layout::default()
             .constraints(self.constraints.as_ref())
-            .split(f.size());
+            .split(size);
 
         self.title(f, rects[0]);
-        self.components_table(f, &state, rects[1]);
+
+        // Require a minimum of 80 chars of line width to display the table
+        if size.width >= 80 {
+            self.components_table(f, &state, rects[1]);
+        } else {
+            self.components_resize_window(f, rects[1]);
+        }
+
         self.quit_box(f, rects[2]);
     }
 }
@@ -178,9 +231,9 @@ pub fn is_tty() -> bool {
 /// stdout. We're using 'direct' drawing mode to control the full output of the dashboard,
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
-pub async fn init_dashboard(
-    url: &str,
-    human_metrics: bool,
+pub async fn init_dashboard<'a>(
+    url: &'a str,
+    opts: &'a super::Opts,
     mut state_rx: state::StateRx,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
@@ -202,7 +255,7 @@ pub async fn init_dashboard(
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    let widgets = Widgets::new(url, human_metrics);
+    let widgets = Widgets::new(url, opts);
 
     loop {
         tokio::select! {

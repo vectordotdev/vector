@@ -55,7 +55,7 @@ impl Expression for ToFloatFn {
             Integer(v) => Ok(Float(v as f64)),
             Boolean(v) => Ok(Float(if v { 1.0 } else { 0.0 })),
             Null => Ok(0.0.into()),
-            String(_) => Conversion::Float
+            Bytes(_) => Conversion::Float
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
@@ -195,13 +195,8 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToFloatFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::Float(10.0)),
-                ToFloatFn::new(Box::new(Path::from("foo")), Some(Value::Float(10.0))),
+                ToFloatFn::new(Literal::from(vec![0]).boxed(), Some(10.0.into())),
             ),
             (
                 map!["foo": "20.5"],

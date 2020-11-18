@@ -12,17 +12,17 @@ impl Function for Replace {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "with",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -73,10 +73,10 @@ impl ReplaceFn {
 
 impl Expression for ReplaceFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value_bytes = self.value.execute(state, object)?.try_string()?;
+        let value_bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&value_bytes);
 
-        let with_bytes = self.with.execute(state, object)?.try_string()?;
+        let with_bytes = self.with.execute(state, object)?.try_bytes()?;
         let with = String::from_utf8_lossy(&with_bytes);
 
         let count = match &self.count {
@@ -86,7 +86,7 @@ impl Expression for ReplaceFn {
 
         match &self.pattern {
             Argument::Expression(expr) => {
-                let bytes = expr.execute(state, object)?.try_string()?;
+                let bytes = expr.execute(state, object)?.try_bytes()?;
                 let pattern = String::from_utf8_lossy(&bytes);
                 let replaced = match count {
                     i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
@@ -114,7 +114,7 @@ impl Expression for ReplaceFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         use value::Kind;
 
-        let with_def = self.with.type_def(state).fallible_unless(Kind::String);
+        let with_def = self.with.type_def(state).fallible_unless(Kind::Bytes);
 
         let count_def = self
             .count
@@ -122,17 +122,17 @@ impl Expression for ReplaceFn {
             .map(|count| count.type_def(state).fallible_unless(Kind::Integer));
 
         let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::String)),
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
         };
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::String)
+            .fallible_unless(Kind::Bytes)
             .merge(with_def)
             .merge_optional(pattern_def)
             .merge_optional(count_def)
-            .with_constraint(Kind::String)
+            .with_constraint(Kind::Bytes)
     }
 }
 
@@ -150,7 +150,7 @@ mod test {
                 count: None,
             },
             def: TypeDef {
-                kind: value::Kind::String,
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -164,7 +164,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                kind: value::Kind::String,
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -177,7 +177,7 @@ mod test {
                 count: None,
             },
             def: TypeDef {
-                kind: value::Kind::String,
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -191,7 +191,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                kind: value::Kind::String,
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -205,7 +205,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                kind: value::Kind::String,
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -218,7 +218,7 @@ mod test {
                 count: Some(Literal::from(10).boxed()),
             },
             def: TypeDef {
-                kind: value::Kind::String,
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -232,7 +232,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                kind: value::Kind::String,
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }

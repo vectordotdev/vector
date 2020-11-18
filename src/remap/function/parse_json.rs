@@ -12,12 +12,12 @@ impl Function for ParseJson {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
         ]
@@ -49,7 +49,7 @@ impl ParseJsonFn {
 impl Expression for ParseJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_json = |value| match value {
-            Value::String(bytes) => serde_json::from_slice(&bytes)
+            Value::Bytes(bytes) => serde_json::from_slice(&bytes)
                 .map(|v: serde_json::Value| {
                     let v: crate::event::Value = v.into();
                     v.into()
@@ -71,15 +71,15 @@ impl Expression for ParseJsonFn {
         let default_def = self
             .default
             .as_ref()
-            .map(|default| default.type_def(state).fallible_unless(Kind::String));
+            .map(|default| default.type_def(state).fallible_unless(Kind::Bytes));
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::String)
+            .fallible_unless(Kind::Bytes)
             .merge_with_default_optional(default_def)
             .into_fallible(true) // JSON parsing errors
             .with_constraint(
-                Kind::String
+                Kind::Bytes
                     | Kind::Boolean
                     | Kind::Integer
                     | Kind::Float
@@ -104,7 +104,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -116,7 +116,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -128,7 +128,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -141,7 +141,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: true,
-                kind: Kind::String | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
             },
         }
     ];

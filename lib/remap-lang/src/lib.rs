@@ -142,7 +142,12 @@ mod tests {
             (
                 r#".foo == .bar"#,
                 Ok(()),
-                Err("remap error: path error: missing path: foo"),
+                Ok(true.into()),
+            ),
+            (
+                r#"if "foo" { "bar" }"#,
+                Ok(()),
+                Err(r#"remap error: value error: expected "boolean", got "string""#),
             ),
             (r#".foo = (null || "bar")"#, Ok(()), Ok("bar".into())),
             (r#"!false"#, Ok(()), Ok(true.into())),

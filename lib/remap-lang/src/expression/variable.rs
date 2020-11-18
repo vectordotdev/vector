@@ -1,11 +1,4 @@
-use super::Error as E;
 use crate::{state, Expression, Object, Result, TypeDef, Value};
-
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error("undefined variable: {0}")]
-    Undefined(String),
-}
 
 #[derive(Debug, Clone)]
 pub struct Variable {
@@ -28,10 +21,9 @@ impl Variable {
 
 impl Expression for Variable {
     fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
-        state
-            .variable(&self.ident)
-            .cloned()
-            .ok_or_else(|| E::from(Error::Undefined(self.ident.to_owned())).into())
+        let value = state.variable(&self.ident).cloned().unwrap_or(Value::Null);
+
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -66,7 +58,7 @@ mod tests {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    kind: Kind::String
+                    kind: Kind::Bytes
                 });
 
                 Variable::new("foo".to_owned())
@@ -74,7 +66,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String,
+                kind: Kind::Bytes,
             },
         }
 
