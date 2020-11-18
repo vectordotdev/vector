@@ -25,18 +25,18 @@ installation: _interfaces: helm: {
 						{config}
 						VECTORCFG
 						"""#
-			install: #"""
+			install:        #"""
 				 helm repo add timberio-nightly https://packages.timber.io/helm/nightly && \
-					helm install vector timberio/\(_name) --devel --values values.yaml --namespace vector --create-namespace
+					helm install \#(_name) timberio/\#(_name) --devel --values values.yaml --namespace vector --create-namespace
 				"""#
-			logs:        #"kubectl logs -n vector \#(_resource_type)/\#(_name)"#
-			reconfigure: #"kubectl edit \#(_resource_type) \#(_name)"#
-			reload:      #"kubectl rollout restart \#(_resource_type)/\#(_name)"#
-			restart:     #"kubectl rollout restart \#(_resource_type)/\#(_name)"#
-			start:       null
-			stop:        null
-			uninstall:   "helm uninstall --namespace vector \(_name)"
-			upgrade:     "helm upgrade vector timberio/vector --version {version}"
+			logs:           #"kubectl logs -n vector \#(_resource_type)/\#(_name)"#
+			reconfigure:    #"kubectl edit \#(_resource_type) \#(_name)"#
+			reload:         #"kubectl rollout restart \#(_resource_type)/\#(_name)"#
+			restart:        #"kubectl rollout restart \#(_resource_type)/\#(_name)"#
+			start:          null
+			stop:           null
+			uninstall:      "helm uninstall \(_name) --namespace vector"
+			upgrade:        "helm upgrade vector timberio/\(_name) --version {version}"
 		}
 		agent: {
 			title:       "Agent"

@@ -82,7 +82,19 @@ installation: _interfaces: kubectl: {
 				variables: config: sinks: out: inputs: ["internal_metrics", "kubernetes_logs"]
 			}
 			tutorials:   _tutorials & {_commands: commands}
-			description: "test"
+			description: #"""
+						The agent role is designed to collect all Kubernetes
+						log data on each Node. Vector runs as a
+						[Daemonset](\#(urls.kubernetes_daemonset)) and tails
+						logs for the entire Pod, automatically enriching them
+						with Kubernetes metdata via the
+						[Kubernetes API](\#(urls.kubernetes_api)). Collection
+						is handled automatically, and it is intended for you to
+						adjust your pipeline as	necessary using Vector's
+						[sources](\#(urls.vector_sources)),
+						[transforms](\#(urls.vector_transforms)), and
+						[sinks](\#(urls.vector_sinks)).
+						"""#
 			title:       "Agent"
 		}
 		aggregator: {
@@ -92,7 +104,18 @@ installation: _interfaces: kubectl: {
 				variables: config: sources: in_upstream: type: components.sources.vector.type
 			}
 			tutorials:   _tutorials & {_commands: commands}
-			description: "test"
+			description: #"""
+							The aggregator role is designed to receive and
+							process data from multiple upstream agents.
+							Typically these are other Vector agents, but it
+							could be anything, including non-Vector agents.
+							By default, we recommend the [`vector` source](\#(urls.vector_source))
+							since it supports all data types, but it is
+							recommended to adjust your pipeline as necessary
+							using Vector's [sources](\#(urls.vector_sources)),
+							[transforms](\#(urls.vector_transforms)), and
+							[sinks](\#(urls.vector_sinks)).
+							"""#
 			title:       "Aggregator"
 		}
 	}
