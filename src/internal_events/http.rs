@@ -10,7 +10,7 @@ pub struct HTTPEventsReceived {
 impl InternalEvent for HTTPEventsReceived {
     fn emit_logs(&self) {
         trace!(
-            message = "Sending events.",
+            message = "Received events.",
             events_count = %self.events_count,
             byte_size = %self.byte_size,
         );
@@ -40,5 +40,21 @@ impl<'a> InternalEvent for HTTPBadRequest<'a> {
 
     fn emit_metrics(&self) {
         counter!("http_bad_requests_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct HTTPEventMissingMessage;
+
+impl InternalEvent for HTTPEventMissingMessage {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Event missing the message key; dropping event.",
+            rate_limit_secs = 30,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("events_discarded_total", 1);
     }
 }
