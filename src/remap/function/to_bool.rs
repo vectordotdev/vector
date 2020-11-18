@@ -32,7 +32,7 @@ impl Function for ToBool {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ToBoolFn {
     value: Box<dyn Expression>,
     default: Option<Box<dyn Expression>>,
@@ -47,18 +47,19 @@ impl ToBoolFn {
 }
 
 impl Expression for ToBoolFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_bool = |value| match value {
             Boolean(_) => Ok(value),
             Integer(v) => Ok(Boolean(v != 0)),
             Float(v) => Ok(Boolean(v != 0.0)),
-            String(_) => Conversion::Boolean
+            Null => Ok(Boolean(false)),
+            Bytes(_) => Conversion::Boolean
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            _ => Err("unable to convert value to boolean".into()),
+            Array(_) | Map(_) | Timestamp(_) => Err("unable to convert value to boolean".into()),
         };
 
         super::convert_value_or_default(
@@ -67,12 +68,127 @@ impl Expression for ToBoolFn {
             to_bool,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Boolean | Kind::Integer | Kind::Float | Kind::Null)
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(Kind::Boolean | Kind::Integer | Kind::Float | Kind::Null)
+            }))
+            .with_constraint(Kind::Boolean)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use std::collections::BTreeMap;
+    use value::Kind;
+
+    remap::test_type_def![
+        boolean_infallible {
+            expr: |_| ToBoolFn { value: Literal::from(true).boxed(), default: None },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
+        }
+
+        integer_infallible {
+            expr: |_| ToBoolFn { value: Literal::from(1).boxed(), default: None },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
+        }
+
+        float_infallible {
+            expr: |_| ToBoolFn { value: Literal::from(1.0).boxed(), default: None },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
+        }
+
+        null_infallible {
+            expr: |_| ToBoolFn { value: Literal::from(()).boxed(), default: None },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
+        }
+
+        string_fallible {
+            expr: |_| ToBoolFn { value: Literal::from("foo").boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+        }
+
+        map_fallible {
+            expr: |_| ToBoolFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+        }
+
+        array_fallible {
+            expr: |_| ToBoolFn { value: Literal::from(vec![0]).boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+        }
+
+        timestamp_fallible {
+            expr: |_| ToBoolFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+        }
+
+        fallible_value_without_default {
+            expr: |_| ToBoolFn { value: Literal::from("foo".to_owned()).boxed(), default: None },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                kind: Kind::Boolean,
+            },
+        }
+
+       fallible_value_with_fallible_default {
+            expr: |_| ToBoolFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                kind: Kind::Boolean,
+            },
+        }
+
+       fallible_value_with_infallible_default {
+            expr: |_| ToBoolFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(true).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                kind: Kind::Boolean,
+            },
+        }
+
+        infallible_value_with_fallible_default {
+            expr: |_| ToBoolFn {
+                value: Literal::from(true).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                kind: Kind::Boolean,
+            },
+        }
+
+        infallible_value_with_infallible_default {
+            expr: |_| ToBoolFn {
+                value: Literal::from(true).boxed(),
+                default: Some(Literal::from(true).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                kind: Kind::Boolean,
+            },
+        }
+    ];
 
     #[test]
     fn to_bool() {
@@ -84,22 +200,22 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), Some(Value::Boolean(true))),
             ),
             (
                 map!["foo": "true"],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20],
-                Ok(Some(Value::Boolean(true))),
+                Ok(Value::Boolean(true)),
                 ToBoolFn::new(Box::new(Path::from("foo")), None),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

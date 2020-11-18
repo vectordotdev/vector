@@ -1,7 +1,7 @@
 pub mod logs;
 pub mod metrics;
 
-use crate::{http::HttpClient, sinks::util::encode_namespace};
+use crate::http::HttpClient;
 use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
@@ -62,14 +62,14 @@ pub struct InfluxDB2Settings {
 }
 
 trait InfluxDBSettings: std::fmt::Debug {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri>;
-    fn token(self: &Self) -> String;
-    fn protocol_version(self: &Self) -> ProtocolVersion;
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri>;
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri>;
+    fn token(&self) -> String;
+    fn protocol_version(&self) -> ProtocolVersion;
 }
 
 impl InfluxDBSettings for InfluxDB1Settings {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "write",
@@ -84,21 +84,21 @@ impl InfluxDBSettings for InfluxDB1Settings {
         )
     }
 
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(&endpoint, "ping", &[])
     }
 
-    fn token(self: &Self) -> String {
+    fn token(&self) -> String {
         "".to_string()
     }
 
-    fn protocol_version(self: &Self) -> ProtocolVersion {
+    fn protocol_version(&self) -> ProtocolVersion {
         ProtocolVersion::V1
     }
 }
 
 impl InfluxDBSettings for InfluxDB2Settings {
-    fn write_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn write_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(
             &endpoint,
             "api/v2/write",
@@ -110,15 +110,15 @@ impl InfluxDBSettings for InfluxDB2Settings {
         )
     }
 
-    fn healthcheck_uri(self: &Self, endpoint: String) -> crate::Result<Uri> {
+    fn healthcheck_uri(&self, endpoint: String) -> crate::Result<Uri> {
         encode_uri(&endpoint, "health", &[])
     }
 
-    fn token(self: &Self) -> String {
+    fn token(&self) -> String {
         self.token.clone()
     }
 
-    fn protocol_version(self: &Self) -> ProtocolVersion {
+    fn protocol_version(&self) -> ProtocolVersion {
         ProtocolVersion::V2
     }
 }
@@ -203,12 +203,8 @@ pub(in crate::sinks) fn influx_line_protocol(
 }
 
 fn encode_tags(tags: BTreeMap<String, String>, output: &mut String) {
-    let sorted = tags
-        // sort by key
-        .iter()
-        .collect::<BTreeMap<_, _>>();
-
-    for (key, value) in sorted {
+    // `tags` is already sorted
+    for (key, value) in tags {
         if key.is_empty() || value.is_empty() {
             continue;
         }
@@ -315,11 +311,17 @@ pub mod test_util {
     use chrono::offset::TimeZone;
     use std::fs::File;
     use std::io::Read;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     pub(crate) const ORG: &str = "my-org";
     pub(crate) const BUCKET: &str = "my-bucket";
     pub(crate) const TOKEN: &str = "my-token";
-    pub(crate) const DATABASE: &str = "testdb";
+
+    static DATABASE_NUM: AtomicUsize = AtomicUsize::new(0);
+
+    pub(crate) fn next_database() -> String {
+        format!("testdb{}", DATABASE_NUM.fetch_add(1, Ordering::Relaxed))
+    }
 
     pub(crate) fn ts() -> DateTime<Utc> {
         Utc.ymd(2018, 11, 14).and_hms_nano(8, 9, 10, 11)
@@ -387,18 +389,20 @@ pub mod test_util {
             .unwrap()
     }
 
-    pub(crate) async fn onboarding_v1(endpoint: &str) {
-        let status = query_v1(endpoint, &format!("create database {}", DATABASE))
+    pub(crate) async fn onboarding_v1(endpoint: &str) -> String {
+        let database = next_database();
+        let status = query_v1(endpoint, &format!("create database {}", database))
             .await
             .status();
         assert!(
             status == http::StatusCode::OK,
             format!("UnexpectedStatus: {}", status)
         );
+        database
     }
 
-    pub(crate) async fn cleanup_v1(endpoint: &str) {
-        let status = query_v1(endpoint, &format!("drop database {}", DATABASE))
+    pub(crate) async fn cleanup_v1(endpoint: &str, database: &str) {
+        let status = query_v1(endpoint, &format!("drop database {}", database))
             .await
             .status();
         assert!(
@@ -587,6 +591,25 @@ mod tests {
     }
 
     #[test]
+    fn tags_order() {
+        let mut value = String::new();
+        encode_tags(
+            vec![
+                ("a", "value"),
+                ("b", "value"),
+                ("c", "value"),
+                ("d", "value"),
+                ("e", "value"),
+            ]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect(),
+            &mut value,
+        );
+        assert_eq!(value, "a=value,b=value,c=value,d=value,e=value");
+    }
+
+    #[test]
     fn test_encode_fields_v1() {
         let fields = vec![
             (
@@ -758,7 +781,7 @@ mod integration_tests {
         http::HttpClient,
         sinks::influxdb::{
             healthcheck,
-            test_util::{onboarding_v2, BUCKET, DATABASE, ORG, TOKEN},
+            test_util::{next_database, onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDB1Settings, InfluxDB2Settings,
         },
     };
@@ -805,7 +828,7 @@ mod integration_tests {
     async fn influxdb1_healthchecks_ok() {
         let endpoint = "http://localhost:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
-            database: DATABASE.to_string(),
+            database: next_database(),
             consistency: None,
             retention_policy_name: None,
             username: None,
@@ -824,7 +847,7 @@ mod integration_tests {
     async fn influxdb1_healthchecks_fail() {
         let endpoint = "http://not_exist:8086".to_string();
         let influxdb1_settings = Some(InfluxDB1Settings {
-            database: DATABASE.to_string(),
+            database: next_database(),
             consistency: None,
             retention_policy_name: None,
             username: None,

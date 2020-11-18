@@ -1,14 +1,17 @@
-use super::Transform;
+use crate::transforms::TaskTransform;
 use crate::{
     config::{DataType, GenerateConfig, TransformConfig, TransformDescription},
     internal_events::{
         TagCardinalityLimitEventProcessed, TagCardinalityLimitRejectingEvent,
         TagCardinalityLimitRejectingTag, TagCardinalityValueLimitReached,
     },
+    transforms::Transform,
     Event,
 };
 use bloom::{BloomFilter, ASMS};
+use futures01::Stream as Stream01;
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 use std::{
     borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
@@ -48,6 +51,7 @@ pub enum LimitExceededAction {
     DropEvent,
 }
 
+#[derive(Debug)]
 pub struct TagCardinalityLimit {
     config: TagCardinalityLimitConfig,
     accepted_tags: HashMap<String, TagValueSet>,
@@ -83,8 +87,8 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
 impl TransformConfig for TagCardinalityLimitConfig {
-    async fn build(&self) -> crate::Result<Box<dyn Transform>> {
-        Ok(Box::new(TagCardinalityLimit::new(self.clone())))
+    async fn build(&self) -> crate::Result<Transform> {
+        Ok(Transform::task(TagCardinalityLimit::new(self.clone())))
     }
 
     fn input_type(&self) -> DataType {
@@ -101,6 +105,7 @@ impl TransformConfig for TagCardinalityLimitConfig {
 }
 
 /// Container for storing the set of accepted values for a given tag key.
+#[derive(Debug)]
 struct TagValueSet {
     storage: TagValueSetStorage,
     num_elements: usize,
@@ -109,6 +114,15 @@ struct TagValueSet {
 enum TagValueSetStorage {
     Set(HashSet<String>),
     Bloom(BloomFilter),
+}
+
+impl std::fmt::Debug for TagValueSetStorage {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            TagValueSetStorage::Set(set) => write!(f, "Set({:?})", set),
+            TagValueSetStorage::Bloom(_) => write!(f, "Bloom"),
+        }
+    }
 }
 
 impl TagValueSet {
@@ -199,10 +213,8 @@ impl TagCardinalityLimit {
             false
         }
     }
-}
 
-impl Transform for TagCardinalityLimit {
-    fn transform(&mut self, mut event: Event) -> Option<Event> {
+    fn transform_one(&mut self, mut event: Event) -> Option<Event> {
         emit!(TagCardinalityLimitEventProcessed);
         match event.as_mut_metric().tags {
             Some(ref mut tags_map) => {
@@ -241,11 +253,24 @@ impl Transform for TagCardinalityLimit {
     }
 }
 
+impl TaskTransform for TagCardinalityLimit {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
+        let mut inner = self;
+        Box::new(task.filter_map(move |v| inner.transform_one(v)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{LimitExceededAction, TagCardinalityLimit, TagCardinalityLimitConfig};
+    use super::*;
     use crate::transforms::tag_cardinality_limit::{default_cache_size, BloomFilterConfig, Mode};
-    use crate::{event::metric, event::Event, event::Metric, transforms::Transform};
+    use crate::{event::metric, event::Event, event::Metric};
     use std::collections::BTreeMap;
 
     #[test]
@@ -311,9 +336,9 @@ mod tests {
             vec![("tag1".into(), "val3".into())].into_iter().collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3);
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3);
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);
@@ -356,9 +381,9 @@ mod tests {
         .collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone()).unwrap();
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3.clone()).unwrap();
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);
@@ -420,9 +445,9 @@ mod tests {
         .collect();
         let event3 = make_metric(tags3);
 
-        let new_event1 = transform.transform(event1.clone()).unwrap();
-        let new_event2 = transform.transform(event2.clone()).unwrap();
-        let new_event3 = transform.transform(event3.clone()).unwrap();
+        let new_event1 = transform.transform_one(event1.clone()).unwrap();
+        let new_event2 = transform.transform_one(event2.clone()).unwrap();
+        let new_event3 = transform.transform_one(event3.clone()).unwrap();
 
         assert_eq!(new_event1, event1);
         assert_eq!(new_event2, event2);

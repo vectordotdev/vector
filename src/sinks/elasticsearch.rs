@@ -15,8 +15,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
@@ -132,10 +131,7 @@ impl SinkConfig for ElasticSearchConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -170,8 +166,6 @@ enum ParseError {
     HostMustIncludeHostname { host: String },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
-    #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
-    AWSCompressionNotAllowed,
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateError },
 }
@@ -379,12 +373,7 @@ impl ElasticSearchCommon {
             ),
         };
 
-        // Only allow compression if we are running with no AWS credentials.
         let compression = config.compression;
-        if credentials.is_some() && compression != Compression::None {
-            return Err(ParseError::AWSCompressionNotAllowed.into());
-        }
-
         let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
         let index = Template::try_from(index).context(IndexTemplate)?;
 
@@ -435,7 +424,7 @@ impl ElasticSearchCommon {
     }
 }
 
-async fn healthcheck(mut client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
     let mut builder = Request::get(format!("{}/_cluster/health", common.base_url));
 
     match &common.credentials {
@@ -841,7 +830,7 @@ mod integration_tests {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let mut client =
+        let client =
             HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
         let response = client.send(request).await?;
         match response.status() {

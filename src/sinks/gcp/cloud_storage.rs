@@ -1,8 +1,7 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    event::Event,
-    http::{HttpClient, HttpClientFuture},
+    http::{HttpClient, HttpClientFuture, HttpError},
     serde::to_string,
     sinks::{
         util::{
@@ -15,11 +14,11 @@ use crate::{
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
+    Event,
 };
 use bytes::Bytes;
 use chrono::Utc;
-use futures::FutureExt;
-use futures01::{stream::iter_ok, Sink};
+use futures::{stream, FutureExt, SinkExt, StreamExt};
 use http::{StatusCode, Uri};
 use hyper::{
     header::{HeaderName, HeaderValue},
@@ -28,10 +27,7 @@ use hyper::{
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::HashMap;
-use std::convert::TryFrom;
-use std::task::Poll;
-
+use std::{collections::HashMap, convert::TryFrom, task::Poll};
 use tower::{Service, ServiceBuilder};
 use uuid::Uuid;
 
@@ -232,12 +228,12 @@ impl GcsSink {
 
         let sink = PartitionBatchSink::new(svc, buffer, batch.timeout, cx.acker())
             .sink_map_err(|error| error!(message = "Fatal gcp_cloud_storage error.", %error))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &key_prefix, &encoding)));
+            .with_flat_map(move |e| stream::iter(encode_event(e, &key_prefix, &encoding)).map(Ok));
 
-        Ok(VectorSink::Futures01Sink(Box::new(sink)))
+        Ok(VectorSink::Sink(Box::new(sink)))
     }
 
-    async fn healthcheck(mut self) -> crate::Result<()> {
+    async fn healthcheck(self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
@@ -255,7 +251,7 @@ impl GcsSink {
 
 impl Service<RequestWrapper> for GcsSink {
     type Response = Response<Body>;
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Future = HttpClientFuture;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -467,9 +463,6 @@ impl RetryLogic for GcsRetryLogic {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
-
-    use std::collections::HashMap;
 
     #[test]
     fn generate_config() {

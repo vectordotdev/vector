@@ -7,27 +7,34 @@ use crate::{
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     template::{Template, TemplateError},
 };
-use futures::{compat::Compat, FutureExt};
-use futures01::{
-    future as future01, stream::FuturesUnordered, Async, AsyncSink, Future, Poll, Sink, StartSend,
-    Stream,
+use futures::{
+    channel::oneshot::Canceled, future::BoxFuture, ready, stream::FuturesUnordered, FutureExt,
+    Sink, StreamExt, TryFutureExt,
 };
 use rdkafka::{
     consumer::{BaseConsumer, Consumer},
+    error::{KafkaError, RDKafkaError},
     producer::{DeliveryFuture, FutureProducer, FutureRecord},
+    ClientConfig,
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
-use std::time::Duration;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
+use tokio::{sync::Notify, time::Duration};
 
-type MetadataFuture<F, M> = future01::Join<F, future01::FutureResult<M, <F as Future>::Error>>;
+// Maximum number of futures blocked by [send_result](https://docs.rs/rdkafka/0.24.0/rdkafka/producer/future_producer/struct.FutureProducer.html#method.send_result)
+const SEND_RESULT_LIMIT: usize = 5;
 
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display("creating kafka producer failed: {}", source))]
-    KafkaCreateFailed { source: rdkafka::error::KafkaError },
+    KafkaCreateFailed { source: KafkaError },
     #[snafu(display("invalid topic template: {}", source))]
     TopicTemplate { source: TemplateError },
 }
@@ -67,11 +74,15 @@ pub enum Encoding {
 }
 
 pub struct KafkaSink {
-    producer: FutureProducer,
+    producer: Arc<FutureProducer>,
     topic: Template,
     key_field: Option<String>,
     encoding: EncodingConfig<Encoding>,
-    in_flight: FuturesUnordered<MetadataFuture<Compat<DeliveryFuture>, usize>>,
+    flush_signal: Arc<Notify>,
+    delivery_fut: FuturesUnordered<BoxFuture<'static, (usize, Result<DeliveryFuture, KafkaError>)>>,
+    in_flight: FuturesUnordered<
+        BoxFuture<'static, (usize, Result<Result<(i32, i64), KafkaError>, Canceled>)>,
+    >,
 
     acker: Acker,
     seq_head: usize,
@@ -104,7 +115,7 @@ impl SinkConfig for KafkaSinkConfig {
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let sink = KafkaSink::new(self.clone(), cx.acker())?;
         let hc = healthcheck(self.clone()).boxed();
-        Ok((super::VectorSink::Futures01Sink(Box::new(sink)), hc))
+        Ok((super::VectorSink::Sink(Box::new(sink)), hc))
     }
 
     fn input_type(&self) -> DataType {
@@ -117,8 +128,8 @@ impl SinkConfig for KafkaSinkConfig {
 }
 
 impl KafkaSinkConfig {
-    fn to_rdkafka(&self) -> crate::Result<rdkafka::ClientConfig> {
-        let mut client_config = rdkafka::ClientConfig::new();
+    fn to_rdkafka(&self) -> crate::Result<ClientConfig> {
+        let mut client_config = ClientConfig::new();
         client_config
             .set("bootstrap.servers", &self.bootstrap_servers)
             .set("compression.codec", &to_string(self.compression))
@@ -141,10 +152,12 @@ impl KafkaSink {
     fn new(config: KafkaSinkConfig, acker: Acker) -> crate::Result<Self> {
         let producer = config.to_rdkafka()?.create().context(KafkaCreateFailed)?;
         Ok(KafkaSink {
-            producer,
+            producer: Arc::new(producer),
             topic: Template::try_from(config.topic).context(TopicTemplate)?,
             key_field: config.key_field,
             encoding: config.encoding.into(),
+            flush_signal: Arc::new(Notify::new()),
+            delivery_fut: FuturesUnordered::new(),
             in_flight: FuturesUnordered::new(),
             acker,
             seq_head: 0,
@@ -152,84 +165,124 @@ impl KafkaSink {
             pending_acks: HashSet::new(),
         })
     }
+
+    fn poll_delivery_fut(&mut self, cx: &mut Context<'_>) -> Poll<()> {
+        loop {
+            match ready!(self.delivery_fut.poll_next_unpin(cx)) {
+                Some((seqno, result)) => self.in_flight.push(Box::pin(async move {
+                    let result = match result {
+                        Ok(fut) => {
+                            fut.map_ok(|result| result.map_err(|(error, _owned_message)| error))
+                                .await
+                        }
+                        Err(error) => Ok(Err(error)),
+                    };
+
+                    (seqno, result)
+                })),
+                None => return Poll::Ready(()),
+            }
+        }
+    }
 }
 
-impl Sink for KafkaSink {
-    type SinkItem = Event;
-    type SinkError = ();
+impl Sink<Event> for KafkaSink {
+    type Error = ();
 
-    fn start_send(&mut self, item: Self::SinkItem) -> StartSend<Self::SinkItem, Self::SinkError> {
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match self.poll_delivery_fut(cx) {
+            Poll::Pending if self.delivery_fut.len() >= SEND_RESULT_LIMIT => Poll::Pending,
+            _ => Poll::Ready(Ok(())),
+        }
+    }
+
+    fn start_send(mut self: Pin<&mut Self>, item: Event) -> Result<(), Self::Error> {
+        assert!(
+            self.delivery_fut.len() < SEND_RESULT_LIMIT,
+            "Expected `poll_ready` to be called first."
+        );
+
         let topic = self.topic.render_string(&item).map_err(|missing_keys| {
             error!(message = "Missing keys for topic.", missing_keys = ?missing_keys);
         })?;
-
         let (key, body) = encode_event(item.clone(), &self.key_field, &self.encoding);
-
-        let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
-
-        if let Some(Value::Timestamp(timestamp)) = item.as_log().get(log_schema().timestamp_key()) {
-            record = record.timestamp(timestamp.timestamp_millis());
-        }
-
-        debug!(message = "Sending event.", count = 1);
-        let future = match self.producer.send_result(record) {
-            Ok(f) => f,
-            Err((error, record)) => {
-                // Docs suggest this will only happen when the producer queue is full, so let's
-                // treat it as we do full buffers in other sinks
-                debug!(message = "The rdkafka queue full.", %error);
-                self.poll_complete()?;
-
-                match self.producer.send_result(record) {
-                    Ok(f) => f,
-                    Err((error, _record)) => {
-                        debug!(message = "The rdkafka queue still full.", %error);
-                        return Ok(AsyncSink::NotReady(item));
-                    }
-                }
-            }
-        };
 
         let seqno = self.seq_head;
         self.seq_head += 1;
 
-        self.in_flight
-            .push(Compat::new(future).join(future01::ok(seqno)));
-        Ok(AsyncSink::Ready)
+        let producer = Arc::clone(&self.producer);
+        let flush_signal = Arc::clone(&self.flush_signal);
+        self.delivery_fut.push(Box::pin(async move {
+            let mut record = FutureRecord::to(&topic).key(&key).payload(&body[..]);
+            if let Some(Value::Timestamp(timestamp)) =
+                item.as_log().get(log_schema().timestamp_key())
+            {
+                record = record.timestamp(timestamp.timestamp_millis());
+            }
+
+            debug!(message = "Sending event.", count = 1);
+            let result = loop {
+                match producer.send_result(record) {
+                    Ok(future) => break Ok(future),
+                    // Try again if queue is full.
+                    // See item 4 on GitHub: https://github.com/timberio/vector/pull/101#issue-257150924
+                    // https://docs.rs/rdkafka/0.24.0/src/rdkafka/producer/future_producer.rs.html#296
+                    Err((error, future_record))
+                        if error == KafkaError::MessageProduction(RDKafkaError::QueueFull) =>
+                    {
+                        debug!(message = "The rdkafka queue full.", %error, %seqno, rate_limit_secs = 1);
+                        record = future_record;
+                        let _ = flush_signal.notified().await;
+                    }
+                    Err((error, _)) => break Err(error),
+                }
+            };
+
+            (seqno, result)
+        }));
+
+        Ok(())
     }
 
-    fn poll_complete(&mut self) -> Poll<(), Self::SinkError> {
-        loop {
-            match self.in_flight.poll() {
-                // nothing ready yet
-                Ok(Async::NotReady) => return Ok(Async::NotReady),
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let this = Pin::into_inner(self);
 
-                // nothing in flight
-                Ok(Async::Ready(None)) => return Ok(Async::Ready(())),
+        while !this.delivery_fut.is_empty() || !this.in_flight.is_empty() {
+            while let Poll::Ready(Some(item)) = this.in_flight.poll_next_unpin(cx) {
+                this.flush_signal.notify();
+                match item {
+                    (seqno, Ok(result)) => {
+                        match result {
+                            Ok((partition, offset)) => {
+                                trace!(message = "Produced message.", ?partition, ?offset)
+                            }
+                            Err(error) => error!(message = "Kafka error.", %error),
+                        };
 
-                // request finished, check for success
-                Ok(Async::Ready(Some((result, seqno)))) => {
-                    match result {
-                        Ok((partition, offset)) => trace!(
-                            message = "Produced message.", parition = ?partition, offset = ?offset
-                        ),
-                        Err((error, _msg)) => error!(message = "Kafka error.", %error),
-                    };
+                        this.pending_acks.insert(seqno);
 
-                    self.pending_acks.insert(seqno);
-
-                    let mut num_to_ack = 0;
-                    while self.pending_acks.remove(&self.seq_tail) {
-                        num_to_ack += 1;
-                        self.seq_tail += 1
+                        let mut num_to_ack = 0;
+                        while this.pending_acks.remove(&this.seq_tail) {
+                            num_to_ack += 1;
+                            this.seq_tail += 1
+                        }
+                        this.acker.ack(num_to_ack);
                     }
-                    self.acker.ack(num_to_ack);
+                    (_seqno, Err(Canceled)) => {
+                        error!(message = "Request canceled.");
+                        return Poll::Ready(Err(()));
+                    }
                 }
-
-                // request got canceled (according to docs)
-                Err(error) => error!(message = "Delivery future canceled.", %error),
             }
+
+            ready!(this.poll_delivery_fut(cx));
         }
+
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.poll_flush(cx)
     }
 }
 
@@ -366,7 +419,7 @@ mod integration_test {
         test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::{compat::Sink01CompatExt, future, SinkExt, StreamExt};
+    use futures::{future, StreamExt};
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
@@ -499,9 +552,7 @@ mod integration_test {
 
         let num_events = 1000;
         let (input, events) = random_lines_with_stream(100, num_events);
-        let mut events = events.map(Ok);
-
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        events.map(Ok).forward(sink).await.unwrap();
 
         // read back everything from the beginning
         let mut client_config = rdkafka::ClientConfig::new();

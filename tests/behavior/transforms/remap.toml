@@ -104,8 +104,8 @@
   inputs = []
   type = "remap"
   source = """
-    only_fields(".foo", ".bar", ".buz.second")
-    del(".foo.second")
+    only_fields(.foo, .bar, .buz.second)
+    del(.foo.second)
   """
 [[tests]]
   name = "remap_delete_only_fields"

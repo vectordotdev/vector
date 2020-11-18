@@ -7,7 +7,7 @@ description = "End-to-end tests of Vector in the Kubernetes environment"
 
 [dependencies]
 futures = "0.3"
-k8s-openapi = { version = "0.9", default-features = false, features = ["v1_15"] }
+k8s-openapi = { version = "0.9", default-features = false, features = ["v1_16"] }
 k8s-test-framework = { version = "0.1", path = "../k8s-test-framework" }
 serde_json = "1"
 tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }

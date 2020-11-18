@@ -55,6 +55,7 @@ pub mod serde;
 pub mod service;
 pub mod shutdown;
 pub mod signal;
+pub mod sink;
 pub mod sinks;
 pub mod sources;
 pub mod stream;
@@ -72,7 +73,7 @@ pub mod validate;
 #[cfg(windows)]
 pub mod vector_windows;
 
-pub use event::Event;
+pub use event::{Event, Value};
 pub use pipeline::Pipeline;
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;

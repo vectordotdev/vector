@@ -1,0 +1,8 @@
+subscription ComponentEventsProcessedTotalSubscription($interval: Int!) {
+  componentEventsProcessedTotal(interval: $interval) {
+    name
+    metric {
+      eventsProcessedTotal
+    }
+  }
+}

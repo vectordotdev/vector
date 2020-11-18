@@ -5,6 +5,7 @@ use crate::{
     FileSourceInternalEvents,
 };
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use futures::{
     executor::block_on,
     future::{select, Either},
@@ -37,7 +38,7 @@ where
     pub paths_provider: PP,
     pub max_read_bytes: usize,
     pub start_at_beginning: bool,
-    pub ignore_before: Option<time::SystemTime>,
+    pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
@@ -101,7 +102,8 @@ where
         existing_files.sort_by_key(|(path, _file_id)| {
             fs::metadata(&path)
                 .and_then(|m| m.created())
-                .unwrap_or_else(|_| time::SystemTime::now())
+                .map(DateTime::<Utc>::from)
+                .unwrap_or_else(|_| Utc::now())
         });
 
         checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
@@ -252,7 +254,7 @@ where
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                    checkpointer.set_checkpoint(file_id, watcher.get_file_position());
+                    checkpointer.update_checkpoint(file_id, watcher.get_file_position());
                 } else {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {

@@ -2,19 +2,27 @@
 
 #![deny(missing_docs)]
 
-use crate::{event::Event, transforms::Transform};
+use crate::{event::Event, transforms::TaskTransform};
+use futures01::Stream as Stream01;
 
 /// Optional transform.
 /// Passes events through the specified transform is any, otherwise passes them,
 /// as-is.
 /// Useful to avoid boxing the transforms.
-pub struct Optional<T: Transform>(pub Option<T>);
+#[derive(Clone, Debug)]
+pub struct Optional<T: TaskTransform>(pub Option<T>);
 
-impl<T: Transform> Transform for Optional<T> {
-    fn transform(&mut self, event: Event) -> Option<Event> {
+impl<T: TaskTransform> TaskTransform for Optional<T> {
+    fn transform(
+        self: Box<Self>,
+        task: Box<dyn Stream01<Item = Event, Error = ()> + Send>,
+    ) -> Box<dyn Stream01<Item = Event, Error = ()> + Send>
+    where
+        Self: 'static,
+    {
         match self.0 {
-            Some(ref mut val) => val.transform(event),
-            None => Some(event),
+            Some(val) => Box::new(val).transform(task),
+            None => task,
         }
     }
 }

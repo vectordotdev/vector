@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
@@ -98,6 +98,15 @@ impl SourceConfig for StatsdConfig {
     fn source_type(&self) -> &'static str {
         "statsd"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self.clone() {
+            Self::Tcp(tcp) => vec![tcp.address.into()],
+            Self::Udp(udp) => vec![udp.address.into()],
+            #[cfg(unix)]
+            Self::Unix(_) => vec![],
+        }
+    }
 }
 
 pub(self) fn parse_event(line: &str) -> Option<Event> {
@@ -174,7 +183,7 @@ mod test {
     use super::*;
     use crate::{
         config,
-        sinks::prometheus::PrometheusSinkConfig,
+        sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
     use futures::{compat::Future01CompatExt, TryStreamExt};
@@ -282,9 +291,9 @@ mod test {
         config.add_sink(
             "out",
             &["in"],
-            PrometheusSinkConfig {
+            PrometheusExporterConfig {
                 address: out_addr,
-                namespace: Some("vector".into()),
+                default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
                 flush_period_secs: 1,

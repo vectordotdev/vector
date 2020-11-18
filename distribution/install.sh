@@ -136,6 +136,12 @@ install_from_archive() {
         aarch64-*linux*)
             _archive_arch="aarch64-unknown-linux-musl"
             ;;
+	armv7-*linux*-gnu)
+            _archive_arch="armv7-unknown-linux-gnueabihf"
+            ;;
+	armv7-*linux*-musl)
+            _archive_arch="armv7-unknown-linux-musleabihf"
+            ;;
         *)
             err "unsupported arch: $_arch"
             ;;

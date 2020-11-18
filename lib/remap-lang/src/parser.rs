@@ -3,8 +3,10 @@
 use crate::{
     expression::{
         Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
+        Variable,
     },
-    Argument, Error, Expr, Function as Fn, Operator, Result, Value,
+    function::Argument,
+    state, Error, Expr, Function as Fn, Operator, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
@@ -14,6 +16,7 @@ use std::str::FromStr;
 #[grammar = "../grammar.pest"]
 pub(super) struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
+    pub compiler_state: state::Compiler,
 }
 
 type R = Rule;
@@ -23,7 +26,7 @@ macro_rules! operation_fns {
     (@impl $($rule:tt => { op: [$head_op:path, $($tail_op:path),+ $(,)?], next: $next:tt, })+) => (
         $(
             paste::paste! {
-                fn [<$rule _from_pairs>](&self, mut pairs: Pairs<R>) -> Result<Expr> {
+                fn [<$rule _from_pairs>](&mut self, mut pairs: Pairs<R>) -> Result<Expr> {
                     let inner = pairs.next().ok_or(e(R::$rule))?.into_inner();
                     let mut lhs = self.[<$next _from_pairs>](inner)?;
                     let mut op = Operator::$head_op;
@@ -57,7 +60,7 @@ macro_rules! operation_fns {
 impl Parser<'_> {
     /// Converts the set of known "root" rules into boxed [`Expression`] trait
     /// objects.
-    pub(crate) fn pairs_to_expressions(&self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
+    pub(crate) fn pairs_to_expressions(&mut self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
         let mut expressions = vec![];
 
         for pair in pairs {
@@ -74,7 +77,7 @@ impl Parser<'_> {
     }
 
     /// Given a `Pair`, build a boxed [`Expression`] trait object from it.
-    fn expression_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+    fn expression_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         match pair.as_rule() {
             R::assignment => {
                 let mut inner = pair.into_inner();
@@ -82,7 +85,11 @@ impl Parser<'_> {
                 let expression =
                     self.expression_from_pair(inner.next().ok_or(e(R::expression))?)?;
 
-                Ok(Expr::from(Assignment::new(target, Box::new(expression))))
+                Ok(Expr::from(Assignment::new(
+                    target,
+                    Box::new(expression),
+                    &mut self.compiler_state,
+                )))
             }
             R::boolean_expr => self.boolean_expr_from_pairs(pair.into_inner()),
             R::block => self.block_from_pairs(pair.into_inner()),
@@ -93,18 +100,26 @@ impl Parser<'_> {
 
     /// Return the target type to which a value is being assigned.
     ///
-    /// This returns a `target_path` target.
-    fn target_from_pair(&self, pair: Pair<R>) -> Result<Target> {
+    /// This can either return a `variable` or a `target_path` target, depending
+    /// on the parser rule being processed.
+    fn target_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
         match pair.as_rule() {
-            R::path => Ok(Target::Path(
+            R::variable => Ok(Target::Variable(Variable::new(
+                pair.into_inner()
+                    .next()
+                    .ok_or(e(R::variable))?
+                    .as_str()
+                    .to_owned(),
+            ))),
+            R::path => Ok(Target::Path(Path::new(
                 self.path_segments_from_pairs(pair.into_inner())?,
-            )),
+            ))),
             _ => Err(e(R::target)),
         }
     }
 
     /// Parse block expressions.
-    fn block_from_pairs(&self, pairs: Pairs<R>) -> Result<Expr> {
+    fn block_from_pairs(&mut self, pairs: Pairs<R>) -> Result<Expr> {
         let mut expressions = vec![];
 
         for pair in pairs {
@@ -115,14 +130,46 @@ impl Parser<'_> {
     }
 
     /// Parse if-statement expressions.
-    fn if_statement_from_pairs(&self, mut pairs: Pairs<R>) -> Result<Expr> {
+    fn if_statement_from_pairs(&mut self, mut pairs: Pairs<R>) -> Result<Expr> {
+        // if condition
         let conditional = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
         let true_expression = self.expression_from_pair(pairs.next().ok_or(e(R::if_statement))?)?;
-        let false_expression = pairs
-            .next()
+
+        // else condition
+        let mut false_expression = pairs
+            .next_back()
             .map(|pair| self.expression_from_pair(pair))
             .transpose()?
             .unwrap_or_else(|| Expr::from(Noop));
+
+        let mut pairs = pairs.rev().peekable();
+
+        // optional if-else conditions
+        while let Some(pair) = pairs.next() {
+            let (conditional, true_expression) = match pairs.peek().map(Pair::as_rule) {
+                Some(R::block) | None => {
+                    let conditional = self.expression_from_pair(pair)?;
+                    let true_expression = false_expression;
+                    false_expression = Expr::from(Noop);
+
+                    (conditional, true_expression)
+                }
+                Some(R::boolean_expr) => {
+                    let next_pair = pairs.next().ok_or(e(R::if_statement))?;
+                    let conditional = self.expression_from_pair(next_pair)?;
+                    let true_expression = self.expression_from_pair(pair)?;
+
+                    (conditional, true_expression)
+                }
+                _ => return Err(e(R::if_statement)),
+            };
+
+            false_expression = Expr::from(IfStatement::new(
+                Box::new(conditional),
+                Box::new(true_expression),
+                Box::new(false_expression),
+            ));
+        }
 
         Ok(Expr::from(IfStatement::new(
             Box::new(conditional),
@@ -132,7 +179,7 @@ impl Parser<'_> {
     }
 
     /// Parse not operator, or fall-through to primary values or function calls.
-    fn not_from_pairs(&self, pairs: Pairs<R>) -> Result<Expr> {
+    fn not_from_pairs(&mut self, pairs: Pairs<R>) -> Result<Expr> {
         let mut count = 0;
         let mut expression = Expr::from(Noop);
 
@@ -153,11 +200,12 @@ impl Parser<'_> {
     }
 
     /// Parse one of possible primary expressions.
-    fn primary_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+    fn primary_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         let pair = pair.into_inner().next().ok_or(e(R::primary))?;
 
         match pair.as_rule() {
             R::value => self.value_from_pair(pair.into_inner().next().ok_or(e(R::value))?),
+            R::variable => self.variable_from_pair(pair),
             R::path => self.path_from_pair(pair),
             R::group => self.expression_from_pair(pair.into_inner().next().ok_or(e(R::group))?),
             _ => Err(e(R::primary)),
@@ -180,7 +228,7 @@ impl Parser<'_> {
     }
 
     /// Parse function call expressions.
-    fn call_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+    fn call_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         let mut inner = pair.into_inner();
 
         let ident = inner.next().ok_or(e(R::call))?.as_str().to_owned();
@@ -194,14 +242,14 @@ impl Parser<'_> {
     }
 
     /// Parse into a vector of argument properties.
-    fn arguments_from_pair(&self, pair: Pair<R>) -> Result<Vec<(Option<String>, Argument)>> {
+    fn arguments_from_pair(&mut self, pair: Pair<R>) -> Result<Vec<(Option<String>, Argument)>> {
         pair.into_inner()
             .map(|pair| self.argument_from_pair(pair))
             .collect::<Result<_>>()
     }
 
     /// Parse optional argument keyword and [`Argument`] value.
-    fn argument_from_pair(&self, pair: Pair<R>) -> Result<(Option<String>, Argument)> {
+    fn argument_from_pair(&mut self, pair: Pair<R>) -> Result<(Option<String>, Argument)> {
         let mut ident = None;
 
         for pair in pair.into_inner() {
@@ -210,10 +258,8 @@ impl Parser<'_> {
                 R::ident => ident = Some(pair.as_str().to_owned()),
                 R::regex => return Ok((ident, Argument::Regex(self.regex_from_pair(pair)?))),
                 _ => {
-                    return Ok((
-                        ident,
-                        Argument::Expression(Box::new(self.expression_from_pair(pair)?)),
-                    ))
+                    let expr = self.expression_from_pair(pair)?;
+                    return Ok((ident, Argument::Expression(expr)));
                 }
             }
         }
@@ -225,7 +271,12 @@ impl Parser<'_> {
     fn regex_from_pair(&self, pair: Pair<R>) -> Result<Regex> {
         let mut inner = pair.into_inner();
 
-        let pattern = inner.next().ok_or(e(R::regex_inner))?.as_str();
+        let pattern = inner
+            .next()
+            .ok_or(e(R::regex_inner))?
+            .as_str()
+            .replace("\\/", "/");
+
         let (x, i, m) = inner
             .next()
             .map(|flags| {
@@ -241,7 +292,7 @@ impl Parser<'_> {
             })
             .unwrap_or_default();
 
-        RegexBuilder::new(pattern)
+        RegexBuilder::new(&pattern)
             .case_insensitive(i)
             .multi_line(m)
             .ignore_whitespace(x)
@@ -296,6 +347,13 @@ impl Parser<'_> {
         pair.into_inner()
             .map(|pair| self.path_field_from_pair(pair))
             .collect::<Result<_>>()
+    }
+
+    /// Parse a [`Variable`] value, e.g. "$foo"
+    fn variable_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+        let ident = pair.into_inner().next().ok_or(e(R::variable))?;
+
+        Ok(Expr::from(Variable::new(ident.as_str().to_owned())))
     }
 
     fn escaped_string_from_pair(&self, pair: Pair<R>) -> Result<String> {
@@ -381,18 +439,18 @@ mod tests {
             ),
             (
                 ".foo = to_string",
-                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 r#"foo = "bar""#,
                 vec![
                     " 1:1\n",
-                    "= expected EOI, if_statement, not, path, or block",
+                    "= expected EOI, assignment, if_statement, not, or block",
                 ],
             ),
             (
                 r#".foo.bar = "baz" and this"#,
-                vec![" 1:18\n", "= expected EOI, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, path, or block"],
+                vec![" 1:18\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
             ),
             (r#".foo.bar = "baz" +"#, vec![" 1:19", "= expected not"]),
             (
@@ -407,7 +465,7 @@ mod tests {
                 "if .foo { }",
                 vec![
                     " 1:11\n",
-                    "= expected if_statement, not, path, or block",
+                    "= expected assignment, if_statement, not, or block",
                 ],
             ),
             (
@@ -431,7 +489,7 @@ mod tests {
                 // Due to the explicit list of allowed escape chars our grammar
                 // doesn't actually recognize this as a string literal.
                 r#".foo = "invalid escape \k sequence""#,
-                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 // Same here as above.
@@ -446,12 +504,12 @@ mod tests {
             (
                 // We cannot assign a regular expression to a field.
                 r#".foo = /ab/i"#,
-                vec![" 1:8\n", "= expected if_statement, not, path, or block"],
+                vec![" 1:8\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 // We cannot assign to a regular expression.
                 r#"/ab/ = .foo"#,
-                vec![" 1:1\n", "= expected EOI, if_statement, not, path, or block"],
+                vec![" 1:1\n", "= expected EOI, assignment, if_statement, not, or block"],
             ),
         ];
 

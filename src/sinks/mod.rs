@@ -1,10 +1,5 @@
 use crate::Event;
-use futures::{
-    compat::{Compat, Future01CompatExt},
-    future::BoxFuture,
-    StreamExt, TryFutureExt,
-};
-use futures01::Stream;
+use futures::{future::BoxFuture, Sink, Stream, StreamExt};
 use snafu::Snafu;
 use std::fmt;
 
@@ -42,7 +37,7 @@ pub mod honeycomb;
 pub mod http;
 #[cfg(feature = "sinks-humio")]
 pub mod humio;
-#[cfg(feature = "sinks-influxdb")]
+#[cfg(any(feature = "sinks-influxdb", feature = "prometheus-integration-tests"))]
 pub mod influxdb;
 #[cfg(all(feature = "sinks-kafka", feature = "rdkafka"))]
 pub mod kafka;
@@ -50,6 +45,8 @@ pub mod kafka;
 pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-nats")]
+pub mod nats;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]
@@ -70,7 +67,7 @@ pub mod statsd;
 pub mod vector;
 
 pub enum VectorSink {
-    Futures01Sink(Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static>),
+    Sink(Box<dyn Sink<Event, Error = ()> + Send + Unpin>),
     Stream(Box<dyn util::StreamSink + Send>),
 }
 
@@ -99,25 +96,18 @@ pub enum HealthcheckError {
 impl VectorSink {
     pub async fn run<S>(mut self, input: S) -> Result<(), ()>
     where
-        S: futures::Stream<Item = Event> + Send + 'static,
+        S: Stream<Item = Event> + Send + 'static,
     {
         match self {
-            Self::Futures01Sink(sink) => {
-                // Convert stream03 to stream01 instead of sink01 to sink03 to avoid close issues with Compat01as03Sink
-                // See https://github.com/timberio/vector/issues/4256
-                let inner = Compat::new(Box::pin(input.map(Ok)));
-                inner.forward(sink).compat().map_ok(|_| ()).await
-            }
+            Self::Sink(sink) => input.map(Ok).forward(sink).await,
             Self::Stream(ref mut s) => s.run(Box::pin(input)).await,
         }
     }
 
-    pub fn into_futures01sink(
-        self,
-    ) -> Box<dyn futures01::Sink<SinkItem = Event, SinkError = ()> + Send + 'static> {
+    pub fn into_sink(self) -> Box<dyn Sink<Event, Error = ()> + Send + Unpin> {
         match self {
-            Self::Futures01Sink(sink) => sink,
-            _ => panic!("Failed type coercion, {:?} is not a Futures01Sink", self),
+            Self::Sink(sink) => sink,
+            _ => panic!("Failed type coercion, {:?} is not a Sink", self),
         }
     }
 }

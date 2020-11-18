@@ -19,7 +19,10 @@
 //!   The reference implementation on preparing the in-cluster config.
 //!
 
-use crate::{http::HttpClient, tls::TlsSettings};
+use crate::{
+    http::{HttpClient, HttpError},
+    tls::TlsSettings,
+};
 use http::{
     header::{self, HeaderValue},
     uri, Request, Response, Uri,
@@ -63,8 +66,8 @@ impl Client {
             scheme, authority, ..
         } = base.into_parts();
 
-        let uri_scheme = scheme.ok_or_else(|| "no scheme")?;
-        let uri_authority = authority.ok_or_else(|| "no authority")?;
+        let uri_scheme = scheme.ok_or("no scheme")?;
+        let uri_authority = authority.ok_or("no authority")?;
 
         let auth_header = format!("Bearer {}", token);
         let auth_header = HeaderValue::from_str(auth_header.as_str())?;
@@ -78,7 +81,10 @@ impl Client {
     }
 
     /// Alters a request according to the client configuration and sends it.
-    pub async fn send<B: Into<Body>>(&mut self, req: Request<B>) -> crate::Result<Response<Body>> {
+    pub async fn send<B: Into<Body>>(
+        &mut self,
+        req: Request<B>,
+    ) -> Result<Response<Body>, HttpError> {
         let req = self.prepare_request(req);
         self.inner.send(req).await
     }

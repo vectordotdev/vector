@@ -13,17 +13,17 @@ impl Function for ParseTimestamp {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
                 required: true,
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::String(_) | Value::Timestamp(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Timestamp(_)),
                 required: false,
             },
         ]
@@ -42,7 +42,7 @@ impl Function for ParseTimestamp {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ParseTimestampFn {
     value: Box<dyn Expression>,
     format: Box<dyn Expression>,
@@ -64,16 +64,15 @@ impl ParseTimestampFn {
 }
 
 impl Expression for ParseTimestampFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let format = {
-            let bytes = required!(state, object, self.format, Value::String(v) => v);
-            format!("timestamp|{}", String::from_utf8_lossy(&bytes))
-        };
-
-        let conversion: Conversion = format.parse().map_err(|e| format!("{}", e))?;
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let format = self.format.execute(state, object);
 
         let to_timestamp = |value| match value {
-            Value::String(_) => conversion
+            Value::Bytes(_) => format
+                .clone()
+                .map(|v| format!("timestamp|{}", String::from_utf8_lossy(&v.unwrap_bytes())))?
+                .parse::<Conversion>()
+                .map_err(|e| format!("{}", e))?
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
@@ -87,6 +86,43 @@ impl Expression for ParseTimestampFn {
             to_timestamp,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let value_def = self
+            .value
+            .type_def(state)
+            .fallible_unless(value::Kind::Timestamp);
+
+        let default_def = self
+            .default
+            .as_ref()
+            .map(|v| v.type_def(state).fallible_unless(value::Kind::Timestamp));
+
+        // The `format` type definition is only relevant if:
+        //
+        // 1. `value` can resolve to a string, AND:
+        //   1. `default` is not defined, OR
+        //   2. `default` can also resolve to a string.
+        //
+        // The `format` type is _always_ fallible, because its string has to be
+        // parsed into a valid timestamp format.
+        let format_def = if value_def.kind.contains(value::Kind::Bytes) {
+            match &default_def {
+                Some(def) if def.kind.contains(value::Kind::Bytes) => {
+                    Some(self.format.type_def(state).into_fallible(true))
+                }
+                Some(_) => None,
+                None => Some(self.format.type_def(state).into_fallible(true)),
+            }
+        } else {
+            None
+        };
+
+        value_def
+            .merge_with_default_optional(default_def)
+            .merge_optional(format_def)
+            .with_constraint(value::Kind::Timestamp)
+    }
 }
 
 #[cfg(test)]
@@ -94,6 +130,82 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::{DateTime, Utc};
+
+    remap::test_type_def![
+        value_fallible_no_default {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Timestamp,
+                ..Default::default()
+            },
+        }
+
+        value_fallible_default_fallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from("<timestamp>").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Timestamp,
+                ..Default::default()
+            },
+        }
+
+        value_fallible_default_infallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from("<timestamp>").boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from(chrono::Utc::now()).boxed()),
+            },
+            def: TypeDef {
+                kind: value::Kind::Timestamp,
+                ..Default::default()
+            },
+        }
+
+        value_infallible_no_default {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                kind: value::Kind::Timestamp,
+                ..Default::default()
+            },
+        }
+
+        value_infallible_default_fallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from("<timestamp>").boxed()),
+            },
+            def: TypeDef {
+                kind: value::Kind::Timestamp,
+                ..Default::default()
+            },
+        }
+
+        value_infallible_default_infallible {
+            expr: |_| ParseTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("<format>").boxed(),
+                default: Some(Literal::from(chrono::Utc::now()).boxed()),
+            },
+            def: TypeDef {
+                kind: value::Kind::Timestamp,
+                ..Default::default()
+            },
+        }
+    ];
 
     #[test]
     fn parse_timestamp() {
@@ -105,14 +217,14 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Timestamp(
+                Ok(Value::Timestamp(
                     DateTime::parse_from_str(
                         "1983 Apr 13 12:09:14.274 +0000",
                         "%Y %b %d %H:%M:%S%.3f %z",
                     )
                     .unwrap()
                     .with_timezone(&Utc),
-                ))),
+                )),
                 ParseTimestampFn::new(
                     "%Y %b %d %H:%M:%S%.3f %z",
                     Box::new(Path::from("foo")),
@@ -125,27 +237,27 @@ mod tests {
                             .unwrap()
                             .with_timezone(&Utc),
                 ],
-                Ok(Some(
+                Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()
                         .with_timezone(&Utc)
                         .into(),
-                )),
+                ),
                 ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": "16/10/2019:12:00:00 +0000"],
-                Ok(Some(
+                Ok(
                     DateTime::parse_from_rfc2822("Wed, 16 Oct 2019 12:00:00 +0000")
                         .unwrap()
                         .with_timezone(&Utc)
                         .into(),
-                )),
+                ),
                 ParseTimestampFn::new("%d/%m/%Y:%H:%M:%S %z", Box::new(Path::from("foo")), None),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
