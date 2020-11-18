@@ -269,7 +269,7 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
         Encoding::Avro => {
-            let schema = avro_rs::Schema::parse_str(encoding.schema().as_ref().unwrap()).unwrap();
+            let schema = avro_rs::Schema::parse_str(encoding.schema().as_ref()?)?;
             let value = avro_rs::to_value(log).unwrap();
             let resolved_value = avro_rs::types::Value::resolve(value, &schema).unwrap();
             avro_rs::to_avro_datum(&schema, resolved_value).unwrap()
