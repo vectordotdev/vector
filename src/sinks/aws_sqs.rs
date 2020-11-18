@@ -241,16 +241,7 @@ impl RetryLogic for SqsRetryLogic {
     type Response = SendMessageResult;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::HttpDispatch(_) => true,
-            RusotoError::Unknown(res)
-                if res.status.is_server_error()
-                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-            {
-                true
-            }
-            _ => false,
-        }
+        rusoto::is_retriable_error(error)
     }
 }
 
