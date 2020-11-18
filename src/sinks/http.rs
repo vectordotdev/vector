@@ -133,13 +133,16 @@ impl SinkConfig for HttpSinkConfig {
             .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
+        let acker = cx.acker();
+        let on_success = Box::new(move |num_to_ack| acker.ack(num_to_ack));
+
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, Compression::None),
             request,
             batch.timeout,
             client.clone(),
-            cx.acker(),
+            on_success,
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 

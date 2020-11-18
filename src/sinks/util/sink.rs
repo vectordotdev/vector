@@ -103,8 +103,8 @@ where
     S::Response: Response,
     B: Batch<Output = Request>,
 {
-    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
-        let service = ServiceSink::new(service, acker);
+    pub fn new(service: S, batch: B, timeout: Duration, on_success: BatchOnSuccess) -> Self {
+        let service = ServiceSink::new(service, on_success);
 
         Self {
             service,
@@ -283,7 +283,7 @@ where
     S::Response: Response,
 {
     pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
-        let service = ServiceSink::new(service, acker);
+        let service = ServiceSink::new(service, acker.into());
 
         Self {
             service,
@@ -445,7 +445,7 @@ where
 struct ServiceSink<S, Request> {
     service: S,
     in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
-    acker: Acker,
+    on_success: BatchOnSuccess,
     seq_head: usize,
     seq_tail: usize,
     pending_acks: HashMap<usize, usize>,
@@ -460,11 +460,11 @@ where
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
 {
-    fn new(service: S, acker: Acker) -> Self {
+    fn new(service: S, on_success: BatchOnSuccess) -> Self {
         Self {
             service,
             in_flight: FuturesUnordered::new(),
-            acker,
+            on_success,
             seq_head: 0,
             seq_tail: 0,
             pending_acks: HashMap::new(),
@@ -529,7 +529,7 @@ where
                         self.seq_tail += 1
                     }
                     trace!(message = "Acking events.", acking_num = num_to_ack);
-                    self.acker.ack(num_to_ack);
+                    (self.on_success)(num_to_ack);
                 }
                 Some(Err(_)) => panic!("ServiceSink service sender dropped."),
                 None => break,
@@ -547,11 +547,20 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ServiceSink")
             .field("service", &self.service)
-            .field("acker", &self.acker)
             .field("seq_head", &self.seq_head)
             .field("seq_tail", &self.seq_tail)
             .field("pending_acks", &self.pending_acks)
             .finish()
+    }
+}
+
+// === BatchOnSuccess ===
+
+pub type BatchOnSuccess = Box<dyn Fn(usize) + Send>;
+
+impl From<Acker> for BatchOnSuccess {
+    fn from(acker: Acker) -> Self {
+        Box::new(move |num_to_ack| acker.ack(num_to_ack))
     }
 }
 
@@ -970,7 +979,7 @@ mod tests {
                 future::ok("good")
             }
         });
-        let mut sink = ServiceSink::new(svc, acker);
+        let mut sink = ServiceSink::new(svc, acker.into());
 
         // send some initial requests
         let mut fut1 = sink.call(1, 1);

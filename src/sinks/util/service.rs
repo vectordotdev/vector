@@ -2,7 +2,7 @@ use super::{
     auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings},
     retries::{FixedRetryPolicy, RetryLogic},
     sink::Response,
-    Batch, BatchSink, Partition, PartitionBatchSink,
+    Batch, BatchOnSuccess, BatchSink, Partition, PartitionBatchSink,
 };
 use crate::buffers::Acker;
 use futures::TryFutureExt;
@@ -261,7 +261,7 @@ impl TowerRequestSettings {
         service: S,
         batch: B,
         batch_timeout: Duration,
-        acker: Acker,
+        on_success: BatchOnSuccess,
     ) -> TowerBatchedSink<S, B, L, Request>
     // Would like to return `impl Sink + SinkExt<T>` here, but that
     // doesn't work with later calls to `batched_with_min` etc (via
@@ -280,7 +280,7 @@ impl TowerRequestSettings {
             self.service(retry_logic, service),
             batch,
             batch_timeout,
-            acker,
+            on_success,
         )
     }
 

@@ -1,6 +1,7 @@
 use super::{
     retries::{RetryAction, RetryLogic},
-    sink, Batch, Partition, TowerBatchedSink, TowerPartitionSink, TowerRequestSettings,
+    sink, Batch, BatchOnSuccess, Partition, TowerBatchedSink, TowerPartitionSink,
+    TowerRequestSettings,
 };
 use crate::{buffers::Acker, http::HttpClient, Event};
 use bytes::{Buf, Bytes};
@@ -74,7 +75,7 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
+        on_success: BatchOnSuccess,
     ) -> Self {
         Self::with_retry_logic(
             sink,
@@ -83,7 +84,7 @@ where
             request_settings,
             batch_timeout,
             client,
-            acker,
+            on_success,
         )
     }
 }
@@ -102,7 +103,7 @@ where
         request_settings: TowerRequestSettings,
         batch_timeout: Duration,
         client: HttpClient,
-        acker: Acker,
+        on_success: BatchOnSuccess,
     ) -> Self {
         let sink = Arc::new(sink);
 
@@ -114,7 +115,7 @@ where
             };
 
         let svc = HttpBatchService::new(client, request_builder);
-        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, acker);
+        let inner = request_settings.batch_sink(logic, svc, batch, batch_timeout, on_success);
 
         Self {
             sink,
