@@ -239,4 +239,71 @@ components: sources: aws_s3: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		sqs_message_delete_failed_total: {
+			description:       "The total number of failures to delete SQS messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
+		}
+
+		sqs_message_delete_succeeded_total: {
+			description:       "The total number of successful deletions of SQS messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
+		}
+
+		sqs_message_processing_failed_total: {
+			description:       "The total number of failures to process SQS messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
+		}
+
+		sqs_message_processing_succeeded_total: {
+			description:       "The total number of SQS messages successfully processed."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
+		}
+
+		sqs_message_receive_failed_total: {
+			description:       "The total number of failures to receive SQS messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
+		}
+
+		sqs_message_receive_succeeded_total: {
+			description:       "The total number of times successfully receiving SQS messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
+		}
+
+		sqs_message_received_messages_total: {
+			description:       "The total number of received SQS messages."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              telemetry.metrics._component_tags
+		}
+
+		sqs_s3_event_record_ignored_total: {
+			description:       "The total number of times an S3 record in an SQS message was ignored (for an event that was not `ObjectCreated`)."
+			type:              "counter"
+			default_namespace: "vector"
+
+			tags: telemetry.metrics._component_tags & {
+				ignore_type: {
+					description: "The reason for ignoring the S3 record"
+					required:    true
+					options: [
+						"invalid_event_kind",
+					]
+				}
+			}
+		}
+	}
 }
