@@ -223,7 +223,12 @@ impl RetryLogic for KinesisFirehoseRetryLogic {
         match error {
             RusotoError::HttpDispatch(_) => true,
             RusotoError::Service(PutRecordBatchError::ServiceUnavailable(_)) => true,
-            RusotoError::Unknown(res) if res.status.is_server_error() => true,
+            RusotoError::Unknown(res)
+                if res.status.is_server_error()
+                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+            {
+                true
+            }
             _ => false,
         }
     }
