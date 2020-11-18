@@ -195,9 +195,10 @@ where
                     let batch = self.batch.fresh_replace();
                     self.linger = None;
 
-                    let batch_size = batch.num_items();
+                    let num_items = batch.num_items();
+                    let num_bytes = batch.num_bytes();
                     let request = batch.finish();
-                    tokio::spawn(self.service.call(request, batch_size));
+                    tokio::spawn(self.service.call(request, num_items, num_bytes));
 
                     continue;
                 }
@@ -385,9 +386,10 @@ where
                     let batch = self.partitions.remove(&partition).unwrap();
                     self.lingers.remove(&partition);
 
-                    let batch_size = batch.num_items();
+                    let num_items = batch.num_items();
+                    let num_bytes = batch.num_bytes();
                     let request = batch.finish();
-                    tokio::spawn(self.service.call(request, batch_size));
+                    tokio::spawn(self.service.call(request, num_items, num_bytes));
 
                     batch_consumed = true;
                 } else {
@@ -444,11 +446,11 @@ where
 
 struct ServiceSink<S, Request> {
     service: S,
-    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
+    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize, usize)>>,
     on_success: BatchOnSuccess,
     seq_head: usize,
     seq_tail: usize,
-    pending_acks: HashMap<usize, usize>,
+    pending_acks: HashMap<usize, (usize, usize)>,
     next_request_id: usize,
     _pd: PhantomData<Request>,
 }
@@ -477,7 +479,7 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: Request, batch_size: usize) -> BoxFuture<'static, ()> {
+    fn call(&mut self, req: Request, num_items: usize, num_bytes: usize) -> BoxFuture<'static, ()> {
         let seqno = self.seq_head;
         self.seq_head += 1;
 
@@ -511,7 +513,7 @@ where
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
                 // ignore for now.
-                let _ = tx.send((seqno, batch_size));
+                let _ = tx.send((seqno, num_items, num_bytes));
             })
             .instrument(info_span!("request", %request_id))
             .boxed()
@@ -520,16 +522,20 @@ where
     fn poll_complete(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         while !self.in_flight.is_empty() {
             match ready!(Pin::new(&mut self.in_flight).poll_next(cx)) {
-                Some(Ok((seqno, batch_size))) => {
-                    self.pending_acks.insert(seqno, batch_size);
+                Some(Ok((seqno, num_items, num_bytes))) => {
+                    self.pending_acks.insert(seqno, (num_items, num_bytes));
 
-                    let mut num_to_ack = 0;
-                    while let Some(ack_size) = self.pending_acks.remove(&self.seq_tail) {
-                        num_to_ack += ack_size;
+                    let mut total_items = 0;
+                    let mut total_bytes = 0;
+                    while let Some((num_items, num_bytes)) =
+                        self.pending_acks.remove(&self.seq_tail)
+                    {
+                        total_items += num_items;
+                        total_bytes += num_bytes;
                         self.seq_tail += 1
                     }
-                    trace!(message = "Acking events.", acking_num = num_to_ack);
-                    (self.on_success)(num_to_ack);
+                    trace!(message = "Acking events.", acking_num = total_items);
+                    (self.on_success)(total_items, total_bytes);
                 }
                 Some(Err(_)) => panic!("ServiceSink service sender dropped."),
                 None => break,
@@ -556,11 +562,11 @@ where
 
 // === BatchOnSuccess ===
 
-pub type BatchOnSuccess = Box<dyn Fn(usize) + Send>;
+pub type BatchOnSuccess = Box<dyn Fn(usize, usize) + Send>;
 
 impl From<Acker> for BatchOnSuccess {
     fn from(acker: Acker) -> Self {
-        Box::new(move |num_to_ack| acker.ack(num_to_ack))
+        Box::new(move |num_to_ack, _total_bytes| acker.ack(num_to_ack))
     }
 }
 
