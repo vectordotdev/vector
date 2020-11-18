@@ -1243,6 +1243,8 @@ components: {
 					"parse_failed",
 					"render_error",
 					"type_conversion_failed",
+					"type_field_does_not_exist",
+					"type_ip_address_parse_error",
 					"value_invalid",
 				]
 			}
