@@ -177,6 +177,10 @@ impl Batch for LokiBuffer {
     fn num_items(&self) -> usize {
         self.num_items
     }
+
+    fn num_bytes(&self) -> usize {
+        self.num_bytes
+    }
 }
 
 #[cfg(test)]

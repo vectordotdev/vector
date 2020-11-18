@@ -68,6 +68,10 @@ impl Batch for JsonArrayBuffer {
     fn num_items(&self) -> usize {
         self.buffer.len()
     }
+
+    fn num_bytes(&self) -> usize {
+        self.total_bytes
+    }
 }
 
 #[cfg(test)]

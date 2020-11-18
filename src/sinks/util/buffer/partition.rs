@@ -64,6 +64,10 @@ where
     fn num_items(&self) -> usize {
         self.inner.num_items()
     }
+
+    fn num_bytes(&self) -> usize {
+        self.inner.num_bytes()
+    }
 }
 
 impl<T, K> PartitionInnerBuffer<T, K> {
