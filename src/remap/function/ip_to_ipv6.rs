@@ -1,0 +1,105 @@
+use std::net::IpAddr;
+
+use remap::prelude::*;
+
+#[derive(Clone, Copy, Debug)]
+pub struct IpToIpv6;
+
+impl Function for IpToIpv6 {
+    fn identifier(&self) -> &'static str {
+        "ip_to_ipv6"
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &[Parameter {
+            keyword: "value",
+            accepts: |v| matches!(v, Value::String(_)),
+            required: true,
+        }]
+    }
+
+    fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+        let value = arguments.required_expr("value")?;
+
+        Ok(Box::new(IpToIpv6Fn { value }))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct IpToIpv6Fn {
+    value: Box<dyn Expression>,
+}
+
+impl IpToIpv6Fn {
+    #[cfg(test)]
+    fn new(value: Box<dyn Expression>) -> Self {
+        Self { value }
+    }
+}
+
+impl Expression for IpToIpv6Fn {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let value = required!(state, object, self.value,
+                              Value::String(bytes) => String::from_utf8_lossy(&bytes).into_owned());
+
+        let ip = value
+            .parse()
+            .map_err(|err| format!("unable to parse IP address: {}", err))?;
+
+        match ip {
+            IpAddr::V4(addr) => Ok(Value::from(addr.to_ipv6_mapped().to_string())),
+            IpAddr::V6(addr) => Ok(Value::from(addr.to_string())),
+        }
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::String)
+            .with_constraint(value::Kind::String)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::map;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| IpToIpv6Fn { value : Literal::from("192.168.0.1").boxed() },
+            def: TypeDef { kind: value::Kind::String, ..Default::default() },
+        }
+    ];
+
+    #[test]
+    fn ip_to_ipv6() {
+        let cases = vec![
+            (
+                map!["foo": "i am not an ipaddress"],
+                Err("function call error: unable to parse IP address: invalid IP address syntax".to_string()),
+                IpToIpv6Fn::new(Box::new(Path::from("foo"))),
+            ),
+            (
+                map!["foo": "192.168.0.1"],
+                Ok(Value::from("::ffff:192.168.0.1")),
+                IpToIpv6Fn::new(Box::new(Path::from("foo"))),
+            ),
+            (
+                map!["foo": "2404:6800:4003:c02::64"],
+                Ok(Value::from("2404:6800:4003:c02::64")),
+                IpToIpv6Fn::new(Box::new(Path::from("foo"))),
+            ),
+        ];
+
+        let mut state = state::Program::default();
+
+        for (mut object, exp, func) in cases {
+            let got = func
+                .execute(&mut state, &mut object)
+                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
+
+            assert_eq!(got, exp);
+        }
+    }
+}
