@@ -65,7 +65,7 @@ installation: _interfaces: helm: {
 						cat <<-VALUES > values.yaml
 						# Configure vect to send the logs from the built-in `kubernetes_logs`
 						# source to the stdout.
-						vector-\(_role):
+						vector-agent:
 						  sinks:
 						    stdout:
 						      type: console
