@@ -1145,7 +1145,7 @@ components: {
 			}
 
 			// Windows metrics
-			_windows_service_does_not_exist: {
+			_windows_service_does_not_exist_total: {
 				description: """
 					The total number of errors raised due to the Windows service not
 					existing.
@@ -1154,7 +1154,7 @@ components: {
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags
 			}
-			_windows_service_install: {
+			_windows_service_install_total: {
 				description: """
 					The total number of times the Windows service has been installed.
 					"""
@@ -1162,7 +1162,7 @@ components: {
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags
 			}
-			_windows_service_restart: {
+			_windows_service_restart_total: {
 				description: """
 					The total number of times the Windows service has been restarted.
 					"""
@@ -1170,7 +1170,7 @@ components: {
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags
 			}
-			_windows_service_start: {
+			_windows_service_start_total: {
 				description: """
 					The total number of times the Windows service has been started.
 					"""
@@ -1178,7 +1178,7 @@ components: {
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags
 			}
-			_windows_service_stop: {
+			_windows_service_stop_total: {
 				description: """
 					The total number of times the Windows service has been stopped.
 					"""
@@ -1186,7 +1186,7 @@ components: {
 				default_namespace: "vector"
 				tags:              _internal_metrics_tags
 			}
-			_windows_service_uninstall: {
+			_windows_service_uninstall_total: {
 				description: """
 					The total number of times the Windows service has been uninstalled.
 					"""
