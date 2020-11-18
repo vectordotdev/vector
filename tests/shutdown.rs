@@ -101,7 +101,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
         .unwrap();
 
     // Give vector time to start.
-    sleep(Duration::from_secs(1));
+    sleep(Duration::from_secs(2));
 
     // Check if vector is still running
     assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early.");
