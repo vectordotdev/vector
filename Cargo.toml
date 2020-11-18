@@ -79,7 +79,6 @@ metrics-tracing-context = { version = "0.1.0-alpha"  }
 rusoto_core = { version = "0.45.0", features = ["encoding"], optional = true }
 rusoto_es = { version = "0.45.0", optional = true }
 rusoto_s3 = { version = "0.45.0", optional = true }
-rusoto_sqs = { version = "0.45.0", optional = true }
 rusoto_logs = { version = "0.45.0", optional = true }
 rusoto_cloudwatch = { version = "0.45.0", optional = true }
 rusoto_kinesis = { version = "0.45.0", optional = true }
@@ -87,6 +86,7 @@ rusoto_credential = { version = "0.45.0", optional = true }
 rusoto_firehose = { version = "0.45.0", optional = true }
 rusoto_sts = { version = "0.45.0", optional = true }
 rusoto_signature = { version = "0.45.0", optional = true }
+rusoto_sqs = { version = "0.45.0", optional = true }
 
 # Tower
 tower = { version = "0.3.1", git = "https://github.com/tower-rs/tower", rev = "43168944220ed32dab83cb4f11f7b97abc5818d5", features = ["buffer", "limit", "retry", "timeout", "util"] }
@@ -419,6 +419,7 @@ sinks = [
   "sinks-aws_kinesis_firehose",
   "sinks-aws_kinesis_streams",
   "sinks-aws_s3",
+  "sinks-aws_sqs",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-clickhouse",
@@ -450,6 +451,7 @@ sinks-aws_cloudwatch_metrics = ["rusoto_core", "rusoto_credential", "rusoto_sign
 sinks-aws_kinesis_firehose = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_firehose"]
 sinks-aws_kinesis_streams = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_kinesis"]
 sinks-aws_s3 = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3"]
+sinks-aws_sqs = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_sqs"]
 sinks-azure_monitor_logs = ["bytesize"]
 sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
@@ -507,6 +509,7 @@ aws-integration-tests = [
   "aws-kinesis-firehose-integration-tests",
   "aws-kinesis-streams-integration-tests",
   "aws-s3-integration-tests",
+  "aws-sqs-integration-tests",
 ]
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
 aws-cloudwatch-metrics-integration-tests = ["sinks-aws_cloudwatch_metrics"]
@@ -515,6 +518,7 @@ aws-ecs-metrics-integration-tests = ["sources-aws_ecs_metrics"]
 aws-kinesis-firehose-integration-tests = ["sinks-aws_kinesis_firehose", "sinks-elasticsearch", "rusoto_es"]
 aws-kinesis-streams-integration-tests = ["sinks-aws_kinesis_streams"]
 aws-s3-integration-tests = ["sources-aws_s3", "sinks-aws_s3"]
+aws-sqs-integration-tests = ["sinks-aws_sqs"]
 clickhouse-integration-tests = ["sinks-clickhouse", "warp"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 es-integration-tests = ["sinks-elasticsearch"]
