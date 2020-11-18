@@ -42,10 +42,6 @@ mod tests {
     fn not() {
         let cases = vec![
             (
-                Err("path error".to_string()),
-                Not::new(Box::new(Path::from("foo").into())),
-            ),
-            (
                 Ok(false.into()),
                 Not::new(Box::new(Literal::from(true).into())),
             ),

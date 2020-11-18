@@ -231,11 +231,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                FormatNumberFn::new(Box::new(Path::from("foo")), None, None, None),
-            ),
-            (
-                map![],
                 Ok("1234.567".into()),
                 FormatNumberFn::new(Box::new(Literal::from(1234.567)), None, None, None),
             ),

@@ -122,11 +122,6 @@ mod tests {
     fn sha2() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                Sha2Fn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
                 map!["foo": "foo"],
                 Ok("d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d".into()),
                 Sha2Fn::new(Box::new(Path::from("foo")), None),

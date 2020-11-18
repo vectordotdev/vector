@@ -161,11 +161,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                EndsWithFn::new(Box::new(Path::from("foo")), "", false),
-            ),
-            (
-                map![],
                 Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "foo", false),
             ),
