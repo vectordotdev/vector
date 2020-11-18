@@ -171,10 +171,7 @@ impl WasmModule {
                 Ok(out)
             }
             Err(lucet_runtime::Error::RuntimeFault(fault)) => {
-                let error = format!(
-                    "WASM instance faulted, resetting: {:?}",
-                    fault.clone().rip_addr_details.and_then(|v| v.file_name)
-                );
+                let error = format!("WASM instance faulted, resetting: {:?}", fault);
                 internal_event_processing.error(error);
                 self.instance.reset()?;
                 Ok(Default::default())

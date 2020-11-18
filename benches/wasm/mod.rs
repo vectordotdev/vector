@@ -120,6 +120,8 @@ fn bench_group_transforms_over_parameterized_event_sizes(
     transforms: Vec<(&str, Transform)>,
     parameters: Vec<usize>,
 ) {
+    vector::test_util::trace_init();
+
     let mut group = criterion.benchmark_group(group);
 
     for (name, transform) in transforms {
