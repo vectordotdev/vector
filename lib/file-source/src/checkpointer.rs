@@ -204,9 +204,9 @@ impl Checkpointer {
         // First write the new checkpoints to a tmp file and flush it fully to disk. If vector
         // dies anywhere during this section, the existing stable file will still be in its current
         // valid state and we'll be able to recover.
-        let mut f = fs::File::create(&self.tmp_file_path)?;
+        let mut f = io::BufWriter::new(fs::File::create(&self.tmp_file_path)?);
         serde_json::to_writer(&mut f, &self.checkpoints.get_state())?;
-        f.sync_all()?;
+        f.into_inner()?.sync_all()?;
 
         // Once the temp file is fully flushed, rename the tmp file to replace the previous stable
         // file. This is an atomic operation on POSIX systems (and the stdlib claims to provide
