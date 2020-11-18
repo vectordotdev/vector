@@ -421,7 +421,6 @@ jobs:
       - cancel-previous
       - cross-linux
       - test-linux
-      - test-wasm
       - test-mac
       - test-windows
       - test-misc
