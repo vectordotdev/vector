@@ -18,19 +18,38 @@ installation: _interfaces: homebrew: {
 	roles: {
 		_commands: roles._bash_configure & {
 			_config_path: paths.config
-			install: #"""
-				curl -1sLf \
-				  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
-				  | sudo -E bash
-				"""#
-			logs:      "sudo journalctl -fu vector"
-			reload:    "systemctl kill -s HUP --kill-who=main vector.service"
-			start:     "sudo systemctl start vector"
-			stop:      "sudo systemctl stop vector"
-			uninstall: "brew remove vector"
-			upgrade:   "brew update && brew upgrade vector"
+			install:      "brew tap timberio/brew && brew install vector"
+			logs:         "tail -f /usr/local/var/log/vector.log"
+			reload:       #"ps axf | grep vector | grep -v grep | awk '{print "kill -SIGHUP " $1}' | sh"#
+			restart:      "brew services restart vector"
+			start:        "brew services start vector"
+			stop:         "brew services stop vector"
+			uninstall:    "brew remove vector"
+			upgrade:      "brew update && brew upgrade vector"
 		}
-		agent:      roles._file_agent & {commands:        _commands}
-		aggregator: roles._vector_aggregator & {commands: _commands}
+		_tutorials: {
+			installation: [
+				{
+					title:   "Install Vector"
+					command: _commands.install
+				},
+				{
+					title:   "Configure Vector"
+					command: _commands.configure
+				},
+				{
+					title:   "Restart Vector"
+					command: _commands.restart
+				},
+			]
+		}
+		agent: roles._file_agent & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
+		aggregator: roles._vector_aggregator & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
 	}
 }

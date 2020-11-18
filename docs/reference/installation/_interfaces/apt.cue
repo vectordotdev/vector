@@ -18,16 +18,40 @@ installation: _interfaces: apt: {
 	roles: {
 		_commands: roles._systemd_commands & roles._bash_configure & {
 			_config_path: paths.config
-			install: #"""
-				curl -1sLf \
-				  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
-				  | sudo -E bash && \
-				  sudo apt-get install vector
-				"""#
+			install:
+				#"""
+					curl -1sLf \
+					  'https://repositories.timber.io/public/vector/cfg/setup/bash.deb.sh' \
+					  | sudo -E bash && \
+					  sudo apt-get install vector
+					"""#
 			uninstall: "sudo apt remove vector"
 			upgrade:   "sudo apt-get upgrade vector"
 		}
-		agent:      roles._journald_agent & {commands:    _commands}
-		aggregator: roles._vector_aggregator & {commands: _commands}
+		_tutorials: {
+			_commands: _
+			installation: [
+				{
+					title:   "Install Vector"
+					command: _commands.install
+				},
+				{
+					title:   "Configure Vector"
+					command: _commands.configure
+				},
+				{
+					title:   "Restart Vector"
+					command: _commands.restart
+				},
+			]
+		}
+		agent: roles._journald_agent & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
+		aggregator: roles._vector_aggregator & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
 	}
 }

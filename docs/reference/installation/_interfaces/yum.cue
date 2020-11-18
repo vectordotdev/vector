@@ -27,7 +27,30 @@ installation: _interfaces: yum: {
 			uninstall: "sudo yum remove vector"
 			upgrade:   "sudo yum upgrade vector"
 		}
-		agent:      roles._journald_agent & {commands:    _commands}
-		aggregator: roles._vector_aggregator & {commands: _commands}
+		_tutorials: {
+			_commands: _
+			installation: [
+				{
+					title:   "Install Vector"
+					command: _commands.install
+				},
+				{
+					title:   "Configure Vector"
+					command: _commands.configure
+				},
+				{
+					title:   "Restart Vector"
+					command: _commands.restart
+				},
+			]
+		}
+		agent: roles._journald_agent & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
+		aggregator: roles._vector_aggregator & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
 	}
 }

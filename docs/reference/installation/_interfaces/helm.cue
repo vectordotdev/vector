@@ -18,19 +18,24 @@ installation: _interfaces: helm: {
 	platform_name:        installation.platforms.kubernetes.name
 	roles: {
 		_commands: {
-			_role:       string
-			configure:   #"""
+			_name:          string
+			_resource_type: string
+			configure:      #"""
 						cat <<-VECTORCFG > \#(paths.config)
 						{config}
 						VECTORCFG
 						"""#
-			install:     "kubectl apply -k ."
-			logs:        #"kubectl logs -n vector daemonset/vector-\#(_role)"#
-			reconfigure: #"kubectl edit daemonset vector-\#(_role)"#
-			reload:      #"kubectl rollout restart daemonset/vector-\#(_role)"#
+			install: #"""
+				 helm repo add timberio-nightly https://packages.timber.io/helm/nightly && \
+					helm install vector timberio/\(_name) --devel --values values.yaml --namespace vector --create-namespace
+				"""#
+			logs:        #"kubectl logs -n vector \#(_resource_type)/\#(_name)"#
+			reconfigure: #"kubectl edit \#(_resource_type) \#(_name)"#
+			reload:      #"kubectl rollout restart \#(_resource_type)/\#(_name)"#
+			restart:     #"kubectl rollout restart \#(_resource_type)/\#(_name)"#
 			start:       null
 			stop:        null
-			uninstall:   "kubectl delete -k ."
+			uninstall:   "helm uninstall --namespace vector \(_name)"
 			upgrade:     "helm upgrade vector timberio/vector --version {version}"
 		}
 		agent: {
@@ -50,9 +55,32 @@ installation: _interfaces: helm: {
 						"""#
 
 			commands: _commands & {
-				_role: "agent"
-				variables: config: sources: in: type: components.sources.kubernetes_logs.type
+				_name:          "vector-agent"
+				_resource_type: "daemonset"
 			}
+			tutorials: installation: [
+				{
+					title: "Configure Vector"
+					command: #"""
+						cat <<-VALUES > values.yaml
+						# Configure vect to send the logs from the built-in `kubernetes_logs`
+						# source to the stdout.
+						vector-\(_role):
+						  sinks:
+						    stdout:
+						      type: console
+						      inputs: ["kubernetes_logs"]
+						      rawConfig: |
+						        target = "stdout"
+						        encoding = "json"
+						VALUES
+						"""#
+				},
+				{
+					title:   "Install Vector"
+					command: commands.install
+				},
+			]
 		}
 		aggregator: {
 			title:       "Aggregator"
@@ -70,17 +98,31 @@ installation: _interfaces: helm: {
 							"""#
 
 			commands: _commands & {
-				_role: "aggregator"
+				_name:          "vector-aggregator"
+				_resource_type: "statefulset"
 				variables: config: sources: in: type: components.sources.vector.type
 			}
-		}
-		god_mode: {
-			commands: _commands & {
-				_role: "god_mode"
-				variables: config: sources: in: type: components.sources.vector.type
-			}
-			description: "test"
-			title:       "God Mode"
+			tutorials: installation: [
+				{
+					title: "Configure Vector"
+					command: #"""
+						cat <<-VALUES > values.yaml
+						vector-aggregator:
+						  sinks:
+						    stdout:
+						      type: console
+						      inputs: ["kubernetes_logs"]
+						      rawConfig: |
+						        target = "stdout"
+						        encoding = "json"
+						VALUES
+						"""#
+				},
+				{
+					title:   "Install Vector"
+					command: commands.install
+				},
+			]
 		}
 	}
 }

@@ -2,11 +2,12 @@ package metadata
 
 installation: close({
 	#Commands: {
-		configure:   string
+		configure:   string | null
 		install:     string | null
 		logs:        string | null
 		reconfigure: string | null
 		reload:      string | null
+		restart:     string | null
 		start:       string | null
 		stop:        string | null
 		top:         string | null | *"vector top"
@@ -20,17 +21,17 @@ installation: close({
 				sinks?:      _
 			}
 			config: {
-				sources: [Name=string]: {
+				api?: {
+					enabled: bool
+				}
+
+				sources?: [Name=string]: {
 					type: string
 
 					if type == "file" {
 						include: [string, ...string]
 					}
 				}
-
-				api: enabled: true
-
-				sources: internal_metrics: type: "internal_metrics"
 
 				sinks: out: {
 					type:   "console"
@@ -60,9 +61,9 @@ installation: close({
 		archs: [#Arch, ...#Arch]
 		description: string
 		paths: {
-			bin:         string
-			bin_in_path: bool
-			config:      string
+			bin:         string | null
+			bin_in_path: bool | null
+			config:      string | null
 		}
 		roles: {
 			_bash_configure: {
@@ -75,12 +76,16 @@ installation: close({
 				reconfigure:  "vi \(_config_path)"
 			}
 			_file_agent: {
-				commands: variables: config: sources: {
-					logs: {
-						type:    components.sources.file.type
-						include: [string, ...string] | *["/var/log/**/*.log"]
+				commands: variables: config: {
+					api: enabled: true
+					sources: {
+						logs: {
+							type:    components.sources.file.type
+							include: [string, ...string] | *["/var/log/**/*.log"]
+						}
+						host_metrics: type:     components.sources.host_metrics.type
+						internal_metrics: type: "internal_metrics"
 					}
-					host_metrics: type: components.sources.host_metrics.type
 				}
 				description: #"""
 							The agent role is designed to collect all data on
@@ -97,12 +102,16 @@ installation: close({
 				title:       "Agent"
 			}
 			_file_sidecar: {
-				commands: variables: config: sources: {
-					logs: {
-						type:    components.sources.file.type
-						include: [string, ...string] | *["/var/log/my-app*.log"]
+				commands: variables: config: {
+					api: enabled: true
+					sources: {
+						logs: {
+							type:    components.sources.file.type
+							include: [string, ...string] | *["/var/log/my-app*.log"]
+						}
+						host_metrics: type:     components.sources.host_metrics.type
+						internal_metrics: type: "internal_metrics"
 					}
-					host_metrics: type: components.sources.host_metrics.type
 				}
 				description: #"""
 							The sidecar role is designed to collect data from
@@ -120,9 +129,13 @@ installation: close({
 				title:       "Sidecar"
 			}
 			_journald_agent: {
-				commands: variables: config: sources: {
-					logs: type:         components.sources.journald.type
-					host_metrics: type: components.sources.host_metrics.type
+				commands: variables: config: {
+					api: enabled: true
+					sources: {
+						logs: type:             components.sources.journald.type
+						host_metrics: type:     components.sources.host_metrics.type
+						internal_metrics: type: "internal_metrics"
+					}
 				}
 				description: #"""
 							The agent role is designed to collect all data on
@@ -140,13 +153,20 @@ installation: close({
 				title:       "Agent"
 			}
 			_systemd_commands: {
-				logs:   "sudo journalctl -fu vector"
-				reload: "systemctl kill -s HUP --kill-who=main vector.service"
-				start:  "sudo systemctl start vector"
-				stop:   "sudo systemctl stop vector"
+				logs:    "sudo journalctl -fu vector"
+				reload:  "systemctl kill -s HUP --kill-who=main vector.service"
+				restart: "sudo systemctl restart vector"
+				start:   "sudo systemctl start vector"
+				stop:    "sudo systemctl stop vector"
 			}
 			_vector_aggregator: {
-				commands: variables: config: sources: vector: type: components.sources.vector.type
+				commands: variables: config: {
+					api: enabled: true
+					sources: {
+						vector: type:           components.sources.vector.type
+						internal_metrics: type: "internal_metrics"
+					}
+				}
 				description: #"""
 							The aggregator role is designed to receive and
 							process data from multiple upstream agents.
@@ -167,6 +187,7 @@ installation: close({
 			description: string
 			name:        Name
 			title:       string
+			tutorials:   #Tutorials
 		}
 		name:                  string
 		package_manager_name?: string
@@ -201,6 +222,13 @@ installation: close({
 	#Roles: [Name=string]: {
 		name:  Name
 		title: string
+	}
+
+	#Tutorials: {
+		installation: [...{
+			title:   string
+			command: string
+		}]
 	}
 
 	_interfaces:       #Interfaces

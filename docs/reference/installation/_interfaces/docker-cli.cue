@@ -23,8 +23,10 @@ installation: _interfaces: "docker-cli": {
 			install:           null
 			logs:              "docker logs -f $(docker ps -aqf \"name=vector\")"
 			reload:            "docker kill --signal=HUP timberio/vector"
+			restart:           "docker restart -f $(docker ps -aqf \"name=vector\")"
 			start:             #"""
 								docker run \
+								  -d \
 								  -v \#(paths.config):/etc/vector/vector.toml:ro \
 								  -p \#(_api_port):\#(_api_port) \{flags}
 								  timberio/vector:{version}-{variant}
@@ -53,6 +55,19 @@ installation: _interfaces: "docker-cli": {
 				version: true
 			}
 		}
+		_tutorials: {
+			_commands: _
+			installation: [
+				{
+					title:   "Configure Vector"
+					command: _commands.configure
+				},
+				{
+					title:   "Start Vector"
+					command: _commands.start
+				},
+			]
+		}
 		agent: {
 			title:       "Agent"
 			description: #"""
@@ -71,7 +86,13 @@ installation: _interfaces: "docker-cli": {
 				variables: config: sources: logs: type: components.sources.docker.type
 			}
 		}
-		sidecar:    roles._file_sidecar & {commands:      _commands}
-		aggregator: roles._vector_aggregator & {commands: _commands}
+		sidecar: roles._file_sidecar & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
+		aggregator: roles._vector_aggregator & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
 	}
 }

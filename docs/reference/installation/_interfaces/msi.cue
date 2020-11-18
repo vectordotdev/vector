@@ -31,6 +31,7 @@ installation: _interfaces: msi: {
 			logs:        null
 			reconfigure: #"edit \#(paths.config)"#
 			reload:      null
+			restart:     null
 			start:       #"\#(paths.bin) --config \#(paths.config)"#
 			stop:        null
 			uninstall:   #"msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet"#
@@ -40,7 +41,30 @@ installation: _interfaces: msi: {
 				version: true
 			}
 		}
-		agent:      roles._file_agent & {commands:        _commands}
-		aggregator: roles._vector_aggregator & {commands: _commands}
+		_tutorials: {
+			_commands: _
+			installation: [
+				{
+					title:   "Install Vector"
+					command: _commands.install
+				},
+				{
+					title:   "Configure Vector"
+					command: _commands.configure
+				},
+				{
+					title:   "Start Vector"
+					command: _commands.start
+				},
+			]
+		}
+		agent: roles._file_agent & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
+		aggregator: roles._vector_aggregator & {
+			commands:  _commands
+			tutorials: _tutorials & {_commands: commands}
+		}
 	}
 }
