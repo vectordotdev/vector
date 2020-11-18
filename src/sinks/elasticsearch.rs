@@ -23,6 +23,7 @@ use http::{
 };
 use hyper::Body;
 use lazy_static::lazy_static;
+use percent_encoding::percent_decode;
 use rusoto_core::Region;
 use rusoto_credential::{CredentialsError, ProvideAwsCredentials};
 use rusoto_signature::{SignedRequest, SignedRequestPayload};
@@ -82,16 +83,6 @@ pub enum Encoding {
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
     Aws { assume_role: Option<String> },
-}
-
-impl ElasticSearchAuth {
-    pub fn apply<B>(&self, req: &mut Request<B>) {
-        if let Self::Basic { user, password } = &self {
-            use headers::{Authorization, HeaderMapExt};
-            let auth = Authorization::basic(&user, &password);
-            req.headers_mut().typed_insert(auth);
-        }
-    }
 }
 
 inventory::submit! {
@@ -340,31 +331,35 @@ fn get_error_reason(body: &str) -> String {
 
 impl ElasticSearchCommon {
     pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        let authorization = match &config.auth {
-            Some(ElasticSearchAuth::Basic { user, password }) => {
-                let token = format!("{}:{}", user, password);
-                Some(format!("Basic {}", base64::encode(token.as_bytes())))
-            }
-            _ => None,
-        };
-
-        let base_url = config.endpoint.clone();
-        let region = match &config.aws {
-            Some(region) => Region::try_from(region)?,
-            None => region_from_endpoint(&config.endpoint)?,
-        };
-
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.endpoint);
-        let uri = uri
-            .parse::<Uri>()
-            .with_context(|| InvalidHost { host: &base_url })?;
+        let uri = uri.parse::<Uri>().with_context(|| InvalidHost {
+            host: &config.endpoint,
+        })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
                 host: config.endpoint.clone(),
             }
             .into());
         }
+
+        let (base_url, mut authorization) = match get_and_strip_basic_auth(&config.endpoint) {
+            Some((new_url, auth)) => (new_url, Some(auth)),
+            None => (config.endpoint.clone(), None),
+        };
+
+        if let Some(ElasticSearchAuth::Basic { user, password }) = &config.auth {
+            let token = format!("{}:{}", user, password);
+            if authorization.is_some() {
+                warn!("Overwriting authorization config in `endpoint`.");
+            }
+            authorization = Some(format!("Basic {}", base64::encode(token.as_bytes())))
+        }
+
+        let region = match &config.aws {
+            Some(region) => Region::try_from(region)?,
+            None => region_from_endpoint(&base_url)?,
+        };
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
@@ -483,6 +478,24 @@ fn maybe_set_id(key: Option<impl AsRef<str>>, doc: &mut serde_json::Value, event
     }
 }
 
+fn get_and_strip_basic_auth(endpoint: &str) -> Option<(String, String)> {
+    let mut url = url::Url::parse(endpoint).ok()?;
+
+    let username = url.username();
+    let password = url.password().unwrap_or("");
+    if !username.is_empty() {
+        let username = percent_decode(username.as_bytes()).decode_utf8_lossy();
+        let password = percent_decode(password.as_bytes()).decode_utf8_lossy();
+        let token = format!("{}:{}", username, password);
+        let header = format!("Basic {}", base64::encode(token.as_bytes()));
+        url.set_username("").ok()?;
+        url.set_password(None).ok()?;
+        Some((url.to_string(), header))
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -490,6 +503,35 @@ mod tests {
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
+
+    #[test]
+    fn basic_auth_url() {
+        assert_eq!(
+            get_and_strip_basic_auth("http://user:pass@example.com"),
+            Some((
+                "http://example.com/".to_owned(),
+                format!("Basic {}", base64::encode("user:pass"))
+            ))
+        );
+
+        // special character
+        assert_eq!(
+            get_and_strip_basic_auth("http://user:pass;@example.com"),
+            Some((
+                "http://example.com/".to_owned(),
+                format!("Basic {}", base64::encode("user:pass;"))
+            ))
+        );
+
+        // no password
+        assert_eq!(
+            get_and_strip_basic_auth("http://user@example.com"),
+            Some((
+                "http://example.com/".to_owned(),
+                format!("Basic {}", base64::encode("user:"))
+            ))
+        );
+    }
 
     #[test]
     fn generate_config() {
