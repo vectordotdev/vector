@@ -80,11 +80,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                StripAnsiEscapeCodesFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map![],
                 Ok("foo bar".into()),
                 StripAnsiEscapeCodesFn::new(Box::new(Literal::from("foo bar"))),
             ),

@@ -44,9 +44,6 @@ pub enum Error {
 
     #[error("if-statement error")]
     IfStatement(#[from] if_statement::Error),
-
-    #[error("variable error")]
-    Variable(#[from] variable::Error),
 }
 
 pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {

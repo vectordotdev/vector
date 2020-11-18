@@ -195,13 +195,8 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToIntFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::Integer(10)),
-                ToIntFn::new(Box::new(Path::from("foo")), Some(10.into())),
+                ToIntFn::new(Literal::from(vec![0]).boxed(), Some(10.into())),
             ),
             (
                 map!["foo": "20"],

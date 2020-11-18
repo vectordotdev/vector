@@ -213,11 +213,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToTimestampFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Utc.timestamp(10, 0).into()),
                 ToTimestampFn::new(Box::new(Path::from("foo")), Some(10.into())),
             ),

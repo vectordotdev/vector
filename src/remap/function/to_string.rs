@@ -47,9 +47,16 @@ impl ToStringFn {
 
 impl Expression for ToStringFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        use Value::*;
+
         let to_string = |value| match value {
-            Value::Bytes(_) => Ok(value),
-            _ => Ok(value.as_string_lossy()),
+            Bytes(_) => Ok(value),
+            Integer(v) => Ok(v.to_string().into()),
+            Float(v) => Ok(v.to_string().into()),
+            Boolean(v) => Ok(v.to_string().into()),
+            Timestamp(v) => Ok(v.to_string().into()),
+            Null => Ok("".into()),
+            Map(_) | Array(_) => Err("unable to convert value to string".into()),
         };
 
         super::convert_value_or_default(
@@ -180,13 +187,8 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToStringFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::from("default")),
-                ToStringFn::new(Box::new(Path::from("foo")), Some(Value::from("default"))),
+                ToStringFn::new(Literal::from(vec![0]).boxed(), Some("default".into())),
             ),
             (
                 map!["foo": 20],
