@@ -132,9 +132,8 @@ pub async fn build_pieces(
             }
             Transform::Task(t) => {
                 let filtered = filter_event_type(input_rx, input_type);
-                let decorated = Box::new(filtered.map(move |event| {
+                let decorated = Box::new(filtered.inspect(|_| {
                     emit!(EventProcessed);
-                    event
                 }));
                 let transformed: Box<dyn futures01::Stream<Item = _, Error = _> + Send> =
                     t.transform(decorated);
