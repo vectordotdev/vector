@@ -148,13 +148,26 @@ impl WasmModule {
             .as_mut();
         guest_data_buf.copy_from_slice(&data_buf);
 
-        match self.instance.run(
+        let retval = self.instance.run(
             "process",
             &[
                 (guest_data_ptr as u32).into(),
                 (guest_data_size as u32).into(),
             ],
-        ) {
+        );
+
+        let _ = self
+            .instance
+            .run(
+                "drop_buffer",
+                &[
+                    (guest_data_ptr as u32).into(),
+                    (guest_data_size as u32).into(),
+                ],
+            )?
+            .returned()?;
+
+        match retval {
             Ok(_num_events) => {
                 let context::EventBuffer { events: out } = self
                     .instance
@@ -171,10 +184,7 @@ impl WasmModule {
                 Ok(out)
             }
             Err(lucet_runtime::Error::RuntimeFault(fault)) => {
-                let error = format!(
-                    "WASM instance faulted, resetting: {:?}",
-                    fault.clone().rip_addr_details.and_then(|v| v.file_name)
-                );
+                let error = format!("WASM instance faulted, resetting: {:?}", fault);
                 internal_event_processing.error(error);
                 self.instance.reset()?;
                 Ok(Default::default())

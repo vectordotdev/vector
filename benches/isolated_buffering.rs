@@ -1,13 +1,11 @@
 use async_trait::async_trait;
-use criterion::{criterion_group, criterion_main, Benchmark, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{
     compat::{Future01CompatExt, Stream01CompatExt},
     stream::BoxStream,
     StreamExt,
 };
 use futures01::{stream, Sink, Stream};
-use rand::distributions::Alphanumeric;
-use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 use tempfile::tempdir;
 use vector::{
     buffers::{
@@ -15,7 +13,7 @@ use vector::{
         Acker,
     },
     sinks::util::StreamSink,
-    test_util::runtime,
+    test_util::{random_lines, runtime},
     Event,
 };
 
@@ -38,178 +36,160 @@ impl StreamSink for NullSink {
 }
 
 fn benchmark_buffers(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
+    let num_lines: usize = 10_000;
     let line_size: usize = 200;
 
-    let data_dir = tempdir().unwrap();
-    let data_dir = data_dir.path().to_path_buf();
-    let data_dir2 = data_dir.clone();
-    let data_dir3 = data_dir.clone();
+    let mut group = c.benchmark_group("isolated_buffers");
+    group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
-    c.bench(
-        "buffers",
-        Benchmark::new("channels/futures01", move |b| {
-            b.iter_with_setup(
-                || {
-                    let rt = runtime();
+    group.bench_function("channels/futures01", |b| {
+        b.iter_batched(
+            || {
+                let rt = runtime();
 
-                    let (writer, reader) = futures01::sync::mpsc::channel(100);
-                    let writer = writer.sink_map_err(|e| panic!(e));
+                let (writer, reader) = futures01::sync::mpsc::channel(100);
+                let writer = writer.sink_map_err(|e| panic!(e));
 
-                    let read_loop = reader.for_each(move |_| Ok(()));
+                let read_loop = reader.for_each(move |_| Ok(()));
 
-                    (rt, writer, read_loop)
-                },
-                |(mut rt, writer, read_loop)| {
-                    let send = writer.send_all(random_events(line_size).take(num_lines as u64));
+                (rt, writer, read_loop)
+            },
+            |(mut rt, writer, read_loop)| {
+                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
 
-                    let read_handle = rt.spawn(read_loop.compat());
-                    let write_handle = rt.spawn(send.compat());
+                let read_handle = rt.spawn(read_loop.compat());
+                let write_handle = rt.spawn(send.compat());
 
-                    let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
-                    drop(writer);
+                let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
+                drop(writer);
 
-                    rt.block_on(read_handle).unwrap().unwrap();
-                },
-            );
-        })
-        .with_function("channels/tokio", move |b| {
-            b.iter_with_setup(
-                || {
-                    let rt = runtime();
+                rt.block_on(read_handle).unwrap().unwrap();
+            },
+            BatchSize::SmallInput,
+        );
+    });
 
-                    let (writer, mut reader) = tokio::sync::mpsc::channel(100);
+    group.bench_function("channels/tokio", |b| {
+        b.iter_batched(
+            || {
+                let rt = runtime();
 
-                    let read_handle =
-                        rt.spawn(async move { while reader.next().await.is_some() {} });
+                let (writer, mut reader) = tokio::sync::mpsc::channel(100);
 
-                    (rt, writer, read_handle)
-                },
-                |(mut rt, mut writer, read_handle)| {
-                    let write_handle = rt.spawn(async move {
-                        let mut stream = random_events(line_size).take(num_lines as u64).compat();
-                        while let Some(e) = stream.next().await {
-                            writer.send(e).await.unwrap();
-                        }
-                    });
+                let read_handle = rt.spawn(async move { while reader.next().await.is_some() {} });
 
-                    rt.block_on(write_handle).unwrap();
-                    rt.block_on(read_handle).unwrap();
-                },
-            );
-        })
-        .with_function("leveldb/writing", move |b| {
-            b.iter_with_setup(
-                || {
-                    let rt = runtime();
-
-                    let path = data_dir.join("basic_sink");
-
-                    // Clear out any existing data
-                    if std::fs::metadata(&path).is_ok() {
-                        std::fs::remove_dir_all(&path).unwrap();
+                (rt, writer, read_handle)
+            },
+            |(mut rt, mut writer, read_handle)| {
+                let write_handle = rt.spawn(async move {
+                    let mut stream = random_events(line_size).take(num_lines as u64).compat();
+                    while let Some(e) = stream.next().await {
+                        writer.send(e).await.unwrap();
                     }
+                });
 
-                    let plenty_of_room = num_lines * line_size * 2;
-                    let (writer, _reader, _acker) =
-                        leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
+                rt.block_on(write_handle).unwrap();
+                rt.block_on(read_handle).unwrap();
+            },
+            BatchSize::SmallInput,
+        );
+    });
 
-                    (rt, writer)
-                },
-                |(mut rt, writer)| {
-                    let send = writer.send_all(random_events(line_size).take(num_lines as u64));
-                    let write_handle = rt.spawn(send.compat());
-                    let _ = rt.block_on(write_handle).unwrap().unwrap();
-                },
-            );
-        })
-        .with_function("leveldb/reading", move |b| {
-            b.iter_with_setup(
-                || {
-                    let mut rt = runtime();
+    group.bench_function("leveldb/writing", |b| {
+        b.iter_batched(
+            || {
+                let data_dir = tempdir().unwrap();
 
-                    let path = data_dir2.join("basic_sink");
+                let rt = runtime();
 
-                    // Clear out any existing data
-                    if std::fs::metadata(&path).is_ok() {
-                        std::fs::remove_dir_all(&path).unwrap();
-                    }
+                let plenty_of_room = num_lines * line_size * 2;
+                let (writer, _reader, _acker) =
+                    leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
+                        .unwrap();
 
-                    let plenty_of_room = num_lines * line_size * 2;
-                    let (writer, reader, acker) =
-                        leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
+                (rt, writer)
+            },
+            |(mut rt, writer)| {
+                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
+                let write_handle = rt.spawn(send.compat());
+                let _ = rt.block_on(write_handle).unwrap().unwrap();
+            },
+            BatchSize::LargeInput,
+        );
+    });
 
-                    let send = writer.send_all(random_events(line_size).take(num_lines as u64));
-                    let write_handle = rt.spawn(send.compat());
-                    let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
-                    drop(writer);
+    group.bench_function("leveldb/reading", |b| {
+        b.iter_batched(
+            || {
+                let data_dir = tempdir().unwrap();
 
-                    let read_loop = async move {
-                        NullSink::new(acker)
-                            .run(Box::pin(reader.compat().map(Result::unwrap)))
-                            .await
-                    };
+                let mut rt = runtime();
 
-                    (rt, read_loop)
-                },
-                |(mut rt, read_loop)| {
-                    let read_handle = rt.spawn(read_loop);
-                    rt.block_on(read_handle).unwrap().unwrap();
-                },
-            );
-        })
-        .with_function("leveldb/both", move |b| {
-            b.iter_with_setup(
-                || {
-                    let rt = runtime();
+                let plenty_of_room = num_lines * line_size * 2;
+                let (writer, reader, acker) =
+                    leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
+                        .unwrap();
 
-                    let path = data_dir3.join("basic_sink");
+                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
+                let write_handle = rt.spawn(send.compat());
+                let (writer, _stream) = rt.block_on(write_handle).unwrap().unwrap();
+                drop(writer);
 
-                    // Clear out any existing data
-                    if std::fs::metadata(&path).is_ok() {
-                        std::fs::remove_dir_all(&path).unwrap();
-                    }
+                let read_loop = async move {
+                    NullSink::new(acker)
+                        .run(Box::pin(reader.compat().map(Result::unwrap)))
+                        .await
+                };
 
-                    let plenty_of_room = num_lines * line_size * 2;
-                    let (writer, reader, acker) =
-                        leveldb_buffer::Buffer::build(path, plenty_of_room).unwrap();
+                (rt, read_loop)
+            },
+            |(mut rt, read_loop)| {
+                let read_handle = rt.spawn(read_loop);
+                rt.block_on(read_handle).unwrap().unwrap();
+            },
+            BatchSize::LargeInput,
+        );
+    });
 
-                    let read_loop = async move {
-                        NullSink::new(acker)
-                            .run(Box::pin(reader.compat().map(Result::unwrap)))
-                            .await
-                    };
+    group.bench_function("leveldb/both", |b| {
+        b.iter_batched(
+            || {
+                let data_dir = tempdir().unwrap();
 
-                    (rt, writer, read_loop)
-                },
-                |(mut rt, writer, read_loop)| {
-                    let send = writer.send_all(random_events(line_size).take(num_lines as u64));
+                let rt = runtime();
 
-                    let read_handle = rt.spawn(read_loop);
-                    let write_handle = rt.spawn(send.compat());
+                let plenty_of_room = num_lines * line_size * 2;
+                let (writer, reader, acker) =
+                    leveldb_buffer::Buffer::build(data_dir.path().to_path_buf(), plenty_of_room)
+                        .unwrap();
 
-                    let _ = rt.block_on(write_handle).unwrap().unwrap();
-                    rt.block_on(read_handle).unwrap().unwrap();
-                },
-            );
-        })
-        .sample_size(10)
-        .noise_threshold(0.05)
-        .throughput(Throughput::Bytes((num_lines * line_size) as u64)),
-    );
+                let read_loop = async move {
+                    NullSink::new(acker)
+                        .run(Box::pin(reader.compat().map(Result::unwrap)))
+                        .await
+                };
+
+                (rt, writer, read_loop)
+            },
+            |(mut rt, writer, read_loop)| {
+                let send = writer.send_all(random_events(line_size).take(num_lines as u64));
+
+                let read_handle = rt.spawn(read_loop);
+                let write_handle = rt.spawn(send.compat());
+
+                let _ = rt.block_on(write_handle).unwrap().unwrap();
+                rt.block_on(read_handle).unwrap().unwrap();
+            },
+            BatchSize::LargeInput,
+        );
+    });
+
+    group.finish();
 }
-
-criterion_group!(buffers, benchmark_buffers);
-criterion_main!(buffers);
 
 fn random_events(size: usize) -> impl Stream<Item = Event, Error = ()> {
-    let rng = SmallRng::from_rng(thread_rng()).unwrap();
-
-    let lines = std::iter::repeat(()).map(move |_| {
-        rng.clone()
-            .sample_iter(&Alphanumeric)
-            .take(size)
-            .collect::<String>()
-    });
-    stream::iter_ok(lines).map(Event::from)
+    stream::iter_ok(random_lines(size)).map(Event::from)
 }
+
+criterion_group!(benches, benchmark_buffers);

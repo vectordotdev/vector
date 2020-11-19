@@ -538,27 +538,21 @@ splunk-integration-tests = ["sinks-splunk_hec", "warp"]
 shutdown-tests = ["sources","sinks-console","sinks-prometheus","sinks-blackhole","unix","rdkafka","transforms-log_to_metric","transforms-lua"]
 disable-resolv-conf = []
 
-[[bench]]
-name = "bench"
-harness = false
+# grouping together features for benchmarks
+# excluing API client due to running out of memory during linking in Github Actions
+benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
+wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
 
 [[bench]]
-name = "buffering"
+name = "default"
 harness = false
-
-[[bench]]
-name = "isolated_buffering"
-harness = false
-
-[[bench]]
-name = "lookup"
-harness = false
-
+required-features = ["benches"]
 
 [[bench]]
 name = "wasm"
+path = "benches/wasm/mod.rs"
 harness = false
-required-features = ["transforms-wasm", "transforms-lua"]
+required-features = ["wasm-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
