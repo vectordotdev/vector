@@ -4,4 +4,7 @@ ignore = [
     "RUSTSEC-2020-0016",
     # failure: failure is officially deprecated/unmaintained
     "RUSTSEC-2020-0036",
+    # Potential segfault in the time crate
+    # https://github.com/time-rs/time/issues/293
+    "RUSTSEC-2020-0071",
 ]
