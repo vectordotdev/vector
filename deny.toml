@@ -8,7 +8,4 @@ ignore = [
     "RUSTSEC-2020-0053",
     # stdweb is unmaintained
     "RUSTSEC-2020-0056",
-    # Potential segfault in the time crate
-    # https://github.com/time-rs/time/issues/293
-    "RUSTSEC-2020-0071",
 ]
