@@ -934,6 +934,8 @@ mod tests {
     #[tokio::test]
     async fn generates_disk_metrics() {
         let metrics = HostMetricsConfig::default().disk_metrics().await;
+        // The Windows test runner doesn't generate any disk metrics on the VM.
+        #[cfg(not(target_os = "windows"))]
         assert!(!metrics.is_empty());
         assert!(metrics.len() % 4 == 0);
         assert!(all_counters(&metrics));
