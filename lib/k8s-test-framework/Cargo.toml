@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
 description = "Kubernetes Test Framework used to test Vector in Kubernetes"
+publish = false
 
 [dependencies]
 k8s-openapi = { version = "0.9", default-features = false, features = ["v1_16"] }
