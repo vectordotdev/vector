@@ -195,13 +195,8 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToBoolFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::Boolean(true)),
-                ToBoolFn::new(Box::new(Path::from("foo")), Some(Value::Boolean(true))),
+                ToBoolFn::new(Literal::from(vec![0]).boxed(), Some(true.into())),
             ),
             (
                 map!["foo": "true"],

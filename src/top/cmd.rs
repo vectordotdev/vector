@@ -66,14 +66,10 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     };
 
     // Subscribe to updated metrics
-    metrics::subscribe(
-        subscription_client,
-        tx.clone(),
-        opts.refresh_interval as i64,
-    );
+    metrics::subscribe(subscription_client, tx.clone(), opts.interval as i64);
 
     // Initialize the dashboard
-    match init_dashboard(url.as_str(), opts.human_metrics, sender).await {
+    match init_dashboard(url.as_str(), opts, sender).await {
         Ok(_) => exitcode::OK,
         _ => {
             eprintln!("Your terminal doesn't support building a dashboard. Exiting.");

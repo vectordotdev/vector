@@ -76,18 +76,11 @@ mod tests {
 
     #[test]
     fn sha1() {
-        let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                Sha1Fn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "foo"],
-                Ok(Value::from("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")),
-                Sha1Fn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+        let cases = vec![(
+            map!["foo": "foo"],
+            Ok(Value::from("0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33")),
+            Sha1Fn::new(Box::new(Path::from("foo"))),
+        )];
 
         let mut state = state::Program::default();
 

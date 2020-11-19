@@ -195,13 +195,8 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToFloatFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::Float(10.0)),
-                ToFloatFn::new(Box::new(Path::from("foo")), Some(Value::Float(10.0))),
+                ToFloatFn::new(Literal::from(vec![0]).boxed(), Some(10.0.into())),
             ),
             (
                 map!["foo": "20.5"],
