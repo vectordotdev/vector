@@ -69,9 +69,9 @@ installation: operating_systems: {
 	}
 
 	macos: {
-		title:       "MacOS"
+		title:       "macOS"
 		description: """
-			[MacOS](\(urls.macos)) is the primary operating system for Apple's
+			[macOS](\(urls.macos)) is the primary operating system for Apple's
 			Mac computers. It is a certified Unix system based on Apple's
 			Darwin operating system.
 			"""

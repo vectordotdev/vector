@@ -78,9 +78,9 @@ installation: _interfaces: "docker-cli": {
 			title:       "Agent"
 			description: #"""
 						The agent role is designed to collect all Docker data on
-						a single host. Vector runs in it's own container
+						a single host. Vector runs in its own container
 						interfacing with the [Docker Engine API](\#(urls.docker_engine_api))
-						for log via the [`docker` source](\#(urls.vector_docker_source)) and
+						for log via the [`docker_logs` source](\#(urls.vector_docker_logs_source)) and
 						metrics via the [`host_metrics` source](\#(urls.vector_host_metrics_source)),
 						but it is recommended to adjust your pipeline as
 						necessary using Vector's [sources](\#(urls.vector_sources)),

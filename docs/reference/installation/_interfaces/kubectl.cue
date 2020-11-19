@@ -4,7 +4,7 @@ installation: _interfaces: kubectl: {
 	title:       "kubectl"
 	description: """
 		The [Kubernetes command-line tool](\(urls.kubectl)), kubectl, allows
-		users to run commands against Kubernetes clusters facilitating in
+		users to run commands against Kubernetes clusters facilitating
 		application deployment, scaling, monitoring, and introspection.
 		"""
 

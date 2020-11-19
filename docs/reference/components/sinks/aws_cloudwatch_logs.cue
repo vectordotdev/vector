@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_cloudwatch_logs: {
 	title:       "AWS Cloudwatch Logs"
-	description: "[Amazon CloudWatch](\(urls.aws_cloudwatch)) is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform."
+	description: sinks._aws_cloudwatch.description
 
 	classes: {
 		commonly_used: true

@@ -350,7 +350,7 @@ urls: {
 	vector_components:                                        "https://vector.dev/components/"
 	vector_configuration:                                     "https://vector.dev/docs/configuration/"
 	vector_debian_source_files:                               "https://github.com/timberio/vector/tree/master/distribution/debian"
-	vector_docker_source:                                     "https://vector.dev/docs/reference/sources/docker/"
+	vector_docker_logs_source:                                "https://vector.dev/docs/reference/sources/docker_logs/"
 	vector_docker_source_files:                               "https://github.com/timberio/vector/tree/master/distribution/docker"
 	vector_docs:                                              "https://vector.dev/docs/"
 	vector_download:                                          "https://vector.dev/releases/latest/download/"

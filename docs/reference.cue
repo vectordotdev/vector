@@ -52,7 +52,7 @@ _values: {
 
 // `#DevelopmentStatus` documents the development status of the component.
 //
-// * `beta` - The component is early in it's development cylce and the
+// * `beta` - The component is early in its development cylce and the
 // API and reliability are not settled.
 // * `stable` - The component is production ready.
 // * `deprecated` - The component will be removed in a future version.
@@ -200,7 +200,7 @@ _values: {
 
 #Object: {[_=string]: #Any}
 
-#OperatingSystem: "Linux" | "MacOS" | "Windows"
+#OperatingSystem: "Linux" | "macOS" | "Windows"
 
 #Permissions: {
 	unix: {

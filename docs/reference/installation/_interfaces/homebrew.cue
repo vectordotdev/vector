@@ -5,7 +5,7 @@ installation: _interfaces: homebrew: {
 	description: """
 		[Homebrew](\(urls.homebrew)) is a free and open-source package
 		management system that manage software installation and management for
-		Apple's MacOS operating system and other supported Linux systems.
+		Apple's macOS operating system and other supported Linux systems.
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]

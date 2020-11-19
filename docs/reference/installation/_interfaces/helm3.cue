@@ -4,8 +4,8 @@ installation: _interfaces: "helm3": {
 	title:       "Helm 3"
 	description: """
 		[Helm](\(urls.helm)) is a package manager for Kubernetes that
-		facilitates the deployment and management of services on Kubernetes
-		clusters.
+		facilitates the deployment and management of applications and services
+		on Kubernetes clusters.
 		"""
 
 	archs: ["x86_64", "ARM64"]

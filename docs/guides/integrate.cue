@@ -25,7 +25,7 @@ guides: integrate: {
 									sources: in: {
 										type: source_type
 									}
-									sinks: oout: {
+									sinks: out: {
 										type: sink_type
 										inputs: ["in"]
 									}

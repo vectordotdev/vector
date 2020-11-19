@@ -47,7 +47,7 @@ installation: downloads: {
 		arch:                 "x86_64"
 		file_name:            "vector-x86_64-apple-darwin.tar.gz"
 		file_type:            "tar.gz"
-		os:                   "MacOS"
+		os:                   "macOS"
 		type:                 "archive"
 	}
 

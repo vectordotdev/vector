@@ -89,8 +89,8 @@ components: _kafka: {
 			title: "librdkafka"
 			body:  """
 				The `kafka` sink uses [`librdkafka`](\(urls.librdkafka)) under the hood. This
-				is a battle tested, high performance, and reliable library that facilitates
-				communication with Kafka. And because Vector produces static MUSL builds,
+				is a battle-tested, high performance, and reliable library that facilitates
+				communication with Kafka. As Vector produces static MUSL builds,
 				this dependency is packaged with Vector, meaning you do not need to install it.
 				"""
 		}
