@@ -110,7 +110,7 @@ impl HttpSink for ClickhouseConfig {
         self.encoding.apply_rules(&mut event);
 
         let mut body =
-            serde_json::to_vec(&event.as_log().all_fields()).expect("Events should be valid json!");
+            serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
         body.push(b'\n');
 
         Some(body)
@@ -308,7 +308,7 @@ mod integration_tests {
         let output = client.select_all(&table).await;
         assert_eq!(1, output.rows);
 
-        let expected = serde_json::to_value(input_event.into_log().all_fields()).unwrap();
+        let expected = serde_json::to_value(input_event.into_log()).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
@@ -373,7 +373,7 @@ mod integration_tests {
             ),
         );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        let expected = serde_json::to_value(exp_event).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 
@@ -435,7 +435,7 @@ timestamp_format = "unix""#,
             ),
         );
 
-        let expected = serde_json::to_value(exp_event.all_fields()).unwrap();
+        let expected = serde_json::to_value(exp_event).unwrap();
         assert_eq!(expected, output.data[0]);
     }
 

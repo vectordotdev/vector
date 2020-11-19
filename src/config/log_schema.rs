@@ -68,16 +68,16 @@ impl LogSchema {
     }
 
     pub fn set_message_key(&mut self, v: LookupBuf) {
-        self.message_key = v.into();
+        self.message_key = v;
     }
     pub fn set_timestamp_key(&mut self, v: LookupBuf) {
-        self.timestamp_key = v.into();
+        self.timestamp_key = v;
     }
     pub fn set_host_key(&mut self, v: LookupBuf) {
-        self.host_key = v.into();
+        self.host_key = v;
     }
     pub fn set_source_type_key(&mut self, v: LookupBuf) {
-        self.source_type_key = v.into();
+        self.source_type_key = v;
     }
 
     pub fn merge(&mut self, other: LogSchema) -> Result<(), Vec<String>> {

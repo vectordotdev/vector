@@ -2,7 +2,7 @@ use crate::event::{LogEvent, LookupBuf, Value};
 use bytes::BytesMut;
 
 /// Merges all fields specified at `fields` from `incoming` to `current`.
-pub fn merge_log_event<'a>(current: &mut LogEvent, mut incoming: LogEvent, fields: &[LookupBuf]) {
+pub fn merge_log_event(current: &mut LogEvent, mut incoming: LogEvent, fields: &[LookupBuf]) {
     for field in fields {
         let incoming_val = match incoming.remove(field, false) {
             None => continue,

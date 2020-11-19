@@ -74,9 +74,9 @@ pub fn parse_check_conversion_map(
     names: &[LookupBuf],
 ) -> Result<HashMap<LookupBuf, Conversion>, ConversionError> {
     // Check if any named type references a nonexistent field
-    let names = names.iter().map(|s| s.as_ref()).collect::<HashSet<_>>();
+    let names = names.iter().collect::<HashSet<_>>();
     for name in types.keys() {
-        if !names.contains(&name.as_lookup()) {
+        if !names.contains(&name) {
             warn!(
                 message = "Field was specified in the types but is not a valid field name.",
                 field = %name

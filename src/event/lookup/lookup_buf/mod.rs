@@ -194,7 +194,12 @@ impl LookupBuf {
     }
 
     #[instrument]
-    pub fn as_lookup(&self) -> Lookup<'_> {
+    pub fn as_lookup<'a>(&'a self) -> Lookup<'a> {
+        Lookup::from(self)
+    }
+
+    #[instrument]
+    pub fn into_lookup<'a>(&'a self) -> Lookup<'a> {
         Lookup::from(self)
     }
 
@@ -365,17 +370,5 @@ impl<'a> From<Lookup<'a>> for LookupBuf {
             "A LookupBuf with 0 length was turned into a Lookup. Since a LookupBuf with 0 \
                   length is an invariant, any action on it is too.",
         )
-    }
-}
-
-impl<'buf: 'view, 'view> AsRef<Lookup<'view>> for &'buf LookupBuf {
-    fn as_ref(&self) -> &Lookup<'view> {
-        &self.as_lookup()
-    }
-}
-
-impl<'buf: 'view, 'view> std::borrow::Borrow<Lookup<'view>> for &'buf LookupBuf {
-    fn borrow(&self) -> &Lookup<'view> {
-        &self.as_lookup()
     }
 }

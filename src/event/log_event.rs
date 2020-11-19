@@ -4,7 +4,6 @@ use crate::event::{
 };
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::{
-    borrow::Borrow,
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
     fmt::Debug,
@@ -19,8 +18,8 @@ pub struct LogEvent {
 impl LogEvent {
     /// Get an immutable borrow of the given value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&Value> {
-        let lookup = lookup.borrow();
+    pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
+        let lookup = lookup.into();
         let mut lookup_iter = lookup.iter();
         // The first step should always be a field.
         let first_step = lookup_iter.next()?;
@@ -70,8 +69,8 @@ impl LogEvent {
 
     /// Get a mutable borrow of the value by lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn get_mut<'a>(&mut self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&mut Value> {
-        let lookup = lookup.borrow();
+    pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&mut Value> {
+        let lookup = lookup.into();
         let mut lookup_iter = lookup.iter();
         // The first step should always be a field.
         let first_step = lookup_iter.next()?;
@@ -85,7 +84,7 @@ impl LogEvent {
             Segment::Index(_) => {
                 error!(
                     "Lookups into LogEvents should never start with indexes.\
-                        Please report your config.."
+                        Please report your config."
                 );
                 return None;
             }
@@ -121,7 +120,7 @@ impl LogEvent {
 
     /// Determine if the log event contains a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
-    pub fn contains<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> bool {
+    pub fn contains<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> bool {
         self.get(lookup).is_some()
     }
 
@@ -129,6 +128,65 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
         unimplemented!()
+        // let mut lookup_iter = lookup.iter().peekable();
+        // let value = value.into();
+        // // The first step should always be a field.
+        // let first_step = lookup_iter.next()?;
+        // // This is good, since the first step into a LogEvent will also be a field.
+        //
+        // // This step largely exists so that we can make `cursor` a `Value` right off the bat.
+        // // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
+        // let mut cursor = match first_step {
+        //     Segment::Field(f) => self.fields.get_mut(*f),
+        //     // In this case, the user has passed us an invariant.
+        //     Segment::Index(_) => {
+        //         error!(
+        //             "Lookups into LogEvents should never start with indexes.\
+        //                 Please report your config."
+        //         );
+        //         return None;
+        //     }
+        // };
+        //
+        // let mut retval = None;
+        // for segment in lookup_iter {
+        //     cursor = match (segment, cursor) {
+        //         // Fields access maps.
+        //         (Segment::Field(f), Some(Value::Map(map))) => {
+        //             match lookup_iter.peek() {
+        //                 None => {
+        //                     trace!("Creating field inside map.");
+        //                     retval = map.insert(f.to_string(), value);
+        //                     break;
+        //                 }
+        //                 Some(v) => {
+        //                     trace!("Matched field into map.");
+        //                     cursor.get_mut(f)
+        //                 }
+        //             }
+        //         }
+        //         // Indexes access arrays.
+        //         (Segment::Index(i), Some(Value::Array(array))) => {
+        //             match lookup_iter.peek() {
+        //                 None => {
+        //                     trace!("Creating index inside array.");
+        //                     unimplemented!()
+        //                 }
+        //                 Some(v) => {
+        //                     trace!("Matched index into array.");
+        //                     cursor.get_mut(f)
+        //                 }
+        //             }
+        //         }
+        //         // The rest, it's not good.
+        //         (Segment::Index(_), _) | (Segment::Field(_), _) => {
+        //             trace!("Unmatched lookup.");
+        //             None
+        //         }
+        //     }
+        // };
+        //
+        // retval
     }
 
     /// Remove a value that exists at a given lookup.
@@ -137,7 +195,7 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn remove<'a>(
         &mut self,
-        lookup: impl Borrow<Lookup<'a>> + Debug,
+        lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
     ) -> Option<Value> {
         unimplemented!()
@@ -149,7 +207,15 @@ impl LogEvent {
     /// and maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = Lookup<'a>> + 'a {
-        unimplemented!();
+        self.fields.iter()
+            .map(|(k, v)| {
+                let lookup = Lookup::from(k);
+                v.lookups().map(move |l| {
+                    let mut lookup = lookup.clone();
+                    lookup.extend(l.clone());
+                    lookup
+                })
+            }).flatten()
     }
 
     /// Iterate over all lookup/value pairs.
@@ -157,8 +223,16 @@ impl LogEvent {
     /// This is notably different than pairs in a map, as this descends into things like arrays and
     /// maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
-    pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> + Serialize {
-        unimplemented!();
+    pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> {
+        self.fields.iter()
+            .map(|(k, v)| {
+                let lookup = Lookup::from(k);
+                v.pairs().map(move |(l, v)| {
+                    let mut lookup = lookup.clone();
+                    lookup.extend(l.clone());
+                    (lookup, *v)
+                })
+            }).flatten()
     }
 
     /// Determine if the log event is empty of fields.
@@ -270,25 +344,23 @@ impl TryInto<serde_json::Value> for LogEvent {
 
 impl<'a, T> std::ops::Index<T> for LogEvent
 where
-    T: Borrow<Lookup<'a>>,
+    T: Into<Lookup<'a>> + Debug,
 {
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
-        let key = key.borrow();
         self.get(key)
-            .expect(&*format!("Key is not found: {:?}", key))
+            .expect("Key not found.")
     }
 }
 
 impl<'a, T> std::ops::IndexMut<T> for LogEvent
 where
-    T: Borrow<Lookup<'a>>,
+    T: Into<Lookup<'a>> + Debug,
 {
     fn index_mut(&mut self, key: T) -> &mut Value {
-        let key = key.borrow();
         self.get_mut(key)
-            .expect(&*format!("Key is not found: {:?}", key))
+            .expect("Key not found.")
     }
 }
 

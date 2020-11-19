@@ -426,13 +426,11 @@ impl From<Metric> for Event {
 
 // TODO(jean): add tests
 impl remap::Object for Event {
-    // TODO(jean): replace this with `Lookup`, once that lands.
-    fn insert(&mut self, path: &[Vec<String>], value: remap::Value) -> Result<(), String> {
+    fn insert(&mut self, _path: &[Vec<String>], _value: remap::Value) -> Result<(), String> {
         unimplemented!()
     }
 
-    // TODO(jean): replace this with `Lookup`, once that lands.
-    fn find(&self, path: &[Vec<String>]) -> Result<Option<remap::Value>, String> {
+    fn find(&self, _path: &[Vec<String>]) -> Result<Option<remap::Value>, String> {
         unimplemented!()
     }
 
@@ -440,7 +438,7 @@ impl remap::Object for Event {
         unimplemented!()
     }
 
-    fn remove(&mut self, path: &str, compact: bool) {
+    fn remove(&mut self, _path: &str, _compact: bool) {
         unimplemented!()
     }
 }
@@ -464,7 +462,7 @@ mod test {
             "timestamp": event.as_log().get(log_schema().timestamp_key()),
         });
 
-        let actual_all = serde_json::to_value(event.as_log().all_fields()).unwrap();
+        let actual_all = serde_json::to_value(event.as_log()).unwrap();
         assert_eq!(expected_all, actual_all);
 
         let rfc3339_re = Regex::new(r"\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z\z").unwrap();
@@ -483,7 +481,7 @@ mod test {
             .as_mut_log()
             .insert(LookupBuf::from("string"), "thisisastring");
 
-        let map = serde_json::to_value(event.as_log().all_fields()).unwrap();
+        let map = serde_json::to_value(event.as_log()).unwrap();
         assert_eq!(map["float"], json!(5.5));
         assert_eq!(map["int"], json!(4));
         assert_eq!(map["bool"], json!(true));

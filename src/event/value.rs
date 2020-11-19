@@ -1,4 +1,4 @@
-use crate::{event::timestamp_to_string, Result};
+use crate::{event::{timestamp_to_string, Lookup}, Result};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
@@ -18,6 +18,24 @@ pub enum Value {
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Null,
+}
+
+impl Value {
+    pub fn lookups<'a>(&'a self) -> impl Iterator<Item=&Lookup<'a>> {
+        match &self {
+            Value::Boolean(_) | Value::Bytes(_) | Value::Timestamp(_) | Value::Float(_) | Value::Integer(_) | Value::Null => [].iter(),
+            Value::Map(_m) => unimplemented!(),
+            Value::Array(_a) => unimplemented!(),
+        }
+    }
+
+    pub fn pairs<'a>(&'a self) -> impl Iterator<Item=&(Lookup<'a>, &'a Value)> {
+        match &self {
+            Value::Boolean(_) | Value::Bytes(_) | Value::Timestamp(_) | Value::Float(_) | Value::Integer(_) | Value::Null => [].iter(),
+            Value::Map(_m) => unimplemented!(),
+            Value::Array(_a) => unimplemented!(),
+        }
+    }
 }
 
 impl Serialize for Value {

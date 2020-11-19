@@ -61,6 +61,7 @@ pub trait EncodingConfiguration<E> {
                                 field.starts_with(only.as_lookup())
                             })
                         })
+                        .map(|v| v.into_buf())
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
                         log_event.remove(&removal, false);
@@ -94,12 +95,12 @@ pub trait EncodingConfiguration<E> {
                             for (k, v) in log_event.all_fields() {
                                 if let Value::Timestamp(ts) = v {
                                     unix_timestamps
-                                        .push((k.clone(), Value::Integer(ts.timestamp())));
+                                        .push((k.into_buf(), Value::Integer(ts.timestamp())));
                                 }
                             }
                             for (k, v) in unix_timestamps {
                                 // TODO: Fixed in https://github.com/timberio/vector/issues/2845
-                                log_event.insert(k.into_buf(), v);
+                                log_event.insert(k, v);
                             }
                         }
                         // RFC3339 is the default serialization of a timestamp.

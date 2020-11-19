@@ -24,7 +24,7 @@ pub struct Discriminant {
 impl Discriminant {
     /// Create a new Discriminant from the `LogEvent` and an ordered slice of
     /// fields to include into a discriminant value.
-    pub fn from_log_event<'a>(event: &LogEvent, discriminant_fields: &Vec<LookupBuf>) -> Self {
+    pub fn from_log_event(event: &LogEvent, discriminant_fields: &[LookupBuf]) -> Self {
         let values: Vec<Option<Value>> = discriminant_fields
             .iter()
             .map(|discriminant_field| event.get(&*discriminant_field).cloned())
