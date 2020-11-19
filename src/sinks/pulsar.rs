@@ -297,7 +297,9 @@ fn encode_event(
             let resolved_value =
                 avro_rs::types::Value::resolve(value, avro_schema.as_ref().unwrap())?;
             avro_rs::to_avro_datum(
-                &avro_schema.as_ref().expect("Avro encoding selected but no schema found. Please report this."),
+                &avro_schema
+                    .as_ref()
+                    .expect("Avro encoding selected but no schema found. Please report this."),
                 resolved_value,
             )?
         }
