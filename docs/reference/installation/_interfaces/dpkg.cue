@@ -1,6 +1,7 @@
 package metadata
 
 installation: _interfaces: dpkg: {
+	title:       "DPKG"
 	description: """
 		[Dpkg](\(urls.dpkg)) is the software that powers the package management
 		system in the Debian operating system and its derivatives. Dpkg is used
@@ -8,13 +9,16 @@ installation: _interfaces: dpkg: {
 		"""
 
 	archs: ["x86_64", "ARM64", "ARMv7"]
+	package_manager_name: installation.package_managers.dpkg.name
+
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
 		config:      "/etc/vector/vector.{config_format}"
 	}
-	roles: {
-		_commands: roles._systemd_commands & roles._bash_configure & {
+
+	roles: [Name=string]: {
+		commands: roles._systemd_commands & {
 			_config_path: paths.config
 			install: #"""
 				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{arch}.deb && \
@@ -22,37 +26,32 @@ installation: _interfaces: dpkg: {
 				"""#
 			uninstall: "sudo dpkg -r vector"
 			upgrade:   null
-			variables: {
-				arch: ["amd64", "arm64", "armhf"]
-				version: true
-			}
 		}
-		_tutorials: {
+		tutorials: {
 			_commands: _
 			installation: [
 				{
 					title:   "Install Vector"
-					command: _commands.install
+					command: commands.install
 				},
 				{
 					title:   "Configure Vector"
-					command: _commands.configure
+					command: commands.configure
 				},
 				{
 					title:   "Restart Vector"
-					command: _commands.restart
+					command: commands.restart
 				},
 			]
 		}
-		agent: roles._journald_agent & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
-		aggregator: roles._vector_aggregator & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
+		variables: {
+			arch: ["amd64", "arm64", "armhf"]
+			version: true
 		}
 	}
-	package_manager_name: installation.package_managers.dpkg.name
-	title:                "DPKG"
+
+	roles: {
+		agent:      roles._journald_agent
+		aggregator: roles._vector_aggregator
+	}
 }

@@ -9,65 +9,71 @@ installation: _interfaces: "docker-cli": {
 		"""
 
 	archs: ["x86_64", "ARM64"]
+
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
 		config:      "~/vector.{config_format}"
 	}
+
 	platform_name: installation.platforms.docker.name
-	roles: {
-		_commands: roles._bash_configure & {
-			_api_port:         8383
-			_config_path:      paths.config
-			_docker_sock_path: "/var/run/docker.sock"
-			install:           null
-			logs:              "docker logs -f $(docker ps -aqf \"name=vector\")"
-			reload:            "docker kill --signal=HUP timberio/vector"
-			restart:           "docker restart -f $(docker ps -aqf \"name=vector\")"
-			start:             #"""
+
+	roles: [Name=string]: {
+		_api_port:         8383
+		_config_path:      paths.config
+		_docker_sock_path: "/var/run/docker.sock"
+		commands: {
+			_config_path: paths.config
+			install:      null
+			logs:         "docker logs -f $(docker ps -aqf \"name=vector\")"
+			reload:       "docker kill --signal=HUP timberio/vector"
+			restart:      "docker restart -f $(docker ps -aqf \"name=vector\")"
+			start:        #"""
 								docker run \
 								  -d \
 								  -v \#(paths.config):/etc/vector/vector.toml:ro \
 								  -p \#(_api_port):\#(_api_port) \{flags}
 								  timberio/vector:{version}-{variant}
 								"""#
-			stop:              "docker stop timberio/vector"
-			uninstall:         "docker rm timberio/vector timberio/vector"
-			upgrade:           null
-			variables: {
-				flags: {
-					// TODO: Use Cue field comprehensions to generate this list.
-					// I attempted this but couldn't get cue to compile.
-					sources: {
-						aws_kinesis_firehose: "\n  -p 443:443 \\"
-						file:                 "\n  -v /var/log:/var/log \\"
-						docker:               "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
-						http:                 "\n  -p 80:80 \\"
-						logplex:              "\n  -p 80:80 \\"
-						socket:               "\n  -p 9000:9000 \\"
-						splunk_hec:           "\n  -p 8080:8080 \\"
-						statsd:               "\n  -p 8125:8125 \\"
-						syslog:               "\n  -p 514:514 \\"
-						vector:               "\n  -p 9000:9000 \\"
-					}
-				}
-				variant: ["debian", "alpine", "distroless"]
-				version: true
-			}
+			stop:         "docker stop timberio/vector"
+			uninstall:    "docker rm timberio/vector timberio/vector"
+			upgrade:      null
 		}
-		_tutorials: {
-			_commands: _
+		tutorials: {
 			installation: [
 				{
 					title:   "Configure Vector"
-					command: _commands.configure
+					command: commands.configure
 				},
 				{
 					title:   "Start Vector"
-					command: _commands.start
+					command: commands.start
 				},
 			]
 		}
+		variables: {
+			flags: {
+				// TODO: Use Cue field comprehensions to generate this list.
+				// I attempted this but couldn't get cue to compile.
+				sources: {
+					aws_kinesis_firehose: "\n  -p 443:443 \\"
+					file:                 "\n  -v /var/log:/var/log \\"
+					docker:               "\n  -v \(_docker_sock_path):\(_docker_sock_path) \\"
+					http:                 "\n  -p 80:80 \\"
+					logplex:              "\n  -p 80:80 \\"
+					socket:               "\n  -p 9000:9000 \\"
+					splunk_hec:           "\n  -p 8080:8080 \\"
+					statsd:               "\n  -p 8125:8125 \\"
+					syslog:               "\n  -p 514:514 \\"
+					vector:               "\n  -p 9000:9000 \\"
+				}
+			}
+			variant: ["debian", "alpine", "distroless"]
+			version: true
+		}
+	}
+
+	roles: {
 		agent: {
 			title:       "Agent"
 			description: #"""
@@ -82,17 +88,9 @@ installation: _interfaces: "docker-cli": {
 						[sinks](\#(urls.vector_sinks)).
 						"""#
 
-			commands: _commands & {
-				variables: config: sources: logs: type: components.sources.docker.type
-			}
+			variables: config: sources: logs: type: components.sources.docker.type
 		}
-		sidecar: roles._file_sidecar & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
-		aggregator: roles._vector_aggregator & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
+		sidecar:    roles._file_sidecar
+		aggregator: roles._vector_aggregator
 	}
 }

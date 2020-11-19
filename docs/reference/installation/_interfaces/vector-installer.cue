@@ -15,8 +15,9 @@ installation: _interfaces: "vector-installer": {
 		bin_in_path: false
 		config:      "./vector.{config_format}"
 	}
-	roles: {
-		_commands: roles._bash_configure & {
+
+	roles: [Name=string]: {
+		commands: {
 			_config_path: paths.config
 			install:      "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
 			logs:         null
@@ -27,31 +28,28 @@ installation: _interfaces: "vector-installer": {
 			uninstall:    "rm -rf ./vector"
 			upgrade:      null
 		}
-		_tutorials: {
-			_commands: _
+
+		tutorials: {
 			installation: [
 				{
 					title:   "Install Vector"
-					command: _commands.install
+					command: commands.install
 				},
 				{
 					title:   "Configure Vector"
-					command: _commands.configure
+					command: commands.configure
 				},
 				{
 					title:   "Start Vector"
-					command: _commands.start
+					command: commands.start
 				},
 			]
 		}
-		agent: {commands: _commands}
-		sidecar: roles._file_sidecar & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
-		aggregator: roles._vector_aggregator & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
+	}
+
+	roles: {
+		agent: {}
+		sidecar:    roles._file_sidecar
+		aggregator: roles._vector_aggregator
 	}
 }

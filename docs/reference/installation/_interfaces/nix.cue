@@ -12,13 +12,15 @@ installation: _interfaces: nix: {
 
 	archs: ["x86_64", "ARM64", "ARMv7"]
 	package_manager_name: installation.package_managers.nix.name
+
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
 		config:      "/etc/vector/vector.{config_format}"
 	}
-	roles: {
-		_commands: roles._bash_configure & {
+
+	roles: [Name=string]: {
+		commands: {
 			_config_path: paths.config
 			install:      "nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --install --attr vector"
 			logs:         null
@@ -29,30 +31,27 @@ installation: _interfaces: nix: {
 			uninstall:    "nix-env --uninstall vector"
 			upgrade:      "nix-env --file https://github.com/NixOS/nixpkgs/archive/master.tar.gz --upgrade vector"
 		}
-		_tutorials: {
-			_commands: _
+
+		tutorials: {
 			installation: [
 				{
 					title:   "Install Vector"
-					command: _commands.install
+					command: commands.install
 				},
 				{
 					title:   "Configure Vector"
-					command: _commands.configure
+					command: commands.configure
 				},
 				{
 					title:   "Start Vector"
-					command: _commands.start
+					command: commands.start
 				},
 			]
 		}
-		agent: roles._journald_agent & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
-		aggregator: roles._vector_aggregator & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
+	}
+
+	roles: {
+		agent:      roles._journald_agent
+		aggregator: roles._vector_aggregator
 	}
 }

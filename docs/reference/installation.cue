@@ -2,6 +2,14 @@ package metadata
 
 installation: close({
 	#Commands: {
+		{[Name=string]: string | null}
+	} & {
+		_config_path: string | *null
+		let ConfigPath = _config_path
+
+		_shell: string | *null
+		let Shell = _shell
+
 		configure:   string | null
 		install:     string | null
 		logs:        string | null
@@ -13,35 +21,23 @@ installation: close({
 		top:         string | null | *"vector top"
 		uninstall:   string
 		upgrade:     string | null
-		variables: {
-			arch?: [string, ...string]
-			flags?: {
-				sources?:    _
-				transforms?: _
-				sinks?:      _
-			}
-			config: {
-				api?: {
-					enabled: bool
-				}
 
-				sources?: [Name=string]: {
-					type: string
+		if Shell == "bash" {
+			configure:   string | *#"""
+					cat <<-VECTORCFG > \#(ConfigPath)
+					{config}
+					VECTORCFG
+					"""#
+			reconfigure: string | *"vi \(ConfigPath)"
+		}
 
-					if type == "file" {
-						include: [string, ...string]
-					}
-				}
-
-				sinks: out: {
-					type:   "console"
-					inputs: ["internal_metrics", ...string] | *[ for id, _source in sources {id}]
-					encoding: codec: "json"
-				}
-			}
-			config_format: ["toml"]
-			variant?: [string, ...string]
-			version: bool | *false
+		if Shell == "powershell" {
+			configure:   string | *#"""
+					@"
+					{config}
+					"@ | Out-File -FilePath \#(ConfigPath)
+					"""#
+			reconfigure: string | *"edit \(ConfigPath)"
 		}
 	}
 
@@ -58,6 +54,9 @@ installation: close({
 	}
 
 	#Interface: {
+		_shell: string | *null
+		let Shell = _shell
+
 		archs: [#Arch, ...#Arch]
 		description: string
 		paths: {
@@ -66,18 +65,8 @@ installation: close({
 			config:      string | null
 		}
 		roles: {
-			_bash_configure: {
-				_config_path: string
-				configure:    #"""
-						cat <<-VECTORCFG > \#(_config_path)
-						{config}
-						VECTORCFG
-						"""#
-				reconfigure:  "vi \(_config_path)"
-			}
 			_file_agent: {
-				commands: variables: config: {
-					api: enabled: true
+				variables: config: {
 					sources: {
 						logs: {
 							type:    components.sources.file.type
@@ -102,7 +91,7 @@ installation: close({
 				title:       "Agent"
 			}
 			_file_sidecar: {
-				commands: variables: config: {
+				variables: config: {
 					api: enabled: true
 					sources: {
 						logs: {
@@ -129,7 +118,7 @@ installation: close({
 				title:       "Sidecar"
 			}
 			_journald_agent: {
-				commands: variables: config: {
+				variables: config: {
 					api: enabled: true
 					sources: {
 						logs: type:             components.sources.journald.type
@@ -160,7 +149,7 @@ installation: close({
 				stop:    "sudo systemctl stop vector"
 			}
 			_vector_aggregator: {
-				commands: variables: config: {
+				variables: config: {
 					api: enabled: true
 					sources: {
 						vector: type:           components.sources.vector.type
@@ -183,11 +172,12 @@ installation: close({
 			}
 		}
 		roles: [Name=string]: {
-			commands:    #Commands
+			commands:    #Commands & {_shell: Shell}
 			description: string
 			name:        Name
 			title:       string
 			tutorials:   #Tutorials
+			variables:   #Variables
 		}
 		name:                  string
 		package_manager_name?: string
@@ -201,9 +191,10 @@ installation: close({
 
 	#OperatingSystems: [Name=string]: {
 		description: string
-		interfaces: [#Interface, ...#Interface]
+		interfaces: [#Interface & {_shell: shell}, ...#Interface & {_shell: shell}]
 		name:  Name
 		os:    string
+		shell: string
 		title: string
 	}
 
@@ -229,6 +220,37 @@ installation: close({
 			title:   string
 			command: string
 		}]
+	}
+
+	#Variables: {
+		arch?: [string, ...string]
+		flags?: {
+			sources?:    _
+			transforms?: _
+			sinks?:      _
+		}
+		config: {
+			api?: {
+				enabled: bool
+			}
+
+			sources?: [Name=string]: {
+				type: string
+
+				if type == "file" {
+					include: [string, ...string]
+				}
+			}
+
+			sinks: out: {
+				type:   "console"
+				inputs: ["internal_metrics", ...string] | *[ for id, _source in sources {id}]
+				encoding: codec: "json"
+			}
+		}
+		config_format: ["toml"]
+		variant?: [string, ...string]
+		version: bool | *false
 	}
 
 	_interfaces:       #Interfaces

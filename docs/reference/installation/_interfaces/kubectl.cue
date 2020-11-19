@@ -15,8 +15,9 @@ installation: _interfaces: kubectl: {
 		config:      null
 	}
 	platform_name: installation.platforms.kubernetes.name
-	roles: {
-		_commands: {
+
+	roles: [Name=string]: {
+		commands: {
 			_resource_type: string
 			_role:          string
 			configure:      #"""
@@ -35,8 +36,8 @@ installation: _interfaces: kubectl: {
 			uninstall:      "kubectl delete -k ."
 			upgrade:        null
 		}
-		_tutorials: {
-			_commands: _
+
+		tutorials: {
 			installation: [
 				{
 					title: "Create Vector namespace.yaml"
@@ -67,21 +68,19 @@ installation: _interfaces: kubectl: {
 				},
 				{
 					title:   "Configure Vector"
-					command: _commands.configure
+					command: commands.configure
 				},
 				{
 					title:   "Install Vector"
-					command: _commands.install
+					command: commands.install
 				},
 			]
 		}
+	}
+
+	roles: {
 		agent: {
-			commands: _commands & {
-				_resource_type: "daemonset"
-				_role:          "agent"
-				variables: config: sinks: out: inputs: ["internal_metrics", "kubernetes_logs"]
-			}
-			tutorials:   _tutorials & {_commands: commands}
+			title:       "Agent"
 			description: #"""
 						The agent role is designed to collect all Kubernetes
 						log data on each Node. Vector runs as a
@@ -95,28 +94,34 @@ installation: _interfaces: kubectl: {
 						[transforms](\#(urls.vector_transforms)), and
 						[sinks](\#(urls.vector_sinks)).
 						"""#
-			title:       "Agent"
+
+			commands: {
+				_resource_type: "daemonset"
+				_role:          "agent"
+			}
+			variables: config: sinks: out: inputs: ["internal_metrics", "kubernetes_logs"]
 		}
+
 		aggregator: {
-			commands: _commands & {
+			title:       "Aggregator"
+			description: #"""
+				The aggregator role is designed to receive and
+				process data from multiple upstream agents.
+				Typically these are other Vector agents, but it
+				could be anything, including non-Vector agents.
+				By default, we recommend the [`vector` source](\#(urls.vector_source))
+				since it supports all data types, but it is
+				recommended to adjust your pipeline as necessary
+				using Vector's [sources](\#(urls.vector_sources)),
+				[transforms](\#(urls.vector_transforms)), and
+				[sinks](\#(urls.vector_sinks)).
+				"""#
+
+			commands: {
 				_resource_type: "statefulset"
 				_role:          "aggregator"
-				variables: config: sources: in_upstream: type: components.sources.vector.type
 			}
-			tutorials:   _tutorials & {_commands: commands}
-			description: #"""
-							The aggregator role is designed to receive and
-							process data from multiple upstream agents.
-							Typically these are other Vector agents, but it
-							could be anything, including non-Vector agents.
-							By default, we recommend the [`vector` source](\#(urls.vector_source))
-							since it supports all data types, but it is
-							recommended to adjust your pipeline as necessary
-							using Vector's [sources](\#(urls.vector_sources)),
-							[transforms](\#(urls.vector_transforms)), and
-							[sinks](\#(urls.vector_sinks)).
-							"""#
-			title:       "Aggregator"
+			variables: config: sources: in_upstream: type: components.sources.vector.type
 		}
 	}
 }

@@ -10,13 +10,15 @@ installation: _interfaces: homebrew: {
 
 	archs: ["x86_64", "ARM64", "ARMv7"]
 	package_manager_name: installation.package_managers.homebrew.name
+
 	paths: {
 		bin:         "/usr/local/bin/vector"
 		bin_in_path: true
 		config:      "/etc/vector/vector.{config_format}"
 	}
-	roles: {
-		_commands: roles._bash_configure & {
+
+	roles: [Name=string]: {
+		commands: {
 			_config_path: paths.config
 			install:      "brew tap timberio/brew && brew install vector"
 			logs:         "tail -f /usr/local/var/log/vector.log"
@@ -27,29 +29,26 @@ installation: _interfaces: homebrew: {
 			uninstall:    "brew remove vector"
 			upgrade:      "brew update && brew upgrade vector"
 		}
-		_tutorials: {
+		tutorials: {
 			installation: [
 				{
 					title:   "Install Vector"
-					command: _commands.install
+					command: commands.install
 				},
 				{
 					title:   "Configure Vector"
-					command: _commands.configure
+					command: "fix me"
 				},
 				{
 					title:   "Restart Vector"
-					command: _commands.restart
+					command: commands.restart
 				},
 			]
 		}
-		agent: roles._file_agent & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
-		aggregator: roles._vector_aggregator & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
+	}
+
+	roles: {
+		agent:      roles._file_agent
+		aggregator: roles._vector_aggregator
 	}
 }

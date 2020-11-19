@@ -9,15 +9,18 @@ installation: _interfaces: helm: {
 		"""
 
 	archs: ["x86_64", "ARM64"]
+
 	paths: {
 		bin:         "/usr/bin/vector"
 		bin_in_path: true
 		config:      "configs/vector.{config_format}"
 	}
+
 	package_manager_name: installation.package_managers.helm.name
 	platform_name:        installation.platforms.kubernetes.name
-	roles: {
-		_commands: {
+
+	roles: [Name=string]: {
+		commands: {
 			_name:          string
 			_resource_type: string
 			configure:      #"""
@@ -38,6 +41,9 @@ installation: _interfaces: helm: {
 			uninstall:      "helm uninstall \(_name) --namespace vector"
 			upgrade:        "helm upgrade vector timberio/\(_name) --version {version}"
 		}
+	}
+
+	roles: {
 		agent: {
 			title:       "Agent"
 			description: #"""
@@ -54,7 +60,7 @@ installation: _interfaces: helm: {
 						[sinks](\#(urls.vector_sinks)).
 						"""#
 
-			commands: _commands & {
+			commands: {
 				_name:          "vector-agent"
 				_resource_type: "daemonset"
 			}
@@ -82,6 +88,7 @@ installation: _interfaces: helm: {
 				},
 			]
 		}
+
 		aggregator: {
 			title:       "Aggregator"
 			description: #"""
@@ -97,10 +104,9 @@ installation: _interfaces: helm: {
 							[sinks](\#(urls.vector_sinks)).
 							"""#
 
-			commands: _commands & {
+			commands: {
 				_name:          "vector-aggregator"
 				_resource_type: "statefulset"
-				variables: config: sources: in: type: components.sources.vector.type
 			}
 			tutorials: installation: [
 				{
@@ -123,6 +129,7 @@ installation: _interfaces: helm: {
 					command: commands.install
 				},
 			]
+			variables: config: sources: in: type: components.sources.vector.type
 		}
 	}
 }

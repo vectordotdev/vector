@@ -19,7 +19,8 @@ installation: operating_systems: {
 			},
 			installation._interfaces."docker-cli",
 		]
-		os: "Linux"
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	centos: {
@@ -40,7 +41,8 @@ installation: operating_systems: {
 			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
-		os: "Linux"
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	debian: {
@@ -61,7 +63,9 @@ installation: operating_systems: {
 			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
-		os: "Linux"
+
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	macos: {
@@ -79,7 +83,9 @@ installation: operating_systems: {
 			},
 			installation._interfaces."docker-cli",
 		]
-		os: "Linux"
+
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	nixos: {
@@ -97,7 +103,8 @@ installation: operating_systems: {
 			},
 			installation._interfaces."docker-cli",
 		]
-		os: "Linux"
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	raspbian: {
@@ -114,7 +121,8 @@ installation: operating_systems: {
 			},
 			installation._interfaces."docker-cli",
 		]
-		os: "Linux"
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	rhel: {
@@ -134,7 +142,9 @@ installation: operating_systems: {
 			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
-		os: "Linux"
+
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	ubuntu: {
@@ -153,7 +163,9 @@ installation: operating_systems: {
 			installation._interfaces.helm,
 			installation._interfaces.kubectl,
 		]
-		os: "Linux"
+
+		os:    "Linux"
+		shell: "bash"
 	}
 
 	windows: {
@@ -170,6 +182,8 @@ installation: operating_systems: {
 			},
 			installation._interfaces."docker-cli",
 		]
-		os: "Windows"
+
+		os:    "Windows"
+		shell: "powershell"
 	}
 }

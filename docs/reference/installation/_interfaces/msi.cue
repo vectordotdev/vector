@@ -17,8 +17,9 @@ installation: _interfaces: msi: {
 		bin_in_path: true
 		config:      #"\#(_dir)\config\vector.{config_format}"#
 	}
-	roles: {
-		_commands: {
+
+	roles: [Name=string]: {
+		commands: {
 			configure: #"""
 						cat <<-VECTORCFG > \#(paths.config)
 						{config}
@@ -36,35 +37,33 @@ installation: _interfaces: msi: {
 			stop:        null
 			uninstall:   #"msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet"#
 			upgrade:     null
-			variables: {
-				arch: ["x64"]
-				version: true
-			}
 		}
-		_tutorials: {
-			_commands: _
+
+		tutorials: {
 			installation: [
 				{
 					title:   "Install Vector"
-					command: _commands.install
+					command: commands.install
 				},
 				{
 					title:   "Configure Vector"
-					command: _commands.configure
+					command: commands.configure
 				},
 				{
 					title:   "Start Vector"
-					command: _commands.start
+					command: commands.start
 				},
 			]
 		}
-		agent: roles._file_agent & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
+
+		variables: {
+			arch: ["x64"]
+			version: true
 		}
-		aggregator: roles._vector_aggregator & {
-			commands:  _commands
-			tutorials: _tutorials & {_commands: commands}
-		}
+	}
+
+	roles: {
+		agent:      roles._file_agent
+		aggregator: roles._vector_aggregator
 	}
 }
