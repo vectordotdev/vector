@@ -7000,7 +7000,6 @@ dependencies = [
  "db-key",
  "derivative 2.1.1",
  "derive_is_enum_variant",
- "dirs 3.0.1",
  "dyn-clone",
  "evmap",
  "exitcode",
