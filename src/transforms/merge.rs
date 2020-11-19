@@ -168,7 +168,7 @@ mod test {
     }
 
     fn make_partial(mut event: Event) -> Event {
-        event.as_mut_log().insert(event::PARTIAL, true);
+        event.as_mut_log().insert(event::PARTIAL.clone(), true);
         event
     }
 
@@ -201,7 +201,7 @@ mod test {
         assert_eq!(
             merged_event
                 .as_log()
-                .get("message")
+                .get(Lookup::from("message"))
                 .unwrap()
                 .as_bytes()
                 .as_ref(),
@@ -214,7 +214,7 @@ mod test {
 
     #[test]
     fn merge_merges_partial_events_from_separate_streams() {
-        let stream_discriminant_field = "stream_name".to_string();
+        let stream_discriminant_field = LookupBuf::from("stream_name");
 
         let mut merge = Merge::from(MergeConfig {
             stream_discriminant_fields: vec![stream_discriminant_field.clone()],
@@ -248,7 +248,7 @@ mod test {
         assert_eq!(
             s1_merged_event
                 .as_log()
-                .get("message")
+                .get(Lookup::from("message"))
                 .unwrap()
                 .as_bytes()
                 .as_ref(),
@@ -258,7 +258,7 @@ mod test {
         assert_eq!(
             s2_merged_event
                 .as_log()
-                .get("message")
+                .get(Lookup::from("message"))
                 .unwrap()
                 .as_bytes()
                 .as_ref(),

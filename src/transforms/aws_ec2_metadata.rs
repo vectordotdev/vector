@@ -502,7 +502,7 @@ enum Ec2MetadataError {
 #[cfg(test)]
 mod integration_tests {
     use super::*;
-    use crate::{event::Event, test_util::trace_init};
+    use crate::{event::{Event, Lookup}, test_util::trace_init};
 
     const HOST: &str = "http://localhost:8111";
 
@@ -530,21 +530,21 @@ mod integration_tests {
         let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
-        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get(Lookup::from_str("availability-zone").unwrap()), Some(&"ww-region-1a".into()));
+        assert_eq!(log.get(Lookup::from_str("public-ipv4").unwrap()), Some(&"192.1.1.1".into()));
         assert_eq!(
-            log.get("public-hostname"),
+            log.get(Lookup::from_str("public-hostname").unwrap()),
             Some(&"mock-public-hostname".into())
         );
-        assert_eq!(log.get(&"local-ipv4"), Some(&"192.1.1.2".into()));
-        assert_eq!(log.get("local-hostname"), Some(&"mock-hostname".into()));
-        assert_eq!(log.get("instance-id"), Some(&"i-096fba6d03d36d262".into()));
-        assert_eq!(log.get("ami-id"), Some(&"ami-05f27d4d6770a43d2".into()));
-        assert_eq!(log.get("instance-type"), Some(&"t2.micro".into()));
-        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
-        assert_eq!(log.get("vpc-id"), Some(&"mock-vpc-id".into()));
-        assert_eq!(log.get("subnet-id"), Some(&"mock-subnet-id".into()));
-        assert_eq!(log.get("role-name[0]"), Some(&"mock-user".into()));
+        assert_eq!(log.get(Lookup::from_str("local-ipv4").unwrap()), Some(&"192.1.1.2".into()));
+        assert_eq!(log.get(Lookup::from_str("local-hostname").unwrap()), Some(&"mock-hostname".into()));
+        assert_eq!(log.get(Lookup::from_str("instance-id").unwrap()), Some(&"i-096fba6d03d36d262".into()));
+        assert_eq!(log.get(Lookup::from_str("ami-id").unwrap()), Some(&"ami-05f27d4d6770a43d2".into()));
+        assert_eq!(log.get(Lookup::from_str("instance-type").unwrap()), Some(&"t2.micro".into()));
+        assert_eq!(log.get(Lookup::from_str("region").unwrap()), Some(&"us-east-1".into()));
+        assert_eq!(log.get(Lookup::from_str("vpc-id").unwrap()), Some(&"mock-vpc-id".into()));
+        assert_eq!(log.get(Lookup::from_str("subnet-id").unwrap()), Some(&"mock-subnet-id".into()));
+        assert_eq!(log.get(Lookup::from_str("role-name[0]").unwrap()), Some(&"mock-user".into()));
     }
 
     #[tokio::test]
@@ -565,15 +565,15 @@ mod integration_tests {
         let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(log.get("availability-zone"), None);
-        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
-        assert_eq!(log.get("public-hostname"), None);
-        assert_eq!(log.get("local-ipv4"), None);
-        assert_eq!(log.get("local-hostname"), None);
-        assert_eq!(log.get("instance-id"), None,);
-        assert_eq!(log.get("instance-type"), None,);
-        assert_eq!(log.get("ami-id"), None);
-        assert_eq!(log.get("region"), Some(&"us-east-1".into()));
+        assert_eq!(log.get(Lookup::from("availability-zone")), None);
+        assert_eq!(log.get(Lookup::from("public-ipv4")), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get(Lookup::from("public-hostname")), None);
+        assert_eq!(log.get(Lookup::from("local-ipv4")), None);
+        assert_eq!(log.get(Lookup::from("local-hostname")), None);
+        assert_eq!(log.get(Lookup::from("instance-id")), None,);
+        assert_eq!(log.get(Lookup::from("instance-type")), None,);
+        assert_eq!(log.get(Lookup::from("ami-id")), None);
+        assert_eq!(log.get(Lookup::from("region")), Some(&"us-east-1".into()));
     }
 
     #[tokio::test]
@@ -595,11 +595,11 @@ mod integration_tests {
         let log = event.as_log();
 
         assert_eq!(
-            log.get("ec2.metadata.availability-zone"),
+            log.get(Lookup::from_str("ec2.metadata.availability-zone").unwrap()),
             Some(&"ww-region-1a".into())
         );
         assert_eq!(
-            log.get("ec2.metadata.public-ipv4"),
+            log.get(Lookup::from_str("ec2.metadata.public-ipv4").unwrap()),
             Some(&"192.1.1.1".into())
         );
 

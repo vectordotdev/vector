@@ -101,7 +101,7 @@ impl FunctionTransform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Value};
+    use crate::event::{LogEvent, Value, Lookup, LookupBuf};
     use crate::{config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
 
@@ -141,20 +141,20 @@ mod tests {
     #[tokio::test]
     async fn converts_valid_fields() {
         let log = parse_it("").await;
-        assert_eq!(log["number"], Value::Integer(1234));
-        assert_eq!(log["bool"], Value::Boolean(true));
+        assert_eq!(log[Lookup::from("number")], Value::Integer(1234));
+        assert_eq!(log[Lookup::from("bool")], Value::Boolean(true));
     }
 
     #[tokio::test]
     async fn leaves_unnamed_fields_as_is() {
         let log = parse_it("").await;
-        assert_eq!(log["other"], Value::Bytes("no".into()));
+        assert_eq!(log[Lookup::from("other")], Value::Bytes("no".into()));
     }
 
     #[tokio::test]
     async fn drops_nonconvertible_fields() {
         let log = parse_it("").await;
-        assert!(log.get("float").is_none());
+        assert!(log.get(Lookup::from("float")).is_none());
     }
 
     #[tokio::test]
@@ -162,8 +162,8 @@ mod tests {
         let log = parse_it("drop_unspecified = true").await;
 
         let mut expected = Event::new_empty_log();
-        expected.as_mut_log().insert("bool", true);
-        expected.as_mut_log().insert("number", 1234);
+        expected.as_mut_log().insert(LookupBuf::from("bool"), true);
+        expected.as_mut_log().insert(LookupBuf::from("number"), 1234);
 
         assert_eq!(log, expected.into_log());
     }

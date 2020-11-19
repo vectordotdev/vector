@@ -56,14 +56,9 @@ pub trait EncodingConfiguration<E> {
                 Event::Log(log_event) => {
                     let to_remove = log_event
                         .keys()
-                        .map(|field|  {
-                            let field_lookup = LookupBuf::from_str(&field)
-                                .expect("Got invalid Lookup from an EventLog iteration. This is an invariant. Please report it.");
-                            field_lookup
-                        })
                         .filter(|field| {
                             !only_fields.iter().any(|only| {
-                                field.starts_with(only)
+                                field.starts_with(only.as_lookup())
                             })
                         })
                         .collect::<VecDeque<_>>();

@@ -228,8 +228,8 @@ mod tests {
 
         let mut augment = Geoip::new(
             "tests/data/GeoIP2-City-Test.mmdb".to_string(),
-            "remote_addr".into(),
-            "geo".to_string(),
+            LookupBuf::from("remote_addr"),
+            LookupBuf::from("geo"),
         )
         .unwrap();
         let new_event = augment.transform_one(event).unwrap();
@@ -288,8 +288,8 @@ mod tests {
 
         let mut augment = Geoip::new(
             "tests/data/GeoIP2-City-Test.mmdb".to_string(),
-            "remote_addr".into(),
-            "geo".to_string(),
+            LookupBuf::from("remote_addr"),
+            LookupBuf::from("geo"),
         )
         .unwrap();
         let new_event = augment.transform_one(event).unwrap();
@@ -304,7 +304,7 @@ mod tests {
         exp_geoip_attr.insert("postal_code", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
+            let k = Lookup::from(&format!("geo.{}", field));
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
@@ -318,8 +318,8 @@ mod tests {
 
         let mut augment = Geoip::new(
             "tests/data/GeoIP2-ISP-Test.mmdb".to_string(),
-            "remote_addr".to_string(),
-            "geo".to_string(),
+            LookupBuf::from("remote_addr"),
+            LookupBuf::from("geo"),
         )
         .unwrap();
         let new_event = augment.transform_one(event).unwrap();
@@ -388,7 +388,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
+            let k = Lookup::from(format!("geo.{}", field).to_string());
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }

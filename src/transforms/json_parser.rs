@@ -136,7 +136,7 @@ impl FunctionTransform for JsonParser {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::Event};
+    use crate::{config::log_schema, event::{Event, Lookup, LookupBuf}};
     use serde_json::json;
 
     #[test]
@@ -180,8 +180,8 @@ mod test {
 
         let event = parser.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["greeting"], "hello".into());
-        assert_eq!(event.as_log()["name"], "bob".into());
+        assert_eq!(event.as_log()[Lookup::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[Lookup::from("name")], "bob".into());
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
@@ -227,8 +227,8 @@ mod test {
 
         let event = parser.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["greeting"], "hello".into());
-        assert_eq!(event.as_log()["name"], "bob".into());
+        assert_eq!(event.as_log()[Lookup::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[Lookup::from("name")], "bob".into());
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             r#" {"greeting": "hello", "name": "bob"}    "#.into()
@@ -248,12 +248,12 @@ mod test {
         let mut event = Event::from("message");
         event
             .as_mut_log()
-            .insert("data", r#"{"greeting": "hello", "name": "bob"}"#);
+            .insert(LookupBuf::from("data"), r#"{"greeting": "hello", "name": "bob"}"#);
 
         let event = parser.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["greeting"], "hello".into(),);
-        assert_eq!(event.as_log()["name"], "bob".into());
+        assert_eq!(event.as_log()[Lookup::from("greeting")], "hello".into(),);
+        assert_eq!(event.as_log()[Lookup::from("name")], "bob".into());
         assert_eq!(
             event.as_log()["data"],
             r#"{"greeting": "hello", "name": "bob"}"#.into()
@@ -284,7 +284,7 @@ mod test {
 
         let parsed_event = parser_outer.transform_one(event).unwrap();
 
-        assert_eq!(parsed_event.as_log()["stream"], "stdout".into());
+        assert_eq!(parsed_event.as_log()[Lookup::from("stream")], "stdout".into());
 
         let parsed_inner_event = parser_inner.transform_one(parsed_event).unwrap();
         let log = parsed_inner_event.into_log();
@@ -318,7 +318,7 @@ mod test {
         });
 
         let mut event = Event::from("message");
-        event.as_mut_log().insert("data", invalid);
+        event.as_mut_log().insert(LookupBuf::from("data"), invalid);
 
         let event = parser.transform_one(event).unwrap();
 
@@ -355,15 +355,15 @@ mod test {
         });
 
         let mut event = Event::from("message");
-        event.as_mut_log().insert("data", valid);
+        event.as_mut_log().insert(LookupBuf::from("data"), valid);
         assert!(parser.transform_one(event).is_some());
 
         let mut event = Event::from("message");
-        event.as_mut_log().insert("data", invalid);
+        event.as_mut_log().insert(LookupBuf::from("data"), invalid);
         assert!(parser.transform_one(event).is_none());
 
         let mut event = Event::from("message");
-        event.as_mut_log().insert("data", not_object);
+        event.as_mut_log().insert(LookupBuf::from("data"), not_object);
         assert!(parser.transform_one(event).is_none());
 
         // Missing field
@@ -387,8 +387,8 @@ mod test {
         let event = parser1.transform_one(event).unwrap();
         let event = parser2.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["greeting"], "hello".into());
-        assert_eq!(event.as_log()["name"], "bob".into());
+        assert_eq!(event.as_log()[Lookup::from("greeting")], "hello".into());
+        assert_eq!(event.as_log()[Lookup::from("name")], "bob".into());
         assert_eq!(
             event.as_log()["message"],
             "help i'm trapped under many layers of json".into()
@@ -416,17 +416,17 @@ mod test {
         );
         let event = parser.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["string"], "this is text".into());
-        assert_eq!(event.as_log()["null"], crate::event::Value::Null);
-        assert_eq!(event.as_log()["float"], 12.34.into());
-        assert_eq!(event.as_log()["int"], 56.into());
-        assert_eq!(event.as_log()["bool true"], true.into());
-        assert_eq!(event.as_log()["bool false"], false.into());
-        assert_eq!(event.as_log()["array[0]"], "z".into());
-        assert_eq!(event.as_log()["array[1]"], 7.into());
-        assert_eq!(event.as_log()["object.nested"], "data".into());
-        assert_eq!(event.as_log()["object.more"], "values".into());
-        assert_eq!(event.as_log()["deep[0][0][0].a.b.c[0][0][0]"], 1234.into());
+        assert_eq!(event.as_log()[Lookup::from("string").unwrap()], "this is text".into());
+        assert_eq!(event.as_log()[Lookup::from("null").unwrap()], crate::event::Value::Null);
+        assert_eq!(event.as_log()[Lookup::from("float").unwrap()], 12.34.into());
+        assert_eq!(event.as_log()[Lookup::from("int").unwrap()], 56.into());
+        assert_eq!(event.as_log()[Lookup::from("bool true").unwrap()], true.into());
+        assert_eq!(event.as_log()[Lookup::from("bool false").unwrap()], false.into());
+        assert_eq!(event.as_log()[Lookup::from("array[0]").unwrap()], "z".into());
+        assert_eq!(event.as_log()[Lookup::from("array[1]").unwrap()], 7.into());
+        assert_eq!(event.as_log()[Lookup::from("object.nested").unwrap()], "data".into());
+        assert_eq!(event.as_log()[Lookup::from("object.more").unwrap()], "values".into());
+        assert_eq!(event.as_log()[Lookup::from("deep[0][0][0].a.b.c[0][0][0]").unwrap()], 1234.into());
     }
 
     #[test]
@@ -445,8 +445,8 @@ mod test {
 
         let event = parser.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["key"], "data".into());
-        assert_eq!(event.as_log()["message"], "inner".into());
+        assert_eq!(event.as_log()[Lookup::from("key")], "data".into());
+        assert_eq!(event.as_log()[Lookup::from("message")], "inner".into());
     }
 
     #[test]
@@ -460,7 +460,7 @@ mod test {
 
         let event = parser.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["message"], "invalid json".into());
+        assert_eq!(event.as_log()[Lookup::from("message")], "invalid json".into());
     }
 
     #[test]
@@ -493,8 +493,8 @@ mod test {
         let event = event.as_log();
 
         assert_eq!(event["message"], message.into());
-        assert_eq!(event.get("message.greeting"), None);
-        assert_eq!(event.get("message.name"), None);
+        assert_eq!(event.get(Lookup::from("message.greeting")), None);
+        assert_eq!(event.get(Lookup::from("message.name")), None);
     }
 
     #[test]
@@ -515,7 +515,7 @@ mod test {
             Some(crate::event::Value::Map(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
-        assert_eq!(event["message.greeting"], "hello".into());
-        assert_eq!(event["message.name"], "bob".into());
+        assert_eq!(event[Lookup::from("message.greeting")], "hello".into());
+        assert_eq!(event[Lookup::from("message.name")], "bob".into());
     }
 }

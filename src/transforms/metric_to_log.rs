@@ -181,10 +181,10 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("gauge.value"), &Value::from(1.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("gauge")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (LookupBuf::from_str("gauge.value").unwrap(), &Value::from(1.0)),
+                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
+                (LookupBuf::from_str("name").unwrap(), &Value::from("gauge")),
+                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -208,11 +208,11 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("set")),
-                (String::from("set.values[0]"), &Value::from("one")),
-                (String::from("set.values[1]"), &Value::from("two")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
+                (LookupBuf::from_str("name").unwrap(), &Value::from("set")),
+                (LookupBuf::from_str("set.values[0]").unwrap(), &Value::from("one")),
+                (LookupBuf::from_str("set.values[1]").unwrap(), &Value::from("two")),
+                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -239,22 +239,22 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("distribution.sample_rates[0]"),
+                    LookupBuf::from_str("distribution.sample_rates[0]").unwrap(),
                     &Value::from(10)
                 ),
                 (
-                    String::from("distribution.sample_rates[1]"),
+                    LookupBuf::from_str("distribution.sample_rates[1]").unwrap(),
                     &Value::from(20)
                 ),
                 (
-                    String::from("distribution.statistic"),
+                    LookupBuf::from_str("distribution.statistic"),
                     &Value::from("histogram")
                 ),
-                (String::from("distribution.values[0]"), &Value::from(1.0)),
-                (String::from("distribution.values[1]"), &Value::from(2.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("distro")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (LookupBuf::from_str("distribution.values[0]").unwrap(), &Value::from(1.0)),
+                (LookupBuf::from_str("distribution.values[1]").unwrap(), &Value::from(2.0)),
+                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
+                (LookupBuf::from_str("name").unwrap(), &Value::from("distro")),
+                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -282,26 +282,26 @@ mod tests {
             collected,
             vec![
                 (
-                    String::from("aggregated_histogram.buckets[0]"),
+                    LookupBuf::from_str("aggregated_histogram.buckets[0]").unwrap(),
                     &Value::from(1.0)
                 ),
                 (
-                    String::from("aggregated_histogram.buckets[1]"),
+                    LookupBuf::from_str("aggregated_histogram.buckets[1]").unwrap(),
                     &Value::from(2.0)
                 ),
-                (String::from("aggregated_histogram.count"), &Value::from(30)),
+                (LookupBuf::from_str("aggregated_histogram.count").unwrap(), &Value::from(30)),
                 (
-                    String::from("aggregated_histogram.counts[0]"),
+                    LookupBuf::from_str("aggregated_histogram.counts[0]").unwrap(),
                     &Value::from(10)
                 ),
                 (
-                    String::from("aggregated_histogram.counts[1]"),
+                    LookupBuf::from_str("aggregated_histogram.counts[1]").unwrap(),
                     &Value::from(20)
                 ),
-                (String::from("aggregated_histogram.sum"), &Value::from(50.0)),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("histo")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (LookupBuf::from_str("aggregated_histogram.sum").unwrap(), &Value::from(50.0)),
+                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
+                (LookupBuf::from_str("name").unwrap(), &Value::from("histo")),
+                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -328,27 +328,27 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("aggregated_summary.count"), &Value::from(30)),
+                (LookupBuf::from_str("aggregated_summary.count").unwrap(), &Value::from(30)),
                 (
-                    String::from("aggregated_summary.quantiles[0]"),
+                    LookupBuf::from_str("aggregated_summary.quantiles[0]").unwrap(),
                     &Value::from(50.0)
                 ),
                 (
-                    String::from("aggregated_summary.quantiles[1]"),
+                    LookupBuf::from_str("aggregated_summary.quantiles[1]").unwrap(),
                     &Value::from(90.0)
                 ),
-                (String::from("aggregated_summary.sum"), &Value::from(50.0)),
+                (LookupBuf::from_str("aggregated_summary.sum").unwrap(), &Value::from(50.0)),
                 (
-                    String::from("aggregated_summary.values[0]"),
+                    LookupBuf::from_str("aggregated_summary.values[0]").unwrap(),
                     &Value::from(10.0)
                 ),
                 (
-                    String::from("aggregated_summary.values[1]"),
+                    LookupBuf::from_str("aggregated_summary.values[1]").unwrap(),
                     &Value::from(20.0)
                 ),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("summary")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
+                (LookupBuf::from_str("name").unwrap(), &Value::from("summary")),
+                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }

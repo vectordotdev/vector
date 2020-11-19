@@ -1,4 +1,4 @@
-use crate::event::{Event, LookupBuf, Value};
+use crate::event::{Event, LookupBuf, Lookup, Value};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
@@ -80,14 +80,12 @@ impl Function for OnlyFields {
     fn apply(&self, target: &mut Event) -> Result<()> {
         let target_log = target.as_mut_log();
 
-        let keys: Vec<LookupBuf> = target_log
+        let keys: Vec<Lookup> = target_log
             .keys()
-            .map(|v| LookupBuf::from_str(&v)
-                .expect("Got an invalid Lookup while iterating internally over an EventLog. This is an invariant. Please report it."))
             .filter(|k| {
                 self.paths
                     .iter()
-                    .find(|&p| k == p)
+                    .find(|&p| k == &p.as_lookup())
                     .is_none()
             })
             .collect();

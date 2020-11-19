@@ -167,10 +167,10 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
                     .and_then(|parsed_json| serde_json::from_value(parsed_json).map(Event::Log))
                     .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))
             })
-            .collect::<Result<_, _>>(),
+            .collect::<Result<Vec<_>, _>>(),
         Encoding::Json => serde_json::from_slice(&body)
             .and_then(|parsed_json| serde_json::from_value(parsed_json).map(Event::Log))
-            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))),
+            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))).map(|v| vec![v]),
     }
 }
 
@@ -371,14 +371,14 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["key"], "value".into());
+            assert_eq!(log[Lookup::from("key")], "value".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log["key2"], "value2".into());
+            assert_eq!(log[Lookup::from("key2")], "value2".into());
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
@@ -400,14 +400,14 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log.get_flat("dotted.key").unwrap(), &Value::from("value"));
+            assert_eq!(log.get(Lookup::from_str("dotted.key").unwrap()).unwrap(), &Value::from("value"));
         }
         {
             let event = events.remove(0);
             let log = event.as_log();
             let mut map = BTreeMap::new();
-            map.insert("dotted.key2".to_string(), Value::from("value2"));
-            assert_eq!(log["nested"], map.into());
+            map.insert(Lookup::from_str("dotted.key2").unwrap(), Value::from("value2"));
+            assert_eq!(log[Lookup::from("nested")], map.into());
         }
     }
 

@@ -110,6 +110,7 @@ fn encode_event(mut event: Event, pid: u32, encoding: &EncodingConfig<Encoding>)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::LookupBuf;
 
     #[test]
     fn generate_config() {
@@ -119,7 +120,7 @@ mod tests {
     #[test]
     fn encode_event_apply_rules() {
         let mut evt = Event::from("vector");
-        evt.as_mut_log().insert("magic", "key");
+        evt.as_mut_log().insert(LookupBuf::from("magic"), "key");
 
         let bytes = encode_event(
             evt,

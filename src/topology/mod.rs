@@ -719,6 +719,7 @@ mod tests {
     feature = "transforms-log_to_metric"
 ))]
 mod reload_tests {
+    use crate::event::LookupBuf;
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
@@ -828,7 +829,7 @@ mod reload_tests {
             GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001));
         let transform = LogToMetricConfig {
             metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                field: "message".to_string(),
+                field: LookupBuf::from("message"),
                 name: None,
                 namespace: None,
                 tags: None,

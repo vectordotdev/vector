@@ -144,6 +144,7 @@ impl FunctionTransform for AddFields {
 mod tests {
     use super::*;
     use std::{iter::FromIterator, string::ToString};
+    use crate::event::Lookup;
 
     #[test]
     fn generate_config() {
@@ -159,8 +160,8 @@ mod tests {
 
         let new_event = augment.transform_one(event).unwrap();
 
-        let key = LookupBuf::from_str("some_key").unwrap().to_string();
-        let kv = new_event.as_log().get_flat(&key);
+        let key = LookupBuf::from_str("some_key").unwrap();
+        let kv = new_event.as_log().get(&key);
 
         let val = "some_val".to_string();
         assert_eq!(kv, Some(&val.into()));
@@ -175,8 +176,8 @@ mod tests {
 
         let new_event = augment.transform_one(event).unwrap();
 
-        let key = LookupBuf::from_str("some_key").unwrap().to_string();
-        let kv = new_event.as_log().get_flat(&key);
+        let key = LookupBuf::from_str("some_key").unwrap();
+        let kv = new_event.as_log().get(&key);
 
         let val = "augment me augment me".to_string();
         assert_eq!(kv, Some(&val.into()));
@@ -185,7 +186,7 @@ mod tests {
     #[test]
     fn add_fields_overwrite() {
         let mut event = Event::from("");
-        event.as_mut_log().insert("some_key", "some_message");
+        event.as_mut_log().insert(LookupBuf::from("some_key"), "some_message");
 
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_overwritten_message".into());
@@ -225,13 +226,13 @@ mod tests {
         let event = transform.transform_one(event).unwrap().into_log();
 
         tracing::error!(?event);
-        assert_eq!(event["float"], 4.5.into());
-        assert_eq!(event["int"], 4.into());
-        assert_eq!(event["string"], "thisisastring".into());
-        assert_eq!(event["bool"], true.into());
-        assert_eq!(event["array[0]"], 1.into());
-        assert_eq!(event["array[1]"], 2.into());
-        assert_eq!(event["array[2]"], 3.into());
-        assert_eq!(event["table.key"], "value".into());
+        assert_eq!(event[Lookup::from_str("float").unwrap()], 4.5.into());
+        assert_eq!(event[Lookup::from_str("int").unwrap()], 4.into());
+        assert_eq!(event[Lookup::from_str("string").unwrap()], "thisisastring".into());
+        assert_eq!(event[Lookup::from_str("bool").unwrap()], true.into());
+        assert_eq!(event[Lookup::from_str("array[0]").unwrap()], 1.into());
+        assert_eq!(event[Lookup::from_str("array[1]").unwrap()], 2.into());
+        assert_eq!(event[Lookup::from_str("array[2]").unwrap()], 3.into());
+        assert_eq!(event[Lookup::from_str("table.key").unwrap()], "value".into());
     }
 }

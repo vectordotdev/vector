@@ -426,7 +426,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::{Event, Lookup}};
+    use crate::{config::log_schema, event::{Event, Segment}};
     use chrono::prelude::*;
 
     #[test]
@@ -539,7 +539,7 @@ mod test {
             expected.insert(LookupBuf::from("procid"), 8449);
         }
 
-        let event = event_from_str(&"host".to_string(), None, &raw);
+        let event = event_from_str(LookupBuf::from("host"), None, &raw);
         assert_eq!(event, Some(expected.clone()));
 
         let raw = format!(
@@ -557,7 +557,7 @@ mod test {
             event
                 .as_log()
                 .all_fields()
-                .find(|(key, _)| (&key[..]).starts_with([Segment::field(String::from("empty"))].as_ref()))
+                .find(|(key, _)| (&key[..]).starts_with([Segment::field("empty")].as_ref()))
                 == None
         }
 
@@ -629,7 +629,7 @@ mod test {
         }
 
         assert_eq!(
-            event_from_str(&"host".to_string(), None, &raw).unwrap(),
+            event_from_str(LookupBuf::from("host"), None, &raw).unwrap(),
             expected
         );
     }

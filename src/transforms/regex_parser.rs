@@ -282,10 +282,10 @@ impl FunctionTransform for RegexParser {
                 }
 
                 log.extend(captures.map(|(name, value)| {
-                    let final_name = self.target_field.clone().map(|mut v| {
-                        v.push(name);
-                        v
-                    });
+                    let final_name = match self.target_field.clone() {
+                        Some(mut v) => { v.extend(name); v },
+                        None => name
+                    };
                     (final_name, value)
                 }));
                 if self.drop_field {

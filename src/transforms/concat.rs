@@ -213,7 +213,7 @@ impl FunctionTransform for Concat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::{Event, LookupBuf, Lookup};
 
     #[test]
     fn generate_config() {
@@ -223,8 +223,8 @@ mod tests {
     #[test]
     fn concat_to_from() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert("first", "Hello vector users");
-        event.as_mut_log().insert("second", "World");
+        event.as_mut_log().insert(LookupBuf::from("first"), "Hello vector users");
+        event.as_mut_log().insert(LookupBuf::from("second"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -242,8 +242,8 @@ mod tests {
     #[test]
     fn concat_full() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert("first", "Hello vector users");
-        event.as_mut_log().insert("second", "World");
+        event.as_mut_log().insert(LookupBuf::from("first"), "Hello vector users");
+        event.as_mut_log().insert(LookupBuf::from("second"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -260,8 +260,8 @@ mod tests {
     #[test]
     fn concat_mixed() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert("first", "Hello vector users");
-        event.as_mut_log().insert("second", "World");
+        event.as_mut_log().insert(LookupBuf::from("first"), "Hello vector users");
+        event.as_mut_log().insert(LookupBuf::from("second"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -276,13 +276,13 @@ mod tests {
         );
 
         let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event.as_log()["out"], "W o r l d".into());
+        assert_eq!(new_event.as_log()[Lookup::from("out")], "W o r l d".into());
     }
 
     #[test]
     fn concat_start_gt_end() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert("only", "Hello vector users");
+        event.as_mut_log().insert(LookupBuf::from("only"), "Hello vector users");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn concat_start_gt_len() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert("only", "World");
+        event.as_mut_log().insert(LookupBuf::from("only"), "World");
 
         let mut transform = Concat::new(
             "out".into(),
@@ -310,7 +310,7 @@ mod tests {
     #[test]
     fn concat_end_gt_len() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert("only", "World");
+        event.as_mut_log().insert(LookupBuf::from("only"), "World");
 
         let mut transform = Concat::new(
             "out".into(),

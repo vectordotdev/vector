@@ -486,7 +486,7 @@ fn maybe_set_id<'a>(key: &Option<LookupBuf>, doc: &mut serde_json::Value, event:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{sinks::util::retries::RetryAction, Event};
+    use crate::{sinks::util::retries::RetryAction, event::{Event, Lookup}};
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;
@@ -523,7 +523,7 @@ mod tests {
 
     #[test]
     fn doesnt_set_id_when_not_configured() {
-        let id_key: Option<&LookupBuf> = None;
+        let id_key: Option<LookupBuf> = None;
         let mut event = Event::from("butts");
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         let mut action = json!({});

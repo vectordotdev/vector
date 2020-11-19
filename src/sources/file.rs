@@ -501,7 +501,7 @@ mod tests {
             if line.starts_with("hello") {
                 assert_eq!(line, format!("hello {}", hello_i));
                 assert_eq!(
-                    event.as_log()[LookupBuf::from("file")].to_string_lossy(),
+                    event.as_log()[Lookup::from("file")].to_string_lossy(),
                     path1.to_str().unwrap()
                 );
                 hello_i += 1;
@@ -563,7 +563,7 @@ mod tests {
 
         for event in received {
             assert_eq!(
-                event.as_log()[LookupBuf::from("file")].to_string_lossy(),
+                event.as_log()[Lookup::from("file")].to_string_lossy(),
                 path.to_str().unwrap()
             );
 
@@ -814,10 +814,10 @@ mod tests {
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
-                    log_schema().host_key().to_string(),
-                    log_schema().message_key().to_string(),
-                    log_schema().timestamp_key().to_string(),
-                    log_schema().source_type_key().to_string()
+                    log_schema().host_key(),
+                    log_schema().message_key(),
+                    log_schema().timestamp_key(),
+                    log_schema().source_type_key()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

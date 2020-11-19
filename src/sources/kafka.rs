@@ -279,6 +279,7 @@ mod integration_test {
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
         Pipeline,
+        event::{Lookup},
     };
     use chrono::Utc;
     use futures::compat::Future01CompatExt;

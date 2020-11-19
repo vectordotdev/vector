@@ -437,7 +437,7 @@ impl remap::Object for Event {
     }
 
     fn paths(&self) -> Vec<String> {
-        self.as_log().keys().collect()
+        unimplemented!()
     }
 
     fn remove(&mut self, path: &str, compact: bool) {

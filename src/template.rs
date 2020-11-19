@@ -278,7 +278,7 @@ mod tests {
     #[test]
     fn render_dynamic() {
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert("log_stream", "stream");
+        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))

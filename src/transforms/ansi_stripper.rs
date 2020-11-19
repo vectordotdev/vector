@@ -105,7 +105,7 @@ mod tests {
                 let event = transform.transform_one(event).unwrap();
 
                 assert_eq!(
-                    event.into_log().remove(crate::config::log_schema().message_key()).unwrap(),
+                    event.into_log().remove(crate::config::log_schema().message_key(), false).unwrap(),
                     Value::from("foo bar")
                 );
             )+
