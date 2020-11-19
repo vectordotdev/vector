@@ -3,6 +3,7 @@ name = "tracing-limit"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@timber.io>"]
 edition = "2018"
+publish = false
 
 [dependencies]
 tracing-core = "0.1"
