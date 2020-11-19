@@ -120,11 +120,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ContainsFn::new(Box::new(Path::from("foo")), "", false),
-            ),
-            (
-                map![],
                 Ok(false.into()),
                 ContainsFn::new(Box::new(Literal::from("foo")), "bar", false),
             ),

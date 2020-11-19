@@ -17,7 +17,7 @@ impl<'a> InternalEvent for WindowsServiceStart<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_start", 1,
+        counter!("windows_service_start_total", 1,
             "already_started" => self.already_started.to_string(),
         );
     }
@@ -39,7 +39,7 @@ impl<'a> InternalEvent for WindowsServiceStop<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_stop", 1,
+        counter!("windows_service_stop_total", 1,
             "already_stopped" => self.already_stopped.to_string(),
         );
     }
@@ -59,7 +59,7 @@ impl<'a> InternalEvent for WindowsServiceRestart<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_restart", 1)
+        counter!("windows_service_restart_total", 1)
     }
 }
 
@@ -77,7 +77,7 @@ impl<'a> InternalEvent for WindowsServiceInstall<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_install", 1,);
+        counter!("windows_service_install_total", 1,);
     }
 }
 
@@ -95,7 +95,7 @@ impl<'a> InternalEvent for WindowsServiceUninstall<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_uninstall", 1,);
+        counter!("windows_service_uninstall_total", 1,);
     }
 }
 
@@ -113,6 +113,6 @@ impl<'a> InternalEvent for WindowsServiceDoesNotExist<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("windows_service_does_not_exist", 1,);
+        counter!("windows_service_does_not_exist_total", 1,);
     }
 }

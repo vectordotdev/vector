@@ -73,18 +73,11 @@ mod tests {
 
     #[test]
     fn upcase() {
-        let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                UpcaseFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "foo 2 bar"],
-                Ok(Value::from("FOO 2 BAR")),
-                UpcaseFn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+        let cases = vec![(
+            map!["foo": "foo 2 bar"],
+            Ok(Value::from("FOO 2 BAR")),
+            UpcaseFn::new(Box::new(Path::from("foo"))),
+        )];
 
         let mut state = state::Program::default();
 

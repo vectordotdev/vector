@@ -189,11 +189,6 @@ mod tests {
             ),
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ParseDurationFn::new(Box::new(Path::from("foo")), "s"),
-            ),
-            (
-                map![],
                 Err("function call error: unable to parse duration: 'foo'".into()),
                 ParseDurationFn::new(Box::new(Literal::from("foo")), "µs"),
             ),

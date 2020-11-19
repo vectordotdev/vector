@@ -49,10 +49,12 @@ impl Path {
 
 impl Expression for Path {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        object
+        let value = object
             .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?
-            .ok_or_else(|| E::from(Error::Missing(self.as_string())).into())
+            .unwrap_or(Value::Null);
+
+        Ok(value)
     }
 
     /// A path resolves to `Any` by default, but the script might assign

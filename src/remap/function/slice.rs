@@ -282,11 +282,6 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                SliceFn::new(Box::new(Path::from("foo")), 0, None),
-            ),
-            (
-                map![],
                 Err(r#"function call error: "start" must be between "-3" and "3""#.into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 4, None),
             ),
