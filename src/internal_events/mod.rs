@@ -69,7 +69,7 @@ mod mongodb_metrics;
 mod nats;
 mod open;
 mod process;
-#[cfg(feature = "sources-prometheus")]
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
@@ -177,8 +177,8 @@ pub(crate) use self::metric_to_log::*;
 pub use self::nats::*;
 pub use self::open::*;
 pub use self::process::*;
-#[cfg(feature = "sources-prometheus")]
-pub use self::prometheus::*;
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+pub(crate) use self::prometheus::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
