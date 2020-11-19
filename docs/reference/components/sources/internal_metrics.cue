@@ -15,7 +15,7 @@ components: sources: internal_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: {
+			from: service: {
 				name:     "Vector instance"
 				thing:    "a \(name)"
 				url:      urls.vector_docs
