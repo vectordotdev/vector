@@ -4,12 +4,14 @@ use crate::{
 };
 use futures::future::BoxFuture;
 use http::header::HeaderValue;
+use http::request::Builder;
 use http::Request;
 use hyper::{
     body::{Body, HttpBody},
     client::{Client, HttpConnector},
 };
 use hyper_openssl::HttpsConnector;
+use percent_encoding::percent_decode;
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{
@@ -181,6 +183,26 @@ pub enum Auth {
 }
 
 impl Auth {
+    pub fn get_and_strip_basic_auth(url: &str) -> Option<(String, Self)> {
+        let mut url = url::Url::parse(url).ok()?;
+
+        let user = url.username();
+        let password = url.password().unwrap_or("");
+        if !user.is_empty() {
+            let user = percent_decode(user.as_bytes())
+                .decode_utf8_lossy()
+                .into_owned();
+            let password = percent_decode(password.as_bytes())
+                .decode_utf8_lossy()
+                .into_owned();
+            url.set_username("").ok()?;
+            url.set_password(None).ok()?;
+            Some((url.to_string(), Auth::Basic { user, password }))
+        } else {
+            None
+        }
+    }
+
     pub fn apply<B>(&self, req: &mut Request<B>) {
         use headers::{Authorization, HeaderMapExt};
 
@@ -194,5 +216,59 @@ impl Auth {
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
         }
+    }
+
+    pub fn apply_builder(&self, builder: Builder) -> Builder {
+        builder
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Auth;
+
+    fn test_basic_auth(url: &str) -> Option<(String, String)> {
+        Auth::get_and_strip_basic_auth(url).map(|(url, auth)| {
+            let mut request = http::Request::new(());
+            auth.apply(&mut request);
+            (
+                url,
+                (request.headers())["authorization"]
+                    .to_str()
+                    .unwrap()
+                    .to_owned(),
+            )
+        })
+    }
+
+    #[test]
+    fn basic_auth_url() {
+        assert_eq!(
+            test_basic_auth("http://user:pass@example.com"),
+            Some((
+                "http://example.com/".to_owned(),
+                format!("Basic {}", base64::encode("user:pass"))
+            ))
+        );
+
+        // special character
+        assert_eq!(
+            test_basic_auth("http://user:pass;@example.com"),
+            Some((
+                "http://example.com/".to_owned(),
+                format!("Basic {}", base64::encode("user:pass;"))
+            ))
+        );
+
+        // no password
+        assert_eq!(
+            test_basic_auth("http://user@example.com"),
+            Some((
+                "http://example.com/".to_owned(),
+                format!("Basic {}", base64::encode("user:"))
+            ))
+        );
+
+        assert_eq!(test_basic_auth("http://example.com:8080/test"), None);
     }
 }
