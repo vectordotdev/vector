@@ -186,7 +186,6 @@ sha2 = "0.9"
 sha3 = "0.9"
 md-5 = "0.9"
 hex = "0.4.2"
-chrono-tz = "0.5.3"
 heim = { version = "0.1.0-beta.3", optional = true, features = ["full"] }
 uom = { version = "0.30.0", optional = true }
 rust_decimal = "1.8.1"
@@ -228,7 +227,6 @@ matches = "0.1.8"
 pretty_assertions = "0.6.1"
 tokio01-test = "0.1.1"
 tower-test = "0.3.0"
-serde_yaml = "0.8.9"
 tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
