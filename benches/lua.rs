@@ -1,186 +1,191 @@
-use bytes::Bytes;
-use criterion::{criterion_group, Benchmark, Criterion};
-use futures::{compat::Stream01CompatExt, StreamExt};
+use criterion::{criterion_group, BatchSize, Criterion, Throughput};
+use futures::{
+    compat::{Future01CompatExt, Stream01CompatExt},
+    Stream, StreamExt,
+};
+use futures01::{Sink, Stream as Stream01};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::TransformConfig,
-    test_util::runtime,
-    transforms::{
-        self, util::runtime_transform::RuntimeTransform, FunctionTransform, TaskTransform,
-    },
+    test_util::{collect_ready03, runtime},
+    transforms::{self, Transform},
     Event,
 };
 
-fn add_fields(c: &mut Criterion) {
-    let num_events: usize = 100_000;
+fn bench_add_fields(c: &mut Criterion) {
+    let event = Event::new_empty_log();
 
     let key = "the key";
     let value = "this is the value";
 
-    let value_bytes_native = Bytes::from(value).into();
-    let value_bytes_v1 = Bytes::from(value).into();
-    let value_bytes_v2 = Bytes::from(value).into();
+    let mut group = c.benchmark_group("lua_add_fields");
+    group.throughput(Throughput::Elements(1));
 
-    c.bench(
-        "lua_add_fields",
-        Benchmark::new("native", move |b| {
-            b.iter_with_setup(
-                || {
-                    let mut map = IndexMap::new();
-                    map.insert(String::from(key), String::from(value).into());
-                    transforms::add_fields::AddFields::new(map, true).unwrap()
-                },
-                |mut transform| {
-                    for _ in 0..num_events {
-                        let event = Event::new_empty_log();
-                        let mut output = vec![];
-                        transform.transform(&mut output, event);
-                        assert_eq!(output[0].as_log()[key], value_bytes_native);
-                    }
-                },
-            )
-        })
-        .with_function("v1", move |b| {
-            b.iter_with_setup(
-                || {
-                    let source = format!("event['{}'] = '{}'", key, value);
-                    transforms::lua::v1::Lua::new(source, vec![]).unwrap()
-                },
-                |mut transform| {
-                    for _ in 0..num_events {
-                        let event = Event::new_empty_log();
-                        let output = transform.transform_one(event).unwrap();
-                        assert_eq!(output.as_log()[key], value_bytes_v1);
-                    }
-                },
-            )
-        })
-        .with_function("v2", move |b| {
-            b.iter_with_setup(
-                || {
-                    let config = format!(
-                        r#"
-                        hooks.process = """
-                            function (event, emit)
-                                event['{}'] = '{}'
-                            end
-                        """
-                        "#,
-                        key, value
-                    );
-                    transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
-                        .unwrap()
-                },
-                |mut transform| {
-                    for _ in 0..num_events {
-                        let event = Event::new_empty_log();
-                        let mut output = Vec::with_capacity(1);
-                        transform.transform(&mut output, event);
-                        assert_eq!(output[0].as_log()[key], value_bytes_v2);
-                    }
-                },
-            )
-        })
-        .sample_size(10),
-    );
-}
+    let benchmarks: Vec<(&str, Transform)> = vec![
+        ("native", {
+            let mut map = IndexMap::new();
+            map.insert(String::from(key), value.to_owned().into());
+            Transform::function(transforms::add_fields::AddFields::new(map, true).unwrap())
+        }),
+        ("v1", {
+            let source = format!("event['{}'] = '{}'", key, value);
 
-fn field_filter(c: &mut Criterion) {
-    let num_events: usize = 100_000;
+            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+        }),
+        ("v2", {
+            let config = format!(
+                r#"
+hooks.process = """
+function (event, emit)
+event.log['{}'] = '{}'
 
-    c.bench(
-        "lua_field_filter",
-        Benchmark::new("native", move |b| {
-            let mut rt = runtime();
-            b.iter_with_setup(
-                || {
-                    rt.block_on(async move {
-                        transforms::field_filter::FieldFilterConfig {
-                            field: "the_field".to_string(),
-                            value: "0".to_string(),
-                        }
-                        .build()
-                        .await
-                        .unwrap()
+emit(event)
+end
+"""
+"#,
+                key, value
+            );
+            Transform::task(
+                transforms::lua::v2::Lua::new(&toml::from_str::<LuaConfig>(&config).unwrap())
+                    .unwrap(),
+            )
+        }),
+    ];
+
+    for (name, transform) in benchmarks {
+        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(1);
+
+        let mut rx: Box<dyn Stream<Item = Result<Event, ()>> + Send + Unpin> = match transform {
+            Transform::Function(t) => {
+                let mut t = t.clone();
+                Box::new(
+                    rx.map(move |v| {
+                        let mut buf = Vec::with_capacity(1);
+                        t.transform(&mut buf, v);
+                        futures01::stream::iter_ok(buf.into_iter())
                     })
+                    .flatten()
+                    .compat(),
+                )
+            }
+            Transform::Task(t) => Box::new(t.transform(Box::new(rx)).compat()),
+        };
+
+        group.bench_function(name.to_owned(), |b| {
+            b.iter_batched(
+                || (tx.clone(), event.clone()),
+                |(tx, event)| {
+                    futures::executor::block_on(tx.send(event).compat()).unwrap();
+                    let transformed = futures::executor::block_on(rx.next()).unwrap().unwrap();
+
+                    debug_assert_eq!(transformed.as_log()[key], value.to_owned().into());
+
+                    transformed
                 },
-                |transform| {
-                    let inputs = (0..num_events).map(|i| {
-                        let mut event = Event::new_empty_log();
-                        event.as_mut_log().insert("the_field", (i % 10).to_string());
-                        event
-                    });
-                    let in_stream = futures01::stream::iter_ok(inputs);
-                    let out_stream = transform
-                        .into_task()
-                        .transform(Box::new(in_stream))
-                        .compat()
-                        .collect::<Vec<_>>();
-                    let blocked = futures::executor::block_on(out_stream);
-                    let num = blocked.len();
-                    assert_eq!(num, num_events / 10);
-                },
+                BatchSize::SmallInput,
             )
-        })
-        .with_function("v1", move |b| {
-            b.iter_with_setup(
-                || {
-                    let source = r#"
-                      if event["the_field"] ~= "0" then
-                        event = nil
-                      end
-                    "#;
-                    transforms::lua::v1::Lua::new(source.to_string(), vec![]).unwrap()
-                },
-                |mut transform| {
-                    let num = (0..num_events)
-                        .map(|i| {
-                            let mut event = Event::new_empty_log();
-                            event.as_mut_log().insert("the_field", (i % 10).to_string());
-                            event
-                        })
-                        .fold(Vec::new(), |mut acc, r| {
-                            let e = transform.transform_one(r);
-                            acc.push(e);
-                            acc
-                        })
-                        .len();
-                    assert_eq!(num, num_events / 10);
-                },
-            )
-        })
-        .with_function("v2", move |b| {
-            b.iter_with_setup(
-                || {
-                    let config = r#"
-                        hooks.proces = """
-                            if event["the_field"] ~= "0" then
-                              event = nil
-                            end
-                        """
-                    "#;
-                    transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap()
-                },
-                |transform| {
-                    let inputs = (0..num_events).map(|i| {
-                        let mut event = Event::new_empty_log();
-                        event.as_mut_log().insert("the_field", (i % 10).to_string());
-                        event
-                    });
-                    let in_stream = futures01::stream::iter_ok(inputs);
-                    let out_stream =
-                        TaskTransform::transform(Box::new(transform), Box::new(in_stream))
-                            .compat()
-                            .collect::<Vec<_>>();
-                    let blocked = futures::executor::block_on(out_stream);
-                    let num = blocked.len();
-                    assert_eq!(num, num_events / 10);
-                },
-            )
-        })
-        .sample_size(10),
-    );
+        });
+    }
+
+    group.finish();
 }
 
-criterion_group!(lua, add_fields, field_filter);
+fn bench_field_filter(c: &mut Criterion) {
+    let num_events = 10;
+    let events = (0..num_events)
+        .map(|i| {
+            let mut event = Event::new_empty_log();
+            event.as_mut_log().insert("the_field", (i % 10).to_string());
+            event
+        })
+        .collect::<Vec<_>>();
+
+    let mut group = c.benchmark_group("lua_field_filter");
+    group.throughput(Throughput::Elements(num_events));
+
+    let benchmarks: Vec<(&str, Transform)> = vec![
+        ("native", {
+            let mut rt = runtime();
+            rt.block_on(async move {
+                transforms::field_filter::FieldFilterConfig {
+                    field: "the_field".to_string(),
+                    value: "0".to_string(),
+                }
+                .build()
+                .await
+                .unwrap()
+            })
+        }),
+        ("v1", {
+            let source = String::from(
+                r#"
+if event["the_field"] ~= "0" then
+event = nil
+end
+"#,
+            );
+            Transform::task(transforms::lua::v1::Lua::new(source, vec![]).unwrap())
+        }),
+        ("v2", {
+            let config = r#"
+hooks.process = """
+function (event, emit)
+if event.log["the_field"] ~= "0" then
+event = nil
+end
+emit(event)
+end
+"""
+"#;
+            Transform::task(
+                transforms::lua::v2::Lua::new(&toml::from_str(config).unwrap()).unwrap(),
+            )
+        }),
+    ];
+
+    for (name, transform) in benchmarks {
+        let (tx, rx) = futures01::sync::mpsc::channel::<Event>(num_events as usize);
+
+        let mut rx: Box<dyn Stream<Item = Result<Event, ()>> + Send + Unpin> = match transform {
+            Transform::Function(t) => {
+                let mut t = t.clone();
+                Box::new(
+                    rx.map(move |v| {
+                        let mut buf = Vec::with_capacity(1);
+                        t.transform(&mut buf, v);
+                        futures01::stream::iter_ok(buf.into_iter())
+                    })
+                    .flatten()
+                    .compat(),
+                )
+            }
+            Transform::Task(t) => Box::new(t.transform(Box::new(rx)).compat()),
+        };
+
+        group.bench_function(name.to_owned(), |b| {
+            b.iter_batched(
+                || (tx.clone(), events.clone()),
+                |(tx, events)| {
+                    let _ = futures::executor::block_on(
+                        tx.send_all(futures01::stream::iter_ok(events)).compat(),
+                    )
+                    .unwrap();
+
+                    let output = futures::executor::block_on(collect_ready03(&mut rx)).unwrap();
+
+                    let num = output.len();
+
+                    debug_assert_eq!(num as u64, num_events / 10);
+
+                    num
+                },
+                BatchSize::SmallInput,
+            )
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(benches, bench_add_fields, bench_field_filter);

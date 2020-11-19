@@ -7,7 +7,7 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{
-    compat::Sink01CompatExt, executor, FutureExt, StreamExt, TryFutureExt, TryStreamExt,
+    compat::Sink01CompatExt, executor, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
 };
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
@@ -95,20 +95,28 @@ where
         }
     });
 
-    let fut = receiver
-        .take_until(shutdown)
-        .map_err(|error| emit!(StdinReadFailed { error }))
-        .map_ok(move |line| {
-            emit!(StdinEventReceived {
-                byte_size: line.len()
-            });
-            create_event(Bytes::from(line), &host_key, &hostname)
-        })
-        .forward(
-            out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
-                .sink_compat(),
-        )
-        .inspect(|_| info!("Finished sending"));
+    let fut = async move {
+        let mut out = out
+            .sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
+            .sink_compat();
+
+        let res = receiver
+            .take_until(shutdown)
+            .map_err(|error| emit!(StdinReadFailed { error }))
+            .map_ok(move |line| {
+                emit!(StdinEventReceived {
+                    byte_size: line.len()
+                });
+                create_event(Bytes::from(line), &host_key, &hostname)
+            })
+            .forward(&mut out)
+            .inspect(|_| info!("Finished sending."))
+            .await;
+
+        let _ = out.flush().await; // error emitted by sink_map_err
+
+        res
+    };
 
     Ok(Box::new(fut.boxed().compat()))
 }

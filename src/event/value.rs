@@ -207,7 +207,7 @@ impl From<remap::Value> for Value {
         use remap::Value::*;
 
         match v {
-            String(v) => Value::Bytes(v),
+            Bytes(v) => Value::Bytes(v),
             Integer(v) => Value::Integer(v),
             Float(v) => Value::Float(v),
             Boolean(v) => Value::Boolean(v),
@@ -224,7 +224,7 @@ impl From<Value> for remap::Value {
         use remap::Value::*;
 
         match v {
-            Value::Bytes(v) => String(v),
+            Value::Bytes(v) => Bytes(v),
             Value::Integer(v) => Integer(v),
             Value::Float(v) => Float(v),
             Value::Boolean(v) => Boolean(v),

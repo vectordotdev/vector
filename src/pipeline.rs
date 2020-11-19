@@ -60,6 +60,11 @@ impl Sink for Pipeline {
         debug_assert!(self.enqueued.is_empty());
         self.inner.poll_complete()
     }
+
+    fn close(&mut self) -> Poll<(), Self::SinkError> {
+        self.poll_complete()?;
+        self.inner.close()
+    }
 }
 
 impl Pipeline {

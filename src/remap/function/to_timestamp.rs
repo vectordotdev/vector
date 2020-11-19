@@ -19,7 +19,7 @@ impl Function for ToTimestamp {
                         v,
                         Value::Integer(_) |
                         Value::Float(_) |
-                        Value::String(_) |
+                        Value::Bytes(_) |
                         Value::Timestamp(_)
                     )
                 },
@@ -32,7 +32,7 @@ impl Function for ToTimestamp {
                         v,
                         Value::Integer(_) |
                         Value::Float(_) |
-                        Value::String(_) |
+                        Value::Bytes(_) |
                         Value::Timestamp(_)
                     )
                 },
@@ -64,18 +64,14 @@ impl ToTimestampFn {
 }
 
 impl Expression for ToTimestampFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_timestamp = |value| match value {
             Timestamp(_) => Ok(value),
             Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
             Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
-            String(_) => Conversion::Timestamp
+            Bytes(_) => Conversion::Timestamp
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
@@ -92,17 +88,17 @@ impl Expression for ToTimestampFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         self.value
             .type_def(state)
-            .fallible_unless(vec![Timestamp, Integer, Float])
+            .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
             .merge_with_default_optional(self.default.as_ref().map(|default| {
                 default
                     .type_def(state)
-                    .fallible_unless(vec![Timestamp, Integer, Float])
+                    .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
             }))
-            .with_constraint(Timestamp)
+            .with_constraint(Kind::Timestamp)
     }
 }
 
@@ -111,47 +107,47 @@ mod tests {
     use super::*;
     use crate::map;
     use std::collections::BTreeMap;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         timestamp_infallible {
             expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
-            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToTimestampFn { value: Literal::from(1).boxed(), default: None},
-            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToTimestampFn { value: Literal::from(1.0).boxed(), default: None},
-            def: TypeDef { constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         null_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(()).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         string_fallible {
             expr: |_| ToTimestampFn { value: Literal::from("foo").boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         map_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         array_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(vec![0]).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         boolean_fallible {
             expr: |_| ToTimestampFn { value: Literal::from(true).boxed(), default: None},
-            def: TypeDef { fallible: true, constraint: Timestamp.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Timestamp, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -159,7 +155,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -171,7 +167,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -183,7 +179,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -195,7 +191,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
 
@@ -207,7 +203,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: Timestamp.into(),
+                kind: Kind::Timestamp,
             },
         }
     ];
@@ -217,17 +213,12 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToTimestampFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
-                Ok(Some(Utc.timestamp(10, 0).into())),
+                Ok(Utc.timestamp(10, 0).into()),
                 ToTimestampFn::new(Box::new(Path::from("foo")), Some(10.into())),
             ),
             (
                 map![],
-                Ok(Some(Utc.timestamp(10, 0).into())),
+                Ok(Utc.timestamp(10, 0).into()),
                 ToTimestampFn::new(
                     Box::new(Path::from("foo")),
                     Some(Utc.timestamp(10, 0).into()),
@@ -235,12 +226,12 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Timestamp(Utc.timestamp(10, 0)))),
+                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
                 ToTimestampFn::new(Box::new(Path::from("foo")), Some("10".into())),
             ),
             (
                 map!["foo": Utc.timestamp(10, 0)],
-                Ok(Some(Value::Timestamp(Utc.timestamp(10, 0)))),
+                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
                 ToTimestampFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

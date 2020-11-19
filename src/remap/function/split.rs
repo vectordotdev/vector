@@ -13,12 +13,12 @@ impl Function for Split {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -50,16 +50,13 @@ pub(crate) struct SplitFn {
 }
 
 impl Expression for SplitFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
         let limit: usize = self
             .limit
             .as_ref()
-            .and_then(|expr| expr.execute(state, object).transpose())
+            .map(|expr| expr.execute(state, object))
             .transpose()?
             .map(i64::try_from)
             .transpose()?
@@ -68,38 +65,43 @@ impl Expression for SplitFn {
 
         let value = match &self.pattern {
             Argument::Regex(pattern) => pattern
-                .splitn(&value, limit as usize)
+                .splitn(value.as_ref(), limit as usize)
                 .collect::<Vec<_>>()
                 .into(),
             Argument::Expression(expr) => {
-                let pattern = required!(state, object, expr, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+                let bytes = expr.execute(state, object)?.try_bytes()?;
+                let pattern = String::from_utf8_lossy(&bytes);
 
-                value.splitn(limit, &pattern).collect::<Vec<_>>().into()
+                value
+                    .splitn(limit, pattern.as_ref())
+                    .collect::<Vec<_>>()
+                    .into()
             }
         };
 
-        Ok(Some(value))
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
-        let limit_def = self
-            .limit
-            .as_ref()
-            .map(|limit| limit.type_def(state).fallible_unless(vec![Integer, Float]));
+        let limit_def = self.limit.as_ref().map(|limit| {
+            limit
+                .type_def(state)
+                .fallible_unless(Kind::Integer | Kind::Float)
+        });
 
         let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(String)),
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
         };
 
         self.value
             .type_def(state)
-            .fallible_unless(String)
+            .fallible_unless(Kind::Bytes)
             .merge_optional(limit_def)
             .merge_optional(pattern_def)
-            .with_constraint(Array)
+            .with_constraint(Kind::Array)
     }
 }
 
@@ -115,7 +117,7 @@ mod test {
                 limit: None,
             },
             def: TypeDef {
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -128,7 +130,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -140,7 +142,7 @@ mod test {
                 limit: None,
             },
             def: TypeDef {
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -153,7 +155,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -165,7 +167,7 @@ mod test {
                 limit: Some(Literal::from(10).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }
@@ -178,7 +180,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::Array.into(),
+                kind: value::Kind::Array,
                 ..Default::default()
             },
         }

@@ -14,7 +14,7 @@ impl Function for ParseSyslog {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -100,22 +100,19 @@ fn message_to_value(message: Message<&str>) -> Value {
 }
 
 impl Expression for ParseSyslogFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let message = required!(state, object, self.value, Value::String(v) => String::from_utf8_lossy(&v).into_owned());
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let message = String::from_utf8_lossy(&bytes);
 
         let parsed = syslog_loose::parse_message_with_year(&message, resolve_year);
 
-        Ok(Some(message_to_value(parsed)))
+        Ok(message_to_value(parsed))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .with_constraint(value::Kind::Map)
     }
 }
@@ -129,17 +126,17 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| ParseSyslogFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: value::Kind::Map.into(), ..Default::default() },
+            def: TypeDef { kind: value::Kind::Map, ..Default::default() },
         }
 
         value_non_string {
             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::Map.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
         }
 
         value_optional {
             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, optional: true, constraint: value::Kind::Map.into() },
+            def: TypeDef { fallible: true, optional: true, kind: value::Kind::Map },
         }
     ];
 
@@ -148,7 +145,7 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some(map![
+                Ok(map![
                         "severity": "notice",
                         "facility": "user",
                         "timestamp": chrono::Utc.ymd(2020, 3, 13).and_hms_milli(20, 45, 38, 119),
@@ -160,28 +157,28 @@ mod tests {
                         "exampleSDID@32473.eventSource": "Application",
                         "exampleSDID@32473.eventID": "1011",
                         "message": "Try to override the THX port, maybe it will reboot the neural interface!",
-                ])),
+                ]),
                 ParseSyslogFn::new(Box::new(Literal::from(
                     r#"<13>1 2020-03-13T20:45:38.119Z dynamicwireless.name non 2426 ID931 [exampleSDID@32473 iut="3" eventSource= "Application" eventID="1011"] Try to override the THX port, maybe it will reboot the neural interface!"#,
                 ))),
             ),
             (
                 map![],
-                Ok(Some(map![
+                Ok(map![
                         "message": "not much of a syslog message",
-                ])),
+                ]),
                 ParseSyslogFn::new(Box::new(Literal::from(r#"not much of a syslog message"#))),
             ),
             (
                 map![],
-                Ok(Some(map![
+                Ok(map![
                         "facility": "local0",
                         "severity": "notice",
                         "message": "Proxy sticky-servers started.",
                         "timestamp": DateTime::<Utc>::from(chrono::Local.ymd(Utc::now().year(), 6, 13).and_hms_milli(16, 33, 35, 0)),
                         "appname": "haproxy",
                         "procid": 73411
-                ])),
+                ]),
                 ParseSyslogFn::new(Box::new(Literal::from(
                     r#"<133>Jun 13 16:33:35 haproxy[73411]: Proxy sticky-servers started."#,
                 ))),
@@ -195,7 +192,7 @@ mod tests {
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
 
-            assert_eq!(got, exp.map(|o| o.map(Into::into)));
+            assert_eq!(got, exp.map(Into::into));
         }
     }
 
@@ -219,7 +216,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap().unwrap();
+        let value = query.execute(&mut state, &mut object).unwrap();
         assert!(there_is_map_called_empty(value).unwrap());
 
         let msg = format!(
@@ -228,7 +225,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap().unwrap();
+        let value = query.execute(&mut state, &mut object).unwrap();
         assert!(there_is_map_called_empty(value).unwrap());
 
         let msg = format!(
@@ -237,7 +234,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap().unwrap();
+        let value = query.execute(&mut state, &mut object).unwrap();
         assert!(there_is_map_called_empty(value).unwrap());
 
         let msg = format!(
@@ -246,7 +243,7 @@ mod tests {
         );
 
         let query = ParseSyslogFn::new(Box::new(Literal::from(msg)));
-        let value = query.execute(&mut state, &mut object).unwrap().unwrap();
+        let value = query.execute(&mut state, &mut object).unwrap();
         assert!(!there_is_map_called_empty(value).unwrap());
     }
 }

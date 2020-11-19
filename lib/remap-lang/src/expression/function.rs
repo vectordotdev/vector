@@ -126,11 +126,7 @@ impl Function {
 }
 
 impl Expression for Function {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.function.execute(state, object)
     }
 
@@ -142,7 +138,7 @@ impl Expression for Function {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression::Noop, test_type_def, value::Constraint::*};
+    use crate::{expression::Noop, test_type_def, value::Kind};
 
     test_type_def![pass_through {
         expr: |_| {
@@ -152,7 +148,7 @@ mod tests {
         def: TypeDef {
             fallible: false,
             optional: true,
-            constraint: Any
+            kind: Kind::all(),
         },
     }];
 }

@@ -248,6 +248,22 @@ where
     }
 }
 
+pub async fn collect_ready03<S>(rx: &mut S) -> Result<Vec<S::Item>, ()>
+where
+    S: Stream + Unpin,
+{
+    let waker = noop_waker_ref();
+    let mut cx = Context::from_waker(waker);
+
+    let mut vec = Vec::new();
+    loop {
+        match rx.poll_next_unpin(&mut cx) {
+            Poll::Ready(Some(item)) => vec.push(item),
+            Poll::Ready(None) | Poll::Pending => return Ok(vec),
+        }
+    }
+}
+
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();

@@ -12,12 +12,16 @@ mod auto_concurrency;
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
 pub(crate) mod aws_s3;
+#[cfg(feature = "sinks-aws_sqs")]
+mod aws_sqs;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -27,11 +31,13 @@ mod concat;
 mod console;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
-#[cfg(feature = "sources-docker")]
-mod docker;
+#[cfg(feature = "sources-docker_logs")]
+mod docker_logs;
 mod elasticsearch;
 #[cfg(feature = "sources-generator")]
 mod generator;
+#[cfg(feature = "transforms-geoip")]
+mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
@@ -116,10 +122,14 @@ pub use self::auto_concurrency::*;
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub use self::aws_ec2_metadata::*;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+pub use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-aws_sqs")]
+pub use self::aws_sqs::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
@@ -129,13 +139,15 @@ pub use self::concat::*;
 pub use self::console::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
-#[cfg(feature = "sources-docker")]
-pub use self::docker::*;
+#[cfg(feature = "sources-docker_logs")]
+pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
+#[cfg(feature = "transforms-geoip")]
+pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;

@@ -48,12 +48,13 @@ impl Path {
 }
 
 impl Expression for Path {
-    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
-        object
+    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let value = object
             .find(&self.segments)
             .map_err(|e| E::from(Error::Resolve(e)))?
-            .ok_or_else(|| E::from(Error::Missing(self.as_string())).into())
-            .map(Some)
+            .unwrap_or(Value::Null);
+
+        Ok(value)
     }
 
     /// A path resolves to `Any` by default, but the script might assign
@@ -73,7 +74,7 @@ impl Expression for Path {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{test_type_def, value::Kind};
 
     test_type_def![
         ident_match {
@@ -89,7 +90,7 @@ mod tests {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    constraint: Exact(String)
+                    kind: Kind::Bytes
                 });
 
                 Path::from("foo")
@@ -97,7 +98,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(String),
+                kind: Kind::Bytes,
             },
         }
 

@@ -12,18 +12,12 @@ impl Block {
 }
 
 impl Expression for Block {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let mut value = None;
-
-        for expr in &self.expressions {
-            value = expr.execute(state, object)?;
-        }
-
-        Ok(value)
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        self.expressions
+            .iter()
+            .map(|expr| expr.execute(state, object))
+            .collect::<Result<Vec<_>>>()
+            .map(|mut v| v.pop().unwrap_or(Value::Null))
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -54,8 +48,7 @@ mod tests {
     use crate::{
         expression::{Arithmetic, Literal},
         test_type_def,
-        value::Constraint::*,
-        value::Kind::*,
+        value::Kind,
         Operator,
     };
 
@@ -67,7 +60,7 @@ mod tests {
 
         one_expression {
             expr: |_| Block::new(vec![Literal::from(true).into()]),
-            def: TypeDef { constraint: Exact(Boolean), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         multiple_expressions {
@@ -76,7 +69,7 @@ mod tests {
                         Literal::from(true).into(),
                         Literal::from(1234).into(),
             ]),
-            def: TypeDef { constraint: Exact(Integer), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         last_one_fallible {
@@ -90,7 +83,7 @@ mod tests {
             ]),
             def: TypeDef {
                 fallible: true,
-                constraint: OneOf(vec![String, Integer, Float]),
+                kind: Kind::Bytes | Kind::Integer | Kind::Float,
                 ..Default::default()
             },
         }
@@ -107,7 +100,7 @@ mod tests {
             ]),
             def: TypeDef {
                 fallible: true,
-                constraint: Exact(Array),
+                kind: Kind::Array,
                 ..Default::default()
             },
         }

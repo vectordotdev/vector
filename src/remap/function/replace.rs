@@ -12,17 +12,17 @@ impl Function for Replace {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "with",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -72,63 +72,67 @@ impl ReplaceFn {
 }
 
 impl Expression for ReplaceFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
-        let with = required!(state, object, self.with, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
-        let count = optional!(state, object, self.count, Value::Integer(v) => v).unwrap_or(-1);
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let value_bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&value_bytes);
+
+        let with_bytes = self.with.execute(state, object)?.try_bytes()?;
+        let with = String::from_utf8_lossy(&with_bytes);
+
+        let count = match &self.count {
+            Some(expr) => expr.execute(state, object)?.try_integer()?,
+            None => -1,
+        };
 
         match &self.pattern {
             Argument::Expression(expr) => {
-                let pattern = required!(state, object, expr, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+                let bytes = expr.execute(state, object)?.try_bytes()?;
+                let pattern = String::from_utf8_lossy(&bytes);
                 let replaced = match count {
-                    i if i > 0 => value.replacen(&pattern, &with, i as usize),
-                    i if i < 0 => value.replace(&pattern, &with),
-                    _ => value,
+                    i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
+                    i if i < 0 => value.replace(pattern.as_ref(), &with),
+                    _ => value.into_owned(),
                 };
 
-                Ok(Some(replaced.into()))
+                Ok(replaced.into())
             }
             Argument::Regex(regex) => {
                 let replaced = match count {
                     i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_str())
+                        .replacen(&value, i as usize, with.as_ref())
                         .as_bytes()
                         .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_str()).as_bytes().into(),
+                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
                     _ => value.into(),
                 };
 
-                Ok(Some(replaced))
+                Ok(replaced)
             }
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
-        let with_def = self.with.type_def(state).fallible_unless(String);
+        let with_def = self.with.type_def(state).fallible_unless(Kind::Bytes);
 
         let count_def = self
             .count
             .as_ref()
-            .map(|count| count.type_def(state).fallible_unless(Integer));
+            .map(|count| count.type_def(state).fallible_unless(Kind::Integer));
 
         let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(String)),
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
         };
 
         self.value
             .type_def(state)
-            .fallible_unless(String)
+            .fallible_unless(Kind::Bytes)
             .merge(with_def)
             .merge_optional(pattern_def)
             .merge_optional(count_def)
-            .with_constraint(String)
+            .with_constraint(Kind::Bytes)
     }
 }
 
@@ -146,7 +150,7 @@ mod test {
                 count: None,
             },
             def: TypeDef {
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -160,7 +164,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -173,7 +177,7 @@ mod test {
                 count: None,
             },
             def: TypeDef {
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -187,7 +191,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -201,7 +205,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -214,7 +218,7 @@ mod test {
                 count: Some(Literal::from(10).boxed()),
             },
             def: TypeDef {
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -228,7 +232,7 @@ mod test {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: value::Kind::String.into(),
+                kind: value::Kind::Bytes,
                 ..Default::default()
             },
         }
@@ -239,7 +243,7 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -249,7 +253,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -259,7 +263,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like apples and bananas".into())),
+                Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -269,7 +273,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -279,7 +283,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bananas".into())),
+                Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("a").into(),
@@ -305,7 +309,7 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -315,7 +319,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -325,7 +329,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like apples and bananas".into())),
+                Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -335,7 +339,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -345,7 +349,7 @@ mod test {
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bananas".into())),
+                Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     regex::Regex::new("a").unwrap().into(),
@@ -371,7 +375,7 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like biscuits and bananas".into())),
+                Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
                     Literal::from("apples").into(),
@@ -381,7 +385,7 @@ mod test {
             ),
             (
                 map!["foo": "I like apples and bananas"],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
                     regex::Regex::new("a").unwrap().into(),
@@ -391,7 +395,7 @@ mod test {
             ),
             (
                 map!["foo": "I like [apples] and bananas"],
-                Ok(Some("I like biscuits and bananas".into())),
+                Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
                     regex::Regex::new("\\[apples\\]").unwrap().into(),

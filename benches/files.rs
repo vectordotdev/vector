@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, Benchmark, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, Criterion, SamplingMode, Throughput};
 use futures::{compat::Future01CompatExt, stream, SinkExt, StreamExt};
 use std::convert::TryInto;
 use std::path::PathBuf;
@@ -12,15 +12,19 @@ use vector::{
 };
 
 fn benchmark_files_without_partitions(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
+    let num_lines: usize = 10_000;
     let line_size: usize = 100;
 
-    let bench = Benchmark::new("files_without_partitions", move |b| {
-        let temp = tempdir().unwrap();
-        let directory = temp.path().to_path_buf();
+    let mut group = c.benchmark_group("files");
+    group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    group.sampling_mode(SamplingMode::Flat);
 
-        b.iter_with_setup(
+    group.bench_function("files_without_partitions", |b| {
+        b.iter_batched(
             || {
+                let temp = tempdir().unwrap();
+                let directory = temp.path().to_path_buf();
+
                 let directory_str = directory.to_str().unwrap();
 
                 let mut data_dir = directory_str.to_owned();
@@ -81,13 +85,11 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     topology.stop().compat().await.unwrap();
                 });
             },
+            BatchSize::LargeInput,
         )
-    })
-    .sample_size(10)
-    .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    });
 
-    c.bench("files", bench);
+    group.finish();
 }
 
-criterion_group!(files, benchmark_files_without_partitions);
+criterion_group!(benches, benchmark_files_without_partitions);

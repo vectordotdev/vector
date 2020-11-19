@@ -254,4 +254,8 @@ components: sinks: elasticsearch: {
 					"""
 		}
 	}
+
+	telemetry: metrics: {
+		missing_keys_total: components.sources.internal_metrics.output.metrics.missing_keys_total
+	}
 }

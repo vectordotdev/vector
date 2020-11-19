@@ -12,7 +12,7 @@ impl Function for Upcase {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -37,26 +37,19 @@ impl UpcaseFn {
 }
 
 impl Expression for UpcaseFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.value
-            .execute(state, object)?
-            .map(String::try_from)
-            .transpose()?
+            .execute(state, object)
+            .and_then(|v| String::try_from(v).map_err(Into::into))
             .map(|v| v.to_uppercase())
             .map(Into::into)
-            .map(Ok)
-            .transpose()
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
-            .with_constraint(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -64,33 +57,27 @@ impl Expression for UpcaseFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
 
     remap::test_type_def![
         string {
             expr: |_| UpcaseFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         non_string {
             expr: |_| UpcaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
     ];
 
     #[test]
     fn upcase() {
-        let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                UpcaseFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "foo 2 bar"],
-                Ok(Some(Value::from("FOO 2 BAR"))),
-                UpcaseFn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+        let cases = vec![(
+            map!["foo": "foo 2 bar"],
+            Ok(Value::from("FOO 2 BAR")),
+            UpcaseFn::new(Box::new(Path::from("foo"))),
+        )];
 
         let mut state = state::Program::default();
 
