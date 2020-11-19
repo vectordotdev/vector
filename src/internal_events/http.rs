@@ -58,3 +58,24 @@ impl InternalEvent for HTTPEventMissingMessage {
         counter!("events_discarded_total", 1);
     }
 }
+
+#[derive(Debug)]
+pub struct HTTPEventsSent {
+    pub events_count: usize,
+    pub byte_size: usize,
+}
+
+impl InternalEvent for HTTPEventsSent {
+    fn emit_logs(&self) {
+        trace!(
+            message = "Events sent.",
+            events_count = %self.events_count,
+            byte_size = %self.byte_size
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("events_processed_total", self.events_count as u64);
+        counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
