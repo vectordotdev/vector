@@ -515,4 +515,17 @@ components: sources: file: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		checkpoint_write_errors_total: components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
+		checkpoints_total:             components.sources.internal_metrics.output.metrics.checkpoints_total
+		checksum_errors:               components.sources.internal_metrics.output.metrics.checksum_errors
+		file_delete_errors:            components.sources.internal_metrics.output.metrics.file_delete_errors
+		file_watch_errors:             components.sources.internal_metrics.output.metrics.file_watch_errors
+		files_added:                   components.sources.internal_metrics.output.metrics.files_added
+		files_deleted:                 components.sources.internal_metrics.output.metrics.files_deleted
+		files_resumed:                 components.sources.internal_metrics.output.metrics.files_resumed
+		files_unwatched:               components.sources.internal_metrics.output.metrics.files_unwatched
+		fingerprint_read_errors:       components.sources.internal_metrics.output.metrics.fingerprint_read_errors
+	}
 }

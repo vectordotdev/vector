@@ -170,4 +170,9 @@ components: transforms: aws_ec2_metadata: {
 			}
 		}
 	}
+
+	telemetry: metrics: {
+		metadata_refresh_failed_total:     components.sources.internal_metrics.output.metrics.metadata_refresh_failed_total
+		metadata_refresh_successful_total: components.sources.internal_metrics.output.metrics.metadata_refresh_successful_total
+	}
 }

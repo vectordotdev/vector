@@ -110,4 +110,8 @@ components: sources: vector: {
 		}
 
 	}
+
+	telemetry: metrics: {
+		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
+	}
 }

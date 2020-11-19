@@ -299,4 +299,9 @@ components: sources: kubernetes_logs: {
 					"""
 		}
 	}
+
+	telemetry: metrics: {
+		docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.docker_format_parse_failures_total
+		event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.event_annotation_failures_total
+	}
 }
