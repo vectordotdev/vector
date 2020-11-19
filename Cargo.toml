@@ -221,6 +221,7 @@ prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
+base64 = "0.13"
 approx = "0.3.0"
 criterion = "0.3"
 tempfile = "3.0.6"
@@ -458,7 +459,7 @@ sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = ["bytesize"]
-sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
+sinks-elasticsearch = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
 sinks-honeycomb = ["bytesize"]
