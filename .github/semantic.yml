@@ -43,7 +43,6 @@ scopes:
   - healthchecks # Anything related to Vector's healtchecks
   - internal docs # Anything related to Vector's internal documentation
   - logs # Anything related to Vector's log events
-  - marketing # Anything related to marketing Vector
   - metrics # Anything related to Vector's metrics events
   - networking # Anything related to Vector's networking
   - observability # Anything related to monitoring/observing Vector
@@ -56,7 +55,7 @@ scopes:
   - reliability # Anything related to Vector's reliability
   - reload # Anything related to reloading Vector (updating configuration)
   - remap # Anything related to the Timber Remap Language
-  - rfcs # Anything related to Vector's internal RFCs
+  - schemas # Anything related to internal Vector event schemas
   - security # Anything related to security
   - setup # Anything related to setting up or installing Vector
   - shutdown # Anything related to the shutdown of Vector
@@ -114,6 +113,7 @@ scopes:
   # sources
   - apache_metrics source # Anything `apache_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
+  - aws_s3 source # Anything `aws_s3` source related
   - docker source # Anything `docker` source related
   - file source # Anything `file` source related
   - generator source # Anything `generator` source related
@@ -188,6 +188,7 @@ scopes:
   - kafka sink # Anything `kafka` sink related
   - logdna sink # Anything `logdna` sink related
   - loki sink # Anything `loki` sink related
+  - nats sink # Anything `nats` sink related
   - new_relic_logs sink # Anything `new_relic_logs` sink related
   - papertrail sink # Anything `papertrail` sink related
   - prometheus sink # Anything `prometheus` sink related
