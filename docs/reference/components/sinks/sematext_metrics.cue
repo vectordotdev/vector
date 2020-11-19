@@ -80,6 +80,6 @@ components: sinks: sematext_metrics: {
 	}
 
 	telemetry: metrics: {
-		processing_errors_total: telemetry.metrics._processing_errors_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

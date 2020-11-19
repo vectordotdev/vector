@@ -99,7 +99,7 @@ components: sources: logplex: {
 	}
 
 	telemetry: metrics: {
-		request_read_errors_total: telemetry.metrics._request_read_errors_total
-		requests_received_total:   telemetry.metrics._requests_received_total
+		request_read_errors_total: components.sources.internal_metrics.output.metrics.request_read_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

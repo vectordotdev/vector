@@ -220,23 +220,7 @@ components: transforms: tag_cardinality_limit: {
 	}
 
 	telemetry: metrics: {
-		tag_value_limit_exceeded_total: {
-			description: """
-				The total number of events discarded because the tag has been rejected after
-				hitting the configured `value_limit`.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._component_tags
-		}
-		value_limit_reached_total: {
-			description: """
-				The total number of times new values for a key have been rejected because the
-				value limit has been reached.
-				"""
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._component_tags
-		}
+		tag_value_limit_exceeded_total: components.sources.internal_metrics.output.metrics.tag_value_limit_exceeded_total
+		value_limit_reached_total:      components.sources.internal_metrics.output.metrics.value_limit_reached_total
 	}
 }

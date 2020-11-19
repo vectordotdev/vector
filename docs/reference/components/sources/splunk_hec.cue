@@ -94,7 +94,7 @@ components: sources: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		http_request_errors_total: telemetry.metrics._http_request_errors_total
-		requests_received_total:   telemetry.metrics._requests_received_total
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

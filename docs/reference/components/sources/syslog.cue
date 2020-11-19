@@ -184,33 +184,7 @@ components: sources: syslog: {
 	}
 
 	telemetry: metrics: {
-		connection_read_errors_total: {
-			description:       "The total number of errors reading datagram."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._component_tags & {
-				mode: {
-					description: ""
-					required:    true
-					options: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
-		}
-		utf8_convert_errors_total: {
-			description:       "The total number of errors converting bytes to a UTF-8 string in UDP mode."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._component_tags & {
-				mode: {
-					description: "The connection mode used by the component."
-					required:    true
-					options: {
-						udp: "User Datagram Protocol"
-					}
-				}
-			}
-		}
+		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
+		utf8_convert_errors_total:    components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
 }

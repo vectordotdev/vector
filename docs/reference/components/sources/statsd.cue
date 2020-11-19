@@ -122,18 +122,8 @@ components: sources: statsd: {
 	}
 
 	telemetry: metrics: {
-		connection_errors_total: telemetry.metrics._connection_errors_total
-		invalid_record_total: {
-			description:       "The total number of discarded invalid StatsD records."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._component_tags
-		}
-		invalid_record_bytes_total: {
-			description:       "The total number of bytes from StatsD journald records."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._component_tags
-		}
+		connection_errors_total:    components.sources.internal_metrics.output.metrics.connection_errors_total
+		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 	}
 }

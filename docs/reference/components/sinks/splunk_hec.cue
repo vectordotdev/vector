@@ -167,7 +167,7 @@ components: sinks: splunk_hec: {
 	}
 
 	telemetry: metrics: {
-		http_request_errors_total: telemetry.metrics._http_request_errors_total
-		http_requests_total:       telemetry.metrics._http_requests_total
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		http_requests_total:       components.sources.internal_metrics.output.metrics.http_requests_total
 	}
 }

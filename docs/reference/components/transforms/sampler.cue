@@ -66,6 +66,6 @@ components: transforms: sampler: {
 	}
 
 	telemetry: metrics: {
-		events_discarded_total: telemetry.metrics._events_discarded_total
+		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
 	}
 }

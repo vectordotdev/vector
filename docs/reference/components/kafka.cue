@@ -90,15 +90,7 @@ components: _kafka: {
 	}
 
 	telemetry: metrics: {
-		consumer_offset_updates_failed_total: {
-			description: "The total number of failures to update a Kafka consumer offset."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
-		}
-		events_failed_total: {
-			description: "The total number of failures to read a Kafka message."
-			type:        "counter"
-			tags:        telemetry.metrics._component_tags
-		}
+		consumer_offset_updates_failed_total: components.sources.internal_metrics.output.metrics.consumer_offset_updates_failed_total
+		events_failed_total:                  components.sources.internal_metrics.output.metrics.events_failed_total
 	}
 }

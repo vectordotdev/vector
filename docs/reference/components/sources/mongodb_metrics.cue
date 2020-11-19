@@ -95,24 +95,9 @@ components: sources: mongodb_metrics: {
 	}
 
 	telemetry: metrics: {
-		collect_duration_nanoseconds: {
-			description:       "The duration spent collecting MongoDB metrics."
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._internal_metrics_tags
-		}
-		collect_completed_total: {
-			description:       "The total number of MongoDB metrics collections completed."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._internal_metrics_tags
-		}
-		request_error_total: {
-			description:       "The total number of MongoDB request errors."
-			type:              "counter"
-			default_namespace: "vector"
-			tags:              telemetry.metrics._internal_metrics_tags
-		}
+		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
+		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
+		request_error_total:          components.sources.internal_metrics.output.metrics.request_error_total
 	}
 
 	output: metrics: {
