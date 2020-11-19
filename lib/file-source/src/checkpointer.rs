@@ -102,11 +102,11 @@ impl CheckpointsView {
 
     fn maybe_upgrade(&self, fresh: impl Iterator<Item = FileFingerprint>) {
         for fng in fresh {
-            if let Some((fng, pos)) = self
+            if let Some((_, pos)) = self
                 .checkpoints
                 .remove(&FileFingerprint::Unknown(fng.to_legacy()))
             {
-                self.checkpoints.insert(fng, pos);
+                self.update(fng, pos);
             }
         }
     }
