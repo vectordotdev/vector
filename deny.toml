@@ -1,7 +1,14 @@
 [advisories]
 ignore = [
-    # net2: `net2` crate has been deprecated; use `socket2` instead
+    # `net2` crate has been deprecated; use `socket2` instead
     "RUSTSEC-2020-0016",
     # failure: failure is officially deprecated/unmaintained
     "RUSTSEC-2020-0036",
+    # dirs is unmaintained, use dirs-next instead
+    "RUSTSEC-2020-0053",
+    # stdweb is unmaintained
+    "RUSTSEC-2020-0056",
+    # Potential segfault in the time crate
+    # https://github.com/time-rs/time/issues/293
+    "RUSTSEC-2020-0071",
 ]
