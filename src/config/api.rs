@@ -7,7 +7,7 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    #[serde(default = "default_bind")]
+    #[serde(default = "default_address")]
     pub address: Option<SocketAddr>,
 
     #[serde(default = "default_playground")]
