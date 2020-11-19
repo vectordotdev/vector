@@ -238,6 +238,7 @@ impl InternalEvent for FileCheckpointWriteFailed {
     }
 }
 
+#[derive(Clone)]
 pub struct FileSourceInternalEventsEmitter;
 
 impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {

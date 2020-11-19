@@ -20,6 +20,7 @@ tokio = { version = "0.2.13", features = ["time"] }
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0.33"
 chrono = { version = "0.4.19", features = ["serde"] }
+dashmap = "3.11.10"
 
 [dev-dependencies]
 quickcheck = "0.9"
