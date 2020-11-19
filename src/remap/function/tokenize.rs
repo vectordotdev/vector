@@ -12,7 +12,7 @@ impl Function for Tokenize {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -37,15 +37,9 @@ impl TokenizeFn {
 }
 
 impl Expression for TokenizeFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
-        };
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
 
         let tokens: Value = tokenize::parse(&value)
             .into_iter()
@@ -56,13 +50,13 @@ impl Expression for TokenizeFn {
             .collect::<Vec<_>>()
             .into();
 
-        Ok(Some(tokens))
+        Ok(tokens)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .with_constraint(value::Kind::Array)
     }
 }
@@ -71,16 +65,17 @@ impl Expression for TokenizeFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
             expr: |_| TokenizeFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: value::Kind::Array.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         value_non_string {
             expr: |_| TokenizeFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::Array.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
         }
     ];
 
@@ -88,7 +83,7 @@ mod tests {
     fn tokenize() {
         let cases = vec![(
                     map![],
-                    Ok(Some(vec![
+                    Ok(vec![
                             "217.250.207.207".into(),
                             Value::Null,
                             Value::Null,
@@ -97,7 +92,7 @@ mod tests {
                             "205".into(),
                             "11881".into(),
 
-                    ].into())),
+                    ].into()),
                     TokenizeFn::new(Box::new(Literal::from("217.250.207.207 - - [07/Sep/2020:16:38:00 -0400] \"DELETE /deliverables/next-generation/user-centric HTTP/1.1\" 205 11881"))),
                 )];
 

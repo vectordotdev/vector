@@ -1,7 +1,4 @@
 <p align="center">
-  <img src="docs/assets/images/diagram.svg" alt="Vector">
-</p>
-<p align="center">
   <strong>
     <a href="https://vector.dev/guides/getting-started/">Get Started<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
     <a href="https://vector.dev/docs/">Docs<a/>&nbsp;&nbsp;&bull;&nbsp;&nbsp;
@@ -11,16 +8,19 @@
     <a href="https://vector.dev/releases/latest/download/">Download<a/>
   </strong>
 </p>
+<p align="center">
+  <img src="docs/assets/images/diagram.svg" alt="Vector">
+</p>
 
 ## What is Vector?
 
-Vector is a high-performance observability data platform (agent & aggregator)
-that puts you in control of your observability data. [Collect][docs.sources],
-[transform][docs.transforms], and [route][docs.sinks] all your logs, metrics,
-and traces to any vendors you want today and any other vendors you may want
-tomorrow. Vector enables cost reduction, novel data enrichment, and data
-security when you need it, not when is most convenient for your vendors.
-100% open source and up to 10x faster than every alternative.
+Vector is a high-performance, end-to-end (agent & aggregator) observability data
+platform that puts you in control of your observability data.
+[Collect][docs.sources], [transform][docs.transforms], and [route][docs.sinks]
+all your logs, metrics, and traces to any vendors you want today and any other
+vendors you may want tomorrow. Vector enables cost reduction, novel data
+enrichment, and data security when you need it, not when is most convenient for
+your vendors. 100% open source and up to 10x faster than every alternative.
 
 To get started, follow our [**getting started guides**][urls.getting_started]
 or [**install Vector**][docs.installation].
@@ -45,9 +45,8 @@ or [**install Vector**][docs.installation].
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
   **Tuple**, **Douban**, and many more.
 * Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 10TB daily**.
-* Vector is **used by multiple fortune 500 companies** with stringent production requirements.
-* Vector has **over 15 active contributors** and growing.
+* Vector's largest user **processes over 20TB daily**.
+* Vector has **over 100 contributors** and growing.
 
 ## [Documentation](https://vector.dev/docs/)
 

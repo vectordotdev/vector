@@ -1,5 +1,5 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, Label, Recorder};
+use metrics::{Key, Label, Recorder, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
@@ -42,15 +42,20 @@ struct VectorRecorder {
 }
 
 impl Recorder for VectorRecorder {
-    fn register_counter(&self, key: Key, _description: Option<&'static str>) {
+    fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Counter, key);
         self.registry.op(ckey, |_| {}, Handle::counter)
     }
-    fn register_gauge(&self, key: Key, _description: Option<&'static str>) {
+    fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Gauge, key);
         self.registry.op(ckey, |_| {}, Handle::gauge)
     }
-    fn register_histogram(&self, key: Key, _description: Option<&'static str>) {
+    fn register_histogram(
+        &self,
+        key: Key,
+        _unit: Option<Unit>,
+        _description: Option<&'static str>,
+    ) {
         let ckey = CompositeKey::new(MetricKind::Histogram, key);
         self.registry.op(ckey, |_| {}, Handle::histogram)
     }

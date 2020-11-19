@@ -46,14 +46,17 @@ impl ToStringFn {
 }
 
 impl Expression for ToStringFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        use Value::*;
+
         let to_string = |value| match value {
-            Value::String(_) => Ok(value),
-            _ => Ok(value.as_string_lossy()),
+            Bytes(_) => Ok(value),
+            Integer(v) => Ok(v.to_string().into()),
+            Float(v) => Ok(v.to_string().into()),
+            Boolean(v) => Ok(v.to_string().into()),
+            Timestamp(v) => Ok(v.to_string().into()),
+            Null => Ok("".into()),
+            Map(_) | Array(_) => Err("unable to convert value to string".into()),
         };
 
         super::convert_value_or_default(
@@ -69,7 +72,7 @@ impl Expression for ToStringFn {
             .merge_with_default_optional(
                 self.default.as_ref().map(|default| default.type_def(state)),
             )
-            .with_constraint(value::Kind::String)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -78,47 +81,47 @@ mod tests {
     use super::*;
     use crate::map;
     use std::collections::BTreeMap;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         boolean_infallible {
             expr: |_| ToStringFn { value: Literal::from(true).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         integer_infallible {
             expr: |_| ToStringFn { value: Literal::from(1).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         float_infallible {
             expr: |_| ToStringFn { value: Literal::from(1.0).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         null_infallible {
             expr: |_| ToStringFn { value: Literal::from(()).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         string_infallible {
             expr: |_| ToStringFn { value: Literal::from("foo").boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         map_infallible {
             expr: |_| ToStringFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         array_infallible {
             expr: |_| ToStringFn { value: Literal::from(vec![0]).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         timestamp_infallible {
             expr: |_| ToStringFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         fallible_value_without_default {
@@ -126,7 +129,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::Bytes,
             },
         }
 
@@ -138,7 +141,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::Bytes,
             },
         }
 
@@ -150,7 +153,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::Bytes,
             },
         }
 
@@ -162,7 +165,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::Bytes,
             },
         }
 
@@ -174,7 +177,7 @@ mod tests {
             def: TypeDef {
                 fallible: false,
                 optional: false,
-                constraint: String.into(),
+                kind: Kind::Bytes,
             },
         }
     ];
@@ -184,22 +187,17 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToStringFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
-                Ok(Some(Value::from("default"))),
-                ToStringFn::new(Box::new(Path::from("foo")), Some(Value::from("default"))),
+                Ok(Value::from("default")),
+                ToStringFn::new(Literal::from(vec![0]).boxed(), Some("default".into())),
             ),
             (
                 map!["foo": 20],
-                Ok(Some(Value::from("20"))),
+                Ok(Value::from("20")),
                 ToStringFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20.5],
-                Ok(Some(Value::from("20.5"))),
+                Ok(Value::from("20.5")),
                 ToStringFn::new(Box::new(Path::from("foo")), None),
             ),
         ];

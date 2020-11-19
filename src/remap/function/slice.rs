@@ -12,7 +12,7 @@ impl Function for Slice {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_) | Value::Array(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Array(_)),
                 required: true,
             },
             Parameter {
@@ -55,13 +55,12 @@ impl SliceFn {
 }
 
 impl Expression for SliceFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let start = required!(state, object, self.start, Value::Integer(v) => v);
-        let end = optional!(state, object, self.end, Value::Integer(v) => v);
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let start = self.start.execute(state, object)?.try_integer()?;
+        let end = match &self.end {
+            Some(expr) => Some(expr.execute(state, object)?.try_integer()?),
+            None => None,
+        };
 
         let range = |len: i64| -> Result<std::ops::Range<usize>> {
             let start = match start {
@@ -85,38 +84,36 @@ impl Expression for SliceFn {
             }
         };
 
-        required! {
-            state, object, self.value,
-            Value::String(v) => range(v.len() as i64)
+        match self.value.execute(state, object)? {
+            Value::Bytes(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
-                .map(Value::from)
-                .map(Some),
+                .map(Value::from),
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
-                .map(Value::from)
-                .map(Some),
+                .map(Value::from),
+            _ => unreachable!(),
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         let value_def = self
             .value
             .type_def(state)
-            .fallible_unless(vec![String, Array]);
+            .fallible_unless(Kind::Bytes | Kind::Array);
         let end_def = self
             .end
             .as_ref()
-            .map(|end| end.type_def(state).fallible_unless(Integer));
+            .map(|end| end.type_def(state).fallible_unless(Kind::Integer));
 
         value_def
             .clone()
-            .merge(self.start.type_def(state).fallible_unless(Integer))
+            .merge(self.start.type_def(state).fallible_unless(Kind::Integer))
             .merge_optional(end_def)
-            .with_constraint(match value_def.constraint {
-                v if v.is(String) || v.is(Array) => v,
-                _ => vec![String, Array].into(),
+            .with_constraint(match value_def.kind {
+                v if v.is_bytes() || v.is_array() => v,
+                _ => Kind::Bytes | Kind::Array,
             })
             .into_fallible(true) // can fail for invalid start..end ranges
     }
@@ -126,7 +123,7 @@ impl Expression for SliceFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -135,7 +132,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_array {
@@ -144,7 +141,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, constraint: Array.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
         }
 
         value_unknown {
@@ -153,7 +150,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, constraint: vec![String, Array].into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array, ..Default::default() },
         }
     ];
 
@@ -162,47 +159,47 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some("foo".into())),
+                Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, None),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, None),
             ),
             (
                 map![],
-                Ok(Some("o".into())),
+                Ok("o".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, None),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), -2, None),
             ),
             (
                 map![],
-                Ok(Some("".into())),
+                Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 3, None),
             ),
             (
                 map![],
-                Ok(Some("".into())),
+                Ok("".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 2, Some(2)),
             ),
             (
                 map![],
-                Ok(Some("foo".into())),
+                Ok("foo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 0, Some(4)),
             ),
             (
                 map![],
-                Ok(Some("oo".into())),
+                Ok("oo".into()),
                 SliceFn::new(Box::new(Literal::from("foo")), 1, Some(5)),
             ),
             (
                 map![],
-                Ok(Some("docious".into())),
+                Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     -7,
@@ -211,7 +208,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("cali".into())),
+                Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     5,
@@ -236,22 +233,22 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some(vec![0, 1, 2].into())),
+                Ok(vec![0, 1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 0, None),
             ),
             (
                 map![],
-                Ok(Some(vec![1, 2].into())),
+                Ok(vec![1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), 1, None),
             ),
             (
                 map![],
-                Ok(Some(vec![1, 2].into())),
+                Ok(vec![1, 2].into()),
                 SliceFn::new(Box::new(Literal::from(vec![0, 1, 2])), -2, None),
             ),
             (
                 map![],
-                Ok(Some("docious".into())),
+                Ok("docious".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     -7,
@@ -260,7 +257,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("cali".into())),
+                Ok("cali".into()),
                 SliceFn::new(
                     Box::new(Literal::from("Supercalifragilisticexpialidocious")),
                     5,
@@ -283,11 +280,6 @@ mod tests {
     #[test]
     fn errors() {
         let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                SliceFn::new(Box::new(Path::from("foo")), 0, None),
-            ),
             (
                 map![],
                 Err(r#"function call error: "start" must be between "-3" and "3""#.into()),

@@ -263,9 +263,11 @@ where
     let s: &'de str = Deserialize::deserialize(des)?;
     match s {
         "systemd" => Ok(0),
-        s if s.starts_with("systemd#") => {
-            Ok(s[8..].parse::<usize>().map_err(de::Error::custom)? - 1)
-        }
+        s if s.starts_with("systemd#") => s[8..]
+            .parse::<usize>()
+            .map_err(de::Error::custom)?
+            .checked_sub(1)
+            .ok_or_else(|| de::Error::custom("systemd indices start from 1, found 0")),
         _ => Err(de::Error::custom("must start with \"systemd\"")),
     }
 }

@@ -844,9 +844,9 @@ E2E (end-to-end) tests.
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
 
-> Note: `minikube` has a bug in the latest versions that affects our test
+> Note: `minikube` had a bug in the versions `1.12.x` that affected our test
 > process - see https://github.com/kubernetes/minikube/issues/8799.
-> Use version `1.11.0` for now.
+> Use version `1.13.0+` that has this bug fixed.
 
 Also:
 

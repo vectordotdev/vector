@@ -16,14 +16,14 @@ impl Runtime {
         &mut self,
         object: &mut impl Object,
         program: &Program,
-    ) -> Result<Option<Value>, RemapError> {
+    ) -> Result<Value, RemapError> {
         let mut values = program
             .expressions
             .iter()
             .map(|expression| expression.execute(&mut self.state, object))
-            .collect::<crate::Result<Vec<Option<Value>>>>()
+            .collect::<crate::Result<Vec<Value>>>()
             .map_err(RemapError)?;
 
-        Ok(values.pop().flatten())
+        Ok(values.pop().unwrap_or(Value::Null))
     }
 }

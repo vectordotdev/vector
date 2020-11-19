@@ -22,12 +22,12 @@ impl Function for Sha2 {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "variant",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
         ]
@@ -57,12 +57,8 @@ impl Sha2Fn {
 }
 
 impl Expression for Sha2Fn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let value = required!(state, object, self.value, Value::String(v) => v);
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let value = self.value.execute(state, object)?.try_bytes()?;
 
         let hash = match self.variant.as_deref() {
             Some("SHA-224") => encode::<Sha224>(&value),
@@ -74,14 +70,14 @@ impl Expression for Sha2Fn {
             _ => unreachable!("enum invariant"),
         };
 
-        Ok(Some(hash.into()))
+        Ok(hash.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
-            .with_constraint(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -94,7 +90,7 @@ fn encode<T: Digest>(value: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -102,7 +98,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 variant: None,
             },
-            def: TypeDef { constraint: String.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         value_non_string {
@@ -110,7 +106,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 variant: None,
             },
-            def: TypeDef { fallible: true, constraint: String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_optional {
@@ -118,7 +114,7 @@ mod tests {
                 value: Box::new(Noop),
                 variant: None,
             },
-            def: TypeDef { fallible: true, optional: true, constraint: String.into() },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::Bytes },
         }
     ];
 
@@ -126,57 +122,38 @@ mod tests {
     fn sha2() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                Sha2Fn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
                 map!["foo": "foo"],
-                Ok(Some(
-                    "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d".into()
-                )),
+                Ok("d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d".into()),
                 Sha2Fn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map![],
-                Ok(Some(
-                    "0808f64e60d58979fcb676c96ec938270dea42445aeefcd3a4e6f8db".into()
-                )),
+                Ok("0808f64e60d58979fcb676c96ec938270dea42445aeefcd3a4e6f8db".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-224")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae".into()
-                )),
+                Ok("2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-256")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "98c11ffdfdd540676b1a137cb1a22b2a70350c9a44171d6b1180c6be5cbb2ee3f79d532c8a1dd9ef2e8e08e752a3babb".into()
-                )),
+                Ok("98c11ffdfdd540676b1a137cb1a22b2a70350c9a44171d6b1180c6be5cbb2ee3f79d532c8a1dd9ef2e8e08e752a3babb".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-384")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7".into()
-                )),
+                Ok("f7fbba6e0636f890e56fbbf3283e524c6fa3204ae298382d624741d0dc6638326e282c41be5e4254d8820772c5518a2c5a8c0c7f7eda19594a7eb539453e1ed7".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-512")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be".into()
-                )),
+                Ok("d68f258d37d670cfc1ec1001a0394784233f88f056994f9a7e5e99be".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-512/224")),
             ),
             (
                 map![],
-                Ok(Some(
-                    "d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d".into()
-                )),
+                Ok("d58042e6aa5a335e03ad576c6a9e43b41591bfd2077f72dec9df7930e492055d".into()),
                 Sha2Fn::new(Box::new(Literal::from("foo")), Some("SHA-512/256")),
             ),
         ];

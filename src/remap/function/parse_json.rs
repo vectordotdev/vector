@@ -12,12 +12,12 @@ impl Function for ParseJson {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
         ]
@@ -47,13 +47,9 @@ impl ParseJsonFn {
 }
 
 impl Expression for ParseJsonFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_json = |value| match value {
-            Value::String(bytes) => serde_json::from_slice(&bytes)
+            Value::Bytes(bytes) => serde_json::from_slice(&bytes)
                 .map(|v: serde_json::Value| {
                     let v: crate::event::Value = v.into();
                     v.into()
@@ -70,19 +66,27 @@ impl Expression for ParseJsonFn {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        use value::Kind::*;
+        use value::Kind;
 
         let default_def = self
             .default
             .as_ref()
-            .map(|default| default.type_def(state).fallible_unless(String));
+            .map(|default| default.type_def(state).fallible_unless(Kind::Bytes));
 
         self.value
             .type_def(state)
-            .fallible_unless(String)
+            .fallible_unless(Kind::Bytes)
             .merge_with_default_optional(default_def)
             .into_fallible(true) // JSON parsing errors
-            .with_constraint(vec![String, Boolean, Integer, Float, Array, Map, Null])
+            .with_constraint(
+                Kind::Bytes
+                    | Kind::Boolean
+                    | Kind::Integer
+                    | Kind::Float
+                    | Kind::Array
+                    | Kind::Map
+                    | Kind::Null,
+            )
     }
 }
 
@@ -90,7 +94,7 @@ impl Expression for ParseJsonFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -100,7 +104,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -112,7 +116,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -124,7 +128,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
                 ..Default::default()
             },
         }
@@ -137,7 +141,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: true,
-                constraint: vec![String, Boolean, Integer, Float, Array, Map, Null].into(),
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
             },
         }
     ];
@@ -147,22 +151,22 @@ mod tests {
         let cases = vec![
             (
                 map!["foo": "42"],
-                Ok(Some(42.into())),
+                Ok(42.into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": "\"hello\""],
-                Ok(Some("hello".into())),
+                Ok("hello".into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": r#"{"field":"value"}"#],
-                Ok(Some(map!["field": "value"].into())),
+                Ok(map!["field": "value"].into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": r#"{ INVALID }"#],
-                Ok(Some(42.into())),
+                Ok(42.into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), Some("42".into())),
             ),
             (

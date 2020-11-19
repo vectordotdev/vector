@@ -40,30 +40,21 @@ impl Assignment {
 }
 
 impl Expression for Assignment {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
 
-        match value {
-            None => Ok(None),
-            Some(value) => {
-                match &self.target {
-                    Target::Variable(variable) => {
-                        state
-                            .variables_mut()
-                            .insert(variable.ident().to_owned(), value.clone());
-                    }
-                    Target::Path(path) => object
-                        .insert(path.segments(), value.clone())
-                        .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
-                }
-
-                Ok(Some(value))
+        match &self.target {
+            Target::Variable(variable) => {
+                state
+                    .variables_mut()
+                    .insert(variable.ident().to_owned(), value.clone());
             }
+            Target::Path(path) => object
+                .insert(path.segments(), value.clone())
+                .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
         }
+
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -83,7 +74,7 @@ impl Expression for Assignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression::Literal, test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{expression::Literal, test_type_def, value::Kind};
 
     test_type_def![
         variable {
@@ -94,7 +85,7 @@ mod tests {
                 Assignment::new(target, value, state)
             },
             def: TypeDef {
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
@@ -107,7 +98,7 @@ mod tests {
                 Assignment::new(target, value, state)
             },
             def: TypeDef {
-                constraint: Exact(String),
+                kind: Kind::Bytes,
                 ..Default::default()
             },
         }

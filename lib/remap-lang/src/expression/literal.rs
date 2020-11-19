@@ -1,4 +1,4 @@
-use crate::{state, value, Expression, Object, Result, TypeDef, Value};
+use crate::{state, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub struct Literal(Value);
@@ -20,13 +20,13 @@ impl<T: Into<Value>> From<T> for Literal {
 }
 
 impl Expression for Literal {
-    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
-        Ok(Some(self.0.clone()))
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+        Ok(self.0.clone())
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            constraint: value::Constraint::Exact(self.0.kind()),
+            kind: self.0.kind(),
             ..Default::default()
         }
     }
@@ -35,48 +35,48 @@ impl Expression for Literal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{test_type_def, value::Kind};
     use std::collections::BTreeMap;
 
     test_type_def![
         boolean {
             expr: |_| Literal::from(true),
-            def: TypeDef { constraint: Exact(Boolean), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         string {
             expr: |_| Literal::from("foo"),
-            def: TypeDef { constraint: Exact(String), ..Default::default() },
+            def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
         integer {
             expr: |_| Literal::from(123),
-            def: TypeDef { constraint: Exact(Integer), ..Default::default() },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
         }
 
         float {
             expr: |_| Literal::from(123.456),
-            def: TypeDef { constraint: Exact(Float), ..Default::default() },
+            def: TypeDef { kind: Kind::Float, ..Default::default() },
         }
 
         array {
             expr: |_| Literal::from(vec!["foo"]),
-            def: TypeDef { constraint: Exact(Array), ..Default::default() },
+            def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         map {
             expr: |_| Literal::from(BTreeMap::default()),
-            def: TypeDef { constraint: Exact(Map), ..Default::default() },
+            def: TypeDef { kind: Kind::Map, ..Default::default() },
         }
 
         timestamp {
             expr: |_| Literal::from(chrono::Utc::now()),
-            def: TypeDef { constraint: Exact(Timestamp), ..Default::default() },
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
         }
 
         null {
             expr: |_| Literal::from(()),
-            def: TypeDef { constraint: Exact(Null), ..Default::default() },
+            def: TypeDef { kind: Kind::Null, ..Default::default() },
         }
     ];
 }

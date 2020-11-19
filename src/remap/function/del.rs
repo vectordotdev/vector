@@ -38,13 +38,13 @@ pub struct DelFn {
 }
 
 impl Expression for DelFn {
-    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.paths
             .iter()
             .map(Path::as_string)
             .for_each(|string| object.remove(&string, false));
 
-        Ok(None)
+        Ok(Value::Null)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {

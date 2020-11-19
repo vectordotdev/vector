@@ -1,11 +1,12 @@
 use crate::value;
+use std::ops::{BitAnd, BitOr, BitXor};
 
 /// Properties for a given expression that express the expected outcome of the
 /// expression.
 ///
 /// This includes whether the expression is fallible, whether it can return
 /// "nothing", and a list of values the expression can resolve to.
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct TypeDef {
     /// True, if an expression can return an error.
     ///
@@ -19,11 +20,54 @@ pub struct TypeDef {
     /// nothing if the if-condition does not match.
     pub optional: bool,
 
-    /// The [`value::Constraint`] applied to this type check.
-    ///
-    /// This resolves to a list of [`value::Kind`]s the expression is expected
-    /// to return.
-    pub constraint: value::Constraint,
+    /// The [`value::Kind`]s this definition represents.
+    pub kind: value::Kind,
+}
+
+impl Default for TypeDef {
+    fn default() -> Self {
+        Self {
+            fallible: false,
+            optional: false,
+            kind: value::Kind::all(),
+        }
+    }
+}
+
+impl BitOr for TypeDef {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self {
+        Self {
+            fallible: self.fallible | rhs.fallible,
+            optional: self.optional | rhs.optional,
+            kind: self.kind | rhs.kind,
+        }
+    }
+}
+
+impl BitAnd for TypeDef {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        Self {
+            fallible: self.fallible & rhs.fallible,
+            optional: self.optional & rhs.optional,
+            kind: self.kind & rhs.kind,
+        }
+    }
+}
+
+impl BitXor for TypeDef {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self {
+            fallible: self.fallible ^ rhs.fallible,
+            optional: self.optional ^ rhs.optional,
+            kind: self.kind ^ rhs.kind,
+        }
+    }
 }
 
 impl TypeDef {
@@ -62,37 +106,24 @@ impl TypeDef {
             return false;
         }
 
-        self.constraint.contains(&other.constraint)
+        self.kind.contains(other.kind)
     }
 
-    pub fn fallible_unless(mut self, constraint: impl Into<value::Constraint>) -> Self {
-        if !constraint.into().contains(&self.constraint) {
+    pub fn fallible_unless(mut self, kind: impl Into<value::Kind>) -> Self {
+        if !kind.into().contains(self.kind) {
             self.fallible = true
         }
 
         self
     }
 
-    pub fn with_constraint(mut self, constraint: impl Into<value::Constraint>) -> Self {
-        self.constraint = constraint.into();
+    pub fn with_constraint(mut self, kind: impl Into<value::Kind>) -> Self {
+        self.kind = kind.into();
         self
     }
 
     pub fn merge(self, other: Self) -> Self {
-        let TypeDef {
-            fallible,
-            optional,
-            constraint,
-        } = other;
-
-        // TODO: take `self`
-        let constraint = self.constraint.merge(&constraint);
-
-        Self {
-            fallible: self.is_fallible() || fallible,
-            optional: self.is_optional() || optional,
-            constraint,
-        }
+        self | other
     }
 
     pub fn merge_optional(self, other: Option<Self>) -> Self {
