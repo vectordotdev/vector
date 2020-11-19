@@ -18,6 +18,10 @@ use vector::test_util::{next_addr, temp_file};
 mod support;
 use crate::support::{create_directory, create_file, overwrite_file};
 
+const STARTUP_TIME: Duration = Duration::from_secs(2);
+const SHUTDOWN_TIME: Duration = Duration::from_secs(3);
+const RELOAD_TIME: Duration = Duration::from_secs(5);
+
 const STDIO_CONFIG: &'static str = r#"
     data_dir = "${VECTOR_DATA_DIR}"
 
@@ -101,7 +105,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
         .unwrap();
 
     // Give vector time to start.
-    sleep(Duration::from_secs(2));
+    sleep(STARTUP_TIME);
 
     // Check if vector is still running
     assert_eq!(None, vector.try_wait().unwrap(), "Vector exited too early.");
@@ -127,7 +131,7 @@ fn test_timely_shutdown_with_sub(mut cmd: Command, sub: impl FnOnce(&mut Child))
 
     // Check if vector has shutdown in a reasonable time
     assert!(
-        now.elapsed() < Duration::from_secs(3),
+        now.elapsed() < SHUTDOWN_TIME,
         "Shutdown lasted for more than 3 seconds."
     );
 }
@@ -175,7 +179,7 @@ fn configuration_path_recomputed() {
         .unwrap();
 
     // Give vector time to start.
-    sleep(Duration::from_secs(1));
+    sleep(STARTUP_TIME);
 
     // Second configuration file
     overwrite_file(dir.join("conf2.toml"), STDIO_CONFIG);
@@ -461,7 +465,7 @@ fn timely_reload_shutdown() {
         );
 
         // Give vector time to reload.
-        sleep(Duration::from_secs(5));
+        sleep(RELOAD_TIME);
 
         // Check if vector is still running
         assert_eq!(
