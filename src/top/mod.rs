@@ -9,12 +9,12 @@ use url::Url;
 
 pub use cmd::cmd;
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Clone)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
-    /// How often the screen refreshes (in milliseconds)
+    /// Interval to sample metrics at, in milliseconds
     #[structopt(default_value = "500", short = "i", long)]
-    refresh_interval: u64,
+    interval: u64,
 
     /// Vector GraphQL API server endpoint
     #[structopt(short, long)]
