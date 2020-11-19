@@ -2198,7 +2198,7 @@ dependencies = [
  "serde_json",
  "simpl",
  "smpl_jwt",
- "time 0.2.16",
+ "time 0.2.23",
  "tokio",
 ]
 
@@ -5225,7 +5225,7 @@ dependencies = [
  "rustc_version",
  "serde",
  "sha2 0.9.1",
- "time 0.2.16",
+ "time 0.2.23",
  "tokio",
 ]
 
@@ -5820,7 +5820,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "simpl",
- "time 0.2.16",
+ "time 0.2.23",
 ]
 
 [[package]]
@@ -6197,11 +6197,11 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.2.16"
+version = "0.2.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a51cadc5b1eec673a685ff7c33192ff7b7603d0b75446fb354939ee615acb15"
+checksum = "bcdaeea317915d59b2b4cd3b5efcd156c309108664277793f5351700c02ce98b"
 dependencies = [
- "cfg-if 0.1.10",
+ "const_fn",
  "libc",
  "standback",
  "stdweb",

@@ -5,8 +5,7 @@ ignore = [
     # failure: failure is officially deprecated/unmaintained
     "RUSTSEC-2020-0036",
     # stdweb is unmaintained
+    # can be removed after next release of time
+    # https://github.com/time-rs/time/commit/8b2734351a5cd05a9bd3315f1af76c28b5852fec
     "RUSTSEC-2020-0056",
-    # Potential segfault in the time crate
-    # https://github.com/time-rs/time/issues/293
-    "RUSTSEC-2020-0071",
 ]
