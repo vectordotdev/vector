@@ -1,5 +1,5 @@
 use crate::event::lookup::*;
-use std::{fs, io::Read, path::Path, str::FromStr};
+use std::{fs, io::Read, path::Path};
 
 const SUFFICIENTLY_COMPLEX: &str =
     r#"regular."quoted"."quoted but spaces"."quoted.but.periods".lookup[0].nested_lookup[0][0]"#;

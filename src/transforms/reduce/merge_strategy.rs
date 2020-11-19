@@ -428,7 +428,7 @@ pub fn get_value_merger(v: Value, m: &MergeStrategy) -> Result<Box<dyn ReduceVal
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Event;
+    use crate::event::{Event, Lookup};
     use serde_json::json;
 
     #[test]
@@ -582,6 +582,6 @@ mod test {
         let mut output = Event::new_empty_log();
         let mut output = output.as_mut_log();
         merger.insert_into("out".into(), &mut output)?;
-        Ok(output.remove("out").unwrap())
+        Ok(output.remove(Lookup::from("out"), false).unwrap())
     }
 }

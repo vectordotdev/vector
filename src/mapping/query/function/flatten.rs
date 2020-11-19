@@ -156,7 +156,7 @@ impl TryFrom<ArgumentList> for FlattenFn {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::mapping::query::path::Path;
+    use crate::{mapping::query::path::Path, event::{LookupBuf}};
     use serde_json::json;
 
     #[test]
@@ -167,7 +167,7 @@ mod test {
                     let mut event = Event::from("");
                     event
                         .as_mut_log()
-                        .insert("foo", Value::from(vec![Value::from(42)]));
+                        .insert(LookupBuf::from("foo"), Value::from(vec![Value::from(42)]));
                     event
                 },
                 Ok(Value::from(vec![Value::from(42)])),
@@ -177,7 +177,7 @@ mod test {
                 {
                     let mut event = Event::from("");
                     event.as_mut_log().insert(
-                        "foo",
+                        LookupBuf::from("foo"),
                         Value::from(vec![
                             Value::from(42),
                             Value::from(vec![Value::from(43), Value::from(44)]),
@@ -196,7 +196,7 @@ mod test {
                 {
                     let mut event = Event::from("");
                     event.as_mut_log().insert(
-                        "foo",
+                        LookupBuf::from("foo"),
                         Value::from(vec![Value::from(42), Value::Array(vec![]), Value::from(43)]),
                     );
                     event
@@ -208,7 +208,7 @@ mod test {
                 {
                     let mut event = Event::from("");
                     event.as_mut_log().insert(
-                        "foo",
+                        LookupBuf::from("foo"),
                         Value::from(vec![
                             Value::from(42),
                             Value::from(vec![
@@ -233,7 +233,7 @@ mod test {
                 {
                     let mut event = Event::from("");
                     event.as_mut_log().insert(
-                        "foo",
+                        LookupBuf::from("foo"),
                         Value::from(vec![
                             Value::from(vec![Value::from(42), Value::from(43)]),
                             Value::from(vec![Value::from(44), Value::from(45)]),
@@ -253,7 +253,7 @@ mod test {
                 {
                     let mut event = Event::from("");
                     let map = json!({"parent": "child"});
-                    event.as_mut_log().insert("foo", Value::from(map));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(map));
                     event
                 },
                 Ok(Value::from(json!({"parent": "child"}))),
@@ -265,7 +265,7 @@ mod test {
                     let map = json!({"parent": { "child1": 1,
                                                  "child2": 2},
                                      "key": "val"});
-                    event.as_mut_log().insert("foo", Value::from(map));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(map));
                     event
                 },
                 Ok(Value::from(json!({"parent.child1": 1,
@@ -280,7 +280,7 @@ mod test {
                                                  "child2": { "grandchild1": 1,
                                                              "grandchild2": 2}},
                                      "key": "val"});
-                    event.as_mut_log().insert("foo", Value::from(map));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(map));
                     event
                 },
                 Ok(Value::from(json!({"parent.child1": 1,
@@ -297,7 +297,7 @@ mod test {
                                                  "child2": { "grandchild1": 1,
                                                              "grandchild2": [1, [2, 3], 4]}},
                                      "key": "val"});
-                    event.as_mut_log().insert("foo", Value::from(map));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(map));
                     event
                 },
                 Ok(Value::from(json!({"parent.child1": [1, [2, 3]],
@@ -321,7 +321,7 @@ mod test {
                             ]
                         ]
                     );
-                    event.as_mut_log().insert("foo", Value::from(map));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(map));
                     event
                 },
                 Ok(Value::from(json!(
@@ -345,7 +345,7 @@ mod test {
                         },
                          "parent2": 4}
                     );
-                    event.as_mut_log().insert("foo", Value::from(map));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(map));
                     event
                 },
                 Ok(Value::from(json!({"parent1.child1.grandchild1": 1,

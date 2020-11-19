@@ -620,7 +620,7 @@ mod integration_tests {
         let event = transform.transform_one(event).unwrap();
         let log = event.as_log();
 
-        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
-        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+        assert_eq!(log.get(Lookup::from("availability-zone")), Some(&"ww-region-1a".into()));
+        assert_eq!(log.get(Lookup::from("public-ipv4")), Some(&"192.1.1.1".into()));
     }
 }

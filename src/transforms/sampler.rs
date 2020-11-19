@@ -100,7 +100,7 @@ impl FunctionTransform for Sampler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::Event;
+    use crate::event::{Event, Lookup};
     use approx::assert_relative_eq;
     use regex::RegexSet;
 
@@ -187,7 +187,7 @@ mod tests {
             })
             .find_map(|event| sampler.transform_one(event))
             .unwrap();
-        assert_eq!(passing.as_log()["sample_rate"], "10".into());
+        assert_eq!(passing.as_log()[Lookup::from("sample_rate")], "10".into());
 
         let events = random_events(10000);
         let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
@@ -200,13 +200,13 @@ mod tests {
             })
             .find_map(|event| sampler.transform_one(event))
             .unwrap();
-        assert_eq!(passing.as_log()["sample_rate"], "25".into());
+        assert_eq!(passing.as_log()[Lookup::from("sample_rate")], "25".into());
 
         // If the event passed the regex check, don't include the sampling rate
         let mut sampler = Sampler::new(25, None, RegexSet::new(&["na"]).unwrap());
         let event = Event::from("nananana");
         let passing = sampler.transform_one(event).unwrap();
-        assert!(passing.as_log().get("sample_rate").is_none());
+        assert!(passing.as_log().get(Lookup::from("sample_rate")).is_none());
     }
 
     fn random_events(n: usize) -> Vec<Event> {

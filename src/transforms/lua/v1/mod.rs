@@ -244,7 +244,7 @@ pub fn format_error(error: &rlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Value};
+    use crate::event::{Event, Value, Lookup};
 
     #[test]
     fn lua_add_field() {
@@ -262,7 +262,7 @@ mod tests {
 
         let event = transform.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["hello"], "goodbye".into());
+        assert_eq!(event.as_log()[Lookup::from("hello")], "goodbye".into());
     }
 
     #[test]
@@ -282,7 +282,7 @@ mod tests {
 
         let event = transform.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["name"], "Bob".into());
+        assert_eq!(event.as_log()[Lookup::from("name")], "Bob".into());
     }
 
     #[test]
@@ -298,10 +298,10 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
+        event.as_mut_log().insert(LookupBuf::from("name"), "Bob");
         let event = transform.transform_one(event).unwrap();
 
-        assert!(event.as_log().get("name").is_none());
+        assert!(event.as_log().get(Lookup::from("name")).is_none());
     }
 
     #[test]
@@ -316,7 +316,7 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
+        event.as_mut_log().insert(LookupBuf::from("name"), "Bob");
         let event = transform.transform_one(event);
 
         assert!(event.is_none());
@@ -341,7 +341,7 @@ mod tests {
         let event = Event::new_empty_log();
         let event = transform.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["result"], "empty".into());
+        assert_eq!(event.as_log()[Lookup::from("result")], "empty".into());
     }
 
     #[test]
@@ -357,7 +357,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Integer(3));
+        assert_eq!(event.as_log()[Lookup::from("number")], Value::Integer(3));
     }
 
     #[test]
@@ -373,7 +373,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["number"], Value::Float(3.14159));
+        assert_eq!(event.as_log()[Lookup::from("number")], Value::Float(3.14159));
     }
 
     #[test]
@@ -389,7 +389,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()["bool"], Value::Boolean(true));
+        assert_eq!(event.as_log()[Lookup::from("bool")], Value::Boolean(true));
     }
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log().get("junk"), None);
+        assert_eq!(event.as_log().get(Lookup::from("junk")), None);
     }
 
     #[test]
@@ -511,7 +511,7 @@ mod tests {
         let event = Event::new_empty_log();
         let event = transform.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["new field"], "new value".into());
+        assert_eq!(event.as_log()[Lookup::from("new field")], "new value".into());
     }
 
     #[test]
@@ -529,12 +529,12 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("name", "Bob");
-        event.as_mut_log().insert("friend", "Alice");
+        event.as_mut_log().insert(LookupBuf::from("name"), "Bob");
+        event.as_mut_log().insert(LookupBuf::from("friend"), "Alice");
 
         let event = transform.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()["name"], "nameBob".into());
-        assert_eq!(event.as_log()["friend"], "friendAlice".into());
+        assert_eq!(event.as_log()[Lookup::from("name")], "nameBob".into());
+        assert_eq!(event.as_log()[Lookup::from("friend")], "friendAlice".into());
     }
 }

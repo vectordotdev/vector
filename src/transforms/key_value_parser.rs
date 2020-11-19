@@ -195,7 +195,7 @@ mod tests {
     use super::KeyValueConfig;
     use crate::{
         config::TransformConfig,
-        event::{LogEvent, LookupBuf, Value},
+        event::{LogEvent, Lookup, LookupBuf, Value},
         Event,
     };
 
@@ -234,8 +234,8 @@ mod tests {
     #[tokio::test]
     async fn it_separates_whitespace() {
         let log = parse_log("foo=bar beep=bop", None, None, true, &[], None, None, None).await;
-        assert_eq!(log["foo"], Value::Bytes("bar".into()));
-        assert_eq!(log["beep"], Value::Bytes("bop".into()));
+        assert_eq!(log[Lookup::from("foo")], Value::Bytes("bar".into()));
+        assert_eq!(log[Lookup::from("beep")], Value::Bytes("bop".into()));
     }
 
     #[tokio::test]
@@ -251,8 +251,8 @@ mod tests {
             None,
         )
         .await;
-        assert_eq!(log["foo"], Value::Bytes("bar".into()));
-        assert_eq!(log["beep"], Value::Bytes("bop".into()));
+        assert_eq!(log[Lookup::from("foo")], Value::Bytes("bar".into()));
+        assert_eq!(log[Lookup::from("beep")], Value::Bytes("bop".into()));
     }
 
     #[tokio::test]
@@ -268,9 +268,9 @@ mod tests {
             None,
         )
         .await;
-        assert_eq!(log["foo"], Value::Bytes("bar".into()));
-        assert_eq!(log["beep"], Value::Bytes("bop".into()));
-        assert_eq!(log["score"], Value::Integer(10));
+        assert_eq!(log[Lookup::from("foo")], Value::Bytes("bar".into()));
+        assert_eq!(log[Lookup::from("beep")], Value::Bytes("bop".into()));
+        assert_eq!(log[Lookup::from("score")], Value::Integer(10));
     }
 
     #[tokio::test]
@@ -287,9 +287,9 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["foo"], Value::Bytes("bar".into()));
-        assert_eq!(log["beep"], Value::Bytes("bop".into()));
-        assert_eq!(log["score"], Value::Integer(10));
+        assert_eq!(log[Lookup::from("foo")], Value::Bytes("bar".into()));
+        assert_eq!(log[Lookup::from("beep")], Value::Bytes("bop".into()));
+        assert_eq!(log[Lookup::from("score")], Value::Integer(10));
     }
 
     #[tokio::test]
@@ -305,9 +305,9 @@ mod tests {
             None,
         )
         .await;
-        assert_eq!(log["foo"], Value::Bytes("=bar".into()));
-        assert_eq!(log["beep"], Value::Bytes("bop=bap".into()));
-        assert_eq!(log["score"], Value::Integer(10));
+        assert_eq!(log[Lookup::from("foo")], Value::Bytes("=bar".into()));
+        assert_eq!(log[Lookup::from("beep")], Value::Bytes("bop=bap".into()));
+        assert_eq!(log[Lookup::from("score")], Value::Integer(10));
     }
 
     #[tokio::test]
@@ -323,8 +323,8 @@ mod tests {
             None,
         )
         .await;
-        assert!(log.contains("score"));
-        assert_eq!(log["score"], Value::Bytes("".into()))
+        assert!(log.contains(Lookup::from("score")));
+        assert_eq!(log[Lookup::from("score")], Value::Bytes("".into()))
     }
 
     #[tokio::test]
@@ -340,9 +340,9 @@ mod tests {
             None,
         )
         .await;
-        assert!(log.contains("foo"));
-        assert!(!log.contains("beep"));
-        assert!(log.contains("score"));
+        assert!(log.contains(Lookup::from("foo")));
+        assert!(!log.contains(Lookup::from("beep")));
+        assert!(log.contains(Lookup::from("score")));
     }
 
     #[tokio::test]
@@ -358,7 +358,7 @@ mod tests {
             None,
         )
         .await;
-        assert_eq!(log["bop"], Value::Bytes("[beep]".into()))
+        assert_eq!(log[Lookup::from("bop")], Value::Bytes("[beep]".into()))
     }
 
     #[tokio::test]
@@ -374,9 +374,9 @@ mod tests {
             None,
         )
         .await;
-        assert!(log.contains("foo"));
-        assert!(log.contains("bop"));
-        assert!(log.contains(&"({score})".to_string()));
+        assert!(log.contains(Lookup::from("foo")));
+        assert!(log.contains(Lookup::from("bop")));
+        assert!(log.contains(Lookup::from("({score})")));
     }
 
     #[tokio::test]
@@ -392,8 +392,8 @@ mod tests {
             Some("\"{}".to_string()),
         )
         .await;
-        assert_eq!(log["foo"], Value::Integer(0));
-        assert_eq!(log["bop"], Value::Bytes("beep".into()));
-        assert_eq!(log["score"], Value::Integer(78));
+        assert_eq!(log[Lookup::from("foo")], Value::Integer(0));
+        assert_eq!(log[Lookup::from("bop")], Value::Bytes("beep".into()));
+        assert_eq!(log[Lookup::from("score")], Value::Integer(78));
     }
 }

@@ -759,7 +759,7 @@ mod tests {
         let received = run_journal(&["syslog.service"], &[], None).await;
         assert_eq!(received.len(), 1);
         assert_eq!(
-            received[0].as_log()[LookupBuf::from("SYSLOG_RAW")],
+            received[0].as_log()[&LookupBuf::from("SYSLOG_RAW")],
             Value::Bytes("¿World?".into())
         );
     }

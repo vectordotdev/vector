@@ -298,7 +298,7 @@ impl TaskTransform for Reduce {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::TransformConfig, event::Value, Event};
+    use crate::{config::TransformConfig, event::{Value, Event, Lookup}};
     use futures::compat::Stream01CompatExt;
     use serde_json::json;
 
@@ -404,13 +404,13 @@ merge_strategies.baz = "max"
         let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
-        assert_eq!(output_1.as_log()["message"], "test message 1".into());
-        assert_eq!(output_1.as_log()["foo"], "first foo second foo".into());
+        assert_eq!(output_1.as_log()[Lookup::from("message")], "test message 1".into());
+        assert_eq!(output_1.as_log()[Lookup::from("foo")], "first foo second foo".into());
         assert_eq!(
-            output_1.as_log()["bar"],
+            output_1.as_log()[Lookup::from("bar")],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
         );
-        assert_eq!(output_1.as_log()["baz"], 3.into(),);
+        assert_eq!(output_1.as_log()[Lookup::from("baz")], 3.into(),);
     }
 
     #[tokio::test]
@@ -456,14 +456,14 @@ group_by = [ "request_id" ]
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
         let output_1 = output_1.as_log();
-        assert_eq!(output_1["message"], "test message 1".into());
-        assert_eq!(output_1["counter"], Value::from(8));
+        assert_eq!(output_1[Lookup::from("message")], "test message 1".into());
+        assert_eq!(output_1[Lookup::from("counter")], Value::from(8));
 
         let output_2 = out_stream.next().await.unwrap().unwrap();
         let output_2 = output_2.as_log();
-        assert_eq!(output_2["message"], "test message 2".into());
-        assert_eq!(output_2["extra_field"], "value1".into());
-        assert_eq!(output_2["counter"], Value::from(7));
+        assert_eq!(output_2[Lookup::from("message")], "test message 2".into());
+        assert_eq!(output_2[Lookup::from("extra_field")], "value1".into());
+        assert_eq!(output_2[Lookup::from("counter")], Value::from(7));
     }
 
     #[tokio::test]
@@ -523,13 +523,13 @@ merge_strategies.bar = "concat"
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
         let output_1 = output_1.as_log();
-        assert_eq!(output_1["foo"], json!([[1, 3], [5, 7], "done"]).into());
+        assert_eq!(output_1[Lookup::from("foo")], json!([[1, 3], [5, 7], "done"]).into());
 
-        assert_eq!(output_1["bar"], json!([1, 3, 5, 7, "done"]).into());
+        assert_eq!(output_1[Lookup::from("bar")], json!([1, 3, 5, 7, "done"]).into());
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
         let output_1 = output_1.as_log();
-        assert_eq!(output_1["foo"], json!([[2, 4], [6, 8], "done"]).into());
-        assert_eq!(output_1["bar"], json!([2, 4, 6, 8, "done"]).into());
+        assert_eq!(output_1[Lookup::from("foo")], json!([[2, 4], [6, 8], "done"]).into());
+        assert_eq!(output_1[Lookup::from("bar")], json!([2, 4, 6, 8, "done"]).into());
     }
 }

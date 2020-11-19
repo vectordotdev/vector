@@ -174,6 +174,15 @@ impl<'a> From<&'a str> for Lookup<'a> {
     }
 }
 
+impl<'a> From<&'a String> for Lookup<'a> {
+    fn from(input: &'a String) -> Self {
+        Self {
+            segments: vec![Segment::field(input.as_str())],
+        }
+        // We know this must be at least one segment.
+    }
+}
+
 impl<'a> TryFrom<Vec<Segment<'a>>> for Lookup<'a> {
     type Error = crate::Error;
 
@@ -296,3 +305,4 @@ impl<'a> AsRef<Lookup<'a>> for Lookup<'a> {
         &self
     }
 }
+

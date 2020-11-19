@@ -244,7 +244,7 @@ mod tests {
         exp_geoip_attr.insert("postal_code", "OX1");
 
         for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
+            let k = LookupBuf::from(format!("geo.{}", field));
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -274,7 +274,7 @@ mod tests {
         exp_geoip_attr.insert("postal_code", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
+            let k = LookupBuf::from(format!("geo.{}", field));
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -334,7 +334,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "Verizon Business");
 
         for field in exp_geoip_attr.keys() {
-            let k = format!("geo.{}", field).to_string();
+            let k = LookupBuf::from(format!("geo.{}", field));
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -361,7 +361,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Lookup::from(format!("geo.{}", field).to_string());
+            let k = Lookup::from(&format!("geo.{}", field));
             let geodata = new_event.as_log().get(k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
@@ -388,7 +388,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Lookup::from(format!("geo.{}", field).to_string());
+            let k = Lookup::from(&format!("geo.{}", field));
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }

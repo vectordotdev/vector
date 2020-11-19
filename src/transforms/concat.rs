@@ -236,7 +236,7 @@ mod tests {
         );
 
         let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event.as_log()["out"], "Hello users".into());
+        assert_eq!(new_event.as_log()[Lookup::from("out")], "Hello users".into());
     }
 
     #[test]
@@ -255,7 +255,7 @@ mod tests {
         );
 
         let new_event = transform.transform_one(event).unwrap();
-        assert_eq!(new_event.as_log()["out"], "Hello World".into());
+        assert_eq!(new_event.as_log()[Lookup::from("out")], "Hello World".into());
     }
     #[test]
     fn concat_mixed() {

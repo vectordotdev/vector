@@ -2,7 +2,7 @@ use crate::event::{
     lookup::{Segment, SegmentBuf},
     Lookup, LookupBuf, Value,
 };
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::{
     borrow::Borrow,
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -17,6 +17,7 @@ pub struct LogEvent {
 }
 
 impl LogEvent {
+    /// Get an immutable borrow of the given value by lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn get<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&Value> {
         let lookup = lookup.borrow();
@@ -67,6 +68,7 @@ impl LogEvent {
         cursor
     }
 
+    /// Get a mutable borrow of the value by lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn get_mut<'a>(&mut self, lookup: impl Borrow<Lookup<'a>> + Debug) -> Option<&mut Value> {
         let lookup = lookup.borrow();
@@ -117,16 +119,21 @@ impl LogEvent {
         cursor
     }
 
+    /// Determine if the log event contains a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn contains<'a>(&self, lookup: impl Borrow<Lookup<'a>> + Debug) -> bool {
         self.get(lookup).is_some()
     }
 
+    /// Insert a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
         unimplemented!()
     }
 
+    /// Remove a value that exists at a given lookup.
+    ///
+    /// Setting `prune` to true will also remove the entries of maps and arrays that are emptied.
     #[instrument(level = "trace", skip(self))]
     pub fn remove<'a>(
         &mut self,
@@ -136,21 +143,31 @@ impl LogEvent {
         unimplemented!()
     }
 
+    /// Iterate over the lookups available in this log event.
+    ///
+    /// This is notably different than the keys in a map, as this descends into things like arrays
+    /// and maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = Lookup<'a>> + 'a {
         unimplemented!();
     }
 
+    /// Iterate over all lookup/value pairs.
+    ///
+    /// This is notably different than pairs in a map, as this descends into things like arrays and
+    /// maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
     pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> + Serialize {
         unimplemented!();
     }
 
+    /// Determine if the log event is empty of fields.
     #[instrument(level = "trace", skip(self))]
     pub fn is_empty(&self) -> bool {
         self.fields.is_empty()
     }
 
+    /// Return an entry for the given lookup.
     #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
     fn entry(&mut self, lookup: LookupBuf) -> crate::Result<Entry<String, Value>> {
         trace!("Seeking to entry.");
@@ -314,12 +331,18 @@ impl Serialize for LogEvent {
     }
 }
 
+impl<'de> Deserialize<'de> for LogEvent {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error> where
+        D: Deserializer<'de> {
+        deserializer.deserialize_map(crate::event::util::LogEventVisitor)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::test_util::open_fixture;
     use serde_json::json;
-    use std::str::FromStr;
     use tracing::trace;
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:

@@ -2,8 +2,8 @@ use crate::{event::timestamp_to_string, Result};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use serde::{Serialize, Serializer};
-use std::collections::BTreeMap;
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
@@ -36,6 +36,13 @@ impl Serialize for Value {
             Value::Array(a) => serializer.collect_seq(a),
             Value::Null => serializer.serialize_none(),
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for Value {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, <D as Deserializer<'de>>::Error> where
+        D: Deserializer<'de> {
+        deserializer.deserialize_map(crate::event::util::ValueVisitor)
     }
 }
 
@@ -121,6 +128,12 @@ impl From<f64> for Value {
 impl From<BTreeMap<String, Value>> for Value {
     fn from(value: BTreeMap<String, Value>) -> Self {
         Value::Map(value)
+    }
+}
+
+impl From<HashMap<String, Value>> for Value {
+    fn from(value: HashMap<String, Value>) -> Self {
+        Value::from_iter(value.into_iter())
     }
 }
 

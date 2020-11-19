@@ -105,7 +105,7 @@ mod tests {
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricValue, StatisticKind},
-        Metric, Value,
+        Metric, Value, Lookup,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
     use std::collections::BTreeMap;
@@ -154,12 +154,12 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (String::from("counter.value"), &Value::from(1.0)),
-                (String::from("host"), &Value::from("localhost")),
-                (String::from("kind"), &Value::from("absolute")),
-                (String::from("name"), &Value::from("counter")),
-                (String::from("tags.some_tag"), &Value::from("some_value")),
-                (String::from("timestamp"), &Value::from(ts())),
+                (Lookup::from_str("counter.value").unwrap(), &Value::from(1.0)),
+                (Lookup::from_str("host").unwrap(), &Value::from("localhost")),
+                (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
+                (Lookup::from_str("name").unwrap(), &Value::from("counter")),
+                (Lookup::from_str("tags.some_tag").unwrap(), &Value::from("some_value")),
+                (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -181,10 +181,10 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (LookupBuf::from_str("gauge.value").unwrap(), &Value::from(1.0)),
-                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
-                (LookupBuf::from_str("name").unwrap(), &Value::from("gauge")),
-                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
+                (Lookup::from_str("gauge.value").unwrap(), &Value::from(1.0)),
+                (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
+                (Lookup::from_str("name").unwrap(), &Value::from("gauge")),
+                (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -208,11 +208,11 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
-                (LookupBuf::from_str("name").unwrap(), &Value::from("set")),
-                (LookupBuf::from_str("set.values[0]").unwrap(), &Value::from("one")),
-                (LookupBuf::from_str("set.values[1]").unwrap(), &Value::from("two")),
-                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
+                (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
+                (Lookup::from_str("name").unwrap(), &Value::from("set")),
+                (Lookup::from_str("set.values[0]").unwrap(), &Value::from("one")),
+                (Lookup::from_str("set.values[1]").unwrap(), &Value::from("two")),
+                (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -239,22 +239,22 @@ mod tests {
             collected,
             vec![
                 (
-                    LookupBuf::from_str("distribution.sample_rates[0]").unwrap(),
+                    Lookup::from_str("distribution.sample_rates[0]").unwrap(),
                     &Value::from(10)
                 ),
                 (
-                    LookupBuf::from_str("distribution.sample_rates[1]").unwrap(),
+                    Lookup::from_str("distribution.sample_rates[1]").unwrap(),
                     &Value::from(20)
                 ),
                 (
-                    LookupBuf::from_str("distribution.statistic"),
+                    Lookup::from_str("distribution.statistic").unwrap(),
                     &Value::from("histogram")
                 ),
-                (LookupBuf::from_str("distribution.values[0]").unwrap(), &Value::from(1.0)),
-                (LookupBuf::from_str("distribution.values[1]").unwrap(), &Value::from(2.0)),
-                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
-                (LookupBuf::from_str("name").unwrap(), &Value::from("distro")),
-                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
+                (Lookup::from_str("distribution.values[0]").unwrap(), &Value::from(1.0)),
+                (Lookup::from_str("distribution.values[1]").unwrap(), &Value::from(2.0)),
+                (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
+                (Lookup::from_str("name").unwrap(), &Value::from("distro")),
+                (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -282,26 +282,26 @@ mod tests {
             collected,
             vec![
                 (
-                    LookupBuf::from_str("aggregated_histogram.buckets[0]").unwrap(),
+                    Lookup::from_str("aggregated_histogram.buckets[0]").unwrap(),
                     &Value::from(1.0)
                 ),
                 (
-                    LookupBuf::from_str("aggregated_histogram.buckets[1]").unwrap(),
+                    Lookup::from_str("aggregated_histogram.buckets[1]").unwrap(),
                     &Value::from(2.0)
                 ),
-                (LookupBuf::from_str("aggregated_histogram.count").unwrap(), &Value::from(30)),
+                (Lookup::from_str("aggregated_histogram.count").unwrap(), &Value::from(30)),
                 (
-                    LookupBuf::from_str("aggregated_histogram.counts[0]").unwrap(),
+                    Lookup::from_str("aggregated_histogram.counts[0]").unwrap(),
                     &Value::from(10)
                 ),
                 (
-                    LookupBuf::from_str("aggregated_histogram.counts[1]").unwrap(),
+                    Lookup::from_str("aggregated_histogram.counts[1]").unwrap(),
                     &Value::from(20)
                 ),
-                (LookupBuf::from_str("aggregated_histogram.sum").unwrap(), &Value::from(50.0)),
-                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
-                (LookupBuf::from_str("name").unwrap(), &Value::from("histo")),
-                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
+                (Lookup::from_str("aggregated_histogram.sum").unwrap(), &Value::from(50.0)),
+                (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
+                (Lookup::from_str("name").unwrap(), &Value::from("histo")),
+                (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }
@@ -328,27 +328,27 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (LookupBuf::from_str("aggregated_summary.count").unwrap(), &Value::from(30)),
+                (Lookup::from_str("aggregated_summary.count").unwrap(), &Value::from(30)),
                 (
-                    LookupBuf::from_str("aggregated_summary.quantiles[0]").unwrap(),
+                    Lookup::from_str("aggregated_summary.quantiles[0]").unwrap(),
                     &Value::from(50.0)
                 ),
                 (
-                    LookupBuf::from_str("aggregated_summary.quantiles[1]").unwrap(),
+                    Lookup::from_str("aggregated_summary.quantiles[1]").unwrap(),
                     &Value::from(90.0)
                 ),
-                (LookupBuf::from_str("aggregated_summary.sum").unwrap(), &Value::from(50.0)),
+                (Lookup::from_str("aggregated_summary.sum").unwrap(), &Value::from(50.0)),
                 (
-                    LookupBuf::from_str("aggregated_summary.values[0]").unwrap(),
+                    Lookup::from_str("aggregated_summary.values[0]").unwrap(),
                     &Value::from(10.0)
                 ),
                 (
-                    LookupBuf::from_str("aggregated_summary.values[1]").unwrap(),
+                    Lookup::from_str("aggregated_summary.values[1]").unwrap(),
                     &Value::from(20.0)
                 ),
-                (LookupBuf::from_str("kind").unwrap(), &Value::from("absolute")),
-                (LookupBuf::from_str("name").unwrap(), &Value::from("summary")),
-                (LookupBuf::from_str("timestamp").unwrap(), &Value::from(ts())),
+                (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
+                (Lookup::from_str("name").unwrap(), &Value::from("summary")),
+                (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
     }

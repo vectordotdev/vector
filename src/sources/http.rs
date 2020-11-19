@@ -2,7 +2,7 @@ use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
     },
-    event::{Event, LookupBuf, Value},
+    event::{Event, LogEvent, LookupBuf, Value},
     shutdown::ShutdownSignal,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
@@ -163,14 +163,14 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
             .collect::<Result<_, _>>(),
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
-                serde_json::from_slice(&j?)
-                    .and_then(|parsed_json| serde_json::from_value(parsed_json).map(Event::Log))
+                serde_json::from_slice::<LogEvent>(&j?)
+                    .map(|parsed_json| Event::Log(parsed_json))
                     .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))
             })
             .collect::<Result<Vec<_>, _>>(),
-        Encoding::Json => serde_json::from_slice(&body)
-            .and_then(|parsed_json| serde_json::from_value(parsed_json).map(Event::Log))
-            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))).map(|v| vec![v]),
+        Encoding::Json => serde_json::from_slice::<LogEvent>(&body)
+                .map(Event::Log)
+                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))).map(|v| vec![v]),
     }
 }
 
@@ -205,7 +205,7 @@ mod tests {
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
-    use std::net::SocketAddr;
+    use std::{net::SocketAddr, convert::TryInto};
 
     #[test]
     fn generate_config() {
@@ -406,8 +406,8 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             let mut map = BTreeMap::new();
-            map.insert(Lookup::from_str("dotted.key2").unwrap(), Value::from("value2"));
-            assert_eq!(log[Lookup::from("nested")], map.into());
+            map.insert("dotted.key2".to_string(), Value::from("value2"));
+            assert_eq!(log[Lookup::from("nested")], map.try_into().unwrap());
         }
     }
 

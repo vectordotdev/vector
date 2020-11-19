@@ -105,8 +105,7 @@ impl TryFrom<ArgumentList> for SplitFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mapping::query::path::Path;
-    use crate::mapping::query::regex::Regex;
+    use crate::{event::LookupBuf, mapping::query::{regex::Regex, path::Path}};
 
     #[test]
     fn check_split() {
@@ -114,7 +113,7 @@ mod tests {
             (
                 {
                     let mut event = Event::from("");
-                    event.as_mut_log().insert("foo", Value::from(""));
+                    event.as_mut_log().insert(LookupBuf::from("foo"), Value::from(""));
                     event
                 },
                 Ok(Value::from(vec![Value::from("")])),
@@ -129,7 +128,7 @@ mod tests {
                     let mut event = Event::from("");
                     event
                         .as_mut_log()
-                        .insert("foo", Value::from("This is a long string."));
+                        .insert(LookupBuf::from("foo"), Value::from("This is a long string."));
                     event
                 },
                 Ok(Value::from(vec![
@@ -150,7 +149,7 @@ mod tests {
                     let mut event = Event::from("");
                     event
                         .as_mut_log()
-                        .insert("foo", Value::from("This is a long string."));
+                        .insert(LookupBuf::from("foo"), Value::from("This is a long string."));
                     event
                 },
                 Ok(Value::from(vec![
@@ -170,7 +169,7 @@ mod tests {
                     let mut event = Event::from("");
                     event
                         .as_mut_log()
-                        .insert("foo", Value::from("ThisaisAlongAstring."));
+                        .insert(LookupBuf::from("foo"), Value::from("ThisaisAlongAstring."));
                     event
                 },
                 Ok(Value::from(vec![

@@ -50,6 +50,7 @@ mod test {
     use crate::event::{
         metric::{MetricKind, MetricValue},
         Metric, Value,
+        Lookup, LookupBuf,
     };
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {
@@ -67,7 +68,7 @@ mod test {
     #[test]
     fn to_lua_log() {
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert("field", "value");
+        event.as_mut_log().insert(LookupBuf::from("field"), "value");
 
         let assertions = vec![
             "type(event) == 'table'",
@@ -116,8 +117,8 @@ mod test {
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();
             let log = event.as_log();
-            assert_eq!(log["field"], Value::Bytes("example".into()));
-            assert_eq!(log["nested.field"], Value::Bytes("another example".into()));
+            assert_eq!(log[Lookup::from_str("field").unwrap()], Value::Bytes("example".into()));
+            assert_eq!(log[Lookup::from_str("nested.field").unwrap()], Value::Bytes("another example".into()));
         });
     }
 

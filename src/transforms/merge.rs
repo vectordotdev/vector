@@ -160,7 +160,7 @@ impl TaskTransform for Merge {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::{self, Event};
+    use crate::event::{self, Event, Lookup};
 
     #[test]
     fn generate_config() {

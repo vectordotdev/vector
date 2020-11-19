@@ -398,8 +398,8 @@ mod tests {
 
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
-        log.as_mut_log().insert(key, value);
-        log.as_mut_log().insert(log_schema().timestamp_key(), ts());
+        log.as_mut_log().insert(LookupBuf::from(key), value);
+        log.as_mut_log().insert(log_schema().timestamp_key().into_buf(), ts());
         log
     }
 
@@ -444,8 +444,8 @@ mod tests {
         );
 
         let mut event = create_event("message", "i am log");
-        event.as_mut_log().insert("method", "post");
-        event.as_mut_log().insert("code", "200");
+        event.as_mut_log().insert(LookupBuf::from("method"), "post");
+        event.as_mut_log().insert(LookupBuf::from("code"), "200");
 
         let mut transform = LogToMetric::new(config);
         let metric = transform.transform_one(event).unwrap();
@@ -626,9 +626,9 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key(), ts());
-        event.as_mut_log().insert("status", "42");
-        event.as_mut_log().insert("backtrace", "message");
+            .insert(log_schema().timestamp_key().into_buf(), ts());
+        event.as_mut_log().insert(LookupBuf::from("status"), "42");
+        event.as_mut_log().insert(LookupBuf::from("backtrace"), "message");
 
         let mut transform = LogToMetric::new(config);
 
@@ -679,12 +679,12 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key(), ts());
-        event.as_mut_log().insert("status", "42");
-        event.as_mut_log().insert("backtrace", "message");
-        event.as_mut_log().insert("host", "local");
-        event.as_mut_log().insert("worker", "abc");
-        event.as_mut_log().insert("service", "xyz");
+            .insert(log_schema().timestamp_key().into_buf(), ts());
+        event.as_mut_log().insert(LookupBuf::from("status"), "42");
+        event.as_mut_log().insert(LookupBuf::from("backtrace"), "message");
+        event.as_mut_log().insert(LookupBuf::from("host"), "local");
+        event.as_mut_log().insert(LookupBuf::from("worker"), "abc");
+        event.as_mut_log().insert(LookupBuf::from("service"), "xyz");
 
         let mut transform = LogToMetric::new(config);
 

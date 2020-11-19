@@ -126,7 +126,7 @@ impl FunctionTransform for Tokenizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Value};
+    use crate::event::{LogEvent, Value, Lookup};
     use crate::{config::TransformConfig, Event};
 
     #[test]
@@ -164,26 +164,26 @@ mod tests {
     async fn tokenizer_adds_parsed_field_to_event() {
         let log = parse_log("1234 5678", "status time", None, false, &[]).await;
 
-        assert_eq!(log["status"], "1234".into());
-        assert_eq!(log["time"], "5678".into());
-        assert!(log.get("message").is_some());
+        assert_eq!(log[Lookup::from("status")], "1234".into());
+        assert_eq!(log[Lookup::from("time")], "5678".into());
+        assert!(log.get(Lookup::from("message")).is_some());
     }
 
     #[tokio::test]
     async fn tokenizer_does_drop_parsed_field() {
-        let log = parse_log("1234 5678", "status time", Some("message"), true, &[]).await;
+        let log = parse_log("1234 5678", "status time", Some(LookupBuf::from("message")), true, &[]).await;
 
-        assert_eq!(log["status"], "1234".into());
-        assert_eq!(log["time"], "5678".into());
-        assert!(log.get("message").is_none());
+        assert_eq!(log[Lookup::from("status")], "1234".into());
+        assert_eq!(log[Lookup::from("time")], "5678".into());
+        assert!(log.get(Lookup::from("message")).is_none());
     }
 
     #[tokio::test]
     async fn tokenizer_does_not_drop_same_name_parsed_field() {
-        let log = parse_log("1234 yes", "status message", Some("message"), true, &[]).await;
+        let log = parse_log("1234 yes", "status message", Some(LookupBuf::from("message")), true, &[]).await;
 
-        assert_eq!(log["status"], "1234".into());
-        assert_eq!(log["message"], "yes".into());
+        assert_eq!(log[Lookup::from("status")], "1234".into());
+        assert_eq!(log[Lookup::from("message")], "yes".into());
     }
 
     #[tokio::test]
@@ -197,10 +197,10 @@ mod tests {
         )
         .await;
 
-        assert_eq!(log["number"], Value::Float(42.3));
-        assert_eq!(log["flag"], Value::Boolean(true));
-        assert_eq!(log["code"], Value::Integer(1234));
-        assert_eq!(log["rest"], Value::Bytes("word".into()));
+        assert_eq!(log[Lookup::from("number")], Value::Float(42.3));
+        assert_eq!(log[Lookup::from("flag")], Value::Boolean(true));
+        assert_eq!(log[Lookup::from("code")], Value::Integer(1234));
+        assert_eq!(log[Lookup::from("rest")], Value::Bytes("word".into()));
     }
 
     #[tokio::test]
@@ -213,8 +213,8 @@ mod tests {
             &[("code", "integer"), ("who", "string"), ("why", "string")],
         )
         .await;
-        assert_eq!(log["code"], Value::Integer(1234));
-        assert_eq!(log["who"], Value::Bytes("-".into()));
-        assert_eq!(log["why"], Value::Bytes("foo".into()));
+        assert_eq!(log[Lookup::from("code")], Value::Integer(1234));
+        assert_eq!(log[Lookup::from("who")], Value::Bytes("-".into()));
+        assert_eq!(log[Lookup::from("why")], Value::Bytes("foo".into()));
     }
 }
