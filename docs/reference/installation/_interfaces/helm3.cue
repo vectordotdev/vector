@@ -75,17 +75,16 @@ installation: _interfaces: "helm3": {
 						// The Vector Kubernetes integration automatically defines a
 						// kubernetes_logs source that is made available to you.
 						// You do not need to define a log source.
-						vector-agent:
-						  sinks:
-						  	// Adjust as necessary. By default we use the console sink
-						  	// to print all data. This allows you to see Vector working.
-						  	// https://vector.dev/docs/reference/sinks/
-						    stdout:
-						      type: console
-						      inputs: ["kubernetes_logs"]
-						      rawConfig: |
-						        target = "stdout"
-						        encoding = "json"
+						sinks:
+						  // Adjust as necessary. By default we use the console sink
+						  // to print all data. This allows you to see Vector working.
+						  // https://vector.dev/docs/reference/sinks/
+						  stdout:
+						    type: console
+						    inputs: ["kubernetes_logs"]
+						    rawConfig: |
+						    target = "stdout"
+						    encoding = "json"
 						VALUES
 						"""#
 				},

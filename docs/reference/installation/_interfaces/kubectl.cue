@@ -1,7 +1,7 @@
 package metadata
 
 installation: _interfaces: kubectl: {
-	title:       "Kubectl"
+	title:       "kubectl"
 	description: """
 		The [Kubernetes command-line tool](\(urls.kubectl)), kubectl, allows
 		users to run commands against Kubernetes clusters facilitating in
