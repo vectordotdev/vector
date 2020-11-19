@@ -98,7 +98,7 @@ impl SinkConfig for PulsarSinkConfig {
             .create_pulsar_producer()
             .await
             .context(CreatePulsarSink)?;
-        let sink = PulsarSink::new(producer, self.encoding.clone().into(), cx.acker());
+        let sink = PulsarSink::new(producer, self.encoding.clone().into(), cx.acker())?;
 
         let producer = self
             .create_pulsar_producer()
@@ -155,19 +155,26 @@ async fn healthcheck(producer: PulsarProducer) -> crate::Result<()> {
 }
 
 impl PulsarSink {
-    fn new(producer: PulsarProducer, encoding: EncodingConfig<Encoding>, acker: Acker) -> Self {
+    fn new(
+        producer: PulsarProducer,
+        encoding: EncodingConfig<Encoding>,
+        acker: Acker,
+    ) -> crate::Result<Self> {
         let schema = match &encoding.codec() {
             Encoding::Avro => {
                 if let Some(schema) = &encoding.schema() {
                     avro_rs::Schema::parse_str(schema).ok()
                 } else {
-                    None
+                    return Err(
+                        "Avro requires a schema, specify a schema file with `encoding.schema`."
+                            .into(),
+                    );
                 }
             }
             _ => None,
         };
 
-        Self {
+        Ok(Self {
             encoding,
             avro_schema: schema,
             state: PulsarSinkState::Ready(Box::new(producer)),
@@ -176,7 +183,7 @@ impl PulsarSink {
             seq_head: 0,
             seq_tail: 0,
             pending_acks: HashSet::new(),
-        }
+        })
     }
 
     fn poll_in_flight_prepare(&mut self, cx: &mut Context<'_>) -> Poll<()> {
@@ -286,10 +293,13 @@ fn encode_event(
             .map(|v| v.as_bytes().to_vec())
             .unwrap_or_default(),
         Encoding::Avro => {
-            let value = avro_rs::to_value(log).unwrap();
+            let value = avro_rs::to_value(log)?;
             let resolved_value =
                 avro_rs::types::Value::resolve(value, avro_schema.as_ref().unwrap())?;
-            avro_rs::to_avro_datum(avro_schema.as_ref().unwrap(), resolved_value)?
+            avro_rs::to_avro_datum(
+                &avro_schema.as_ref().expect("Avro encoding selected but no schema found. Please report this."),
+                resolved_value,
+            )?
         }
     })
 }
