@@ -177,7 +177,6 @@ getset = "0.1.1"
 lru = "0.6.0"
 bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
-task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "1.0.1"
 nats = { version = "0.8.3", optional = true }

@@ -6137,16 +6137,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab0e7238dcc7b40a7be719a25365910f6807bd864f4cce6b2e6b873658e2b19d"
 
 [[package]]
-name = "task-compat"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0328783c46b98ea9e2747a49761313f483cf7bba40e51d6f0b05bf31b988d578"
-dependencies = [
- "futures 0.1.29",
- "futures 0.3.5",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7132,7 +7122,6 @@ dependencies = [
  "structopt",
  "syslog",
  "syslog_loose",
- "task-compat",
  "tempfile",
  "tokio",
  "tokio-openssl",
