@@ -20,11 +20,6 @@ installation: _interfaces: kubectl: {
 		commands: {
 			_resource_type: string
 			_role:          string
-			configure:      #"""
-						cat <<-VECTORCFG > vector-\#(_role).toml
-						{config}
-						VECTORCFG
-						"""#
 			install:        "kubectl apply -k ."
 			logs:           #"kubectl logs -n vector \#(_resource_type)/vector-\#(_role)"#
 			reconfigure:    #"kubectl edit \#(_resource_type) vector-\#(_role)"#
@@ -35,23 +30,17 @@ installation: _interfaces: kubectl: {
 			top:            null
 			uninstall:      "kubectl delete -k ."
 			upgrade:        null
+			verify_config:  "kubectl kustomize"
 		}
 
 		tutorials: {
 			installation: [
 				{
-					title: "Create Vector namespace.yaml"
-					command: #"""
-						cat <<-NAMESPACE > namespace.yaml
-						apiVersion: v1
-						kind: Namespace
-						metadata:
-						  name: vector
-						NAMESPACE
-						"""#
+					title:   "Define Vector's namespace"
+					command: "kubectl create namespace --dry-run=client -oyaml vector > namespace.yaml"
 				},
 				{
-					title: "Create Vector kustomization.yaml"
+					title: "Prepare kustomization"
 					command: #"""
 						cat <<-KUSTOMIZATION > kustomization.yaml
 						namespace: vector
@@ -69,6 +58,10 @@ installation: _interfaces: kubectl: {
 				{
 					title:   "Configure Vector"
 					command: commands.configure
+				},
+				{
+					title:   "Verify the config"
+					command: commands.verify_config
 				},
 				{
 					title:   "Install Vector"
@@ -98,30 +91,44 @@ installation: _interfaces: kubectl: {
 			commands: {
 				_resource_type: "daemonset"
 				_role:          "agent"
+				configure: #"""
+					cat <<-'VECTORCFG' > vector-agent.toml
+					# The Vector Kubernetes integration automatically defines a
+					# kubernetes_logs source that is made available to you.
+					# You do not need to define a log source.
+
+					{config}
+					VECTORCFG
+					"""#
 			}
-			variables: config: sinks: out: inputs: ["internal_metrics", "kubernetes_logs"]
+			variables: config: sinks: out: inputs: ["kubernetes_logs"]
 		}
 
-		aggregator: {
-			title:       "Aggregator"
-			description: #"""
-				The aggregator role is designed to receive and
-				process data from multiple upstream agents.
-				Typically these are other Vector agents, but it
-				could be anything, including non-Vector agents.
-				By default, we recommend the [`vector` source](\#(urls.vector_source))
-				since it supports all data types, but it is
-				recommended to adjust your pipeline as necessary
-				using Vector's [sources](\#(urls.vector_sources)),
-				[transforms](\#(urls.vector_transforms)), and
-				[sinks](\#(urls.vector_sinks)).
-				"""#
+		// aggregator: {
+		//  title:       "Aggregator"
+		//  description: #"""
+		//   The aggregator role is designed to receive and
+		//   process data from multiple upstream agents.
+		//   Typically these are other Vector agents, but it
+		//   could be anything, including non-Vector agents.
+		//   By default, we recommend the [`vector` source](\#(urls.vector_source))
+		//   since it supports all data types, but it is
+		//   recommended to adjust your pipeline as necessary
+		//   using Vector's [sources](\#(urls.vector_sources)),
+		//   [transforms](\#(urls.vector_transforms)), and
+		//   [sinks](\#(urls.vector_sinks)).
+		//   """#
 
-			commands: {
-				_resource_type: "statefulset"
-				_role:          "aggregator"
-			}
-			variables: config: sources: in_upstream: type: components.sources.vector.type
-		}
+		//  commands: {
+		//   _resource_type: "statefulset"
+		//   _role:          "aggregator"
+		//   configure: #"""
+		//    cat <<-'VECTORCFG' > vector-aggregator.toml
+		//    {config}
+		//    VECTORCFG
+		//    """#
+		//  }
+		//  variables: config: sources: in_upstream: type: components.sources.vector.type
+		// }
 	}
 }

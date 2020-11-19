@@ -24,7 +24,7 @@ installation: close({
 
 		if Shell == "bash" {
 			configure:   string | *#"""
-					cat <<-VECTORCFG > \#(ConfigPath)
+					cat <<-'VECTORCFG' > \#(ConfigPath)
 					{config}
 					VECTORCFG
 					"""#
@@ -92,7 +92,6 @@ installation: close({
 			}
 			_file_sidecar: {
 				variables: config: {
-					api: enabled: true
 					sources: {
 						logs: {
 							type:    components.sources.file.type
@@ -119,7 +118,6 @@ installation: close({
 			}
 			_journald_agent: {
 				variables: config: {
-					api: enabled: true
 					sources: {
 						logs: type:             components.sources.journald.type
 						host_metrics: type:     components.sources.host_metrics.type
@@ -150,7 +148,6 @@ installation: close({
 			}
 			_vector_aggregator: {
 				variables: config: {
-					api: enabled: true
 					sources: {
 						vector: type:           components.sources.vector.type
 						internal_metrics: type: "internal_metrics"
@@ -230,10 +227,6 @@ installation: close({
 			sinks?:      _
 		}
 		config: {
-			api?: {
-				enabled: bool
-			}
-
 			sources?: [Name=string]: {
 				type: string
 
@@ -244,7 +237,7 @@ installation: close({
 
 			sinks: out: {
 				type:   "console"
-				inputs: ["internal_metrics", ...string] | *[ for id, _source in sources {id}]
+				inputs: [string, ...string] | *[ for id, _source in sources {id}]
 				encoding: codec: "json"
 			}
 		}

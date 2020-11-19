@@ -38,7 +38,7 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
-			installation._interfaces.helm,
+			installation._interfaces."helm3",
 			installation._interfaces.kubectl,
 		]
 		os:    "Linux"
@@ -60,7 +60,7 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
-			installation._interfaces.helm,
+			installation._interfaces."helm3",
 			installation._interfaces.kubectl,
 		]
 
@@ -139,7 +139,7 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
-			installation._interfaces.helm,
+			installation._interfaces."helm3",
 			installation._interfaces.kubectl,
 		]
 
@@ -160,7 +160,7 @@ installation: operating_systems: {
 				roles: agent: roles._journald_agent
 			},
 			installation._interfaces."docker-cli",
-			installation._interfaces.helm,
+			installation._interfaces."helm3",
 			installation._interfaces.kubectl,
 		]
 
