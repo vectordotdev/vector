@@ -206,4 +206,8 @@ components: sources: http: {
 			}]
 		},
 	]
+
+	telemetry: metrics: {
+		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
+	}
 }

@@ -45,4 +45,8 @@ components: transforms: ansi_stripper: {
 		logs:    true
 		metrics: null
 	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

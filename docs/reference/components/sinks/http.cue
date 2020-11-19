@@ -119,4 +119,8 @@ components: sinks: http: {
 		logs:    true
 		metrics: null
 	}
+
+	telemetry: metrics: {
+		http_bad_requests_total: components.sources.internal_metrics.output.metrics.http_bad_requests_total
+	}
 }
