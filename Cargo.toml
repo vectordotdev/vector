@@ -59,7 +59,6 @@ futures01 = { package = "futures", version = "0.1.25" }
 futures = { version = "0.3", default-features = false, features = ["compat", "io-compat"] }
 tokio = { version = "0.2.13", features = ["blocking", "fs", "io-std", "macros", "process", "rt-core", "rt-threaded", "uds", "udp", "signal", "sync", "time", "stream"] }
 tokio-openssl = "0.4.0"
-tokio-retry = "0.2.0"
 tokio-util = { version = "0.3.1", features = ["codec"] }
 async-trait = "0.1"
 
@@ -177,7 +176,6 @@ getset = "0.1.1"
 lru = "0.6.0"
 bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
-task-compat = "0.1"
 cidr-utils = "0.4.2"
 pin-project = "1.0.1"
 nats = { version = "0.8.3", optional = true }

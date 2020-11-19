@@ -9,6 +9,7 @@ use crate::{
     sink::VecSinkExt,
     sinks::{
         util::{
+            retries::ExponentialBackoff,
             socket_bytes_sink::{BytesSink, ShutdownCheck},
             SinkBuildError, StreamSink,
         },
@@ -31,7 +32,6 @@ use std::{
     time::Duration,
 };
 use tokio::{io::AsyncRead, net::TcpStream, time::delay_for};
-use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Debug, Snafu)]
 enum TcpError {

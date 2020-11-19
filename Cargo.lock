@@ -4640,19 +4640,6 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.4.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
-dependencies = [
- "fuchsia-cprng",
- "libc",
- "rand_core 0.3.1",
- "rdrand",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "rand"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d71dacdc3c88c1fde3885a3be3fbab9f35724e6ce99467f7d9c5026132184ca"
@@ -6137,16 +6124,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab0e7238dcc7b40a7be719a25365910f6807bd864f4cce6b2e6b873658e2b19d"
 
 [[package]]
-name = "task-compat"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0328783c46b98ea9e2747a49761313f483cf7bba40e51d6f0b05bf31b988d578"
-dependencies = [
- "futures 0.1.29",
- "futures 0.3.5",
-]
-
-[[package]]
 name = "tempfile"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6346,17 +6323,6 @@ checksum = "3c4b08c5f4208e699ede3df2520aca2e82401b2de33f45e96696a074480be594"
 dependencies = [
  "openssl",
  "tokio",
-]
-
-[[package]]
-name = "tokio-retry"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c03755b956458582182941061def32b8123a26c98b08fc6ddcf49ae89d18f33"
-dependencies = [
- "futures 0.1.29",
- "rand 0.4.6",
- "tokio-timer",
 ]
 
 [[package]]
@@ -7132,11 +7098,9 @@ dependencies = [
  "structopt",
  "syslog",
  "syslog_loose",
- "task-compat",
  "tempfile",
  "tokio",
  "tokio-openssl",
- "tokio-retry",
  "tokio-test",
  "tokio-util",
  "tokio01-test",
