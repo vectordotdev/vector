@@ -21,14 +21,14 @@ and 0.11 includes our initial efforts:
 
 ## Get Started
 
-To help you get started with these sources, we've included the following guides:
-
-1. [Export CloudWatch logs using Vector]()
-2. [Export CloudTrail logs using Vector]()
-3. ...
+To help you get started with these sources, we wrote [a guide][cloudwatch_guide]
+on collecting AWS CloudWatch logs via AWS Firehose. With this setup you can
+send your AWS CloudWatch logs to any supported Vector [sink][sinks].
 
 We're eager to hear what you think about these sources! [Join our chat][chat]
 and let us know.
 
 [chat]: https://chat.vector.dev
+[cloudwatch_guide]: /guides/advanced/cloudwatch-logs-firehose/
 [rube_goldberg]: https://en.wikipedia.org/wiki/Rube_Goldberg_machine
+[sinks]: /docs/reference/sinks/

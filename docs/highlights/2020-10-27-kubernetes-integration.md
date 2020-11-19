@@ -13,40 +13,33 @@ tags: ["type: announcement"]
 After eight months of development, [83 pull requests][kubernetes_pull_requests],
 and intensive QA in clusters producing over 50 terabytes per day, we’re pleased
 to announce Vector's first-class Kubernetes integration. It is our intent for
-Vector to become the single, best pipeline for all Kubernetes observability
+Vector to become the single, best platform for all Kubernetes observability
 data.
 
 For a deepdive into our Kubernetes integration, checkout the
 [announcement blog post][announcement_post].
+
+## Highlights
+
+1. A new [`kubernetes_logs` source] that:
+   1. Automatically collects all Node logs.
+   2. Automatically merges split logs due to the 12kb Docker limit.
+   3. Enriches logs with Kubernetes metdata.
+   4. Provides robust filtering options for Pod inclusion/exclusion.
+   5. Is designed for scale. Vector is routinely benchmarked at 150k messages
+      per second tailing hundreds of files.
+2.
+3. Composable design that allows k8s operators to include Vector in restricted
+   and unrestricted setups.
 
 PS - we also launched a new [adapative concurrency feature][adative_concurrency_post]
 that compliments our Kubernetes integration.
 
 ## Get Started
 
-To cut straight to the chase, we recommend installing Vector using our Helm
-charts:
+To cut straight to the chase, check out our Kubernetes installation instructions:
 
-1. Add our Helm repo:
-
-   ```bash
-   helm repo add timberio-nightly https://packages.timber.io/helm/nightly
-   ```
-
-2. Configure Vector:
-
-   ```bash
-   helm template vector timberio-nightly/vector --devel --values values.yaml --namespace vector
-   ```
-
-3. Deploy:
-
-   ```bash
-   helm install vector timberio-nightly/vector --devel --values values.yaml --namespace vector --create-namespace
-   ```
-
-For other methods, like `kubectl`, visit our
-[Kubernetes installation docs][installation_docs].
+<Jump to="/docs/setup/installation/platforms/kubernetes/#install">Kubernetes Installation Instructions</Jump>
 
 [announcement_post]: TODO
 [installation_docs]: TODO
