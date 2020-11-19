@@ -29,7 +29,6 @@ jobs:
   bench:
     name: Bench - Linux
     runs-on: ubuntu-20.04
-    container: timberio/ci_image
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
