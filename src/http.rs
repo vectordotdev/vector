@@ -1,5 +1,6 @@
 use crate::{
     dns::Resolver,
+    internal_events::http_client,
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
 use futures::future::BoxFuture;
@@ -88,50 +89,44 @@ where
                 .insert("User-Agent", self.user_agent.clone());
         }
 
-        debug!(
-            message = "Sending HTTP request.",
-            uri = %request.uri(),
-            method = %request.method(),
-            version = ?request.version(),
-            headers = ?request.headers(),
-            body = %FormatBody(request.body()),
-        );
+        emit!(http_client::AboutToSendHTTPRequest { request: &request });
 
         let response = self.client.request(request);
 
         let fut = async move {
-            let res = response.await.context(CallRequest)?;
-            debug!(
-                    message = "HTTP response.",
-                    status = %res.status(),
-                    version = ?res.version(),
-                    headers = ?res.headers(),
-                    body = %FormatBody(res.body()),
-            );
-            Ok(res)
+            // Capture the time right before we issue the request.
+            // Request doesn't start the processing until we start polling it.
+            let before = std::time::Instant::now();
+
+            // Send request and wait for the result.
+            let response_result = response.await;
+
+            // Compute the roundtrip time it took to send the request and get
+            // the response or error.
+            let roundtrip = before.elapsed();
+
+            // Handle the errors and extract the response.
+            let response = response_result
+                .map_err(|error| {
+                    // Emit the error into the internal events system.
+                    emit!(http_client::GotHTTPError {
+                        error: &error,
+                        roundtrip
+                    });
+                    error
+                })
+                .context(CallRequest)?;
+
+            // Emit the response into the internal events system.
+            emit!(http_client::GotHTTPResponse {
+                response: &response,
+                roundtrip
+            });
+            Ok(response)
         }
         .instrument(self.span.clone());
 
         Box::pin(fut)
-    }
-}
-
-/// Newtype placeholder to provide a formatter for the request and response body.
-struct FormatBody<'a, B>(&'a B);
-
-impl<'a, B: HttpBody> fmt::Display for FormatBody<'a, B> {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        let size = self.0.size_hint();
-        match (size.lower(), size.upper()) {
-            (0, None) => write!(fmt, "[unknown]"),
-            (lower, None) => write!(fmt, "[>={} bytes]", lower),
-
-            (0, Some(0)) => write!(fmt, "[empty]"),
-            (0, Some(upper)) => write!(fmt, "[<={} bytes]", upper),
-
-            (lower, Some(upper)) if lower == upper => write!(fmt, "[{} bytes]", lower),
-            (lower, Some(upper)) => write!(fmt, "[{}..={} bytes]", lower, upper),
-        }
     }
 }
 
