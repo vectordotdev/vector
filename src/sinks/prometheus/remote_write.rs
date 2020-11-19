@@ -263,7 +263,7 @@ mod integration_tests {
                 _ => panic!("Unhandled metric value, fix the test"),
             }
             for (tag, value) in metric.tags.unwrap() {
-                assert_eq!(output[&tag], Value::String(value.into()));
+                assert_eq!(output[&tag], Value::String(value));
             }
             let timestamp = strip_timestamp(
                 metric
@@ -272,7 +272,7 @@ mod integration_tests {
                     .format("%Y-%m-%dT%H:%M:%S%.3fZ")
                     .to_string(),
             );
-            assert_eq!(output["time"], Value::String(timestamp.into()));
+            assert_eq!(output["time"], Value::String(timestamp));
         }
 
         cleanup_v1(url, &database).await;
@@ -297,13 +297,14 @@ mod integration_tests {
     fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
         let data = data.as_object().expect("Data is not an object");
         let columns = data["columns"].as_array().expect("Columns is not an array");
-        let values = data["values"].as_array().expect("Values is not an array");
-        values
-            .into_iter()
+        data["values"]
+            .as_array()
+            .expect("Values is not an array")
+            .iter()
             .map(|values| {
                 columns
-                    .into_iter()
-                    .zip(values.as_array().unwrap().into_iter())
+                    .iter()
+                    .zip(values.as_array().unwrap().iter())
                     .map(|(column, value)| (column.as_str().unwrap().to_owned(), value.clone()))
                     .collect()
             })
