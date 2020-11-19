@@ -61,6 +61,7 @@ pub struct ElasticSearchConfig {
 
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
+    pub bulk_action: BulkAction,
 }
 
 lazy_static! {
@@ -82,6 +83,45 @@ pub enum Encoding {
 pub enum ElasticSearchAuth {
     Basic { user: String, password: String },
     Aws { assume_role: Option<String> },
+}
+
+impl ElasticSearchAuth {
+    pub fn apply<B>(&self, req: &mut Request<B>) {
+        if let Self::Basic { user, password } = &self {
+            use headers::{Authorization, HeaderMapExt};
+            let auth = Authorization::basic(&user, &password);
+            req.headers_mut().typed_insert(auth);
+        }
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+pub enum BulkAction {
+    Index,
+    Create,
+}
+
+impl Default for BulkAction {
+    fn default() -> Self {
+        BulkAction::Index
+    }
+}
+
+impl BulkAction {
+    pub fn as_str(&self) -> &'static str {
+        match *self {
+            BulkAction::Index => "index",
+            BulkAction::Create => "create",
+        }
+    }
+
+    pub fn as_path(&self) -> &'static str {
+        match *self {
+            BulkAction::Index => "/index",
+            BulkAction::Create => "/create",
+        }
+    }
 }
 
 inventory::submit! {
@@ -146,6 +186,7 @@ pub struct ElasticSearchCommon {
     compression: Compression,
     region: Region,
     query_params: HashMap<String, String>,
+    bulk_action: BulkAction,
 }
 
 #[derive(Debug, Snafu)]
@@ -177,14 +218,14 @@ impl HttpSink for ElasticSearchCommon {
             .ok()?;
 
         let mut action = json!({
-            "index": {
+            self.bulk_action.as_str(): {
                 "_index": index,
                 "_type": self.doc_type,
             }
         });
         maybe_set_id(
             self.config.id_key.as_ref(),
-            action.pointer_mut("/index").unwrap(),
+            action.pointer_mut(self.bulk_action.as_path()).unwrap(),
             &mut event,
         );
 
@@ -372,6 +413,7 @@ impl ElasticSearchCommon {
         let index = Template::try_from(index).context(IndexTemplate)?;
 
         let doc_type = config.doc_type.clone().unwrap_or_else(|| "_doc".into());
+        let bulk_action = config.bulk_action.clone();
 
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
@@ -404,6 +446,7 @@ impl ElasticSearchCommon {
             compression,
             region,
             query_params,
+            bulk_action,
         })
     }
 
