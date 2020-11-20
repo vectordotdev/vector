@@ -3,13 +3,14 @@
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
-    export OPERATING_SYSTEM := Windows
-	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
     export DEFAULT_FEATURES = default-msvc
 else
-    export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+  OPERATING_SYSTEM := $(shell uname -s)
+  ifeq ($(OPERATING_SYSTEM),Darwin)
+    export DEFAULT_FEATURES = default-macos
+  else
     export DEFAULT_FEATURES = default
+  endif
 endif
 
 # Override this with any scopes for testing/benching.
@@ -294,7 +295,7 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 
 .PHONY: test-behavior
 test-behavior: ## Runs behaviorial test
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*.toml
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features "${DEFAULT_FEATURES}" -- test tests/behavior/**/*.toml
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
