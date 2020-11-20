@@ -4,12 +4,14 @@
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export OPERATING_SYSTEM := Windows
-	export RUST_TARGET ?= "x86_64-unknown-windows-msvc"
     export DEFAULT_FEATURES = default-msvc
 else
-    export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
+  export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
+  ifeq ($(UNAME_S),Darwin)
+    export DEFAULT_FEATURES = default-macos
+  else
     export DEFAULT_FEATURES = default
+  endif
 endif
 
 # Override this with any scopes for testing/benching.
