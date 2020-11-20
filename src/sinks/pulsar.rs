@@ -222,11 +222,12 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let message = encode_event(item, &self.encoding, &self.avro_schema)
-            .map_err(|e| {
-                emit!(PulsarEncodeEventFailed { error: &*e.to_string() });
-                ()
-            })?;
+        let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| {
+            emit!(PulsarEncodeEventFailed {
+                error: &*e.to_string()
+            });
+            ()
+        })?;
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,
