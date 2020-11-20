@@ -8,6 +8,10 @@ package metadata
 	type:        #ArgType
 	default?:    string | [...string]
 	required:    bool | *false
+
+	if default == _|_ {
+		required: true
+	}
 }
 
 #ArgType: "string" | "list"
@@ -228,7 +232,12 @@ cli: #CommandLineTool & {
 				"""
 
 			args: {
-				paths: _paths_arg
+				paths: _paths_arg & {
+					description: """
+						Any number of Vector config files to test. If none are specified
+						the default config path `/etc/vector/vector.toml` will be targeted
+						"""
+				}
 			}
 		}
 
@@ -280,17 +289,18 @@ cli: #CommandLineTool & {
 			}
 
 			args: {
-				paths: _paths_arg
+				paths: _paths_arg & {
+					description: """
+						Any number of Vector config files to validate. If none are specified
+						the default config path `/etc/vector/vector.toml` will be targeted
+						"""
+				}
 			}
 		}
 	}
 
 	// Helpers
 	_paths_arg: {
-		description: """
-			Any number of Vector config files to validate. If none are specified
-			the default config path `/etc/vector/vector.toml` will be targeted
-			"""
 		type:    "list"
 		default: "/etc/vector/vector.toml"
 	}
