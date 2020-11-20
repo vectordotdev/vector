@@ -159,8 +159,8 @@ cli: #CommandLineTool & {
 			options: {
 				"file": {
 					description: "Generate config as a file"
-					type: "string"
-					example: "/etc/vector/my-config.toml"
+					type:        "string"
+					example:     "/etc/vector/my-config.toml"
 				}
 			}
 
@@ -274,7 +274,7 @@ cli: #CommandLineTool & {
 						"""
 				}
 				"deny-warnings": {
-					_short: "d"
+					_short:      "d"
 					description: "Fail validation on warnings"
 				}
 			}
