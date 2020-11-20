@@ -145,8 +145,8 @@ headers = "0.3"
 rdkafka = { version = "0.24.0", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.3.1"
 seahash = { version = "3.0.6", optional = true }
+jemallocator = { version = "0.3.2", optional = true, features = ["background_threads"] }
 semver = { version = "0.11.0", features = ["serde"] }
-jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
 rlua = { git = "https://github.com/kyren/rlua", optional = true }
 num_cpus = "1.10.0"
