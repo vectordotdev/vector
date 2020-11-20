@@ -21,6 +21,13 @@ use std::{
 
 const PEM_START_MARKER: &str = "-----BEGIN ";
 
+#[cfg(test)]
+pub const TEST_PEM_CA_PATH: &str = "tests/data/Vector_CA.crt";
+#[cfg(test)]
+pub const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
+#[cfg(test)]
+pub const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct TlsConfig {
     pub enabled: Option<bool>,
@@ -33,6 +40,14 @@ impl TlsConfig {
         Self {
             enabled: Some(true),
             ..Self::default()
+        }
+    }
+
+    #[cfg(test)]
+    pub fn test_config() -> Self {
+        Self {
+            enabled: Some(true),
+            options: TlsOptions::test_options(),
         }
     }
 }
@@ -49,6 +64,18 @@ pub struct TlsOptions {
     #[serde(alias = "key_path")]
     pub key_file: Option<PathBuf>,
     pub key_pass: Option<String>,
+}
+
+impl TlsOptions {
+    #[cfg(test)]
+    pub fn test_options() -> Self {
+        Self {
+            ca_file: Some(TEST_PEM_CA_PATH.into()),
+            crt_file: Some(TEST_PEM_CRT_PATH.into()),
+            key_file: Some(TEST_PEM_KEY_PATH.into()),
+            ..Self::default()
+        }
+    }
 }
 
 /// Directly usable settings for TLS connectors
@@ -428,9 +455,7 @@ mod test {
     use crate::BoolAndSome;
 
     const TEST_PKCS12_PATH: &str = "tests/data/localhost.p12";
-    const TEST_PEM_CRT_PATH: &str = "tests/data/localhost.crt";
     const TEST_PEM_CRT_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.crt");
-    const TEST_PEM_KEY_PATH: &str = "tests/data/localhost.key";
     const TEST_PEM_KEY_BYTES: &[u8] = include_bytes!("../../tests/data/localhost.key");
 
     #[test]
