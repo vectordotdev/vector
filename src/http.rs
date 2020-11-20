@@ -3,8 +3,10 @@ use crate::{
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
 use futures::future::BoxFuture;
+use headers::{Authorization, HeaderMapExt};
 use http::header::HeaderValue;
 use http::request::Builder;
+use http::HeaderMap;
 use http::Request;
 use hyper::{
     body::{Body, HttpBody},
@@ -204,40 +206,40 @@ impl Auth {
     }
 
     pub fn apply<B>(&self, req: &mut Request<B>) {
-        use headers::{Authorization, HeaderMapExt};
+        self.apply_headers_map(req.headers_mut())
+    }
 
+    pub fn apply_builder(&self, mut builder: Builder) -> Builder {
+        if let Some(map) = builder.headers_mut() {
+            self.apply_headers_map(map)
+        }
+        builder
+    }
+
+    pub fn apply_headers_map(&self, map: &mut HeaderMap) {
         match &self {
             Auth::Basic { user, password } => {
                 let auth = Authorization::basic(&user, &password);
-                req.headers_mut().typed_insert(auth);
+                map.typed_insert(auth);
             }
             Auth::Bearer { token } => match Authorization::bearer(&token) {
-                Ok(auth) => req.headers_mut().typed_insert(auth),
+                Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
         }
-    }
-
-    pub fn apply_builder(&self, builder: Builder) -> Builder {
-        builder
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::Auth;
+    use http::HeaderMap;
 
     fn test_basic_auth(url: &str) -> Option<(String, String)> {
         Auth::get_and_strip_basic_auth(url).map(|(url, auth)| {
-            let mut request = http::Request::new(());
-            auth.apply(&mut request);
-            (
-                url,
-                (request.headers())["authorization"]
-                    .to_str()
-                    .unwrap()
-                    .to_owned(),
-            )
+            let mut map = HeaderMap::new();
+            auth.apply_headers_map(&mut map);
+            (url, map["authorization"].to_str().unwrap().to_owned())
         })
     }
 
