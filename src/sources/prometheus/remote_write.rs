@@ -197,7 +197,7 @@ mod integration_tests {
         sinks::prometheus::remote_write::RemoteWriteConfig,
         test_util, Pipeline,
     };
-    use chrono::Utc;
+    use chrono::{SubsecRound as _, Utc};
     use futures::stream;
 
     #[tokio::test]
@@ -255,12 +255,7 @@ mod integration_tests {
     fn make_events() -> Vec<Event> {
         (0..10)
             .map(|num| {
-                let timestamp = Utc::now().timestamp_millis();
-                // The remote_write protocol truncates timestamps to
-                // milliseconds, so we have to truncate them to make comparable
-                // events.
-                let timestamp =
-                    Utc.timestamp(timestamp / 1000, (timestamp % 1000) as u32 * 1000000);
+                let timestamp = Utc::now().trunc_subsecs(3);
                 Event::Metric(Metric {
                     name: format!("gauge_{}", num),
                     namespace: None,
