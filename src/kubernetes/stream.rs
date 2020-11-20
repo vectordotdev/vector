@@ -12,6 +12,8 @@ use snafu::{ResultExt, Snafu};
 
 /// Converts the HTTP response [`Body`] to a stream of parsed Kubernetes
 /// [`Response`]s.
+// Clippy rule, because `try_stream!`?
+#[allow(clippy::needless_return)]
 pub fn body<B, T>(body: B) -> impl Stream<Item = Result<T, Error<<B as Body>::Error>>>
 where
     T: Response + Unpin + 'static,

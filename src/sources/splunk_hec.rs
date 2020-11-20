@@ -471,7 +471,7 @@ impl<R: Read> Stream for EventStream<R> {
             Some(Some(t)) => {
                 if let Some(t) = t.as_u64() {
                     let time = parse_timestamp(t as i64)
-                        .ok_or_else(|| ApiError::InvalidDataFormat { event: self.events })?;
+                        .ok_or(ApiError::InvalidDataFormat { event: self.events })?;
 
                     self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
