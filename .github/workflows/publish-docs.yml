@@ -41,6 +41,7 @@ jobs:
           repository: timberio/vector-website
           ref: gatsby-docs
           path: vector-website
+          token: ${{ secrets.GH_ACCESS_TOKEN }}
 
       - name: Setup Cue
         run: brew install cuelang/tap/cue
