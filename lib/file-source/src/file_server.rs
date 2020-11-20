@@ -123,6 +123,7 @@ where
                 self.start_at_beginning,
             );
         }
+        self.emitter.emit_files_open(fp_map.len());
 
         let mut stats = TimingStats::default();
 
@@ -242,6 +243,7 @@ where
                         } else {
                             // untracked file fingerprint
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
+                            self.emitter.emit_files_open(fp_map.len());
                         }
                     }
                 }
@@ -323,6 +325,7 @@ where
                     true
                 }
             });
+            self.emitter.emit_files_open(fp_map.len());
 
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
