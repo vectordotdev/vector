@@ -1,4 +1,4 @@
-mod tcp;
+pub mod tcp;
 mod udp;
 #[cfg(unix)]
 mod unix;
@@ -34,7 +34,11 @@ pub enum Mode {
 }
 
 impl SocketConfig {
-    pub fn make_tcp_config(addr: SocketAddr) -> Self {
+    pub fn make_tcp_config(tcp_config: tcp::TcpConfig) -> Self {
+        tcp_config.into()
+    }
+
+    pub fn make_basic_tcp_config(addr: SocketAddr) -> Self {
         tcp::TcpConfig::new(addr.into()).into()
     }
 }
