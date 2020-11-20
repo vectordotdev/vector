@@ -24,7 +24,7 @@ api: #GraphQLAPI & {
 			required:    false
 			description: "Whether the GraphQL API is enabled for this Vector instance."
 		}
-		bind: {
+		address: {
 			common:   true
 			required: false
 			type: string: {
