@@ -38,7 +38,7 @@ installation: _interfaces: "helm3": {
 			stop:           null
 			top:            null
 			uninstall:      "helm uninstall \(_name) --namespace vector"
-			upgrade:        "helm upgrade vector timberio/\(_name) --version {version}"
+			upgrade:        "helm repo update && helm upgrade vector timberio/\(_name) --namespace vector --reuse-values"
 		}
 	}
 
