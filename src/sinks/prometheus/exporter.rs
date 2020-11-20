@@ -10,7 +10,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use chrono::Utc;
-use futures::{future, stream::BoxStream, FutureExt, StreamExt, TryFutureExt};
+use futures::{future, stream::BoxStream, FutureExt, Stream, TryFutureExt};
 use hyper::{
     header::HeaderValue,
     service::{make_service_fn, service_fn},
@@ -23,7 +23,9 @@ use std::{
     collections::HashSet,
     convert::Infallible,
     net::SocketAddr,
+    pin::Pin,
     sync::{Arc, RwLock},
+    task::Poll,
 };
 use stream_cancel::{Trigger, Tripwire};
 
@@ -276,39 +278,66 @@ impl PrometheusExporter {
 impl StreamSink for PrometheusExporter {
     async fn run(&mut self, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
         self.start_server_if_needed();
-        while let Some(event) = input.next().await {
-            let item = event.into_metric();
-            let mut metrics = self.metrics.write().unwrap();
 
-            match item.kind {
-                MetricKind::Incremental => {
-                    let new = MetricEntry(item.to_absolute());
-                    if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
-                        if item.value.is_set() {
-                            // sets need to be expired from time to time
-                            // because otherwise they could grow infinitelly
-                            let now = Utc::now().timestamp();
-                            let interval = now - *self.last_flush_timestamp.read().unwrap();
-                            if interval > self.config.flush_period_secs as i64 {
-                                *self.last_flush_timestamp.write().unwrap() = now;
-                                existing.reset();
-                            }
+        future::poll_fn(|cx| -> Poll<Result<(), ()>> {
+            let mut received = 0;
+            let mut metrics = None;
+            let mut reset_existing = None;
+
+            let result = loop {
+                match Pin::new(&mut input).poll_next(cx) {
+                    Poll::Ready(Some(event)) => {
+                        received += 1;
+
+                        if metrics.is_none() {
+                            metrics.replace(self.metrics.write().unwrap());
                         }
-                        existing.add(&item);
-                        metrics.insert(MetricEntry(existing));
-                    } else {
-                        metrics.insert(new);
-                    };
-                }
-                MetricKind::Absolute => {
-                    let new = MetricEntry(item);
-                    metrics.replace(new);
+                        let metrics = metrics.as_mut().unwrap();
+
+                        let item = event.into_metric();
+                        match item.kind {
+                            MetricKind::Incremental => {
+                                let new = MetricEntry(item.to_absolute());
+                                if let Some(MetricEntry(mut existing)) = metrics.take(&new) {
+                                    if item.value.is_set() {
+                                        // sets need to be expired from time to time
+                                        // because otherwise they could grow infinitelly
+                                        if reset_existing.is_none() {
+                                            let now = Utc::now().timestamp();
+                                            let interval =
+                                                now - *self.last_flush_timestamp.read().unwrap();
+                                            if interval > self.config.flush_period_secs as i64 {
+                                                *self.last_flush_timestamp.write().unwrap() = now;
+                                                reset_existing = Some(true);
+                                            } else {
+                                                reset_existing = Some(false);
+                                            }
+                                        }
+                                        if reset_existing == Some(true) {
+                                            existing.reset();
+                                        }
+                                    }
+                                    existing.add(&item);
+                                    metrics.insert(MetricEntry(existing));
+                                } else {
+                                    metrics.insert(new);
+                                };
+                            }
+                            MetricKind::Absolute => {
+                                let new = MetricEntry(item);
+                                metrics.replace(new);
+                            }
+                        };
+                    }
+                    Poll::Ready(None) => break Poll::Ready(Ok(())),
+                    Poll::Pending => break Poll::Pending,
                 }
             };
 
-            self.acker.ack(1);
-        }
-        Ok(())
+            self.acker.ack(received);
+            result
+        })
+        .await
     }
 }
 
