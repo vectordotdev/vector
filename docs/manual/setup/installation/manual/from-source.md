@@ -383,7 +383,7 @@ features one has to pass a comma-separated list of component features.
 | :--------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
 | `sources-apache_metrics`                             | Enables building of [`apache_metrics` source][docs.sources.apache_metrics].                                                                |
 | `sources-aws_kinesis_firehose`                       | Enables building of [`aws_kinesis_firehose` source][docs.sources.aws_kinesis_firehose].                                                    |
-| `sources-docker`                                     | Enables building of [`docker` source][docs.sources.docker]. Requires `unix` feature to be also enabled for support of Unix domain sockets. |
+| `sources-docker_logs`                                     | Enables building of [`docker` source][docs.sources.docker]. Requires `unix` feature to be also enabled for support of Unix domain sockets. |
 | `sources-file`                                       | Enables building of [`file` source][docs.sources.file].                                                                                    |
 | `sources-generator`                                  | Enables building of [`generator` source][docs.sources.generator].                                                                          |
 | `sources-host_metrics`                               | Enables building of [`host_metrics` source][docs.sources.host_metrics].                                                                    |

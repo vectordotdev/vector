@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use indexmap::map::IndexMap;
 use std::convert::TryFrom;
 use std::{fs, io::Read, path::Path};
@@ -44,12 +44,10 @@ fn lookup_to_string(c: &mut Criterion) {
             &fixture.clone(),
             move |b, ref param| {
                 let input = &(*param).clone();
-                b.iter_with_setup(
+                b.iter_batched(
                     || input.clone(),
-                    |input| {
-                        let lookup = Lookup::try_from(input).unwrap();
-                        black_box(lookup)
-                    },
+                    |input| Lookup::try_from(input).unwrap(),
+                    BatchSize::SmallInput,
                 )
             },
         );
@@ -64,12 +62,10 @@ fn lookup_to_string(c: &mut Criterion) {
             &fixture.clone(),
             move |b, ref param| {
                 let input = &(*param).clone();
-                b.iter_with_setup(
+                b.iter_batched(
                     || Lookup::try_from(input.clone()).unwrap(),
-                    |input| {
-                        let string = input.to_string();
-                        black_box(string)
-                    },
+                    |input| input.to_string(),
+                    BatchSize::SmallInput,
                 )
             },
         );
@@ -84,12 +80,10 @@ fn lookup_to_string(c: &mut Criterion) {
             &fixture.clone(),
             move |b, ref param| {
                 let input = &(*param).clone();
-                b.iter_with_setup(
+                b.iter_batched(
                     || Lookup::try_from(input.clone()).unwrap(),
-                    |input| {
-                        let string = serde_json::to_string(&input);
-                        black_box(string)
-                    },
+                    |input| serde_json::to_string(&input),
+                    BatchSize::SmallInput,
                 )
             },
         );
@@ -104,12 +98,10 @@ fn lookup_to_string(c: &mut Criterion) {
             &fixture.clone(),
             move |b, ref param| {
                 let input = &(*param).clone();
-                b.iter_with_setup(
+                b.iter_batched(
                     || serde_json::to_string(&Lookup::try_from(input.clone()).unwrap()).unwrap(),
-                    |input| {
-                        let lookup: Lookup = serde_json::from_str(&input).unwrap();
-                        black_box(lookup)
-                    },
+                    |input| serde_json::from_str::<Lookup>(&input).unwrap(),
+                    BatchSize::SmallInput,
                 )
             },
         );

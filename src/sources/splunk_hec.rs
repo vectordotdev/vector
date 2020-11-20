@@ -114,7 +114,7 @@ impl SourceConfig for SplunkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
-        let fut = async move {
+        Ok(Box::pin(async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
@@ -124,8 +124,7 @@ impl SourceConfig for SplunkConfig {
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
             drop(shutdown);
             Ok(())
-        };
-        Ok(Box::new(fut.boxed().compat()))
+        }))
     }
 
     fn output_type(&self) -> DataType {
@@ -171,23 +170,7 @@ impl SplunkSource {
                       host: Option<String>,
                       gzip: bool,
                       body: Bytes| {
-                    let out = out.clone();
-                    async move {
-                        // Construct event parser
-                        if gzip {
-                            EventStream::new(GzDecoder::new(body.reader()), channel, host)
-                                .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
-                                .map(|_| ())
-                                .compat()
-                                .await
-                        } else {
-                            EventStream::new(body.reader(), channel, host)
-                                .forward(out.clone().sink_map_err(|_| ApiError::ServerShutdown))
-                                .map(|_| ())
-                                .compat()
-                                .await
-                        }
-                    }
+                    process_service_request(out.clone(), channel, host, gzip, body)
                 },
             )
             .map(finish_ok)
@@ -317,6 +300,38 @@ impl SplunkSource {
             })
             .boxed()
     }
+}
+
+async fn process_service_request(
+    out: Pipeline,
+    channel: Option<String>,
+    host: Option<String>,
+    gzip: bool,
+    body: Bytes,
+) -> Result<(), Rejection> {
+    use futures::compat::Sink01CompatExt;
+    use futures::compat::Stream01CompatExt;
+    use futures::{SinkExt, StreamExt};
+
+    let mut out = out
+        .sink_map_err(|_| Rejection::from(ApiError::ServerShutdown))
+        .sink_compat();
+
+    let reader: Box<dyn Read + Send> = if gzip {
+        Box::new(GzDecoder::new(body.reader()))
+    } else {
+        Box::new(body.reader())
+    };
+
+    let stream = EventStream::new(reader, channel, host).compat();
+
+    let res = stream.forward(&mut out).await;
+
+    out.flush()
+        .map_err(|_| Rejection::from(ApiError::ServerShutdown))
+        .await?;
+
+    res.map(|_| ())
 }
 
 /// Constructs one ore more events from json-s coming from reader.
@@ -764,7 +779,7 @@ mod tests {
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
-    use futures::{compat::Future01CompatExt, future, stream, StreamExt};
+    use futures::{future, stream, StreamExt};
     use futures01::sync::mpsc;
     use std::net::SocketAddr;
 
@@ -797,7 +812,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap()
         });

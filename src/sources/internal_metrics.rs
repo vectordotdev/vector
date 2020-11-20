@@ -5,11 +5,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{
-    compat::Future01CompatExt,
-    future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
-};
+use futures::{compat::Future01CompatExt, stream::StreamExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -50,10 +46,12 @@ impl SourceConfig for InternalMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let fut = run(get_controller()?, self.scrape_interval_secs, out, shutdown)
-            .boxed()
-            .compat();
-        Ok(Box::new(fut))
+        Ok(Box::pin(run(
+            get_controller()?,
+            self.scrape_interval_secs,
+            out,
+            shutdown,
+        )))
     }
 
     fn output_type(&self) -> DataType {

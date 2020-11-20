@@ -1,11 +1,4 @@
-use super::Error as E;
 use crate::{state, Expression, Object, Result, TypeDef, Value};
-
-#[derive(thiserror::Error, Clone, Debug, PartialEq)]
-pub enum Error {
-    #[error("undefined variable: {0}")]
-    Undefined(String),
-}
 
 #[derive(Debug, Clone)]
 pub struct Variable {
@@ -20,15 +13,17 @@ impl Variable {
     pub fn boxed(self) -> Box<Self> {
         Box::new(self)
     }
+
+    pub fn ident(&self) -> &str {
+        &self.ident
+    }
 }
 
 impl Expression for Variable {
-    fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Option<Value>> {
-        state
-            .variable(&self.ident)
-            .cloned()
-            .ok_or_else(|| E::from(Error::Undefined(self.ident.to_owned())).into())
-            .map(Some)
+    fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+        let value = state.variable(&self.ident).cloned().unwrap_or(Value::Null);
+
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -47,7 +42,7 @@ impl Expression for Variable {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{test_type_def, value::Kind};
 
     test_type_def![
         ident_match {
@@ -63,7 +58,7 @@ mod tests {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
                     optional: false,
-                    constraint: Exact(String)
+                    kind: Kind::Bytes
                 });
 
                 Variable::new("foo".to_owned())
@@ -71,7 +66,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                constraint: Exact(String),
+                kind: Kind::Bytes,
             },
         }
 

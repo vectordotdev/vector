@@ -104,16 +104,16 @@ impl Parser<'_> {
     /// on the parser rule being processed.
     fn target_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
         match pair.as_rule() {
-            R::variable => Ok(Target::Variable(
+            R::variable => Ok(Target::Variable(Variable::new(
                 pair.into_inner()
                     .next()
                     .ok_or(e(R::variable))?
                     .as_str()
                     .to_owned(),
-            )),
-            R::path => Ok(Target::Path(
+            ))),
+            R::path => Ok(Target::Path(Path::new(
                 self.path_segments_from_pairs(pair.into_inner())?,
-            )),
+            ))),
             _ => Err(e(R::target)),
         }
     }
@@ -258,10 +258,8 @@ impl Parser<'_> {
                 R::ident => ident = Some(pair.as_str().to_owned()),
                 R::regex => return Ok((ident, Argument::Regex(self.regex_from_pair(pair)?))),
                 _ => {
-                    return Ok((
-                        ident,
-                        Argument::Expression(Box::new(self.expression_from_pair(pair)?)),
-                    ))
+                    let expr = self.expression_from_pair(pair)?;
+                    return Ok((ident, Argument::Expression(expr)));
                 }
             }
         }

@@ -44,12 +44,12 @@ impl Function for ParseDuration {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "output",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
         ]
@@ -79,23 +79,17 @@ impl ParseDurationFn {
 }
 
 impl Expression for ParseDurationFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
-        let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
-        };
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
 
         let conversion_factor = {
-            let bytes = required!(state, object, self.output, Value::String(v) => v);
-            let output = String::from_utf8_lossy(&bytes).into_owned();
+            let bytes = self.output.execute(state, object)?.try_bytes()?;
+            let string = String::from_utf8_lossy(&bytes);
 
             UNITS
-                .get(&output)
-                .ok_or(format!("unknown output format: '{}'", output))?
+                .get(string.as_ref())
+                .ok_or(format!("unknown output format: '{}'", string))?
         };
 
         let captures = RE
@@ -114,18 +108,18 @@ impl Expression for ParseDurationFn {
             .to_f64()
             .ok_or(format!("unable to format duration: '{}'", number))?;
 
-        Ok(Some(number.into()))
+        Ok(number.into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         let output_def = self
             .output
             .type_def(state)
-            .fallible_unless(value::Kind::String);
+            .fallible_unless(value::Kind::Bytes);
 
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .merge(output_def)
             .into_fallible(true) // parsing errors
             .with_constraint(value::Kind::Float)
@@ -143,7 +137,7 @@ mod tests {
                 value: Literal::from("foo").boxed(),
                 output: Literal::from("foo").boxed(),
             },
-            def: TypeDef { fallible: true, constraint: value::Kind::Float.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Float, ..Default::default() },
         }
 
         optional_expression {
@@ -151,7 +145,7 @@ mod tests {
                 value: Box::new(Noop),
                 output: Literal::from("foo").boxed(),
             },
-            def: TypeDef { fallible: true, optional: true, constraint: value::Kind::Float.into() },
+            def: TypeDef { fallible: true, optional: true, kind: value::Kind::Float },
         }
     ];
 
@@ -160,43 +154,38 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Ok(Some(0.5.into())),
+                Ok(0.5.into()),
                 ParseDurationFn::new(Box::new(Literal::from("30s")), "m"),
             ),
             (
                 map![],
-                Ok(Some(1.2.into())),
+                Ok(1.2.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1200ms")), "s"),
             ),
             (
                 map![],
-                Ok(Some(100.0.into())),
+                Ok(100.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("100ms")), "ms"),
             ),
             (
                 map![],
-                Ok(Some(1.005.into())),
+                Ok(1.005.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1005ms")), "s"),
             ),
             (
                 map![],
-                Ok(Some(0.0001.into())),
+                Ok(0.0001.into()),
                 ParseDurationFn::new(Box::new(Literal::from("100ns")), "ms"),
             ),
             (
                 map![],
-                Ok(Some(86400.0.into())),
+                Ok(86400.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1d")), "s"),
             ),
             (
                 map![],
-                Ok(Some(1000000000.0.into())),
+                Ok(1000000000.0.into()),
                 ParseDurationFn::new(Box::new(Literal::from("1 s")), "ns"),
-            ),
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                ParseDurationFn::new(Box::new(Path::from("foo")), "s"),
             ),
             (
                 map![],

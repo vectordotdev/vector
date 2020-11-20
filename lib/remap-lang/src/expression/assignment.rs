@@ -1,5 +1,8 @@
 use super::Error as E;
-use crate::{state, Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{
+    expression::{Path, Variable},
+    state, Expr, Expression, Object, Result, TypeDef, Value,
+};
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
@@ -9,8 +12,8 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub enum Target {
-    Path(Vec<Vec<String>>),
-    Variable(String),
+    Path(Path),
+    Variable(Variable),
 }
 
 #[derive(Debug, Clone)]
@@ -24,11 +27,12 @@ impl Assignment {
         let type_def = value.type_def(state);
 
         match &target {
-            Target::Variable(ident) => state.variable_types_mut().insert(ident.clone(), type_def),
-            Target::Path(segments) => {
-                let path = crate::expression::path::segments_to_path(segments);
-                state.path_query_types_mut().insert(path, type_def)
-            }
+            Target::Variable(variable) => state
+                .variable_types_mut()
+                .insert(variable.ident().to_owned(), type_def),
+            Target::Path(path) => state
+                .path_query_types_mut()
+                .insert(path.as_string(), type_def),
         };
 
         Self { target, value }
@@ -36,43 +40,33 @@ impl Assignment {
 }
 
 impl Expression for Assignment {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = self.value.execute(state, object)?;
 
-        match value {
-            None => Ok(None),
-            Some(value) => {
-                match &self.target {
-                    Target::Variable(ident) => {
-                        state.variables_mut().insert(ident.clone(), value.clone());
-                    }
-                    Target::Path(path) => object
-                        .insert(&path, value.clone())
-                        .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
-                }
-
-                Ok(Some(value))
+        match &self.target {
+            Target::Variable(variable) => {
+                state
+                    .variables_mut()
+                    .insert(variable.ident().to_owned(), value.clone());
             }
+            Target::Path(path) => object
+                .insert(path.segments(), value.clone())
+                .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
         }
+
+        Ok(value)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         match &self.target {
-            Target::Variable(ident) => state
-                .variable_type(ident.clone())
+            Target::Variable(variable) => state
+                .variable_type(variable.ident().to_owned())
                 .cloned()
                 .expect("variable must be assigned via Assignment::new"),
-            Target::Path(segments) => {
-                let path = crate::expression::path::segments_to_path(segments);
-                state
-                    .path_query_type(&path)
-                    .cloned()
-                    .expect("variable must be assigned via Assignment::new")
-            }
+            Target::Path(path) => state
+                .path_query_type(&path.as_string())
+                .cloned()
+                .expect("path must be assigned via Assignment::new"),
         }
     }
 }
@@ -80,31 +74,31 @@ impl Expression for Assignment {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{expression::Literal, test_type_def, value::Constraint::*, value::Kind::*};
+    use crate::{expression::Literal, test_type_def, value::Kind};
 
     test_type_def![
         variable {
             expr: |state: &mut state::Compiler| {
-                let target = Target::Variable("foo".to_owned());
+                let target = Target::Variable(Variable::new("foo".to_owned()));
                 let value = Box::new(Literal::from(true).into());
 
                 Assignment::new(target, value, state)
             },
             def: TypeDef {
-                constraint: Exact(Boolean),
+                kind: Kind::Boolean,
                 ..Default::default()
             },
         }
 
         path {
             expr: |state: &mut state::Compiler| {
-                let target = Target::Path(vec![vec!["foo".to_owned()]]);
+                let target = Target::Path(Path::from("foo"));
                 let value = Box::new(Literal::from("foo").into());
 
                 Assignment::new(target, value, state)
             },
             def: TypeDef {
-                constraint: Exact(String),
+                kind: Kind::Bytes,
                 ..Default::default()
             },
         }

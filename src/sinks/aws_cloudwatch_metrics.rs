@@ -242,15 +242,8 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            RusotoError::HttpDispatch(_) => true,
             RusotoError::Service(PutMetricDataError::InternalServiceFault(_)) => true,
-            RusotoError::Unknown(res)
-                if res.status.is_server_error()
-                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-            {
-                true
-            }
-            _ => false,
+            error => rusoto::is_retriable_error(error),
         }
     }
 }

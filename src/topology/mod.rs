@@ -236,7 +236,10 @@ impl RunningTopology {
                     .chain(add_source)
                     .map(|(key, value)| ((false, key), value)),
             ),
-        );
+        )
+        .into_iter()
+        .flat_map(|(_, components)| components)
+        .collect::<HashSet<_>>();
         let wait_for_sinks = conflicts
             .into_iter()
             .filter(|&(existing_sink, _)| existing_sink)
@@ -1023,7 +1026,7 @@ mod transient_state_tests {
         transforms::json_parser::JsonParserConfig,
         Error, Pipeline,
     };
-    use futures::{future, FutureExt, TryFutureExt};
+    use futures::{future, FutureExt};
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
 
@@ -1055,19 +1058,18 @@ mod transient_state_tests {
             shutdown: ShutdownSignal,
             out: Pipeline,
         ) -> Result<Source, Error> {
-            let source = future::select(
-                shutdown.map(|_| ()).boxed(),
-                self.tripwire
-                    .clone()
-                    .unwrap()
-                    .then(crate::stream::tripwire_handler)
-                    .boxed(),
-            )
-            .map(|_| std::mem::drop(out))
-            .unit_error()
-            .boxed()
-            .compat();
-            Ok(Box::new(source))
+            Ok(Box::pin(
+                future::select(
+                    shutdown.map(|_| ()).boxed(),
+                    self.tripwire
+                        .clone()
+                        .unwrap()
+                        .then(crate::stream::tripwire_handler)
+                        .boxed(),
+                )
+                .map(|_| std::mem::drop(out))
+                .unit_error(),
+            ))
         }
 
         fn output_type(&self) -> DataType {

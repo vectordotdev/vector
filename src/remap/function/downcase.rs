@@ -12,7 +12,7 @@ impl Function for Downcase {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -37,26 +37,19 @@ impl DowncaseFn {
 }
 
 impl Expression for DowncaseFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.value
-            .execute(state, object)?
-            .map(String::try_from)
-            .transpose()?
+            .execute(state, object)
+            .and_then(|v| String::try_from(v).map_err(Into::into))
             .map(|v| v.to_lowercase())
             .map(Into::into)
-            .map(Ok)
-            .transpose()
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
-            .with_constraint(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -67,18 +60,11 @@ mod tests {
 
     #[test]
     fn downcase() {
-        let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                DowncaseFn::new(Box::new(Path::from("foo"))),
-            ),
-            (
-                map!["foo": "FOO 2 bar"],
-                Ok(Some(Value::from("foo 2 bar"))),
-                DowncaseFn::new(Box::new(Path::from("foo"))),
-            ),
-        ];
+        let cases = vec![(
+            map!["foo": "FOO 2 bar"],
+            Ok(Value::from("foo 2 bar")),
+            DowncaseFn::new(Box::new(Path::from("foo"))),
+        )];
 
         let mut state = state::Program::default();
 
@@ -94,12 +80,12 @@ mod tests {
     remap::test_type_def![
         string {
             expr: |_| DowncaseFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { kind: value::Kind::Bytes, ..Default::default() },
         }
 
         non_string {
             expr: |_| DowncaseFn { value: Literal::from(true).boxed() },
-            def: TypeDef { fallible: true, constraint: value::Kind::String.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
     ];
 }

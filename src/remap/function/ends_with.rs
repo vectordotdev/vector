@@ -12,12 +12,12 @@ impl Function for EndsWith {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -63,35 +63,40 @@ impl EndsWithFn {
 }
 
 impl Expression for EndsWithFn {
-    fn execute(
-        &self,
-        state: &mut state::Program,
-        object: &mut dyn Object,
-    ) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let case_sensitive = match &self.case_sensitive {
+            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            None => false,
+        };
+
         let substring = {
-            let bytes = required!(state, object, self.substring, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+            let bytes = self.substring.execute(state, object)?.try_bytes()?;
+            let string = String::from_utf8_lossy(&bytes);
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
         };
 
         let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+            let bytes = self.value.execute(state, object)?.try_bytes()?;
+            let string = String::from_utf8_lossy(&bytes);
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
         };
 
-        let ends_with = value.ends_with(&substring)
-            || optional!(state, object, self.case_sensitive, Value::Boolean(b) => b)
-                .iter()
-                .filter(|&case_sensitive| !case_sensitive)
-                .any(|_| value.to_lowercase().ends_with(&substring.to_lowercase()));
-
-        Ok(Some(ends_with.into()))
+        Ok(value.ends_with(&substring).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         let substring_def = self
             .substring
             .type_def(state)
-            .fallible_unless(value::Kind::String);
+            .fallible_unless(value::Kind::Bytes);
 
         let case_sensitive_def = self
             .case_sensitive
@@ -100,7 +105,7 @@ impl Expression for EndsWithFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .merge(substring_def)
             .merge_optional(case_sensitive_def)
             .with_constraint(value::Kind::Boolean)
@@ -111,7 +116,7 @@ impl Expression for EndsWithFn {
 mod tests {
     use super::*;
     use crate::map;
-    use value::Kind::*;
+    use value::Kind;
 
     remap::test_type_def![
         value_string {
@@ -120,7 +125,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
         }
 
         value_non_string {
@@ -129,7 +134,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         substring_non_string {
@@ -138,7 +143,7 @@ mod tests {
                 substring: Literal::from(true).boxed(),
                 case_sensitive: None,
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
 
         case_sensitive_non_boolean {
@@ -147,7 +152,7 @@ mod tests {
                 substring: Literal::from("foo").boxed(),
                 case_sensitive: Some(Literal::from(1).boxed()),
             },
-            def: TypeDef { fallible: true, constraint: Boolean.into(), ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
         }
     ];
 
@@ -156,52 +161,47 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                EndsWithFn::new(Box::new(Path::from("foo")), "", false),
-            ),
-            (
-                map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "foobar", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("bar")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "oba", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "bar", false),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "foo", false),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("fooBAR")), "BAR", true),
             ),
             (
                 map![],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", true),
             ),
             (
                 map![],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 EndsWithFn::new(Box::new(Literal::from("foobar")), "BAR", false),
             ),
         ];
