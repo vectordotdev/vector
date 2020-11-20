@@ -8,7 +8,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt};
 use futures01::Sink;
 use std::path::PathBuf;
 use tokio::net::{UnixListener, UnixStream};
@@ -35,7 +35,7 @@ where
 {
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
-    let fut = async move {
+    Box::pin(async move {
         let mut listener =
             UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
@@ -100,7 +100,5 @@ where
         }
 
         Ok(())
-    };
-
-    Box::new(fut.boxed().compat())
+    })
 }

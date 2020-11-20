@@ -15,7 +15,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{compat::Sink01CompatExt, FutureExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, StreamExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::io;
@@ -275,49 +275,45 @@ pub fn udp(
 ) -> super::Source {
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
-    Box::new(
-        async move {
-            let socket = UdpSocket::bind(&addr)
-                .await
-                .expect("Failed to bind to UDP listener socket");
-            info!(
-                message = "Listening.",
-                addr = %addr,
-                r#type = "udp"
-            );
+    Box::pin(async move {
+        let socket = UdpSocket::bind(&addr)
+            .await
+            .expect("Failed to bind to UDP listener socket");
+        info!(
+            message = "Listening.",
+            addr = %addr,
+            r#type = "udp"
+        );
 
-            let _ = UdpFramed::new(socket, BytesCodec::new())
-                .take_until(shutdown)
-                .filter_map(|frame| {
-                    let host_key = host_key.clone();
-                    async move {
-                        match frame {
-                            Ok((bytes, received_from)) => {
-                                let received_from = received_from.ip().to_string().into();
+        let _ = UdpFramed::new(socket, BytesCodec::new())
+            .take_until(shutdown)
+            .filter_map(|frame| {
+                let host_key = host_key.clone();
+                async move {
+                    match frame {
+                        Ok((bytes, received_from)) => {
+                            let received_from = received_from.ip().to_string().into();
 
-                                std::str::from_utf8(&bytes)
-                                    .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
-                                    .ok()
-                                    .and_then(|s| {
-                                        event_from_str(&host_key, Some(received_from), s).map(Ok)
-                                    })
-                            }
-                            Err(error) => {
-                                emit!(SyslogUdpReadError { error });
-                                None
-                            }
+                            std::str::from_utf8(&bytes)
+                                .map_err(|error| emit!(SyslogUdpUtf8Error { error }))
+                                .ok()
+                                .and_then(|s| {
+                                    event_from_str(&host_key, Some(received_from), s).map(Ok)
+                                })
+                        }
+                        Err(error) => {
+                            emit!(SyslogUdpReadError { error });
+                            None
                         }
                     }
-                })
-                .forward(out.sink_compat())
-                .await;
+                }
+            })
+            .forward(out.sink_compat())
+            .await;
 
-            info!("Finished sending.");
-            Ok(())
-        }
-        .boxed()
-        .compat(),
-    )
+        info!("Finished sending.");
+        Ok(())
+    })
 }
 
 /// Function used to resolve the year for syslog messages that don't include the year.

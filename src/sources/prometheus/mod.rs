@@ -78,7 +78,7 @@ impl SourceConfig for PrometheusConfig {
         ))
     }
 
-    fn output_type(&self) -> crate::config::DataType {
+    fn output_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 
@@ -98,7 +98,8 @@ fn prometheus(
     let out = out
         .sink_map_err(|error| error!(message = "Error sending metric.", %error))
         .sink_compat();
-    let task = tokio::time::interval(Duration::from_secs(interval))
+
+    Box::pin(tokio::time::interval(Duration::from_secs(interval))
         .take_until(shutdown)
         .map(move |_| stream::iter(urls.clone()))
         .flatten()
@@ -185,9 +186,7 @@ fn prometheus(
         })
         .flatten()
         .forward(out)
-        .inspect(|_| info!("Finished sending."));
-
-    Box::new(task.boxed().compat())
+        .inspect(|_| info!("Finished sending.")))
 }
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
@@ -336,7 +335,6 @@ mod integration_tests {
         event::{MetricKind, MetricValue},
         shutdown, test_util, Pipeline,
     };
-    use futures::compat::Future01CompatExt as _;
     use tokio::time::Duration;
 
     #[tokio::test]
@@ -359,7 +357,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        tokio::spawn(source.compat());
+        tokio::spawn(source);
         tokio::time::delay_for(Duration::from_secs(1)).await;
 
         let events = test_util::collect_ready(rx).await.unwrap();
