@@ -77,7 +77,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 
         let listenfd = ListenFd::from_env();
 
-        let fut = async move {
+        Ok(Box::pin(async move {
             let listener = match make_listener(addr, listenfd, &tls).await {
                 None => return Err(()),
                 Some(listener) => listener,
@@ -151,9 +151,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                 })
                 .map(Ok)
                 .await
-        };
-
-        Ok(Box::new(fut.boxed().compat()))
+        }))
     }
 }
 

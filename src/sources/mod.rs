@@ -1,4 +1,4 @@
-use futures01::Future;
+use futures::future::BoxFuture;
 use snafu::Snafu;
 
 #[cfg(feature = "sources-apache_metrics")]
@@ -48,7 +48,7 @@ pub mod vector;
 
 mod util;
 
-pub type Source = Box<dyn Future<Item = (), Error = ()> + Send>;
+pub type Source = BoxFuture<'static, Result<(), ()>>;
 
 /// Common build errors
 #[derive(Debug, Snafu)]

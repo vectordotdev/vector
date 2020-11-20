@@ -6,9 +6,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{
-    compat::Sink01CompatExt, executor, FutureExt, SinkExt, StreamExt, TryFutureExt, TryStreamExt,
-};
+use futures::{compat::Sink01CompatExt, executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
@@ -95,7 +93,7 @@ where
         }
     });
 
-    let fut = async move {
+    Ok(Box::pin(async move {
         let mut out = out
             .sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
             .sink_compat();
@@ -116,9 +114,7 @@ where
         let _ = out.flush().await; // error emitted by sink_map_err
 
         res
-    };
-
-    Ok(Box::new(fut.boxed().compat()))
+    }))
 }
 
 fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
@@ -140,7 +136,6 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 mod tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
 
@@ -173,7 +168,6 @@ mod tests {
 
         stdin_source(buf, config, ShutdownSignal::noop(), tx)
             .unwrap()
-            .compat()
             .await
             .unwrap();
 

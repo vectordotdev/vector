@@ -7,7 +7,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{compat::Future01CompatExt, FutureExt, StreamExt, TryFutureExt};
+use futures::{compat::Future01CompatExt, StreamExt};
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
@@ -104,20 +104,16 @@ impl SourceConfig for AwsEcsMetricsSourceConfig {
     ) -> crate::Result<super::Source> {
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
-        Ok(Box::new(
-            aws_ecs_metrics(
-                self.stats_endpoint(),
-                self.scrape_interval_secs,
-                namespace,
-                out,
-                shutdown,
-            )
-            .boxed()
-            .compat(),
-        ))
+        Ok(Box::pin(aws_ecs_metrics(
+            self.stats_endpoint(),
+            self.scrape_interval_secs,
+            namespace,
+            out,
+            shutdown,
+        )))
     }
 
-    fn output_type(&self) -> crate::config::DataType {
+    fn output_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 
@@ -545,8 +541,7 @@ mod test {
             tx,
         )
         .await
-        .unwrap()
-        .compat();
+        .unwrap();
         tokio::spawn(source);
 
         delay_for(Duration::from_secs(1)).await;
@@ -604,8 +599,7 @@ mod integration_tests {
             tx,
         )
         .await
-        .unwrap()
-        .compat();
+        .unwrap();
         tokio::spawn(source);
 
         delay_for(Duration::from_secs(5)).await;

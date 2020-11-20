@@ -198,7 +198,7 @@ mod integration_tests {
         test_util, Pipeline,
     };
     use chrono::Utc;
-    use futures::{compat::Future01CompatExt as _, stream};
+    use futures::stream;
 
     #[tokio::test]
     async fn receives_metrics_over_http() {
@@ -229,7 +229,7 @@ mod integration_tests {
             )
             .await
             .unwrap();
-        tokio::spawn(source.compat());
+        tokio::spawn(source);
 
         let sink = RemoteWriteConfig {
             endpoint: format!("{}://localhost:{}/", proto, address.port()),
