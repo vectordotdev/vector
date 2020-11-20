@@ -267,9 +267,9 @@ mod test {
             session_timeout_ms: 10000,
             commit_interval_ms: 5000,
             key_field: Some("message_key".to_string()),
-            topic_key: Some("topic_key".to_string()),
-            partition_key: Some("partition_key".to_string()),
-            offset_key: Some("offset_key".to_string()),
+            topic_key: Some("topic".to_string()),
+            partition_key: Some("partition".to_string()),
+            offset_key: Some("offset".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -301,7 +301,7 @@ mod integration_test {
         test_util::{collect_n, random_string},
         Pipeline,
     };
-    use chrono::Utc;
+    use chrono::{SubsecRound, Utc};
     use futures::compat::Future01CompatExt;
     use rdkafka::{
         config::ClientConfig,
@@ -309,7 +309,7 @@ mod integration_test {
         util::Timeout,
     };
 
-    const BOOTSTRAP_SERVER: &str = "localhost:9092";
+    const BOOTSTRAP_SERVER: &str = "localhost:9091";
 
     async fn send_event(topic: String, key: &str, text: &str, timestamp: i64) {
         let producer: FutureProducer = ClientConfig::new()
@@ -329,7 +329,6 @@ mod integration_test {
         }
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kafka_source_consume_event() {
         let topic = format!("test-topic-{}", random_string(10));
@@ -345,6 +344,9 @@ mod integration_test {
             session_timeout_ms: 6000,
             commit_interval_ms: 5000,
             key_field: Some("message_key".to_string()),
+            topic_key: Some("topic".to_string()),
+            partition_key: Some("partition".to_string()),
+            offset_key: Some("offset".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -377,6 +379,9 @@ mod integration_test {
             events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
+        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.trunc_subsecs(3).into());
+        assert_eq!(events[0].as_log()["topic"], topic.into());
+        assert!(events[0].as_log().contains("partition"));
+        assert!(events[0].as_log().contains("offset"));
     }
 }
