@@ -3,10 +3,9 @@
 
 # Begin OS detection
 ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
-    export OPERATING_SYSTEM := Windows
     export DEFAULT_FEATURES = default-msvc
 else
-  export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
+  OPERATING_SYSTEM := $(shell uname -s)
   ifeq ($(OPERATING_SYSTEM),Darwin)
     export DEFAULT_FEATURES = default-macos
   else
