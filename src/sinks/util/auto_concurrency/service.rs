@@ -315,7 +315,7 @@ mod tests {
                 // but that runs afoul of the borrow checker since `svc`
                 // must be borrowed mutable with a non-static
                 // lifetime. Resolving it is more work than it's worth
-                // for this test, so the clippy lint allow remains above.
+                // for this test.
                 for (i, req) in reqs.iter_mut().take(concurrent).enumerate() {
                     *req = Some(svc.send(i < concurrent - 1).await);
                 }
