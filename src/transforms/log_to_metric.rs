@@ -217,7 +217,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 1.0
             };
 
-            let name = counter.name.as_ref().unwrap_or(&counter.field.to_string());
+            let name = counter.name.clone().unwrap_or_else(|| counter.field.to_string());
             let name = render_template(&name, &event)?;
 
             let namespace = counter.namespace.as_ref();
@@ -321,7 +321,7 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 })?;
             let value = value.to_string_lossy();
 
-            let name = set.name.as_ref().unwrap_or(&set.field.to_string());
+            let name = set.name.clone().unwrap_or_else(|| set.field.to_string());
             let name = render_template(&name, &event)?;
 
             let namespace = set.namespace.as_ref();
@@ -354,11 +354,11 @@ impl FunctionTransform for LogToMetric {
                     output.push(Event::Metric(metric));
                 }
                 Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
-                    field: field.as_lookup()
+                    field: &field
                 }),
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError {
-                        field: field.as_lookup(),
+                        field: &field,
                         error
                     })
                 }

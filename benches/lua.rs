@@ -4,7 +4,7 @@ use futures::{compat::Stream01CompatExt, StreamExt};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig, TransformContext},
+    config::{TransformConfig},
     event::LookupBuf,
     test_util::runtime,
     transforms::{
@@ -102,7 +102,7 @@ fn field_filter(c: &mut Criterion) {
                 || {
                     rt.block_on(async move {
                         transforms::field_filter::FieldFilterConfig {
-                            field: "the_field".to_string(),
+                            field: LookupBuf::from("the_field"),
                             value: "0".to_string(),
                         }
                         .build()
@@ -113,7 +113,7 @@ fn field_filter(c: &mut Criterion) {
                 |transform| {
                     let inputs = (0..num_events).map(|i| {
                         let mut event = Event::new_empty_log();
-                        event.as_mut_log().insert("the_field", (i % 10).to_string());
+                        event.as_mut_log().insert(LookupBuf::from("the_field"), (i % 10).to_string());
                         event
                     });
                     let in_stream = futures01::stream::iter_ok(inputs);

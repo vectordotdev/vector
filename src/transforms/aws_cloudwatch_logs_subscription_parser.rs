@@ -71,7 +71,7 @@ impl From<AwsCloudwatchLogsSubscriptionParserConfig> for AwsCloudwatchLogsSubscr
         AwsCloudwatchLogsSubscriptionParser {
             field: config
                 .field
-                .unwrap_or_else(|| log_schema().message_key().into_buf()),
+                .unwrap_or_else(|| log_schema().message_key().clone()),
         }
     }
 }
@@ -119,8 +119,8 @@ fn subscription_event_to_events<'a>(
                 let mut event = event.clone();
                 let log = event.as_mut_log();
 
-                log.insert(log_schema().message_key().into_buf(), log_event.message);
-                log.insert(log_schema().timestamp_key().into_buf(), log_event.timestamp);
+                log.insert(log_schema().message_key().clone(), log_event.message);
+                log.insert(log_schema().timestamp_key().clone(), log_event.timestamp);
                 log.insert(ID_LOOKUP.clone(), log_event.id);
                 log.insert(LOG_GROUP_LOOKUP.clone(), log_group.clone());
                 log.insert(LOG_STREAM_LOOKUP.clone(), log_stream.clone());

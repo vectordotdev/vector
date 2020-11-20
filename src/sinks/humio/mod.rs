@@ -23,5 +23,5 @@ impl From<Encoding> for splunk_hec::Encoding {
 }
 
 fn default_host_key() -> LookupBuf {
-    crate::config::LogSchema::default().host_key().into_buf()
+    crate::config::LogSchema::default().host_key().clone()
 }

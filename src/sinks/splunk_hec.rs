@@ -77,7 +77,7 @@ pub enum Encoding {
 }
 
 fn default_host_key() -> LookupBuf {
-    crate::config::LogSchema::default().host_key().into_buf()
+    crate::config::LogSchema::default().host_key().clone()
 }
 
 inventory::submit! {

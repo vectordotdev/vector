@@ -43,7 +43,7 @@ impl TransformConfig for KeyValueConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| log_schema().message_key().into_buf());
+            .unwrap_or_else(|| log_schema().message_key().clone());
 
         let separator = self.separator.clone().unwrap_or_else(|| " ".to_string());
         let trim_key = self.trim_key.as_ref().map(|key| key.chars().collect());
@@ -145,7 +145,7 @@ impl FunctionTransform for KeyValue {
                         log.remove(target_field, false);
                     } else {
                         emit!(KeyValueTargetExists {
-                            target_field: target_field.as_lookup()
+                            target_field: &target_field
                         });
                         return output.push(event);
                     }
@@ -167,7 +167,7 @@ impl FunctionTransform for KeyValue {
                         }
                         Err(error) => {
                             emit!(KeyValueParseFailed {
-                                key: key_lookup_buf.as_lookup(),
+                                key: &key_lookup_buf,
                                 error
                             });
                         }
@@ -182,7 +182,7 @@ impl FunctionTransform for KeyValue {
             }
         } else {
             emit!(KeyValueFieldDoesNotExist {
-                field: self.field.as_lookup()
+                field: &self.field
             });
         };
 

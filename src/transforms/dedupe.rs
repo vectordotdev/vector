@@ -45,9 +45,9 @@ impl DedupeConfig {
             Some(FieldMatchConfig::MatchFields(x)) => FieldMatchConfig::MatchFields(x.clone()),
             Some(FieldMatchConfig::IgnoreFields(y)) => FieldMatchConfig::IgnoreFields(y.clone()),
             None => FieldMatchConfig::MatchFields(vec![
-                log_schema().timestamp_key().into(),
-                log_schema().host_key().into(),
-                log_schema().message_key().into(),
+                log_schema().timestamp_key().clone(),
+                log_schema().host_key().clone(),
+                log_schema().message_key().clone(),
             ]),
         }
     }

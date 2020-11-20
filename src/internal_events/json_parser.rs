@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 use serde_json::Error;
 
@@ -18,7 +18,7 @@ impl InternalEvent for JsonParserEventProcessed {
 
 #[derive(Debug)]
 pub(crate) struct JsonParserFailedParse<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
     pub value: &'a str,
     pub error: Error,
 }
@@ -43,7 +43,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
 
 #[derive(Debug)]
 pub(crate) struct JsonParserTargetExists<'a> {
-    pub target_field: Lookup<'a>,
+    pub target_field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for JsonParserTargetExists<'a> {

@@ -58,7 +58,7 @@ impl From<JsonParserConfig> for JsonParser {
     fn from(config: JsonParserConfig) -> JsonParser {
         let field = config
             .field
-            .unwrap_or_else(|| log_schema().message_key().into_buf());
+            .unwrap_or_else(|| log_schema().message_key().clone());
 
         JsonParser {
             field,
@@ -83,7 +83,7 @@ impl FunctionTransform for JsonParser {
                 serde_json::from_slice::<Value>(to_parse.as_ref())
                     .map_err(|error| {
                         emit!(JsonParserFailedParse {
-                            field: self.field.as_lookup(),
+                            field: &self.field,
                             value: value.to_string_lossy().as_str(),
                             error
                         })
@@ -105,7 +105,7 @@ impl FunctionTransform for JsonParser {
 
                     if contains_target && !self.overwrite_target {
                         emit!(JsonParserTargetExists {
-                            target_field: target_field.as_lookup()
+                            target_field: &target_field
                         })
                     } else {
                         if self.drop_field {

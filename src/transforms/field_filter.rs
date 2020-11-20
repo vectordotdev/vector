@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct FieldFilterConfig {
-    pub field: String,
+    pub field: LookupBuf,
     pub value: String,
 }
 
@@ -19,7 +19,7 @@ inventory::submit! {
 impl GenerateConfig for FieldFilterConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            field: String::new(),
+            field: LookupBuf::from("field"),
             value: String::new(),
         })
         .unwrap()

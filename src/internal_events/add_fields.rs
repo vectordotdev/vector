@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ impl InternalEvent for AddFieldsEventProcessed {
 
 #[derive(Debug)]
 pub struct AddFieldsTemplateRenderingError<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
@@ -29,7 +29,7 @@ impl<'a> InternalEvent for AddFieldsTemplateRenderingError<'a> {
 #[derive(Debug)]
 pub struct AddFieldsTemplateInvalid<'a> {
     pub error: crate::template::TemplateError,
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for AddFieldsTemplateInvalid<'a> {
@@ -44,7 +44,7 @@ impl<'a> InternalEvent for AddFieldsTemplateInvalid<'a> {
 
 #[derive(Debug)]
 pub struct AddFieldsFieldOverwritten<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
@@ -55,7 +55,7 @@ impl<'a> InternalEvent for AddFieldsFieldOverwritten<'a> {
 
 #[derive(Debug)]
 pub struct AddFieldsFieldNotOverwritten<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for AddFieldsFieldNotOverwritten<'a> {

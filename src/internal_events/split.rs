@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ impl InternalEvent for SplitEventProcessed {
 
 #[derive(Debug)]
 pub struct SplitFieldMissing<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for SplitFieldMissing<'a> {
@@ -32,7 +32,7 @@ impl<'a> InternalEvent for SplitFieldMissing<'a> {
 
 #[derive(Debug)]
 pub struct SplitConvertFailed<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
     pub error: crate::types::Error,
 }
 

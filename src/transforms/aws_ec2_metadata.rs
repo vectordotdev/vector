@@ -178,7 +178,7 @@ impl FunctionTransform for Ec2MetadataTransform {
             read_ref.into_iter().for_each(|(k, v)| {
                 if let Some(value) = v.get_one() {
                     log.insert(
-                        LookupBuf::from_str(k).unwrap_or(LookupBuf::from(k.clone())),
+                        LookupBuf::from_str(k).unwrap_or_else(|_| LookupBuf::from(k.clone())),
                         value.clone(),
                     );
                 }

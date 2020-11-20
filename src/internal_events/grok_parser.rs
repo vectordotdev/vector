@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ impl InternalEvent for GrokParserFailedMatch<'_> {
 
 #[derive(Debug)]
 pub(crate) struct GrokParserMissingField<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
 }
 
 impl InternalEvent for GrokParserMissingField<'_> {

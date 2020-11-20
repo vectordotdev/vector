@@ -161,24 +161,24 @@ impl rlua::UserData for LuaEvent {
                 match value {
                     Some(rlua::Value::String(string)) => {
                         this.inner.as_mut_log().insert(
-                            key.clone(),
+                            key,
                             Value::from(string.to_str().expect("Expected UTF-8.").to_owned()),
                         );
                     }
                     Some(rlua::Value::Integer(integer)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.clone(), Value::Integer(integer));
+                            .insert(key, Value::Integer(integer));
                     }
                     Some(rlua::Value::Number(number)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.clone(), Value::Float(number));
+                            .insert(key, Value::Float(number));
                     }
                     Some(rlua::Value::Boolean(boolean)) => {
                         this.inner
                             .as_mut_log()
-                            .insert(key.clone(), Value::Boolean(boolean));
+                            .insert(key, Value::Boolean(boolean));
                     }
                     Some(rlua::Value::Nil) | None => {
                         this.inner.as_mut_log().remove(&key, false);

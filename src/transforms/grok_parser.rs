@@ -44,7 +44,7 @@ impl TransformConfig for GrokParserConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| log_schema().message_key().into_buf());
+            .unwrap_or_else(|| log_schema().message_key().clone());
 
         let mut grok = grok::Grok::with_patterns();
 
@@ -115,7 +115,7 @@ impl FunctionTransform for GrokParser {
                 for (name, value) in matches.iter() {
                     let conv = self
                         .types
-                        .get(&LookupBuf::from_str(name).unwrap_or(LookupBuf::from(name)))
+                        .get(&LookupBuf::from_str(name).unwrap_or_else(|_| LookupBuf::from(name)))
                         .unwrap_or(&Conversion::Bytes);
                     match conv.convert(value.to_string().into()) {
                         Ok(value) => {
@@ -139,7 +139,7 @@ impl FunctionTransform for GrokParser {
             }
         } else {
             emit!(GrokParserMissingField {
-                field: self.field.as_lookup(),
+                field: &self.field,
             });
         }
 

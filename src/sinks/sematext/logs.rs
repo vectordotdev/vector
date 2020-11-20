@@ -91,8 +91,8 @@ impl SinkConfig for SematextLogsConfig {
 }
 
 lazy_static::lazy_static! {
-    static ref timestamp_lookup: LookupBuf = LookupBuf::from("@timestamp");
-    static ref host_lookup: LookupBuf = LookupBuf::from("os.host");
+    static ref TIMESTAMP_LOOKUP: LookupBuf = LookupBuf::from("@timestamp");
+    static ref HOST_LOOKUP: LookupBuf = LookupBuf::from("os.host");
 }
 
 /// Used to map `timestamp` to `@timestamp`.
@@ -100,11 +100,11 @@ fn map_timestamp(mut event: Event) -> BoxFuture<'static, Result<Event, ()>> {
     let log = event.as_mut_log();
 
     if let Some(ts) = log.remove(crate::config::log_schema().timestamp_key(), false) {
-        log.insert(timestamp_lookup.clone(), ts);
+        log.insert(TIMESTAMP_LOOKUP.clone(), ts);
     }
 
     if let Some(host) = log.remove(crate::config::log_schema().host_key(), false) {
-        log.insert(host_lookup.clone(), host);
+        log.insert(HOST_LOOKUP.clone(), host);
     }
 
     future::ok(event).boxed()

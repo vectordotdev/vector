@@ -33,7 +33,7 @@ impl TransformConfig for AnsiStripperConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
 
         Ok(Transform::function(AnsiStripper { field }))
     }
@@ -62,19 +62,19 @@ impl FunctionTransform for AnsiStripper {
 
         match log.get_mut(&self.field) {
             None => emit!(ANSIStripperFieldMissing {
-                field: self.field.as_lookup()
+                field: &self.field,
             }),
             Some(Value::Bytes(ref mut bytes)) => {
                 match strip_ansi_escapes::strip(&bytes) {
                     Ok(b) => *bytes = b.into(),
                     Err(error) => emit!(ANSIStripperFailed {
-                        field: self.field.as_lookup(),
+                        field: &self.field,
                         error
                     }),
                 };
             }
             _ => emit!(ANSIStripperFieldInvalid {
-                field: self.field.as_lookup()
+                field: &self.field,
             }),
         }
 

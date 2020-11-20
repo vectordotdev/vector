@@ -69,7 +69,7 @@ impl FunctionTransform for RemoveFields {
             let old_val = log.remove(field, self.drop_empty);
             if old_val.is_none() {
                 emit!(RemoveFieldsFieldMissing {
-                    field: field.as_lookup()
+                    field
                 });
             }
         }

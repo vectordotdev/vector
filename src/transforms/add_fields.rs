@@ -113,7 +113,7 @@ impl FunctionTransform for AddFields {
                     Ok(v) => v,
                     Err(_) => {
                         emit!(AddFieldsTemplateRenderingError {
-                            field: key.as_lookup(),
+                            field: &key,
                         });
                         continue;
                     }
@@ -122,14 +122,14 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Value(v) => v,
             };
             if self.overwrite {
-                if event.as_mut_log().insert(key, value).is_some() {
+                if event.as_mut_log().insert(key.clone(), value).is_some() {
                     emit!(AddFieldsFieldOverwritten {
-                        field: key.as_lookup(),
+                        field: &key,
                     });
                 }
             } else if event.as_mut_log().contains(&key) {
                 emit!(AddFieldsFieldNotOverwritten {
-                    field: key.as_lookup(),
+                    field: &key,
                 });
             } else {
                 event.as_mut_log().insert(key, value);

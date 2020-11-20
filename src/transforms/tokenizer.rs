@@ -32,12 +32,12 @@ impl TransformConfig for TokenizerConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
         // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.types.iter().any(|(f, c)| *f == field);
+        let drop_field = self.drop_field && !self.types.iter().any(|(f, _c)| *f == field);
 
         Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
@@ -102,7 +102,7 @@ impl FunctionTransform for Tokenizer {
                     }
                     Err(error) => {
                         emit!(TokenizerConvertFailed {
-                            field: name.as_lookup(),
+                            field: &name,
                             error
                         });
                     }
@@ -113,7 +113,7 @@ impl FunctionTransform for Tokenizer {
             }
         } else {
             emit!(TokenizerFieldMissing {
-                field: self.field.as_lookup()
+                field: &self.field
             });
         };
 

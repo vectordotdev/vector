@@ -319,9 +319,9 @@ mod tests {
     fn insert_timestamp_kv(log: &mut LogEvent) -> (LookupBuf, String) {
         let now = chrono::Utc::now();
 
-        let timestamp_key = log_schema().timestamp_key().into_buf();
+        let timestamp_key = log_schema().timestamp_key().clone();
         let timestamp_value = now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
-        log.insert(timestamp_key, now);
+        log.insert(timestamp_key.clone(), now);
 
         (timestamp_key, timestamp_value)
     }

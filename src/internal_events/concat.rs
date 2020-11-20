@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ impl InternalEvent for ConcatEventProcessed {
 
 #[derive(Debug)]
 pub struct ConcatSubstringError<'a> {
-    pub source: Lookup<'a>,
+    pub source: &'a LookupBuf,
     pub condition: &'a str,
     pub start: usize,
     pub end: usize,
@@ -40,7 +40,7 @@ impl<'a> InternalEvent for ConcatSubstringError<'a> {
 
 #[derive(Debug)]
 pub struct ConcatSubstringSourceMissing<'a> {
-    pub source: Lookup<'a>,
+    pub source: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for ConcatSubstringSourceMissing<'a> {

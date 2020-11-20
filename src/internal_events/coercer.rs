@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -13,7 +13,7 @@ impl InternalEvent for CoercerEventProcessed {
 
 #[derive(Debug)]
 pub(crate) struct CoercerConversionFailed<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
     pub error: crate::types::Error,
 }
 

@@ -71,7 +71,7 @@ impl FunctionTransform for Coercer {
                             new_log.insert(field.clone(), converted);
                         }
                         Err(error) => emit!(CoercerConversionFailed {
-                            field: field.as_lookup(),
+                            field,
                             error
                         }),
                     }
@@ -87,7 +87,7 @@ impl FunctionTransform for Coercer {
                             log.insert(field.clone(), converted);
                         }
                         Err(error) => emit!(CoercerConversionFailed {
-                            field: field.as_lookup(),
+                            field,
                             error
                         }),
                     }

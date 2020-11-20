@@ -32,7 +32,7 @@ impl TransformConfig for LogfmtConfig {
         let field = self
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
         let conversions = parse_conversion_map(&self.types)?;
 
         Ok(Transform::function(Logfmt {
@@ -74,7 +74,7 @@ impl FunctionTransform for Logfmt {
                 .filter_map(|logfmt::Pair { key, val }| val.map(|val| (key, val)));
 
             for (key, val) in pairs {
-                let key = LookupBuf::from_str(&*key).unwrap_or(LookupBuf::from(key));
+                let key = LookupBuf::from_str(&*key).unwrap_or_else(|_| LookupBuf::from(key));
                 if key == self.field {
                     drop_field = false;
                 }
@@ -86,13 +86,13 @@ impl FunctionTransform for Logfmt {
                         }
                         Err(error) => {
                             emit!(LogfmtParserConversionFailed {
-                                name: key.as_lookup(),
+                                name: &key,
                                 error
                             });
                         }
                     }
                 } else {
-                    event.as_mut_log().insert(LookupBuf::from(key), val);
+                    event.as_mut_log().insert(key, val);
                 }
             }
 
@@ -101,7 +101,7 @@ impl FunctionTransform for Logfmt {
             }
         } else {
             emit!(LogfmtParserMissingField {
-                field: self.field.as_lookup()
+                field: &self.field
             });
         };
 

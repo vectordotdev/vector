@@ -82,12 +82,12 @@ impl ReduceState {
             fields: e
                 .into_iter()
                 .filter_map(|(k, v)| {
-                    let k_lookup = LookupBuf::from_str(&k).unwrap_or(LookupBuf::from(k));
+                    let k_lookup = LookupBuf::from_str(&k).unwrap_or_else(|_| LookupBuf::from(k));
                     if let Some(strat) = strategies.get(&k_lookup) {
                         match get_value_merger(v, strat) {
                             Ok(m) => Some((k_lookup, m)),
                             Err(error) => {
-                                warn!(message = "Failed to create merger.", field = ?k, %error);
+                                warn!(message = "Failed to create merger.", field = ?k_lookup, %error);
                                 None
                             }
                         }
@@ -101,7 +101,7 @@ impl ReduceState {
 
     fn add_event(&mut self, e: LogEvent, strategies: &IndexMap<LookupBuf, MergeStrategy>) {
         for (k, v) in e.into_iter() {
-            let k_lookup = LookupBuf::from_str(&k).unwrap_or(LookupBuf::from(k));
+            let k_lookup = LookupBuf::from_str(&k).unwrap_or_else(|_| LookupBuf::from(k));
             let strategy = strategies.get(&k_lookup);
             match self.fields.entry(k_lookup) {
                 hash_map::Entry::Vacant(entry) => {

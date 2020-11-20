@@ -3,7 +3,7 @@ use criterion::{criterion_group, Criterion};
 use serde_json::{json, Value};
 use vector::{
     config::log_schema,
-    event::{Event, LogEvent},
+    event::{Event, LogEvent, LookupBuf},
     transforms::{
         json_parser::{JsonParser, JsonParserConfig},
         FunctionTransform,
@@ -14,9 +14,9 @@ fn benchmark_event(c: &mut Criterion) {
     c.bench_function("create and insert single-level", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert("key1", Bytes::from("value1"));
-            log.insert("key2", Bytes::from("value2"));
-            log.insert("key3", Bytes::from("value3"));
+            log.insert(LookupBuf::from("key1"), Bytes::from("value1"));
+            log.insert(LookupBuf::from("key2"), Bytes::from("value2"));
+            log.insert(LookupBuf::from("key3"), Bytes::from("value3"));
         })
     });
 
@@ -36,9 +36,9 @@ fn benchmark_event(c: &mut Criterion) {
     c.bench_function("create and insert nested-keys", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert("key1.nested1.nested2", Bytes::from("value1"));
-            log.insert("key1.nested1.nested3", Bytes::from("value4"));
-            log.insert("key3", Bytes::from("value3"));
+            log.insert(LookupBuf::from_str("key1.nested1.nested2").unwrap(), Bytes::from("value1"));
+            log.insert(LookupBuf::from_str("key1.nested1.nested3").unwrap(), Bytes::from("value4"));
+            log.insert(LookupBuf::from_str("key3").unwrap(), Bytes::from("value3"));
         })
     });
 

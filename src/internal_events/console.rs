@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -16,7 +16,7 @@ impl InternalEvent for ConsoleEventProcessed {
 
 #[derive(Debug)]
 pub struct ConsoleFieldNotFound<'a> {
-    pub missing_field: Lookup<'a>,
+    pub missing_field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for ConsoleFieldNotFound<'a> {

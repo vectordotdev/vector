@@ -837,7 +837,7 @@ mod tests {
                 let mut event = Event::new_empty_log();
                 event
                     .as_mut_log()
-                    .insert(log_schema().timestamp_key().into_buf(), timestamp);
+                    .insert(log_schema().timestamp_key().clone(), timestamp);
                 encode_log(event.into_log(), &Encoding::Text.into()).unwrap()
             })
             .collect();
@@ -949,7 +949,7 @@ mod integration_tests {
                 let timestamp = chrono::Utc::now() - chrono::Duration::days(1);
 
                 event.as_mut_log().insert(
-                    log_schema().timestamp_key().into_buf(),
+                    log_schema().timestamp_key().clone(),
                     Value::Timestamp(timestamp),
                 );
             }
@@ -1012,7 +1012,7 @@ mod integration_tests {
             let mut event = Event::from(line.clone());
             event
                 .as_mut_log()
-                .insert(log_schema().timestamp_key().into_buf(), now + offset);
+                .insert(log_schema().timestamp_key().clone(), now + offset);
             events.push(event);
             line
         };
