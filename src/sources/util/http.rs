@@ -144,7 +144,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
-        let fut = async move {
+        Ok(Box::pin(async move {
             let span = crate::trace::current_span();
 
             let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -233,8 +233,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
             drop(shutdown);
             Ok(())
-        };
-
-        Ok(Box::new(fut.boxed().compat()))
+        }))
     }
 }

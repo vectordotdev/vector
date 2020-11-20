@@ -204,7 +204,7 @@ impl SourceConfig for ErrorSourceConfig {
         _shutdown: ShutdownSignal,
         _out: Pipeline,
     ) -> Result<sources::Source, vector::Error> {
-        Ok(Box::new(futures01::future::err(())))
+        Ok(Box::pin(future::err(())))
     }
 
     fn output_type(&self) -> config::DataType {
@@ -271,10 +271,7 @@ impl SourceConfig for PanicSourceConfig {
         _shutdown: ShutdownSignal,
         _out: Pipeline,
     ) -> Result<sources::Source, vector::Error> {
-        Ok(Box::new(futures01::future::lazy::<
-            _,
-            futures01::future::FutureResult<(), ()>,
-        >(|| panic!())))
+        Ok(Box::pin(async { panic!() }))
     }
 
     fn output_type(&self) -> config::DataType {

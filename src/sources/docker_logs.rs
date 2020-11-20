@@ -22,9 +22,7 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
-use futures::{
-    compat::Sink01CompatExt, future, sink::SinkExt, FutureExt, Stream, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, sink::SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
@@ -142,16 +140,12 @@ impl SourceConfig for DockerLogsConfig {
         };
 
         // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
-        Ok(Box::new(
-            async move {
-                Ok(tokio::select! {
-                    _ = fut => {}
-                    _ = shutdown => {}
-                })
-            }
-            .boxed()
-            .compat(),
-        ))
+        Ok(Box::pin(async move {
+            Ok(tokio::select! {
+                _ = fut => {}
+                _ = shutdown => {}
+            })
+        }))
     }
 
     fn output_type(&self) -> DataType {
@@ -1069,7 +1063,6 @@ mod integration_tests {
                 )
                 .await
                 .unwrap()
-                .compat()
                 .await
                 .unwrap();
         });
