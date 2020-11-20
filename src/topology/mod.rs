@@ -20,6 +20,7 @@ use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFuture
 use futures01::{sync::mpsc, Future};
 use std::{
     collections::{HashMap, HashSet},
+    future::ready,
     panic::AssertUnwindSafe,
 };
 use tokio::time::{delay_until, interval, Duration, Instant};
@@ -173,7 +174,7 @@ impl RunningTopology {
                     message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
                 );
             })
-            .filter(|_| future::ready(false)) // Run indefinitely without emitting items
+            .filter(|_| ready(false)) // Run indefinitely without emitting items
             .into_future()
             .map(|_| Ok(()));
 
