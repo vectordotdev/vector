@@ -227,6 +227,11 @@ installation: close({
 			sinks?:      _
 		}
 		config: {
+			apt: {
+				enabled: false
+				port: 9001
+			}
+
 			sources?: [Name=string]: {
 				type: string
 
