@@ -20,8 +20,8 @@ use warp::{
     Filter,
 };
 
-#[cfg(feature = "sources-http")]
-pub fn add_query_parameters(
+#[cfg(any(feature = "sources-http", feature = "sources-logplex"))]
+pub(crate) fn add_query_parameters(
     mut events: Vec<Event>,
     query_parameters_config: &[String],
     query_parameters: HashMap<String, String>,

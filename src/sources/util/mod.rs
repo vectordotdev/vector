@@ -6,7 +6,7 @@ mod tcp;
 #[cfg(all(unix, feature = "sources-utils-unix",))]
 mod unix;
 
-#[cfg(feature = "sources-http")]
+#[cfg(any(feature = "sources-http", feature = "sources-logplex"))]
 pub(crate) use self::http::add_query_parameters;
 #[cfg(feature = "sources-utils-http")]
 pub(crate) use self::http::{ErrorMessage, HttpSource, HttpSourceAuthConfig};
