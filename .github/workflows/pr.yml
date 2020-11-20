@@ -184,7 +184,7 @@ jobs:
     # Full CI suites for this platform were only recently introduced.
     # Some failures are permitted until we can properly correct them.
     continue-on-error: true
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows, x64]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
