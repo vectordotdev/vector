@@ -85,7 +85,7 @@ impl Function for OnlyFields {
             .filter(|k| {
                 self.paths
                     .iter()
-                    .find(|&p| k == &p.as_lookup())
+                    .find(|&p| k == &p.into())
                     .is_none()
             })
             // Shed borrow so we can remove these keys.

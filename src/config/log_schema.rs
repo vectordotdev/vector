@@ -1,4 +1,4 @@
-use crate::event::{Lookup, LookupBuf};
+use crate::event::{LookupBuf};
 use getset::{Getters, Setters};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -54,17 +54,17 @@ impl LogSchema {
         LookupBuf::from("source_type")
     }
 
-    pub fn message_key(&self) -> Lookup {
-        self.message_key.as_lookup()
+    pub fn message_key(&self) -> &LookupBuf {
+        &self.message_key
     }
-    pub fn timestamp_key(&self) -> Lookup {
-        self.timestamp_key.as_lookup()
+    pub fn timestamp_key(&self) -> &LookupBuf {
+        &self.timestamp_key
     }
-    pub fn host_key(&self) -> Lookup {
-        self.host_key.as_lookup()
+    pub fn host_key(&self) -> &LookupBuf {
+        &self.host_key
     }
-    pub fn source_type_key(&self) -> Lookup {
-        self.source_type_key.as_lookup()
+    pub fn source_type_key(&self) -> &LookupBuf {
+        &self.source_type_key
     }
 
     pub fn set_message_key(&mut self, v: LookupBuf) {
@@ -90,21 +90,21 @@ impl LogSchema {
             {
                 errors.push("conflicting values for 'log_schema.host_key' found".to_owned());
             } else {
-                self.set_host_key(other.host_key().into_buf());
+                self.set_host_key(other.host_key().clone());
             }
             if self.message_key() != LOG_SCHEMA_DEFAULT.message_key()
                 && self.message_key() != other.message_key()
             {
                 errors.push("conflicting values for 'log_schema.message_key' found".to_owned());
             } else {
-                self.set_message_key(other.message_key().into_buf());
+                self.set_message_key(other.message_key().clone());
             }
             if self.timestamp_key() != LOG_SCHEMA_DEFAULT.timestamp_key()
                 && self.timestamp_key() != other.timestamp_key()
             {
                 errors.push("conflicting values for 'log_schema.timestamp_key' found".to_owned());
             } else {
-                self.set_timestamp_key(other.timestamp_key().into_buf());
+                self.set_timestamp_key(other.timestamp_key().clone());
             }
         }
 

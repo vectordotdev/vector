@@ -194,12 +194,7 @@ impl LookupBuf {
     }
 
     #[instrument]
-    pub fn as_lookup<'a>(&'a self) -> Lookup<'a> {
-        Lookup::from(self)
-    }
-
-    #[instrument]
-    pub fn into_lookup<'a>(&'a self) -> Lookup<'a> {
+    pub fn clone_lookup(&self) -> Lookup {
         Lookup::from(self)
     }
 

@@ -104,7 +104,7 @@ impl SourceConfig for SocketConfig {
             Mode::Udp(config) => {
                 let host_key = config
                     .host_key
-                    .unwrap_or_else(|| log_schema().host_key().into_buf());
+                    .unwrap_or_else(|| log_schema().host_key().clone());
                 Ok(udp::udp(
                     config.address,
                     config.max_length,
@@ -117,7 +117,7 @@ impl SourceConfig for SocketConfig {
             Mode::Unix(config) => {
                 let host_key = config
                     .host_key
-                    .unwrap_or_else(|| log_schema().host_key().into_buf());
+                    .unwrap_or_else(|| log_schema().host_key().clone());
                 Ok(unix::unix(
                     config.path,
                     config.max_length,

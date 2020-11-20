@@ -218,7 +218,7 @@ pub fn file_source(
     let host_key = config
         .host_key
         .clone()
-        .unwrap_or_else(|| log_schema().host_key().into_buf());
+        .unwrap_or_else(|| log_schema().host_key().clone());
     let hostname = crate::get_hostname().ok();
 
     let include = config.include.clone();
@@ -312,7 +312,7 @@ fn create_event<'a>(
 
     // Add source type
     event.as_mut_log().insert(
-        log_schema().source_type_key().into_buf(),
+        log_schema().source_type_key().clone(),
         Bytes::from("file"),
     );
 

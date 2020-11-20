@@ -45,6 +45,7 @@ use lifecycle::Lifecycle;
 use pod_metadata_annotator::PodMetadataAnnotator;
 
 lazy_static::lazy_static! {
+    /// The file lookup.
     pub static ref FILE_KEY: LookupBuf = LookupBuf::from("file");
 }
 
@@ -380,7 +381,7 @@ fn create_event(line: Bytes, file: &str) -> Event {
 
     // Add source type.
     event.as_mut_log().insert(
-        crate::config::log_schema().source_type_key().into_buf(),
+        crate::config::log_schema().source_type_key().clone(),
         COMPONENT_NAME.to_owned(),
     );
 

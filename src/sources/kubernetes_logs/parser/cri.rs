@@ -39,7 +39,7 @@ impl Cri {
             rp_config.patterns = vec![pattern.to_owned()];
 
             rp_config.types.insert(
-                crate::config::log_schema().timestamp_key().into_buf(),
+                crate::config::log_schema().timestamp_key().clone(),
                 "timestamp|%+".to_owned(),
             );
 
@@ -69,7 +69,7 @@ impl FunctionTransform for Cri {
 fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     // Detect if this is a partial event.
     let multiline_tag = log
-        .remove(MULTILINE_TAG.as_lookup(), false)
+        .remove(&*MULTILINE_TAG, false)
         .context(MultilineTagFieldMissing)?;
     let multiline_tag = match multiline_tag {
         Value::Bytes(val) => val,

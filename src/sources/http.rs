@@ -11,7 +11,6 @@ use crate::{
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
 use std::{collections::HashMap, net::SocketAddr};
 
 use tokio_util::codec::Decoder;
@@ -76,12 +75,10 @@ impl HttpSource for SimpleHttpSource {
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
             .map(|mut events| {
-                // Add source type
-                let key = log_schema().source_type_key();
                 for event in events.iter_mut() {
                     event
                         .as_mut_log()
-                        .insert(key.into_buf(), Bytes::from("http"));
+                        .insert(log_schema().source_type_key().clone(), Bytes::from("http"));
                 }
                 events
             })
@@ -164,7 +161,7 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
                 serde_json::from_slice::<LogEvent>(&j?)
-                    .map(|parsed_json| Event::Log(parsed_json))
+                    .map(Event::Log)
                     .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))
             })
             .collect::<Result<Vec<_>, _>>(),
@@ -178,16 +175,16 @@ fn json_error(s: String) -> ErrorMessage {
     ErrorMessage::new(StatusCode::BAD_REQUEST, format!("Bad JSON: {}", s))
 }
 
-fn json_value_to_type_string(value: &JsonValue) -> &'static str {
-    match value {
-        JsonValue::Object(_) => "Object",
-        JsonValue::Array(_) => "Array",
-        JsonValue::String(_) => "String",
-        JsonValue::Number(_) => "Number",
-        JsonValue::Bool(_) => "Bool",
-        JsonValue::Null => "Null",
-    }
-}
+// fn json_value_to_type_string(value: &JsonValue) -> &'static str {
+//     match value {
+//         JsonValue::Object(_) => "Object",
+//         JsonValue::Array(_) => "Array",
+//         JsonValue::String(_) => "String",
+//         JsonValue::Number(_) => "Number",
+//         JsonValue::Bool(_) => "Bool",
+//         JsonValue::Null => "Null",
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

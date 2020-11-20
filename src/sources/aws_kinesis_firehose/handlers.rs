@@ -65,8 +65,8 @@ fn parse_records(
                 let mut event = Event::new_empty_log();
                 let log = event.as_mut_log();
 
-                log.insert(log_schema().message_key().into_buf(), record);
-                log.insert(log_schema().timestamp_key().into_buf(), request.timestamp);
+                log.insert(log_schema().message_key().clone(), record);
+                log.insert(log_schema().timestamp_key().clone(), request.timestamp);
                 log.insert(LookupBuf::from("request_id"), request_id.to_string());
                 log.insert(LookupBuf::from("source_arn"), source_arn.to_string());
 

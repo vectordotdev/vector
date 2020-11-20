@@ -41,11 +41,11 @@ fn build_event(host_key: LookupBuf, received_from: Option<Bytes>, line: &str) ->
     let byte_size = line.len();
     let mut event = Event::from(line);
     event.as_mut_log().insert(
-        crate::config::log_schema().source_type_key().into_buf(),
+        crate::config::log_schema().source_type_key().clone(),
         Bytes::from("socket"),
     );
     if let Some(host) = received_from {
-        event.as_mut_log().insert(host_key.clone(), host);
+        event.as_mut_log().insert(host_key, host);
     }
     emit!(SocketEventReceived {
         byte_size,

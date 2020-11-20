@@ -807,23 +807,23 @@ impl ContainerLogInfo {
 
             // Source type
             log_event.insert(
-                log_schema().source_type_key().into_buf(),
+                log_schema().source_type_key().clone(),
                 Bytes::from("docker"),
             );
 
             // The log message.
-            log_event.insert(log_schema().message_key().into_buf(), bytes_message);
+            log_event.insert(log_schema().message_key().clone(), bytes_message);
 
             // Stream we got the message from.
-            log_event.insert(*STREAM, stream);
+            log_event.insert(STREAM.clone(), stream);
 
             // Timestamp of the event.
             if let Some(timestamp) = timestamp {
-                log_event.insert(log_schema().timestamp_key().into_buf(), timestamp);
+                log_event.insert(log_schema().timestamp_key().clone(), timestamp);
             }
 
             // Container ID.
-            log_event.insert(*CONTAINER, self.id.0.clone());
+            log_event.insert(CONTAINER.clone(), self.id.0.clone());
 
             // Labels.
             for (key, value) in self.metadata.labels.iter() {
@@ -831,13 +831,13 @@ impl ContainerLogInfo {
             }
 
             // Container name.
-            log_event.insert(*NAME, self.metadata.name.clone());
+            log_event.insert(NAME.clone(), self.metadata.name.clone());
 
             // Container image.
-            log_event.insert(*IMAGE, self.metadata.image.clone());
+            log_event.insert(IMAGE.clone(), self.metadata.image.clone());
 
             // Timestamp of the container creation.
-            log_event.insert(*CREATED_AT, self.metadata.created_at);
+            log_event.insert(CREATED_AT.clone(), self.metadata.created_at);
 
             // Return the resulting log event.
             log_event
@@ -859,7 +859,7 @@ impl ContainerLogInfo {
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
                     partial_event_merge_state.merge_in_next_event(
                         log_event,
-                        &vec![log_schema().message_key().into_buf()],
+                        &[log_schema().message_key().clone()],
                     );
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
@@ -873,7 +873,7 @@ impl ContainerLogInfo {
             // Otherwise it's just a regular event that we return as-is.
             match partial_event_merge_state.take() {
                 Some(partial_event_merge_state) => partial_event_merge_state
-                    .merge_in_final_event(log_event, &vec![log_schema().message_key().into_buf()]),
+                    .merge_in_final_event(log_event, &[log_schema().message_key().clone()]),
                 None => log_event,
             }
         } else {
@@ -975,7 +975,7 @@ fn line_agg_adapter(
     });
     let line_agg_out = LineAgg::<_, Bytes, LogEvent>::new(line_agg_in, logic);
     line_agg_out.map(|(_, message, mut log_event)| {
-        log_event.insert(log_schema().message_key().into_buf(), message);
+        log_event.insert(log_schema().message_key().clone(), message);
         Event::Log(log_event)
     })
 }

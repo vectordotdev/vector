@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::event::Lookup;
+use crate::event::LookupBuf;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -36,7 +36,7 @@ impl InternalEvent for RegexParserFailedMatch<'_> {
 
 #[derive(Debug)]
 pub(crate) struct RegexParserMissingField<'a> {
-    pub field: Lookup<'a>,
+    pub field: &'a LookupBuf,
 }
 
 impl InternalEvent for RegexParserMissingField<'_> {
@@ -51,7 +51,7 @@ impl InternalEvent for RegexParserMissingField<'_> {
 
 #[derive(Debug)]
 pub(crate) struct RegexParserTargetExists<'a> {
-    pub target_field: Lookup<'a>,
+    pub target_field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for RegexParserTargetExists<'a> {
@@ -70,7 +70,7 @@ impl<'a> InternalEvent for RegexParserTargetExists<'a> {
 
 #[derive(Debug)]
 pub(crate) struct RegexParserConversionFailed<'a> {
-    pub name: Lookup<'a>,
+    pub name: &'a LookupBuf,
     pub error: crate::types::Error,
 }
 

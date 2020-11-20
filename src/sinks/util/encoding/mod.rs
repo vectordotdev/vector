@@ -58,7 +58,7 @@ pub trait EncodingConfiguration<E> {
                         .keys()
                         .filter(|field| {
                             !only_fields.iter().any(|only| {
-                                field.starts_with(only.as_lookup())
+                                field.starts_with(only.into())
                             })
                         })
                         .map(|v| v.into_buf())

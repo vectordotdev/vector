@@ -347,13 +347,13 @@ impl<R: Read> EventStream<R> {
             time: Time::Now(Utc::now()),
             extractors: [
                 DefaultExtractor::new_with(
-                    *HOST_LOOKUP,
-                    log_schema().host_key().into_buf(),
+                    HOST_LOOKUP.clone(),
+                    log_schema().host_key().clone(),
                     host.map(Value::from),
                 ),
-                DefaultExtractor::new(*INDEX_LOOKUP, *SPLUNK_INDEX_LOOKUP),
-                DefaultExtractor::new(*SOURCE_LOOKUP, *SPLUNK_SOURCE_LOOKUP),
-                DefaultExtractor::new(*SOURCETYPE_LOOKUP, *SPLUNK_SOURCETYPE_LOOKUP),
+                DefaultExtractor::new(INDEX_LOOKUP.clone(), SPLUNK_INDEX_LOOKUP.clone()),
+                DefaultExtractor::new(SOURCE_LOOKUP.clone(), SPLUNK_SOURCE_LOOKUP.clone()),
+                DefaultExtractor::new(SOURCETYPE_LOOKUP.clone(), SPLUNK_SOURCETYPE_LOOKUP.clone()),
             ],
         }
     }
@@ -401,7 +401,7 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add source type
         log.insert(
-            log_schema().source_type_key().into_buf(),
+            log_schema().source_type_key().clone(),
             Bytes::from("splunk_hec"),
         );
 
@@ -412,7 +412,7 @@ impl<R: Read> Stream for EventStream<R> {
                     if string.is_empty() {
                         return Err(ApiError::EmptyEventField { event: self.events }.into());
                     }
-                    log.insert(log_schema().message_key().into_buf(), string);
+                    log.insert(log_schema().message_key().clone(), string);
                 }
                 JsonValue::Object(mut object) => {
                     if object.is_empty() {
@@ -427,7 +427,7 @@ impl<R: Read> Stream for EventStream<R> {
                                 log.insert(LINE_LOOKUP.clone(), line);
                             }
                             _ => {
-                                log.insert(log_schema().message_key().into_buf(), line);
+                                log.insert(log_schema().message_key().clone(), line);
                             }
                         }
                     }
@@ -483,8 +483,8 @@ impl<R: Read> Stream for EventStream<R> {
 
         // Add time field
         match self.time.clone() {
-            Time::Provided(time) => log.insert(log_schema().timestamp_key().into_buf(), time),
-            Time::Now(time) => log.insert(log_schema().timestamp_key().into_buf(), time),
+            Time::Provided(time) => log.insert(log_schema().timestamp_key().clone(), time),
+            Time::Now(time) => log.insert(log_schema().timestamp_key().clone(), time),
         };
 
         // Extract default extracted fields
@@ -565,7 +565,7 @@ impl DefaultExtractor {
 
         // Add data field
         if let Some(index) = self.value.as_ref() {
-            log.insert(self.to_field, index.clone());
+            log.insert(self.to_field.clone(), index.clone());
         }
     }
 }
@@ -606,22 +606,22 @@ fn raw_event(
     let log = event.as_mut_log();
 
     // Add message
-    log.insert(log_schema().message_key().into_buf(), message);
+    log.insert(log_schema().message_key().clone(), message);
 
     // Add channel
     log.insert(SPLUNK_CHANNEL_LOOKUP.clone(), channel);
 
     // Add host
     if let Some(host) = host {
-        log.insert(log_schema().host_key().into_buf(), host);
+        log.insert(log_schema().host_key().clone(), host);
     }
 
     // Add timestamp
-    log.insert(log_schema().timestamp_key().into_buf(), Utc::now());
+    log.insert(log_schema().timestamp_key().clone(), Utc::now());
 
     // Add source type
     event.as_mut_log().insert(
-        log_schema().source_type_key().into_buf(),
+        log_schema().source_type_key().clone(),
         Bytes::from("splunk_hec"),
     );
 

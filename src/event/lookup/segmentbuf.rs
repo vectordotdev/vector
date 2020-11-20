@@ -30,9 +30,9 @@ impl SegmentBuf {
     }
 
     #[instrument]
-    pub(crate) fn as_segment(&self) -> Segment<'_> {
+    pub(crate) fn as_segment<'a>(&'a self) -> Segment<'a> {
         match self {
-            SegmentBuf::Field(f) => Segment::field(f.as_ref()),
+            SegmentBuf::Field(f) => Segment::field(f.as_str()),
             SegmentBuf::Index(i) => Segment::index(*i),
         }
     }

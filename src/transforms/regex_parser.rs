@@ -121,7 +121,7 @@ impl CompiledRegex {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
                                         emit!(RegexParserConversionFailed {
-                                            name: name.as_lookup(),
+                                            name: &name,
                                             error
                                         });
                                         None
@@ -144,7 +144,7 @@ impl RegexParser {
         let field = config
             .field
             .clone()
-            .unwrap_or_else(|| crate::config::log_schema().message_key().into_buf());
+            .unwrap_or_else(|| crate::config::log_schema().message_key().clone());
 
         let patterns = match (&config.regex, &config.patterns.len()) {
             (None, 0) => {
@@ -266,13 +266,12 @@ impl FunctionTransform for RegexParser {
                 .expect("Mismatch between capture patterns and regexset");
 
             if let Some(captures) = pattern.captures(&value) {
+                let target_field = self.target_field.clone();
                 // Handle optional overwriting of the target field
-                if let Some(target_field) = &self.target_field {
-                    // We can reuse this since we borrow it.
-                    let target_field = target_field.as_lookup();
+                if let Some(ref target_field) = target_field {
                     if log.contains(target_field) {
                         if self.overwrite_target {
-                            log.remove(target_field.clone(), false);
+                            log.remove(target_field, false);
                         } else {
                             emit!(RegexParserTargetExists { target_field });
                             output.push(event);
@@ -282,7 +281,7 @@ impl FunctionTransform for RegexParser {
                 }
 
                 log.extend(captures.map(|(name, value)| {
-                    let final_name = match self.target_field.clone() {
+                    let final_name = match target_field.clone() {
                         Some(mut v) => { v.extend(name); v },
                         None => name
                     };
@@ -296,7 +295,7 @@ impl FunctionTransform for RegexParser {
             }
         } else {
             emit!(RegexParserMissingField {
-                field: self.field.as_lookup()
+                field: &self.field
             });
         }
 

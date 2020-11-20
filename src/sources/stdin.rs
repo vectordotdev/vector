@@ -74,7 +74,7 @@ where
 {
     let host_key = config
         .host_key
-        .unwrap_or_else(|| log_schema().host_key().into_buf());
+        .unwrap_or_else(|| log_schema().host_key().clone());
     let hostname = crate::get_hostname().ok();
 
     let (mut sender, receiver) = channel(1024);
@@ -98,7 +98,7 @@ where
             emit!(StdinEventReceived {
                 byte_size: line.len()
             });
-            create_event(Bytes::from(line), host_key, hostname)
+            create_event(Bytes::from(line), host_key.clone(), hostname.clone())
         })
         .forward(
             out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
@@ -114,7 +114,7 @@ fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> E
 
     // Add source type
     event.as_mut_log().insert(
-        log_schema().source_type_key().into_buf(),
+        log_schema().source_type_key().clone(),
         Bytes::from("stdin"),
     );
 

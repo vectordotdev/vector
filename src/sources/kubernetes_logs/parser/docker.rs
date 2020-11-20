@@ -61,13 +61,13 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
         .context(TimeParsing)?;
     log.insert(
-        log_schema().timestamp_key().into_buf(),
+        log_schema().timestamp_key().clone(),
         time.with_timezone(&Utc),
     );
 
     // Parse message, remove trailing newline and detect if it's partial.
     let message = log
-        .remove(LOG_LOOKUP.as_lookup(), false)
+        .remove(&*LOG_LOOKUP, false)
         .context(LogFieldMissing)?;
     let mut message = match message {
         Value::Bytes(val) => val,
@@ -89,7 +89,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
         message.truncate(message.len() - 1);
         is_partial = false;
     };
-    log.insert(log_schema().message_key().into_buf(), message);
+    log.insert(log_schema().message_key().clone(), message);
 
     // For partial messages add a partial event indicator.
     if is_partial {

@@ -42,7 +42,7 @@ impl Default for MergeConfig {
     fn default() -> Self {
         Self {
             partial_event_marker_field: event::PARTIAL.clone(),
-            fields: vec![crate::config::log_schema().message_key().into_buf()],
+            fields: vec![crate::config::log_schema().message_key().clone()],
             stream_discriminant_fields: vec![],
         }
     }

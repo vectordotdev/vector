@@ -20,7 +20,7 @@ pub fn statsd_unix(config: UnixConfig, shutdown: ShutdownSignal, out: Pipeline) 
     build_unix_source(
         config.path,
         LinesCodec::new(),
-        crate::config::log_schema().host_key().into_buf(),
+        crate::config::log_schema().host_key().clone(),
         shutdown,
         out,
         build_event,

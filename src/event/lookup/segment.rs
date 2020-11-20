@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 /// A sequence of Segments can become a lookup.
 ///
 /// If you need an owned, allocated version, see `SegmentBuf`.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum Segment<'a> {
     Field(&'a str),
     Index(usize),
@@ -165,6 +165,9 @@ impl<'a> From<usize> for Segment<'a> {
 
 impl<'a> From<&'a SegmentBuf> for Segment<'a> {
     fn from(v: &'a SegmentBuf) -> Self {
-        v.as_segment()
+        match v {
+            SegmentBuf::Field(f) => Self::Field(f),
+            SegmentBuf::Index(i) => Self::Index(*i),
+        }
     }
 }

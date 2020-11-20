@@ -13,7 +13,7 @@ pub fn build(enabled: bool) -> PartialEventsMerger {
         Some(
             MergeConfig {
                 partial_event_marker_field: event::PARTIAL.clone(),
-                fields: vec![crate::config::log_schema().message_key().into_buf()],
+                fields: vec![crate::config::log_schema().message_key().clone()],
                 stream_discriminant_fields: vec![FILE_KEY.clone()],
             }
             .into(),

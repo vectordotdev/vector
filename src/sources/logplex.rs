@@ -165,10 +165,10 @@ fn line_to_event(line: String) -> Event {
         let log = event.as_mut_log();
 
         if let Ok(ts) = timestamp.parse::<DateTime<Utc>>() {
-            log.insert(log_schema().timestamp_key().into_buf(), ts);
+            log.insert(log_schema().timestamp_key().clone(), ts);
         }
 
-        log.insert(log_schema().host_key().into_buf(), hostname.to_owned());
+        log.insert(log_schema().host_key().clone(), hostname.to_owned());
 
         log.insert(LookupBuf::from("app_name"), app_name.to_owned());
         log.insert(LookupBuf::from("proc_id"), proc_id.to_owned());
@@ -185,7 +185,7 @@ fn line_to_event(line: String) -> Event {
 
     // Add source type
     event.as_mut_log().insert(
-        log_schema().source_type_key().into_buf(),
+        log_schema().source_type_key().clone(),
         Bytes::from("logplex"),
     );
 

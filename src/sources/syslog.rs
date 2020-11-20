@@ -112,7 +112,7 @@ impl SourceConfig for SyslogConfig {
         let host_key = self
             .host_key
             .clone()
-            .unwrap_or_else(|| log_schema().host_key().into_buf());
+            .unwrap_or_else(|| log_schema().host_key().clone());
 
         match self.mode.clone() {
             Mode::Tcp { address, tls } => {
@@ -347,7 +347,7 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
 
     // Add source type
     event.as_mut_log().insert(
-        log_schema().source_type_key().into_buf(),
+        log_schema().source_type_key().clone(),
         Bytes::from("syslog"),
     );
 
@@ -368,7 +368,7 @@ fn event_from_str(host_key: LookupBuf, default_host: Option<Bytes>, line: &str) 
         .unwrap_or_else(Utc::now);
     event
         .as_mut_log()
-        .insert(log_schema().timestamp_key().into_buf(), timestamp);
+        .insert(log_schema().timestamp_key().clone(), timestamp);
 
     insert_fields_from_syslog(&mut event, parsed);
 

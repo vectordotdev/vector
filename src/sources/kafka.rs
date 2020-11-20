@@ -135,7 +135,7 @@ fn kafka_source(
                             let log = event.as_mut_log();
 
                             log.insert(
-                                log_schema().message_key().into_buf(),
+                                log_schema().message_key().clone(),
                                 Value::from(Bytes::from(payload.to_owned())),
                             );
 
@@ -145,11 +145,11 @@ fn kafka_source(
                                 .to_millis()
                                 .and_then(|millis| Utc.timestamp_millis_opt(millis).latest())
                                 .unwrap_or_else(Utc::now);
-                            log.insert(log_schema().timestamp_key().into_buf(), timestamp);
+                            log.insert(log_schema().timestamp_key().clone(), timestamp);
 
                             // Add source type
                             log.insert(
-                                log_schema().source_type_key().into_buf(),
+                                log_schema().source_type_key().clone(),
                                 Bytes::from("kafka"),
                             );
 
