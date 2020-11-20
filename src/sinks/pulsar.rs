@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    internal_events::PulsarEncodeEventFailed,
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
 };
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
@@ -221,7 +222,11 @@ impl Sink<Event> for PulsarSink {
             "Expected `poll_ready` to be called first."
         );
 
-        let message = encode_event(item, &self.encoding, &self.avro_schema).map_err(|e| error!("Error during encoding: {}", e))?;
+        let message = encode_event(item, &self.encoding, &self.avro_schema)
+            .map_err(|e| {
+                emit!(PulsarEncodeEventFailed { error: &*e.to_string() });
+                ()
+            })?;
 
         let mut producer = match std::mem::replace(&mut self.state, PulsarSinkState::None) {
             PulsarSinkState::Ready(producer) => producer,
