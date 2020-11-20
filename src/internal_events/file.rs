@@ -20,8 +20,7 @@ mod source {
     use super::{FileOpen, InternalEvent};
     use file_source::FileSourceInternalEvents;
     use metrics::counter;
-    use std::io::Error;
-    use std::path::Path;
+    use std::{io::Error, path::Path, time::Duration};
 
     #[derive(Debug)]
     pub struct FileEventReceived<'a> {
@@ -230,11 +229,16 @@ mod source {
     #[derive(Debug)]
     pub struct FileCheckpointed {
         pub count: usize,
+        pub duration: Duration,
     }
 
     impl InternalEvent for FileCheckpointed {
         fn emit_logs(&self) {
-            debug!(message = "Files checkpointed.", count = %self.count);
+            debug!(
+                message = "Files checkpointed.",
+                count = %self.count,
+                duration_ms = self.duration.as_millis() as u64,
+            );
         }
 
         fn emit_metrics(&self) {
@@ -296,8 +300,8 @@ mod source {
             emit!(FileChecksumFailed { path });
         }
 
-        fn emit_file_checkpointed(&self, count: usize) {
-            emit!(FileCheckpointed { count });
+        fn emit_file_checkpointed(&self, count: usize, duration: Duration) {
+            emit!(FileCheckpointed { count, duration });
         }
 
         fn emit_file_checkpoint_write_failed(&self, error: Error) {
