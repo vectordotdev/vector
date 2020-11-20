@@ -109,6 +109,20 @@ mod tests {
                 Ok(Value::from(false)),
                 IpCidrContainsFn::new(Box::new(Path::from("foo")), Box::new(Path::from("cidr"))),
             ),
+            (
+                map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
+                     "cidr": "2001:4f8:3:ba::/64",
+                ],
+                Ok(Value::from(true)),
+                IpCidrContainsFn::new(Box::new(Path::from("foo")), Box::new(Path::from("cidr"))),
+            ),
+            (
+                map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
+                     "cidr": "2001:4f8:4:ba::/64",
+                ],
+                Ok(Value::from(false)),
+                IpCidrContainsFn::new(Box::new(Path::from("foo")), Box::new(Path::from("cidr"))),
+            ),
         ];
 
         let mut state = state::Program::default();
