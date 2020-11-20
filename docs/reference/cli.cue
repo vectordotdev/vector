@@ -29,7 +29,6 @@ package metadata
 #Flags: [Flag=string]: {
 	flag:        "--\(Flag)"
 	description: !=""
-	default:     bool | *false
 	env_var?:    string
 
 	if _short != _|_ {
@@ -246,7 +245,6 @@ cli: #CommandLineTool & {
 						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
 						1,000,000 = 1.00 M
 						"""
-					default: false
 				}
 			}
 
