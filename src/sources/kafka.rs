@@ -369,7 +369,10 @@ mod integration_test {
             events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.trunc_subsecs(3).into());
+        assert_eq!(
+            events[0].as_log()[log_schema().timestamp_key()],
+            now.trunc_subsecs(3).into()
+        );
         assert_eq!(events[0].as_log()["topic"], topic.into());
         assert!(events[0].as_log().contains("partition"));
         assert!(events[0].as_log().contains("offset"));
