@@ -188,14 +188,24 @@ mod integration_tests {
     use futures::{compat::Future01CompatExt as _, stream};
 
     #[tokio::test]
-    async fn receives_metrics() {
-        let (tx, rx) = Pipeline::new_test();
-        let address = "127.0.0.1:9099";
+    async fn receives_metrics_over_http() {
+        receives_metrics(None).await;
+    }
 
+    #[tokio::test]
+    async fn receives_metrics_over_https() {
+        receives_metrics(Some(TlsConfig::test_config())).await;
+    }
+
+    async fn receives_metrics(tls: Option<TlsConfig>) {
+        let address = test_util::next_addr();
+        let (tx, rx) = Pipeline::new_test();
+
+        let proto = if tls.is_none() { "http" } else { "https" };
         let source = PrometheusRemoteWriteConfig {
-            address: address.parse().unwrap(),
+            address,
             auth: None,
-            tls: None,
+            tls: tls.clone(),
         };
         let source = source
             .build(
@@ -209,7 +219,8 @@ mod integration_tests {
         tokio::spawn(source.compat());
 
         let sink = RemoteWriteConfig {
-            endpoint: format!("http://{}/", address),
+            endpoint: format!("{}://localhost:{}/", proto, address.port()),
+            tls: tls.map(|tls| tls.options),
             ..Default::default()
         };
         let (sink, _) = sink
