@@ -25,6 +25,7 @@ enum State {
 /// A simple JSON-friendly struct of the fingerprint/position pair, since fingerprints as objects
 /// cannot be keys in a plain JSON map.
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 struct Checkpoint {
     fingerprint: FileFingerprint,
     position: FilePosition,
