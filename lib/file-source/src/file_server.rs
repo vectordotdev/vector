@@ -299,7 +299,6 @@ where
                                 Ok(()) => {
                                     self.emitter.emit_file_deleted(&watcher.path);
                                     watcher.set_dead();
-                                    checkpoints.set_dead(file_id);
                                 }
                                 Err(error) => {
                                     // We will try again after some time.
