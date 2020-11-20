@@ -226,7 +226,9 @@ impl HttpSink for ElasticSearchCommon {
         });
         maybe_set_id(
             self.config.id_key.as_ref(),
-            action.pointer_mut(self.bulk_action.as_json_pointer()).unwrap(),
+            action
+                .pointer_mut(self.bulk_action.as_json_pointer())
+                .unwrap(),
             &mut event,
         );
 
