@@ -92,4 +92,9 @@ components: sources: splunk_hec: {
 			timestamp: fields._current_timestamp
 		}
 	}
+
+	telemetry: metrics: {
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
+	}
 }

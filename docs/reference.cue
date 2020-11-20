@@ -44,7 +44,7 @@ _values: {
 // * `sidecar` - Vector is installed alongside each process it is
 //   monitoring. Therefore, there might be multiple Vector processes
 //   on the host.
-// * `service` - Vector receives data from one or more upstream
+// * `aggregator` - Vector receives data from one or more upstream
 //   sources, typically over a network protocol.
 #DeploymentRole: "aggregator" | "daemon" | "sidecar"
 
