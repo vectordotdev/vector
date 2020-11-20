@@ -96,7 +96,7 @@ impl ElasticSearchAuth {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[serde(default, deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
     Index,
     Create,
