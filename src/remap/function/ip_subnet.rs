@@ -1,7 +1,12 @@
+use lazy_static::lazy_static;
 use regex::Regex;
 use remap::prelude::*;
 use std::cmp::min;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+
+lazy_static! {
+    static ref RE: Regex = Regex::new(r"/(?P<subnet>\d*)").unwrap();
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct IpSubnet;
@@ -102,8 +107,7 @@ impl Expression for IpSubnetFn {
 
 /// Parses a subnet in the form "/8" returns the number.
 fn parse_subnet(subnet: &str) -> Result<u32> {
-    let re = Regex::new(r"/(?P<subnet>\d*)").unwrap();
-    let subnet = re
+    let subnet = RE
         .captures(subnet)
         .ok_or_else(|| format!("{} is not a valid subnet", subnet))?;
 
