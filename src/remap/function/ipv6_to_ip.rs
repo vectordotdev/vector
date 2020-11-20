@@ -13,7 +13,7 @@ impl Function for Ipv6ToIp {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -39,29 +39,27 @@ impl Ipv6ToIpFn {
 
 impl Expression for Ipv6ToIpFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = required!(state, object, self.value,
-                              Value::String(bytes) => String::from_utf8_lossy(&bytes).into_owned());
-
-        let ip = value
-            .parse()
-            .map_err(|err| format!("unable to parse IP address: {}", err))?;
+        let ip = {
+            let bytes = self.value.execute(state, object)?.try_bytes()?;
+            String::from_utf8_lossy(&bytes)
+                .parse()
+                .map_err(|err| format!("unable to parse IP address: {}", err))?
+        };
 
         match ip {
             IpAddr::V4(addr) => Ok(Value::from(addr.to_ipv6_mapped().to_string())),
-            IpAddr::V6(addr) => {
-                match addr.to_ipv4() {
-                    Some(addr) => Ok(Value::from(addr.to_string())),
-                    None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
-                }
-            }
+            IpAddr::V6(addr) => match addr.to_ipv4() {
+                Some(addr) => Ok(Value::from(addr.to_string())),
+                None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
+            },
         }
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
-            .with_constraint(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -70,12 +68,15 @@ mod tests {
     use super::*;
     use crate::map;
 
-    remap::test_type_def![
-        value_string {
-            expr: |_| Ipv6ToIpFn { value : Literal::from("192.168.0.1").boxed() },
-            def: TypeDef { kind: value::Kind::String, ..Default::default() },
-        }
-    ];
+    remap::test_type_def![value_string {
+        expr: |_| Ipv6ToIpFn {
+            value: Literal::from("192.168.0.1").boxed()
+        },
+        def: TypeDef {
+            kind: value::Kind::Bytes,
+            ..Default::default()
+        },
+    }];
 
     #[test]
     fn ipv6_to_ip() {

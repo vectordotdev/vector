@@ -13,12 +13,12 @@ impl Function for IpCidrContains {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "cidr",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
         ]
@@ -48,17 +48,17 @@ impl IpCidrContainsFn {
 impl Expression for IpCidrContainsFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
+            let bytes = self.value.execute(state, object)?.try_bytes()?;
             String::from_utf8_lossy(&bytes)
                 .parse()
-                .map_err(|err| format!("unable to parse IP address: {}", err))
-        }?;
+                .map_err(|err| format!("unable to parse IP address: {}", err))?
+        };
 
         let cidr = {
-            let bytes = required!(state, object, self.cidr, Value::String(v) => v);
+            let bytes = self.cidr.execute(state, object)?.try_bytes()?;
             let cidr = String::from_utf8_lossy(&bytes);
-            IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))
-        }?;
+            IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?
+        };
 
         Ok(Value::from(cidr.contains(value)))
     }
@@ -66,11 +66,11 @@ impl Expression for IpCidrContainsFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .merge(
                 self.cidr
                     .type_def(state)
-                    .fallible_unless(value::Kind::String),
+                    .fallible_unless(value::Kind::Bytes),
             )
             .with_constraint(value::Kind::Boolean)
     }
@@ -87,7 +87,7 @@ mod tests {
             cidr: Literal::from("192.168.0.0/16").boxed()
         },
         def: TypeDef {
-            kind: value::Kind::String,
+            kind: value::Kind::Boolean,
             ..Default::default()
         },
     }];

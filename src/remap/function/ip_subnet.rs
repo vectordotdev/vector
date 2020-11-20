@@ -15,12 +15,12 @@ impl Function for IpSubnet {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "subnet",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
         ]
@@ -50,18 +50,16 @@ impl IpSubnetFn {
 impl Expression for IpSubnetFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let value: IpAddr = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
+            let bytes = self.value.execute(state, object)?.try_bytes()?;
             String::from_utf8_lossy(&bytes)
                 .parse()
-                .map_err(|err| format!("unable to parse IP address: {}", err))
-        }?;
-
-        let mask = {
-            let bytes = required!(state, object, self.subnet, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+                .map_err(|err| format!("unable to parse IP address: {}", err))?
         };
 
-        let mask = if mask.starts_with("/") {
+        let bytes = self.subnet.execute(state, object)?.try_bytes()?;
+        let mask = String::from_utf8_lossy(&bytes);
+
+        let mask = if mask.starts_with('/') {
             // The parameter is a subnet.
             let subnet = parse_subnet(&mask)?;
             match value {
@@ -92,14 +90,92 @@ impl Expression for IpSubnetFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .merge(
                 self.subnet
                     .type_def(state)
-                    .fallible_unless(value::Kind::String),
+                    .fallible_unless(value::Kind::Bytes),
             )
-            .with_constraint(value::Kind::String)
+            .with_constraint(value::Kind::Bytes)
     }
+}
+
+/// Parses a subnet in the form "/8" returns the number.
+fn parse_subnet(subnet: &str) -> Result<u32> {
+    let re = Regex::new(r"/(?P<subnet>\d*)").unwrap();
+    let subnet = re
+        .captures(subnet)
+        .ok_or_else(|| format!("{} is not a valid subnet", subnet))?;
+
+    let subnet = subnet["subnet"].parse().unwrap(); // The regex ensures these are only digits.
+
+    Ok(subnet)
+}
+
+/// Masks the address by performing a bitwise AND between the two addresses.
+fn mask_ips(ip: IpAddr, mask: IpAddr) -> Result<IpAddr> {
+    match (ip, mask) {
+        (IpAddr::V4(addr), IpAddr::V4(mask)) => {
+            let addr: u32 = addr.into();
+            let mask: u32 = mask.into();
+            Ok(Ipv4Addr::from(addr & mask).into())
+        }
+        (IpAddr::V6(addr), IpAddr::V6(mask)) => {
+            let mut masked = [0; 8];
+            for ((masked, addr), mask) in masked
+                .iter_mut()
+                .zip(addr.segments().iter())
+                .zip(mask.segments().iter())
+            {
+                *masked = addr & mask
+            }
+
+            Ok(IpAddr::from(masked))
+        }
+        (IpAddr::V6(_), IpAddr::V4(_)) => {
+            Err("attempting to mask an ipv6 address with an ipv4 mask".into())
+        }
+        (IpAddr::V4(_), IpAddr::V6(_)) => {
+            Err("attempting to mask an ipv4 address with an ipv6 mask".into())
+        }
+    }
+}
+
+/// Returns a vector with the left `subnet_bits` set to 1,
+/// The remaining are set to 0, to make up a total length of `bytes`.
+fn get_mask_bits(mut subnet_bits: u32, bytes: usize) -> Vec<u8> {
+    let mut mask = Vec::with_capacity(bytes);
+
+    while subnet_bits > 0 {
+        let bits = min(subnet_bits, 8);
+        let byte = 255 - (2u16.pow(8 - bits) - 1) as u8;
+        mask.push(byte);
+
+        subnet_bits -= bits
+    }
+
+    while mask.len() < bytes {
+        mask.push(0);
+    }
+
+    mask
+}
+
+/// Take a vector of 4 bytes and returns an ipv4 IpAddr.
+fn ipv4_addr(vec: Vec<u8>) -> IpAddr {
+    debug_assert!(vec.len() == 4);
+    Ipv4Addr::new(vec[0], vec[1], vec[2], vec[3]).into()
+}
+
+/// Take a vector of 16 bytes and returns an ipv6 IpAddr.
+/// This can be made nicer in [1.48](https://blog.rust-lang.org/2020/11/19/Rust-1.48.html#library-changes)
+fn ipv6_addr(vec: Vec<u8>) -> IpAddr {
+    debug_assert!(vec.len() == 16);
+    Ipv6Addr::from([
+        vec[0], vec[1], vec[2], vec[3], vec[4], vec[5], vec[6], vec[7], vec[8], vec[9], vec[10],
+        vec[11], vec[12], vec[13], vec[14], vec[15],
+    ])
+    .into()
 }
 
 #[cfg(test)]
@@ -113,7 +189,7 @@ mod tests {
             subnet: Literal::from("/1").boxed(),
         },
         def: TypeDef {
-            kind: value::Kind::String,
+            kind: value::Kind::Bytes,
             ..Default::default()
         },
     }];
@@ -175,78 +251,4 @@ mod tests {
             assert_eq!(got, exp);
         }
     }
-}
-
-/// Parses a subnet in the form "/8" returns the number.
-fn parse_subnet(subnet: &str) -> Result<u32> {
-    let re = Regex::new(r"/(?P<subnet>\d*)").unwrap();
-    let subnet = re
-        .captures(subnet)
-        .ok_or_else(|| format!("{} is not a valid subnet", subnet))?;
-
-    let subnet = subnet["subnet"].parse().unwrap(); // The regex ensures these are only digits.
-
-    Ok(subnet)
-}
-
-/// Masks the address by performing a bitwise AND between the two addresses.
-fn mask_ips(ip: IpAddr, mask: IpAddr) -> Result<IpAddr> {
-    match (ip, mask) {
-        (IpAddr::V4(addr), IpAddr::V4(mask)) => {
-            let addr: u32 = addr.into();
-            let mask: u32 = mask.into();
-            Ok(Ipv4Addr::from(addr & mask).into())
-        }
-        (IpAddr::V6(addr), IpAddr::V6(mask)) => {
-            let mut masked = [0; 8];
-            for i in 0..8 {
-                masked[i] = addr.segments()[i] & mask.segments()[i];
-            }
-
-            Ok(IpAddr::from(masked))
-        }
-        (IpAddr::V6(_), IpAddr::V4(_)) => {
-            Err("attempting to mask an ipv6 address with an ipv4 mask".into())
-        }
-        (IpAddr::V4(_), IpAddr::V6(_)) => {
-            Err("attempting to mask an ipv4 address with an ipv6 mask".into())
-        }
-    }
-}
-
-/// Returns a vector with the left `subnet_bits` set to 1,
-/// The remaining are set to 0, to make up a total length of `bytes`.
-fn get_mask_bits(mut subnet_bits: u32, bytes: usize) -> Vec<u8> {
-    let mut mask = Vec::with_capacity(bytes);
-
-    while subnet_bits > 0 {
-        let bits = min(subnet_bits, 8);
-        let byte = 255 - (2u16.pow(8 - bits) - 1) as u8;
-        mask.push(byte);
-
-        subnet_bits -= bits
-    }
-
-    while mask.len() < bytes {
-        mask.push(0);
-    }
-
-    mask
-}
-
-/// Take a vector of 4 bytes and returns an ipv4 IpAddr.
-fn ipv4_addr(vec: Vec<u8>) -> IpAddr {
-    debug_assert!(vec.len() == 4);
-    Ipv4Addr::new(vec[0], vec[1], vec[2], vec[3]).into()
-}
-
-/// Take a vector of 16 bytes and returns an ipv6 IpAddr.
-/// This can be made nicer in [1.48](https://blog.rust-lang.org/2020/11/19/Rust-1.48.html#library-changes)
-fn ipv6_addr(vec: Vec<u8>) -> IpAddr {
-    debug_assert!(vec.len() == 16);
-    Ipv6Addr::from([
-        vec[0], vec[1], vec[2], vec[3], vec[4], vec[5], vec[6], vec[7], vec[8], vec[9], vec[10],
-        vec[11], vec[12], vec[13], vec[14], vec[15],
-    ])
-    .into()
 }
