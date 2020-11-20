@@ -11,7 +11,6 @@ use crate::{
 use chrono::{DateTime, Utc};
 use futures::{
     compat::Future01CompatExt,
-    future::{FutureExt, TryFutureExt},
     stream::{self, StreamExt},
 };
 use futures01::Sink;
@@ -131,7 +130,7 @@ impl SourceConfig for HostMetricsConfig {
         let mut config = self.clone();
         config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
 
-        Ok(Box::new(config.run(out, shutdown).boxed().compat()))
+        Ok(Box::pin(config.run(out, shutdown)))
     }
 
     fn output_type(&self) -> DataType {
