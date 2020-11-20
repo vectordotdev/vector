@@ -7,7 +7,7 @@ ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
     export DEFAULT_FEATURES = default-msvc
 else
   export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
-  ifeq ($(UNAME_S),Darwin)
+  ifeq ($(OPERATING_SYSTEM),Darwin)
     export DEFAULT_FEATURES = default-macos
   else
     export DEFAULT_FEATURES = default
