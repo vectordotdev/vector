@@ -91,10 +91,10 @@ impl FunctionTransform for Sampler {
         let num = if let Some(value) = value {
             seahash::hash(value.as_bytes())
         } else {
-            let count = self.count;
-            self.count = (count + 1) % self.rate;
-            count
+            self.count
         };
+
+        self.count = (self.count + 1) % self.rate;
 
         if num % self.rate == 0 {
             event
