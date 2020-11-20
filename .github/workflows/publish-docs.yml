@@ -38,8 +38,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           # timberio/vector-website and gatsby-docs respectively
-          repository: "${{ secrets.VECTOR_WEBSITE_REPO }}"
-          ref: ${{ secrets.NETLIFY_VECTOR_WEBSITE_REF }}"
+          repository: timberio/vector-website
+          ref: gatsby-docs
           path: vector-website
 
       - name: Setup Cue
@@ -84,7 +84,7 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: netlify deploy --dir=./ --message="Preview from vector:${{ github.head_ref }}@${{ github.sha }} With ${{ secrets.NETLIFY_VECTOR_WEBSITE_REPO }}@${{ secrets.NETLIFY_VECTOR_WEBSITE_REF }}"
+        run: netlify deploy --dir=./ --message="Preview from vector:${{ github.head_ref }}@${{ github.sha }} With timberio/vector-website@gatsby-docs"
 
   publish:
     runs-on: macos-latest
@@ -106,4 +106,4 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        run: netlify deploy --dir=./ --prod --message="Deploy from vector:${{ github.head_ref }}@${{ github.sha }} With ${{ secrets.NETLIFY_VECTOR_WEBSITE_REPO }}@${{ secrets.NETLIFY_VECTOR_WEBSITE_REF }}"
+        run: netlify deploy --dir=./ --prod --message="Deploy from vector:${{ github.head_ref }}@${{ github.sha }} With timberio/vector-website@gatsby-docs"
