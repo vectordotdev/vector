@@ -22,6 +22,7 @@ where
     C: Sink<Vec<(Bytes, String)>> + Unpin + Send + 'static,
     <C as Sink<Vec<(Bytes, String)>>>::Error: Error + Send,
     S: Future + Unpin + Send + 'static,
+    <S as Future>::Output: Clone + Send + Sync,
 {
     let span = info_span!("file_server");
     let join_handle = spawn_blocking(move || {

@@ -1,11 +1,12 @@
 use super::{fingerprinter::FileFingerprint, FilePosition};
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use glob::glob;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
     fs, io,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
@@ -35,8 +36,80 @@ pub struct Checkpointer {
     tmp_file_path: PathBuf,
     stable_file_path: PathBuf,
     glob_string: String,
-    checkpoints: HashMap<FileFingerprint, FilePosition>,
-    modified_times: HashMap<FileFingerprint, DateTime<Utc>>,
+    checkpoints: Arc<CheckpointsView>,
+}
+
+/// A thread-safe handle for reading and writing checkpoints in-memory across multiple threads.
+#[derive(Debug, Default)]
+pub struct CheckpointsView {
+    checkpoints: DashMap<FileFingerprint, FilePosition>,
+    modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
+}
+
+impl CheckpointsView {
+    pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
+        self.checkpoints.insert(fng, pos);
+        self.modified_times.insert(fng, Utc::now());
+    }
+
+    pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
+        self.checkpoints.get(&fng).map(|r| *r.value())
+    }
+
+    fn load(&self, checkpoint: Checkpoint) {
+        self.checkpoints
+            .insert(checkpoint.fingerprint, checkpoint.position);
+        self.modified_times
+            .insert(checkpoint.fingerprint, checkpoint.modified);
+    }
+
+    fn set_state(&self, state: State, ignore_before: Option<DateTime<Utc>>) {
+        match state {
+            State::V1 { checkpoints } => {
+                for checkpoint in checkpoints {
+                    if let Some(ignore_before) = ignore_before {
+                        if checkpoint.modified < ignore_before {
+                            continue;
+                        }
+                    }
+                    self.load(checkpoint);
+                }
+            }
+        }
+    }
+
+    fn get_state(&self) -> State {
+        State::V1 {
+            checkpoints: self
+                .checkpoints
+                .iter()
+                .map(|entry| {
+                    let fingerprint = entry.key();
+                    let position = entry.value();
+                    Checkpoint {
+                        fingerprint: *fingerprint,
+                        position: *position,
+                        modified: self
+                            .modified_times
+                            .get(fingerprint)
+                            .map(|r| *r.value())
+                            .unwrap_or_else(Utc::now),
+                    }
+                })
+                .collect(),
+        }
+    }
+
+    fn maybe_upgrade(&self, fresh: impl Iterator<Item = FileFingerprint>) {
+        for fng in fresh {
+            if let Some((_, pos)) = self
+                .checkpoints
+                .remove(&FileFingerprint::Unknown(fng.to_legacy()))
+            {
+                self.update(fng, pos);
+            }
+        }
+    }
 }
 
 impl Checkpointer {
@@ -51,9 +124,12 @@ impl Checkpointer {
             glob_string,
             tmp_file_path,
             stable_file_path,
-            checkpoints: HashMap::new(),
-            modified_times: HashMap::new(),
+            checkpoints: Arc::new(CheckpointsView::default()),
         }
+    }
+
+    pub fn view(&self) -> Arc<CheckpointsView> {
+        Arc::clone(&self.checkpoints)
     }
 
     /// Encode a fingerprint to a file name, including legacy Unknown values
@@ -106,77 +182,31 @@ impl Checkpointer {
         }
     }
 
+    #[cfg(test)]
     pub fn update_checkpoint(&mut self, fng: FileFingerprint, pos: FilePosition) {
-        self.checkpoints.insert(fng, pos);
-        self.modified_times.insert(fng, Utc::now());
+        self.checkpoints.update(fng, pos);
     }
 
+    #[cfg(test)]
     pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
-        self.checkpoints.get(&fng).cloned()
-    }
-
-    fn load_checkpoint(&mut self, checkpoint: Checkpoint) {
-        self.checkpoints
-            .insert(checkpoint.fingerprint, checkpoint.position);
-        self.modified_times
-            .insert(checkpoint.fingerprint, checkpoint.modified);
-    }
-
-    fn set_state(&mut self, state: State, ignore_before: Option<DateTime<Utc>>) {
-        match state {
-            State::V1 { checkpoints } => {
-                for checkpoint in checkpoints {
-                    if let Some(ignore_before) = ignore_before {
-                        if checkpoint.modified < ignore_before {
-                            continue;
-                        }
-                    }
-                    self.load_checkpoint(checkpoint);
-                }
-            }
-        }
-    }
-
-    fn get_state(&self) -> State {
-        State::V1 {
-            checkpoints: self
-                .checkpoints
-                .iter()
-                .map(|(&fingerprint, &position)| Checkpoint {
-                    fingerprint,
-                    position,
-                    modified: self
-                        .modified_times
-                        .get(&fingerprint)
-                        .cloned()
-                        .unwrap_or_else(Utc::now),
-                })
-                .collect(),
-        }
+        self.checkpoints.get(fng)
     }
 
     /// Scan through a given list of fresh fingerprints (i.e. not legacy Unknown) to see if any
     /// match an existing legacy fingerprint. If so, upgrade the existing fingerprint.
     pub fn maybe_upgrade(&mut self, fresh: impl Iterator<Item = FileFingerprint>) {
-        for fng in fresh {
-            if let Some(pos) = self
-                .checkpoints
-                .remove(&FileFingerprint::Unknown(fng.to_legacy()))
-            {
-                self.checkpoints.insert(fng, pos);
-            }
-        }
+        self.checkpoints.maybe_upgrade(fresh)
     }
 
     /// Persist the current checkpoints state to disk, making our best effort to do so in an atomic
     /// way that allow for recovering the previous state in the event of a crash.
-    pub fn write_checkpoints(&mut self) -> Result<usize, io::Error> {
+    pub fn write_checkpoints(&self) -> Result<usize, io::Error> {
         // First write the new checkpoints to a tmp file and flush it fully to disk. If vector
         // dies anywhere during this section, the existing stable file will still be in its current
         // valid state and we'll be able to recover.
-        let mut f = fs::File::create(&self.tmp_file_path)?;
-        serde_json::to_writer(&mut f, &self.get_state())?;
-        f.sync_all()?;
+        let mut f = io::BufWriter::new(fs::File::create(&self.tmp_file_path)?);
+        serde_json::to_writer(&mut f, &self.checkpoints.get_state())?;
+        f.into_inner()?.sync_all()?;
 
         // Once the temp file is fully flushed, rename the tmp file to replace the previous stable
         // file. This is an atomic operation on POSIX systems (and the stdlib claims to provide
@@ -184,7 +214,7 @@ impl Checkpointer {
         // least one full valid file to recover from.
         fs::rename(&self.tmp_file_path, &self.stable_file_path)?;
 
-        Ok(self.checkpoints.len())
+        Ok(self.checkpoints.checkpoints.len())
     }
 
     /// Write checkpoints to disk in the legacy format. Used for compatibility testing only.
@@ -192,10 +222,10 @@ impl Checkpointer {
     pub fn write_legacy_checkpoints(&mut self) -> Result<usize, io::Error> {
         fs::remove_dir_all(&self.directory).ok();
         fs::create_dir_all(&self.directory)?;
-        for (&fng, &pos) in self.checkpoints.iter() {
-            fs::File::create(self.encode(fng, pos))?;
+        for c in self.checkpoints.checkpoints.iter() {
+            fs::File::create(self.encode(*c.key(), *c.value()))?;
         }
-        Ok(self.checkpoints.len())
+        Ok(self.checkpoints.checkpoints.len())
     }
 
     /// Read persisted checkpoints from disk, preferring the new JSON file format but falling back
@@ -207,7 +237,7 @@ impl Checkpointer {
         match self.read_checkpoints_file(&self.tmp_file_path) {
             Ok(state) => {
                 warn!(message = "Recovered checkpoint data from interrupted process.");
-                self.set_state(state, ignore_before);
+                self.checkpoints.set_state(state, ignore_before);
 
                 // Try to move this tmp file to the stable location so we don't immediately overwrite
                 // it when we next persist checkpoints.
@@ -229,7 +259,7 @@ impl Checkpointer {
         match self.read_checkpoints_file(&self.stable_file_path) {
             Ok(state) => {
                 info!(message = "Loaded checkpoint data.");
-                self.set_state(state, ignore_before);
+                self.checkpoints.set_state(state, ignore_before);
                 return;
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
@@ -269,9 +299,9 @@ impl Checkpointer {
                 }
             }
             let (fng, pos) = self.decode(&path);
-            self.checkpoints.insert(fng, pos);
+            self.checkpoints.checkpoints.insert(fng, pos);
             if let Some(mtime) = mtime {
-                self.modified_times.insert(fng, mtime);
+                self.checkpoints.modified_times.insert(fng, mtime);
             }
         }
     }
@@ -331,10 +361,10 @@ mod test {
 
         // load and persist the checkpoints
         {
-            let mut chkptr = Checkpointer::new(&data_dir.path());
+            let chkptr = Checkpointer::new(&data_dir.path());
 
             for (fingerprint, modified) in &[&newer, &newish, &oldish, &older] {
-                chkptr.load_checkpoint(Checkpoint {
+                chkptr.checkpoints.load(Checkpoint {
                     fingerprint: *fingerprint,
                     position,
                     modified: *modified,
