@@ -61,15 +61,15 @@ pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
     if conflicting_componenets.is_empty() {
         Ok(())
     } else {
-        let conflicting_componenets = conflicting_componenets
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>();
-        let error = format!(
-            "Multiple components own the same resource. Conflicting components: {}.",
-            conflicting_componenets.join(", ")
-        );
-        Err(vec![error])
+        Err(conflicting_componenets
+            .into_iter()
+            .map(|(resource, components)| {
+                format!(
+                    "Resource `{}` is claimed by multiple components: {:?}",
+                    resource, components
+                )
+            })
+            .collect())
     }
 }
 

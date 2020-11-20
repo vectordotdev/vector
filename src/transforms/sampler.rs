@@ -112,6 +112,7 @@ mod tests {
     use super::*;
     use crate::{
         conditions::check_fields::CheckFieldsPredicateArg, config::log_schema, event::Event,
+        test_util::random_lines,
     };
     use approx::assert_relative_eq;
     use indexmap::IndexMap;
@@ -258,17 +259,6 @@ mod tests {
     }
 
     fn random_events(n: usize) -> Vec<Event> {
-        use rand::{thread_rng, Rng};
-        use rand_distr::Alphanumeric;
-
-        (0..n)
-            .map(|_| {
-                thread_rng()
-                    .sample_iter(&Alphanumeric)
-                    .take(10)
-                    .collect::<String>()
-            })
-            .map(Event::from)
-            .collect()
+        random_lines(10).take(n).map(Event::from).collect()
     }
 }

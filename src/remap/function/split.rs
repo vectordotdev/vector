@@ -13,12 +13,12 @@ impl Function for Split {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -51,7 +51,8 @@ pub(crate) struct SplitFn {
 
 impl Expression for SplitFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
         let limit: usize = self
             .limit
             .as_ref()
@@ -64,13 +65,17 @@ impl Expression for SplitFn {
 
         let value = match &self.pattern {
             Argument::Regex(pattern) => pattern
-                .splitn(&value, limit as usize)
+                .splitn(value.as_ref(), limit as usize)
                 .collect::<Vec<_>>()
                 .into(),
             Argument::Expression(expr) => {
-                let pattern = required!(state, object, expr, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+                let bytes = expr.execute(state, object)?.try_bytes()?;
+                let pattern = String::from_utf8_lossy(&bytes);
 
-                value.splitn(limit, &pattern).collect::<Vec<_>>().into()
+                value
+                    .splitn(limit, pattern.as_ref())
+                    .collect::<Vec<_>>()
+                    .into()
             }
         };
 
@@ -87,13 +92,13 @@ impl Expression for SplitFn {
         });
 
         let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::String)),
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
         };
 
         self.value
             .type_def(state)
-            .fallible_unless(Kind::String)
+            .fallible_unless(Kind::Bytes)
             .merge_optional(limit_def)
             .merge_optional(pattern_def)
             .with_constraint(Kind::Array)

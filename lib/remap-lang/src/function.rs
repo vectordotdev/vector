@@ -116,7 +116,7 @@ impl ArgumentList {
         let variant = expression::Literal::try_from(argument.into_expr())?
             .as_value()
             .clone()
-            .try_string()
+            .try_bytes()
             .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())?;
 
         if variants.contains(&variant.as_str()) {

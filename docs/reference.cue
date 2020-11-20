@@ -44,7 +44,7 @@ _values: {
 // * `sidecar` - Vector is installed alongside each process it is
 //   monitoring. Therefore, there might be multiple Vector processes
 //   on the host.
-// * `service` - Vector receives data from one or more upstream
+// * `aggregator` - Vector receives data from one or more upstream
 //   sources, typically over a network protocol.
 #DeploymentRole: "aggregator" | "daemon" | "sidecar"
 
@@ -238,7 +238,7 @@ _values: {
 		category: strings.ToTitle(name)
 	}
 
-	// `desription` describes the option in a succinct fashion. Usually 1 to
+	// `description` describes the option in a succinct fashion. Usually 1 to
 	// 2 sentences.
 	description: string
 

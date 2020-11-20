@@ -1,26 +1,5 @@
 #![macro_use]
 
-macro_rules! required {
-    ($state:expr, $object:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
-        match $fn.execute($state, $object)? {
-            $($pattern $(if $if)? => $then,)+
-            v => panic!(v),
-        }
-    }
-}
-
-macro_rules! optional {
-    ($state:expr, $object:expr, $fn:expr, $($pattern:pat $(if $if:expr)? => $then:expr),+ $(,)?) => {
-        $fn.as_ref()
-            .map(|v| v.execute($state, $object))
-            .transpose()?
-            .map(|value| match value {
-                $($pattern $(if $if)? => $then,)+
-                v => panic!(v),
-            })
-    }
-}
-
 mod ceil;
 mod contains;
 mod del;
@@ -111,7 +90,7 @@ fn is_scalar_value(value: &Value) -> bool {
     use Value::*;
 
     match value {
-        Integer(_) | Float(_) | String(_) | Boolean(_) | Null => true,
+        Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
         Timestamp(_) | Map(_) | Array(_) => false,
     }
 }

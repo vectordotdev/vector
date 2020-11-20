@@ -294,6 +294,8 @@ impl Source {
             remove_after: None,
             // The standard emitter.
             emitter: FileSourceInternalEventsEmitter,
+            // A handle to the current tokio runtime
+            handle: tokio::runtime::Handle::current(),
         };
 
         let (file_source_tx, file_source_rx) =

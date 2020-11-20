@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use remap::prelude::*;
 use rust_decimal::{prelude::FromPrimitive, Decimal};
 
@@ -24,12 +23,12 @@ impl Function for FormatNumber {
             },
             Parameter {
                 keyword: "decimal_separator",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
             Parameter {
                 keyword: "grouping_separator",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
         ]
@@ -81,18 +80,26 @@ impl FormatNumberFn {
 
 impl Expression for FormatNumberFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = required!(state, object, self.value,
-            Value::Integer(v) => Decimal::from_i64(v),
-            Value::Float(v) => Decimal::from_f64(v),
-        )
-        .ok_or("unable to parse number")?;
+        let value: Decimal = match self.value.execute(state, object)? {
+            Value::Integer(v) => v.into(),
+            Value::Float(v) => Decimal::from_f64(v).expect("not NaN"),
+            _ => unreachable!(),
+        };
 
-        let scale = optional!(state, object, self.scale, Value::Integer(v) => v);
-        let grouping_separator =
-            optional!(state, object, self.grouping_separator, Value::String(v) => v);
-        let decimal_separator =
-            optional!(state, object, self.decimal_separator, Value::String(v) => v)
-                .unwrap_or_else(|| Bytes::from("."));
+        let scale = match &self.scale {
+            Some(expr) => Some(expr.execute(state, object)?.try_integer()?),
+            None => None,
+        };
+
+        let grouping_separator = match &self.grouping_separator {
+            Some(expr) => Some(expr.execute(state, object)?.try_bytes()?),
+            None => None,
+        };
+
+        let decimal_separator = match &self.decimal_separator {
+            Some(expr) => expr.execute(state, object)?.try_bytes()?,
+            None => ".".into(),
+        };
 
         // Split integral and fractional part of float.
         let mut parts = value
@@ -159,13 +166,13 @@ impl Expression for FormatNumberFn {
         let decimal_separator_def = self.decimal_separator.as_ref().map(|decimal_separator| {
             decimal_separator
                 .type_def(state)
-                .fallible_unless(Kind::String)
+                .fallible_unless(Kind::Bytes)
         });
 
         let grouping_separator_def = self.grouping_separator.as_ref().map(|grouping_separator| {
             grouping_separator
                 .type_def(state)
-                .fallible_unless(Kind::String)
+                .fallible_unless(Kind::Bytes)
         });
 
         self.value
@@ -175,7 +182,7 @@ impl Expression for FormatNumberFn {
             .merge_optional(decimal_separator_def)
             .merge_optional(grouping_separator_def)
             .into_fallible(true) // `Decimal::from` can theoretically fail.
-            .with_constraint(Kind::String)
+            .with_constraint(Kind::Bytes)
     }
 }
 
@@ -193,7 +200,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_float {
@@ -203,7 +210,7 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         // TODO(jean): we should update the function to ignore `None` values,
@@ -215,18 +222,13 @@ mod tests {
                 decimal_separator: None,
                 grouping_separator: None,
             },
-            def: TypeDef { fallible: true, optional: true, kind: Kind::String },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::Bytes },
         }
     ];
 
     #[test]
     fn format_number() {
         let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                FormatNumberFn::new(Box::new(Path::from("foo")), None, None, None),
-            ),
             (
                 map![],
                 Ok("1234.567".into()),

@@ -12,12 +12,12 @@ impl Function for EndsWith {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "substring",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -64,30 +64,39 @@ impl EndsWithFn {
 
 impl Expression for EndsWithFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let case_sensitive = match &self.case_sensitive {
+            Some(expr) => expr.execute(state, object)?.try_boolean()?,
+            None => false,
+        };
+
         let substring = {
-            let bytes = required!(state, object, self.substring, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+            let bytes = self.substring.execute(state, object)?.try_bytes()?;
+            let string = String::from_utf8_lossy(&bytes);
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
         };
 
         let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
+            let bytes = self.value.execute(state, object)?.try_bytes()?;
+            let string = String::from_utf8_lossy(&bytes);
+
+            match case_sensitive {
+                true => string.into_owned(),
+                false => string.to_lowercase(),
+            }
         };
 
-        let ends_with = value.ends_with(&substring)
-            || optional!(state, object, self.case_sensitive, Value::Boolean(b) => b)
-                .iter()
-                .filter(|&case_sensitive| !case_sensitive)
-                .any(|_| value.to_lowercase().ends_with(&substring.to_lowercase()));
-
-        Ok(ends_with.into())
+        Ok(value.ends_with(&substring).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         let substring_def = self
             .substring
             .type_def(state)
-            .fallible_unless(value::Kind::String);
+            .fallible_unless(value::Kind::Bytes);
 
         let case_sensitive_def = self
             .case_sensitive
@@ -96,7 +105,7 @@ impl Expression for EndsWithFn {
 
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .merge(substring_def)
             .merge_optional(case_sensitive_def)
             .with_constraint(value::Kind::Boolean)
@@ -150,11 +159,6 @@ mod tests {
     #[test]
     fn ends_with() {
         let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                EndsWithFn::new(Box::new(Path::from("foo")), "", false),
-            ),
             (
                 map![],
                 Ok(false.into()),

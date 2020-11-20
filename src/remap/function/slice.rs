@@ -12,7 +12,7 @@ impl Function for Slice {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_) | Value::Array(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Array(_)),
                 required: true,
             },
             Parameter {
@@ -56,8 +56,11 @@ impl SliceFn {
 
 impl Expression for SliceFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let start = required!(state, object, self.start, Value::Integer(v) => v);
-        let end = optional!(state, object, self.end, Value::Integer(v) => v);
+        let start = self.start.execute(state, object)?.try_integer()?;
+        let end = match &self.end {
+            Some(expr) => Some(expr.execute(state, object)?.try_integer()?),
+            None => None,
+        };
 
         let range = |len: i64| -> Result<std::ops::Range<usize>> {
             let start = match start {
@@ -81,14 +84,14 @@ impl Expression for SliceFn {
             }
         };
 
-        required! {
-            state, object, self.value,
-            Value::String(v) => range(v.len() as i64)
+        match self.value.execute(state, object)? {
+            Value::Bytes(v) => range(v.len() as i64)
                 .map(|range| v.slice(range))
                 .map(Value::from),
             Value::Array(mut v) => range(v.len() as i64)
                 .map(|range| v.drain(range).collect::<Vec<_>>())
                 .map(Value::from),
+            _ => unreachable!(),
         }
     }
 
@@ -98,7 +101,7 @@ impl Expression for SliceFn {
         let value_def = self
             .value
             .type_def(state)
-            .fallible_unless(Kind::String | Kind::Array);
+            .fallible_unless(Kind::Bytes | Kind::Array);
         let end_def = self
             .end
             .as_ref()
@@ -109,8 +112,8 @@ impl Expression for SliceFn {
             .merge(self.start.type_def(state).fallible_unless(Kind::Integer))
             .merge_optional(end_def)
             .with_constraint(match value_def.kind {
-                v if v.is_string() || v.is_array() => v,
-                _ => Kind::String | Kind::Array,
+                v if v.is_bytes() || v.is_array() => v,
+                _ => Kind::Bytes | Kind::Array,
             })
             .into_fallible(true) // can fail for invalid start..end ranges
     }
@@ -129,7 +132,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
         }
 
         value_array {
@@ -147,7 +150,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::String | Kind::Array, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array, ..Default::default() },
         }
     ];
 
@@ -277,11 +280,6 @@ mod tests {
     #[test]
     fn errors() {
         let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                SliceFn::new(Box::new(Path::from("foo")), 0, None),
-            ),
             (
                 map![],
                 Err(r#"function call error: "start" must be between "-3" and "3""#.into()),

@@ -55,7 +55,7 @@ impl Expression for ToBoolFn {
             Integer(v) => Ok(Boolean(v != 0)),
             Float(v) => Ok(Boolean(v != 0.0)),
             Null => Ok(Boolean(false)),
-            String(_) => Conversion::Boolean
+            Bytes(_) => Conversion::Boolean
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
@@ -195,13 +195,8 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToBoolFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::Boolean(true)),
-                ToBoolFn::new(Box::new(Path::from("foo")), Some(Value::Boolean(true))),
+                ToBoolFn::new(Literal::from(vec![0]).boxed(), Some(true.into())),
             ),
             (
                 map!["foo": "true"],

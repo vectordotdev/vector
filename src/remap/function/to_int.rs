@@ -55,7 +55,7 @@ impl Expression for ToIntFn {
             Float(v) => Ok(Integer(v as i64)),
             Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
             Null => Ok(0.into()),
-            String(_) => Conversion::Integer
+            Bytes(_) => Conversion::Integer
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
@@ -195,13 +195,8 @@ mod tests {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToIntFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
                 Ok(Value::Integer(10)),
-                ToIntFn::new(Box::new(Path::from("foo")), Some(10.into())),
+                ToIntFn::new(Literal::from(vec![0]).boxed(), Some(10.into())),
             ),
             (
                 map!["foo": "20"],

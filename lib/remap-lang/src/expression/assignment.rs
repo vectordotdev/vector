@@ -98,7 +98,7 @@ mod tests {
                 Assignment::new(target, value, state)
             },
             def: TypeDef {
-                kind: Kind::String,
+                kind: Kind::Bytes,
                 ..Default::default()
             },
         }

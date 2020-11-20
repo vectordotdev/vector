@@ -391,6 +391,7 @@ pub mod test_util {
 
     pub(crate) async fn onboarding_v1(endpoint: &str) -> String {
         let database = next_database();
+        query_v1(endpoint, &format!("drop database {}", database)).await;
         let status = query_v1(endpoint, &format!("create database {}", database))
             .await
             .status();

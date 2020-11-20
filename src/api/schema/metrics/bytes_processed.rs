@@ -61,3 +61,28 @@ impl ComponentBytesProcessedTotal {
         BytesProcessedTotal::new(self.metric.clone())
     }
 }
+
+pub struct ComponentBytesProcessedThroughput {
+    name: String,
+    throughput: i64,
+}
+
+impl ComponentBytesProcessedThroughput {
+    /// Returns a new `ComponentBytesProcessedThroughput`, set to the provided name/throughput values
+    pub fn new(name: String, throughput: i64) -> Self {
+        Self { name, throughput }
+    }
+}
+
+#[Object]
+impl ComponentBytesProcessedThroughput {
+    /// Component name
+    async fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Bytes processed throughput
+    async fn throughput(&self) -> i64 {
+        self.throughput
+    }
+}

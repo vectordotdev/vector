@@ -514,6 +514,11 @@ enum Ec2MetadataError {
 mod integration_tests {
     use super::*;
     use crate::{event::Event, test_util::trace_init};
+    use futures::{
+        compat::{Future01CompatExt, Stream01CompatExt},
+        StreamExt,
+    };
+    use futures01::Sink;
 
     const HOST: &str = "http://localhost:8111";
 
@@ -530,15 +535,18 @@ mod integration_tests {
             endpoint: Some(HOST.to_string()),
             ..Default::default()
         };
-        let mut transform = config.build().await.unwrap();
-        let transform = transform.as_function();
+        let transform = config.build().await.unwrap().into_task();
+
+        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let mut rx = transform.transform(Box::new(rx)).compat();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
+        tx.send(event).compat().await.unwrap();
 
-        let event = transform.transform_one(event).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
@@ -565,15 +573,18 @@ mod integration_tests {
             fields: Some(vec!["public-ipv4".into(), "region".into()]),
             ..Default::default()
         };
-        let mut transform = config.build().await.unwrap();
-        let transform = transform.as_function();
+        let transform = config.build().await.unwrap().into_task();
+
+        let (tx, rx) = futures01::sync::mpsc::channel(100);
+        let mut rx = transform.transform(Box::new(rx)).compat();
 
         // We need to sleep to let the background task fetch the data.
         delay_for(Duration::from_secs(1)).await;
 
         let event = Event::new_empty_log();
+        tx.send(event).compat().await.unwrap();
 
-        let event = transform.transform_one(event).unwrap();
+        let event = rx.next().await.unwrap().unwrap();
         let log = event.as_log();
 
         assert_eq!(log.get("availability-zone"), None);
@@ -589,49 +600,59 @@ mod integration_tests {
 
     #[tokio::test]
     async fn namespace() {
-        let config = Ec2Metadata {
-            endpoint: Some(HOST.to_string()),
-            namespace: Some("ec2.metadata".into()),
-            ..Default::default()
-        };
-        let mut transform = config.build().await.unwrap();
-        let transform = transform.as_function();
+        {
+            let config = Ec2Metadata {
+                endpoint: Some(HOST.to_string()),
+                namespace: Some("ec2.metadata".into()),
+                ..Default::default()
+            };
+            let transform = config.build().await.unwrap().into_task();
 
-        // We need to sleep to let the background task fetch the data.
-        delay_for(Duration::from_secs(1)).await;
+            let (tx, rx) = futures01::sync::mpsc::channel(100);
+            let mut rx = transform.transform(Box::new(rx)).compat();
 
-        let event = Event::new_empty_log();
+            // We need to sleep to let the background task fetch the data.
+            delay_for(Duration::from_secs(1)).await;
 
-        let event = transform.transform_one(event).unwrap();
-        let log = event.as_log();
+            let event = Event::new_empty_log();
+            tx.send(event).compat().await.unwrap();
 
-        assert_eq!(
-            log.get("ec2.metadata.availability-zone"),
-            Some(&"ww-region-1a".into())
-        );
-        assert_eq!(
-            log.get("ec2.metadata.public-ipv4"),
-            Some(&"192.1.1.1".into())
-        );
+            let event = rx.next().await.unwrap().unwrap();
+            let log = event.as_log();
 
-        // Set an empty namespace to ensure we don't prepend one.
-        let config = Ec2Metadata {
-            endpoint: Some(HOST.to_string()),
-            namespace: Some("".into()),
-            ..Default::default()
-        };
-        let mut transform = config.build().await.unwrap();
-        let transform = transform.as_function();
+            assert_eq!(
+                log.get("ec2.metadata.availability-zone"),
+                Some(&"ww-region-1a".into())
+            );
+            assert_eq!(
+                log.get("ec2.metadata.public-ipv4"),
+                Some(&"192.1.1.1".into())
+            );
+        }
 
-        // We need to sleep to let the background task fetch the data.
-        delay_for(Duration::from_secs(1)).await;
+        {
+            // Set an empty namespace to ensure we don't prepend one.
+            let config = Ec2Metadata {
+                endpoint: Some(HOST.to_string()),
+                namespace: Some("".into()),
+                ..Default::default()
+            };
+            let transform = config.build().await.unwrap().into_task();
 
-        let event = Event::new_empty_log();
+            let (tx, rx) = futures01::sync::mpsc::channel(100);
+            let mut rx = transform.transform(Box::new(rx)).compat();
 
-        let event = transform.transform_one(event).unwrap();
-        let log = event.as_log();
+            // We need to sleep to let the background task fetch the data.
+            delay_for(Duration::from_secs(1)).await;
 
-        assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
-        assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+            let event = Event::new_empty_log();
+            tx.send(event).compat().await.unwrap();
+
+            let event = rx.next().await.unwrap().unwrap();
+            let log = event.as_log();
+
+            assert_eq!(log.get("availability-zone"), Some(&"ww-region-1a".into()));
+            assert_eq!(log.get("public-ipv4"), Some(&"192.1.1.1".into()));
+        }
     }
 }

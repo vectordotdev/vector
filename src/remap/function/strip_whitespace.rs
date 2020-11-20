@@ -11,7 +11,7 @@ impl Function for StripWhitespace {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -37,7 +37,8 @@ impl StripWhitespaceFn {
 
 impl Expression for StripWhitespaceFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
 
         Ok(value.trim().into())
     }
@@ -45,8 +46,8 @@ impl Expression for StripWhitespaceFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
-            .with_constraint(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -58,23 +59,18 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| StripWhitespaceFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { kind: value::Kind::String, ..Default::default() },
+            def: TypeDef { kind: value::Kind::Bytes, ..Default::default() },
         }
 
         fallible_expression {
             expr: |_| StripWhitespaceFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::String, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
         }
     ];
 
     #[test]
     fn strip_whitespace() {
         let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                StripWhitespaceFn::new(Box::new(Path::from("foo"))),
-            ),
             (
                 map!["foo": ""],
                 Ok("".into()),

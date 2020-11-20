@@ -12,12 +12,16 @@ mod auto_concurrency;
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
 pub(crate) mod aws_s3;
+#[cfg(feature = "sinks-aws_sqs")]
+mod aws_sqs;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -118,10 +122,14 @@ pub use self::auto_concurrency::*;
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub use self::aws_ec2_metadata::*;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+pub use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-aws_sqs")]
+pub use self::aws_sqs::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;

@@ -48,7 +48,7 @@ impl Expression for Arithmetic {
 
         let kind = match self.op {
             Or => self.lhs.type_def(state).kind | self.rhs.type_def(state).kind,
-            Multiply | Add => Kind::String | Kind::Integer | Kind::Float,
+            Multiply | Add => Kind::Bytes | Kind::Integer | Kind::Float,
             Remainder | Subtract | Divide => Kind::Integer | Kind::Float,
             And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => Kind::Boolean,
         };
@@ -80,7 +80,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String | Kind::Boolean,
+                kind: Kind::Bytes | Kind::Boolean,
             },
         }
 
@@ -106,7 +106,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String | Kind::Integer | Kind::Float,
+                kind: Kind::Bytes | Kind::Integer | Kind::Float,
             },
         }
 
@@ -119,7 +119,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 optional: false,
-                kind: Kind::String | Kind::Integer | Kind::Float,
+                kind: Kind::Bytes | Kind::Integer | Kind::Float,
             },
         }
 
