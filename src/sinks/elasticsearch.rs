@@ -61,6 +61,7 @@ pub struct ElasticSearchConfig {
 
     pub aws: Option<RegionOrEndpoint>,
     pub tls: Option<TlsOptions>,
+    #[serde(default)]
     pub bulk_action: BulkAction,
 }
 
@@ -96,7 +97,7 @@ impl ElasticSearchAuth {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(default, deny_unknown_fields, rename_all = "snake_case")]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum BulkAction {
     Index,
     Create,
