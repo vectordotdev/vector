@@ -8,10 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{
-    compat::{Compat, Future01CompatExt},
-    FutureExt, StreamExt,
-};
+use futures::{compat::Future01CompatExt, StreamExt};
 use futures01::Sink;
 use rdkafka::{
     config::ClientConfig,
@@ -108,7 +105,7 @@ fn kafka_source(
     let key_field = config.key_field.clone();
     let consumer = Arc::new(create_consumer(config)?);
 
-    let fut = async move {
+    Ok(Box::pin(async move {
         Arc::clone(&consumer)
             .start()
             .take_until(shutdown.clone())
@@ -189,9 +186,7 @@ fn kafka_source(
             })
             .await;
         Ok(())
-    };
-
-    Ok(Box::new(Compat::new(fut.boxed())))
+    }))
 }
 
 fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> {
@@ -278,7 +273,6 @@ mod integration_test {
         Pipeline,
     };
     use chrono::Utc;
-    use futures::compat::Future01CompatExt;
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
@@ -337,11 +331,7 @@ mod integration_test {
 
         println!("Receiving event...");
         let (tx, rx) = Pipeline::new_test();
-        tokio::spawn(
-            kafka_source(&config, ShutdownSignal::noop(), tx)
-                .unwrap()
-                .compat(),
-        );
+        tokio::spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
         let events = collect_n(rx, 1).await.unwrap();
 
         assert_eq!(
