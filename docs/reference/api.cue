@@ -3,14 +3,14 @@ package metadata
 // These sources produce JSON providing a structured representation of the
 // Vector GraphQL API
 
-#GraphQLAPI: {
+api: {
 	description:     !=""
 	playground_url:  !=""
 	schema_json_url: !=""
 	configuration:   #Schema
 }
 
-api: #GraphQLAPI & {
+api: {
 	description:     """
 		The [GraphQL](\(urls.graphql)) API exposed by Vector for configuration,
 		monitoring, and topology visualization.
