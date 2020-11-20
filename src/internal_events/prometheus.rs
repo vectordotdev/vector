@@ -1,6 +1,7 @@
 use super::InternalEvent;
 #[cfg(feature = "sources-prometheus")]
 use crate::sources::prometheus::parser::ParserError;
+use hyper::StatusCode;
 use metrics::{counter, histogram};
 #[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
@@ -98,12 +99,12 @@ impl InternalEvent for PrometheusHttpError {
 
 #[derive(Debug)]
 pub struct PrometheusServerRequestComplete {
-    pub code: u16,
+    pub status_code: StatusCode,
 }
 
 impl InternalEvent for PrometheusServerRequestComplete {
     fn emit_logs(&self) {
-        error!(message = "Request to prometheus server complete.", code = %self.code);
+        error!(message = "Request to prometheus server complete.", status_code = %self.status_code);
     }
 
     fn emit_metrics(&self) {

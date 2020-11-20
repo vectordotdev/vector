@@ -252,7 +252,7 @@ impl PrometheusExporter {
                     });
 
                     emit!(PrometheusServerRequestComplete {
-                        code: response.status().as_u16(),
+                        status_code: response.status(),
                     });
 
                     future::ok::<_, Infallible>(response)
