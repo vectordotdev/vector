@@ -2,61 +2,6 @@ package metadata
 
 // These sources produce JSON providing a structured representation of the
 // Vector CLI (commands, flags, etc.)
-
-#Args: [Arg=string]: {
-	description: !=""
-	type:        #ArgType
-	default?:    string | [...string]
-}
-
-#ArgType: "string" | "list"
-
-#CommandLineTool: {
-	name:     !=""
-	flags:    #Flags
-	options:  #Options
-	commands: #Commands
-}
-
-#Commands: [Command=string]: {
-	description: !=""
-	flags?:      #Flags
-	options?:    #Options
-	args?:       #Args
-}
-
-#Flags: [Flag=string]: {
-	flag:        "--\(Flag)"
-	description: !=""
-	default:     bool | *false
-
-	if _short != _|_ {
-		short: "-\(_short)"
-	}
-
-	_short: !=""
-}
-
-#Options: [Option=string]: {
-	option:      "--\(Option)"
-	description: !=""
-	default?:    string | int
-	enum?: [...string]
-	type: #OptionType
-
-	if _short != _|_ {
-		short: "-\(_short)"
-	}
-
-	_short: !=""
-
-	if enum != _|_ {
-		type: "enum"
-	}
-}
-
-#OptionType: "string" | "integer" | "enum"
-
 _default_flags: {
 	"help": {
 		_short:      "h"
@@ -68,7 +13,61 @@ _default_flags: {
 	}
 }
 
-cli: #CommandLineTool & {
+cli: {
+	#Args: [Arg=string]: {
+		description: !=""
+		type:        #ArgType
+		default?:    string | [...string]
+	}
+
+	#ArgType: "string" | "list"
+
+	#Commands: [Command=string]: {
+		description: !=""
+		flags?:      #Flags
+		options?:    #Options
+		args?:       #Args
+	}
+
+	#Flags: [Flag=string]: {
+		flag:        "--\(Flag)"
+		description: !=""
+		default:     bool | *false
+
+		if _short != _|_ {
+			short: "-\(_short)"
+		}
+
+		_short: !=""
+	}
+
+	#Options: [Option=string]: {
+		option:      "--\(Option)"
+		description: !=""
+		default?:    string | int
+		enum?: [...string]
+		type: #OptionType
+
+		if _short != _|_ {
+			short: "-\(_short)"
+		}
+
+		_short: !=""
+
+		if enum != _|_ {
+			type: "enum"
+		}
+	}
+
+	#OptionType: "string" | "integer" | "enum"
+
+	name:     !=""
+	flags:    #Flags
+	options:  #Options
+	commands: #Commands
+}
+
+cli: {
 	name: "vector"
 
 	flags: _default_flags & {
