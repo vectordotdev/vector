@@ -60,7 +60,10 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
-        RemoteWriteSource.run(self.address, "", &self.tls, &self.auth, out, shutdown)
+        let source = RemoteWriteSource {
+            decompressor: snap::raw::Decoder::new(),
+        };
+        source.run(self.address, "", &self.tls, &self.auth, out, shutdown)
     }
 
     fn output_type(&self) -> crate::config::DataType {
@@ -73,11 +76,15 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 }
 
 #[derive(Clone)]
-struct RemoteWriteSource;
+struct RemoteWriteSource {
+    decompressor: snap::raw::Decoder,
+}
 
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
-        let body = snap::raw::Decoder::new()
+        let body = self
+            .decompressor
+            .clone()
             .decompress_vec(&body)
             .map_err(|error| {
                 emit!(PrometheusRemoteWriteSnapError {
