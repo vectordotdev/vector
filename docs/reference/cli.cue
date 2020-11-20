@@ -5,9 +5,16 @@ package metadata
 
 #Args: [Arg=string]: {
 	description: !=""
-	type:        "string" | "list" | *"string"
+	type:        #ArgType
 	default?:    string | [...string]
+	required:    bool | *false
+
+	if default == _|_ {
+		required: true
+	}
 }
+
+#ArgType: "string" | "list"
 
 #CommandLineTool: {
 	name:     !=""
@@ -26,7 +33,7 @@ package metadata
 #Flags: [Flag=string]: {
 	flag:        "--\(Flag)"
 	description: !=""
-	default:     bool | *false
+	env_var?:    string
 
 	if _short != _|_ {
 		short: "-\(_short)"
@@ -38,15 +45,29 @@ package metadata
 #Options: [Option=string]: {
 	option:      "--\(Option)"
 	description: !=""
-	default?:    string
+	default?:    string | int
 	enum?: [...string]
+	type:     #OptionType
+	env_var?: string
+	example?: string
+	required: bool | *false
+
+	if default == _|_ {
+		required: true
+	}
 
 	if _short != _|_ {
 		short: "-\(_short)"
 	}
 
 	_short: !=""
+
+	if enum != _|_ {
+		type: "enum"
+	}
 }
+
+#OptionType: "string" | "integer" | "enum"
 
 _default_flags: {
 	"help": {
@@ -73,6 +94,7 @@ cli: #CommandLineTool & {
 		"require-healthy": {
 			_short:      "r"
 			description: "Exit on startup if any sinks fail healthchecks"
+			env_var:     "VECTOR_REQUIRE_HEALTHY"
 		}
 		"verbose": {
 			_short:      "v"
@@ -81,6 +103,7 @@ cli: #CommandLineTool & {
 		"watch-config": {
 			_short:      "w"
 			description: "Watch for changes in the configuration file, and reload accordingly"
+			env_var:     "VECTOR_WATCH_CONFIG"
 		}
 	}
 
@@ -106,7 +129,9 @@ cli: #CommandLineTool & {
 				supported. If zero files are specified the default config path
 				`/etc/vector/vector.toml` will be targeted
 				"""
+			type:    "string"
 			default: "/etc/vector/vector.toml"
+			env_var: "VECTOR_CONFIG"
 		}
 		"threads": {
 			_short: "t"
@@ -114,6 +139,8 @@ cli: #CommandLineTool & {
 				Number of threads to use for processing (default is number of
 				available cores)
 				"""
+			type:    "integer"
+			env_var: "VECTOR_THREADS"
 		}
 		"log-format": {
 			description: "Set the logging format [default: text]"
@@ -130,6 +157,14 @@ cli: #CommandLineTool & {
 				"fragment": {
 					_short:      "f"
 					description: "Whether to skip the generation of global fields"
+				}
+			}
+
+			options: {
+				"file": {
+					description: "Generate config as a file"
+					type:        "string"
+					example:     "/etc/vector/my-config.toml"
 				}
 			}
 
@@ -195,15 +230,52 @@ cli: #CommandLineTool & {
 				therefore subject to change. For guidance on how to write unit tests check
 				out: https://vector.dev/docs/setup/guides/unit-testing/
 				"""
+
+			args: {
+				paths: _paths_arg & {
+					description: """
+						Any number of Vector config files to test. If none are specified
+						the default config path `/etc/vector/vector.toml` will be targeted
+						"""
+				}
+			}
+		}
+
+		"top": {
+			description: """
+				Display topology and metrics in the console, for a local or remote Vector
+				instance
+				"""
+
+			flags: _default_flags & {
+				"human-metrics": {
+					_short: "h"
+					description: """
+						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
+						1,000,000 = 1.00 M
+						"""
+				}
+			}
+
+			options: {
+				"refresh-interval": {
+					_short:      "i"
+					description: "How often the screen refreshes (in milliseconds)"
+					type:        "integer"
+					default:     500
+				}
+				"url": {
+					_short:      "u"
+					description: "The URL for the GraphQL endpoint of the running Vector instance"
+					type:        "string"
+				}
+			}
 		}
 
 		"validate": {
 			description: "Validate the target config, then exit"
 
 			flags: _default_flags & {
-				"no-topology": {
-					description: "Disables topology check"
-				}
 				"no-environment": {
 					description: """
 						Disables environment checks. That includes component
@@ -211,33 +283,25 @@ cli: #CommandLineTool & {
 						"""
 				}
 				"deny-warnings": {
+					_short:      "d"
 					description: "Fail validation on warnings"
 				}
 			}
 
-			options: {
-				n: {
-					description: """
-						Shorthand for the `--no-topology` and `--no-environment` flags. Just
-						`-n` won't disable anything, it needs to be used with `t` for
-						`--no-topology`, and or `e` for `--no-environment` in any order.
-						Example: `-nte` and `net` both mean `--no-topology` and
-						`--no-environment`
-						"""
-					enum: ["e", "t", "et", "te"]
-				}
-			}
-
 			args: {
-				paths: {
+				paths: _paths_arg & {
 					description: """
 						Any number of Vector config files to validate. If none are specified
 						the default config path `/etc/vector/vector.toml` will be targeted
 						"""
-					type:    "list"
-					default: "/etc/vector/vector.toml"
 				}
 			}
 		}
+	}
+
+	// Helpers
+	_paths_arg: {
+		type:    "list"
+		default: "/etc/vector/vector.toml"
 	}
 }

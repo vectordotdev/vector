@@ -3,22 +3,23 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::Event,
     internal_events::StatsdInvalidMetricReceived,
-    sinks::util::{encode_namespace, BatchConfig, BatchSettings, BatchSink, Buffer, Compression},
     sinks::util::{
+        encode_namespace,
         tcp::TcpSinkConfig,
         udp::{UdpService, UdpSinkConfig},
+        BatchConfig, BatchSettings, BatchSink, Buffer, Compression,
     },
+    Event,
 };
-use futures::{future, FutureExt, TryFutureExt};
-use futures01::{stream, Sink};
+use futures::{future, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
-
-use std::collections::BTreeMap;
-use std::fmt::Display;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::task::{Context, Poll};
+use std::{
+    collections::BTreeMap,
+    fmt::Display,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    task::{Context, Poll},
+};
 use tower::{Service, ServiceBuilder};
 
 pub struct StatsdSvc {
@@ -110,13 +111,10 @@ impl SinkConfig for StatsdSinkConfig {
                 )
                 .sink_map_err(|error| error!(message = "Fatal statsd sink error.", %error))
                 .with_flat_map(move |event| {
-                    stream::iter_ok(encode_event(event, default_namespace.as_deref()))
+                    stream::iter(encode_event(event, default_namespace.as_deref())).map(Ok)
                 });
 
-                Ok((
-                    super::VectorSink::Futures01Sink(Box::new(sink)),
-                    healthcheck,
-                ))
+                Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
             }
             #[cfg(unix)]
             Mode::Unix(config) => {
@@ -137,7 +135,7 @@ impl SinkConfig for StatsdSinkConfig {
 }
 
 fn encode_tags(tags: &BTreeMap<String, String>) -> String {
-    let mut parts: Vec<_> = tags
+    let parts: Vec<_> = tags
         .iter()
         .map(|(name, value)| {
             if value == "true" {
@@ -147,7 +145,7 @@ fn encode_tags(tags: &BTreeMap<String, String>) -> String {
             }
         })
         .collect();
-    parts.sort();
+    // `parts` is already sorted by key because of BTreeMap
     parts.join(",")
 }
 
@@ -244,13 +242,9 @@ impl Service<Vec<u8>> for StatsdSvc {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        event::{metric::MetricKind, metric::MetricValue, metric::StatisticKind, Metric},
-        test_util::*,
-        Event,
-    };
+    use crate::{event::Metric, test_util::*};
     use bytes::Bytes;
-    use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryStreamExt};
+    use futures::{compat::Sink01CompatExt, SinkExt, TryStreamExt};
     use futures01::sync::mpsc;
     use tokio::net::UdpSocket;
     use tokio_util::{codec::BytesCodec, udp::UdpFramed};
@@ -278,6 +272,25 @@ mod test {
         assert_eq!(
             &encode_tags(&tags()),
             "empty_tag:,normal_tag:value,true_tag"
+        );
+    }
+
+    #[test]
+    fn tags_order() {
+        assert_eq!(
+            &encode_tags(
+                &vec![
+                    ("a", "value"),
+                    ("b", "value"),
+                    ("c", "value"),
+                    ("d", "value"),
+                    ("e", "value"),
+                ]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect()
+            ),
+            "a:value,b:value,c:value,d:value,e:value"
         );
     }
 
@@ -439,15 +452,17 @@ mod test {
 
         let socket = UdpSocket::bind(addr).await.unwrap();
         tokio::spawn(async move {
-            UdpFramed::new(socket, BytesCodec::new())
+            let stream = UdpFramed::new(socket, BytesCodec::new())
                 .map_err(|error| error!(message = "Error reading line.", %error))
-                .map_ok(|(bytes, _addr)| bytes.freeze())
-                .forward(
-                    tx.sink_compat()
-                        .sink_map_err(|error| error!(message = "Error sending event.", %error)),
-                )
-                .await
-                .unwrap()
+                .map_ok(|(bytes, _addr)| bytes.freeze());
+
+            let mut tx = tx
+                .sink_compat()
+                .sink_map_err(|error| error!(message = "Error sending event.", %error));
+
+            stream.forward(&mut tx).await.unwrap();
+
+            tx.flush().await.unwrap();
         });
 
         sink.run(stream::iter(events)).await.unwrap();

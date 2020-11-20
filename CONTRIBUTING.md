@@ -662,7 +662,7 @@ This will create a `100MiB` sample log file in the `sample.log` file.
 ### Benchmarking
 
 All benchmarks are placed in the [`/benches`](/benches) folder. You can
-run benchmarks via the `make benchmarks` command. In addition, Vector
+run benchmarks via the `make bench` command. In addition, Vector
 maintains a full [test harness][urls.vector_test_harness] for complex
 end-to-end integration and performance testing.
 
@@ -844,9 +844,9 @@ E2E (end-to-end) tests.
 Vector release artifacts are prepared for E2E tests, so the ability to do that
 is required too, see Vector [docs](https://vector.dev) for more details.
 
-> Note: `minikube` has a bug in the latest versions that affects our test
+> Note: `minikube` had a bug in the versions `1.12.x` that affected our test
 > process - see https://github.com/kubernetes/minikube/issues/8799.
-> Use version `1.11.0` for now.
+> Use version `1.13.0+` that has this bug fixed.
 
 Also:
 

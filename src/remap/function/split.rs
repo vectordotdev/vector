@@ -1,5 +1,5 @@
 use remap::prelude::*;
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Split;
@@ -13,12 +13,12 @@ impl Function for Split {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -50,17 +50,13 @@ pub(crate) struct SplitFn {
 }
 
 impl Expression for SplitFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let string: String = self
-            .value
-            .execute(state, object)?
-            .ok_or_else(|| Error::from("argument missing"))?
-            .try_into()?;
-
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
         let limit: usize = self
             .limit
             .as_ref()
-            .and_then(|expr| expr.execute(state, object).transpose())
+            .map(|expr| expr.execute(state, object))
             .transpose()?
             .map(i64::try_from)
             .transpose()?
@@ -69,19 +65,124 @@ impl Expression for SplitFn {
 
         let value = match &self.pattern {
             Argument::Regex(pattern) => pattern
-                .splitn(&string, limit as usize)
+                .splitn(value.as_ref(), limit as usize)
                 .collect::<Vec<_>>()
                 .into(),
             Argument::Expression(expr) => {
-                let pattern: String = expr
-                    .execute(state, object)?
-                    .ok_or_else(|| Error::from("argument missing"))?
-                    .try_into()?;
+                let bytes = expr.execute(state, object)?.try_bytes()?;
+                let pattern = String::from_utf8_lossy(&bytes);
 
-                string.splitn(limit, &pattern).collect::<Vec<_>>().into()
+                value
+                    .splitn(limit, pattern.as_ref())
+                    .collect::<Vec<_>>()
+                    .into()
             }
         };
 
-        Ok(Some(value))
+        Ok(value)
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        let limit_def = self.limit.as_ref().map(|limit| {
+            limit
+                .type_def(state)
+                .fallible_unless(Kind::Integer | Kind::Float)
+        });
+
+        let pattern_def = match &self.pattern {
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
+            Argument::Regex(_) => None, // regex is a concrete infallible type
+        };
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Bytes)
+            .merge_optional(limit_def)
+            .merge_optional(pattern_def)
+            .with_constraint(Kind::Array)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    remap::test_type_def![
+        infallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: None,
+            },
+            def: TypeDef {
+                kind: value::Kind::Array,
+                ..Default::default()
+            },
+        }
+
+        value_fallible {
+            expr: |_| SplitFn {
+                value: Literal::from(10).boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Array,
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_infallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from("foo").into(),
+                limit: None,
+            },
+            def: TypeDef {
+                kind: value::Kind::Array,
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_fallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from(10).into(),
+                limit: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Array,
+                ..Default::default()
+            },
+        }
+
+        limit_infallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: Some(Literal::from(10).boxed()),
+            },
+            def: TypeDef {
+                kind: value::Kind::Array,
+                ..Default::default()
+            },
+        }
+
+        limit_fallible {
+            expr: |_| SplitFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                limit: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Array,
+                ..Default::default()
+            },
+        }
+    ];
 }

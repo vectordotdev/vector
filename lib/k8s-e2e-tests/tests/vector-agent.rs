@@ -4,6 +4,7 @@ use k8s_test_framework::{
     lock, test_pod, vector::Config as VectorConfig, wait_for_resource::WaitFor,
 };
 use std::collections::HashSet;
+use std::str::FromStr;
 
 const HELM_CHART_VECTOR_AGENT: &str = "vector-agent";
 
@@ -15,6 +16,12 @@ sinks:
     rawConfig: |
       target = "stdout"
       encoding = "json"
+"#;
+
+const HELM_VALUES_ADDITIONAL_CONFIGMAP: &str = r#"
+extraConfigDirSources:
+- configMap:
+    name: vector-agent-config
 "#;
 
 const CUSTOM_RESOURCE_VECTOR_CONFIG: &str = r#"
@@ -413,6 +420,8 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
     smoke_check_first_line(&mut log_reader).await;
+    let k8s_version = framework.kubernetes_version().await?;
+    let minor = u8::from_str(&k8s_version.minor()).expect("Couldn't get u8 from String!");
 
     // Read the rest of the log lines.
     let mut got_marker = false;
@@ -442,6 +451,16 @@ async fn pod_metadata_annotation() -> Result<(), Box<dyn std::error::Error>> {
         assert_eq!(val["kubernetes"]["pod_uid"].as_str().unwrap().len(), 36); // 36 is a standard UUID string length
         assert_eq!(val["kubernetes"]["pod_labels"]["label1"], "hello");
         assert_eq!(val["kubernetes"]["pod_labels"]["label2"], "world");
+
+        if minor < 16 {
+            assert!(val["kubernetes"]["pod_ip"].is_string());
+        } else {
+            assert!(val["kubernetes"]["pod_ip"].is_string());
+            assert!(!val["kubernetes"]["pod_ips"]
+                .as_array()
+                .expect("Couldn't take array from expected vec")
+                .is_empty());
+        }
         // We don't have the node name to compare this to, so just assert it's
         // a non-empty string.
         assert!(!val["kubernetes"]["pod_node_name"]
@@ -1203,6 +1222,7 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
             "test-vector",
             HELM_CHART_VECTOR_AGENT,
             VectorConfig {
+                custom_helm_values: HELM_VALUES_ADDITIONAL_CONFIGMAP,
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
                 ..Default::default()
             },

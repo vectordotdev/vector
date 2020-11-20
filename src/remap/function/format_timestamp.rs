@@ -19,7 +19,7 @@ impl Function for FormatTimestamp {
             },
             Parameter {
                 keyword: "format",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
         ]
@@ -49,11 +49,26 @@ impl FormatTimestampFn {
 }
 
 impl Expression for FormatTimestampFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let format = required!(state, object, self.format, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
-        let ts = required!(state, object, self.value, Value::Timestamp(ts) => ts);
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.format.execute(state, object)?.try_bytes()?;
+        let format = String::from_utf8_lossy(&bytes);
+        let ts = self.value.execute(state, object)?.try_timestamp()?;
 
-        try_format(&ts, &format).map(Into::into).map(Some)
+        try_format(&ts, &format).map(Into::into)
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        let format_def = self
+            .format
+            .type_def(state)
+            .fallible_unless(value::Kind::Bytes);
+
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::Timestamp)
+            .merge(format_def)
+            .into_fallible(true) // due to `try_format`
+            .with_constraint(value::Kind::Bytes)
     }
 }
 
@@ -73,15 +88,29 @@ mod tests {
     use super::*;
     use crate::map;
     use chrono::TimeZone;
+    use value::Kind;
+
+    remap::test_type_def![
+        value_and_format {
+            expr: |_| FormatTimestampFn {
+                value: Literal::from(chrono::Utc::now()).boxed(),
+                format: Literal::from("%s").boxed(),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+        }
+
+        optional_value {
+            expr: |_| FormatTimestampFn {
+                value: Box::new(Noop),
+                format: Literal::from("%s").boxed(),
+            },
+            def: TypeDef { fallible: true, optional: true, kind: Kind::Bytes },
+        }
+    ];
 
     #[test]
     fn format_timestamp() {
         let cases = vec![
-            (
-                map![],
-                Err("path error: missing path: foo".into()),
-                FormatTimestampFn::new(Box::new(Path::from("foo")), "%s"),
-            ),
             (
                 map![],
                 Err("function call error: invalid format".into()),
@@ -92,7 +121,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("10".into())),
+                Ok("10".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
                     "%s",
@@ -100,7 +129,7 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some("1970-01-01T00:00:10+00:00".into())),
+                Ok("1970-01-01T00:00:10+00:00".into()),
                 FormatTimestampFn::new(
                     Box::new(Literal::from(Value::from(Utc.timestamp(10, 0)))),
                     "%+",
@@ -108,7 +137,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

@@ -3,10 +3,14 @@ use snafu::Snafu;
 
 #[cfg(feature = "sources-apache_metrics")]
 pub mod apache_metrics;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+pub mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub mod aws_kinesis_firehose;
-#[cfg(feature = "sources-docker")]
-pub mod docker;
+#[cfg(feature = "sources-aws_s3")]
+pub mod aws_s3;
+#[cfg(feature = "sources-docker_logs")]
+pub mod docker_logs;
 #[cfg(feature = "sources-file")]
 pub mod file;
 #[cfg(feature = "sources-generator")]

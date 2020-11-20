@@ -12,7 +12,7 @@ mod metadata_ext;
 pub mod paths_provider;
 
 pub use self::file_server::{FileServer, Shutdown as FileServerShutdown};
-pub use self::fingerprinter::Fingerprinter;
+pub use self::fingerprinter::{FingerprintStrategy, Fingerprinter};
 pub use self::internal_events::FileSourceInternalEvents;
 
 type FilePosition = u64;

@@ -257,6 +257,7 @@ mod source {
         }
     }
 
+    #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter;
 
     impl FileSourceInternalEvents for FileSourceInternalEventsEmitter {

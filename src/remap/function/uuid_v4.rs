@@ -18,11 +18,18 @@ impl Function for UuidV4 {
 struct UuidV4Fn;
 
 impl Expression for UuidV4Fn {
-    fn execute(&self, _: &mut State, _: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
         let mut buf = [0; 36];
         let uuid = uuid::Uuid::new_v4().to_hyphenated().encode_lower(&mut buf);
 
-        Ok(Some(Bytes::copy_from_slice(uuid.as_bytes()).into()))
+        Ok(Bytes::copy_from_slice(uuid.as_bytes()).into())
+    }
+
+    fn type_def(&self, _: &state::Compiler) -> TypeDef {
+        TypeDef {
+            kind: value::Kind::Bytes,
+            ..Default::default()
+        }
     }
 }
 
@@ -32,13 +39,21 @@ mod tests {
     use crate::map;
     use std::convert::TryFrom;
 
+    remap::test_type_def![static_def {
+        expr: |_| UuidV4Fn,
+        def: TypeDef {
+            kind: value::Kind::Bytes,
+            ..Default::default()
+        },
+    }];
+
     #[test]
     fn uuid_v4() {
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
         let mut object = map![];
-        let value = UuidV4Fn.execute(&mut state, &mut object).unwrap().unwrap();
+        let value = UuidV4Fn.execute(&mut state, &mut object).unwrap();
 
-        assert!(matches!(&value, Value::String(_)));
+        assert!(matches!(&value, Value::Bytes(_)));
 
         uuid::Uuid::parse_str(&String::try_from(value).unwrap()).expect("valid UUID V4");
     }

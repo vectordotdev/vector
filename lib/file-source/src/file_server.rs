@@ -1,13 +1,14 @@
 use crate::{
-    checkpointer::Checkpointer,
+    checkpointer::{Checkpointer, CheckpointsView},
     file_watcher::FileWatcher,
     fingerprinter::{FileFingerprint, Fingerprinter},
     FileSourceInternalEvents,
 };
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
 use futures::{
     executor::block_on,
-    future::{select, Either},
+    future::{select, Either, FutureExt},
     stream, Future, Sink, SinkExt,
 };
 use indexmap::IndexMap;
@@ -15,6 +16,7 @@ use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, remove_file},
     path::PathBuf,
+    sync::Arc,
     time::{self, Duration},
 };
 use tokio::time::delay_for;
@@ -37,7 +39,7 @@ where
     pub paths_provider: PP,
     pub max_read_bytes: usize,
     pub start_at_beginning: bool,
-    pub ignore_before: Option<time::SystemTime>,
+    pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
@@ -45,6 +47,7 @@ where
     pub oldest_first: bool,
     pub remove_after: Option<Duration>,
     pub emitter: E,
+    pub handle: tokio::runtime::Handle,
 }
 
 /// `FileServer` as Source
@@ -65,14 +68,16 @@ where
     PP: PathsProvider,
     E: FileSourceInternalEvents,
 {
-    pub fn run<C>(
+    pub fn run<C, S>(
         self,
         mut chans: C,
-        mut shutdown: impl Future + Unpin,
+        shutdown: S,
     ) -> Result<Shutdown, <C as Sink<Vec<(Bytes, String)>>>::Error>
     where
         C: Sink<Vec<(Bytes, String)>> + Unpin,
         <C as Sink<Vec<(Bytes, String)>>>::Error: std::error::Error,
+        S: Future + Unpin + Send + 'static,
+        <S as Future>::Output: Clone + Send + Sync,
     {
         let mut fingerprint_buffer = Vec::new();
 
@@ -101,23 +106,62 @@ where
         existing_files.sort_by_key(|(path, _file_id)| {
             fs::metadata(&path)
                 .and_then(|m| m.created())
-                .unwrap_or_else(|_| time::SystemTime::now())
+                .map(DateTime::<Utc>::from)
+                .unwrap_or_else(|_| Utc::now())
         });
 
         checkpointer.maybe_upgrade(existing_files.iter().map(|(_, id)| id).cloned());
+
+        let checkpoints = checkpointer.view();
 
         for (path, file_id) in existing_files {
             self.watch_new_file(
                 path,
                 file_id,
                 &mut fp_map,
-                &checkpointer,
+                &checkpoints,
                 self.start_at_beginning,
             );
         }
         self.emitter.emit_files_open(fp_map.len());
 
         let mut stats = TimingStats::default();
+
+        // Spawn the checkpoint writer task
+        //
+        // We have to do a lot of cloning here to convince the compiler that we aren't going to get
+        // away with anything, but none of it should have any perf impact.
+        let mut shutdown = shutdown.shared();
+        let shutdown2 = shutdown.clone();
+        let emitter = self.emitter.clone();
+        let checkpointer = Arc::new(checkpointer);
+        let sleep_duration = self.glob_minimum_cooldown;
+        self.handle.spawn(async move {
+            let mut done = false;
+            loop {
+                let sleep = tokio::time::delay_for(sleep_duration);
+                match select(shutdown2.clone(), sleep).await {
+                    Either::Left((_, _)) => done = true,
+                    Either::Right((_, _)) => {}
+                }
+
+                let emitter = emitter.clone();
+                let checkpointer = Arc::clone(&checkpointer);
+                tokio::task::spawn_blocking(move || {
+                    checkpointer
+                        .write_checkpoints()
+                        .map_err(|error| emitter.emit_file_checkpoint_write_failed(error))
+                        .map(|count| emitter.emit_file_checkpointed(count))
+                        .ok()
+                })
+                .await
+                .ok();
+
+                if done {
+                    break;
+                }
+            }
+        });
 
         // Alright friends, how does this work?
         //
@@ -143,15 +187,6 @@ where
                 if stats.started_at.elapsed() > Duration::from_secs(10) {
                     stats = TimingStats::default();
                 }
-
-                let start = time::Instant::now();
-                // Write any stored checkpoints (uses glob to find old checkpoints).
-                checkpointer
-                    .write_checkpoints()
-                    .map_err(|error| self.emitter.emit_file_checkpoint_write_failed(error))
-                    .map(|count| self.emitter.emit_file_checkpointed(count))
-                    .ok();
-                stats.record("checkpointing", start.elapsed());
 
                 // Search (glob) for files to detect major file changes.
                 let start = time::Instant::now();
@@ -207,7 +242,7 @@ where
                             }
                         } else {
                             // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpointer, false);
+                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
@@ -254,7 +289,7 @@ where
 
                 if bytes_read > 0 {
                     global_bytes_read = global_bytes_read.saturating_add(bytes_read);
-                    checkpointer.set_checkpoint(file_id, watcher.get_file_position());
+                    checkpoints.update(file_id, watcher.get_file_position());
                 } else {
                     // Should the file be removed
                     if let Some(grace_period) = self.remove_after {
@@ -346,13 +381,13 @@ where
         path: PathBuf,
         file_id: FileFingerprint,
         fp_map: &mut IndexMap<FileFingerprint, FileWatcher>,
-        checkpointer: &Checkpointer,
+        checkpoints: &CheckpointsView,
         read_from_beginning: bool,
     ) {
         let file_position = if read_from_beginning {
             0
         } else {
-            checkpointer.get_checkpoint(file_id).unwrap_or(0)
+            checkpoints.get(file_id).unwrap_or(0)
         };
         match FileWatcher::new(
             path.clone(),

@@ -7,7 +7,10 @@ use crate::{
         SocketEventsSent, SocketMode, UdpSendIncomplete, UdpSocketConnectionEstablished,
         UdpSocketConnectionFailed, UdpSocketError,
     },
-    sinks::{util::StreamSink, Healthcheck, VectorSink},
+    sinks::{
+        util::{retries::ExponentialBackoff, StreamSink},
+        Healthcheck, VectorSink,
+    },
     Event,
 };
 use async_trait::async_trait;
@@ -22,7 +25,6 @@ use std::{
     time::Duration,
 };
 use tokio::{net::UdpSocket, sync::oneshot, time::delay_for};
-use tokio_retry::strategy::ExponentialBackoff;
 
 #[derive(Debug, Snafu)]
 pub enum UdpError {

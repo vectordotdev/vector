@@ -12,12 +12,12 @@ impl Function for ParseJson {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "default",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: false,
             },
         ]
@@ -47,9 +47,9 @@ impl ParseJsonFn {
 }
 
 impl Expression for ParseJsonFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_json = |value| match value {
-            Value::String(bytes) => serde_json::from_slice(&bytes)
+            Value::Bytes(bytes) => serde_json::from_slice(&bytes)
                 .map(|v: serde_json::Value| {
                     let v: crate::event::Value = v.into();
                     v.into()
@@ -64,34 +64,109 @@ impl Expression for ParseJsonFn {
             to_json,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        let default_def = self
+            .default
+            .as_ref()
+            .map(|default| default.type_def(state).fallible_unless(Kind::Bytes));
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Bytes)
+            .merge_with_default_optional(default_def)
+            .into_fallible(true) // JSON parsing errors
+            .with_constraint(
+                Kind::Bytes
+                    | Kind::Boolean
+                    | Kind::Integer
+                    | Kind::Float
+                    | Kind::Array
+                    | Kind::Map
+                    | Kind::Null,
+            )
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| ParseJsonFn {
+                value: Literal::from("foo").boxed(),
+                default: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+                ..Default::default()
+            },
+        }
+
+        optional_default {
+            expr: |_| ParseJsonFn {
+                value: Literal::from("foo").boxed(),
+                default: Some(Box::new(Noop)),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+                ..Default::default()
+            },
+        }
+
+        optional_value {
+            expr: |_| ParseJsonFn {
+                value: Box::new(Noop),
+                default: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+                ..Default::default()
+            },
+        }
+
+        optional_value_and_default {
+            expr: |_| ParseJsonFn {
+                value: Box::new(Noop),
+                default: Some(Box::new(Noop)),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: true,
+                kind: Kind::Bytes | Kind::Boolean | Kind::Integer | Kind::Float | Kind::Array | Kind::Map | Kind::Null,
+            },
+        }
+    ];
 
     #[test]
     fn parse_json() {
         let cases = vec![
             (
                 map!["foo": "42"],
-                Ok(Some(42.into())),
+                Ok(42.into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": "\"hello\""],
-                Ok(Some("hello".into())),
+                Ok("hello".into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": r#"{"field":"value"}"#],
-                Ok(Some(map!["field": "value"].into())),
+                Ok(map!["field": "value"].into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": r#"{ INVALID }"#],
-                Ok(Some(42.into())),
+                Ok(42.into()),
                 ParseJsonFn::new(Box::new(Path::from("foo")), Some("42".into())),
             ),
             (
@@ -106,7 +181,7 @@ mod tests {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

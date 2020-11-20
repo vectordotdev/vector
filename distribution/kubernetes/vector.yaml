@@ -178,15 +178,11 @@ spec:
         - name: config-dir
           projected:
             sources:
-              # Managed `ConfigMap`.
               - configMap:
                   name: vector-agent
-                  optional: true
-              # Custom `ConfigMap`.
               - configMap:
                   name: vector-agent-config
                   optional: true
-              # Custom `Secret`.
               - secret:
                   name: vector-agent-config
                   optional: true

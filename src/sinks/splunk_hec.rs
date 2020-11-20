@@ -14,8 +14,7 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -114,10 +113,7 @@ impl SinkConfig for HecSinkConfig {
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -246,7 +242,7 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub async fn healthcheck(config: HecSinkConfig, mut client: HttpClient) -> crate::Result<()> {
+pub async fn healthcheck(config: HecSinkConfig, client: HttpClient) -> crate::Result<()> {
     let uri = build_uri(&config.endpoint, "/services/collector/health/1.0")
         .context(super::UriParseError)?;
 

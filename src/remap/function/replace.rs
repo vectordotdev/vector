@@ -12,17 +12,17 @@ impl Function for Replace {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "with",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -72,35 +72,67 @@ impl ReplaceFn {
 }
 
 impl Expression for ReplaceFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let value = required!(state, object, self.value, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
-        let with = required!(state, object, self.with, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
-        let count = optional!(state, object, self.count, Value::Integer(v) => v).unwrap_or(-1);
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let value_bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&value_bytes);
+
+        let with_bytes = self.with.execute(state, object)?.try_bytes()?;
+        let with = String::from_utf8_lossy(&with_bytes);
+
+        let count = match &self.count {
+            Some(expr) => expr.execute(state, object)?.try_integer()?,
+            None => -1,
+        };
 
         match &self.pattern {
             Argument::Expression(expr) => {
-                let pattern = required!(state, object, expr, Value::String(b) => String::from_utf8_lossy(&b).into_owned());
+                let bytes = expr.execute(state, object)?.try_bytes()?;
+                let pattern = String::from_utf8_lossy(&bytes);
                 let replaced = match count {
-                    i if i > 0 => value.replacen(&pattern, &with, i as usize),
-                    i if i < 0 => value.replace(&pattern, &with),
-                    _ => value,
+                    i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
+                    i if i < 0 => value.replace(pattern.as_ref(), &with),
+                    _ => value.into_owned(),
                 };
 
-                Ok(Some(replaced.into()))
+                Ok(replaced.into())
             }
             Argument::Regex(regex) => {
                 let replaced = match count {
                     i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_str())
+                        .replacen(&value, i as usize, with.as_ref())
                         .as_bytes()
                         .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_str()).as_bytes().into(),
+                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
                     _ => value.into(),
                 };
 
-                Ok(Some(replaced))
+                Ok(replaced)
             }
         }
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        let with_def = self.with.type_def(state).fallible_unless(Kind::Bytes);
+
+        let count_def = self
+            .count
+            .as_ref()
+            .map(|count| count.type_def(state).fallible_unless(Kind::Integer));
+
+        let pattern_def = match &self.pattern {
+            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
+            Argument::Regex(_) => None, // regex is a concrete infallible type
+        };
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Bytes)
+            .merge(with_def)
+            .merge_optional(pattern_def)
+            .merge_optional(count_def)
+            .with_constraint(Kind::Bytes)
     }
 }
 
@@ -109,62 +141,159 @@ mod test {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![
+        infallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        value_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from(10).boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_infallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from("foo").into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        pattern_expression_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Literal::from(10).into(),
+                with: Literal::from("foo").boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        with_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from(10).boxed(),
+                count: None,
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        count_infallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: Some(Literal::from(10).boxed()),
+            },
+            def: TypeDef {
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+
+        count_fallible {
+            expr: |_| ReplaceFn {
+                value: Literal::from("foo").boxed(),
+                pattern: regex::Regex::new("foo").unwrap().into(),
+                with: Literal::from("foo").boxed(),
+                count: Some(Literal::from("foo").boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Bytes,
+                ..Default::default()
+            },
+        }
+    ];
+
     #[test]
     fn check_replace_string() {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     None,
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(-1),
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like apples and bananas".into())),
+                Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(0),
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(1),
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bananas".into())),
+                Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("a"))),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("a").into(),
                     "o",
                     Some(2),
                 ),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -180,57 +309,57 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    Literal::from("I like apples and bananas").boxed(),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     None,
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bononos".into())),
+                Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    Literal::from("I like apples and bananas").boxed(),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(-1),
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like apples and bananas".into())),
+                Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    Literal::from("I like apples and bananas").boxed(),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(0),
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    Literal::from("I like apples and bananas").boxed(),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(1),
                 ),
             ),
             (
                 map![],
-                Ok(Some("I like opples ond bananas".into())),
+                Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    Literal::from("I like apples and bananas").boxed(),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(2),
                 ),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
@@ -246,37 +375,37 @@ mod test {
         let cases = vec![
             (
                 map![],
-                Ok(Some("I like biscuits and bananas".into())),
+                Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
-                    Box::new(Literal::from("I like apples and bananas")),
-                    Argument::Expression(Box::new(Literal::from("apples"))),
+                    Literal::from("I like apples and bananas").boxed(),
+                    Literal::from("apples").into(),
                     "biscuits",
                     None,
                 ),
             ),
             (
                 map!["foo": "I like apples and bananas"],
-                Ok(Some("I like opples and bananas".into())),
+                Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
-                    Argument::Regex(regex::Regex::new("a").unwrap()),
+                    regex::Regex::new("a").unwrap().into(),
                     "o",
                     Some(1),
                 ),
             ),
             (
                 map!["foo": "I like [apples] and bananas"],
-                Ok(Some("I like biscuits and bananas".into())),
+                Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
-                    Argument::Regex(regex::Regex::new("\\[apples\\]").unwrap()),
+                    regex::Regex::new("\\[apples\\]").unwrap().into(),
                     "biscuits",
                     None,
                 ),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

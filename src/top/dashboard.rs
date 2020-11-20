@@ -1,7 +1,4 @@
-use super::{
-    events::capture_key_press,
-    state::{WidgetsState, COMPONENT_HEADERS},
-};
+use super::{events::capture_key_press, state};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
     execute,
@@ -9,11 +6,9 @@ use crossterm::{
     tty::IsTty,
     ExecutableCommand,
 };
-use std::{
-    io::{stdout, Write},
-    sync::Arc,
-};
-use tokio::stream::StreamExt;
+use num_format::{Locale, ToFormattedString};
+use number_prefix::NumberPrefix;
+use std::io::{stdout, Write};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Alignment, Constraint, Layout, Rect},
@@ -23,26 +18,106 @@ use tui::{
     Frame, Terminal,
 };
 
-pub struct Widgets {
-    constraints: Vec<Constraint>,
-    state: Arc<WidgetsState>,
+/// Format metrics, with thousands separation
+trait ThousandsFormatter {
+    fn thousands_format(&self) -> String;
 }
 
-impl Widgets {
+impl ThousandsFormatter for u64 {
+    fn thousands_format(&self) -> String {
+        match self {
+            0 => "--".into(),
+            _ => self.to_formatted_string(&Locale::en),
+        }
+    }
+}
+
+impl ThousandsFormatter for i64 {
+    fn thousands_format(&self) -> String {
+        match self {
+            0 => "--".into(),
+            _ => self.to_formatted_string(&Locale::en),
+        }
+    }
+}
+
+/// Format metrics, using the 'humanized' format, abbreviating with suffixes
+trait HumanFormatter {
+    fn human_format(&self) -> String;
+    fn human_format_bytes(&self) -> String;
+}
+
+impl HumanFormatter for i64 {
+    /// Format an i64 as a string, returning `--` if zero, the value as a string if < 1000, or
+    /// the value and the recognised abbreviation
+    fn human_format(&self) -> String {
+        match self {
+            0 => "--".into(),
+            n => match NumberPrefix::decimal(*n as f64) {
+                NumberPrefix::Standalone(n) => n.to_string(),
+                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}", n, p),
+            },
+        }
+    }
+
+    /// Format an i64 as a string in the same way as `human_format`, but using a 1024 base
+    /// for binary, and appended with a "B" to represent byte values
+    fn human_format_bytes(&self) -> String {
+        match self {
+            0 => "--".into(),
+            n => match NumberPrefix::binary(*n as f64) {
+                NumberPrefix::Standalone(n) => n.to_string(),
+                NumberPrefix::Prefixed(p, n) => format!("{:.2} {}B", n, p),
+            },
+        }
+    }
+}
+
+struct Widgets<'a> {
+    constraints: Vec<Constraint>,
+    url_string: &'a str,
+    opts: &'a super::Opts,
+    component_headers: [String; 8],
+}
+
+impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(state: Arc<WidgetsState>) -> Self {
+    pub fn new(url_string: &'a str, opts: &'a super::Opts) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
             Constraint::Length(3),
         ];
 
-        Self { constraints, state }
+        // Create component headers
+        let component_headers = [
+            "Name".to_string(),
+            "Kind".to_string(),
+            "Type".to_string(),
+            "Events".to_string(),
+            format!("I/O @ {}ms", opts.interval),
+            "Bytes".to_string(),
+            format!("I/O @ {}ms", opts.interval),
+            "Errors".to_string(),
+        ];
+
+        Self {
+            constraints,
+            url_string,
+            opts,
+            component_headers,
+        }
     }
 
     /// Renders a title showing 'Vector', and the URL the dashboard is currently connected to.
-    fn title<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let text = vec![Spans::from(self.state.url())];
+    fn title<B: Backend>(&'a self, f: &mut Frame<B>, area: Rect) {
+        let text = vec![Spans::from(vec![
+            Span::from(self.url_string),
+            Span::styled(
+                format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
+                Style::default().fg(Color::Gray),
+            ),
+        ])];
 
         let block = Block::default().borders(Borders::ALL).title(Span::styled(
             "Vector",
@@ -57,33 +132,57 @@ impl Widgets {
 
     /// Renders a components table, showing sources, transforms and sinks in tabular form, with
     /// statistics pulled from `ComponentsState`,
-    fn components_table<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
-        let components = self.state.components();
-        let items = components.rows().into_iter().map(|r| {
-            Row::StyledData(
-                vec![
-                    r.name.clone(),
-                    r.component_type.clone(),
-                    r.format_events_processed_total(),
-                    r.format_errors(),
-                    r.format_throughput(),
+    fn components_table<B: Backend>(&self, f: &mut Frame<B>, state: &state::State, area: Rect) {
+        let items = state.iter().map(|(_, r)| {
+            let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
+
+            // Build metric stats
+            let formatted_metrics = if self.opts.human_metrics {
+                [
+                    r.events_processed_total.human_format(),
+                    r.events_processed_throughput.human_format(),
+                    r.bytes_processed_total.human_format_bytes(),
+                    r.bytes_processed_throughput.human_format_bytes(),
+                    r.errors.human_format(),
                 ]
-                .into_iter(),
-                Style::default().fg(Color::White),
-            )
+            } else {
+                [
+                    r.events_processed_total.thousands_format(),
+                    r.events_processed_throughput.thousands_format(),
+                    r.bytes_processed_total.thousands_format(),
+                    r.bytes_processed_throughput.thousands_format(),
+                    r.errors.thousands_format(),
+                ]
+            };
+
+            data.extend_from_slice(&formatted_metrics);
+            Row::StyledData(data.into_iter(), Style::default().fg(Color::White))
         });
 
-        let w = Table::new(COMPONENT_HEADERS.iter(), items)
+        let w = Table::new(self.component_headers.iter(), items)
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .header_gap(1)
             .column_spacing(2)
             .widths(&[
                 Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
-                Constraint::Percentage(20),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
+                Constraint::Percentage(10),
             ]);
+
+        f.render_widget(w, area);
+    }
+
+    /// Alerts the user to resize the window to view columns
+    fn components_resize_window<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+        let block = Block::default().borders(Borders::ALL).title("Components");
+        let w = Paragraph::new("Expand the window to > 80 chars to view metrics")
+            .block(block)
+            .wrap(Wrap { trim: true });
 
         f.render_widget(w, area);
     }
@@ -104,19 +203,22 @@ impl Widgets {
     }
 
     /// Draw a single frame. Creates a layout and renders widgets into it.
-    fn draw<B: Backend>(&self, f: &mut Frame<B>) {
+    fn draw<B: Backend>(&self, f: &mut Frame<B>, state: state::State) {
+        let size = f.size();
         let rects = Layout::default()
             .constraints(self.constraints.as_ref())
-            .split(f.size());
+            .split(size);
 
         self.title(f, rects[0]);
-        self.components_table(f, rects[1]);
-        self.quit_box(f, rects[2]);
-    }
 
-    /// Listen for state updates. Used to determine when to redraw.
-    fn listen(&self) -> tokio::sync::watch::Receiver<()> {
-        self.state.listen()
+        // Require a minimum of 80 chars of line width to display the table
+        if size.width >= 80 {
+            self.components_table(f, &state, rects[1]);
+        } else {
+            self.components_resize_window(f, rects[1]);
+        }
+
+        self.quit_box(f, rects[2]);
     }
 }
 
@@ -129,7 +231,11 @@ pub fn is_tty() -> bool {
 /// stdout. We're using 'direct' drawing mode to control the full output of the dashboard,
 /// as well as entering an 'alternate screen' to overlay the console. This ensures that when
 /// the dashboard is exited, the user's previous terminal session can commence, unaffected.
-pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn init_dashboard<'a>(
+    url: &'a str,
+    opts: &'a super::Opts,
+    mut state_rx: state::StateRx,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Capture key presses, to determine when to quit
     let (mut key_press_rx, key_press_kill_tx) = capture_key_press();
 
@@ -149,16 +255,12 @@ pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error:
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    // Throttle widgets changes to 250ms, to space out re-draws
-    let widget_listener =
-        tokio::time::throttle(tokio::time::Duration::from_millis(250), widgets.listen());
-
-    tokio::pin!(widget_listener);
+    let widgets = Widgets::new(url, opts);
 
     loop {
         tokio::select! {
-            _ = widget_listener.next() => {
-                terminal.draw(|f| widgets.draw(f))?;
+            Some(state) = state_rx.recv() => {
+                terminal.draw(|f| widgets.draw(f, state))?;
             },
             k = key_press_rx.recv() => {
                 if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
@@ -176,4 +278,102 @@ pub async fn init_dashboard(widgets: &Widgets) -> Result<(), Box<dyn std::error:
     disable_raw_mode()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// Zero should be formatted as "--" in all cases
+    fn format_zero() {
+        const N: i64 = 0;
+
+        assert_eq!(N.thousands_format(), "--");
+        assert_eq!(N.human_format(), "--");
+    }
+
+    #[test]
+    /// < 1000 should always be as-is
+    fn format_hundred() {
+        const N: i64 = 100;
+
+        assert_eq!(N.thousands_format(), "100");
+        assert_eq!(N.human_format(), "100");
+    }
+
+    #[test]
+    /// 1,000+ starts to make a difference...
+    fn format_thousands() {
+        const N: i64 = 1_000;
+
+        assert_eq!(N.thousands_format(), "1,000");
+        assert_eq!(N.human_format(), "1.00 k");
+    }
+
+    #[test]
+    /// Shouldn't round down
+    fn format_thousands_no_rounding() {
+        const N: i64 = 1_500;
+
+        assert_eq!(N.thousands_format(), "1,500");
+        assert_eq!(N.human_format(), "1.50 k");
+    }
+
+    #[test]
+    /// Should round down when human formatted
+    fn format_thousands_round_down() {
+        const N: i64 = 1_514;
+
+        assert_eq!(N.thousands_format(), "1,514");
+        assert_eq!(N.human_format(), "1.51 k");
+    }
+
+    #[test]
+    /// Should round up when human formatted
+    fn format_thousands_round_up() {
+        const N: i64 = 1_999;
+
+        assert_eq!(N.thousands_format(), "1,999");
+        assert_eq!(N.human_format(), "2.00 k");
+    }
+
+    #[test]
+    /// Should format millions
+    fn format_millions() {
+        const N: i64 = 1_000_000;
+
+        assert_eq!(N.thousands_format(), "1,000,000");
+        assert_eq!(N.human_format(), "1.00 M");
+    }
+
+    #[test]
+    /// Should format billions
+    fn format_billions() {
+        const N: i64 = 1_000_000_000;
+
+        assert_eq!(N.thousands_format(), "1,000,000,000");
+        assert_eq!(N.human_format(), "1.00 G");
+    }
+
+    #[test]
+    /// Should format trillions
+    fn format_trillions() {
+        const N: i64 = 1_100_000_000_000;
+
+        assert_eq!(N.thousands_format(), "1,100,000,000,000");
+        assert_eq!(N.human_format(), "1.10 T");
+    }
+
+    #[test]
+    /// Should format bytes
+    fn format_bytes() {
+        const N: i64 = 1024;
+
+        assert_eq!(N.human_format_bytes(), "1.00 KiB");
+        assert_eq!((N * N).human_format_bytes(), "1.00 MiB");
+        assert_eq!((N * (N * N)).human_format_bytes(), "1.00 GiB");
+        assert_eq!((N * (N * (N * N))).human_format_bytes(), "1.00 TiB");
+        assert_eq!((N * (N * (N * (N * N)))).human_format_bytes(), "1.00 PiB");
+    }
 }
