@@ -172,24 +172,15 @@ fn kafka_source(
                             }
 
                             if let Some(topic_key) = &topic_key {
-                                log.insert(
-                                    topic_key,
-                                    Value::from(msg.topic().to_string()),
-                                );
+                                log.insert(topic_key, Value::from(msg.topic().to_string()));
                             }
 
                             if let Some(partition_key) = &partition_key {
-                                log.insert(
-                                    partition_key,
-                                    Value::from(msg.partition()),
-                                );
+                                log.insert(partition_key, Value::from(msg.partition()));
                             }
 
                             if let Some(offset_key) = &offset_key {
-                                log.insert(
-                                    offset_key,
-                                    Value::from(msg.offset()),
-                                );
+                                log.insert(offset_key, Value::from(msg.offset()));
                             }
 
                             consumer.store_offset(&msg).map_err(|error| {
