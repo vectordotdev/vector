@@ -354,11 +354,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: close({
-		description:    string
-		relevant_when?: string
-		tags:           #MetricTags
-		name:           Name
-		type:           #MetricType
+		description:       string
+		relevant_when?:    string
+		tags:              #MetricTags
+		name:              Name
+		type:              #MetricType
+		default_namespace: string
 	})
 
 	#Output: {
@@ -833,7 +834,8 @@ components: {
 							required: false
 						}
 					}
-					type: "counter"
+					type:              "counter"
+					default_namespace: "vector"
 				}
 
 				_passthrough_distribution: {
@@ -845,7 +847,8 @@ components: {
 							required: false
 						}
 					}
-					type: "distribution"
+					type:              "distribution"
+					default_namespace: "vector"
 				}
 
 				_passthrough_gauge: {
@@ -857,7 +860,8 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 
 				_passthrough_histogram: {
@@ -869,7 +873,8 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 
 				_passthrough_set: {
@@ -881,7 +886,8 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 
 				_passthrough_summary: {
@@ -893,14 +899,16 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 			}
 		}
 
 		telemetry: metrics: {
 			// Default metrics for each component
-			vector_events_processed_total: _vector_events_processed_total
+			events_processed_total: components.sources.internal_metrics.output.metrics.events_processed_total
+			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		}
 	}}
 }

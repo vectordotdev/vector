@@ -90,7 +90,7 @@ fn is_scalar_value(value: &Value) -> bool {
     use Value::*;
 
     match value {
-        Integer(_) | Float(_) | String(_) | Boolean(_) | Null => true,
+        Integer(_) | Float(_) | Bytes(_) | Boolean(_) | Null => true,
         Timestamp(_) | Map(_) | Array(_) => false,
     }
 }

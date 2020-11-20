@@ -12,7 +12,7 @@ impl Function for Tokenize {
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "value",
-            accepts: |v| matches!(v, Value::String(_)),
+            accepts: |v| matches!(v, Value::Bytes(_)),
             required: true,
         }]
     }
@@ -38,7 +38,7 @@ impl TokenizeFn {
 
 impl Expression for TokenizeFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let bytes = self.value.execute(state, object)?.try_string()?;
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
         let value = String::from_utf8_lossy(&bytes);
 
         let tokens: Value = tokenize::parse(&value)
@@ -56,7 +56,7 @@ impl Expression for TokenizeFn {
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
         self.value
             .type_def(state)
-            .fallible_unless(value::Kind::String)
+            .fallible_unless(value::Kind::Bytes)
             .with_constraint(value::Kind::Array)
     }
 }

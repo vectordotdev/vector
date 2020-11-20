@@ -12,7 +12,7 @@ impl InternalEvent for LogfmtParserMissingField<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
             "error_type" => "missing_field",
         );
     }
@@ -35,7 +35,7 @@ impl<'a> InternalEvent for LogfmtParserConversionFailed<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("processing_errors", 1,
+        counter!("processing_errors_total", 1,
             "error_type" => "type_conversion_failed",
         );
     }

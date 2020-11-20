@@ -125,11 +125,6 @@ mod tests {
     fn ceil() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                CeilFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
                 map!["foo": 1234.2],
                 Ok(1235.0.into()),
                 CeilFn::new(Box::new(Path::from("foo")), None),

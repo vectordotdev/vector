@@ -20,6 +20,8 @@ mod aws_kinesis_firehose;
 mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
 pub(crate) mod aws_s3;
+#[cfg(feature = "sinks-aws_sqs")]
+mod aws_sqs;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -125,6 +127,8 @@ pub use self::aws_ecs_metrics::*;
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-aws_sqs")]
+pub use self::aws_sqs::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
@@ -138,7 +142,11 @@ pub(crate) use self::dedupe::*;
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
 pub use self::event_processed::EventProcessed;
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes-logs",
+    feature = "sinks-file",
+))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
@@ -232,7 +240,11 @@ macro_rules! emit {
 }
 
 // Modules that require emit! macro so they need to be defined after the macro.
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes-logs",
+    feature = "sinks-file",
+))]
 mod file;
 mod windows;
 

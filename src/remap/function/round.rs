@@ -125,11 +125,6 @@ mod tests {
     fn round() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                RoundFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
                 map!["foo": 1234.2],
                 Ok(1234.0.into()),
                 RoundFn::new(Box::new(Path::from("foo")), None),

@@ -9,7 +9,6 @@ mod tests {
     use crate::support::{sink, source_with_event_counter};
     use chrono::Utc;
     use futures::StreamExt;
-    use std::collections::HashMap;
     use std::{
         net::SocketAddr,
         sync::Once,
@@ -344,71 +343,9 @@ mod tests {
     #[tokio::test]
     #[allow(clippy::float_cmp)]
     #[ignore]
-    /// Tests componentEventsProcessedTotal returns increasing metrics, ordered by
+    /// Tests componentEventsProcessedTotals returns increasing metrics, ordered by
     /// source -> transform -> sink
-    async fn api_graphql_component_events_processed_total() {
-        init_metrics();
-
-        let topology = from_str_config(
-            r#"
-            [api]
-              enabled = true
-
-            [sources.events_processed_total_source]
-              type = "generator"
-              lines = ["Random line", "And another"]
-              batch_interval = 0.1
-
-            [sinks.events_processed_total_sink]
-              # General
-              type = "blackhole"
-              inputs = ["events_processed_total_source"]
-              print_amount = 100000
-        "#,
-        )
-        .await;
-
-        let server = api::Server::start(topology.config());
-        let client = new_subscription_client(server.addr()).await;
-        let subscription = client.component_events_processed_total_subscription(500);
-
-        tokio::pin! {
-            let component_events_processed_total = subscription.stream();
-        }
-
-        // Results should be sorted by source -> sink, so we'll need to assert that
-        // order. The events generated should be the same in both cases
-        let mut map = HashMap::new();
-
-        for r in 0..=1 {
-            map.insert(
-                r,
-                component_events_processed_total
-                    .next()
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .data
-                    .unwrap()
-                    .component_events_processed_total,
-            );
-        }
-
-        assert_eq!(map[&0].name, "events_processed_total_source");
-        assert_eq!(map[&1].name, "events_processed_total_sink");
-
-        assert_eq!(
-            map[&0].metric.events_processed_total,
-            map[&1].metric.events_processed_total
-        );
-    }
-
-    #[tokio::test]
-    #[allow(clippy::float_cmp)]
-    #[ignore]
-    /// Tests componentEventsProcessedTotalBatch returns increasing metrics, ordered by
-    /// source -> transform -> sink
-    async fn api_graphql_component_events_processed_total_batch() {
+    async fn api_graphql_component_events_processed_totals() {
         init_metrics();
 
         let topology = from_str_config(
@@ -432,20 +369,20 @@ mod tests {
 
         let server = api::Server::start(topology.config());
         let client = new_subscription_client(server.addr()).await;
-        let subscription = client.component_events_processed_total_batch_subscription(500);
+        let subscription = client.component_events_processed_totals_subscription(500);
 
         tokio::pin! {
-            let component_events_processed_total_batch = subscription.stream();
+            let stream = subscription.stream();
         }
 
-        let data = component_events_processed_total_batch
+        let data = stream
             .next()
             .await
             .unwrap()
             .unwrap()
             .data
             .unwrap()
-            .component_events_processed_total_batch;
+            .component_events_processed_totals;
 
         assert_eq!(data[0].name, "events_processed_total_batch_source");
         assert_eq!(data[1].name, "events_processed_total_batch_sink");
@@ -459,70 +396,9 @@ mod tests {
     #[tokio::test]
     #[allow(clippy::float_cmp)]
     #[ignore]
-    /// Tests componentBytesProcessedTotal returns increasing metrics, ordered by
+    /// Tests componentBytesProcessedTotals returns increasing metrics, ordered by
     /// source -> transform -> sink
-    async fn api_graphql_component_bytes_processed_total() {
-        init_metrics();
-
-        let topology = from_str_config(
-            r#"
-            [api]
-              enabled = true
-
-            [sources.bytes_processed_total_source]
-              type = "generator"
-              lines = ["Random line", "And another"]
-              batch_interval = 0.1
-
-            [sinks.bytes_processed_total_sink]
-              # General
-              type = "blackhole"
-              inputs = ["bytes_processed_total_source"]
-              print_amount = 100000
-        "#,
-        )
-        .await;
-
-        let server = api::Server::start(topology.config());
-        let client = new_subscription_client(server.addr()).await;
-        let subscription = client.component_bytes_processed_total_subscription(500);
-
-        tokio::pin! {
-            let component_bytes_processed_total = subscription.stream();
-        }
-
-        // Results should be sorted by source -> sink, so we'll need to assert that
-        // order. The events generated should be the same in both cases
-        let mut map = HashMap::new();
-
-        for r in 0..=1 {
-            map.insert(
-                r,
-                component_bytes_processed_total
-                    .next()
-                    .await
-                    .unwrap()
-                    .unwrap()
-                    .data
-                    .unwrap()
-                    .component_bytes_processed_total,
-            );
-        }
-
-        // Should only show byte totals on sinks
-        assert_eq!(map[&0].name, "bytes_processed_total_sink");
-        assert_eq!(map[&1].name, "bytes_processed_total_sink");
-
-        assert!(map[&0].metric.bytes_processed_total > 0.00);
-        assert!(map[&1].metric.bytes_processed_total > map[&0].metric.bytes_processed_total)
-    }
-
-    #[tokio::test]
-    #[allow(clippy::float_cmp)]
-    #[ignore]
-    /// Tests componentBytesProcessedTotalBatch returns increasing metrics, ordered by
-    /// source -> transform -> sink
-    async fn api_graphql_component_bytes_processed_total_batch() {
+    async fn api_graphql_component_bytes_processed_totals() {
         init_metrics();
 
         let topology = from_str_config(
@@ -546,20 +422,20 @@ mod tests {
 
         let server = api::Server::start(topology.config());
         let client = new_subscription_client(server.addr()).await;
-        let subscription = client.component_bytes_processed_total_batch_subscription(500);
+        let subscription = client.component_bytes_processed_totals_subscription(500);
 
         tokio::pin! {
-            let component_bytes_processed_total_batch = subscription.stream();
+            let stream = subscription.stream();
         }
 
-        let data = component_bytes_processed_total_batch
+        let data = stream
             .next()
             .await
             .unwrap()
             .unwrap()
             .data
             .unwrap()
-            .component_bytes_processed_total_batch;
+            .component_bytes_processed_totals;
 
         // Bytes are currently only relevant on sinks
         assert_eq!(data[0].name, "bytes_processed_total_batch_sink");
