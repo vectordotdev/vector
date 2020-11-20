@@ -5,6 +5,7 @@ use crate::{
     sinks::util::{
         encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
+    tcp::TcpKeepaliveConfig,
     tls::TlsConfig,
 };
 use serde::{Deserialize, Serialize};
@@ -46,16 +47,21 @@ impl SocketSinkConfig {
     pub fn make_tcp_config(
         address: String,
         encoding: EncodingConfig<Encoding>,
+        keepalive: Option<TcpKeepaliveConfig>,
         tls: Option<TlsConfig>,
     ) -> Self {
         SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig { address, tls }),
+            mode: Mode::Tcp(TcpSinkConfig {
+                address,
+                keepalive,
+                tls,
+            }),
             encoding,
         }
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
-        Self::make_tcp_config(address, EncodingConfig::from(Encoding::Text), None)
+        Self::make_tcp_config(address, EncodingConfig::from(Encoding::Text), None, None)
     }
 }
 
@@ -160,6 +166,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
+                keepalive: None,
                 tls: None,
             }),
             encoding: Encoding::Json.into(),
@@ -222,6 +229,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
+                keepalive: None,
                 tls: Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
@@ -340,6 +348,7 @@ mod test {
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpSinkConfig {
                 address: addr.to_string(),
+                keepalive: None,
                 tls: None,
             }),
             encoding: Encoding::Text.into(),

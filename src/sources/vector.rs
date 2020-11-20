@@ -198,6 +198,7 @@ mod test {
             VectorConfig::new(addr.into(), None, None),
             VectorSinkConfig {
                 address: format!("localhost:{}", addr.port()),
+                keepalive: None,
                 tls: None,
             },
         )
@@ -212,6 +213,7 @@ mod test {
             VectorConfig::new(addr.into(), None, Some(TlsConfig::test_config())),
             VectorSinkConfig {
                 address: format!("localhost:{}", addr.port()),
+                keepalive: None,
                 tls: Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {

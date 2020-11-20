@@ -1,3 +1,4 @@
+use crate::tcp::TcpKeepaliveConfig;
 use openssl::{
     error::ErrorStack,
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
@@ -123,6 +124,15 @@ impl MaybeTlsStream<TcpStream> {
             Self::Raw(raw) => raw.peer_addr(),
             Self::Tls(tls) => tls.get_ref().peer_addr(),
         }
+    }
+
+    pub fn set_keepalive(&mut self, keepalive: Option<TcpKeepaliveConfig>) -> std::io::Result<()> {
+        let stream = match self {
+            Self::Raw(raw) => raw,
+            Self::Tls(tls) => tls.get_ref(),
+        };
+
+        stream.set_keepalive(keepalive.and_then(|keepalive| keepalive.time))
     }
 }
 

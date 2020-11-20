@@ -450,7 +450,7 @@ mod test {
 
         let cx = SinkContext::new_test();
         let encode_event = move |_event| Some(message_bytes.clone());
-        let sink_config = TcpSinkConfig::new(format!("localhost:{}", addr.port()), None);
+        let sink_config = TcpSinkConfig::new(format!("localhost:{}", addr.port()), None, None);
         let (sink, _healthcheck) = sink_config.build(cx, encode_event).unwrap();
 
         // Spawn future that keeps sending lines to the TCP source forever.
