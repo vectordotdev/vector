@@ -82,7 +82,7 @@ impl SourceConfig for ApacheMetricsConfig {
         ))
     }
 
-    fn output_type(&self) -> crate::config::DataType {
+    fn output_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 

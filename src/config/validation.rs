@@ -300,8 +300,7 @@ fn capitalize(s: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use super::Graph;
-    use crate::config::DataType;
+    use super::*;
     use pretty_assertions::assert_eq;
 
     #[test]
