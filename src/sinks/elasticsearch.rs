@@ -116,7 +116,7 @@ impl BulkAction {
         }
     }
 
-    pub fn as_path(&self) -> &'static str {
+    pub fn as_json_pointer(&self) -> &'static str {
         match *self {
             BulkAction::Index => "/index",
             BulkAction::Create => "/create",
@@ -225,7 +225,7 @@ impl HttpSink for ElasticSearchCommon {
         });
         maybe_set_id(
             self.config.id_key.as_ref(),
-            action.pointer_mut(self.bulk_action.as_path()).unwrap(),
+            action.pointer_mut(self.bulk_action.as_json_pointer()).unwrap(),
             &mut event,
         );
 
