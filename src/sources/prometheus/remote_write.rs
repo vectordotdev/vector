@@ -97,37 +97,7 @@ impl RemoteWriteSource {
                 format!("Could not decode write request: {}", error),
             )
         })?;
-        Ok(request
-            .timeseries
-            .into_iter()
-            .filter_map(|timeseries| {
-                let (name, tags) = parse_labels(timeseries.labels);
-                match name {
-                    Some(name) => Some(timeseries.samples.into_iter().map(move |sample| {
-                        let value = sample.value;
-                        let value = if name.ends_with("_total") {
-                            MetricValue::Counter { value }
-                        } else {
-                            MetricValue::Gauge { value }
-                        };
-                        Metric {
-                            name: name.clone(),
-                            namespace: None,
-                            timestamp: parse_timestamp(sample.timestamp),
-                            tags: tags.clone(),
-                            kind: MetricKind::Absolute,
-                            value,
-                        }
-                        .into()
-                    })),
-                    None => {
-                        emit!(PrometheusNoNameError);
-                        None
-                    }
-                }
-            })
-            .flatten()
-            .collect())
+        Ok(decode_request(request))
     }
 }
 
@@ -143,6 +113,42 @@ impl HttpSource for RemoteWriteSource {
         let count = result.len();
         emit!(PrometheusRemoteWriteReceived { byte_size, count });
         Ok(result)
+    }
+}
+
+fn decode_request(request: proto::WriteRequest) -> Vec<Event> {
+    request
+        .timeseries
+        .into_iter()
+        .filter_map(decode_timeseries)
+        .flatten()
+        .collect()
+}
+
+fn decode_timeseries(timeseries: proto::TimeSeries) -> Option<impl Iterator<Item = Event>> {
+    let (name, tags) = parse_labels(timeseries.labels);
+    match name {
+        Some(name) => Some(timeseries.samples.into_iter().map(move |sample| {
+            let value = sample.value;
+            let value = if name.ends_with("_total") {
+                MetricValue::Counter { value }
+            } else {
+                MetricValue::Gauge { value }
+            };
+            Metric {
+                name: name.clone(),
+                namespace: None,
+                timestamp: parse_timestamp(sample.timestamp),
+                tags: tags.clone(),
+                kind: MetricKind::Absolute,
+                value,
+            }
+            .into()
+        })),
+        None => {
+            emit!(PrometheusNoNameError);
+            None
+        }
     }
 }
 
