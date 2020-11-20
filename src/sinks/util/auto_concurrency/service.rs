@@ -304,7 +304,6 @@ mod tests {
         .await;
     }
 
-    #[allow(clippy::needless_range_loop)]
     #[tokio::test]
     async fn rapid_decrease() {
         TestService::run(|mut svc| async move {
@@ -317,12 +316,12 @@ mod tests {
                 // must be borrowed mutable with a non-static
                 // lifetime. Resolving it is more work than it's worth
                 // for this test, so the clippy lint allow remains above.
-                for i in 0..concurrent {
-                    reqs[i] = Some(svc.send(i < concurrent - 1).await);
+                for (i, req) in reqs.iter_mut().take(concurrent).enumerate() {
+                    *req = Some(svc.send(i < concurrent - 1).await);
                 }
                 advance(Duration::from_secs(1)).await;
-                for i in 0..concurrent {
-                    reqs[i].take().unwrap().respond().await;
+                for req in reqs.iter_mut().take(concurrent) {
+                    req.take().unwrap().respond().await;
                 }
             }
 
