@@ -32,7 +32,7 @@ remap: functions: ip_cidr_contains: {
 				"""#
 			output: {
 				address: "192.168.10.32"
-				cidr: true
+				cidr:    true
 			}
 		},
 		{
@@ -45,8 +45,8 @@ remap: functions: ip_cidr_contains: {
 				"""#
 			output: {
 				address: "2001:4f8:3:ba:2e0:81ff:fe22:d1f1"
-				cidr: false
+				cidr:    false
 			}
-		}
+		},
 	]
 }

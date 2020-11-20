@@ -26,7 +26,7 @@ remap: functions: ipv6_to_ip: {
 				"""#
 			output: {
 				address: "::ffff:192.168.0.1"
-				v4: "192.168.0.1"
+				v4:      "192.168.0.1"
 			}
 		},
 		{

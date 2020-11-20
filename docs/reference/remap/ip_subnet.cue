@@ -9,12 +9,12 @@ remap: functions: ip_subnet: {
 			type: ["string"]
 		},
 		{
-			name:        "subnet"
+			name: "subnet"
 			description: #"""
-				The subnet to extract from the ip address. This can be either in the form of a prefix length,
-				eg. `/8` or as a net mask - `255.255.0.0`. The net mask can be either an IPv4 or IPv6 address.
-			"""#
-			required:    true
+					The subnet to extract from the ip address. This can be either in the form of a prefix length,
+					eg. `/8` or as a net mask - `255.255.0.0`. The net mask can be either an IPv4 or IPv6 address.
+				"""#
+			required: true
 			type: ["string"]
 		},
 	]
@@ -36,7 +36,7 @@ remap: functions: ip_subnet: {
 				"""#
 			output: {
 				address: "192.168.10.32"
-				subnet: "192.168.10.0"
+				subnet:  "192.168.10.0"
 			}
 		},
 		{
@@ -49,7 +49,7 @@ remap: functions: ip_subnet: {
 				"""#
 			output: {
 				address: "2404:6800:4003:c02::64"
-				subnet: "2404:6800::"
+				subnet:  "2404:6800::"
 			}
 		},
 	]
