@@ -90,7 +90,7 @@ components: sources: kafka: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["topic_key"]
+				examples: ["topic"]
 			}
 		}
 		partition_key: {
@@ -100,7 +100,7 @@ components: sources: kafka: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["partition_key"]
+				examples: ["partition"]
 			}
 		}
 		offset_key: {
@@ -110,7 +110,7 @@ components: sources: kafka: {
 			warnings: []
 			type: string: {
 				default: null
-				examples: ["offset_key"]
+				examples: ["offset"]
 			}
 		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
