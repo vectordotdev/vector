@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     event::{Event, LogEvent, LookupBuf, Value},
     shutdown::ShutdownSignal,
@@ -110,6 +111,10 @@ impl SourceConfig for SimpleHttpConfig {
     fn source_type(&self) -> &'static str {
         "http"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
+    }
 }
 
 fn add_headers(
@@ -197,7 +202,6 @@ mod tests {
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
@@ -233,7 +237,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap();
         });

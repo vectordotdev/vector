@@ -221,10 +221,8 @@ impl RetryLogic for KinesisFirehoseRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            RusotoError::HttpDispatch(_) => true,
             RusotoError::Service(PutRecordBatchError::ServiceUnavailable(_)) => true,
-            RusotoError::Unknown(res) if res.status.is_server_error() => true,
-            _ => false,
+            error => rusoto::is_retriable_error(error),
         }
     }
 }

@@ -15,6 +15,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_kinesis_streams;
 #[cfg(feature = "sinks-aws_s3")]
 pub mod aws_s3;
+#[cfg(feature = "sinks-aws_sqs")]
+pub mod aws_sqs;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
@@ -45,6 +47,8 @@ pub mod kafka;
 pub mod logdna;
 #[cfg(feature = "sinks-loki")]
 pub mod loki;
+#[cfg(feature = "sinks-nats")]
+pub mod nats;
 #[cfg(feature = "sinks-new_relic_logs")]
 pub mod new_relic_logs;
 #[cfg(feature = "sinks-papertrail")]

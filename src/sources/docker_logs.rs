@@ -4,9 +4,10 @@ use crate::{
     event::merge_state::LogEventMergeState,
     event::{self, Event, LogEvent, LookupBuf, Value},
     internal_events::{
-        DockerCommunicationError, DockerContainerEventReceived, DockerContainerMetadataFetchFailed,
-        DockerContainerUnwatch, DockerContainerWatch, DockerEventReceived,
-        DockerLoggingDriverUnsupported, DockerTimestampParseFailed,
+        DockerLogsCommunicationError, DockerLogsContainerEventReceived,
+        DockerLogsContainerMetadataFetchFailed, DockerLogsContainerUnwatch,
+        DockerLogsContainerWatch, DockerLogsEventReceived, DockerLogsLoggingDriverUnsupported,
+        DockerLogsTimestampParseFailed,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -21,9 +22,7 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
-use futures::{
-    compat::Sink01CompatExt, future, sink::SinkExt, FutureExt, Stream, StreamExt, TryFutureExt,
-};
+use futures::{compat::Sink01CompatExt, future, sink::SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
@@ -48,7 +47,7 @@ lazy_static! {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct DockerConfig {
+pub struct DockerLogsConfig {
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
@@ -58,7 +57,7 @@ pub struct DockerConfig {
     retry_backoff_secs: u64,
 }
 
-impl Default for DockerConfig {
+impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
             include_containers: None,
@@ -72,7 +71,7 @@ impl Default for DockerConfig {
     }
 }
 
-impl DockerConfig {
+impl DockerLogsConfig {
     fn container_name_included<'a>(
         &self,
         id: &str,
@@ -97,14 +96,14 @@ impl DockerConfig {
 }
 
 inventory::submit! {
-    SourceDescription::new::<DockerConfig>("docker")
+    SourceDescription::new::<DockerLogsConfig>("docker_logs")
 }
 
-impl_generate_config_from_default!(DockerConfig);
+impl_generate_config_from_default!(DockerLogsConfig);
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "docker")]
-impl SourceConfig for DockerConfig {
+#[typetag::serde(name = "docker_logs")]
+impl SourceConfig for DockerLogsConfig {
     async fn build(
         &self,
         _name: &str,
@@ -112,7 +111,7 @@ impl SourceConfig for DockerConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let source = DockerSource::new(self.clone(), out, shutdown.clone())?;
+        let source = DockerLogsSource::new(self.clone(), out, shutdown.clone())?;
 
         // Capture currently running containers, and do main future(run)
         let fut = async move {
@@ -127,17 +126,13 @@ impl SourceConfig for DockerConfig {
             }
         };
 
-        // Once this ShutdownSignal resolves it will drop DockerSource and by extension it's ShutdownSignal.
-        Ok(Box::new(
-            async move {
-                Ok(tokio::select! {
-                    _ = fut => {}
-                    _ = shutdown => {}
-                })
-            }
-            .boxed()
-            .compat(),
-        ))
+        // Once this ShutdownSignal resolves it will drop DockerLogsSource and by extension it's ShutdownSignal.
+        Ok(Box::pin(async move {
+            Ok(tokio::select! {
+                _ = fut => {}
+                _ = shutdown => {}
+            })
+        }))
     }
 
     fn output_type(&self) -> DataType {
@@ -145,20 +140,50 @@ impl SourceConfig for DockerConfig {
     }
 
     fn source_type(&self) -> &'static str {
+        "docker_logs"
+    }
+}
+
+// Add a compatibility alias to avoid breaking existing configs
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct DockerCompatConfig {
+    #[serde(flatten)]
+    config: DockerLogsConfig,
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "docker")]
+impl SourceConfig for DockerCompatConfig {
+    async fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        self.config.build(_name, _globals, shutdown, out).await
+    }
+
+    fn output_type(&self) -> DataType {
+        self.config.output_type()
+    }
+
+    fn source_type(&self) -> &'static str {
         "docker"
     }
 }
 
-struct DockerSourceCore {
-    config: DockerConfig,
+struct DockerLogsSourceCore {
+    config: DockerLogsConfig,
     line_agg_config: Option<line_agg::Config>,
     docker: Docker,
     /// Only logs created at, or after this moment are logged.
     now_timestamp: DateTime<Utc>,
 }
 
-impl DockerSourceCore {
-    fn new(config: DockerConfig) -> crate::Result<Self> {
+impl DockerLogsSourceCore {
+    fn new(config: DockerLogsConfig) -> crate::Result<Self> {
         // ?NOTE: Constructs a new Docker instance for a docker host listening at url specified by an env var DOCKER_HOST.
         // ?      Otherwise connects to unix socket which requires sudo privileges, or docker group membership.
         let docker = docker()?;
@@ -176,7 +201,7 @@ impl DockerSourceCore {
             None
         };
 
-        Ok(DockerSourceCore {
+        Ok(DockerLogsSourceCore {
             config,
             line_agg_config,
             docker,
@@ -185,7 +210,7 @@ impl DockerSourceCore {
     }
 
     /// Returns event stream coming from docker.
-    fn docker_event_stream(
+    fn docker_logs_event_stream(
         &self,
     ) -> impl Stream<Item = Result<SystemEventsResponse, DockerError>> + Send {
         let mut filters = HashMap::new();
@@ -235,7 +260,7 @@ impl DockerSourceCore {
 /// main <----|<---- event_stream ---->out
 ///           | ...                 ...out
 ///
-struct DockerSource {
+struct DockerLogsSource {
     esb: EventStreamBuilder,
     /// event stream from docker
     events: Pin<Box<dyn Stream<Item = Result<SystemEventsResponse, DockerError>> + Send>>,
@@ -250,12 +275,12 @@ struct DockerSource {
     backoff_duration: Duration,
 }
 
-impl DockerSource {
+impl DockerLogsSource {
     fn new(
-        config: DockerConfig,
+        config: DockerLogsConfig,
         out: Pipeline,
         shutdown: ShutdownSignal,
-    ) -> crate::Result<DockerSource> {
+    ) -> crate::Result<DockerLogsSource> {
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
         // various approaches need to be made. As such the solution is not
@@ -272,11 +297,11 @@ impl DockerSource {
         let backoff_secs = config.retry_backoff_secs;
 
         // Only logs created at, or after this moment are logged.
-        let core = DockerSourceCore::new(config)?;
+        let core = DockerLogsSourceCore::new(config)?;
 
         // main event stream, with whom only newly started/restarted containers will be logged.
-        let events = core.docker_event_stream();
-        info!(message = "Listening to docker events.");
+        let events = core.docker_logs_event_stream();
+        info!(message = "Listening to docker log events.");
 
         // Channel of communication between main future and event_stream futures
         let (main_send, main_recv) =
@@ -297,7 +322,7 @@ impl DockerSource {
             shutdown,
         };
 
-        Ok(DockerSource {
+        Ok(DockerLogsSource {
             esb,
             events: Box::pin(events),
             containers: HashMap::new(),
@@ -394,8 +419,8 @@ impl DockerSource {
                             }
                         }
                         None => {
-                            error!(message = "Docker source main stream has ended unexpectedly.");
-                            info!(message = "Shutting down docker source.");
+                            error!(message = "The docker_logs source main stream has ended unexpectedly.");
+                            info!(message = "Shutting down docker_logs source.");
                             return;
                         }
                     };
@@ -408,7 +433,7 @@ impl DockerSource {
                             let id = actor.id.unwrap();
                             let attributes = actor.attributes.unwrap();
 
-                            emit!(DockerContainerEventReceived { container_id: &id, action: &action });
+                            emit!(DockerLogsContainerEventReceived { container_id: &id, action: &action });
 
                             let id = ContainerId::new(id);
 
@@ -443,11 +468,11 @@ impl DockerSource {
                                 _ => {},
                             };
                         }
-                        Some(Err(error)) => emit!(DockerCommunicationError{error,container_id:None}),
+                        Some(Err(error)) => emit!(DockerLogsCommunicationError{error,container_id:None}),
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
-                            error!(message = "Docker event stream has ended unexpectedly.");
-                            info!(message = "Shutting down docker source.");
+                            error!(message = "Docker log event stream has ended unexpectedly.");
+                            info!(message = "Shutting down docker_logs source.");
                             return;
                         }
                     };
@@ -482,7 +507,7 @@ impl DockerSource {
 /// Used to construct and start event stream futures
 #[derive(Clone)]
 struct EventStreamBuilder {
-    core: Arc<DockerSourceCore>,
+    core: Arc<DockerLogsSourceCore>,
     /// Event stream futures send events through this
     out: Pipeline,
     /// End through which event stream futures send ContainerLogInfo to main future
@@ -511,12 +536,12 @@ impl EventStreamBuilder {
                         this.run_event_stream(info).await;
                         return;
                     }
-                    Err(error) => emit!(DockerTimestampParseFailed {
+                    Err(error) => emit!(DockerLogsTimestampParseFailed {
                         error,
                         container_id: id.as_str()
                     }),
                 },
-                Err(error) => emit!(DockerContainerMetadataFetchFailed {
+                Err(error) => emit!(DockerLogsContainerMetadataFetchFailed {
                     error,
                     container_id: id.as_str()
                 }),
@@ -550,7 +575,7 @@ impl EventStreamBuilder {
         });
 
         let stream = self.core.docker.logs(info.id.as_str(), options);
-        emit!(DockerContainerWatch {
+        emit!(DockerLogsContainerWatch {
             container_id: info.id.as_str()
         });
 
@@ -572,12 +597,12 @@ impl EventStreamBuilder {
                             DockerError::DockerResponseServerError { status_code, .. }
                                 if *status_code == http::StatusCode::NOT_IMPLEMENTED =>
                             {
-                                emit!(DockerLoggingDriverUnsupported {
+                                emit!(DockerLogsLoggingDriverUnsupported {
                                     error,
                                     container_id: info.id.as_str(),
                                 })
                             }
-                            _ => emit!(DockerCommunicationError {
+                            _ => emit!(DockerLogsCommunicationError {
                                 error,
                                 container_id: Some(info.id.as_str())
                             }),
@@ -607,7 +632,7 @@ impl EventStreamBuilder {
             .await;
 
         // End of stream
-        emit!(DockerContainerUnwatch {
+        emit!(DockerLogsContainerUnwatch {
             container_id: info.id.as_str()
         });
 
@@ -776,7 +801,7 @@ impl ContainerLogInfo {
             }
             Err(error) => {
                 // Received bad timestamp, if any at all.
-                emit!(DockerTimestampParseFailed {
+                emit!(DockerLogsTimestampParseFailed {
                     error,
                     container_id: self.id.as_str()
                 });
@@ -892,7 +917,7 @@ impl ContainerLogInfo {
         // other cases were handled earlier.
         let event = Event::Log(log_event);
 
-        emit!(DockerEventReceived {
+        emit!(DockerLogsEventReceived {
             byte_size,
             container_id: self.id.as_str()
         });
@@ -986,11 +1011,11 @@ mod tests {
 
     #[test]
     fn generate_config() {
-        crate::test_util::test_generate_config::<DockerConfig>();
+        crate::test_util::test_generate_config::<DockerLogsConfig>();
     }
 }
 
-#[cfg(all(test, feature = "docker-integration-tests"))]
+#[cfg(all(test, feature = "docker-logs-integration-tests"))]
 mod integration_tests {
     use super::*;
     use crate::{
@@ -1013,15 +1038,15 @@ mod integration_tests {
         names: &[&str],
         label: L,
     ) -> mpsc01::Receiver<Event> {
-        source_with_config(DockerConfig {
+        source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
-            ..DockerConfig::default()
+            ..DockerLogsConfig::default()
         })
     }
 
     /// None if docker is not present on the system
-    fn source_with_config(config: DockerConfig) -> mpsc01::Receiver<Event> {
+    fn source_with_config(config: DockerLogsConfig) -> mpsc01::Receiver<Event> {
         // trace_init();
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
@@ -1034,7 +1059,6 @@ mod integration_tests {
                 )
                 .await
                 .unwrap()
-                .compat()
                 .await
                 .unwrap();
         });
@@ -1375,10 +1399,10 @@ mod integration_tests {
 
         let message = "15";
         let name = "vector_test_include_image";
-        let config = DockerConfig {
+        let config = DockerLogsConfig {
             include_containers: Some(vec![name.to_owned()]),
             include_images: Some(vec!["busybox".to_owned()]),
-            ..DockerConfig::default()
+            ..DockerLogsConfig::default()
         };
 
         let out = source_with_config(config);
@@ -1401,9 +1425,9 @@ mod integration_tests {
 
         let message = "16";
         let name = "vector_test_not_include_image";
-        let config_ex = DockerConfig {
+        let config_ex = DockerLogsConfig {
             include_images: Some(vec!["some_image".to_owned()]),
-            ..DockerConfig::default()
+            ..DockerLogsConfig::default()
         };
 
         let exclude_out = source_with_config(config_ex);
@@ -1422,14 +1446,14 @@ mod integration_tests {
 
         let message = "17";
         let name = "vector_test_not_include_running_image";
-        let config_ex = DockerConfig {
+        let config_ex = DockerLogsConfig {
             include_images: Some(vec!["some_image".to_owned()]),
-            ..DockerConfig::default()
+            ..DockerLogsConfig::default()
         };
-        let config_in = DockerConfig {
+        let config_in = DockerLogsConfig {
             include_containers: Some(vec![name.to_owned()]),
             include_images: Some(vec!["busybox".to_owned()]),
-            ..DockerConfig::default()
+            ..DockerLogsConfig::default()
         };
 
         let docker = docker().unwrap();
@@ -1482,7 +1506,7 @@ mod integration_tests {
             "    at com.foo.baz(baz.java:456)",
         )];
         let name = "vector_test_merge_multiline";
-        let config = DockerConfig {
+        let config = DockerLogsConfig {
             include_containers: Some(vec![name.to_owned()]),
             include_images: Some(vec!["busybox".to_owned()]),
             multiline: Some(MultilineConfig {
@@ -1491,7 +1515,7 @@ mod integration_tests {
                 mode: line_agg::Mode::ContinueThrough,
                 timeout_ms: 10,
             }),
-            ..DockerConfig::default()
+            ..DockerLogsConfig::default()
         };
 
         let out = source_with_config(config);

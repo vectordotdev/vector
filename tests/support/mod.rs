@@ -6,10 +6,12 @@
 
 use async_trait::async_trait;
 use futures::{
-    compat::Sink01CompatExt, future, stream::BoxStream, FutureExt, Sink, SinkExt, StreamExt,
-    TryFutureExt,
+    compat::{Sink01CompatExt, Stream01CompatExt},
+    future,
+    stream::{self, BoxStream},
+    FutureExt, Sink, SinkExt, StreamExt, TryStreamExt,
 };
-use futures01::{sink::Sink as Sink01, stream, sync::mpsc::Receiver, Async, Future, Stream};
+use futures01::{sink::Sink as Sink01, sync::mpsc::Receiver};
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::{
@@ -20,6 +22,7 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
+    task::Poll,
 };
 use tracing::{error, info};
 use vector::{
@@ -35,7 +38,7 @@ use vector::{
 };
 
 pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
     let sink = MockSinkConfig::new(tx, true);
     (rx, sink)
 }
@@ -43,7 +46,7 @@ pub fn sink(channel_size: usize) -> (Receiver<Event>, MockSinkConfig<Pipeline>) 
 pub fn sink_failing_healthcheck(
     channel_size: usize,
 ) -> (Receiver<Event>, MockSinkConfig<Pipeline>) {
-    let (tx, rx) = Pipeline::new_with_buffer(channel_size);
+    let (tx, rx) = Pipeline::new_with_buffer(channel_size, vec![]);
     let sink = MockSinkConfig::new(tx, false);
     (rx, sink)
 }
@@ -53,14 +56,14 @@ pub fn sink_dead() -> MockSinkConfig<DeadSink<Event>> {
 }
 
 pub fn source() -> (Pipeline, MockSourceConfig) {
-    let (tx, rx) = Pipeline::new_with_buffer(0);
+    let (tx, rx) = Pipeline::new_with_buffer(0, vec![]);
     let source = MockSourceConfig::new(rx);
     (tx, source)
 }
 
 pub fn source_with_event_counter() -> (Pipeline, MockSourceConfig, Arc<AtomicUsize>) {
     let event_counter = Arc::new(AtomicUsize::new(0));
-    let (tx, rx) = Pipeline::new_with_buffer(0);
+    let (tx, rx) = Pipeline::new_with_buffer(0, vec![]);
     let source = MockSourceConfig::new_with_event_counter(rx, event_counter.clone());
     (tx, source, event_counter)
 }
@@ -143,40 +146,37 @@ impl SourceConfig for MockSourceConfig {
     ) -> Result<Source, vector::Error> {
         let wrapped = self.receiver.clone();
         let event_counter = self.event_counter.clone();
-        let mut recv = wrapped.lock().unwrap().take().unwrap();
-        let mut shutdown = Some(shutdown.unit_error().boxed().compat());
+        let mut recv = wrapped.lock().unwrap().take().unwrap().compat();
+        let mut shutdown = Some(shutdown);
         let mut _token = None;
-        let source =
-            futures01::future::lazy(move || {
-                stream::poll_fn(move || {
-                    if let Some(until) = shutdown.as_mut() {
-                        match until.poll() {
-                            Ok(Async::Ready(res)) => {
-                                _token = Some(res);
-                                shutdown.take();
-                                recv.close();
-                            }
-                            Err(_) => {
-                                shutdown.take();
-                            }
-                            Ok(Async::NotReady) => {}
+        Ok(Box::pin(async move {
+            stream::poll_fn(move |cx| {
+                if let Some(until) = shutdown.as_mut() {
+                    match until.poll_unpin(cx) {
+                        Poll::Ready(res) => {
+                            _token = Some(res);
+                            shutdown.take();
+                            recv.get_mut().close();
                         }
+                        Poll::Pending => {}
                     }
+                }
 
-                    recv.poll()
-                })
-                .map(move |x| {
-                    if let Some(counter) = &event_counter {
-                        counter.fetch_add(1, Ordering::Relaxed);
-                    }
-                    x
-                })
-                .forward(out.sink_map_err(
+                recv.poll_next_unpin(cx)
+            })
+            .inspect_ok(move |_| {
+                if let Some(counter) = &event_counter {
+                    counter.fetch_add(1, Ordering::Relaxed);
+                }
+            })
+            .forward(
+                out.sink_compat().sink_map_err(
                     |error| error!(message = "Error sending in sink..", error = ?error),
-                ))
-                .map(|_| info!("Finished sending."))
-            });
-        Ok(Box::new(source))
+                ),
+            )
+            .inspect(|_| info!("Finished sending."))
+            .await
+        }))
     }
 
     fn output_type(&self) -> DataType {

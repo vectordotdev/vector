@@ -20,7 +20,7 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use file_source::{FileServer, FileServerShutdown, Fingerprinter};
+use file_source::{FileServer, FileServerShutdown, FingerprintStrategy, Fingerprinter};
 use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -37,7 +37,11 @@ mod transform_utils;
 mod util;
 
 use futures::{
-    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
+    compat::{Sink01CompatExt, Stream01CompatExt},
+    future::FutureExt,
+    sink::Sink,
+    stream::StreamExt,
+    TryStreamExt,
 };
 use futures01::Stream as Stream01;
 use k8s_paths_provider::K8sPathsProvider;
@@ -125,21 +129,13 @@ impl SourceConfig for Config {
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
         let source = Source::new(self, globals, name)?;
-
-        // TODO: this is a workaround for the legacy futures 0.1.
-        // When the core is updated to futures 0.3 this should be simplified
-        // significantly.
-        let out = futures::compat::Compat01As03Sink::new(out);
-        let fut = source.run(out, shutdown);
-        let fut = fut.map(|result| {
-            result.map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            })
-        });
-        let fut = Box::pin(fut);
-        let fut = futures::compat::Compat::new(fut);
-        let fut: sources::Source = Box::new(fut);
-        Ok(fut)
+        Ok(Box::pin(source.run(out.sink_compat(), shutdown).map(
+            |result| {
+                result.map_err(|error| {
+                    error!(message = "Source future failed.", %error);
+                })
+            },
+        )))
     }
 
     fn output_type(&self) -> DataType {
@@ -277,11 +273,14 @@ impl Source {
             // The shape of the log files is well-known in the Kubernetes
             // environment, so we pick the a specially crafted fingerprinter
             // for the log files.
-            fingerprinter: Fingerprinter::FirstLineChecksum {
-                // Max line length to expect during fingerprinting, see the
-                // explanation above.
-                max_line_length: max_line_bytes,
-                ignored_header_bytes: 0,
+            fingerprinter: Fingerprinter {
+                strategy: FingerprintStrategy::FirstLineChecksum {
+                    // Max line length to expect during fingerprinting, see the
+                    // explanation above.
+                    max_line_length: max_line_bytes,
+                    ignored_header_bytes: 0,
+                },
+                ignore_not_found: true,
             },
             // We expect the files distribution to not be a concern because of
             // the way we pick files for gathering: for each container, only the
@@ -294,6 +293,8 @@ impl Source {
             remove_after: None,
             // The standard emitter.
             emitter: FileSourceInternalEventsEmitter,
+            // A handle to the current tokio runtime
+            handle: tokio::runtime::Handle::current(),
         };
 
         let (file_source_tx, file_source_rx) =

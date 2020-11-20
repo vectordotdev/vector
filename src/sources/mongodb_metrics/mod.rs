@@ -11,7 +11,7 @@ use chrono::Utc;
 use futures::{
     compat::Sink01CompatExt,
     future::{join_all, ready, try_join_all},
-    stream, FutureExt, SinkExt, StreamExt, TryFutureExt,
+    stream, FutureExt, SinkExt, StreamExt,
 };
 use futures01::Sink;
 use mongodb::{
@@ -141,7 +141,7 @@ impl SourceConfig for MongoDBMetricsConfig {
             .sink_map_err(|error| error!(message = "Error sending metric.", %error))
             .sink_compat();
 
-        Ok(Box::new(
+        Ok(Box::pin(
             async move {
                 loop {
                     select! {
@@ -163,13 +163,11 @@ impl SourceConfig for MongoDBMetricsConfig {
                     }
                 }
             }
-            .map(Ok)
-            .boxed()
-            .compat(),
+            .map(Ok),
         ))
     }
 
-    fn output_type(&self) -> crate::config::DataType {
+    fn output_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 
@@ -1059,7 +1057,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures::compat::{Future01CompatExt, Stream01CompatExt};
+    use futures::compat::Stream01CompatExt;
     use tokio::time::{timeout, Duration};
 
     async fn test_instance(endpoint: &'static str) {
@@ -1083,7 +1081,6 @@ mod integration_tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap()
         });

@@ -12,7 +12,7 @@ use futures::{
     compat::{Compat01As03Sink, Sink01CompatExt},
     future,
     stream::BoxStream,
-    FutureExt, SinkExt, StreamExt, TryFutureExt,
+    SinkExt, StreamExt,
 };
 use lazy_static::lazy_static;
 use nix::{
@@ -138,7 +138,7 @@ impl SourceConfig for JournaldConfig {
         let start: StartJournalctlFn =
             Box::new(move |cursor| start_journalctl(&journalctl_path, current_boot_only, cursor));
 
-        Ok(Box::new(
+        Ok(Box::pin(
             JournaldSource {
                 include_units,
                 exclude_units,
@@ -148,9 +148,7 @@ impl SourceConfig for JournaldConfig {
                 out: out.sink_compat(),
             }
             .run_shutdown(shutdown, start)
-            .instrument(info_span!("journald-server"))
-            .boxed()
-            .compat(),
+            .instrument(info_span!("journald-server")),
         ))
     }
 

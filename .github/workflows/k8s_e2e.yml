@@ -94,7 +94,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.11.0", // https://github.com/kubernetes/minikube/issues/8799
+              "v1.15.1",
             ]
             const kubernetes_version = [
               { version: "v1.19.2", is_essential: true },

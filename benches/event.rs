@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use criterion::{criterion_group, Criterion};
+use criterion::{criterion_group, BatchSize, Criterion};
 use serde_json::{json, Value};
 use vector::{
     config::log_schema,
@@ -21,7 +21,7 @@ fn benchmark_event(c: &mut Criterion) {
     });
 
     c.bench_function("iterate all fields single-level", |b| {
-        b.iter_with_setup(
+        b.iter_batched_ref(
             || {
                 create_event(json!({
                     "key1": "value1",
@@ -30,6 +30,7 @@ fn benchmark_event(c: &mut Criterion) {
                 }))
             },
             |e| e.all_fields().count(),
+            BatchSize::SmallInput,
         )
     });
 
@@ -43,7 +44,7 @@ fn benchmark_event(c: &mut Criterion) {
     });
 
     c.bench_function("iterate all fields nested-keys", |b| {
-        b.iter_with_setup(
+        b.iter_batched_ref(
             || {
                 create_event(json!({
                     "key1": {
@@ -56,6 +57,7 @@ fn benchmark_event(c: &mut Criterion) {
                 }))
             },
             |e| e.all_fields().count(),
+            BatchSize::SmallInput,
         )
     });
 
@@ -68,7 +70,7 @@ fn benchmark_event(c: &mut Criterion) {
     });
 
     c.bench_function("iterate all fields array", |b| {
-        b.iter_with_setup(
+        b.iter_batched_ref(
             || {
                 create_event(json!({
                     "key1": {
@@ -80,6 +82,7 @@ fn benchmark_event(c: &mut Criterion) {
                 }))
             },
             |e| e.all_fields().count(),
+            BatchSize::SmallInput,
         )
     });
 }
@@ -95,4 +98,4 @@ fn create_event(json: Value) -> LogEvent {
     output.into_iter().next().unwrap().into_log()
 }
 
-criterion_group!(event, benchmark_event);
+criterion_group!(benches, benchmark_event);

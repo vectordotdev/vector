@@ -33,7 +33,7 @@ pub mod source {
 
         fn emit_metrics(&self) {
             counter!("sqs_message_receive_succeeded_total", 1);
-            counter!("sqs_message_received_messages", self.count as u64,);
+            counter!("sqs_message_received_messages_total", self.count as u64);
         }
     }
 
@@ -113,7 +113,7 @@ pub mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("sqs_s3_event_record_ignored", 1, "ignore_type" => "invalid_event_kind");
+            counter!("sqs_s3_event_record_ignored_total", 1, "ignore_type" => "invalid_event_kind");
         }
     }
 }

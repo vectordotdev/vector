@@ -11,7 +11,7 @@ use rusoto_core::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
     },
-    ByteStream, Region,
+    ByteStream, Region, RusotoError,
 };
 use rusoto_credential::{
     AutoRefreshingProvider, AwsCredentials, ChainProvider, CredentialsError, ProvideAwsCredentials,
@@ -40,7 +40,7 @@ pub fn client() -> crate::Result<Client> {
 }
 
 #[derive(Debug, Snafu)]
-enum RusotoError {
+enum AwsRusotoError {
     #[snafu(display("Failed to create request dispatcher"))]
     DispatcherError,
 
@@ -116,7 +116,7 @@ impl AwsCredentialsProvider {
             debug!("Using STS assume role credentials for AWS.");
 
             let dispatcher = rusoto_core::request::HttpClient::new()
-                .map_err(|_| RusotoError::DispatcherError)?;
+                .map_err(|_| AwsRusotoError::DispatcherError)?;
 
             let mut credentials = CustomChainProvider::new();
             credentials.set_timeout(Duration::from_secs(8));
@@ -332,5 +332,18 @@ impl HttpBody for RusotoBody {
 impl From<Option<SignedRequestPayload>> for RusotoBody {
     fn from(inner: Option<SignedRequestPayload>) -> Self {
         RusotoBody { inner }
+    }
+}
+
+pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
+    match error {
+        RusotoError::HttpDispatch(_) => true,
+        RusotoError::Unknown(res)
+            if res.status.is_server_error()
+                || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+        {
+            true
+        }
+        _ => false,
     }
 }

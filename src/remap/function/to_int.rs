@@ -47,18 +47,19 @@ impl ToIntFn {
 }
 
 impl Expression for ToIntFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_int = |value| match value {
             Integer(_) => Ok(value),
             Float(v) => Ok(Integer(v as i64)),
             Boolean(v) => Ok(Integer(if v { 1 } else { 0 })),
-            String(_) => Conversion::Integer
+            Null => Ok(0.into()),
+            Bytes(_) => Conversion::Integer
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            _ => Err("unable to convert value to integer".into()),
+            Array(_) | Map(_) | Timestamp(_) => Err("unable to convert value to integer".into()),
         };
 
         super::convert_value_or_default(
@@ -67,39 +68,149 @@ impl Expression for ToIntFn {
             to_int,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Integer | Kind::Float | Kind::Boolean | Kind::Null)
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(Kind::Integer | Kind::Float | Kind::Boolean | Kind::Null)
+            }))
+            .with_constraint(Kind::Integer)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use std::collections::BTreeMap;
+    use value::Kind;
+
+    remap::test_type_def![
+        boolean_infallible {
+            expr: |_| ToIntFn { value: Literal::from(true).boxed(), default: None },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        }
+
+        integer_infallible {
+            expr: |_| ToIntFn { value: Literal::from(1).boxed(), default: None },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        }
+
+        float_infallible {
+            expr: |_| ToIntFn { value: Literal::from(1.0).boxed(), default: None },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        }
+
+        null_infallible {
+            expr: |_| ToIntFn { value: Literal::from(()).boxed(), default: None },
+            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+        }
+
+        string_fallible {
+            expr: |_| ToIntFn { value: Literal::from("foo").boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+
+        map_fallible {
+            expr: |_| ToIntFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+
+        array_fallible {
+            expr: |_| ToIntFn { value: Literal::from(vec![0]).boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+
+        timestamp_infallible {
+            expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
+            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+        }
+
+        fallible_value_without_default {
+            expr: |_| ToIntFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                kind: Kind::Integer,
+            },
+        }
+
+       fallible_value_with_fallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                optional: false,
+                kind: Kind::Integer,
+            },
+        }
+
+       fallible_value_with_infallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                kind: Kind::Integer,
+            },
+        }
+
+        infallible_value_with_fallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                kind: Kind::Integer,
+            },
+        }
+
+        infallible_value_with_infallible_default {
+            expr: |_| ToIntFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                optional: false,
+                kind: Kind::Integer,
+            },
+        }
+    ];
 
     #[test]
     fn to_int() {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToIntFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
-                Ok(Some(Value::Integer(10))),
-                ToIntFn::new(Box::new(Path::from("foo")), Some(10.into())),
+                Ok(Value::Integer(10)),
+                ToIntFn::new(Literal::from(vec![0]).boxed(), Some(10.into())),
             ),
             (
                 map!["foo": "20"],
-                Ok(Some(Value::Integer(20))),
+                Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
             (
                 map!["foo": 20.5],
-                Ok(Some(Value::Integer(20))),
+                Ok(Value::Integer(20)),
                 ToIntFn::new(Box::new(Path::from("foo")), None),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
