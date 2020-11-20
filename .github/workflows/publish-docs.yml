@@ -25,7 +25,7 @@ jobs:
   build:
     runs-on: macos-latest
     needs: check-docs-diff
-    if: ${{ needs.checkMdDiff.outputs.diff }}
+    if: ${{ needs.check-docs-diff.outputs.diff }}
     steps:
       - name: Clone Vector
         uses: actions/checkout@v2
