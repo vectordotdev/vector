@@ -76,7 +76,7 @@ impl CheckpointsView {
                 let duration = now - *ts;
                 duration >= chrono::Duration::seconds(60)
             })
-            .map(|entry| entry.key().clone())
+            .map(|entry| *entry.key())
             .collect::<Vec<FileFingerprint>>();
 
         for fng in to_remove {
