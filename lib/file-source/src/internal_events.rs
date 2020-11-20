@@ -23,4 +23,6 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
     fn emit_file_checksum_failed(&self, path: &Path);
 
     fn emit_file_checkpoint_write_failed(&self, error: Error);
+
+    fn emit_files_open(&self, count: usize);
 }
