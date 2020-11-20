@@ -3,11 +3,11 @@ query ComponentsQuery {
     __typename
     name
     componentType
-    eventsProcessedTotal {
-      eventsProcessedTotal
+    processedEventsTotal {
+      processedEventsTotal
     }
-    bytesProcessedTotal {
-      bytesProcessedTotal
+    processedBytesTotal {
+      processedBytesTotal
     }
   }
 }

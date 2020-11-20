@@ -139,18 +139,18 @@ impl<'a> Widgets<'a> {
             // Build metric stats
             let formatted_metrics = if self.opts.human_metrics {
                 [
-                    r.events_processed_total.human_format(),
-                    r.events_processed_throughput.human_format(),
-                    r.bytes_processed_total.human_format_bytes(),
-                    r.bytes_processed_throughput.human_format_bytes(),
+                    r.processed_events_total.human_format(),
+                    r.processed_events_throughput.human_format(),
+                    r.processed_bytes_total.human_format_bytes(),
+                    r.processed_bytes_throughput.human_format_bytes(),
                     r.errors.human_format(),
                 ]
             } else {
                 [
-                    r.events_processed_total.thousands_format(),
-                    r.events_processed_throughput.thousands_format(),
-                    r.bytes_processed_total.thousands_format(),
-                    r.bytes_processed_throughput.thousands_format(),
+                    r.processed_events_total.thousands_format(),
+                    r.processed_events_throughput.thousands_format(),
+                    r.processed_bytes_total.thousands_format(),
+                    r.processed_bytes_throughput.thousands_format(),
                     r.errors.thousands_format(),
                 ]
             };
