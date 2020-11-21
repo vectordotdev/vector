@@ -71,13 +71,13 @@ or [**install Vector**][docs.installation].
 ### Administration
 
 * [**Process management**][docs.process-management]
-* [**Monitoring**][docs.monitoring]
+* [**Monitoring & Observability**][docs.monitoring]
 * [**Updating**][docs.updating]
 * [**Validating**][docs.validating]
 
 ### Resources
 
-* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
+* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter]
 * [**Releases**][urls.vector_releases] - [latest][urls.latest]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
@@ -209,7 +209,6 @@ Vector is an end-to-end, unified, open data platform.
 [urls.getting_started]: https://vector.dev/guides/getting-started/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.latest]: https://vector.dev/releases/latest/
-[urls.mailing_list]: https://vector.dev/community/
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
@@ -228,4 +227,4 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
-[urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
+[urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc
