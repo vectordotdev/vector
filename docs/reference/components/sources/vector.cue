@@ -25,7 +25,8 @@ components: sources: vector: {
 				}
 
 				interface: socket: {
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["tcp"]
 					ssl: "optional"
 				}

@@ -41,7 +41,8 @@ components: sources: logplex: {
 						title: "Syslog 6587"
 						url:   urls.syslog_6587
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["http"]
 					ssl: "optional"
 				}

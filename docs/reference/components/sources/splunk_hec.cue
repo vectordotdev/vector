@@ -30,7 +30,8 @@ components: sources: splunk_hec: {
 						title: "Splunk HEC"
 						url:   urls.splunk_hec_protocol
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["http"]
 					ssl: "optional"
 				}

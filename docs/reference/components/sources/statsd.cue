@@ -30,7 +30,8 @@ components: sources: statsd: {
 						title: "StatsD"
 						url:   urls.statsd_udp_protocol
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["udp"]
 					ssl: "optional"
 				}

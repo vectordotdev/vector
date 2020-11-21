@@ -97,9 +97,10 @@ components: sinks: prometheus_exporter: {
 		default_namespace: {
 			common:      true
 			description: """
-				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
-				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
+				Used as a namespace for metrics that don't have it. Typically
+				namespaces are set during ingestion (sources), but it is
+				optional and when missing, we'll use this value. It should
+				follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
 				"""
 			required:    false
 			warnings: []

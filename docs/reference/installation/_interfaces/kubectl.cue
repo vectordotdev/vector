@@ -131,7 +131,7 @@ installation: _interfaces: kubectl: {
 		//    VECTORCFG
 		//    """#
 		//  }
-		//  variables: config: sources: in_upstream: type: components.sources.vector.type
+		//  variables: config: sources: in_upstream: type: "vector"
 		// }
 	}
 }

@@ -88,7 +88,7 @@ installation: _interfaces: "docker-cli": {
 						[sinks](\#(urls.vector_sinks)).
 						"""#
 
-			variables: config: sources: logs: type: components.sources.docker_logs.type
+			variables: config: sources: logs: type: "docker_logs"
 		}
 		sidecar:    roles._file_sidecar
 		aggregator: roles._vector_aggregator

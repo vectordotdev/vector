@@ -124,7 +124,7 @@ installation: _interfaces: "helm3": {
 		//    command: commands.install
 		//   },
 		//  ]
-		//  variables: config: sources: in: type: components.sources.vector.type
+		//  variables: config: sources: in: type: "vector"
 		// }
 	}
 }

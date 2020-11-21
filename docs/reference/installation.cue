@@ -73,7 +73,7 @@ installation: close({
 							include: [string, ...string] | *["/var/log/**/*.log"]
 						}
 						host_metrics: type:     components.sources.host_metrics.type
-						internal_metrics: type: "internal_metrics"
+						internal_metrics: type: components.sources.internal_metrics.type
 					}
 				}
 				description: #"""
@@ -98,7 +98,7 @@ installation: close({
 							include: [string, ...string] | *["/var/log/my-app*.log"]
 						}
 						host_metrics: type:     components.sources.host_metrics.type
-						internal_metrics: type: "internal_metrics"
+						internal_metrics: type: components.sources.internal_metrics.type
 					}
 				}
 				description: #"""
@@ -121,7 +121,7 @@ installation: close({
 					sources: {
 						logs: type:             components.sources.journald.type
 						host_metrics: type:     components.sources.host_metrics.type
-						internal_metrics: type: "internal_metrics"
+						internal_metrics: type: components.sources.internal_metrics.type
 					}
 				}
 				description: #"""
@@ -150,7 +150,7 @@ installation: close({
 				variables: config: {
 					sources: {
 						vector: type:           components.sources.vector.type
-						internal_metrics: type: "internal_metrics"
+						internal_metrics: type: components.sources.internal_metrics.type
 					}
 				}
 				description: #"""
@@ -227,7 +227,7 @@ installation: close({
 			sinks?:      _
 		}
 		config: {
-			apt: {
+			api: {
 				enabled: false
 				port:    9001
 			}

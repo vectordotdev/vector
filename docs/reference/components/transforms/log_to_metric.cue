@@ -64,7 +64,7 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
-							default:      string
+							default:      null
 							templateable: true
 						}
 					}
