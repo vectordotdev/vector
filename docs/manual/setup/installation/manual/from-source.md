@@ -383,7 +383,7 @@ features one has to pass a comma-separated list of component features.
 | :--------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
 | `sources-apache_metrics`                             | Enables building of [`apache_metrics` source][docs.sources.apache_metrics].                                                                |
 | `sources-aws_kinesis_firehose`                       | Enables building of [`aws_kinesis_firehose` source][docs.sources.aws_kinesis_firehose].                                                    |
-| `sources-docker_logs`                                     | Enables building of [`docker` source][docs.sources.docker]. Requires `unix` feature to be also enabled for support of Unix domain sockets. |
+| `sources-docker_logs`                                | Enables building of [`docker_logs` source][docs.sources.docker_logs]. Requires `unix` feature to be also enabled for support of Unix domain sockets. |
 | `sources-file`                                       | Enables building of [`file` source][docs.sources.file].                                                                                    |
 | `sources-generator`                                  | Enables building of [`generator` source][docs.sources.generator].                                                                          |
 | `sources-host_metrics`                               | Enables building of [`host_metrics` source][docs.sources.host_metrics].                                                                    |
@@ -510,7 +510,7 @@ features one has to pass a comma-separated list of component features.
 [docs.sinks.vector]: /docs/reference/sinks/vector/
 [docs.sources.apache_metrics]: /docs/reference/sources/apache_metrics/
 [docs.sources.aws_kinesis_firehose]: /docs/reference/sources/aws_kinesis_firehose/
-[docs.sources.docker]: /docs/reference/sources/docker/
+[docs.sources.docker_logs]: /docs/reference/sources/docker_logs/
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.sources.generator]: /docs/reference/sources/generator/
 [docs.sources.host_metrics]: /docs/reference/sources/host_metrics/

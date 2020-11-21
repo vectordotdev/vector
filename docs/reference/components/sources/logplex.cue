@@ -18,31 +18,34 @@ components: sources: logplex: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Heroku"
-				thing:    "a \(name) app"
-				url:      urls.logplex
-				versions: null
+				service: {
+					name:     "Heroku"
+					thing:    "a \(name) app"
+					url:      urls.logplex
+					versions: null
+
+					setup: [
+						"""
+							Create a [Heroku log drain](\(urls.heroku_http_log_drain)) that
+							points to your Vector instance's address:
+
+							```bash
+							heroku drains:add https://<user>:<pass>@<address> -a <app>
+							```
+							""",
+					]
+				}
 
 				interface: socket: {
 					api: {
 						title: "Syslog 6587"
 						url:   urls.syslog_6587
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["http"]
 					ssl: "optional"
 				}
-
-				setup: [
-					"""
-						Create a [Heroku log drain](\(urls.heroku_http_log_drain)) that
-						points to your Vector instance's address:
-
-						```bash
-						heroku drains:add https://<user>:<pass>@<address> -a <app>
-						```
-						""",
-				]
 			}
 
 			tls: {

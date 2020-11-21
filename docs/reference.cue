@@ -19,6 +19,8 @@ _values: {
 // `#Any` allows for any value.
 #Any: _ | {[_=string]: #Any}
 
+#Arch: "ARM64" | "ARMv7" | "x86_64"
+
 // `#CompressionAlgorithm` specified data compression algorithm.
 //
 // * `none` - compression is not applied
@@ -50,7 +52,7 @@ _values: {
 
 // `#DevelopmentStatus` documents the development status of the component.
 //
-// * `beta` - The component is early in it's development cylce and the
+// * `beta` - The component is early in its development cylce and the
 // API and reliability are not settled.
 // * `stable` - The component is production ready.
 // * `deprecated` - The component will be removed in a future version.
@@ -198,19 +200,12 @@ _values: {
 
 #Object: {[_=string]: #Any}
 
+#OperatingSystem: "Linux" | "macOS" | "Windows"
+
 #Permissions: {
 	unix: {
 		group: string
 	}
-}
-
-#Platforms: {
-	"aarch64-unknown-linux-gnu":  bool
-	"aarch64-unknown-linux-musl": bool
-	"x86_64-apple-darwin":        bool
-	"x86_64-pc-windows-msv":      bool
-	"x86_64-unknown-linux-gnu":   bool
-	"x86_64-unknown-linux-musl":  bool
 }
 
 #Protocol: "http" | "tcp" | "udp" | "unix"
@@ -220,8 +215,6 @@ _values: {
 	thing:    string
 	url:      string
 	versions: string | null
-
-	interface?: #Interface
 
 	setup?: [string, ...string]
 }
@@ -284,6 +277,15 @@ _values: {
 	// `types` sets the option's value type. External tagging is used since
 	// each type has its own set of fields.
 	type: #Type & {_args: "required": required}
+}
+
+#TargetTriples: {
+	"aarch64-unknown-linux-gnu":  bool
+	"aarch64-unknown-linux-musl": bool
+	"x86_64-apple-darwin":        bool
+	"x86_64-pc-windows-msv":      bool
+	"x86_64-unknown-linux-gnu":   bool
+	"x86_64-unknown-linux-musl":  bool
 }
 
 #Timestamp: =~"^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}Z"
@@ -440,7 +442,8 @@ _values: {
 
 #Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
-components: _
-data_model: _
-releases:   _
-remap:      _
+components:   _
+data_model:   _
+installation: _
+releases:     _
+remap:        _
