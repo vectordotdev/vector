@@ -43,8 +43,11 @@ installation: _interfaces: "helm3": {
 				"""#
 			install:     #"helm install \#(_name) timberio/\#(_name) --devel --values values.yaml --namespace vector --create-namespace"#
 			logs:        #"kubectl logs -n vector \#(_controller_resource_type)/\#(_name)"#
-			reconfigure: #"kubectl edit \#(_controller_resource_type) \#(_name)"#
-			reload:      #"kubectl rollout restart \#(_controller_resource_type)/\#(_name)"#
+			reconfigure: #"""
+							helm upgrade \#(_name) timberio/\#(_name) --devel --values values.yaml --namespace vector --version {version} && \
+								kubectl rollout restart --namespace vector \#(_resource_type)/\#(_name)
+							"""#
+			reload:      null
 			restart:     #"kubectl rollout restart \#(_controller_resource_type)/\#(_name)"#
 			start:       null
 			stop:        null
