@@ -120,7 +120,6 @@ impl<S> MaybeTlsIncomingStream<S> {
     }
 
     /// None if connection still hasn't been established.
-    #[cfg(feature = "listenfd")]
     pub fn get_ref(&self) -> Option<&S> {
         match &self.state {
             StreamState::Accepted(stream) => Some(match stream {
