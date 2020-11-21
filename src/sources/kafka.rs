@@ -44,6 +44,9 @@ pub struct KafkaSourceConfig {
     #[serde(default = "default_commit_interval_ms")]
     commit_interval_ms: u64,
     key_field: Option<String>,
+    topic_key: Option<String>,
+    partition_key: Option<String>,
+    offset_key: Option<String>,
     librdkafka_options: Option<HashMap<String, String>>,
     #[serde(flatten)]
     auth: KafkaAuthConfig,
@@ -103,6 +106,9 @@ fn kafka_source(
     out: Pipeline,
 ) -> crate::Result<super::Source> {
     let key_field = config.key_field.clone();
+    let topic_key = config.topic_key.clone();
+    let partition_key = config.partition_key.clone();
+    let offset_key = config.offset_key.clone();
     let consumer = Arc::new(create_consumer(config)?);
 
     Ok(Box::pin(async move {
@@ -111,6 +117,9 @@ fn kafka_source(
             .take_until(shutdown.clone())
             .then(move |message| {
                 let key_field = key_field.clone();
+                let topic_key = topic_key.clone();
+                let partition_key = partition_key.clone();
+                let offset_key = offset_key.clone();
                 let consumer = Arc::clone(&consumer);
 
                 async move {
@@ -157,6 +166,18 @@ fn kafka_source(
                                         );
                                     }
                                 }
+                            }
+
+                            if let Some(topic_key) = &topic_key {
+                                log.insert(topic_key, Value::from(msg.topic().to_string()));
+                            }
+
+                            if let Some(partition_key) = &partition_key {
+                                log.insert(partition_key, Value::from(msg.partition()));
+                            }
+
+                            if let Some(offset_key) = &offset_key {
+                                log.insert(offset_key, Value::from(msg.offset()));
                             }
 
                             consumer.store_offset(&msg).map_err(|error| {
@@ -241,6 +262,9 @@ mod test {
             session_timeout_ms: 10000,
             commit_interval_ms: 5000,
             key_field: Some("message_key".to_string()),
+            topic_key: Some("topic".to_string()),
+            partition_key: Some("partition".to_string()),
+            offset_key: Some("offset".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -272,14 +296,14 @@ mod integration_test {
         test_util::{collect_n, random_string},
         Pipeline,
     };
-    use chrono::Utc;
+    use chrono::{SubsecRound, Utc};
     use rdkafka::{
         config::ClientConfig,
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
     };
 
-    const BOOTSTRAP_SERVER: &str = "localhost:9092";
+    const BOOTSTRAP_SERVER: &str = "localhost:9091";
 
     async fn send_event(topic: String, key: &str, text: &str, timestamp: i64) {
         let producer: FutureProducer = ClientConfig::new()
@@ -299,7 +323,6 @@ mod integration_test {
         }
     }
 
-    #[ignore]
     #[tokio::test]
     async fn kafka_source_consume_event() {
         let topic = format!("test-topic-{}", random_string(10));
@@ -315,6 +338,9 @@ mod integration_test {
             session_timeout_ms: 6000,
             commit_interval_ms: 5000,
             key_field: Some("message_key".to_string()),
+            topic_key: Some("topic".to_string()),
+            partition_key: Some("partition".to_string()),
+            offset_key: Some("offset".to_string()),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -343,6 +369,12 @@ mod integration_test {
             events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()
         );
-        assert_eq!(events[0].as_log()[log_schema().timestamp_key()], now.into());
+        assert_eq!(
+            events[0].as_log()[log_schema().timestamp_key()],
+            now.trunc_subsecs(3).into()
+        );
+        assert_eq!(events[0].as_log()["topic"], topic.into());
+        assert!(events[0].as_log().contains("partition"));
+        assert!(events[0].as_log().contains("offset"));
     }
 }
