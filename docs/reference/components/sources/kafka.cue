@@ -83,6 +83,36 @@ components: sources: kafka: {
 				examples: ["message_key"]
 			}
 		}
+		topic_key: {
+			common:      true
+			description: "The log field name to use for the Kafka topic key. If unspecified, the key would not be added to the log event."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["topic"]
+			}
+		}
+		partition_key: {
+			common:      true
+			description: "The log field name to use for the Kafka partition key. If unspecified, the key would not be added to the log event."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["partition"]
+			}
+		}
+		offset_key: {
+			common:      true
+			description: "The log field name to use for the Kafka offset key. If unspecified, the key would not be added to the log event."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["offset"]
+			}
+		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
 		sasl: {
 			common:      false

@@ -139,6 +139,8 @@ urls: {
 	github_protected_branches:                                "https://help.github.com/en/github/administering-a-repository/about-protected-branches"
 	github_sign_commits:                                      "https://help.github.com/en/github/authenticating-to-github/signing-commits"
 	globbing:                                                 "https://en.wikipedia.org/wiki/Glob_(programming)"
+	graphql:                                                  "https://graphql.org"
+	graphql_playground:                                       "https://github.com/graphql/graphql-playground"
 	grok:                                                     "https://grokdebug.herokuapp.com/"
 	grok_debugger:                                            "https://grokdebug.herokuapp.com/"
 	grok_patterns:                                            "https://github.com/daschl/grok/tree/master/patterns"
