@@ -18,17 +18,20 @@ components: sources: statsd: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "StatsD"
-				thing:    "a \(name) client"
-				url:      urls.statsd
-				versions: null
+				service: {
+					name:     "StatsD"
+					thing:    "a \(name) client"
+					url:      urls.statsd
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
 						title: "StatsD"
 						url:   urls.statsd_udp_protocol
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["udp"]
 					ssl: "optional"
 				}

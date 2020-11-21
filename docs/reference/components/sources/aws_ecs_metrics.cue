@@ -16,10 +16,12 @@ components: sources: aws_ecs_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Amazon ECS"
-				thing:    "an \(name) container"
-				url:      urls.aws_ecs
-				versions: null
+				service: {
+					name:     "Amazon ECS"
+					thing:    "an \(name) container"
+					url:      urls.aws_ecs
+					versions: null
+				}
 
 				interface: {
 					socket: {

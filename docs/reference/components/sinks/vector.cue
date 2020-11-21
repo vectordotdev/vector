@@ -29,10 +29,12 @@ components: sinks: vector: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "Vector source"
-				thing:    "a \(name)"
-				url:      urls.vector_source
-				versions: null
+				service: {
+					name:     "Vector source"
+					thing:    "a \(name)"
+					url:      urls.vector_source
+					versions: null
+				}
 
 				interface: {
 					socket: {

@@ -62,10 +62,12 @@ components: sinks: _humio: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "Humio"
-				thing:    "a \(name) database"
-				url:      urls.humio
-				versions: null
+				service: {
+					name:     "Humio"
+					thing:    "a \(name) database"
+					url:      urls.humio
+					versions: null
+				}
 
 				interface: {
 					socket: {

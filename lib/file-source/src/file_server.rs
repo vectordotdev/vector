@@ -361,7 +361,7 @@ where
             // This works only if run inside tokio context since we are using
             // tokio's Timer. Outside of such context, this will panic on the first
             // call. Also since we are using block_on here and in the above code,
-            // this should be run in it's own thread. `spawn_blocking` fulfills
+            // this should be run in its own thread. `spawn_blocking` fulfills
             // all of these requirements.
             let sleep = async move {
                 if backoff > 0 {

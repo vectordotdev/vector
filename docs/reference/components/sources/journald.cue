@@ -16,10 +16,12 @@ components: sources: journald: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				name:     "JournalD"
-				thing:    name
-				url:      urls.journald
-				versions: null
+				service: {
+					name:     "JournalD"
+					thing:    name
+					url:      urls.journald
+					versions: null
+				}
 
 				interface: binary: {
 					name: "journalctl"
