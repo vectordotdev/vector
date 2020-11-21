@@ -131,12 +131,12 @@ impl TcpConnector {
             .connect(&self.host, &addr)
             .await
             .context(ConnectError)
-            .and_then(|mut maybe_tls| {
+            .map(|mut maybe_tls| {
                 if let Err(error) = maybe_tls.set_keepalive(self.keepalive) {
                     warn!(message = "Failed configuring TCP keepalive.", %error);
                 }
 
-                Ok(maybe_tls)
+                maybe_tls
             })
     }
 
