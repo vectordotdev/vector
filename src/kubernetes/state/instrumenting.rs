@@ -118,8 +118,8 @@ mod tests {
         after: Option<MetricValue>,
         expected_difference: u64,
     ) {
-        let before = before.unwrap_or_else(|| MetricValue::Counter { value: 0.0 });
-        let after = after.unwrap_or_else(|| MetricValue::Counter { value: 0.0 });
+        let before = before.unwrap_or(MetricValue::Counter { value: 0.0 });
+        let after = after.unwrap_or(MetricValue::Counter { value: 0.0 });
 
         let (before, after) = match (before, after) {
             (MetricValue::Counter { value: before }, MetricValue::Counter { value: after }) => {
