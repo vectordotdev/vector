@@ -241,7 +241,6 @@ mod tests {
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
@@ -277,7 +276,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap();
         });

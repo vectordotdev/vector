@@ -114,7 +114,7 @@ impl SourceConfig for SplunkConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
-        let fut = async move {
+        Ok(Box::pin(async move {
             let _ = warp::serve(services)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
@@ -124,8 +124,7 @@ impl SourceConfig for SplunkConfig {
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
             drop(shutdown);
             Ok(())
-        };
-        Ok(Box::new(fut.boxed().compat()))
+        }))
     }
 
     fn output_type(&self) -> DataType {
@@ -780,9 +779,9 @@ mod tests {
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
-    use futures::{compat::Future01CompatExt, future::ready, stream, StreamExt};
+    use futures::{stream, StreamExt};
     use futures01::sync::mpsc;
-    use std::net::SocketAddr;
+    use std::{future::ready, net::SocketAddr};
 
     #[test]
     fn generate_config() {
@@ -813,7 +812,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap()
         });
