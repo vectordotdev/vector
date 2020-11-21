@@ -117,7 +117,7 @@ spec:
         - name: vector
           securityContext:
             {}
-          image: "timberio/vector:latest-alpine"
+          image: "timberio/vector:latest-debian"
           imagePullPolicy: "IfNotPresent"
           args:
             - --config
