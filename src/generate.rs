@@ -6,13 +6,12 @@ use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
 use std::{
-    collections::BTreeMap,
     fs::{create_dir_all, File},
     io::Write,
     path::PathBuf,
 };
 use structopt::StructOpt;
-use toml::Value;
+use toml::{map::Map, Value};
 
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
@@ -136,7 +135,7 @@ fn generate_example(
                             source_type, err
                         ));
                     }
-                    Value::Table(BTreeMap::new())
+                    Value::Table(Map::new())
                 }
             };
             example
@@ -193,7 +192,7 @@ fn generate_example(
                             transform_type, err
                         ));
                     }
-                    Value::Table(BTreeMap::new())
+                    Value::Table(Map::new())
                 }
             };
             example
@@ -242,7 +241,7 @@ fn generate_example(
                     if err != ExampleError::MissingExample {
                         errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
                     }
-                    Value::Table(BTreeMap::new())
+                    Value::Table(Map::new())
                 }
             };
             example

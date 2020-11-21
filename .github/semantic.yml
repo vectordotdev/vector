@@ -119,6 +119,7 @@ scopes:
   - generator source # Anything `generator` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
+  - internal_metrics source # Anything `internal_metrics` source related
   - journald source # Anything `journald` source related
   - kafka source # Anything `kafka` source related
   - kubernetes_logs source # Anything `kubernetes_logs` source related

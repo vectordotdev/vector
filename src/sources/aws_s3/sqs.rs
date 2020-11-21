@@ -28,7 +28,7 @@ use rusoto_sqs::{
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
-use std::time::Duration;
+use std::{future::ready, time::Duration};
 use tokio::{select, time};
 use tokio_util::codec::FramedRead;
 
@@ -342,7 +342,7 @@ impl Ingestor {
                             })
                             .ok()
                         })
-                        .take_while(|res| futures::future::ready(res.is_some()))
+                        .take_while(|res| ready(res.is_some()))
                         .map(|r| r.expect("validated by take_while")),
                 );
 
@@ -372,7 +372,7 @@ impl Ingestor {
                         }
                     }
 
-                    futures::future::ready(Some(Ok(event)))
+                    ready(Some(Ok(event)))
                 });
 
                 let mut send_error: Option<futures01::sync::mpsc::SendError<Event>> = None;

@@ -14,7 +14,7 @@ use crate::{
     Event,
 };
 use chrono::{DateTime, Utc};
-use futures::{future, stream, FutureExt, SinkExt, StreamExt};
+use futures::{stream, FutureExt, SinkExt, StreamExt};
 use http::{uri::InvalidUri, Request, StatusCode, Uri};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,7 @@ use snafu::{ResultExt, Snafu};
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashMap},
+    future::ready,
     sync::atomic::{AtomicI64, Ordering::SeqCst},
 };
 
@@ -181,9 +182,7 @@ impl SinkConfig for DatadogConfig {
 
         let svc = request.service(
             HttpRetryLogic,
-            HttpBatchService::new(client, move |request| {
-                future::ready(sink.build_request(request))
-            }),
+            HttpBatchService::new(client, move |request| ready(sink.build_request(request))),
         );
 
         let buffer = PartitionBuffer::new(MetricBuffer::new(batch.size));

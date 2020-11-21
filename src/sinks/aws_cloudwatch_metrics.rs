@@ -219,7 +219,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
         if metric_data.is_empty() {
-            return future::ready(Ok(())).boxed();
+            return future::ok(()).boxed();
         }
 
         let input = PutMetricDataInput {

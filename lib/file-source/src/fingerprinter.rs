@@ -27,6 +27,7 @@ pub enum FingerprintStrategy {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FileFingerprint {
     Checksum(u64),
     FirstLineChecksum(u64),

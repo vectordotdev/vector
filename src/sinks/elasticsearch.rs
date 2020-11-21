@@ -584,12 +584,11 @@ mod integration_tests {
         tls::TlsOptions,
         Event,
     };
-    use futures::{future, stream, StreamExt};
+    use futures::{stream, StreamExt};
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
-    use std::fs::File;
-    use std::io::Read;
+    use std::{fs::File, future::ready, io::Read};
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -628,7 +627,7 @@ mod integration_tests {
         input_event.as_mut_log().insert("my_id", "42");
         input_event.as_mut_log().insert("foo", "bar");
 
-        sink.run(stream::once(future::ready(input_event.clone())))
+        sink.run(stream::once(ready(input_event.clone())))
             .await
             .unwrap();
 

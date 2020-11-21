@@ -96,7 +96,7 @@ impl SinkConfig for RemoteWriteConfig {
         Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
-    fn input_type(&self) -> crate::config::DataType {
+    fn input_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 

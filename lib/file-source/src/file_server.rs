@@ -123,6 +123,7 @@ where
                 self.start_at_beginning,
             );
         }
+        self.emitter.emit_files_open(fp_map.len());
 
         let mut stats = TimingStats::default();
 
@@ -147,11 +148,11 @@ where
                 let emitter = emitter.clone();
                 let checkpointer = Arc::clone(&checkpointer);
                 tokio::task::spawn_blocking(move || {
-                    checkpointer
-                        .write_checkpoints()
-                        .map_err(|error| emitter.emit_file_checkpoint_write_failed(error))
-                        .map(|count| emitter.emit_file_checkpointed(count))
-                        .ok()
+                    let start = time::Instant::now();
+                    match checkpointer.write_checkpoints() {
+                        Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+                        Err(error) => emitter.emit_file_checkpoint_write_failed(error),
+                    }
                 })
                 .await
                 .ok();
@@ -242,6 +243,7 @@ where
                         } else {
                             // untracked file fingerprint
                             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
+                            self.emitter.emit_files_open(fp_map.len());
                         }
                     }
                 }
@@ -315,14 +317,16 @@ where
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
-            fp_map.retain(|_file_id, watcher| {
+            fp_map.retain(|file_id, watcher| {
                 if watcher.dead() {
                     self.emitter.emit_file_unwatched(&watcher.path);
+                    checkpoints.set_dead(*file_id);
                     false
                 } else {
                     true
                 }
             });
+            self.emitter.emit_files_open(fp_map.len());
 
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);

@@ -3,7 +3,7 @@ title: Concepts
 description: The fundamental Vector concepts. A great place to start learning about Vector.
 ---
 
-<SVG src="/img/concepts.svg" />
+<SVG src="/optimized_svg/concepts_687_357.svg" />
 
 It's worth getting familiar with the basic concepts that comprise Vector as they
 are used throughout the documentation. This knowledge will be helpful as you
