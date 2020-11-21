@@ -306,6 +306,46 @@ components: sinks: [Name=string]: {
 		}
 
 		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.keepalive != _|_ {
+				keepalive: {
+					common:      false
+					description: "Configures the sink keepalive behavior."
+					required:    false
+					type: object: {
+						examples: []
+						options: {
+							time: {
+								common:      false
+								description: "The connection life time."
+								required:    false
+								type: uint: {
+									default: sinks[Name].features.send.keepalive.time
+									unit:    "seconds"
+								}
+							}
+							interval: {
+								common:      false
+								description: "The connection life time."
+								required:    false
+								type: uint: {
+									default: sinks[Name].features.send.keepalive.interval
+									unit:    "seconds"
+								}
+							}
+							retries: {
+								common:      false
+								description: "The number of times to retry a connection."
+								required:    false
+								type: uint: {
+									default: sinks[Name].features.send.keepalive.retries
+									unit:    "seconds"
+								}
+							}
+						}
+					}
+				}
+			}
+
 			if sinks[Name].features.send.tls.enabled {
 				tls: configuration._tls_connect & {_args: {
 					can_enable:             sinks[Name].features.send.tls.can_enable

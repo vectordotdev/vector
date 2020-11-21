@@ -214,6 +214,16 @@ components: {
 	#FeaturesGenerate: {
 	}
 
+	#FeaturesKeepalive: {
+		enabled: bool
+
+		if enabled {
+			time:     uint
+			interval: uint
+			retries:  uint
+		}
+	}
+
 	#FeaturesMultiline: {
 		enabled: bool
 	}
@@ -231,8 +241,9 @@ components: {
 	}
 
 	#FeaturesReceive: {
-		from?: #Service
-		tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+		from?:      #Service
+		keepalive?: #FeaturesKeepalive
+		tls:        #FeaturesTLS & {_args: {mode: "accept"}}
 	}
 
 	#FeaturesReduce: {
@@ -292,6 +303,8 @@ components: {
 				}
 			}
 		}
+
+		keepalive?: #FeaturesKeepalive
 
 		// `request` describes how the component issues and manages external
 		// requests.
@@ -796,6 +809,10 @@ components: {
 						receive_context: "Enriches data with useful \(features.receive.from.name) context."
 					}
 
+					if features.receive.keepalive.enabled != _|_ {
+						keepalive: "Supports keepalive connections for bandwidth efficiency."
+					}
+
 					if features.receive.tls.enabled != _|_ {
 						tls_receive: "Securely receives data via Transport Layer Security (TLS)."
 					}
@@ -810,6 +827,10 @@ components: {
 
 					if features.send.compression.enabled != _|_ {
 						compress: "Compresses data to optimize bandwidth."
+					}
+
+					if features.receive.keepalive.enabled != _|_ {
+						keepalive: "Supports keepalive connections for bandwidth efficiency."
 					}
 
 					if features.send.request.enabled != _|_ {
