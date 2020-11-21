@@ -50,11 +50,8 @@ impl SinkConfig for VectorSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let sink_config = TcpSinkConfig::new(
-            self.address.clone(),
-            self.keepalive.clone(),
-            self.tls.clone(),
-        );
+        let sink_config =
+            TcpSinkConfig::new(self.address.clone(), self.keepalive, self.tls.clone());
         sink_config.build(cx, encode_event)
     }
 
