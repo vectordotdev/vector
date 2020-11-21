@@ -71,7 +71,10 @@ async fn happy_path() {
 async fn early_eof() {
     let err = load("[sinks]\n[sin").await.unwrap_err();
 
-    assert_eq!(err, vec!["expected a right bracket, found eof at line 2"]);
+    assert_eq!(
+        err,
+        vec!["expected a right bracket, found eof at line 2 column 5"]
+    );
 }
 
 #[tokio::test]
@@ -80,7 +83,7 @@ async fn bad_syntax() {
 
     assert_eq!(
         err,
-        vec!["expected a table key, found a left brace at line 1"]
+        vec!["expected a table key, found a left brace at line 1 column 1"]
     );
 }
 
@@ -102,7 +105,10 @@ async fn missing_key() {
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["missing field `mode` for key `sources.in`"]);
+    assert_eq!(
+        err,
+        vec!["missing field `mode` for key `sources.in` at line 5 column 9"]
+    );
 }
 
 #[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
@@ -124,7 +130,10 @@ async fn missing_key2() {
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["missing field `address` for key `sources.in`"]);
+    assert_eq!(
+        err,
+        vec!["missing field `address` for key `sources.in` at line 6 column 9"]
+    );
 }
 
 #[cfg(feature = "sources-socket")]
