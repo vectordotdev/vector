@@ -318,7 +318,7 @@ components: sinks: [Name=string]: {
 						options: {
 							time: {
 								common:      false
-								description: "The connection life time."
+								description: "The time a connection needs to be idle before sending keepalive probes."
 								required:    false
 								type: uint: {
 									default: sinks[Name].features.send.keepalive.time
@@ -327,7 +327,7 @@ components: sinks: [Name=string]: {
 							}
 							interval: {
 								common:      false
-								description: "The connection life time."
+								description: "The interval in which keepalive probes should be sent."
 								required:    false
 								type: uint: {
 									default: sinks[Name].features.send.keepalive.interval
@@ -336,7 +336,7 @@ components: sinks: [Name=string]: {
 							}
 							retries: {
 								common:      false
-								description: "The number of times to retry a connection."
+								description: "The number of keepalive probes to send before considering the connection closed."
 								required:    false
 								type: uint: {
 									default: sinks[Name].features.send.keepalive.retries
