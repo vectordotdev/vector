@@ -84,7 +84,6 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
       - uses: actions/checkout@v2
-      - run: make ci-sweep
       - uses: actions/cache@v2
         with:
           path: |
