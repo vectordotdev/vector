@@ -17,7 +17,7 @@ impl Function for Assert {
             },
             Parameter {
                 keyword: "message",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
         ]
@@ -45,18 +45,28 @@ impl AssertFn {
 }
 
 impl Expression for AssertFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let condition = required!(state, object, self.condition, Value::Boolean(v) => v);
-        let message = {
-            let bytes = required!(state, object, self.message, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
-        };
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let condition = self.condition.execute(state, object)?.try_boolean()?;
+        let bytes = self.message.execute(state, object)?.try_bytes()?;
+        let message = String::from_utf8_lossy(&bytes).into_owned();
 
         if condition {
-            Ok(None)
+            Ok(Value::Null)
         } else {
             Err(Error::Assert(message))
         }
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.condition
+            .type_def(state)
+            .fallible_unless(value::Kind::Boolean)
+            .merge(
+                self.message
+                    .type_def(state)
+                    .fallible_unless(value::Kind::Bytes),
+            )
+            .with_constraint(value::Kind::Null)
     }
 }
 
@@ -76,7 +86,7 @@ mod tests {
             ),
         )];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
