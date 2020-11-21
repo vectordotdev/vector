@@ -79,7 +79,7 @@ jobs:
   # Then, modify the `cross-linux` job to run `test` instead of `build`.
   test-linux:
     name: Unit - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, ubuntu, x64]
     needs: changes
     if: ${{ needs.changes.outputs.source == 'true' }}
     steps:
