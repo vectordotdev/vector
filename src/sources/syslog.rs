@@ -444,7 +444,48 @@ mod test {
     }
 
     #[test]
-    fn config_tcp_keepalive() {
+    fn config_tcp_keepalive_empty() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+          "#,
+        )
+        .unwrap();
+
+        let keepalive = match config.mode {
+            Mode::Tcp { keepalive, .. } => keepalive,
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        assert_eq!(keepalive, None);
+    }
+
+    #[test]
+    fn config_tcp_keepalive_partial() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+            keepalive.time = 7200
+          "#,
+        )
+        .unwrap();
+
+        let keepalive = match config.mode {
+            Mode::Tcp { keepalive, .. } => keepalive,
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        let keepalive = keepalive.expect("keepalive config not set");
+
+        assert_eq!(keepalive.time, Some(std::time::Duration::from_secs(7200)));
+        assert_eq!(keepalive.interval, None);
+        assert_eq!(keepalive.retries, None);
+    }
+
+    #[test]
+    fn config_tcp_keepalive_full() {
         let config: SyslogConfig = toml::from_str(
             r#"
             mode = "tcp"
