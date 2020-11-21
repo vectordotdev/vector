@@ -342,10 +342,7 @@ impl ElasticSearchCommon {
             .into());
         }
 
-        let (base_url, mut authorization) = match Auth::get_and_strip_basic_auth(&config.endpoint) {
-            Some((new_url, auth)) => (new_url, Some(auth)),
-            None => (config.endpoint.clone(), None),
-        };
+        let (base_url, mut authorization) = Auth::get_and_strip_basic_auth(&config.endpoint);
 
         if let Some(ElasticSearchAuth::Basic { user, password }) = config.auth.clone() {
             if authorization.is_some() {
