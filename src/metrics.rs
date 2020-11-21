@@ -61,7 +61,7 @@ impl VectorRecorder {
         self.registry.op(
             CARDINALITY_KEY.clone(),
             |handle| handle.increment_counter(1),
-            Handle::counter,
+            || unreachable!("Counter had to be initialized, but it wasn't"),
         );
         f()
     }
