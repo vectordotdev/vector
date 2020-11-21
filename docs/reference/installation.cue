@@ -229,7 +229,7 @@ installation: close({
 		config: {
 			apt: {
 				enabled: false
-				port: 9001
+				port:    9001
 			}
 
 			sources?: [Name=string]: {

@@ -12,25 +12,28 @@ installation: _interfaces: kubectl: {
 	paths: {
 		bin:         null
 		bin_in_path: null
-		config:      null
+		config:      "vector.toml"
 	}
 	platform_name: installation.platforms.kubernetes.name
 
 	roles: [Name=string]: {
 		commands: {
-			_resource_type: string
-			_role:          string
-			install:        "kubectl apply -k ."
-			logs:           #"kubectl logs -n vector \#(_resource_type)/vector-\#(_role)"#
-			reconfigure:    #"kubectl edit \#(_resource_type) vector-\#(_role)"#
-			reload:         #"kubectl rollout restart \#(_resource_type)/vector-\#(_role)"#
-			restart:        null
-			start:          null
-			stop:           null
-			top:            null
-			uninstall:      "kubectl delete -k ."
-			upgrade:        null
-			verify_config:  "kubectl kustomize"
+			_controller_resource_type: string
+			_controller_resource_name: string
+			install:                   "kubectl apply -k ."
+			logs:                      "kubectl logs -n vector \(_controller_resource_type)/\(_controller_resource_name)"
+			reconfigure:               #"""
+							vi \#(paths.config) && \
+								kubectl apply -k .
+							"""#
+			reload:                    null
+			restart:                   "kubectl rollout restart \(_controller_resource_type)/\(_controller_resource_name)"
+			start:                     null
+			stop:                      null
+			top:                       null
+			uninstall:                 "kubectl delete -k ."
+			upgrade:                   null
+			verify_config:             "kubectl kustomize"
 		}
 
 		tutorials: {
@@ -89,8 +92,8 @@ installation: _interfaces: kubectl: {
 						"""#
 
 			commands: {
-				_resource_type: "daemonset"
-				_role:          "agent"
+				_controller_resource_type: "daemonset"
+				_controller_resource_name: "vector-agent"
 				configure: #"""
 					cat <<-'VECTORCFG' > vector-agent.toml
 					# The Vector Kubernetes integration automatically defines a
@@ -120,8 +123,8 @@ installation: _interfaces: kubectl: {
 		//   """#
 
 		//  commands: {
-		//   _resource_type: "statefulset"
-		//   _role:          "aggregator"
+		//   _controller_resource_type: "statefulset"
+		//   _controller_resource_name:          "vector-aggregator"
 		//   configure: #"""
 		//    cat <<-'VECTORCFG' > vector-aggregator.toml
 		//    {config}

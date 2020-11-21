@@ -16,7 +16,7 @@ _default_flags: {
 cli: {
 	#Args: [Arg=string]: {
 		description: !=""
-		name: Arg
+		name:        Arg
 		type:        #ArgType
 		default?:    string | [...string]
 	}
@@ -25,7 +25,7 @@ cli: {
 
 	#Commands: [Command=string]: {
 		description: !=""
-		name: Command
+		name:        Command
 		flags?:      #Flags
 		options?:    #Options
 		args?:       #Args
@@ -35,7 +35,7 @@ cli: {
 		flag:        "--\(Flag)"
 		default:     bool | *false
 		description: string
-		name: Flag
+		name:        Flag
 
 		if _short != _|_ {
 			short: "-\(_short)"
@@ -48,9 +48,9 @@ cli: {
 		option:      "--\(Option)"
 		default?:    string | int
 		description: string
-		enum?: #Enum
-		name: Option
-		type: #OptionType
+		enum?:       #Enum
+		name:        Option
+		type:        #OptionType
 
 		if _short != _|_ {
 			short: "-\(_short)"
@@ -99,11 +99,11 @@ cli: {
 	options: {
 		"color": {
 			description: "Control when ANSI terminal formatting is used."
-			default: "auto"
+			default:     "auto"
 			enum: {
 				always: "Enable ANSI terminal formatting always."
-				auto: "Detect ANSI terminal formatting and enable if supported."
-				never: "Disable ANSI terminal formatting."
+				auto:   "Detect ANSI terminal formatting and enable if supported."
+				never:  "Disable ANSI terminal formatting."
 			}
 		}
 		"config": {
@@ -148,7 +148,7 @@ cli: {
 			args: {
 				pipeline: {
 					description: "Pipeline expression, e.g. `stdin/json_parser,add_fields/console`"
-					type: "string"
+					type:        "string"
 				}
 			}
 		}
@@ -220,7 +220,7 @@ cli: {
 
 			flags: _default_flags & {
 				"no-topology": {
-					_short: "nt"
+					_short:      "nt"
 					description: "Disables topology check"
 				}
 				"no-environment": {
