@@ -775,9 +775,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.62"
+version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1770ced377336a88a67c473594ccc14eca6f4559217c34f64aac8f83d641b40"
+checksum = "95752358c8f7552394baf48cd82695b345628ad3f170d607de3ca03b8dacca15"
 dependencies = [
  "jobserver",
 ]
@@ -2386,7 +2386,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix 0.17.0",
+ "nix",
  "pin-utils",
  "uom 0.28.0",
  "winapi 0.3.9",
@@ -2473,7 +2473,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix 0.17.0",
+ "nix",
 ]
 
 [[package]]
@@ -3226,7 +3226,7 @@ dependencies = [
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset",
- "nix 0.17.0",
+ "nix",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
@@ -3260,7 +3260,7 @@ dependencies = [
  "lucet-runtime-internals",
  "lucet-wasi-generate",
  "lucet-wiggle",
- "nix 0.17.0",
+ "nix",
  "rand 0.6.5",
  "wasi-common",
 ]
@@ -3767,19 +3767,6 @@ dependencies = [
  "cfg-if 0.1.10",
  "libc",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "nix"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd0eaf8df8bab402257e0a5c17a254e4cc1f72a93588a1ddfb5d356c801aa7cb"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if 0.1.10",
- "libc",
- "void",
 ]
 
 [[package]]
@@ -6894,7 +6881,7 @@ checksum = "e394bc3ecd454f68f04803a7b527b36956413120fa06420dc1329cda49340763"
 dependencies = [
  "bitflags",
  "libc",
- "nix 0.17.0",
+ "nix",
  "thiserror",
  "userfaultfd-sys",
 ]
@@ -7029,7 +7016,7 @@ dependencies = [
  "metrics-util",
  "mongodb",
  "nats",
- "nix 0.16.1",
+ "nix",
  "nom 5.1.2",
  "notify",
  "num-format",
