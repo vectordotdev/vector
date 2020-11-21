@@ -16,7 +16,7 @@ use futures::{
     future, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::{sync::mpsc, Future as Future01, Stream as Stream01};
-use std::collections::HashMap;
+use std::{collections::HashMap, future::ready};
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
@@ -175,7 +175,7 @@ pub async fn build_pieces(
             .run(
                 filter_event_type(rx, input_type)
                     .compat()
-                    .take_while(|e| future::ready(e.is_ok()))
+                    .take_while(|e| ready(e.is_ok()))
                     .map(|x| x.unwrap()),
             )
             .inspect(|_| debug!("Finished."));

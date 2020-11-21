@@ -22,13 +22,16 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
-use futures::{compat::Sink01CompatExt, future, sink::SinkExt, Stream, StreamExt};
+use futures::{compat::Sink01CompatExt, sink::SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::pin::Pin;
-use std::sync::Arc;
-use std::time::Duration;
-use std::{collections::HashMap, convert::TryFrom, env};
+use std::{
+    future::ready,
+    pin::Pin,
+    sync::Arc,
+    time::Duration,
+    {collections::HashMap, convert::TryFrom, env},
+};
 
 use tokio::sync::mpsc;
 
@@ -625,8 +628,8 @@ impl EventStreamBuilder {
                     }
                 }
             })
-            .take_while(|v| future::ready(v.is_ok()))
-            .filter_map(|v| future::ready(v.unwrap()))
+            .take_while(|v| ready(v.is_ok()))
+            .filter_map(|v| ready(v.unwrap()))
             .take_until(self.shutdown.clone());
 
         let events_stream: Box<dyn Stream<Item = Event> + Unpin + Send> =

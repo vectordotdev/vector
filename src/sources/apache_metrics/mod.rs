@@ -10,13 +10,16 @@ use crate::{
     Event, Pipeline,
 };
 use chrono::Utc;
-use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeMap,
+    future::ready,
+    time::{Duration, Instant},
+};
 
 mod parser;
 
@@ -143,6 +146,7 @@ fn apache_metrics(
     let out = out
         .sink_map_err(|error| error!(message = "Error sending metric.", %error))
         .sink_compat();
+
     Box::pin(
         tokio::time::interval(Duration::from_secs(interval))
             .take_until(shutdown)
@@ -172,7 +176,7 @@ fn apache_metrics(
                     })
                     .into_stream()
                     .filter_map(move |response| {
-                        future::ready(match response {
+                        ready(match response {
                             Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                                 emit!(ApacheMetricsRequestCompleted {
                                     start,

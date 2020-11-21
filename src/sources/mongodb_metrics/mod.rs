@@ -10,7 +10,7 @@ use crate::{
 use chrono::Utc;
 use futures::{
     compat::Sink01CompatExt,
-    future::{join_all, ready, try_join_all},
+    future::{join_all, try_join_all},
     stream, FutureExt, SinkExt, StreamExt,
 };
 use futures01::Sink;
@@ -22,7 +22,7 @@ use mongodb::{
 };
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{collections::BTreeMap, time::Instant};
+use std::{collections::BTreeMap, future::ready, time::Instant};
 use tokio::{
     select,
     time::{interval, Duration},
