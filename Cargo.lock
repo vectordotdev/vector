@@ -754,7 +754,7 @@ checksum = "8504b63dd1249fd1745b7b4ef9b6f7b107ddeb3c95370043c7dbcc38653a2679"
 dependencies = [
  "semver 0.9.0",
  "serde",
- "toml 0.5.6",
+ "toml",
  "url",
 ]
 
@@ -4429,7 +4429,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d6ea3c4595b96363c13943497db34af4460fb474a95c43f4446ad341b8c9785"
 dependencies = [
- "toml 0.5.6",
+ "toml",
 ]
 
 [[package]]
@@ -6398,18 +6398,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.4.10"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "toml"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc92d160b1eef40665be3a05630d003936a3bc7da7421277846c2613e92c71a"
+checksum = "75cf45bb0bef80604d001caaec0d09da99611b3c0fd39d3080468875cdb65645"
 dependencies = [
  "serde",
 ]
@@ -7077,7 +7068,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "tokio01-test",
- "toml 0.4.10",
+ "toml",
  "tower",
  "tower-test",
  "tracing 0.1.21",
@@ -7138,7 +7129,7 @@ dependencies = [
  "regex",
  "semver-parser 0.9.0",
  "syn 1.0.48",
- "toml 0.5.6",
+ "toml",
  "url",
 ]
 
