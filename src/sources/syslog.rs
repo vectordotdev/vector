@@ -422,7 +422,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 
 #[cfg(test)]
 mod test {
-    use super::{event_from_str, SyslogConfig};
+    use super::{event_from_str, Mode, SyslogConfig};
     use crate::{config::log_schema, event::Event};
     use chrono::prelude::*;
 
@@ -441,6 +441,31 @@ mod test {
         )
         .unwrap();
         assert!(config.mode.is_tcp());
+    }
+
+    #[test]
+    fn config_tcp_keepalive() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "tcp"
+            address = "127.0.0.1:1235"
+            keepalive.time = 7200
+            keepalive.interval = 75
+            keepalive.retries = 9
+          "#,
+        )
+        .unwrap();
+
+        let keepalive = match config.mode {
+            Mode::Tcp { keepalive, .. } => keepalive,
+            _ => panic!("expected Mode::Tcp"),
+        };
+
+        let keepalive = keepalive.expect("keepalive config not set");
+
+        assert_eq!(keepalive.time, Some(std::time::Duration::from_secs(7200)));
+        assert_eq!(keepalive.interval, Some(std::time::Duration::from_secs(75)));
+        assert_eq!(keepalive.retries, Some(9));
     }
 
     #[test]
