@@ -15,8 +15,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use codec::BytesDelimitedCodec;
 use futures::{
     compat::{Compat, Future01CompatExt},
-    future::TryFutureExt,
-    stream::{Stream, StreamExt},
+    Stream, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
 use lazy_static::lazy_static;
@@ -29,7 +28,7 @@ use rusoto_sqs::{
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use snafu::{ResultExt, Snafu};
 use std::{future::ready, time::Duration};
-use tokio::{select, time};
+use tokio::time;
 use tokio_util::codec::FramedRead;
 
 lazy_static! {
@@ -160,73 +159,72 @@ impl Ingestor {
         })
     }
 
-    pub(super) async fn run(self, out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
-        let mut interval = time::interval(self.poll_interval).map(|_| ());
+    pub(super) async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+        time::interval(self.poll_interval)
+            .take_until(shutdown)
+            .for_each(|_| self.run_once(&out))
+            .await;
 
-        loop {
-            select! {
-                Some(()) = interval.next() => (),
-                _ = &mut shutdown => break Ok(()),
-                else => break Ok(()),
+        Ok(())
+    }
+
+    async fn run_once(&self, out: &Pipeline) {
+        let messages = self
+            .receive_messages()
+            .inspect_ok(|messages| {
+                emit!(SqsMessageReceiveSucceeded {
+                    count: messages.len(),
+                });
+            })
+            .inspect_err(|err| {
+                emit!(SqsMessageReceiveFailed { error: err });
+            })
+            .await
+            .unwrap_or_default();
+
+        for message in messages {
+            let receipt_handle = match message.receipt_handle {
+                None => {
+                    // I don't think this will ever actually happen, but is just an artifact of the
+                    // AWS's API predilection for returning nullable values for all response
+                    // attributes
+                    warn!(message = "Refusing to process message with no receipt_handle.", ?message.message_id);
+                    continue;
+                }
+                Some(ref handle) => handle.to_owned(),
             };
 
-            let messages = self
-                .receive_messages()
-                .inspect_ok(|messages| {
-                    emit!(SqsMessageReceiveSucceeded {
-                        count: messages.len(),
+            let message_id = message
+                .message_id
+                .clone()
+                .unwrap_or_else(|| "<unknown>".to_owned());
+
+            match self.handle_sqs_message(message, out.clone()).await {
+                Ok(()) => {
+                    emit!(SqsMessageProcessingSucceeded {
+                        message_id: &message_id
                     });
-                })
-                .inspect_err(|err| {
-                    emit!(SqsMessageReceiveFailed { error: err });
-                })
-                .await
-                .unwrap_or_default();
-
-            for message in messages {
-                let receipt_handle = match message.receipt_handle {
-                    None => {
-                        // I don't think this will ever actually happen, but is just an artifact of the
-                        // AWS's API predilection for returning nullable values for all response
-                        // attributes
-                        warn!(message = "Refusing to process message with no receipt_handle.", ?message.message_id);
-                        continue;
-                    }
-                    Some(ref handle) => handle.to_owned(),
-                };
-
-                let message_id = message
-                    .message_id
-                    .clone()
-                    .unwrap_or_else(|| "<unknown>".to_owned());
-
-                match self.handle_sqs_message(message, out.clone()).await {
-                    Ok(()) => {
-                        emit!(SqsMessageProcessingSucceeded {
-                            message_id: &message_id
-                        });
-                        if self.delete_message {
-                            match self.delete_message(receipt_handle).await {
-                                Ok(_) => {
-                                    emit!(SqsMessageDeleteSucceeded {
-                                        message_id: &message_id
-                                    });
-                                }
-                                Err(err) => {
-                                    emit!(SqsMessageDeleteFailed {
-                                        error: &err,
-                                        message_id: &message_id,
-                                    });
-                                }
+                    if self.delete_message {
+                        match self.delete_message(receipt_handle).await {
+                            Ok(_) => {
+                                emit!(SqsMessageDeleteSucceeded {
+                                    message_id: &message_id
+                                });
+                            }
+                            Err(err) => {
+                                emit!(SqsMessageDeleteFailed {
+                                    error: &err,
+                                    message_id: &message_id,
+                                });
                             }
                         }
                     }
-                    Err(err) => {
-                        emit!(SqsMessageProcessingFailed {
-                            message_id: &message_id,
-                            error: &err,
-                        });
-                    }
+                }
+                Err(err) => {
+                    emit!(SqsMessageProcessingFailed {
+                        message_id: &message_id,
+                        error: &err,
+                    });
                 }
             }
         }
