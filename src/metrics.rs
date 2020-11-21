@@ -4,7 +4,10 @@ use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
 use once_cell::sync::OnceCell;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
 
@@ -23,7 +26,13 @@ pub fn init() -> crate::Result<()> {
     let registry = Arc::new(registry);
 
     // Init the cardinality counter.
-    registry.op(CARDINALITY_KEY.clone(), |_| {}, Handle::counter);
+    let cardinality_counter = Arc::new(AtomicU64::new(1));
+    // Inject the cardinality counter into the registry.
+    registry.op(
+        CARDINALITY_KEY.clone(),
+        |_| {},
+        || Handle::Counter(Arc::clone(&cardinality_counter)),
+    );
 
     // Initialize the controller.
     let controller = Controller {
@@ -37,6 +46,7 @@ pub fn init() -> crate::Result<()> {
     // Initialize the recorder.
     let recorder = VectorRecorder {
         registry: Arc::clone(&registry),
+        cardinality_counter: Arc::clone(&cardinality_counter),
     };
     // Apply a layer to capture tracing span fields as labels.
     let recorder = TracingContextLayer::new(VectorLabelFilter).layer(recorder);
@@ -51,6 +61,7 @@ pub fn init() -> crate::Result<()> {
 /// for the advanced usage that we have in Vector.
 struct VectorRecorder {
     registry: Arc<Registry<CompositeKey, Handle>>,
+    cardinality_counter: Arc<AtomicU64>,
 }
 
 impl VectorRecorder {
@@ -58,11 +69,7 @@ impl VectorRecorder {
     where
         F: FnOnce() -> O,
     {
-        self.registry.op(
-            CARDINALITY_KEY.clone(),
-            |handle| handle.increment_counter(1),
-            || unreachable!("Counter had to be initialized, but it wasn't"),
-        );
+        self.cardinality_counter.fetch_add(1, Ordering::Relaxed);
         f()
     }
 }
