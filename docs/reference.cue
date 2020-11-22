@@ -200,7 +200,7 @@ _values: {
 
 #Object: {[_=string]: #Any}
 
-#OperatingSystem: "Linux" | "macOS" | "Windows"
+#OperatingSystemFamily: "Linux" | "macOS" | "Windows"
 
 #Permissions: {
 	unix: {
