@@ -4,7 +4,7 @@ use futures::{compat::Future01CompatExt, future, stream, StreamExt};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 use vector::{
-    conditions, config, sinks, sources,
+    config, sinks, sources,
     test_util::{
         next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
     },
