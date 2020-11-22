@@ -11,9 +11,6 @@
 # Docs: https://vector.dev/docs/
 # ------------------------------------------------------------------------------
 
-# Note: A full config spec is located at ./vector.spec.toml and examples
-#       in the ./examples folder.
-
 data_dir = "/var/lib/vector"
 
 # Input data. Change me to a valid input source.

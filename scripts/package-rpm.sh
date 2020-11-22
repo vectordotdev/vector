@@ -69,8 +69,7 @@ rpmbuild \
   --define "_topdir $RPMBUILD_DIR" \
   --target "$ARCH-redhat-linux" \
   --define "_arch $ARCH" \
-  --nodebuginfo \
-  -ba distribution/rpm/vector.spec
+  --nodebuginfo
 
 #
 # Move the RPM into the artifacts dir
