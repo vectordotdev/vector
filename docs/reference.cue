@@ -60,6 +60,20 @@ _values: {
 
 #EncodingCodec: "json" | "ndjson" | "text"
 
+#Endpoint: {
+	description: string
+	responses: [Code=string]: {
+		description: string
+	}
+}
+
+#Endpoints: [Path=string]: {
+	DELETE?: #Endpoint
+	GET?:    #Endpoint
+	POST?:   #Endpoint
+	PUT?:    #Endpoint
+}
+
 // `enum` restricts the value to a set of values.
 //
 //                enum: {
