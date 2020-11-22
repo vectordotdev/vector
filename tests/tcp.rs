@@ -72,7 +72,7 @@ async fn sample() {
         transforms::sampler::SamplerConfig {
             rate: 10,
             key_field: Some(config::log_schema().message_key().into()),
-            exclude: CheckFieldsConfig::default(),
+            exclude: None,
         },
     );
     config.add_sink(

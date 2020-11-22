@@ -12,8 +12,7 @@ use serde::{Deserialize, Serialize};
 pub struct SamplerConfig {
     pub rate: u64,
     pub key_field: Option<String>,
-    #[serde(default)]
-    pub exclude: CheckFieldsConfig,
+    pub exclude: Option<CheckFieldsConfig>,
 }
 
 inventory::submit! {
@@ -25,7 +24,7 @@ impl GenerateConfig for SamplerConfig {
         toml::Value::try_from(Self {
             rate: 10,
             key_field: None,
-            exclude: CheckFieldsConfig::default(),
+            exclude: None,
         })
         .unwrap()
     }
@@ -38,7 +37,10 @@ impl TransformConfig for SamplerConfig {
         Ok(Transform::function(Sampler::new(
             self.rate,
             self.key_field.clone(),
-            self.exclude.build()?,
+            self.exclude
+                .as_ref()
+                .map(|condition| condition.build())
+                .transpose()?,
         )))
     }
 
@@ -59,12 +61,12 @@ impl TransformConfig for SamplerConfig {
 pub struct Sampler {
     rate: u64,
     key_field: Option<String>,
-    exclude: Box<dyn Condition>,
+    exclude: Option<Box<dyn Condition>>,
     count: u64,
 }
 
 impl Sampler {
-    pub fn new(rate: u64, key_field: Option<String>, exclude: Box<dyn Condition>) -> Self {
+    pub fn new(rate: u64, key_field: Option<String>, exclude: Option<Box<dyn Condition>>) -> Self {
         Self {
             rate,
             key_field,
@@ -78,9 +80,11 @@ impl FunctionTransform for Sampler {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         emit!(SamplerEventProcessed);
 
-        if self.exclude.check(&event) {
-            output.push(event);
-            return;
+        if let Some(condition) = self.exclude.as_ref() {
+            if condition.check(&event) {
+                output.push(event);
+                return;
+            }
         }
 
         let value = self
