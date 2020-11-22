@@ -149,17 +149,12 @@ fn mask_ips(ip: IpAddr, mask: IpAddr) -> Result<IpAddr> {
 /// The remaining are set to 0, to make up a total length of `bytes`.
 fn get_mask_bits(mut subnet_bits: u32, bytes: usize) -> Vec<u8> {
     let mut mask = Vec::with_capacity(bytes);
-
-    while subnet_bits > 0 {
+    for _ in 0..bytes {
         let bits = min(subnet_bits, 8);
         let byte = 255 - (2u16.pow(8 - bits) - 1) as u8;
         mask.push(byte);
 
         subnet_bits -= bits
-    }
-
-    while mask.len() < bytes {
-        mask.push(0);
     }
 
     mask
@@ -203,6 +198,7 @@ mod tests {
         assert_eq!(vec![255, 240, 0, 0], get_mask_bits(12, 4));
         assert_eq!(vec![255, 255, 0, 0], get_mask_bits(16, 4));
         assert_eq!(vec![255, 128, 0, 0], get_mask_bits(9, 4));
+        assert_eq!(vec![255, 255, 255, 255], get_mask_bits(128, 4));
         assert_eq!(
             vec![255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0,],
             get_mask_bits(64, 16)
