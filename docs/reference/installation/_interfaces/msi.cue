@@ -30,7 +30,6 @@ installation: _interfaces: msi: {
 					msiexec /i vector-{arch}.msi /quiet
 				"""#
 			logs:        null
-			reconfigure: #"edit \#(paths.config)"#
 			reload:      null
 			restart:     null
 			start:       #"\#(paths.bin) --config \#(paths.config)"#

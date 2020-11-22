@@ -13,7 +13,6 @@ installation: close({
 		configure:   string | null
 		install:     string | null
 		logs:        string | null
-		reconfigure: string | null
 		reload:      string | null
 		restart:     string | null
 		start:       string | null
@@ -28,7 +27,6 @@ installation: close({
 					{config}
 					VECTORCFG
 					"""#
-			reconfigure: string | *"vi \(ConfigPath)"
 		}
 
 		if Shell == "powershell" {
@@ -37,7 +35,6 @@ installation: close({
 					{config}
 					"@ | Out-File -FilePath \#(ConfigPath)
 					"""#
-			reconfigure: string | *"edit \(ConfigPath)"
 		}
 	}
 
@@ -190,6 +187,7 @@ installation: close({
 		description: string
 		family:      #OperatingSystemFamily
 		interfaces: [#Interface & {_shell: shell}, ...#Interface & {_shell: shell}]
+		minimum_supported_version: string | null
 		name:  Name
 		shell: string
 		title: string
@@ -203,6 +201,7 @@ installation: close({
 
 	#Platforms: [Name=string]: {
 		description: string
+		minimum_supported_version: string | null
 		name:        Name
 		title:       string
 	}
@@ -228,8 +227,8 @@ installation: close({
 		}
 		config: {
 			api: {
-				enabled: false
-				port:    9001
+				enabled: true
+				address: "127.0.0.1:8686"
 			}
 
 			sources?: [Name=string]: {

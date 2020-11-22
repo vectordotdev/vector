@@ -19,6 +19,7 @@ installation: operating_systems: {
 		]
 
 		family: "Linux"
+		minimum_supported_version: "14.04"
 		shell:  "bash"
 	}
 }
