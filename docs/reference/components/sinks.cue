@@ -325,24 +325,6 @@ components: sinks: [Name=string]: {
 									unit:    "seconds"
 								}
 							}
-							interval: {
-								common:      false
-								description: "The interval in which TCP keepalive probes should be sent."
-								required:    false
-								type: uint: {
-									default: null
-									unit:    "seconds"
-								}
-							}
-							retries: {
-								common:      false
-								description: "The number of TCP keepalive probes to send before considering the connection closed."
-								required:    false
-								type: uint: {
-									default: null
-									unit:    "seconds"
-								}
-							}
 						}
 					}
 				}
