@@ -7,7 +7,6 @@
 use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
 use vector::{
-    conditions::CheckFieldsConfig,
     config, sinks, sources,
     test_util::{
         next_addr, random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
