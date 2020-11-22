@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use remap::prelude::*;
 use std::cmp::min;
+use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 lazy_static! {
@@ -73,14 +74,14 @@ impl Expression for IpSubnetFn {
                         return Err("subnet cannot be greater than 32 for ipv4 addresses".into());
                     }
 
-                    ipv4_addr(get_mask_bits(subnet, 4))
+                    ipv4_mask(subnet)
                 }
                 IpAddr::V6(_) => {
                     if subnet > 128 {
                         return Err("subnet cannot be greater than 128 for ipv6 addresses".into());
                     }
 
-                    ipv6_addr(get_mask_bits(subnet, 16))
+                    ipv6_mask(subnet)
                 }
             }
         } else {
@@ -160,21 +161,22 @@ fn get_mask_bits(mut subnet_bits: u32, bytes: usize) -> Vec<u8> {
     mask
 }
 
-/// Take a vector of 4 bytes and returns an ipv4 IpAddr.
-fn ipv4_addr(vec: Vec<u8>) -> IpAddr {
-    debug_assert!(vec.len() == 4);
-    Ipv4Addr::new(vec[0], vec[1], vec[2], vec[3]).into()
+/// Returns an ipv4 address that masks out the given number of bits.
+fn ipv4_mask(subnet_bits: u32) -> IpAddr {
+    let bits = get_mask_bits(subnet_bits, 4);
+    debug_assert!(bits.len() == 4);
+
+    let bytes: [u8; 4] = bits.try_into().expect("wrong length for ipv4 address");
+    Ipv4Addr::from(bytes).into()
 }
 
-/// Take a vector of 16 bytes and returns an ipv6 IpAddr.
-/// This can be made nicer in [1.48](https://blog.rust-lang.org/2020/11/19/Rust-1.48.html#library-changes)
-fn ipv6_addr(vec: Vec<u8>) -> IpAddr {
-    debug_assert!(vec.len() == 16);
-    Ipv6Addr::from([
-        vec[0], vec[1], vec[2], vec[3], vec[4], vec[5], vec[6], vec[7], vec[8], vec[9], vec[10],
-        vec[11], vec[12], vec[13], vec[14], vec[15],
-    ])
-    .into()
+/// Returns an ipv4 address that masks out the given number of bits.
+fn ipv6_mask(subnet_bits: u32) -> IpAddr {
+    let bits = get_mask_bits(subnet_bits, 16);
+    debug_assert!(bits.len() == 16);
+
+    let bytes: [u8; 16] = bits.try_into().expect("wrong length for ipv6 address");
+    Ipv6Addr::from(bytes).into()
 }
 
 #[cfg(test)]
