@@ -854,7 +854,7 @@ components: {
 					}
 
 					if features.receive.keepalive.enabled != _|_ {
-						keepalive: "Supports keepalive connections for bandwidth efficiency."
+						keepalive: "Supports TCP keepalive for efficient resource use and reliability."
 					}
 
 					if features.receive.tls.enabled != _|_ {
@@ -873,8 +873,8 @@ components: {
 						compress: "Compresses data to optimize bandwidth."
 					}
 
-					if features.receive.keepalive.enabled != _|_ {
-						keepalive: "Supports keepalive connections for bandwidth efficiency."
+					if features.send.keepalive.enabled != _|_ {
+						keepalive: "Supports TCP keepalive for efficient resource use and reliability."
 					}
 
 					if features.send.request.enabled != _|_ {

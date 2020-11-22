@@ -311,14 +311,14 @@ components: sinks: [Name=string]: {
 			if sinks[Name].features.send.keepalive != _|_ {
 				keepalive: {
 					common:      false
-					description: "Configures the sink keepalive behavior."
+					description: "Configures the TCP keepalive behavior for the connection to the sink."
 					required:    false
 					type: object: {
 						examples: []
 						options: {
 							time: {
 								common:      false
-								description: "The time a connection needs to be idle before sending keepalive probes."
+								description: "The time a connection needs to be idle before sending TCP keepalive probes."
 								required:    false
 								type: uint: {
 									default: null
@@ -327,7 +327,7 @@ components: sinks: [Name=string]: {
 							}
 							interval: {
 								common:      false
-								description: "The interval in which keepalive probes should be sent."
+								description: "The interval in which TCP keepalive probes should be sent."
 								required:    false
 								type: uint: {
 									default: null
@@ -336,7 +336,7 @@ components: sinks: [Name=string]: {
 							}
 							retries: {
 								common:      false
-								description: "The number of keepalive probes to send before considering the connection closed."
+								description: "The number of TCP keepalive probes to send before considering the connection closed."
 								required:    false
 								type: uint: {
 									default: null
