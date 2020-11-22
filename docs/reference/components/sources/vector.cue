@@ -32,6 +32,8 @@ components: sources: vector: {
 				}
 			}
 
+			keepalive: enabled: true
+
 			tls: {
 				enabled:                true
 				can_enable:             true

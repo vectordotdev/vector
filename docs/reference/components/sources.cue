@@ -74,6 +74,46 @@ components: sources: [Name=string]: {
 		}
 
 		if sources[Name].features.receive != _|_ {
+			if sources[Name].features.receive.keepalive != _|_ {
+				keepalive: {
+					common:      false
+					description: "Configures the TCP keepalive behavior for the connection to the source."
+					required:    false
+					type: object: {
+						examples: []
+						options: {
+							time: {
+								common:      false
+								description: "The time a connection needs to be idle before sending TCP keepalive probes."
+								required:    false
+								type: uint: {
+									default: null
+									unit:    "seconds"
+								}
+							}
+							interval: {
+								common:      false
+								description: "The interval in which TCP keepalive probes should be sent."
+								required:    false
+								type: uint: {
+									default: null
+									unit:    "seconds"
+								}
+							}
+							retries: {
+								common:      false
+								description: "The number of TCP keepalive probes to send before considering the connection closed."
+								required:    false
+								type: uint: {
+									default: null
+									unit:    "seconds"
+								}
+							}
+						}
+					}
+				}
+			}
+
 			if sources[Name].features.receive.tls.enabled {
 				tls: configuration._tls_accept & {_args: {
 					can_enable:             sources[Name].features.receive.tls.can_enable
