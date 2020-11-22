@@ -12,6 +12,7 @@ installation: platforms: {
 			you can significantly reduce the delay between writing code and running it in
 			production.
 			"""
+		minimum_supported_version: null
 	}
 
 	kubernetes: {
@@ -21,5 +22,6 @@ installation: platforms: {
 			open-source container-orchestration system for automating
 			application deployment, scaling, and management.
 			"""
+		minimum_supported_version: "1.14"
 	}
 }

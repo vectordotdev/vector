@@ -17,6 +17,7 @@ installation: operating_systems: {
 		]
 
 		family: "Windows"
+		minimum_supported_version: "7"
 		shell:  "powershell"
 	}
 }

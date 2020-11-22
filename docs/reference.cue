@@ -445,5 +445,6 @@ _values: {
 components:   _
 data_model:   _
 installation: _
+process:      _
 releases:     _
 remap:        _

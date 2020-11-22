@@ -20,6 +20,7 @@ installation: operating_systems: {
 		]
 
 		family: "Linux"
+		minimum_supported_version: "4"
 		shell:  "bash"
 	}
 }

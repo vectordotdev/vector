@@ -1,7 +1,7 @@
 package metadata
 
 installation: operating_systems: {
-	centfamily: {
+	centos: {
 		title:       "CentOS"
 		description: """
 			[CentOS](\(urls.centos)) is a Linux distribution that is
@@ -19,7 +19,9 @@ installation: operating_systems: {
 			installation._interfaces."helm3",
 			installation._interfaces.kubectl,
 		]
+
 		family: "Linux"
+		minimum_supported_version: "6"
 		shell:  "bash"
 	}
 }

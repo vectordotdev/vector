@@ -22,7 +22,7 @@ installation: _interfaces: homebrew: {
 			_config_path: paths.config
 			install:      "brew tap timberio/brew && brew install vector"
 			logs:         "tail -f /usr/local/var/log/vector.log"
-			reload:       #"ps axf | grep vector | grep -v grep | awk '{print "kill -SIGHUP " $1}' | sh"#
+			reload:       "killall -s SIGHUP vector"
 			restart:      "brew services restart vector"
 			start:        "brew services start vector"
 			stop:         "brew services stop vector"
