@@ -10,19 +10,19 @@ installation: close({
 		_shell: string | *null
 		let Shell = _shell
 
-		configure:   string | null
-		install:     string | null
-		logs:        string | null
-		reload:      string | null
-		restart:     string | null
-		start:       string | null
-		stop:        string | null
-		top:         string | null | *"vector top"
-		uninstall:   string
-		upgrade:     string | null
+		configure: string | null
+		install:   string | null
+		logs:      string | null
+		reload:    string | null
+		restart:   string | null
+		start:     string | null
+		stop:      string | null
+		top:       string | null | *"vector top"
+		uninstall: string
+		upgrade:   string | null
 
 		if Shell == "bash" {
-			configure:   string | *#"""
+			configure: string | *#"""
 					cat <<-'VECTORCFG' > \#(ConfigPath)
 					{config}
 					VECTORCFG
@@ -30,7 +30,7 @@ installation: close({
 		}
 
 		if Shell == "powershell" {
-			configure:   string | *#"""
+			configure: string | *#"""
 					@"
 					{config}
 					"@ | Out-File -FilePath \#(ConfigPath)
@@ -188,9 +188,9 @@ installation: close({
 		family:      #OperatingSystemFamily
 		interfaces: [#Interface & {_shell: shell}, ...#Interface & {_shell: shell}]
 		minimum_supported_version: string | null
-		name:  Name
-		shell: string
-		title: string
+		name:                      Name
+		shell:                     string
+		title:                     string
 	}
 
 	#PackageManagers: [Name=string]: {
@@ -200,10 +200,10 @@ installation: close({
 	}
 
 	#Platforms: [Name=string]: {
-		description: string
+		description:               string
 		minimum_supported_version: string | null
-		name:        Name
-		title:       string
+		name:                      Name
+		title:                     string
 	}
 
 	#Roles: [Name=string]: {
