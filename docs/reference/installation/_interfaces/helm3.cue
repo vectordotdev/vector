@@ -41,19 +41,15 @@ installation: _interfaces: "helm3": {
 				    encoding = "json"
 				VALUES
 				"""#
-			install:     #"helm install \#(_name) timberio/\#(_name) --devel --values values.yaml --namespace vector --create-namespace"#
-			logs:        #"kubectl logs -n vector \#(_controller_resource_type)/\#(_name)"#
-			reconfigure: #"""
-							helm upgrade \#(_name) timberio/\#(_name) --devel --values values.yaml --namespace vector --version {version} && \
-								kubectl rollout restart --namespace vector \#(_controller_resource_type)/\#(_name)
-							"""#
-			reload:      null
-			restart:     #"kubectl rollout restart \#(_controller_resource_type)/\#(_name)"#
-			start:       null
-			stop:        null
-			top:         null
-			uninstall:   "helm uninstall \(_name) --namespace vector"
-			upgrade:     "helm repo update && helm upgrade vector timberio/\(_name) --namespace vector --reuse-values"
+			install:   #"helm install \#(_name) timberio/\#(_name) --devel --values values.yaml --namespace vector --create-namespace"#
+			logs:      #"kubectl logs -n vector \#(_controller_resource_type)/\#(_name)"#
+			reload:    null
+			restart:   #"kubectl rollout restart \#(_controller_resource_type)/\#(_name)"#
+			start:     null
+			stop:      null
+			top:       null
+			uninstall: "helm uninstall \(_name) --namespace vector"
+			upgrade:   "helm repo update && helm upgrade vector timberio/\(_name) --namespace vector --reuse-values"
 		}
 	}
 
@@ -65,7 +61,7 @@ installation: _interfaces: "helm3": {
 						log data on each Node. Vector runs as a
 						[Daemonset](\#(urls.kubernetes_daemonset)) and tails
 						logs for the entire Pod, automatically enriching them
-						with Kubernetes metdata via the
+						with Kubernetes metadata via the
 						[Kubernetes API](\#(urls.kubernetes_api)). Collection
 						is handled automatically, and it is intended for you to
 						adjust your pipeline as	necessary using Vector's

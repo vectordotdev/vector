@@ -22,10 +22,6 @@ installation: _interfaces: kubectl: {
 			_controller_resource_name: string
 			install:                   "kubectl apply -k ."
 			logs:                      "kubectl logs -n vector \(_controller_resource_type)/\(_controller_resource_name)"
-			reconfigure:               #"""
-							vi \#(paths.config) && \
-								kubectl apply -k .
-							"""#
 			reload:                    null
 			restart:                   "kubectl rollout restart \(_controller_resource_type)/\(_controller_resource_name)"
 			start:                     null
@@ -82,7 +78,7 @@ installation: _interfaces: kubectl: {
 						log data on each Node. Vector runs as a
 						[Daemonset](\#(urls.kubernetes_daemonset)) and tails
 						logs for the entire Pod, automatically enriching them
-						with Kubernetes metdata via the
+						with Kubernetes metadata via the
 						[Kubernetes API](\#(urls.kubernetes_api)). Collection
 						is handled automatically, and it is intended for you to
 						adjust your pipeline as	necessary using Vector's

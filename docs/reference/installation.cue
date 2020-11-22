@@ -10,34 +10,31 @@ installation: close({
 		_shell: string | *null
 		let Shell = _shell
 
-		configure:   string | null
-		install:     string | null
-		logs:        string | null
-		reconfigure: string | null
-		reload:      string | null
-		restart:     string | null
-		start:       string | null
-		stop:        string | null
-		top:         string | null | *"vector top"
-		uninstall:   string
-		upgrade:     string | null
+		configure: string | null
+		install:   string | null
+		logs:      string | null
+		reload:    string | null
+		restart:   string | null
+		start:     string | null
+		stop:      string | null
+		top:       string | null | *"vector top"
+		uninstall: string
+		upgrade:   string | null
 
 		if Shell == "bash" {
-			configure:   string | *#"""
+			configure: string | *#"""
 					cat <<-'VECTORCFG' > \#(ConfigPath)
 					{config}
 					VECTORCFG
 					"""#
-			reconfigure: string | *"vi \(ConfigPath)"
 		}
 
 		if Shell == "powershell" {
-			configure:   string | *#"""
+			configure: string | *#"""
 					@"
 					{config}
 					"@ | Out-File -FilePath \#(ConfigPath)
 					"""#
-			reconfigure: string | *"edit \(ConfigPath)"
 		}
 	}
 
@@ -190,9 +187,10 @@ installation: close({
 		description: string
 		family:      #OperatingSystemFamily
 		interfaces: [#Interface & {_shell: shell}, ...#Interface & {_shell: shell}]
-		name:  Name
-		shell: string
-		title: string
+		minimum_supported_version: string | null
+		name:                      Name
+		shell:                     string
+		title:                     string
 	}
 
 	#PackageManagers: [Name=string]: {
@@ -202,9 +200,10 @@ installation: close({
 	}
 
 	#Platforms: [Name=string]: {
-		description: string
-		name:        Name
-		title:       string
+		description:               string
+		minimum_supported_version: string | null
+		name:                      Name
+		title:                     string
 	}
 
 	#Roles: [Name=string]: {
@@ -228,8 +227,8 @@ installation: close({
 		}
 		config: {
 			api: {
-				enabled: false
-				port:    9001
+				enabled: true
+				address: "127.0.0.1:8686"
 			}
 
 			sources?: [Name=string]: {

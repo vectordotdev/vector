@@ -60,6 +60,20 @@ _values: {
 
 #EncodingCodec: "json" | "ndjson" | "text"
 
+#Endpoint: {
+	description: string
+	responses: [Code=string]: {
+		description: string
+	}
+}
+
+#Endpoints: [Path=string]: {
+	DELETE?: #Endpoint
+	GET?:    #Endpoint
+	POST?:   #Endpoint
+	PUT?:    #Endpoint
+}
+
 // `enum` restricts the value to a set of values.
 //
 //                enum: {
@@ -442,8 +456,10 @@ _values: {
 
 #Unit: "bytes" | "events" | "milliseconds" | "requests" | "seconds"
 
-components:   _
-data_model:   _
-installation: _
-releases:     _
-remap:        _
+components:    _
+configuration: _
+data_model:    _
+installation:  _
+process:       _
+releases:      _
+remap:         _

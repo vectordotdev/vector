@@ -15,7 +15,8 @@ installation: operating_systems: {
 			},
 			installation._interfaces."docker-cli",
 		]
-		family: "Linux"
-		shell:  "bash"
+		family:                    "Linux"
+		minimum_supported_version: null
+		shell:                     "bash"
 	}
 }

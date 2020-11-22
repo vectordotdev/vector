@@ -21,7 +21,7 @@ installation: _interfaces: "vector-installer": {
 			_config_path: paths.config
 			install:      "curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | sh"
 			logs:         null
-			reload:       #"ps axf | grep vector | grep -v grep | awk '{print "kill -SIGHUP " $1}' | sh"#
+			reload:       "killall -s SIGHUP vector"
 			restart:      null
 			start:        "vector --config \(paths.config)"
 			stop:         null

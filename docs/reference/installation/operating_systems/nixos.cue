@@ -1,7 +1,7 @@
 package metadata
 
 installation: operating_systems: {
-	nixfamily: {
+	nixos: {
 		title:       "NixOS"
 		description: """
 			[NixOS](\(urls.nixos)) is a Linux distribution built on top of the
@@ -16,7 +16,8 @@ installation: operating_systems: {
 			},
 			installation._interfaces."docker-cli",
 		]
-		family: "Linux"
-		shell:  "bash"
+		family:                    "Linux"
+		minimum_supported_version: "15.09"
+		shell:                     "bash"
 	}
 }
