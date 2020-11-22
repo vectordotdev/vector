@@ -149,7 +149,7 @@ mod tests {
         let mut sampler = Sampler::new(
             2,
             Some(log_schema().message_key().into()),
-            condition_contains("na"),
+            Some(condition_contains("na")),
         );
         let total_passed = events
             .into_iter()
@@ -163,7 +163,7 @@ mod tests {
         let mut sampler = Sampler::new(
             25,
             Some(log_schema().message_key().into()),
-            condition_contains("na"),
+            Some(condition_contains("na")),
         );
         let total_passed = events
             .into_iter()
@@ -180,7 +180,7 @@ mod tests {
         let mut sampler = Sampler::new(
             2,
             Some(log_schema().message_key().into()),
-            condition_contains("na"),
+            Some(condition_contains("na")),
         );
 
         let first_run = events
@@ -200,7 +200,8 @@ mod tests {
     fn always_passes_events_matching_pass_list() {
         for key_field in &[None, Some(log_schema().message_key().into())] {
             let event = Event::from("i am important");
-            let mut sampler = Sampler::new(0, key_field.clone(), condition_contains("important"));
+            let mut sampler =
+                Sampler::new(0, key_field.clone(), Some(condition_contains("important")));
             let iterations = 0..1000;
             let total_passed = iterations
                 .filter_map(|_| sampler.transform_one(event.clone()))
@@ -216,7 +217,7 @@ mod tests {
             let mut sampler = Sampler::new(
                 0,
                 key_field.clone(),
-                condition(log_schema().timestamp_key(), "contains", ":"),
+                Some(condition(log_schema().timestamp_key(), "contains", ":")),
             );
             let iterations = 0..1000;
             let total_passed = iterations
@@ -230,7 +231,7 @@ mod tests {
     fn sampler_adds_sampling_rate_to_event() {
         for key_field in &[None, Some(log_schema().message_key().into())] {
             let events = random_events(10000);
-            let mut sampler = Sampler::new(10, key_field.clone(), condition_contains("na"));
+            let mut sampler = Sampler::new(10, key_field.clone(), Some(condition_contains("na")));
             let passing = events
                 .into_iter()
                 .filter(|s| {
@@ -243,7 +244,7 @@ mod tests {
             assert_eq!(passing.as_log()["sample_rate"], "10".into());
 
             let events = random_events(10000);
-            let mut sampler = Sampler::new(25, key_field.clone(), condition_contains("na"));
+            let mut sampler = Sampler::new(25, key_field.clone(), Some(condition_contains("na")));
             let passing = events
                 .into_iter()
                 .filter(|s| {
@@ -256,7 +257,7 @@ mod tests {
             assert_eq!(passing.as_log()["sample_rate"], "25".into());
 
             // If the event passed the regex check, don't include the sampling rate
-            let mut sampler = Sampler::new(25, key_field.clone(), condition_contains("na"));
+            let mut sampler = Sampler::new(25, key_field.clone(), Some(condition_contains("na")));
             let event = Event::from("nananana");
             let passing = sampler.transform_one(event).unwrap();
             assert!(passing.as_log().get("sample_rate").is_none());
