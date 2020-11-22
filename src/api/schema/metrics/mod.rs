@@ -218,37 +218,94 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     }
 }
 
-/// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order.
+/// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order,
+/// where same metrics with different `origin` label under the same componenets are aggregated.
 /// Metrics are collected into a `Vec<Metric>`, yielding at `inverval` milliseconds.
-fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
+fn component_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     let controller = get_controller().unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
-    // Sort each interval of metrics by key
     stream! {
         loop {
             interval.tick().await;
 
-            yield capture_metrics(&controller)
-                .filter_map(|m| match m {
-                    Event::Metric(m) => match m.tag_value("component_name") {
-                        Some(name) => match COMPONENTS.read().expect(components::INVARIANT).get(&name) {
-                            Some(t) => Some(match t {
-                                Component::Source(_) => (m, 1),
-                                Component::Transform(_) => (m, 2),
-                                Component::Sink(_) => (m, 3),
-                            }),
-                            _ => None,
-                        },
+            // Sort each interval of metrics by key
+            let mut metrics_it=capture_metrics(&controller)
+            .filter_map(|m| match m {
+                Event::Metric(m) => match m.tag_value("component_name") {
+                    Some(name) => match COMPONENTS.read().expect(components::INVARIANT).get(&name) {
+                        Some(t) => Some(match t {
+                            Component::Source(_) => (m, 1),
+                            Component::Transform(_) => (m, 2),
+                            Component::Sink(_) => (m, 3),
+                        }),
                         _ => None,
                     },
                     _ => None,
-                })
-                .sorted_by_key(|m| m.1)
-                .map(|(m, _)| m)
-                .collect();
+                },
+                _ => None,
+            })
+            .sorted_by_key(|m| (m.1,m.0.name.clone()))
+            .map(|(m, _)| m);
+
+            // Aggregate metrics per componenet
+            let mut metrics=Vec::new();
+            let mut component=Vec::new();
+            let mut component_name=None;
+            while let Some(metric)=metrics_it.next(){
+                let name=metric.tag_value("component_name");
+                if component_name != name{
+                    aggregate(&mut component,&mut metrics);
+                    component_name=name;
+                }
+                component.push((metric,false));
+            }
+            aggregate(&mut component,&mut metrics);
+
+            yield metrics;
         }
     }
+}
+
+/// Same metrics with different `origin` label are aggregated.
+/// `origin` label is removed in the process
+fn aggregate(metrics: &mut Vec<(Metric, bool)>, out: &mut Vec<Metric>) {
+    // Remove `origin` so that we can sort metrics.
+    for (metric, origin_component) in metrics.iter_mut() {
+        let origin = metric.tags.as_mut().and_then(|tags| tags.remove("origin"));
+        *origin_component = origin == metric.tag_value("component_type");
+    }
+
+    metrics.sort_unstable_by(|a, b| (&a.0.name, &a.0.tags).cmp(&(&b.0.name, &b.0.tags)));
+
+    // Aggregate same named same tagged metrics.
+    metrics.dedup_by(|(m, m_oc), (sum, sum_oc)| {
+        if (&m.name, &m.tags) == (&sum.name, &sum.tags) {
+            if let (&MetricValue::Counter { value: a }, &MetricValue::Counter { value: b }) =
+                (&m.value, &sum.value)
+            {
+                let value = match sum.name.as_str() {
+                    // Choose one of the values
+                    "events_processed_total" | "processed_bytes_total" => {
+                        match (m_oc, sum_oc) {
+                            (true, false) => a,
+                            (false, true) => b,
+                            // Select max value
+                            (true, true) | (false, false) => a.max(b),
+                        }
+                    }
+                    // Sum values
+                    _ => a + b,
+                };
+                sum.value = MetricValue::Counter { value };
+
+                return true;
+            }
+        }
+        false
+    });
+
+    out.extend(metrics.drain(..).map(|(m, _)| m));
 }
 
 /// Get the events processed by component name.
@@ -294,7 +351,7 @@ pub fn component_counter_metrics(
 ) -> impl Stream<Item = Vec<Metric>> {
     let mut cache = BTreeMap::new();
 
-    metrics_sorted(interval).map(move |m| {
+    component_metrics(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
             .filter_map(|m| {
@@ -342,7 +399,7 @@ fn component_counter_throughputs(
 ) -> impl Stream<Item = Vec<(Metric, f64)>> {
     let mut cache = BTreeMap::new();
 
-    metrics_sorted(interval)
+    component_metrics(interval)
         .map(move |m| {
             m.into_iter()
                 .filter(filter_fn)
