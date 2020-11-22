@@ -256,8 +256,7 @@ The Vector configuration file is located at:
 config/vector.toml
 ```
 
-A full spec is located at `config/vector.spec.toml` and examples are
-located in `config/vector/examples/*`. You can learn more about configuring
+Example configurations are located in `config/vector/examples/*`. You can learn more about configuring
 Vector in the [Configuration][docs.configuration] section.
 
 ### Data Directory
