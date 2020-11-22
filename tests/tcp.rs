@@ -7,6 +7,7 @@
 use approx::assert_relative_eq;
 use futures::compat::Future01CompatExt;
 use vector::{
+    conditions::CheckFieldsConfig,
     config, sinks, sources,
     test_util::{
         next_addr, random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
@@ -70,8 +71,8 @@ async fn sample() {
         &["in"],
         transforms::sampler::SamplerConfig {
             rate: 10,
-            key_field: None,
-            pass_list: vec![],
+            key_field: Some(config::log_schema().message_key().into()),
+            exclude: None,
         },
     );
     config.add_sink(

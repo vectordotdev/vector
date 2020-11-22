@@ -4,7 +4,7 @@ use futures::{compat::Future01CompatExt, future, stream, StreamExt};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 use vector::{
-    config, sinks, sources,
+    conditions, config, sinks, sources,
     test_util::{
         next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
     },
@@ -296,7 +296,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     transforms::sampler::SamplerConfig {
                         rate: sample_rate,
                         key_field: None,
-                        pass_list: vec![],
+                        exclude: None,
                     },
                 );
                 config.add_sink(
