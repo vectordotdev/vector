@@ -233,12 +233,6 @@ components: {
 
 	#FeaturesKeepalive: {
 		enabled: bool
-
-		if enabled {
-			time:     uint
-			interval: uint
-			retries:  uint
-		}
 	}
 
 	#FeaturesMultiline: {

@@ -24,13 +24,8 @@ components: sinks: socket: {
 					enum: ["json", "text"]
 				}
 			}
-			keepalive: {
-				enabled:  true
-				time:     7200
-				interval: 75
-				retries:  5
-			}
-			request: enabled: false
+			keepalive: enabled: true
+			request: enabled:   false
 			tls: {
 				enabled:                true
 				can_enable:             true

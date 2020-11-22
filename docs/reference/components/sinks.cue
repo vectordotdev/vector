@@ -321,7 +321,7 @@ components: sinks: [Name=string]: {
 								description: "The time a connection needs to be idle before sending keepalive probes."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.keepalive.time
+									default: null
 									unit:    "seconds"
 								}
 							}
@@ -330,7 +330,7 @@ components: sinks: [Name=string]: {
 								description: "The interval in which keepalive probes should be sent."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.keepalive.interval
+									default: null
 									unit:    "seconds"
 								}
 							}
@@ -339,7 +339,7 @@ components: sinks: [Name=string]: {
 								description: "The number of keepalive probes to send before considering the connection closed."
 								required:    false
 								type: uint: {
-									default: sinks[Name].features.send.keepalive.retries
+									default: null
 									unit:    "seconds"
 								}
 							}
