@@ -38,7 +38,8 @@ async fn happy_path() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -57,7 +58,7 @@ async fn happy_path() {
         in = {type = "socket", mode = "tcp", address = "127.0.0.1:1235"}
 
         [transforms]
-        sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
+        sampler = {type = "sampler", inputs = ["in"], rate = 10, key_field = "message", exclude."message.contains" = "error"}
 
         [sinks]
         out = {type = "socket", mode = "tcp", inputs = ["sampler"], encoding = "text", address = "127.0.0.1:9999"}
@@ -181,7 +182,8 @@ async fn nonexistant_input() {
         type = "sampler"
         inputs = ["qwerty"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -221,7 +223,8 @@ async fn bad_regex() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = ["(["]
+        key_field = "message"
+        exclude."message.regex" = "(["
 
         [sinks.out]
         type = "socket"
@@ -421,13 +424,15 @@ async fn warnings() {
         type = "sampler"
         inputs = ["in1"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [transforms.sampler2]
         type = "sampler"
         inputs = ["in1"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -467,25 +472,25 @@ async fn cycle() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.two]
         type = "sampler"
         inputs = ["one", "four"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.three]
         type = "sampler"
         inputs = ["two"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.four]
         type = "sampler"
         inputs = ["three"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [sinks.out]
         type = "socket"
