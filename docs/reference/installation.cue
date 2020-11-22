@@ -47,7 +47,7 @@ installation: close({
 		arch:                 #Arch
 		file_name:            string
 		file_type:            string
-		os:                   #OperatingSystem
+		os:                   #OperatingSystemFamily
 		package_manager?:     string
 		title:                "\(os) (\(arch))"
 		type:                 "archive" | "package"
@@ -188,9 +188,9 @@ installation: close({
 
 	#OperatingSystems: [Name=string]: {
 		description: string
+		family:      #OperatingSystemFamily
 		interfaces: [#Interface & {_shell: shell}, ...#Interface & {_shell: shell}]
 		name:  Name
-		os:    string
 		shell: string
 		title: string
 	}
