@@ -285,7 +285,8 @@ fn aggregate(metrics: &mut Vec<(Metric, bool)>, out: &mut Vec<Metric>) {
                 (&m.value, &sum.value)
             {
                 let value = match sum.name.as_str() {
-                    // Choose one of the values
+                    // Choose one of the values, where those metrics with
+                    // origin same as the components type have an advantage.
                     "events_processed_total" | "processed_bytes_total" => {
                         match (m_oc, sum_oc) {
                             (true, false) => a,
@@ -418,4 +419,160 @@ fn component_counter_throughputs(
         })
         // Ignore the first, since we only care about sampling between `interval`
         .skip(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::aggregate;
+    use crate::event::{Metric, MetricKind, MetricValue};
+
+    fn metric(name: &str, tags: Vec<(&str, &str)>, value: f64) -> Metric {
+        Metric {
+            name: name.into(),
+            namespace: None,
+            tags: Some(
+                tags.into_iter()
+                    .map(|(key, value)| (key.to_string(), value.to_string()))
+                    .collect(),
+            ),
+            value: MetricValue::Counter { value },
+            timestamp: None,
+            kind: MetricKind::Incremental,
+        }
+    }
+
+    fn aggregate_test(metrics: Vec<Metric>) -> Vec<Metric> {
+        let mut metrics = metrics.into_iter().map(|m| (m, false)).collect();
+        let mut out = Vec::new();
+        aggregate(&mut metrics, &mut out);
+        out
+    }
+
+    #[test]
+    fn sum() {
+        assert_eq!(
+            aggregate_test(vec![
+                metric(
+                    "some_metric",
+                    vec![("tag", "value"), ("origin", "test_0")],
+                    1.0
+                ),
+                metric(
+                    "some_metric",
+                    vec![("tag", "value"), ("origin", "test_1")],
+                    1.0
+                )
+            ]),
+            vec![metric("some_metric", vec![("tag", "value")], 2.0)]
+        );
+    }
+
+    #[test]
+    fn choose_eq_type() {
+        assert_eq!(
+            aggregate_test(vec![
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0"), ("origin", "type_0")],
+                    2.0
+                ),
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0"), ("origin", "type_1")],
+                    3.0
+                )
+            ]),
+            vec![metric(
+                "events_processed_total",
+                vec![("component_type", "type_0")],
+                2.0
+            )]
+        );
+    }
+
+    #[test]
+    fn choose_neq_type() {
+        assert_eq!(
+            aggregate_test(vec![
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0"), ("origin", "type_1")],
+                    1.0
+                ),
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0"), ("origin", "type_2")],
+                    2.0
+                )
+            ]),
+            vec![metric(
+                "events_processed_total",
+                vec![("component_type", "type_0")],
+                2.0
+            )]
+        );
+    }
+
+    #[test]
+    fn multi() {
+        assert_eq!(
+            aggregate_test(vec![
+                metric(
+                    "events_processed_total",
+                    vec![
+                        ("component_type", "type_0"),
+                        ("tag", "value"),
+                        ("origin", "test_0")
+                    ],
+                    1.0
+                ),
+                metric(
+                    "events_processed_total",
+                    vec![
+                        ("component_type", "type_0"),
+                        ("tag", "value"),
+                        ("origin", "test_1")
+                    ],
+                    1.0
+                ),
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0"), ("origin", "type_0")],
+                    3.0
+                ),
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0"), ("origin", "type_1")],
+                    5.0
+                ),
+                metric(
+                    "processed_bytes_total",
+                    vec![("component_type", "type_0"), ("origin", "type_1")],
+                    1.0
+                ),
+                metric(
+                    "processed_bytes_total",
+                    vec![("component_type", "type_0"), ("origin", "type_2")],
+                    4.0
+                )
+            ]),
+            vec![
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0")],
+                    3.0
+                ),
+                metric(
+                    "events_processed_total",
+                    vec![("component_type", "type_0"), ("tag", "value")],
+                    1.0
+                ),
+                metric(
+                    "processed_bytes_total",
+                    vec![("component_type", "type_0")],
+                    4.0
+                )
+            ]
+        );
+    }
 }
