@@ -20,8 +20,8 @@ installation: operating_systems: {
 			installation._interfaces.kubectl,
 		]
 
-		family: "Linux"
+		family:                    "Linux"
 		minimum_supported_version: "4"
-		shell:  "bash"
+		shell:                     "bash"
 	}
 }

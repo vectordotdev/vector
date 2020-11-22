@@ -16,8 +16,8 @@ installation: operating_systems: {
 			installation._interfaces."docker-cli",
 		]
 
-		family: "Windows"
+		family:                    "Windows"
 		minimum_supported_version: "7"
-		shell:  "powershell"
+		shell:                     "powershell"
 	}
 }

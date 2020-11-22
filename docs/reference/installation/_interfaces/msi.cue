@@ -29,13 +29,13 @@ installation: _interfaces: msi: {
 				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{arch}.msi && \
 					msiexec /i vector-{arch}.msi /quiet
 				"""#
-			logs:        null
-			reload:      null
-			restart:     null
-			start:       #"\#(paths.bin) --config \#(paths.config)"#
-			stop:        null
-			uninstall:   #"msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet"#
-			upgrade:     null
+			logs:      null
+			reload:    null
+			restart:   null
+			start:     #"\#(paths.bin) --config \#(paths.config)"#
+			stop:      null
+			uninstall: #"msiexec /x {7FAD6F97-D84E-42CC-A600-5F4EC3460FF5} /quiet"#
+			upgrade:   null
 		}
 
 		tutorials: {
