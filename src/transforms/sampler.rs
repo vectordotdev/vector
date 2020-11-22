@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 pub struct SamplerConfig {
     pub rate: u64,
     pub key_field: Option<String>,
+    #[serde(default)]
     pub exclude: CheckFieldsConfig,
 }
 
