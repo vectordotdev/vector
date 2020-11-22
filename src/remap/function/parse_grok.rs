@@ -14,12 +14,12 @@ impl Function for ParseGrok {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
         ]
@@ -28,23 +28,16 @@ impl Function for ParseGrok {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
 
-        let patternstr = match arguments
-            .required_expr("pattern")?
-            .literal()
-            .ok_or("grok pattern must be a literal string")?
-        {
-            Value::String(patternstr) => String::from_utf8_lossy(&patternstr).into_owned(),
-            _ => {
-                // The parameter type check should prevent us from reaching this point.
-                return Err(Error::Unknown);
-            }
-        };
+        let patternbytes = arguments
+            .required_literal("pattern")?
+            .as_value()
+            .clone()
+            .try_bytes()?;
+
+        let patternstr = String::from_utf8_lossy(&patternbytes).into_owned();
 
         let mut grok = grok::Grok::with_patterns();
-        let pattern = Arc::new(
-            grok.compile(&patternstr, true)
-                .map_err(|e| Error::from(e.to_string()))?,
-        );
+        let pattern = Arc::new(grok.compile(&patternstr, true).map_err(|e| e.to_string())?);
 
         Ok(Box::new(ParseGrokFn { value, pattern }))
     }
@@ -71,11 +64,9 @@ impl ParseGrokFn {
 }
 
 impl Expression for ParseGrokFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        let value = {
-            let bytes = required!(state, object, self.value, Value::String(v) => v);
-            String::from_utf8_lossy(&bytes).into_owned()
-        };
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
 
         match self.pattern.match_against(&value) {
             Some(matches) => {
@@ -85,10 +76,17 @@ impl Expression for ParseGrokFn {
                     result.insert(name.to_string(), Value::from(value));
                 }
 
-                Ok(Some(Value::from(result)))
+                Ok(Value::from(result))
             }
-            None => Ok(Some(Value::from(BTreeMap::new()))),
+            None => Ok(Value::from(BTreeMap::new())),
         }
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Array)
     }
 }
 
@@ -97,12 +95,27 @@ mod test {
     use super::*;
     use crate::map;
 
+    remap::test_type_def![string {
+        expr: |_| ParseGrokFn {
+            value: Literal::from("foo").boxed(),
+            pattern: Arc::new(
+                grok::Grok::with_patterns()
+                    .compile("%{LOGLEVEL:level}", true)
+                    .unwrap()
+            )
+        },
+        def: TypeDef {
+            kind: value::Kind::Array,
+            ..Default::default()
+        },
+    }];
+
     #[test]
     fn check_parse_grok() {
         let cases = vec![
             (
                 map!["message": "an ungrokkable message"],
-                Ok(Some(Value::from(map![]))),
+                Ok(Value::from(map![])),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -112,7 +125,7 @@ mod test {
             ),
             (
                 map!["message": "2020-10-02T23:22:12.223222Z an ungrokkable message"],
-                Ok(Some(Value::from(map![]))),
+                Ok(Value::from(map![])),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -122,11 +135,11 @@ mod test {
             ),
             (
                 map!["message": "2020-10-02T23:22:12.223222Z info Hello world"],
-                Ok(Some(Value::from(
+                Ok(Value::from(
                     map!["timestamp": "2020-10-02T23:22:12.223222Z",
                          "level": "info",
                          "message": "Hello world"],
-                ))),
+                )),
                 ParseGrokFn::new(
                     Box::new(Path::from("message")),
                     "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
@@ -136,7 +149,7 @@ mod test {
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func
