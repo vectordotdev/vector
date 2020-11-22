@@ -271,24 +271,24 @@ fn component_metrics(interval: i32) -> impl Stream<Item = Vec<Metric>> {
 /// `origin` label is removed in the process
 fn aggregate(metrics: &mut Vec<(Metric, bool)>, out: &mut Vec<Metric>) {
     // Remove `origin` so that we can sort metrics.
-    for (metric, origin_component) in metrics.iter_mut() {
+    for (metric, priority) in metrics.iter_mut() {
         let origin = metric.tags.as_mut().and_then(|tags| tags.remove("origin"));
-        *origin_component = origin == metric.tag_value("component_type");
+        *priority = origin == metric.tag_value("component_type");
     }
 
     metrics.sort_unstable_by(|a, b| (&a.0.name, &a.0.tags).cmp(&(&b.0.name, &b.0.tags)));
 
     // Aggregate same named same tagged metrics.
-    metrics.dedup_by(|(m, m_oc), (sum, sum_oc)| {
-        if (&m.name, &m.tags) == (&sum.name, &sum.tags) {
+    metrics.dedup_by(|(metric, metric_priority), (sum, sum_priority)| {
+        if (&metric.name, &metric.tags) == (&sum.name, &sum.tags) {
             if let (&MetricValue::Counter { value: a }, &MetricValue::Counter { value: b }) =
-                (&m.value, &sum.value)
+                (&metric.value, &sum.value)
             {
                 let value = match sum.name.as_str() {
                     // Choose one of the values, where those metrics with
                     // origin same as the components type have an advantage.
                     "events_processed_total" | "processed_bytes_total" => {
-                        match (m_oc, sum_oc) {
+                        match (metric_priority, sum_priority) {
                             (true, false) => a,
                             (false, true) => b,
                             // Select max value
