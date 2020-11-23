@@ -11,7 +11,7 @@ tags: ["type: announcement"]
 ---
 
 After eight months of development, [83 pull requests][kubernetes_pull_requests],
-and intensive QA in clusters producing over 50 terabytes per day, we’re pleased
+and intensive QA in clusters producing over 30 terabytes per day, we’re pleased
 to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for all Kubernetes observability
 data.
@@ -19,7 +19,13 @@ data.
 For a deepdive into our Kubernetes integration, checkout the
 [announcement blog post][announcement_post].
 
-## Highlights
+## Get Started
+
+To cut straight to the chase, check out our Kubernetes installation instructions:
+
+<Jump to="/docs/setup/installation/platforms/kubernetes/#install">Kubernetes Installation Instructions</Jump>
+
+## Feature highlights
 
 1. A new [`kubernetes_logs` source] that:
    1. Automatically collects all Node logs.
@@ -32,14 +38,12 @@ For a deepdive into our Kubernetes integration, checkout the
 3. Composable design that allows k8s operators to include Vector in restricted
    and unrestricted setups.
 
+Prometheus integrations
+
 PS - we also launched a new [adapative concurrency feature][adative_concurrency_post]
 that compliments our Kubernetes integration.
 
-## Get Started
-
-To cut straight to the chase, check out our Kubernetes installation instructions:
-
-<Jump to="/docs/setup/installation/platforms/kubernetes/#install">Kubernetes Installation Instructions</Jump>
+## Future plans
 
 [announcement_post]: TODO
 [installation_docs]: TODO

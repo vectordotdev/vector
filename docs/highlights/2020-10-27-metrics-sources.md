@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [1314]
 release: "0.11.0"https://github.com/Lusitaniae/apache_exporter
 hide_on_release_notes: false
-tags: ["type: announcement"]
+tags: ["type: announcement", "domain: metrics", "domain: sources"]
 ---
 
 Vector 0.11 includes four new metrics sources:
@@ -15,9 +15,10 @@ Vector 0.11 includes four new metrics sources:
 1. The [`host_metrics` source][host_metrics_source]
 2. The [`apache_metrics` source][apache_metrics_source]
 3. The [`mongodb_metrics` source][mongodb_metrics_source]
-4. The [`internal_metrics` source][internal_metrics_source]
+4. The [`aws_ecs_metrics` source][aws_ecs_metrics_source]
+5. The [`internal_metrics` source][internal_metrics_source]
 
-And while these are only four sources, they represent a broader initiative
+And while these are only five sources, they represent a broader initiative
 to replace metrics agents entirely. A lot of groundwork was laid to expedite
 these types of integrations, so you can expect many more of them in
 subsequent Vector releases.
@@ -30,7 +31,7 @@ that deploy five or more agents on a single host -- using more than _30% of the
 CPU resources for that host_! We cover this in detail in our
 [Kubernetes announcements post][kubernetes_announcement]. It's a genuine and
 costly problem. Vector has its sights set on solving this. We want Vector to be
-the single pipeline for all of your logs, metrics, and traces.
+the single agent for all of your logs, metrics, and traces.
 
 ## Get Started
 
@@ -49,7 +50,14 @@ type = "prometheus"
 inputs = ["host_metrics"]
 ```
 
-Tada! One agent for all of your data. Check out the docs for more details.
+Tada! One agent for all of your data. Check out the [docs][docs] for more
+details.
+
+## Switching from another metrics agent?
+
+We'd love to chat! We're eager to unblock the transition. If Vector is missing
+a metrics integration or feature, [chat with us][chat]. We are working closely
+with a number of organizations to assist with this transition.
 
 [apache_metrics_source]: ...
 [mongodb_metrics_source]: ...
