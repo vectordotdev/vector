@@ -183,7 +183,7 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
         .await
         .map_err(|_| ())?
         .data
-        .ok_or_else(|| ())?
+        .ok_or(())?
         .components
         .into_iter()
         .map(|d| {

@@ -2,73 +2,6 @@ package metadata
 
 // These sources produce JSON providing a structured representation of the
 // Vector CLI (commands, flags, etc.)
-
-#Args: [Arg=string]: {
-	description: !=""
-	type:        #ArgType
-	default?:    string | [...string]
-	required:    bool | *false
-
-	if default == _|_ {
-		required: true
-	}
-}
-
-#ArgType: "string" | "list"
-
-#CommandLineTool: {
-	name:     !=""
-	flags:    #Flags
-	options:  #Options
-	commands: #Commands
-}
-
-#Commands: [Command=string]: {
-	description: !=""
-	flags?:      #Flags
-	options?:    #Options
-	args?:       #Args
-}
-
-#Flags: [Flag=string]: {
-	flag:        "--\(Flag)"
-	description: !=""
-	env_var?:    string
-
-	if _short != _|_ {
-		short: "-\(_short)"
-	}
-
-	_short: !=""
-}
-
-#Options: [Option=string]: {
-	option:      "--\(Option)"
-	description: !=""
-	default?:    string | int
-	enum?: [...string]
-	type:     #OptionType
-	env_var?: string
-	example?: string
-	required: bool | *false
-
-	if default == _|_ {
-		required: true
-	}
-
-	if _short != _|_ {
-		short: "-\(_short)"
-	}
-
-	_short: !=""
-
-	if enum != _|_ {
-		type: "enum"
-	}
-}
-
-#OptionType: "string" | "integer" | "enum"
-
 _default_flags: {
 	"help": {
 		_short:      "h"
@@ -80,7 +13,72 @@ _default_flags: {
 	}
 }
 
-cli: #CommandLineTool & {
+cli: {
+	#Args: [Arg=string]: {
+		description: !=""
+		name:        Arg
+		type:        #ArgType
+		default?:    string | [...string]
+	}
+
+	#ArgType: "string" | "list"
+
+	#Commands: [Command=string]: {
+		description: !=""
+		name:        Command
+		flags?:      #Flags
+		options?:    #Options
+		args?:       #Args
+	}
+
+	#Flags: [Flag=string]: {
+		flag:        "--\(Flag)"
+		description: string
+		env_var?:    string
+		name:        Flag
+
+		if _short != _|_ {
+			short: "-\(_short)"
+		}
+
+		_short: string
+	}
+
+	#Options: [Option=string]: {
+		option:      "--\(Option)"
+		default?:    string | int
+		description: string
+		enum?:       #Enum
+		name:        Option
+		type:        #OptionType
+		env_var?:    string
+		example?:    string
+		required:    bool | *false
+
+		if default == _|_ {
+			required: true
+		}
+
+		if _short != _|_ {
+			short: "-\(_short)"
+		}
+
+		_short: !=""
+
+		if enum != _|_ {
+			type: "enum"
+		}
+	}
+
+	#OptionType: "string" | "integer" | "enum"
+
+	name:     !=""
+	flags:    #Flags
+	options:  #Options
+	commands: #Commands
+}
+
+cli: {
 	name: "vector"
 
 	flags: _default_flags & {
@@ -109,18 +107,13 @@ cli: #CommandLineTool & {
 
 	options: {
 		"color": {
-			description: """
-				Control when ANSI terminal formatting is used.
-
-				By default `vector` will try and detect if `stdout` is a terminal,
-				if it is ANSI will be enabled. Otherwise it will be disabled. By
-				providing this flag with the `--color always` option will always
-				enable ANSI terminal formatting. `--color never` will disable all
-				ANSI terminal formatting. `--color auto` will attempt to detect it
-				automatically.
-				"""
-			default: "auto"
-			enum: ["always", "auto", "never"]
+			description: "Control when ANSI terminal formatting is used."
+			default:     "auto"
+			enum: {
+				always: "Enable ANSI terminal formatting always."
+				auto:   "Detect ANSI terminal formatting and enable if supported."
+				never:  "Disable ANSI terminal formatting."
+			}
 		}
 		"config": {
 			_short: "c"
@@ -145,7 +138,10 @@ cli: #CommandLineTool & {
 		"log-format": {
 			description: "Set the logging format [default: text]"
 			default:     "text"
-			enum: ["json", "text"]
+			enum: {
+				json: "Output Vector's logs as JSON."
+				text: "Output Vector's logs as text."
+			}
 		}
 	}
 
@@ -169,39 +165,9 @@ cli: #CommandLineTool & {
 			}
 
 			args: {
-				expression: {
-					description: """
-						Generate expression, e.g. `stdin/json_parser,add_fields/console`
-
-						Three comma-separated lists of sources, transforms and sinks, divided
-						by forward slashes. If subsequent component types are not needed then
-						their dividers can be omitted from the expression.
-
-						For example:
-
-						`/json_parser` prints a `json_parser` transform.
-
-						`//file,http` prints a `file` and `http` sink.
-
-						`stdin//http` prints a `stdin` source an an `http` sink.
-
-						Generated components are given incremental names (`source1`,
-						`source2`, etc) which should be replaced in order to provide better
-						context. You can optionally specify the names of components by
-						prefixing them with `<name>:`, e.g.:
-
-						`foo:stdin/bar:regex_parser/baz:http` prints a `stdin` source called
-						`foo`, a `regex_parser` transform called `bar`, and an `http` sink
-						called `baz`.
-
-						Vector makes a best attempt at constructing a sensible topology. The
-						first transform generated will consume from all sources and subsequent
-						transforms will consume from their predecessor. All sinks will consume
-						from the last transform or, if none are specified, from all sources.
-						It is then up to you to restructure the `inputs` of each component to
-						build the topology you need.
-						"""
-					type: "string"
+				pipeline: {
+					description: "Pipeline expression, e.g. `stdin/json_parser,add_fields/console`"
+					type:        "string"
 				}
 			}
 		}
@@ -219,7 +185,10 @@ cli: #CommandLineTool & {
 				"format": {
 					description: "Format the list in an encoding schema"
 					default:     "text"
-					enum: ["json", "text"]
+					enum: {
+						json: "Output components as JSON"
+						text: "Output components as text"
+					}
 				}
 			}
 		}
@@ -277,6 +246,7 @@ cli: #CommandLineTool & {
 
 			flags: _default_flags & {
 				"no-environment": {
+					_short: "ne"
 					description: """
 						Disables environment checks. That includes component
 						checks and health checks

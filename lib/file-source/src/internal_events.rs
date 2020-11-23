@@ -1,5 +1,4 @@
-use std::io::Error;
-use std::path::Path;
+use std::{io::Error, path::Path, time::Duration};
 
 /// Every internal event in this crate has a corresponding
 /// method in this trait which should emit the event.
@@ -18,7 +17,7 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
 
     fn emit_file_fingerprint_read_failed(&self, path: &Path, error: Error);
 
-    fn emit_file_checkpointed(&self, count: usize);
+    fn emit_file_checkpointed(&self, count: usize, duration: Duration);
 
     fn emit_file_checksum_failed(&self, path: &Path);
 

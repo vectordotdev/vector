@@ -256,15 +256,15 @@ mod integration_tests {
     use serde_json::Value;
     use std::{
         convert::Infallible,
+        future::ready,
         net::SocketAddr,
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
         },
     };
-    use warp::Filter;
-
     use tokio::time::{timeout, Duration};
+    use warp::Filter;
 
     #[tokio::test]
     async fn insert_events() {
@@ -300,7 +300,7 @@ mod integration_tests {
             .as_mut_log()
             .insert(LookupBuf::from("host"), "example.com");
 
-        sink.run(stream::once(future::ready(input_event.clone())))
+        sink.run(stream::once(ready(input_event.clone())))
             .await
             .unwrap();
 

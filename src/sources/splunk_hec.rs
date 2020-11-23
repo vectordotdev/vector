@@ -485,7 +485,7 @@ impl<R: Read> Stream for EventStream<R> {
             Some(Some(t)) => {
                 if let Some(t) = t.as_u64() {
                     let time = parse_timestamp(t as i64)
-                        .ok_or_else(|| ApiError::InvalidDataFormat { event: self.events })?;
+                        .ok_or(ApiError::InvalidDataFormat { event: self.events })?;
 
                     self.time = Time::Provided(time);
                 } else if let Some(t) = t.as_f64() {
@@ -793,9 +793,9 @@ mod tests {
         Pipeline,
     };
     use chrono::{TimeZone, Utc};
-    use futures::{future, stream, StreamExt};
+    use futures::{stream, StreamExt};
     use futures01::sync::mpsc;
-    use std::net::SocketAddr;
+    use std::{future::ready, net::SocketAddr};
 
     #[test]
     fn generate_config() {
@@ -1002,7 +1002,7 @@ mod tests {
             .as_mut_log()
             .insert(LookupBuf::from("greeting"), "hello");
         event.as_mut_log().insert(LookupBuf::from("name"), "bob");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()[Lookup::from("greeting")], "hello".into());
@@ -1022,7 +1022,7 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert(LookupBuf::from("line"), "hello");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());

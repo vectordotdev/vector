@@ -16,7 +16,7 @@ impl InternalEvent for MongoDBMetricsCollectCompleted {
 
     fn emit_metrics(&self) {
         counter!("collect_completed_total", 1);
-        histogram!("collect_duration_nanoseconds", self.end - self.start);
+        histogram!("request_duration_nanoseconds", self.end - self.start);
     }
 }
 

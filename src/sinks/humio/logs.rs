@@ -138,9 +138,9 @@ mod integration_tests {
         Event,
     };
     use chrono::Utc;
-    use futures::{future, stream};
+    use futures::stream;
     use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
+    use std::{collections::HashMap, convert::TryFrom, future::ready};
 
     // matches humio container address
     const HOST: &str = "http://localhost:8080";
@@ -161,7 +161,7 @@ mod integration_tests {
         let log = event.as_mut_log();
         log.insert(log_schema().host_key().clone(), host.clone());
 
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -197,7 +197,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -230,7 +230,7 @@ mod integration_tests {
                 .as_mut_log()
                 .insert(LookupBuf::from("@timestamp"), Utc::now().to_rfc3339());
 
-            sink.run(stream::once(future::ready(event))).await.unwrap();
+            sink.run(stream::once(ready(event))).await.unwrap();
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 
@@ -253,7 +253,7 @@ mod integration_tests {
             let message = random_string(100);
             let event = Event::from(message.clone());
 
-            sink.run(stream::once(future::ready(event))).await.unwrap();
+            sink.run(stream::once(ready(event))).await.unwrap();
 
             let entry = find_entry(repo.name.as_str(), message.as_str()).await;
 

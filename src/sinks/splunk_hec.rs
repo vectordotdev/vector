@@ -428,9 +428,9 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
-    use futures::{future, stream};
+    use futures::stream;
     use serde_json::Value as JsonValue;
-    use std::net::SocketAddr;
+    use std::{future::ready, net::SocketAddr};
     use tokio::time::{delay_for, Duration};
     use warp::Filter;
 
@@ -462,7 +462,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -481,7 +481,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -498,7 +498,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -546,7 +546,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -569,7 +569,7 @@ mod integration_tests {
         event
             .as_mut_log()
             .insert(LookupBuf::from("host"), "example.com:1234");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -593,7 +593,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert(LookupBuf::from("asdf"), "hello");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -624,7 +624,7 @@ mod integration_tests {
         event
             .as_mut_log()
             .insert(LookupBuf::from("roast"), "beef.example.com:1234");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 

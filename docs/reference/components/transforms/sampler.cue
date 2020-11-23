@@ -30,28 +30,34 @@ components: transforms: sampler: {
 
 	configuration: {
 		key_field: {
-			common:      false
-			description: "The name of the log field to use to determine if the event should be passed. This defaults to the [global `message_key` option][docs.reference.global-options#message_key]."
-			required:    false
+			common: false
+			description: """
+				The name of the log field whose value will be hashed to determine if the event should be passed.
+				Consistently samples the same events.
+				Actual rate of sampling may differ from the configured one if
+				values in the field are not uniformly distributed.
+				If left unspecified, or if the event doesn't have `key_field`, events will be count rated.
+				"""
+			required: false
 			warnings: []
 			type: string: {
 				default: null
 				examples: ["message"]
 			}
 		}
-		pass_list: {
+		exclude: {
 			common:      true
-			description: "A list of regular expression patterns to exclude events from sampling. If an event's key field (see `key_field`) matches _any_ of these patterns it will _not_ be sampled."
+			description: "The set of logical conditions to exclude events from sampling."
 			required:    false
 			warnings: []
-			type: array: {
-				default: null
-				items: type: string: examples: ["[error]", "field2"]
-			}
+			type: object: configuration._conditions
 		}
 		rate: {
-			description: "The rate at which events will be forwarded, expressed as 1/N. For example, `rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped."
-			required:    true
+			description: """
+				The rate at which events will be forwarded, expressed as 1/N. For example,
+				`rate = 10` means 1 out of every 10 events will be forwarded and the rest will be dropped.
+				"""
+			required: true
 			warnings: []
 			type: uint: {
 				examples: [10]

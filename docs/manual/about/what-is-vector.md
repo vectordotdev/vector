@@ -3,7 +3,7 @@ title: "What is Vector?"
 description: "High-level description of the Vector observability data collector and router."
 ---
 
-<SVG src="/img/components.svg" />
+<SVG src="/optimized_svg/components_683_294.svg" />
 
 Vector is a lightweight, ultra-fast, [open-source][urls.vector_repo] tool for
 building observability pipelines. Compared to Logstash and friends, Vector

@@ -8,9 +8,9 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt};
+use futures::{compat::Sink01CompatExt, FutureExt, SinkExt, StreamExt};
 use futures01::Sink;
-use std::path::PathBuf;
+use std::{future::ready, path::PathBuf};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
@@ -76,7 +76,7 @@ where
 
             let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
-                future::ready(match line {
+                ready(match line {
                     Ok(line) => build_event(host_key.clone(), received_from.clone(), &line).map(Ok),
                     Err(error) => {
                         emit!(UnixSocketError {
