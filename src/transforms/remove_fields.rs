@@ -68,9 +68,7 @@ impl FunctionTransform for RemoveFields {
         for field in &self.fields {
             let old_val = log.remove(field, self.drop_empty);
             if old_val.is_none() {
-                emit!(RemoveFieldsFieldMissing {
-                    field
-                });
+                emit!(RemoveFieldsFieldMissing { field });
             }
         }
 
@@ -91,8 +89,12 @@ mod tests {
     #[test]
     fn remove_fields() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert(LookupBuf::from("to_remove"), "some value");
-        event.as_mut_log().insert(LookupBuf::from("to_keep"), "another value");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("to_remove"), "some value");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("to_keep"), "another value");
 
         let mut transform =
             RemoveFields::new(vec!["to_remove".into(), "unknown".into()], false).unwrap();
@@ -101,6 +103,9 @@ mod tests {
 
         assert!(new_event.as_log().get(Lookup::from("to_remove")).is_none());
         assert!(new_event.as_log().get(Lookup::from("unknown")).is_none());
-        assert_eq!(new_event.as_log()[Lookup::from("to_keep")], "another value".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("to_keep")],
+            "another value".into()
+        );
     }
 }

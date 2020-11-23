@@ -474,7 +474,10 @@ async fn finish_signer(
 }
 
 fn maybe_set_id(key: &Option<LookupBuf>, doc: &mut serde_json::Value, event: &mut Event) {
-    if let Some(val) = key.as_ref().and_then(|k| event.as_mut_log().remove(k, false)) {
+    if let Some(val) = key
+        .as_ref()
+        .and_then(|k| event.as_mut_log().remove(k, false))
+    {
         let val = val.to_string_lossy();
 
         doc.as_object_mut()
@@ -486,7 +489,10 @@ fn maybe_set_id(key: &Option<LookupBuf>, doc: &mut serde_json::Value, event: &mu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{sinks::util::retries::RetryAction, event::{Event, Lookup}};
+    use crate::{
+        event::{Event, Lookup},
+        sinks::util::retries::RetryAction,
+    };
     use http::{Response, StatusCode};
     use pretty_assertions::assert_eq;
     use serde_json::json;

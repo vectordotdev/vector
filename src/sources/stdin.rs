@@ -121,10 +121,9 @@ fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> E
     let mut event = Event::from(line);
 
     // Add source type
-    event.as_mut_log().insert(
-        log_schema().source_type_key().clone(),
-        Bytes::from("stdin"),
-    );
+    event
+        .as_mut_log()
+        .insert(log_schema().source_type_key().clone(), Bytes::from("stdin"));
 
     if let Some(hostname) = hostname {
         event.as_mut_log().insert(host_key, hostname);
@@ -136,7 +135,11 @@ fn create_event(line: Bytes, host_key: LookupBuf, hostname: Option<String>) -> E
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_util::trace_init, Pipeline, event::{LookupBuf, Lookup}};
+    use crate::{
+        event::{Lookup, LookupBuf},
+        test_util::trace_init,
+        Pipeline,
+    };
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
 

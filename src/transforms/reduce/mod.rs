@@ -298,7 +298,10 @@ impl TaskTransform for Reduce {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::TransformConfig, event::{Value, Event, Lookup}};
+    use crate::{
+        config::TransformConfig,
+        event::{Event, Lookup, Value},
+    };
     use futures::compat::Stream01CompatExt;
     use serde_json::json;
 
@@ -343,7 +346,8 @@ group_by = [ "request_id" ]
         let mut e_5 = Event::from("test message 5");
         e_5.as_mut_log().insert(LookupBuf::from("counter"), 5);
         e_5.as_mut_log().insert(LookupBuf::from("request_id"), "2");
-        e_5.as_mut_log().insert(LookupBuf::from("extra_field"), "value1");
+        e_5.as_mut_log()
+            .insert(LookupBuf::from("extra_field"), "value1");
         e_5.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
@@ -351,12 +355,21 @@ group_by = [ "request_id" ]
         let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
-        assert_eq!(output_1.as_log()[Lookup::from("message")], "test message 1".into());
+        assert_eq!(
+            output_1.as_log()[Lookup::from("message")],
+            "test message 1".into()
+        );
         assert_eq!(output_1.as_log()[Lookup::from("counter")], Value::from(8));
 
         let output_2 = out_stream.next().await.unwrap().unwrap();
-        assert_eq!(output_2.as_log()[Lookup::from("message")], "test message 2".into());
-        assert_eq!(output_2.as_log()[Lookup::from("extra_field")], "value1".into());
+        assert_eq!(
+            output_2.as_log()[Lookup::from("message")],
+            "test message 2".into()
+        );
+        assert_eq!(
+            output_2.as_log()[Lookup::from("extra_field")],
+            "value1".into()
+        );
         assert_eq!(output_2.as_log()[Lookup::from("counter")], Value::from(7));
     }
 
@@ -387,9 +400,11 @@ merge_strategies.baz = "max"
         e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
         let mut e_2 = Event::from("test message 2");
-        e_2.as_mut_log().insert(LookupBuf::from("foo"), "second foo");
+        e_2.as_mut_log()
+            .insert(LookupBuf::from("foo"), "second foo");
         e_2.as_mut_log().insert(LookupBuf::from("bar"), 2);
-        e_2.as_mut_log().insert(LookupBuf::from("baz"), "not number");
+        e_2.as_mut_log()
+            .insert(LookupBuf::from("baz"), "not number");
         e_2.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
         let mut e_3 = Event::from("test message 3");
@@ -404,8 +419,14 @@ merge_strategies.baz = "max"
         let mut out_stream = reduce.transform(Box::new(in_stream)).compat();
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
-        assert_eq!(output_1.as_log()[Lookup::from("message")], "test message 1".into());
-        assert_eq!(output_1.as_log()[Lookup::from("foo")], "first foo second foo".into());
+        assert_eq!(
+            output_1.as_log()[Lookup::from("message")],
+            "test message 1".into()
+        );
+        assert_eq!(
+            output_1.as_log()[Lookup::from("foo")],
+            "first foo second foo".into()
+        );
         assert_eq!(
             output_1.as_log()[Lookup::from("bar")],
             Value::Array(vec!["first bar".into(), 2.into(), "third bar".into()]),
@@ -447,7 +468,8 @@ group_by = [ "request_id" ]
 
         let mut e_5 = Event::from("test message 5");
         e_5.as_mut_log().insert(LookupBuf::from("counter"), 5);
-        e_5.as_mut_log().insert(LookupBuf::from("extra_field"), "value1");
+        e_5.as_mut_log()
+            .insert(LookupBuf::from("extra_field"), "value1");
         e_5.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
         let inputs = vec![e_1, e_2, e_3, e_4, e_5];
@@ -486,34 +508,46 @@ merge_strategies.bar = "concat"
         let reduce = reduce.into_task();
 
         let mut e_1 = Event::from("test message 1");
-        e_1.as_mut_log().insert(LookupBuf::from("foo"), json!([1, 3]));
-        e_1.as_mut_log().insert(LookupBuf::from("bar"), json!([1, 3]));
+        e_1.as_mut_log()
+            .insert(LookupBuf::from("foo"), json!([1, 3]));
+        e_1.as_mut_log()
+            .insert(LookupBuf::from("bar"), json!([1, 3]));
         e_1.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
         let mut e_2 = Event::from("test message 2");
-        e_2.as_mut_log().insert(LookupBuf::from("foo"), json!([2, 4]));
-        e_2.as_mut_log().insert(LookupBuf::from("bar"), json!([2, 4]));
+        e_2.as_mut_log()
+            .insert(LookupBuf::from("foo"), json!([2, 4]));
+        e_2.as_mut_log()
+            .insert(LookupBuf::from("bar"), json!([2, 4]));
         e_2.as_mut_log().insert(LookupBuf::from("request_id"), "2");
 
         let mut e_3 = Event::from("test message 3");
-        e_3.as_mut_log().insert(LookupBuf::from("foo"), json!([5, 7]));
-        e_3.as_mut_log().insert(LookupBuf::from("bar"), json!([5, 7]));
+        e_3.as_mut_log()
+            .insert(LookupBuf::from("foo"), json!([5, 7]));
+        e_3.as_mut_log()
+            .insert(LookupBuf::from("bar"), json!([5, 7]));
         e_3.as_mut_log().insert(LookupBuf::from("request_id"), "1");
 
         let mut e_4 = Event::from("test message 4");
-        e_4.as_mut_log().insert(LookupBuf::from("foo"), json!("done"));
-        e_4.as_mut_log().insert(LookupBuf::from("bar"), json!("done"));
+        e_4.as_mut_log()
+            .insert(LookupBuf::from("foo"), json!("done"));
+        e_4.as_mut_log()
+            .insert(LookupBuf::from("bar"), json!("done"));
         e_4.as_mut_log().insert(LookupBuf::from("request_id"), "1");
         e_4.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
         let mut e_5 = Event::from("test message 5");
-        e_5.as_mut_log().insert(LookupBuf::from("foo"), json!([6, 8]));
-        e_5.as_mut_log().insert(LookupBuf::from("bar"), json!([6, 8]));
+        e_5.as_mut_log()
+            .insert(LookupBuf::from("foo"), json!([6, 8]));
+        e_5.as_mut_log()
+            .insert(LookupBuf::from("bar"), json!([6, 8]));
         e_5.as_mut_log().insert(LookupBuf::from("request_id"), "2");
 
         let mut e_6 = Event::from("test message 6");
-        e_6.as_mut_log().insert(LookupBuf::from("foo"), json!("done"));
-        e_6.as_mut_log().insert(LookupBuf::from("bar"), json!("done"));
+        e_6.as_mut_log()
+            .insert(LookupBuf::from("foo"), json!("done"));
+        e_6.as_mut_log()
+            .insert(LookupBuf::from("bar"), json!("done"));
         e_6.as_mut_log().insert(LookupBuf::from("request_id"), "2");
         e_6.as_mut_log().insert(LookupBuf::from("test_end"), "yep");
 
@@ -523,13 +557,25 @@ merge_strategies.bar = "concat"
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
         let output_1 = output_1.as_log();
-        assert_eq!(output_1[Lookup::from("foo")], json!([[1, 3], [5, 7], "done"]).into());
+        assert_eq!(
+            output_1[Lookup::from("foo")],
+            json!([[1, 3], [5, 7], "done"]).into()
+        );
 
-        assert_eq!(output_1[Lookup::from("bar")], json!([1, 3, 5, 7, "done"]).into());
+        assert_eq!(
+            output_1[Lookup::from("bar")],
+            json!([1, 3, 5, 7, "done"]).into()
+        );
 
         let output_1 = out_stream.next().await.unwrap().unwrap();
         let output_1 = output_1.as_log();
-        assert_eq!(output_1[Lookup::from("foo")], json!([[2, 4], [6, 8], "done"]).into());
-        assert_eq!(output_1[Lookup::from("bar")], json!([2, 4, 6, 8, "done"]).into());
+        assert_eq!(
+            output_1[Lookup::from("foo")],
+            json!([[2, 4], [6, 8], "done"]).into()
+        );
+        assert_eq!(
+            output_1[Lookup::from("bar")],
+            json!([2, 4, 6, 8, "done"]).into()
+        );
     }
 }

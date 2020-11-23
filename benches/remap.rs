@@ -12,7 +12,7 @@ use vector::transforms::{
 };
 use vector::{
     config::TransformConfig,
-    event::{Event, Value, LookupBuf},
+    event::{Event, LookupBuf, Value},
     test_util::runtime,
 };
 
@@ -44,7 +44,9 @@ fn benchmark_remap(c: &mut Criterion) {
 
         let event = {
             let mut event = Event::from("augment me");
-            event.as_mut_log().insert(LookupBuf::from("copy_from"), "buz".to_owned());
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from("copy_from"), "buz".to_owned());
             event
         };
 
@@ -65,7 +67,9 @@ fn benchmark_remap(c: &mut Criterion) {
 
         let event = {
             let mut event = Event::from("augment me");
-            event.as_mut_log().insert(LookupBuf::from("copy_from"), "buz".to_owned());
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from("copy_from"), "buz".to_owned());
             event
         };
 
@@ -174,8 +178,13 @@ fn benchmark_remap(c: &mut Criterion) {
         for (key, value) in [
             (LookupBuf::from("number"), "1234".to_string()),
             (LookupBuf::from("bool"), "yes".to_string()),
-            (LookupBuf::from("timestamp"), "19/06/2019:17:20:49 -0400".to_string()),
-        ].iter() {
+            (
+                LookupBuf::from("timestamp"),
+                "19/06/2019:17:20:49 -0400".to_string(),
+            ),
+        ]
+        .iter()
+        {
             event.as_mut_log().insert(key.clone(), value.clone());
         }
 
@@ -214,8 +223,13 @@ fn benchmark_remap(c: &mut Criterion) {
         for (key, value) in [
             (LookupBuf::from("number"), "1234".to_string()),
             (LookupBuf::from("bool"), "yes".to_string()),
-            (LookupBuf::from("timestamp"), "19/06/2019:17:20:49 -0400".to_string()),
-        ].iter() {
+            (
+                LookupBuf::from("timestamp"),
+                "19/06/2019:17:20:49 -0400".to_string(),
+            ),
+        ]
+        .iter()
+        {
             event.as_mut_log().insert(key.clone(), value.clone());
         }
 

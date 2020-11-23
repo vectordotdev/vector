@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::{Event},
+    event::Event,
     internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     sinks::util::StreamSink,
@@ -208,7 +208,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 mod tests {
     use super::*;
     use super::{encode_event, Encoding, EncodingConfig};
-    use crate::event::{Event, Value, LookupBuf};
+    use crate::event::{Event, LookupBuf, Value};
 
     #[test]
     fn generate_config() {

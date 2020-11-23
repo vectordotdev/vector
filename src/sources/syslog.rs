@@ -432,7 +432,10 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{config::log_schema, event::{Event, Segment}};
+    use crate::{
+        config::log_schema,
+        event::{Event, Segment},
+    };
     use chrono::prelude::*;
 
     #[test]

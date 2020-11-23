@@ -255,8 +255,8 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use crate::event::LookupBuf;
+    use std::collections::HashMap;
 
     #[test]
     fn generate_config() {

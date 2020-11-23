@@ -181,9 +181,7 @@ impl FunctionTransform for KeyValue {
                 log.remove(&self.field, false);
             }
         } else {
-            emit!(KeyValueFieldDoesNotExist {
-                field: &self.field
-            });
+            emit!(KeyValueFieldDoesNotExist { field: &self.field });
         };
 
         output.push(event)

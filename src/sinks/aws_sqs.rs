@@ -283,8 +283,8 @@ fn encode_event(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
     use crate::event::LookupBuf;
+    use std::collections::BTreeMap;
 
     #[test]
     fn sqs_encode_event_text() {

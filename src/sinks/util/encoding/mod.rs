@@ -57,9 +57,9 @@ pub trait EncodingConfiguration<E> {
                     let to_remove = log_event
                         .keys()
                         .filter(|field| {
-                            !only_fields.iter().any(|only| {
-                                field.starts_with(only.into())
-                            })
+                            !only_fields
+                                .iter()
+                                .any(|only| field.starts_with(only.into()))
                         })
                         .map(|v| v.into_buf())
                         .collect::<VecDeque<_>>();

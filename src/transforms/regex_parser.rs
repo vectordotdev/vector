@@ -120,10 +120,7 @@ impl CompiledRegex {
                                 match conversion.convert(capture) {
                                     Ok(value) => Some((name.clone(), value)),
                                     Err(error) => {
-                                        emit!(RegexParserConversionFailed {
-                                            name: &name,
-                                            error
-                                        });
+                                        emit!(RegexParserConversionFailed { name: &name, error });
                                         None
                                     }
                                 }
@@ -282,8 +279,11 @@ impl FunctionTransform for RegexParser {
 
                 log.extend(captures.map(|(name, value)| {
                     let final_name = match target_field.clone() {
-                        Some(mut v) => { v.extend(name); v },
-                        None => name
+                        Some(mut v) => {
+                            v.extend(name);
+                            v
+                        }
+                        None => name,
                     };
                     (final_name, value)
                 }));
@@ -294,9 +294,7 @@ impl FunctionTransform for RegexParser {
                 return;
             }
         } else {
-            emit!(RegexParserMissingField {
-                field: &self.field
-            });
+            emit!(RegexParserMissingField { field: &self.field });
         }
 
         if !self.drop_failed {
@@ -308,7 +306,7 @@ impl FunctionTransform for RegexParser {
 #[cfg(test)]
 mod tests {
     use super::RegexParserConfig;
-    use crate::event::{LogEvent, Value, Lookup};
+    use crate::event::{LogEvent, Lookup, Value};
     use crate::{config::TransformConfig, Event};
 
     #[test]

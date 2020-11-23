@@ -407,7 +407,9 @@ mod tests {
         let mut event = Event::from("hello");
 
         event.as_mut_log().insert(LookupBuf::from("value"), 100);
-        event.as_mut_log().insert(LookupBuf::from("timestamp"), ts());
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("timestamp"), ts());
 
         let sink = create_sink(
             "http://localhost:9999",
@@ -435,19 +437,23 @@ mod tests {
     fn test_encode_nested_fields() {
         let mut event = Event::new_empty_log();
 
-        event.as_mut_log().insert(LookupBuf::from_str("a").unwrap(), 1);
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from_str("a").unwrap(), 1);
         event
             .as_mut_log()
             .insert(LookupBuf::from_str("nested.field").unwrap(), "2");
         event
             .as_mut_log()
             .insert(LookupBuf::from_str("nested.bool").unwrap(), true);
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("nested.array[0]").unwrap(), "example-value");
-        event
-            .as_mut_log()
-            .insert(LookupBuf::from_str("nested.array[2]").unwrap(), "another-value");
+        event.as_mut_log().insert(
+            LookupBuf::from_str("nested.array[0]").unwrap(),
+            "example-value",
+        );
+        event.as_mut_log().insert(
+            LookupBuf::from_str("nested.array[2]").unwrap(),
+            "another-value",
+        );
         event
             .as_mut_log()
             .insert(LookupBuf::from_str("nested.array[3]").unwrap(), 15);
@@ -696,12 +702,12 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::SinkContext,
+        event::LookupBuf,
         sinks::influxdb::{
             logs::InfluxDBLogsConfig,
             test_util::{onboarding_v2, BUCKET, ORG, TOKEN},
             InfluxDB2Settings,
         },
-        event::LookupBuf,
     };
     use chrono::Utc;
     use futures::stream;

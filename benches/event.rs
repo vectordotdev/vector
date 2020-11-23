@@ -37,8 +37,14 @@ fn benchmark_event(c: &mut Criterion) {
     c.bench_function("create and insert nested-keys", |b| {
         b.iter(|| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert(LookupBuf::from_str("key1.nested1.nested2").unwrap(), Bytes::from("value1"));
-            log.insert(LookupBuf::from_str("key1.nested1.nested3").unwrap(), Bytes::from("value4"));
+            log.insert(
+                LookupBuf::from_str("key1.nested1.nested2").unwrap(),
+                Bytes::from("value1"),
+            );
+            log.insert(
+                LookupBuf::from_str("key1.nested1.nested3").unwrap(),
+                Bytes::from("value4"),
+            );
             log.insert(LookupBuf::from_str("key3").unwrap(), Bytes::from("value3"));
         })
     });
@@ -69,10 +75,12 @@ fn benchmark_event(c: &mut Criterion) {
         b.iter_batched(
             || (lookup_1.clone(), lookup_2.clone()),
             |(lookup_1, lookup_2)| {
-            let mut log = Event::new_empty_log().into_log();
-            log.insert(lookup_1, Bytes::from("value1"));
-            log.insert(lookup_2, Bytes::from("value2"));
-        }, BatchSize::SmallInput)
+                let mut log = Event::new_empty_log().into_log();
+                log.insert(lookup_1, Bytes::from("value1"));
+                log.insert(lookup_2, Bytes::from("value2"));
+            },
+            BatchSize::SmallInput,
+        )
     });
 
     c.bench_function("iterate all fields array", |b| {
@@ -96,7 +104,9 @@ fn benchmark_event(c: &mut Criterion) {
 fn create_event(json: Value) -> LogEvent {
     let s = serde_json::to_string(&json).unwrap();
     let mut event = Event::new_empty_log();
-    event.as_mut_log().insert(log_schema().message_key().clone(), s);
+    event
+        .as_mut_log()
+        .insert(log_schema().message_key().clone(), s);
 
     let mut parser = JsonParser::from(JsonParserConfig::default());
     let mut output = Vec::with_capacity(1);

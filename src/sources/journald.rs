@@ -580,6 +580,7 @@ mod checkpointer_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::Lookup;
     use futures::compat::Future01CompatExt;
     use futures::Stream;
     use futures01::Stream as _;
@@ -594,7 +595,6 @@ mod tests {
         io,
         time::{delay_for, timeout, Duration},
     };
-    use crate::event::Lookup;
 
     const FAKE_JOURNAL: &str = r#"{"_SYSTEMD_UNIT":"sysinit.target","MESSAGE":"System Initialization","__CURSOR":"1","_SOURCE_REALTIME_TIMESTAMP":"1578529839140001","PRIORITY":"6"}
 {"_SYSTEMD_UNIT":"unit.service","MESSAGE":"unit message","__CURSOR":"2","_SOURCE_REALTIME_TIMESTAMP":"1578529839140002","PRIORITY":"7"}

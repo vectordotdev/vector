@@ -742,8 +742,8 @@ mod tests {
     feature = "transforms-log_to_metric"
 ))]
 mod reload_tests {
-    use crate::event::LookupBuf;
     use crate::config::Config;
+    use crate::event::LookupBuf;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
     use crate::sources::generator::GeneratorConfig;

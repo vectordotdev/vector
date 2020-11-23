@@ -112,9 +112,7 @@ impl FunctionTransform for Tokenizer {
                 event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            emit!(TokenizerFieldMissing {
-                field: &self.field
-            });
+            emit!(TokenizerFieldMissing { field: &self.field });
         };
 
         emit!(TokenizerEventProcessed);
@@ -126,7 +124,7 @@ impl FunctionTransform for Tokenizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Value, Lookup};
+    use crate::event::{LogEvent, Lookup, Value};
     use crate::{config::TransformConfig, Event};
 
     #[test]
@@ -171,7 +169,14 @@ mod tests {
 
     #[tokio::test]
     async fn tokenizer_does_drop_parsed_field() {
-        let log = parse_log("1234 5678", "status time", Some(LookupBuf::from("message")), true, &[]).await;
+        let log = parse_log(
+            "1234 5678",
+            "status time",
+            Some(LookupBuf::from("message")),
+            true,
+            &[],
+        )
+        .await;
 
         assert_eq!(log[Lookup::from("status")], "1234".into());
         assert_eq!(log[Lookup::from("time")], "5678".into());
@@ -180,7 +185,14 @@ mod tests {
 
     #[tokio::test]
     async fn tokenizer_does_not_drop_same_name_parsed_field() {
-        let log = parse_log("1234 yes", "status message", Some(LookupBuf::from("message")), true, &[]).await;
+        let log = parse_log(
+            "1234 yes",
+            "status message",
+            Some(LookupBuf::from("message")),
+            true,
+            &[],
+        )
+        .await;
 
         assert_eq!(log[Lookup::from("status")], "1234".into());
         assert_eq!(log[Lookup::from("message")], "yes".into());

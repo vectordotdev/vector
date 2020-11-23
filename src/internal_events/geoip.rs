@@ -1,6 +1,6 @@
 use super::InternalEvent;
-use metrics::counter;
 use crate::event::LookupBuf;
+use metrics::counter;
 
 #[derive(Debug)]
 pub struct GeoipEventProcessed;

@@ -278,7 +278,9 @@ mod tests {
     #[test]
     fn render_dynamic() {
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("log_stream"), "stream");
         let template = Template::try_from("{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream")), template.render(&event))
@@ -287,7 +289,9 @@ mod tests {
     #[test]
     fn render_dynamic_with_prefix() {
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("log_stream"), "stream");
         let template = Template::try_from("abcd-{{log_stream}}").unwrap();
 
         assert_eq!(Ok(Bytes::from("abcd-stream")), template.render(&event))
@@ -296,7 +300,9 @@ mod tests {
     #[test]
     fn render_dynamic_with_postfix() {
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert(LookupBuf::from("log_stream"), "stream");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("log_stream"), "stream");
         let template = Template::try_from("{{log_stream}}-abcd").unwrap();
 
         assert_eq!(Ok(Bytes::from("stream-abcd")), template.render(&event))
@@ -344,7 +350,9 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert(log_schema().timestamp_key().clone(), ts);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("abcd-%F").unwrap();
 
@@ -356,7 +364,9 @@ mod tests {
         let ts = Utc.ymd(2001, 2, 3).and_hms(4, 5, 6);
 
         let mut event = Event::from("hello world");
-        event.as_mut_log().insert(log_schema().timestamp_key().clone(), ts);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("abcd-%F_%T").unwrap();
 
@@ -372,7 +382,9 @@ mod tests {
 
         let mut event = Event::from("hello world");
         event.as_mut_log().insert(LookupBuf::from("foo"), "butts");
-        event.as_mut_log().insert(log_schema().timestamp_key().clone(), ts);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("{{ foo }}-%F_%T").unwrap();
 
@@ -388,7 +400,9 @@ mod tests {
 
         let mut event = Event::from("hello world");
         event.as_mut_log().insert(LookupBuf::from("format"), "%F");
-        event.as_mut_log().insert(log_schema().timestamp_key().clone(), ts);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("nested {{ format }} %T").unwrap();
 
@@ -404,7 +418,9 @@ mod tests {
 
         let mut event = Event::from("hello world");
         event.as_mut_log().insert(LookupBuf::from("%F"), "foo");
-        event.as_mut_log().insert(log_schema().timestamp_key().clone(), ts);
+        event
+            .as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), ts);
 
         let template = Template::try_from("nested {{ %F }} %T").unwrap();
 

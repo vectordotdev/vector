@@ -138,9 +138,7 @@ impl FunctionTransform for GrokParser {
                 });
             }
         } else {
-            emit!(GrokParserMissingField {
-                field: &self.field,
-            });
+            emit!(GrokParserMissingField { field: &self.field });
         }
 
         output.push(Event::Log(event));

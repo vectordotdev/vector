@@ -782,7 +782,7 @@ mod tests {
     use super::{parse_timestamp, SplunkConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SinkConfig, SinkContext, SourceConfig},
-        event::{Event, LookupBuf, Lookup},
+        event::{Event, Lookup, LookupBuf},
         shutdown::ShutdownSignal,
         sinks::{
             splunk_hec::{Encoding, HecSinkConfig},
@@ -998,7 +998,9 @@ mod tests {
         let (sink, source) = start(Encoding::Json, Compression::gzip_default()).await;
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert(LookupBuf::from("greeting"), "hello");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("greeting"), "hello");
         event.as_mut_log().insert(LookupBuf::from("name"), "bob");
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
@@ -1037,7 +1039,10 @@ mod tests {
 
         let event = collect_n(source, 1).await.unwrap().remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
-        assert_eq!(event.as_log()[&*super::SPLUNK_CHANNEL_LOOKUP], "guid".into());
+        assert_eq!(
+            event.as_log()[&*super::SPLUNK_CHANNEL_LOOKUP],
+            "guid".into()
+        );
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],

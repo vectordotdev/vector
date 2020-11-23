@@ -158,8 +158,9 @@ impl HttpSink for LokiConfig {
 
         self.encoding.apply_rules(&mut event);
         let event = match &self.encoding.codec() {
-            Encoding::Json => serde_json::to_string(&event.as_log())
-                .expect("json encoding should never fail"),
+            Encoding::Json => {
+                serde_json::to_string(&event.as_log()).expect("json encoding should never fail")
+            }
 
             Encoding::Text => event
                 .as_log()

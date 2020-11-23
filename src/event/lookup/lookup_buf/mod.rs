@@ -263,6 +263,15 @@ impl From<String> for LookupBuf {
     }
 }
 
+impl From<usize> for LookupBuf {
+    fn from(input: usize) -> Self {
+        LookupBuf {
+            segments: vec![SegmentBuf::index(input)],
+        }
+        // We know this must be at least one segment.
+    }
+}
+
 impl From<&str> for LookupBuf {
     fn from(input: &str) -> Self {
         LookupBuf {

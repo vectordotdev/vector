@@ -532,8 +532,8 @@ mod integration_tests {
     use super::*;
     use crate::{
         assert_downcast_matches,
+        event::LookupBuf,
         test_util::{random_lines_with_stream, random_string},
-        event::{LookupBuf},
     };
     use bytes::{buf::BufExt, BytesMut};
     use flate2::read::GzDecoder;

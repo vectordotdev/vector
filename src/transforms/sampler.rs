@@ -100,7 +100,10 @@ impl FunctionTransform for Sampler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{event::{Event, Lookup}, test_util::random_lines};
+    use crate::{
+        event::{Event, Lookup},
+        test_util::random_lines,
+    };
     use approx::assert_relative_eq;
     use regex::RegexSet;
 

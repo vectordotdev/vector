@@ -85,10 +85,7 @@ impl FunctionTransform for Logfmt {
                             event.as_mut_log().insert(key, value);
                         }
                         Err(error) => {
-                            emit!(LogfmtParserConversionFailed {
-                                name: &key,
-                                error
-                            });
+                            emit!(LogfmtParserConversionFailed { name: &key, error });
                         }
                     }
                 } else {
@@ -100,9 +97,7 @@ impl FunctionTransform for Logfmt {
                 event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            emit!(LogfmtParserMissingField {
-                field: &self.field
-            });
+            emit!(LogfmtParserMissingField { field: &self.field });
         };
 
         emit!(LogfmtParserEventProcessed {});
@@ -116,7 +111,7 @@ mod tests {
     use super::LogfmtConfig;
     use crate::{
         config::TransformConfig,
-        event::{LogEvent, Value, Lookup},
+        event::{LogEvent, Lookup, Value},
         Event,
     };
 
@@ -219,7 +214,13 @@ mod tests {
         assert_eq!(log[Lookup::from("sample#memory_rss")], "21.22MB".into());
         assert_eq!(log[Lookup::from("sample#memory_cache")], "0.00MB".into());
         assert_eq!(log[Lookup::from("sample#memory_swap")], "0.00MB".into());
-        assert_eq!(log[Lookup::from("sample#memory_pgpgin")], "348836pages".into());
-        assert_eq!(log[Lookup::from("sample#memory_pgpgout")], "343403pages".into());
+        assert_eq!(
+            log[Lookup::from("sample#memory_pgpgin")],
+            "348836pages".into()
+        );
+        assert_eq!(
+            log[Lookup::from("sample#memory_pgpgout")],
+            "343403pages".into()
+        );
     }
 }

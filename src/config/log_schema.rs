@@ -1,4 +1,4 @@
-use crate::event::{LookupBuf};
+use crate::event::LookupBuf;
 use getset::{Getters, Setters};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};

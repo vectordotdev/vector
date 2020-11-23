@@ -70,10 +70,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             new_log.insert(field.clone(), converted);
                         }
-                        Err(error) => emit!(CoercerConversionFailed {
-                            field,
-                            error
-                        }),
+                        Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
                 }
             }
@@ -86,10 +83,7 @@ impl FunctionTransform for Coercer {
                         Ok(converted) => {
                             log.insert(field.clone(), converted);
                         }
-                        Err(error) => emit!(CoercerConversionFailed {
-                            field,
-                            error
-                        }),
+                        Err(error) => emit!(CoercerConversionFailed { field, error }),
                     }
                 }
             }
@@ -101,7 +95,7 @@ impl FunctionTransform for Coercer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Value, Lookup, LookupBuf};
+    use crate::event::{LogEvent, Lookup, LookupBuf, Value};
     use crate::{config::TransformConfig, Event};
     use pretty_assertions::assert_eq;
 
@@ -163,7 +157,9 @@ mod tests {
 
         let mut expected = Event::new_empty_log();
         expected.as_mut_log().insert(LookupBuf::from("bool"), true);
-        expected.as_mut_log().insert(LookupBuf::from("number"), 1234);
+        expected
+            .as_mut_log()
+            .insert(LookupBuf::from("number"), 1234);
 
         assert_eq!(log, expected.into_log());
     }

@@ -181,6 +181,15 @@ impl<'a> From<&'a str> for Lookup<'a> {
     }
 }
 
+impl<'a> From<usize> for Lookup<'a> {
+    fn from(input: usize) -> Self {
+        Self {
+            segments: vec![Segment::index(input)],
+        }
+        // We know this must be at least one segment.
+    }
+}
+
 impl<'a> From<&'a String> for Lookup<'a> {
     fn from(input: &'a String) -> Self {
         Self {
@@ -312,4 +321,3 @@ impl<'a> AsRef<Lookup<'a>> for Lookup<'a> {
         &self
     }
 }
-

@@ -217,7 +217,10 @@ fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformEr
                 1.0
             };
 
-            let name = counter.name.clone().unwrap_or_else(|| counter.field.to_string());
+            let name = counter
+                .name
+                .clone()
+                .unwrap_or_else(|| counter.field.to_string());
             let name = render_template(&name, &event)?;
 
             let namespace = counter.namespace.as_ref();
@@ -353,9 +356,9 @@ impl FunctionTransform for LogToMetric {
                     emit!(LogToMetricEventProcessed);
                     output.push(Event::Metric(metric));
                 }
-                Err(TransformError::FieldNotFound { field }) => emit!(LogToMetricFieldNotFound {
-                    field: &field
-                }),
+                Err(TransformError::FieldNotFound { field }) => {
+                    emit!(LogToMetricFieldNotFound { field: &field })
+                }
                 Err(TransformError::ParseFloatError { field, error }) => {
                     emit!(LogToMetricParseFloatError {
                         field: &field,
@@ -399,7 +402,8 @@ mod tests {
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(LookupBuf::from(key), value);
-        log.as_mut_log().insert(log_schema().timestamp_key().clone(), ts());
+        log.as_mut_log()
+            .insert(log_schema().timestamp_key().clone(), ts());
         log
     }
 
@@ -628,7 +632,9 @@ mod tests {
             .as_mut_log()
             .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert(LookupBuf::from("status"), "42");
-        event.as_mut_log().insert(LookupBuf::from("backtrace"), "message");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("backtrace"), "message");
 
         let mut transform = LogToMetric::new(config);
 
@@ -681,7 +687,9 @@ mod tests {
             .as_mut_log()
             .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert(LookupBuf::from("status"), "42");
-        event.as_mut_log().insert(LookupBuf::from("backtrace"), "message");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("backtrace"), "message");
         event.as_mut_log().insert(LookupBuf::from("host"), "local");
         event.as_mut_log().insert(LookupBuf::from("worker"), "abc");
         event.as_mut_log().insert(LookupBuf::from("service"), "xyz");

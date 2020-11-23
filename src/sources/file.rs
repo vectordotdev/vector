@@ -315,10 +315,9 @@ fn create_event<'a>(
     let mut event = Event::from(line);
 
     // Add source type
-    event.as_mut_log().insert(
-        log_schema().source_type_key().clone(),
-        Bytes::from("file"),
-    );
+    event
+        .as_mut_log()
+        .insert(log_schema().source_type_key().clone(), Bytes::from("file"));
 
     if let Some(file_key) = &file_key {
         event.as_mut_log().insert(file_key.clone(), file);
@@ -336,7 +335,12 @@ fn create_event<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{config::Config, shutdown::ShutdownSignal, sources::file, event::{LookupBuf, Lookup}};
+    use crate::{
+        config::Config,
+        event::{Lookup, LookupBuf},
+        shutdown::ShutdownSignal,
+        sources::file,
+    };
     use futures01::Stream;
     use pretty_assertions::assert_eq;
     use std::{
@@ -1041,12 +1045,20 @@ mod tests {
         let received = wait_with_timeout(rx.collect().compat()).await;
         let before_lines = received
             .iter()
-            .filter(|event| event.as_log()[Lookup::from("file")].to_string_lossy().ends_with("before"))
+            .filter(|event| {
+                event.as_log()[Lookup::from("file")]
+                    .to_string_lossy()
+                    .ends_with("before")
+            })
             .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         let after_lines = received
             .iter()
-            .filter(|event| event.as_log()[Lookup::from("file")].to_string_lossy().ends_with("after"))
+            .filter(|event| {
+                event.as_log()[Lookup::from("file")]
+                    .to_string_lossy()
+                    .ends_with("after")
+            })
             .map(|event| event.as_log()[log_schema().message_key()].to_string_lossy())
             .collect::<Vec<_>>();
         assert_eq!(before_lines, vec!["second line"]);

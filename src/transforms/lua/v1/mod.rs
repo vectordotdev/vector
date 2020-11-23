@@ -195,19 +195,13 @@ impl rlua::UserData for LuaEvent {
                         );
                     }
                     Some(rlua::Value::Integer(integer)) => {
-                        this.inner
-                            .as_mut_log()
-                            .insert(key, Value::Integer(integer));
+                        this.inner.as_mut_log().insert(key, Value::Integer(integer));
                     }
                     Some(rlua::Value::Number(number)) => {
-                        this.inner
-                            .as_mut_log()
-                            .insert(key, Value::Float(number));
+                        this.inner.as_mut_log().insert(key, Value::Float(number));
                     }
                     Some(rlua::Value::Boolean(boolean)) => {
-                        this.inner
-                            .as_mut_log()
-                            .insert(key, Value::Boolean(boolean));
+                        this.inner.as_mut_log().insert(key, Value::Boolean(boolean));
                     }
                     Some(rlua::Value::Nil) | None => {
                         this.inner.as_mut_log().remove(&key, false);
@@ -240,7 +234,9 @@ impl rlua::UserData for LuaEvent {
         methods.add_meta_function(rlua::MetaMethod::Pairs, |ctx, event: LuaEvent| {
             let state = ctx.create_table()?;
             {
-                let keys = ctx.create_table_from(event.inner.as_log().keys().map(|k| (k.to_string(), true)))?;
+                let keys = ctx.create_table_from(
+                    event.inner.as_log().keys().map(|k| (k.to_string(), true)),
+                )?;
                 state.set("event", event)?;
                 state.set("keys", keys)?;
             }
@@ -273,7 +269,7 @@ pub fn format_error(error: &rlua::Error) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{Event, Value, Lookup};
+    use crate::event::{Event, Lookup, Value};
 
     #[test]
     fn lua_add_field() {
@@ -402,7 +398,10 @@ mod tests {
         .unwrap();
 
         let event = transform.transform_one(Event::new_empty_log()).unwrap();
-        assert_eq!(event.as_log()[Lookup::from("number")], Value::Float(3.14159));
+        assert_eq!(
+            event.as_log()[Lookup::from("number")],
+            Value::Float(3.14159)
+        );
     }
 
     #[test]
@@ -540,7 +539,10 @@ mod tests {
         let event = Event::new_empty_log();
         let event = transform.transform_one(event).unwrap();
 
-        assert_eq!(event.as_log()[Lookup::from("new field")], "new value".into());
+        assert_eq!(
+            event.as_log()[Lookup::from("new field")],
+            "new value".into()
+        );
     }
 
     #[test]
@@ -559,7 +561,9 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert(LookupBuf::from("name"), "Bob");
-        event.as_mut_log().insert(LookupBuf::from("friend"), "Alice");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("friend"), "Alice");
 
         let event = transform.transform_one(event).unwrap();
 

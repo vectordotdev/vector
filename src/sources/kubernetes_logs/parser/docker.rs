@@ -66,9 +66,7 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
     );
 
     // Parse message, remove trailing newline and detect if it's partial.
-    let message = log
-        .remove(&*LOG_LOOKUP, false)
-        .context(LogFieldMissing)?;
+    let message = log.remove(&*LOG_LOOKUP, false).context(LogFieldMissing)?;
     let mut message = match message {
         Value::Bytes(val) => val,
         _ => return Err(NormalizationError::LogValueUnexpectedType),

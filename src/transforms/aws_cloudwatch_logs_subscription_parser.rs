@@ -165,7 +165,10 @@ struct AwsCloudWatchLogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{event::{Event, LookupBuf}, log_event};
+    use crate::{
+        event::{Event, LookupBuf},
+        log_event,
+    };
     use chrono::{TimeZone, Utc};
     use pretty_assertions::assert_eq;
 

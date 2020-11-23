@@ -228,7 +228,7 @@ fn create_consumer(config: &KafkaSourceConfig) -> crate::Result<StreamConsumer> 
 #[cfg(test)]
 mod test {
     use super::{kafka_source, KafkaSourceConfig};
-    use crate::{shutdown::ShutdownSignal, Pipeline, event::LookupBuf};
+    use crate::{event::LookupBuf, shutdown::ShutdownSignal, Pipeline};
 
     #[test]
     fn generate_config() {
@@ -271,10 +271,10 @@ mod test {
 mod integration_test {
     use super::*;
     use crate::{
+        event::Lookup,
         shutdown::ShutdownSignal,
         test_util::{collect_n, random_string},
         Pipeline,
-        event::{Lookup},
     };
     use chrono::Utc;
     use rdkafka::{
@@ -342,7 +342,10 @@ mod integration_test {
             events[0].as_log()[log_schema().message_key()],
             "my message".into()
         );
-        assert_eq!(events[0].as_log()[Lookup::from("message_key")], "my key".into());
+        assert_eq!(
+            events[0].as_log()[Lookup::from("message_key")],
+            "my key".into()
+        );
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
             "kafka".into()

@@ -882,10 +882,8 @@ impl ContainerLogInfo {
                 // Otherwise, create a new partial event merge state with the
                 // current message being the initial one.
                 if let Some(partial_event_merge_state) = partial_event_merge_state {
-                    partial_event_merge_state.merge_in_next_event(
-                        log_event,
-                        &[log_schema().message_key().clone()],
-                    );
+                    partial_event_merge_state
+                        .merge_in_next_event(log_event, &[log_schema().message_key().clone()]);
                 } else {
                     *partial_event_merge_state = Some(LogEventMergeState::new(log_event));
                 };
@@ -1019,9 +1017,9 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
+        event::Lookup,
         test_util::{collect_n, trace_init},
         Pipeline,
-        event::Lookup,
     };
     use bollard::{
         container::{
@@ -1282,7 +1280,9 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(&LookupBuf::from(format!("label.{}", label))).is_some());
+        assert!(log
+            .get(&LookupBuf::from(format!("label.{}", label)))
+            .is_some());
         assert_eq!(events[0].as_log()[&*super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
@@ -1385,7 +1385,9 @@ mod integration_tests {
         assert_eq!(log[&*super::CONTAINER], id.into());
         assert!(log.get(&*super::CREATED_AT).is_some());
         assert_eq!(log[&*super::IMAGE], "busybox".into());
-        assert!(log.get(Lookup::from_str(&*format!("label.{}", label)).unwrap()).is_some());
+        assert!(log
+            .get(Lookup::from_str(&*format!("label.{}", label)).unwrap())
+            .is_some());
         assert_eq!(events[0].as_log()[&*super::NAME], name.into());
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],

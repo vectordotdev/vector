@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use indexmap::map::IndexMap;
 use std::convert::TryFrom;
 use std::{fs, io::Read, path::Path};
-use vector::event::{LookupBuf};
+use vector::event::LookupBuf;
 
 const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 

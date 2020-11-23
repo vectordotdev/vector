@@ -32,7 +32,7 @@ impl<'a> FromLua<'a> for LogEvent {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::event::{Event, LookupBuf, Lookup};
+    use crate::event::{Event, Lookup, LookupBuf};
 
     #[test]
     fn to_lua() {
@@ -40,8 +40,14 @@ mod test {
         let log = event.as_mut_log();
         log.insert(LookupBuf::from_str("a").unwrap(), 1);
         log.insert(LookupBuf::from_str("nested.field").unwrap(), "2");
-        log.insert(LookupBuf::from_str("nested.array[0]").unwrap(), "example value");
-        log.insert(LookupBuf::from_str("nested.array[2]").unwrap(), "another value");
+        log.insert(
+            LookupBuf::from_str("nested.array[0]").unwrap(),
+            "example value",
+        );
+        log.insert(
+            LookupBuf::from_str("nested.array[2]").unwrap(),
+            "another value",
+        );
 
         let assertions = vec![
             "type(log) == 'table'",
@@ -81,12 +87,18 @@ mod test {
             let event: LogEvent = ctx.load(lua_event).eval().unwrap();
 
             assert_eq!(event[Lookup::from_str("a").unwrap()], Value::Integer(1));
-            assert_eq!(event[Lookup::from_str("nested.field").unwrap()], Value::Bytes("2".into()));
+            assert_eq!(
+                event[Lookup::from_str("nested.field").unwrap()],
+                Value::Bytes("2".into())
+            );
             assert_eq!(
                 event[Lookup::from_str("nested.array[0]").unwrap()],
                 Value::Bytes("example value".into())
             );
-            assert_eq!(event[Lookup::from_str("nested.array[1]").unwrap()], Value::Bytes("".into()));
+            assert_eq!(
+                event[Lookup::from_str("nested.array[1]").unwrap()],
+                Value::Bytes("".into())
+            );
             assert_eq!(
                 event[Lookup::from_str("nested.array[2]").unwrap()],
                 Value::Bytes("another value".into())

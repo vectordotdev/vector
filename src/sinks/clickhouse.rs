@@ -109,8 +109,7 @@ impl HttpSink for ClickhouseConfig {
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
         self.encoding.apply_rules(&mut event);
 
-        let mut body =
-            serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
+        let mut body = serde_json::to_vec(&event.as_log()).expect("Events should be valid json!");
         body.push(b'\n');
 
         Some(body)
@@ -467,7 +466,9 @@ timestamp_format = "unix""#,
         let (sink, _hc) = config.build(SinkContext::new_test()).await.unwrap();
 
         let mut input_event = Event::from("raw log line");
-        input_event.as_mut_log().insert(LookupBuf::from("host"), "example.com");
+        input_event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "example.com");
 
         // Retries should go on forever, so if we are retrying incorrectly
         // this timeout should trigger.

@@ -7,10 +7,10 @@ use futures01::{Sink, Stream as Stream01};
 use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
-    config::{TransformConfig},
+    config::TransformConfig,
+    event::{Event, LookupBuf},
     test_util::{collect_ready03, runtime},
     transforms::{self, Transform},
-    event::{Event, LookupBuf},
 };
 
 fn bench_add_fields(c: &mut Criterion) {
@@ -96,7 +96,9 @@ fn bench_field_filter(c: &mut Criterion) {
     let events = (0..num_events)
         .map(|i| {
             let mut event = Event::new_empty_log();
-            event.as_mut_log().insert(LookupBuf::from("the_field"), (i % 10).to_string());
+            event
+                .as_mut_log()
+                .insert(LookupBuf::from("the_field"), (i % 10).to_string());
             event
         })
         .collect::<Vec<_>>();

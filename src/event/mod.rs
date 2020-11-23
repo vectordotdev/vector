@@ -451,6 +451,7 @@ mod test {
 
     #[test]
     fn serialization() {
+        crate::test_util::trace_init();
         let mut event = Event::from("raw log line");
         event.as_mut_log().insert(LookupBuf::from("foo"), "bar");
         event.as_mut_log().insert(LookupBuf::from("bar"), "baz");
@@ -472,6 +473,7 @@ mod test {
     #[test]
     fn type_serialization() {
         use serde_json::json;
+        crate::test_util::trace_init();
 
         let mut event = Event::from("hello world");
         event.as_mut_log().insert(LookupBuf::from("int"), 4);
@@ -490,6 +492,7 @@ mod test {
 
     #[test]
     fn event_iteration() {
+        crate::test_util::trace_init();
         let mut event = Event::new_empty_log();
 
         event.as_mut_log().insert(
@@ -525,6 +528,7 @@ mod test {
 
     #[test]
     fn event_iteration_order() {
+        crate::test_util::trace_init();
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
         log.insert(LookupBuf::from("lZDfzKIL"), Value::from("tOVrjveM"));

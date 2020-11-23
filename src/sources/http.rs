@@ -171,8 +171,9 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
             })
             .collect::<Result<Vec<_>, _>>(),
         Encoding::Json => serde_json::from_slice::<LogEvent>(&body)
-                .map(Event::Log)
-                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))).map(|v| vec![v]),
+            .map(Event::Log)
+            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))
+            .map(|v| vec![v]),
     }
 }
 
@@ -198,7 +199,7 @@ mod tests {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        event::{Event, Value, Lookup},
+        event::{Event, Lookup, Value},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
@@ -206,7 +207,7 @@ mod tests {
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
     use std::collections::BTreeMap;
-    use std::{net::SocketAddr, convert::TryInto};
+    use std::{convert::TryInto, net::SocketAddr};
 
     #[test]
     fn generate_config() {
@@ -400,7 +401,10 @@ mod tests {
         {
             let event = events.remove(0);
             let log = event.as_log();
-            assert_eq!(log.get(Lookup::from_str("dotted.key").unwrap()).unwrap(), &Value::from("value"));
+            assert_eq!(
+                log.get(Lookup::from_str("dotted.key").unwrap()).unwrap(),
+                &Value::from("value")
+            );
         }
         {
             let event = events.remove(0);
@@ -471,7 +475,10 @@ mod tests {
             let log = event.as_log();
             assert_eq!(log[Lookup::from("key1")], "value1".into());
             assert_eq!(log[Lookup::from("User-Agent")], "test_client".into());
-            assert_eq!(log[Lookup::from("Upgrade-Insecure-Requests")], "false".into());
+            assert_eq!(
+                log[Lookup::from("Upgrade-Insecure-Requests")],
+                "false".into()
+            );
             assert_eq!(log[Lookup::from("AbsentHeader")], Value::Null);
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());

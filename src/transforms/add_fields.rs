@@ -112,9 +112,7 @@ impl FunctionTransform for AddFields {
                 TemplateOrValue::Template(v) => match v.render_string(&event) {
                     Ok(v) => v,
                     Err(_) => {
-                        emit!(AddFieldsTemplateRenderingError {
-                            field: &key,
-                        });
+                        emit!(AddFieldsTemplateRenderingError { field: &key });
                         continue;
                     }
                 }
@@ -123,14 +121,10 @@ impl FunctionTransform for AddFields {
             };
             if self.overwrite {
                 if event.as_mut_log().insert(key.clone(), value).is_some() {
-                    emit!(AddFieldsFieldOverwritten {
-                        field: &key,
-                    });
+                    emit!(AddFieldsFieldOverwritten { field: &key });
                 }
             } else if event.as_mut_log().contains(&key) {
-                emit!(AddFieldsFieldNotOverwritten {
-                    field: &key,
-                });
+                emit!(AddFieldsFieldNotOverwritten { field: &key });
             } else {
                 event.as_mut_log().insert(key, value);
             }
@@ -143,8 +137,8 @@ impl FunctionTransform for AddFields {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{iter::FromIterator, string::ToString};
     use crate::event::Lookup;
+    use std::{iter::FromIterator, string::ToString};
 
     #[test]
     fn generate_config() {
@@ -186,7 +180,9 @@ mod tests {
     #[test]
     fn add_fields_overwrite() {
         let mut event = Event::from("");
-        event.as_mut_log().insert(LookupBuf::from("some_key"), "some_message");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("some_key"), "some_message");
 
         let mut fields = IndexMap::new();
         fields.insert("some_key".into(), "some_overwritten_message".into());
@@ -228,11 +224,17 @@ mod tests {
         tracing::error!(?event);
         assert_eq!(event[Lookup::from_str("float").unwrap()], 4.5.into());
         assert_eq!(event[Lookup::from_str("int").unwrap()], 4.into());
-        assert_eq!(event[Lookup::from_str("string").unwrap()], "thisisastring".into());
+        assert_eq!(
+            event[Lookup::from_str("string").unwrap()],
+            "thisisastring".into()
+        );
         assert_eq!(event[Lookup::from_str("bool").unwrap()], true.into());
         assert_eq!(event[Lookup::from_str("array[0]").unwrap()], 1.into());
         assert_eq!(event[Lookup::from_str("array[1]").unwrap()], 2.into());
         assert_eq!(event[Lookup::from_str("array[2]").unwrap()], 3.into());
-        assert_eq!(event[Lookup::from_str("table.key").unwrap()], "value".into());
+        assert_eq!(
+            event[Lookup::from_str("table.key").unwrap()],
+            "value".into()
+        );
     }
 }

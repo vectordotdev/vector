@@ -49,8 +49,7 @@ mod test {
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricValue},
-        Metric, Value,
-        Lookup, LookupBuf,
+        Lookup, LookupBuf, Metric, Value,
     };
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {
@@ -117,8 +116,14 @@ mod test {
         Lua::new().context(|ctx| {
             let event = ctx.load(lua_event).eval::<Event>().unwrap();
             let log = event.as_log();
-            assert_eq!(log[Lookup::from_str("field").unwrap()], Value::Bytes("example".into()));
-            assert_eq!(log[Lookup::from_str("nested.field").unwrap()], Value::Bytes("another example".into()));
+            assert_eq!(
+                log[Lookup::from_str("field").unwrap()],
+                Value::Bytes("example".into())
+            );
+            assert_eq!(
+                log[Lookup::from_str("nested.field").unwrap()],
+                Value::Bytes("another example".into())
+            );
         });
     }
 

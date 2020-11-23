@@ -203,7 +203,7 @@ mod tests {
     use crate::shutdown::ShutdownSignal;
     use crate::{
         config::{log_schema, GlobalOptions, SourceConfig},
-        event::{Event, Value, Lookup},
+        event::{Event, Lookup, Value},
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };

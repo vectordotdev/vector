@@ -347,7 +347,7 @@ mod tests {
     use crate::{
         event::{
             metric::{Metric, MetricKind, MetricValue},
-            Event, Value, LookupBuf, Lookup,
+            Event, Lookup, LookupBuf, Value,
         },
         test_util::trace_init,
         transforms::TaskTransform,
@@ -472,7 +472,9 @@ mod tests {
         .unwrap();
 
         let mut event = Event::new_empty_log();
-        event.as_mut_log().insert(LookupBuf::from("host"), "127.0.0.1");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("host"), "127.0.0.1");
         let input = Box::new(futures01::stream::iter_ok(vec![event]));
         let output = transform.transform(Box::new(input));
         let out = output.compat().collect::<Vec<_>>().await;
@@ -554,7 +556,10 @@ mod tests {
         let mut out_stream = transform.transform(in_stream).compat();
         let output = out_stream.next().await.unwrap().unwrap();
 
-        assert_eq!(output.as_log()[Lookup::from("number")], Value::Float(3.14159));
+        assert_eq!(
+            output.as_log()[Lookup::from("number")],
+            Value::Float(3.14159)
+        );
         Ok(())
     }
 
@@ -736,7 +741,10 @@ mod tests {
         let mut out_stream = transform.transform(in_stream).compat();
         let output = out_stream.next().await.unwrap().unwrap();
 
-        assert_eq!(output.as_log()[Lookup::from("new field")], "new value".into());
+        assert_eq!(
+            output.as_log()[Lookup::from("new field")],
+            "new value".into()
+        );
         Ok(())
     }
 
@@ -759,14 +767,19 @@ mod tests {
 
         let mut event = Event::new_empty_log();
         event.as_mut_log().insert(LookupBuf::from("name"), "Bob");
-        event.as_mut_log().insert(LookupBuf::from("friend"), "Alice");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("friend"), "Alice");
 
         let in_stream = Box::new(futures01::stream::iter_ok(vec![event]));
         let mut out_stream = transform.transform(in_stream).compat();
         let output = out_stream.next().await.unwrap().unwrap();
 
         assert_eq!(output.as_log()[Lookup::from("name")], "nameBob".into());
-        assert_eq!(output.as_log()[Lookup::from("friend")], "friendAlice".into());
+        assert_eq!(
+            output.as_log()[Lookup::from("friend")],
+            "friendAlice".into()
+        );
         Ok(())
     }
 

@@ -79,15 +79,11 @@ impl FunctionTransform for RenameFields {
             match log.remove(old_key, self.drop_empty) {
                 Some(v) => {
                     if event.as_mut_log().insert(new_key.clone(), v).is_some() {
-                        emit!(RenameFieldsFieldOverwritten {
-                            field: &old_key
-                        });
+                        emit!(RenameFieldsFieldOverwritten { field: &old_key });
                     }
                 }
                 None => {
-                    emit!(RenameFieldsFieldDoesNotExist {
-                        field: &old_key
-                    });
+                    emit!(RenameFieldsFieldDoesNotExist { field: &old_key });
                 }
             }
         }
@@ -109,14 +105,15 @@ mod tests {
     #[test]
     fn rename_fields() {
         let mut event = Event::from("message");
-        event.as_mut_log().insert(LookupBuf::from("to_move"), "some value");
-        event.as_mut_log().insert(LookupBuf::from("do_not_move"), "not moved");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("to_move"), "some value");
+        event
+            .as_mut_log()
+            .insert(LookupBuf::from("do_not_move"), "not moved");
         let mut fields = IndexMap::new();
         fields.insert(LookupBuf::from("to_move"), LookupBuf::from("moved"));
-        fields.insert(
-            LookupBuf::from("to_move"),
-            LookupBuf::from("moved"),
-        );
+        fields.insert(LookupBuf::from("to_move"), LookupBuf::from("moved"));
         fields.insert(
             LookupBuf::from("not_present"),
             LookupBuf::from("should_not_exist"),
@@ -127,9 +124,21 @@ mod tests {
         let new_event = transform.transform_one(event).unwrap();
 
         assert!(new_event.as_log().get(Lookup::from("to_move")).is_none());
-        assert_eq!(new_event.as_log()[Lookup::from("moved")], "some value".into());
-        assert!(new_event.as_log().get(Lookup::from("not_present")).is_none());
-        assert!(new_event.as_log().get(Lookup::from("should_not_exist")).is_none());
-        assert_eq!(new_event.as_log()[Lookup::from("do_not_move")], "not moved".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("moved")],
+            "some value".into()
+        );
+        assert!(new_event
+            .as_log()
+            .get(Lookup::from("not_present"))
+            .is_none());
+        assert!(new_event
+            .as_log()
+            .get(Lookup::from("should_not_exist"))
+            .is_none());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("do_not_move")],
+            "not moved".into()
+        );
     }
 }

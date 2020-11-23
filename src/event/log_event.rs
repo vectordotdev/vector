@@ -2,7 +2,7 @@ use crate::event::{
     lookup::{Segment, SegmentBuf},
     Lookup, LookupBuf, Value,
 };
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
     convert::{TryFrom, TryInto},
@@ -28,7 +28,10 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
-            Segment::Field(ref f) => self.fields.get(*f),
+            Segment::Field(ref f) => {
+                trace!(key = f, "Descending into map.");
+                self.fields.get(*f)
+            }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
@@ -47,12 +50,12 @@ impl LogEvent {
             cursor = match (segment, cursor) {
                 // Fields access maps.
                 (Segment::Field(ref f), Some(Value::Map(map))) => {
-                    trace!("Matched field into map.");
+                    trace!(key = %f, "Descending into map.");
                     map.get(*f)
                 }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
-                    trace!("Matched index into array");
+                    trace!(key = %i, "Descending into array.");
                     array.get(*i)
                 }
                 // The rest, it's not good.
@@ -79,7 +82,10 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
-            Segment::Field(f) => self.fields.get_mut(*f),
+            Segment::Field(f) => {
+                trace!(key = %f, "Descending into array.");
+                self.fields.get_mut(*f)
+            }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
@@ -98,12 +104,12 @@ impl LogEvent {
             cursor = match (segment, cursor) {
                 // Fields access maps.
                 (Segment::Field(f), Some(Value::Map(map))) => {
-                    trace!("Matched field into map.");
+                    trace!(key = %f, "Descending into map.");
                     map.get_mut(*f)
                 }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
-                    trace!("Matched index into array");
+                    trace!(key = %i, "Descending into array.");
                     array.get_mut(*i)
                 }
                 // The rest, it's not good.
@@ -137,7 +143,15 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
-            SegmentBuf::Field(f) => self.fields.get_mut(&*f),
+            SegmentBuf::Field(f) => {
+                if lookup_len == 1 {
+                    trace!(key = %f, value = ?value, "Inserted into root.");
+                    return self.fields.insert(f, value);
+                } else {
+                    trace!(key = %f, "Descending into map.");
+                    self.fields.get_mut(&*f)
+                }
+            }
             // In this case, the user has passed us an invariant.
             SegmentBuf::Index(_) => {
                 error!(
@@ -152,20 +166,20 @@ impl LogEvent {
         for (index, segment) in lookup_iter {
             cursor = match (segment, cursor) {
                 // Fields access maps.
-                (SegmentBuf::Field(ref f), Some(Value::Map(map))) => {
+                (SegmentBuf::Field(ref f), Some(Value::Map(ref mut map))) => {
                     if index == lookup_len {
-                        trace!("Creating field inside map.");
+                        trace!(key = %f, "Creating field inside map.");
                         retval = map.insert(f.clone(), value);
                         break;
                     } else {
-                        trace!("Matched field into map.");
+                        trace!(key = %f, "Descending into map.");
                         map.get_mut(&*f)
                     }
-                },
+                }
                 // Indexes access arrays.
-                (SegmentBuf::Index(i), Some(Value::Array(array))) => {
+                (SegmentBuf::Index(i), Some(Value::Array(ref mut array))) => {
                     if index == lookup_len {
-                        trace!("Creating index inside array.");
+                        trace!(key = %i, "Creating index inside array.");
                         match array.get_mut(i) {
                             None => {
                                 // We have to create space in the array here!
@@ -173,7 +187,6 @@ impl LogEvent {
                                 array.resize_with(i.saturating_sub(1), || Value::Null);
                                 array.insert(i, value);
                                 break;
-
                             }
                             Some(target) => {
                                 let mut removed = Value::Null;
@@ -183,17 +196,17 @@ impl LogEvent {
                             }
                         }
                     } else {
-                        trace!("Matched index into array.");
+                        trace!(key = %i, "Descending into array.");
                         array.get_mut(i)
                     }
-                },
+                }
                 // The rest, it's not good.
                 (SegmentBuf::Index(_), _) | (SegmentBuf::Field(_), _) => {
                     trace!("Unmatched lookup.");
                     None
                 }
             }
-        };
+        }
 
         retval
     }
@@ -217,7 +230,10 @@ impl LogEvent {
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
-            Segment::Field(f) => self.fields.get_mut(*f),
+            Segment::Field(f) => {
+                trace!(key = %f, "Descending into map.");
+                self.fields.get_mut(*f)
+            }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
                 error!(
@@ -244,10 +260,10 @@ impl LogEvent {
                         }
                         break;
                     } else {
-                        trace!("Matched field into map.");
+                        trace!(key = %f, "Descending into map.");
                         map.get_mut(*f)
                     }
-                },
+                }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
                     if index == lookup_len {
@@ -261,19 +277,18 @@ impl LogEvent {
                                 break;
                             }
                         }
-
                     } else {
-                        trace!("Matched index into array.");
+                        trace!(key = %i, "Descending into array.");
                         array.get_mut(*i)
                     }
-                },
+                }
                 // The rest, it's not good.
                 (Segment::Index(_), _) | (Segment::Field(_), _) => {
                     trace!("Unmatched lookup.");
                     None
                 }
             }
-        };
+        }
 
         if let Some(prune_here) = needs_prune {
             self.remove(prune_here, true);
@@ -288,15 +303,20 @@ impl LogEvent {
     /// and maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
     pub fn keys<'a>(&'a self) -> impl Iterator<Item = Lookup<'a>> + 'a {
-        self.fields.iter()
+        self.fields
+            .iter()
             .map(|(k, v)| {
                 let lookup = Lookup::from(k);
-                v.lookups().map(move |l| {
+                trace!(prefix = %lookup, "Descending.");
+                let iter = Some(lookup.clone()).into_iter();
+                let chain = v.lookups().map(move |l| {
                     let mut lookup = lookup.clone();
                     lookup.extend(l.clone());
                     lookup
-                })
-            }).flatten()
+                });
+                iter.chain(chain)
+            })
+            .flatten()
     }
 
     /// Iterate over all lookup/value pairs.
@@ -305,15 +325,20 @@ impl LogEvent {
     /// maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
     pub fn all_fields<'a>(&'a self) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> {
-        self.fields.iter()
+        self.fields
+            .iter()
             .map(|(k, v)| {
                 let lookup = Lookup::from(k);
-                v.pairs().map(move |(l, v)| {
+                trace!(prefix = %lookup, "Descending.");
+                let iter = Some((lookup.clone(), v)).into_iter();
+                let chain = v.pairs().map(move |(l, v)| {
                     let mut lookup = lookup.clone();
                     lookup.extend(l.clone());
-                    (lookup, *v)
-                })
-            }).flatten()
+                    (lookup, v)
+                });
+                iter.chain(chain)
+            })
+            .flatten()
     }
 
     /// Determine if the log event is empty of fields.
@@ -430,8 +455,7 @@ where
     type Output = Value;
 
     fn index(&self, key: T) -> &Value {
-        self.get(key)
-            .expect("Key not found.")
+        self.get(key).expect("Key not found.")
     }
 }
 
@@ -440,8 +464,7 @@ where
     T: Into<Lookup<'a>> + Debug,
 {
     fn index_mut(&mut self, key: T) -> &mut Value {
-        self.get_mut(key)
-            .expect("Key not found.")
+        self.get_mut(key).expect("Key not found.")
     }
 }
 
@@ -485,8 +508,10 @@ impl Serialize for LogEvent {
 }
 
 impl<'de> Deserialize<'de> for LogEvent {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error> where
-        D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
         deserializer.deserialize_map(crate::event::util::LogEventVisitor)
     }
 }

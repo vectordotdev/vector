@@ -1,8 +1,11 @@
-use crate::{event::{timestamp_to_string, Lookup}, Result};
+use crate::{
+    event::{timestamp_to_string, Lookup},
+    Result,
+};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
@@ -21,19 +24,85 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn lookups<'a>(&'a self) -> impl Iterator<Item=&Lookup<'a>> {
+    #[instrument(level = "trace")]
+    pub fn lookups<'a>(&'a self) -> Box<dyn Iterator<Item = Lookup<'a>> + 'a> {
         match &self {
-            Value::Boolean(_) | Value::Bytes(_) | Value::Timestamp(_) | Value::Float(_) | Value::Integer(_) | Value::Null => [].iter(),
-            Value::Map(_m) => unimplemented!(),
-            Value::Array(_a) => unimplemented!(),
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => Box::new(Vec::<Lookup<'_>>::with_capacity(0).into_iter()),
+            Value::Map(m) => Box::new(
+                m.iter()
+                    .map(|(k, v)| {
+                        let lookup = Lookup::from(k);
+                        let chain = v.lookups().map(move |l| {
+                            let mut lookup = lookup.clone();
+                            lookup.extend(l.clone());
+                            lookup
+                        });
+                        chain
+                    })
+                    .flatten(),
+            ),
+            Value::Array(a) => Box::new(
+                a.iter()
+                    .enumerate()
+                    .map(|(k, v)| {
+                        let lookup = Lookup::from(k);
+                        let chain = v.lookups().map(move |l| {
+                            let mut lookup = lookup.clone();
+                            lookup.extend(l.clone());
+                            lookup
+                        });
+                        chain
+                    })
+                    .flatten(),
+            ),
         }
     }
 
-    pub fn pairs<'a>(&'a self) -> impl Iterator<Item=&(Lookup<'a>, &'a Value)> {
+    #[instrument(level = "trace")]
+    pub fn pairs<'a>(&'a self) -> Box<dyn Iterator<Item = (Lookup<'a>, &'a Value)> + 'a> {
         match &self {
-            Value::Boolean(_) | Value::Bytes(_) | Value::Timestamp(_) | Value::Float(_) | Value::Integer(_) | Value::Null => [].iter(),
-            Value::Map(_m) => unimplemented!(),
-            Value::Array(_a) => unimplemented!(),
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => Box::new(Vec::<(Lookup<'_>, &'_ Value)>::with_capacity(0).into_iter()),
+            Value::Map(m) => Box::new(
+                m.iter()
+                    .map(|(k, v)| {
+                        let lookup = Lookup::from(k);
+                        trace!(prefix = %lookup, "Descending.");
+                        let iter = Some((lookup.clone(), v)).into_iter();
+                        let chain = v.pairs().map(move |(l, v)| {
+                            let mut lookup = lookup.clone();
+                            lookup.extend(l.clone());
+                            (lookup, v)
+                        });
+                        iter.chain(chain)
+                    })
+                    .flatten(),
+            ),
+            Value::Array(a) => Box::new(
+                a.iter()
+                    .enumerate()
+                    .map(|(k, v)| {
+                        let lookup = Lookup::from(k);
+                        trace!(prefix = %lookup, "Descending.");
+                        let iter = Some((lookup.clone(), v)).into_iter();
+                        let chain = v.pairs().map(move |(l, v)| {
+                            let mut lookup = lookup.clone();
+                            lookup.extend(l.clone());
+                            (lookup, v)
+                        });
+                        iter.chain(chain)
+                    })
+                    .flatten(),
+            ),
         }
     }
 }
@@ -58,8 +127,10 @@ impl Serialize for Value {
 }
 
 impl<'de> Deserialize<'de> for Value {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, <D as Deserializer<'de>>::Error> where
-        D: Deserializer<'de> {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, <D as Deserializer<'de>>::Error>
+    where
+        D: Deserializer<'de>,
+    {
         deserializer.deserialize_map(crate::event::util::ValueVisitor)
     }
 }

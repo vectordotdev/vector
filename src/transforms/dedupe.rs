@@ -202,8 +202,8 @@ impl TaskTransform for Dedupe {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::event::{Event, Lookup, LookupBuf, Value};
     use crate::transforms::dedupe::{CacheConfig, DedupeConfig, FieldMatchConfig};
-    use crate::event::{Event, Value, Lookup, LookupBuf};
     use std::collections::BTreeMap;
 
     #[test]
@@ -243,27 +243,45 @@ mod tests {
 
     fn basic(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
-        event1.as_mut_log().insert(LookupBuf::from("matched"), "some value");
-        event1.as_mut_log().insert(LookupBuf::from("unmatched"), "another value");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("matched"), "some value");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("unmatched"), "another value");
 
         // Test that unmatched field isn't considered
         let mut event2 = Event::from("message");
-        event2.as_mut_log().insert(LookupBuf::from("matched"), "some value2");
-        event2.as_mut_log().insert(LookupBuf::from("unmatched"), "another value");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("matched"), "some value2");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("unmatched"), "another value");
 
         // Test that matched field is considered
         let mut event3 = Event::from("message");
-        event3.as_mut_log().insert(LookupBuf::from("matched"), "some value");
-        event3.as_mut_log().insert(LookupBuf::from("unmatched"), "another value2");
+        event3
+            .as_mut_log()
+            .insert(LookupBuf::from("matched"), "some value");
+        event3
+            .as_mut_log()
+            .insert(LookupBuf::from("unmatched"), "another value2");
 
         // First event should always be passed through as-is.
         let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched")], "some value".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched")],
+            "some value".into()
+        );
 
         // Second event differs in matched field so should be outputted even though it
         // has the same value for unmatched field.
         let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched")], "some value2".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched")],
+            "some value2".into()
+        );
 
         // Third event has the same value for "matched" as first event, so it should be dropped.
         assert_eq!(None, transform.transform_one(event3));
@@ -283,19 +301,29 @@ mod tests {
 
     fn field_name_matters(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
-        event1.as_mut_log().insert(LookupBuf::from("matched1"), "some value");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("matched1"), "some value");
 
         let mut event2 = Event::from("message");
-        event2.as_mut_log().insert(LookupBuf::from("matched2"), "some value");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("matched2"), "some value");
 
         // First event should always be passed through as-is.
         let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched1")], "some value".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched1")],
+            "some value".into()
+        );
 
         // Second event has a different matched field name with the same value, so it should not be
         // considered a dupe
         let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched2")], "some value".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched2")],
+            "some value".into()
+        );
     }
 
     #[test]
@@ -314,18 +342,32 @@ mod tests {
     /// if the order of the matched fields is different between the two.
     fn field_order_irrelevant(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
-        event1.as_mut_log().insert(LookupBuf::from("matched1"), "value1");
-        event1.as_mut_log().insert(LookupBuf::from("matched2"), "value2");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("matched1"), "value1");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("matched2"), "value2");
 
         // Add fields in opposite order
         let mut event2 = Event::from("message");
-        event2.as_mut_log().insert(LookupBuf::from("matched2"), "value2");
-        event2.as_mut_log().insert(LookupBuf::from("matched1"), "value1");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("matched2"), "value2");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("matched1"), "value1");
 
         // First event should always be passed through as-is.
         let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched1")], "value1".into());
-        assert_eq!(new_event.as_log()[Lookup::from("matched2")], "value2".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched1")],
+            "value1".into()
+        );
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched2")],
+            "value2".into()
+        );
 
         // Second event is the same just with different field order, so it shouldn't be outputted.
         assert_eq!(None, transform.transform_one(event2));
@@ -348,27 +390,40 @@ mod tests {
     /// Test the eviction behavior of the underlying LruCache
     fn age_out(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
-        event1.as_mut_log().insert(LookupBuf::from("matched"), "some value");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("matched"), "some value");
 
         let mut event2 = Event::from("message");
-        event2.as_mut_log().insert(LookupBuf::from("matched"), "some value2");
+        event2
+            .as_mut_log()
+            .insert(LookupBuf::from("matched"), "some value2");
 
         // This event is a duplicate of event1, but won't be treated as such.
         let event3 = event1.clone();
 
         // First event should always be passed through as-is.
         let new_event = transform.transform_one(event1).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched")], "some value".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched")],
+            "some value".into()
+        );
 
         // Second event gets outputted because it's not a dupe.  This causes the first
         // Event to be evicted from the cache.
         let new_event = transform.transform_one(event2).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched")], "some value2".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched")],
+            "some value2".into()
+        );
 
         // Third event is a dupe but gets outputted anyway because the first event has aged
         // out of the cache.
         let new_event = transform.transform_one(event3).unwrap();
-        assert_eq!(new_event.as_log()[Lookup::from("matched")], "some value".into());
+        assert_eq!(
+            new_event.as_log()[Lookup::from("matched")],
+            "some value".into()
+        );
     }
 
     #[test]
@@ -387,7 +442,9 @@ mod tests {
     /// types but the same string representation aren't considered duplicates.
     fn type_matching(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
-        event1.as_mut_log().insert(LookupBuf::from("matched"), "123");
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("matched"), "123");
 
         let mut event2 = Event::from("message");
         event2.as_mut_log().insert(LookupBuf::from("matched"), 123);
@@ -458,7 +515,9 @@ mod tests {
     /// Test an explicit null vs a field being missing are treated as different.
     fn ignore_vs_missing(mut transform: Dedupe) {
         let mut event1 = Event::from("message");
-        event1.as_mut_log().insert(LookupBuf::from("matched"), Value::Null);
+        event1
+            .as_mut_log()
+            .insert(LookupBuf::from("matched"), Value::Null);
 
         let event2 = Event::from("message");
 

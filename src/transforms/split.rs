@@ -120,9 +120,7 @@ impl FunctionTransform for Split {
                 event.as_mut_log().remove(&self.field, false);
             }
         } else {
-            emit!(SplitFieldMissing {
-                field: &self.field
-            });
+            emit!(SplitFieldMissing { field: &self.field });
         };
 
         emit!(SplitEventProcessed);
@@ -143,7 +141,7 @@ pub fn split(input: &str, separator: Option<String>) -> Vec<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::{LogEvent, Value, Lookup};
+    use crate::event::{LogEvent, Lookup, Value};
     use crate::{config::TransformConfig, Event};
 
     #[test]

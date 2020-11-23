@@ -105,7 +105,7 @@ mod tests {
     use super::*;
     use crate::event::{
         metric::{MetricKind, MetricValue, StatisticKind},
-        Metric, Value, Lookup,
+        Lookup, Metric, Value,
     };
     use chrono::{offset::TimeZone, DateTime, Utc};
     use std::collections::BTreeMap;
@@ -154,11 +154,17 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (Lookup::from_str("counter.value").unwrap(), &Value::from(1.0)),
+                (
+                    Lookup::from_str("counter.value").unwrap(),
+                    &Value::from(1.0)
+                ),
                 (Lookup::from_str("host").unwrap(), &Value::from("localhost")),
                 (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
                 (Lookup::from_str("name").unwrap(), &Value::from("counter")),
-                (Lookup::from_str("tags.some_tag").unwrap(), &Value::from("some_value")),
+                (
+                    Lookup::from_str("tags.some_tag").unwrap(),
+                    &Value::from("some_value")
+                ),
                 (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
@@ -210,8 +216,14 @@ mod tests {
             vec![
                 (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
                 (Lookup::from_str("name").unwrap(), &Value::from("set")),
-                (Lookup::from_str("set.values[0]").unwrap(), &Value::from("one")),
-                (Lookup::from_str("set.values[1]").unwrap(), &Value::from("two")),
+                (
+                    Lookup::from_str("set.values[0]").unwrap(),
+                    &Value::from("one")
+                ),
+                (
+                    Lookup::from_str("set.values[1]").unwrap(),
+                    &Value::from("two")
+                ),
                 (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
             ]
         );
@@ -250,8 +262,14 @@ mod tests {
                     Lookup::from_str("distribution.statistic").unwrap(),
                     &Value::from("histogram")
                 ),
-                (Lookup::from_str("distribution.values[0]").unwrap(), &Value::from(1.0)),
-                (Lookup::from_str("distribution.values[1]").unwrap(), &Value::from(2.0)),
+                (
+                    Lookup::from_str("distribution.values[0]").unwrap(),
+                    &Value::from(1.0)
+                ),
+                (
+                    Lookup::from_str("distribution.values[1]").unwrap(),
+                    &Value::from(2.0)
+                ),
                 (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
                 (Lookup::from_str("name").unwrap(), &Value::from("distro")),
                 (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
@@ -289,7 +307,10 @@ mod tests {
                     Lookup::from_str("aggregated_histogram.buckets[1]").unwrap(),
                     &Value::from(2.0)
                 ),
-                (Lookup::from_str("aggregated_histogram.count").unwrap(), &Value::from(30)),
+                (
+                    Lookup::from_str("aggregated_histogram.count").unwrap(),
+                    &Value::from(30)
+                ),
                 (
                     Lookup::from_str("aggregated_histogram.counts[0]").unwrap(),
                     &Value::from(10)
@@ -298,7 +319,10 @@ mod tests {
                     Lookup::from_str("aggregated_histogram.counts[1]").unwrap(),
                     &Value::from(20)
                 ),
-                (Lookup::from_str("aggregated_histogram.sum").unwrap(), &Value::from(50.0)),
+                (
+                    Lookup::from_str("aggregated_histogram.sum").unwrap(),
+                    &Value::from(50.0)
+                ),
                 (Lookup::from_str("kind").unwrap(), &Value::from("absolute")),
                 (Lookup::from_str("name").unwrap(), &Value::from("histo")),
                 (Lookup::from_str("timestamp").unwrap(), &Value::from(ts())),
@@ -328,7 +352,10 @@ mod tests {
         assert_eq!(
             collected,
             vec![
-                (Lookup::from_str("aggregated_summary.count").unwrap(), &Value::from(30)),
+                (
+                    Lookup::from_str("aggregated_summary.count").unwrap(),
+                    &Value::from(30)
+                ),
                 (
                     Lookup::from_str("aggregated_summary.quantiles[0]").unwrap(),
                     &Value::from(50.0)
@@ -337,7 +364,10 @@ mod tests {
                     Lookup::from_str("aggregated_summary.quantiles[1]").unwrap(),
                     &Value::from(90.0)
                 ),
-                (Lookup::from_str("aggregated_summary.sum").unwrap(), &Value::from(50.0)),
+                (
+                    Lookup::from_str("aggregated_summary.sum").unwrap(),
+                    &Value::from(50.0)
+                ),
                 (
                     Lookup::from_str("aggregated_summary.values[0]").unwrap(),
                     &Value::from(10.0)
