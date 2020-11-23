@@ -2332,6 +2332,30 @@
             {
               "args": [],
               "deprecationReason": null,
+              "description": "Transform outputs",
+              "isDeprecated": false,
+              "name": "transforms",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Transform",
+                      "ofType": null
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "args": [],
+              "deprecationReason": null,
               "description": "Sink outputs",
               "isDeprecated": false,
               "name": "sinks",

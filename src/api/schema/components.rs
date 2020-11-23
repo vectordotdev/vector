@@ -142,6 +142,14 @@ impl Transform {
             .collect()
     }
 
+    /// Transform outputs
+    async fn transforms(&self) -> Vec<Transform> {
+        filter_components(|(_name, components)| match components {
+            Component::Transform(t) if t.0.inputs.contains(&self.0.name) => Some(t.clone()),
+            _ => None,
+        })
+    }
+
     /// Sink outputs
     async fn sinks(&self) -> Vec<Sink> {
         filter_components(|(_name, components)| match components {
