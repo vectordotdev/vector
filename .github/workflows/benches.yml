@@ -8,6 +8,8 @@ on:
 
 env:
   VERBOSE: true
+  AWS_ACCESS_KEY_ID: "dummy"
+  AWS_SECRET_ACCESS_KEY: "dummy"
   CI: true
 
 jobs:
