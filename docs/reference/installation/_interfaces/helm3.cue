@@ -41,15 +41,15 @@ installation: _interfaces: "helm3": {
 				    encoding = "json"
 				VALUES
 				"""#
-			install:   #"helm install \#(_name) timberio/\#(_name) --devel --values values.yaml --namespace vector --create-namespace"#
-			logs:      #"kubectl logs -n vector \#(_controller_resource_type)/\#(_name)"#
+			install:   #"helm install --namespace vector --create-namespace \#(_name) timberio/\#(_name) --devel --values values.yaml"#
+			logs:      #"kubectl logs --namespace vector \#(_controller_resource_type)/\#(_name)"#
 			reload:    null
-			restart:   #"kubectl rollout restart \#(_controller_resource_type)/\#(_name)"#
+			restart:   #"kubectl rollout restart --namespace vector \#(_controller_resource_type)/\#(_name)"#
 			start:     null
 			stop:      null
 			top:       null
 			uninstall: "helm uninstall \(_name) --namespace vector"
-			upgrade:   "helm repo update && helm upgrade vector timberio/\(_name) --namespace vector --reuse-values"
+			upgrade:   "helm repo update && helm upgrade vector --namespace vector timberio/\(_name) --reuse-values"
 		}
 	}
 
