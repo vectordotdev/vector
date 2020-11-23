@@ -23,7 +23,7 @@ installation: _interfaces: kubectl: {
 			install:                   "kubectl apply -k ."
 			logs:                      "kubectl logs -n vector \(_controller_resource_type)/\(_controller_resource_name)"
 			reload:                    null
-			restart:                   "kubectl rollout restart \(_controller_resource_type)/\(_controller_resource_name)"
+			restart:                   "kubectl rollout restart -n vector \(_controller_resource_type)/\(_controller_resource_name)"
 			start:                     null
 			stop:                      null
 			top:                       null
