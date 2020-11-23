@@ -12,7 +12,7 @@ use vector::transforms::{
 };
 use vector::{
     config::TransformConfig,
-    event::{Event, Value},
+    event::{Event, Value, LookupBuf},
     test_util::runtime,
 };
 
@@ -44,7 +44,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
         let event = {
             let mut event = Event::from("augment me");
-            event.as_mut_log().insert("copy_from", "buz".to_owned());
+            event.as_mut_log().insert(LookupBuf::from("copy_from"), "buz".to_owned());
             event
         };
 
@@ -65,7 +65,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
         let event = {
             let mut event = Event::from("augment me");
-            event.as_mut_log().insert("copy_from", "buz".to_owned());
+            event.as_mut_log().insert(LookupBuf::from("copy_from"), "buz".to_owned());
             event
         };
 
@@ -106,7 +106,7 @@ fn benchmark_remap(c: &mut Criterion) {
             let mut event = Event::from("parse me");
             event
                 .as_mut_log()
-                .insert("foo", r#"{"key": "value"}"#.to_owned());
+                .insert(LookupBuf::from("foo"), r#"{"key": "value"}"#.to_owned());
             event
         };
 
@@ -119,8 +119,8 @@ fn benchmark_remap(c: &mut Criterion) {
 
     c.bench_function("remap: parse JSON with json_parser", |b| {
         let mut tform: Box<dyn FunctionTransform> = Box::new(JsonParser::from(JsonParserConfig {
-            field: Some("foo".to_string()),
-            target_field: Some("bar".to_owned()),
+            field: Some(LookupBuf::from("foo")),
+            target_field: Some(LookupBuf::from("bar")),
             drop_field: false,
             drop_invalid: false,
             overwrite_target: None,
@@ -130,7 +130,7 @@ fn benchmark_remap(c: &mut Criterion) {
             let mut event = Event::from("parse me");
             event
                 .as_mut_log()
-                .insert("foo", r#"{"key": "value"}"#.to_owned());
+                .insert(LookupBuf::from("foo"), r#"{"key": "value"}"#.to_owned());
             event
         };
 
@@ -171,12 +171,12 @@ fn benchmark_remap(c: &mut Criterion) {
         );
 
         let mut event = Event::from("coerce me");
-        for &(key, value) in &[
-            ("number", "1234"),
-            ("bool", "yes"),
-            ("timestamp", "19/06/2019:17:20:49 -0400"),
-        ] {
-            event.as_mut_log().insert(key, value.to_owned());
+        for (key, value) in [
+            (LookupBuf::from("number"), "1234".to_string()),
+            (LookupBuf::from("bool"), "yes".to_string()),
+            (LookupBuf::from("timestamp"), "19/06/2019:17:20:49 -0400".to_string()),
+        ].iter() {
+            event.as_mut_log().insert(key.clone(), value.clone());
         }
 
         let timestamp =
@@ -211,12 +211,12 @@ fn benchmark_remap(c: &mut Criterion) {
             .into_function();
 
         let mut event = Event::from("coerce me");
-        for &(key, value) in &[
-            ("number", "1234"),
-            ("bool", "yes"),
-            ("timestamp", "19/06/2019:17:20:49 -0400"),
-        ] {
-            event.as_mut_log().insert(key, value.to_owned());
+        for (key, value) in [
+            (LookupBuf::from("number"), "1234".to_string()),
+            (LookupBuf::from("bool"), "yes".to_string()),
+            (LookupBuf::from("timestamp"), "19/06/2019:17:20:49 -0400".to_string()),
+        ].iter() {
+            event.as_mut_log().insert(key.clone(), value.clone());
         }
 
         let timestamp =

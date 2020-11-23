@@ -304,7 +304,7 @@ mod tests {
                 .unwrap()
                 .into()
         );
-        assert_eq!(log[&log_schema().host_key()], "host".into());
+        assert_eq!(log[log_schema().host_key()], "host".into());
         assert_eq!(log[log_schema().source_type_key()], "logplex".into());
         assert_eq!(log[Lookup::from("appname")], "lumberjack-store".into());
         assert_eq!(log[Lookup::from("absent")], Value::Null);

@@ -284,6 +284,7 @@ fn encode_event(
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
+    use crate::event::LookupBuf;
 
     #[test]
     fn sqs_encode_event_text() {
@@ -297,7 +298,7 @@ mod tests {
     fn sqs_encode_event_json() {
         let message = "hello world".to_string();
         let mut event = Event::from(message.clone());
-        event.as_mut_log().insert("key", "value");
+        event.as_mut_log().insert(LookupBuf::from("key"), "value");
         let event = encode_event(event, &Encoding::Json.into(), None).unwrap();
 
         let map: BTreeMap<String, String> = serde_json::from_str(&event.message_body).unwrap();

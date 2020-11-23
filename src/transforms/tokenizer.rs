@@ -144,7 +144,7 @@ mod tests {
         let event = Event::from(text);
         let field_names = fields
             .split(' ')
-            .map(|s| LookupBuf::from(s))
+            .map(|s| LookupBuf::from_str(s).unwrap_or_else(|_| LookupBuf::from(s)))
             .collect::<Vec<_>>();
         let mut parser = TokenizerConfig {
             field_names,

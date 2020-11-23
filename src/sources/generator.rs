@@ -141,7 +141,7 @@ mod tests {
             match event {
                 Ready(Some(event)) => {
                     let log = event.as_log();
-                    let message = log[&message_key].to_string_lossy();
+                    let message = log[message_key].to_string_lossy();
                     assert_eq!(message, *line);
                 }
                 Ready(None) => panic!("Premature end of input"),
@@ -181,7 +181,7 @@ mod tests {
             match event {
                 Ready(Some(event)) => {
                     let log = event.as_log();
-                    let message = log[&message_key].to_string_lossy();
+                    let message = log[message_key].to_string_lossy();
                     assert_eq!(message, *line);
                 }
                 Ready(None) => panic!("Premature end of input"),

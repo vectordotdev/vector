@@ -537,7 +537,7 @@ mod tests {
             ),
             (
                 FieldsSpec {
-                    container_image: LookupBuf::from("container_image").to_owned(),
+                    container_image: LookupBuf::from("container_image"),
                     ..Default::default()
                 },
                 Container {

@@ -159,7 +159,7 @@ mod integration_tests {
         let host = "192.168.1.1".to_string();
         let mut event = Event::from(message.clone());
         let log = event.as_mut_log();
-        log.insert(log_schema().host_key().into_buf(), host.clone());
+        log.insert(log_schema().host_key().clone(), host.clone());
 
         sink.run(stream::once(future::ready(event))).await.unwrap();
 
@@ -272,7 +272,7 @@ mod integration_tests {
                 max_events: Some(1),
                 ..Default::default()
             },
-            host_key: log_schema().host_key().into_buf(),
+            host_key: log_schema().host_key().clone(),
             ..Default::default()
         }
     }

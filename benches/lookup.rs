@@ -2,7 +2,7 @@ use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criteri
 use indexmap::map::IndexMap;
 use std::convert::TryFrom;
 use std::{fs, io::Read, path::Path};
-use vector::event::LookupBuf;
+use vector::event::{LookupBuf};
 
 const FIXTURE_ROOT: &str = "tests/data/fixtures/lookup";
 
@@ -46,7 +46,7 @@ fn lookup_to_string(c: &mut Criterion) {
                 let input = &(*param).clone();
                 b.iter_batched(
                     || input.clone(),
-                    |input| Lookup::try_from(input).unwrap(),
+                    |input| LookupBuf::try_from(input).unwrap(),
                     BatchSize::SmallInput,
                 )
             },
@@ -99,8 +99,8 @@ fn lookup_to_string(c: &mut Criterion) {
             move |b, ref param| {
                 let input = &(*param).clone();
                 b.iter_batched(
-                    || serde_json::to_string(&Lookup::try_from(input.clone()).unwrap()).unwrap(),
-                    |input| serde_json::from_str::<Lookup>(&input).unwrap(),
+                    || serde_json::to_string(&LookupBuf::try_from(input.clone()).unwrap()).unwrap(),
+                    |input| serde_json::from_str::<LookupBuf>(&input).unwrap(),
                     BatchSize::SmallInput,
                 )
             },

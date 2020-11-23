@@ -8,10 +8,9 @@ use indexmap::IndexMap;
 use transforms::lua::v2::LuaConfig;
 use vector::{
     config::{TransformConfig},
-    event::LookupBuf,
     test_util::{collect_ready03, runtime},
     transforms::{self, Transform},
-    Event,
+    event::{Event, LookupBuf},
 };
 
 fn bench_add_fields(c: &mut Criterion) {
@@ -26,7 +25,7 @@ fn bench_add_fields(c: &mut Criterion) {
     let benchmarks: Vec<(&str, Transform)> = vec![
         ("native", {
             let mut map = IndexMap::new();
-            map.insert(String::from(key), value.to_owned().into());
+            map.insert(LookupBuf::from(key), value.to_owned().into());
             Transform::function(transforms::add_fields::AddFields::new(map, true).unwrap())
         }),
         ("v1", {
@@ -97,7 +96,7 @@ fn bench_field_filter(c: &mut Criterion) {
     let events = (0..num_events)
         .map(|i| {
             let mut event = Event::new_empty_log();
-            event.as_mut_log().insert("the_field", (i % 10).to_string());
+            event.as_mut_log().insert(LookupBuf::from("the_field"), (i % 10).to_string());
             event
         })
         .collect::<Vec<_>>();
@@ -110,7 +109,7 @@ fn bench_field_filter(c: &mut Criterion) {
             let mut rt = runtime();
             rt.block_on(async move {
                 transforms::field_filter::FieldFilterConfig {
-                    field: "the_field".to_string(),
+                    field: LookupBuf::from("the_field"),
                     value: "0".to_string(),
                 }
                 .build()

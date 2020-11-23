@@ -399,7 +399,7 @@ mod tests {
     fn create_event(key: &str, value: &str) -> Event {
         let mut log = Event::from("i am a log");
         log.as_mut_log().insert(LookupBuf::from(key), value);
-        log.as_mut_log().insert(log_schema().timestamp_key().into_buf(), ts());
+        log.as_mut_log().insert(log_schema().timestamp_key().clone(), ts());
         log
     }
 
@@ -626,7 +626,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().into_buf(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert(LookupBuf::from("status"), "42");
         event.as_mut_log().insert(LookupBuf::from("backtrace"), "message");
 
@@ -679,7 +679,7 @@ mod tests {
         let mut event = Event::from("i am a log");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key().into_buf(), ts());
+            .insert(log_schema().timestamp_key().clone(), ts());
         event.as_mut_log().insert(LookupBuf::from("status"), "42");
         event.as_mut_log().insert(LookupBuf::from("backtrace"), "message");
         event.as_mut_log().insert(LookupBuf::from("host"), "local");

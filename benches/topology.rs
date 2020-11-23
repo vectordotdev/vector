@@ -4,7 +4,7 @@ use futures::{compat::Future01CompatExt, future, stream, StreamExt};
 use rand::{rngs::SmallRng, thread_rng, Rng, SeedableRng};
 
 use vector::{
-    config, sinks, sources,
+    config, sinks, sources, event::LookupBuf,
     test_util::{
         next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver,
     },
@@ -187,7 +187,7 @@ fn benchmark_transforms(c: &mut Criterion) {
                     "filter",
                     &["parser"],
                     transforms::field_filter::FieldFilterConfig {
-                        field: "status".to_string(),
+                        field: LookupBuf::from("status"),
                         value: "404".to_string(),
                     },
                 );
@@ -270,7 +270,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     "filter_200",
                     &["parser"],
                     transforms::field_filter::FieldFilterConfig {
-                        field: "status".to_string(),
+                        field: LookupBuf::from("status"),
                         value: "200".to_string(),
                     },
                 );
@@ -278,7 +278,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     "filter_404",
                     &["parser"],
                     transforms::field_filter::FieldFilterConfig {
-                        field: "status".to_string(),
+                        field: LookupBuf::from("status"),
                         value: "404".to_string(),
                     },
                 );
@@ -286,7 +286,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     "filter_500",
                     &["parser"],
                     transforms::field_filter::FieldFilterConfig {
-                        field: "status".to_string(),
+                        field: LookupBuf::from("status"),
                         value: "500".to_string(),
                     },
                 );

@@ -906,7 +906,7 @@ mod reload_tests {
 
         let transform = LogToMetricConfig {
             metrics: vec![MetricConfig::Gauge(GaugeConfig {
-                field: "message".to_string(),
+                field: LookupBuf::from("message"),
                 name: None,
                 namespace: None,
                 tags: None,

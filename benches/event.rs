@@ -62,11 +62,17 @@ fn benchmark_event(c: &mut Criterion) {
     });
 
     c.bench_function("create and insert array", |b| {
-        b.iter(|| {
+        let str_1 = "key1.nested1[0]";
+        let lookup_1 = LookupBuf::from(str_1);
+        let str_2 = "key1.nested1[1]";
+        let lookup_2 = LookupBuf::from(str_2);
+        b.iter_batched(
+            || (lookup_1.clone(), lookup_2.clone()),
+            |(lookup_1, lookup_2)| {
             let mut log = Event::new_empty_log().into_log();
-            log.insert("key1.nested1[0]", Bytes::from("value1"));
-            log.insert("key1.nested1[1]", Bytes::from("value2"));
-        })
+            log.insert(lookup_1, Bytes::from("value1"));
+            log.insert(lookup_2, Bytes::from("value2"));
+        }, BatchSize::SmallInput)
     });
 
     c.bench_function("iterate all fields array", |b| {
@@ -90,7 +96,7 @@ fn benchmark_event(c: &mut Criterion) {
 fn create_event(json: Value) -> LogEvent {
     let s = serde_json::to_string(&json).unwrap();
     let mut event = Event::new_empty_log();
-    event.as_mut_log().insert(log_schema().message_key(), s);
+    event.as_mut_log().insert(log_schema().message_key().clone(), s);
 
     let mut parser = JsonParser::from(JsonParserConfig::default());
     let mut output = Vec::with_capacity(1);

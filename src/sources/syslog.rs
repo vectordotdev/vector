@@ -494,10 +494,10 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key().into_buf(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert(LookupBuf::from("host"), "74794bfb6795");
             expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
 
@@ -532,12 +532,12 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key().into_buf(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
-            expected.insert(log_schema().host_key().into_buf(), "74794bfb6795");
+            expected.insert(log_schema().host_key().clone(), "74794bfb6795");
             expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
-            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert(LookupBuf::from("severity"), "notice");
             expected.insert(LookupBuf::from("facility"), "user");
             expected.insert(LookupBuf::from("version"), 1);
@@ -624,9 +624,9 @@ mod test {
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
                 chrono::Local.ymd(2020, 2, 13).and_hms(20, 7, 26).into();
-            expected.insert(log_schema().timestamp_key().into_buf(), expected_date);
-            expected.insert(log_schema().host_key().into_buf(), "74794bfb6795");
-            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(log_schema().timestamp_key().clone(), expected_date);
+            expected.insert(log_schema().host_key().clone(), "74794bfb6795");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
             expected.insert(LookupBuf::from("severity"), "notice");
             expected.insert(LookupBuf::from("facility"), "user");
@@ -653,8 +653,8 @@ mod test {
             let expected = expected.as_mut_log();
             let expected_date: DateTime<Utc> =
                 chrono::Local.ymd(2020, 2, 13).and_hms(21, 31, 56).into();
-            expected.insert(log_schema().timestamp_key().into_buf(), expected_date);
-            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(log_schema().timestamp_key().clone(), expected_date);
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert(LookupBuf::from("host"), "74794bfb6795");
             expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
             expected.insert(LookupBuf::from("severity"), "info");
@@ -684,12 +684,12 @@ mod test {
         {
             let expected = expected.as_mut_log();
             expected.insert(
-                log_schema().timestamp_key().into_buf(),
+                log_schema().timestamp_key().clone(),
                 chrono::Utc
                     .ymd(2019, 2, 13)
                     .and_hms_micro(21, 53, 30, 605_850),
             );
-            expected.insert(log_schema().source_type_key().into_buf(), "syslog");
+            expected.insert(log_schema().source_type_key().clone(), "syslog");
             expected.insert(LookupBuf::from("host"), "74794bfb6795");
             expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
             expected.insert(LookupBuf::from("severity"), "info");

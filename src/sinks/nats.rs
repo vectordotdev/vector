@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     emit,
-    event::Event,
+    event::{Event},
     internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
     sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
     sinks::util::StreamSink,
@@ -208,7 +208,7 @@ fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> String
 mod tests {
     use super::*;
     use super::{encode_event, Encoding, EncodingConfig};
-    use crate::event::{Event, Value};
+    use crate::event::{Event, Value, LookupBuf};
 
     #[test]
     fn generate_config() {
@@ -228,9 +228,9 @@ mod tests {
     fn encodes_log_events() {
         let mut event = Event::new_empty_log();
         let log = event.as_mut_log();
-        log.insert("x", Value::from("23"));
-        log.insert("z", Value::from(25));
-        log.insert("a", Value::from("0"));
+        log.insert(LookupBuf::from("x"), Value::from("23"));
+        log.insert(LookupBuf::from("z"), Value::from(25));
+        log.insert(LookupBuf::from("a"), Value::from("0"));
 
         let encoded = encode_event(event, &EncodingConfig::from(Encoding::Json));
         let expected = r#"{"a":"0","x":"23","z":25}"#;

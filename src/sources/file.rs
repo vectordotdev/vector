@@ -818,10 +818,10 @@ mod tests {
             assert_eq!(
                 received.as_log().keys().collect::<HashSet<_>>(),
                 vec![
-                    log_schema().host_key(),
-                    log_schema().message_key(),
-                    log_schema().timestamp_key(),
-                    log_schema().source_type_key()
+                    log_schema().host_key().clone_lookup(),
+                    log_schema().message_key().clone_lookup(),
+                    log_schema().timestamp_key().clone_lookup(),
+                    log_schema().source_type_key().clone_lookup()
                 ]
                 .into_iter()
                 .collect::<HashSet<_>>()

@@ -361,7 +361,7 @@ mod integration_tests {
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().into_buf(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event
@@ -423,7 +423,7 @@ timestamp_format = "unix""#,
 
         let exp_event = input_event.as_mut_log();
         exp_event.insert(
-            log_schema().timestamp_key().into_buf(),
+            log_schema().timestamp_key().clone(),
             format!(
                 "{}",
                 exp_event

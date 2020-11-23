@@ -15,7 +15,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
+            .insert(log_schema().timestamp_key().clone(), Utc::now());
 
         b.iter_batched(
             || event.clone(),
@@ -29,7 +29,7 @@ fn bench_elasticsearch_index(c: &mut Criterion) {
         let mut event = Event::from("hello world");
         event
             .as_mut_log()
-            .insert(log_schema().timestamp_key(), Utc::now());
+            .insert(log_schema().timestamp_key().clone(), Utc::now());
 
         b.iter_batched(
             || event.clone(),

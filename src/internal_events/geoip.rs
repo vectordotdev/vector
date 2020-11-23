@@ -1,5 +1,6 @@
 use super::InternalEvent;
 use metrics::counter;
+use crate::event::LookupBuf;
 
 #[derive(Debug)]
 pub struct GeoipEventProcessed;
@@ -31,7 +32,7 @@ impl<'a> InternalEvent for GeoipIpAddressParseError<'a> {
 
 #[derive(Debug)]
 pub(crate) struct GeoipFieldDoesNotExist<'a> {
-    pub field: &'a str,
+    pub field: &'a LookupBuf,
 }
 
 impl<'a> InternalEvent for GeoipFieldDoesNotExist<'a> {

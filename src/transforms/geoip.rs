@@ -211,7 +211,7 @@ impl FunctionTransform for Geoip {
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, Lookup, LookupBuf},
+        event::{Event, LookupBuf},
         transforms::json_parser::{JsonParser, JsonParserConfig},
     };
     use std::collections::HashMap;
@@ -305,7 +305,7 @@ mod tests {
         exp_geoip_attr.insert("postal_code", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Lookup::from(&format!("geo.{}", field));
+            let k = LookupBuf::from(format!("geo.{}", field));
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
@@ -362,8 +362,8 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Lookup::from(&format!("geo.{}", field));
-            let geodata = new_event.as_log().get(k).unwrap().to_string_lossy();
+            let k = LookupBuf::from(format!("geo.{}", field));
+            let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("field exists"));
         }
     }
@@ -389,7 +389,7 @@ mod tests {
         exp_geoip_attr.insert("organization", "");
 
         for field in exp_geoip_attr.keys() {
-            let k = Lookup::from(&format!("geo.{}", field));
+            let k = LookupBuf::from(format!("geo.{}", field));
             let geodata = new_event.as_log().get(&k).unwrap().to_string_lossy();
             assert_eq!(&geodata, exp_geoip_attr.get(field).expect("fields exists"));
         }
