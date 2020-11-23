@@ -16,11 +16,11 @@ can be. Docker, by default, splits log messages that exceed 16kb. While 16kb
 seems like a lot, it can easily be exceeded if you're logging rich structured
 events. This can be a very difficult and frustrating problem to solve with
 other tools (we speak from experience). In this release, Vector solves this
-automatically with a new `auto_partial_merge` option in the `docker` source.
+automatically with a new `auto_partial_merge` option in the `docker_logs` source.
 
 ```toml title="vector.toml"
 [sources.my_source_id]
-  type = "docker"
+  type = "docker_logs"
   auto_partial_merge = true
 ```
 

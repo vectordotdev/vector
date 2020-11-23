@@ -96,6 +96,11 @@ where
         self.expiration_queue.is_empty()
     }
 
+    /// Returns the number of elements in the map.
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
     /// If the [`ExpiringHashMap`] is empty, immediately returns `None`.
     /// Otherwise, waits for the closest deadline, removes expired item and
     /// returns it.

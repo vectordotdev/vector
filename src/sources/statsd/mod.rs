@@ -8,7 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{compat::Sink01CompatExt, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
@@ -73,9 +73,7 @@ impl SourceConfig for StatsdConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         match self {
-            StatsdConfig::Udp(config) => Ok(Box::new(
-                statsd_udp(config.clone(), shutdown, out).boxed().compat(),
-            )),
+            StatsdConfig::Udp(config) => Ok(Box::pin(statsd_udp(config.clone(), shutdown, out))),
             StatsdConfig::Tcp(config) => {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 StatsdTcpSource.run(
@@ -91,7 +89,7 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn output_type(&self) -> crate::config::DataType {
+    fn output_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 

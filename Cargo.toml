@@ -24,7 +24,6 @@ conf-files = ["/etc/vector/vector.toml"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
-  ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
@@ -135,7 +134,7 @@ structopt = "0.3.19"
 indexmap = {version = "1.5.1", features = ["serde-1"]}
 http = "0.2"
 typetag = "0.1"
-toml = "0.4"
+toml = "0.5.7"
 syslog = "5"
 syslog_loose = { version = "0.5.0" }
 derive_is_enum_variant = "0.1.1"
@@ -160,6 +159,7 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
 url = "2.2.0"
+percent-encoding = "2.1.0"
 base64 = { version = "0.13.0", optional = true }
 bollard = { version = "0.8.0", optional = true }
 listenfd = { version = "0.3.3", optional = true }
@@ -178,7 +178,7 @@ bloom = "0.3.2"
 pulsar = { version = "1.0.0", default-features = false, features = ["tokio-runtime"], optional = true }
 cidr-utils = "0.4.2"
 pin-project = "1.0.1"
-nats = { version = "0.8.3", optional = true }
+nats = { version = "0.8.6", optional = true }
 k8s-openapi = { version = "0.9", features = ["v1_16"], optional = true }
 portpicker = "0.1.0"
 sha-1 = "0.9"
@@ -210,13 +210,14 @@ security-framework = "0.4"
 
 [target.'cfg(unix)'.dependencies]
 atty = "0.2"
-nix = "0.16.1"
+nix = "0.17.0"
 
 [build-dependencies]
 prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
+base64 = "0.13"
 approx = "0.3.0"
 criterion = "0.3"
 tempfile = "3.0.6"
@@ -452,7 +453,7 @@ sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = ["bytesize"]
-sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
+sinks-elasticsearch = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
 sinks-honeycomb = ["bytesize"]

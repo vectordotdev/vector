@@ -36,7 +36,11 @@ mod transform_utils;
 mod util;
 
 use futures::{
-    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
+    compat::{Sink01CompatExt, Stream01CompatExt},
+    future::FutureExt,
+    sink::Sink,
+    stream::StreamExt,
+    TryStreamExt,
 };
 use futures01::Stream as Stream01;
 use k8s_paths_provider::K8sPathsProvider;
@@ -92,6 +96,12 @@ pub struct Config {
     /// a significant overhead.
     #[serde(default = "default_glob_minimum_cooldown_ms")]
     glob_minimum_cooldown_ms: usize,
+
+    /// A field to use to set the timestamp when Vector ingested the event.
+    /// This is useful to compute the latency between important event processing
+    /// stages, i.e. the time delta between log line was written and when it was
+    /// processed by the `kubernetes_logs` source.
+    ingestion_timestamp_field: Option<String>,
 }
 
 inventory::submit! {
@@ -122,21 +132,13 @@ impl SourceConfig for Config {
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
         let source = Source::new(self, globals, name)?;
-
-        // TODO: this is a workaround for the legacy futures 0.1.
-        // When the core is updated to futures 0.3 this should be simplified
-        // significantly.
-        let out = futures::compat::Compat01As03Sink::new(out);
-        let fut = source.run(out, shutdown);
-        let fut = fut.map(|result| {
-            result.map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            })
-        });
-        let fut = Box::pin(fut);
-        let fut = futures::compat::Compat::new(fut);
-        let fut: sources::Source = Box::new(fut);
-        Ok(fut)
+        Ok(Box::pin(source.run(out.sink_compat(), shutdown).map(
+            |result| {
+                result.map_err(|error| {
+                    error!(message = "Source future failed.", %error);
+                })
+            },
+        )))
     }
 
     fn output_type(&self) -> DataType {
@@ -159,6 +161,7 @@ struct Source {
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     glob_minimum_cooldown: Duration,
+    ingestion_timestamp_field: Option<String>,
 }
 
 impl Source {
@@ -197,6 +200,7 @@ impl Source {
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
             glob_minimum_cooldown,
+            ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
         })
     }
 
@@ -215,6 +219,7 @@ impl Source {
             exclude_paths,
             max_read_bytes,
             glob_minimum_cooldown,
+            ingestion_timestamp_field,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -311,7 +316,7 @@ impl Source {
                 file: &file,
                 byte_size: bytes.len(),
             });
-            let mut event = create_event(bytes, &file);
+            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
             if annotator.annotate(&mut event, &file).is_none() {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
@@ -378,7 +383,7 @@ impl Source {
     }
 }
 
-fn create_event(line: Bytes, file: &str) -> Event {
+fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.
@@ -389,6 +394,13 @@ fn create_event(line: Bytes, file: &str) -> Event {
 
     // Add file.
     event.as_mut_log().insert(FILE_KEY, file.to_owned());
+
+    // Add ingestion timestamp if requested.
+    if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
+        event
+            .as_mut_log()
+            .insert(ingestion_timestamp_field, chrono::Utc::now());
+    }
 
     event
 }

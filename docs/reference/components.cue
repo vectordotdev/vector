@@ -189,15 +189,19 @@ components: {
 			enabled: bool
 		})
 
-		from?: #Service
-		tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
+		from?: {
+			service:    #Service
+			interface?: #Interface
+		}
+
+		tls?: #FeaturesTLS & {_args: {mode: "connect"}}
 	}
 
 	#FeaturesConvert: {
 	}
 
 	#FeaturesEnrich: {
-		from: close({
+		from: service: close({
 			name:     string
 			url:      string
 			versions: string | null
@@ -205,7 +209,10 @@ components: {
 	}
 
 	#FeaturesExpose: {
-		for: #Service
+		for: {
+			service:    #Service
+			interface?: #Interface
+		}
 	}
 
 	#FeaturesFilter: {
@@ -231,8 +238,12 @@ components: {
 	}
 
 	#FeaturesReceive: {
-		from?: #Service
-		tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+		from?: {
+			service:    #Service
+			interface?: #Interface
+		}
+
+		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
 
 	#FeaturesReduce: {
@@ -313,7 +324,10 @@ components: {
 		// via TLS.
 		tls: #FeaturesTLS & {_args: {mode: "connect"}}
 
-		to?: #Service
+		to?: {
+			service:    #Service
+			interface?: #Interface
+		}
 	}
 
 	#FeaturesTLS: {
@@ -354,11 +368,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: close({
-		description:    string
-		relevant_when?: string
-		tags:           #MetricTags
-		name:           Name
-		type:           #MetricType
+		description:       string
+		relevant_when?:    string
+		tags:              #MetricTags
+		name:              Name
+		type:              #MetricType
+		default_namespace: string
 	})
 
 	#Output: {
@@ -379,7 +394,7 @@ components: {
 		//
 		// For example, the `journald` source is only available on Linux
 		// environments.
-		platforms: #Platforms
+		platforms: #TargetTriples
 
 		// `requirements` describes any external requirements that the component
 		// needs to function properly.
@@ -772,7 +787,7 @@ components: {
 
 				if features.collect != _|_ {
 					if features.collect.from != _|_ {
-						collect_context: "Enriches data with useful \(features.collect.from.name) context."
+						collect_context: "Enriches data with useful \(features.collect.from.service.name) context."
 					}
 
 					if features.collect.checkpoint.enabled != _|_ {
@@ -792,7 +807,7 @@ components: {
 
 				if features.receive != _|_ {
 					if features.receive.from != _|_ {
-						receive_context: "Enriches data with useful \(features.receive.from.name) context."
+						receive_context: "Enriches data with useful \(features.receive.from.service.name) context."
 					}
 
 					if features.receive.tls.enabled != _|_ {
@@ -833,7 +848,8 @@ components: {
 							required: false
 						}
 					}
-					type: "counter"
+					type:              "counter"
+					default_namespace: "vector"
 				}
 
 				_passthrough_distribution: {
@@ -845,7 +861,8 @@ components: {
 							required: false
 						}
 					}
-					type: "distribution"
+					type:              "distribution"
+					default_namespace: "vector"
 				}
 
 				_passthrough_gauge: {
@@ -857,7 +874,8 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 
 				_passthrough_histogram: {
@@ -869,7 +887,8 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 
 				_passthrough_set: {
@@ -881,7 +900,8 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 
 				_passthrough_summary: {
@@ -893,14 +913,16 @@ components: {
 							required: false
 						}
 					}
-					type: "gauge"
+					type:              "gauge"
+					default_namespace: "vector"
 				}
 			}
 		}
 
 		telemetry: metrics: {
 			// Default metrics for each component
-			vector_events_processed_total: _vector_events_processed_total
+			events_processed_total: components.sources.internal_metrics.output.metrics.events_processed_total
+			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		}
 	}}
 }

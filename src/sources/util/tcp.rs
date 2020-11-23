@@ -7,14 +7,12 @@ use crate::{
 };
 use bytes::Bytes;
 use futures::{
-    compat::Sink01CompatExt,
-    future::{self, BoxFuture},
-    stream, FutureExt, StreamExt, TryFutureExt,
+    compat::Sink01CompatExt, future::BoxFuture, stream, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::Sink;
 use listenfd::ListenFd;
 use serde::{de, Deserialize, Deserializer, Serialize};
-use std::{fmt, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
+use std::{fmt, future::ready, io, mem::drop, net::SocketAddr, task::Poll, time::Duration};
 use tokio::{
     net::{TcpListener, TcpStream},
     time::delay_for,
@@ -77,7 +75,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
 
         let listenfd = ListenFd::from_env();
 
-        let fut = async move {
+        Ok(Box::pin(async move {
             let listener = match make_listener(addr, listenfd, &tls).await {
                 None => return Err(()),
                 Some(listener) => listener,
@@ -151,9 +149,7 @@ pub trait TcpSource: Clone + Send + Sync + 'static {
                 })
                 .map(Ok)
                 .await
-        };
-
-        Ok(Box::new(fut.boxed().compat()))
+        }))
     }
 }
 
@@ -208,7 +204,7 @@ async fn handle_stream(
         reader.poll_next_unpin(cx)
     })
     .take_until(tripwire)
-    .filter_map(move |frame| future::ready(match frame {
+    .filter_map(move |frame| ready(match frame {
         Ok(frame) => {
             let host = host.clone();
             source.build_event(frame, host).map(Ok)

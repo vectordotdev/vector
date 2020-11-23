@@ -17,10 +17,12 @@ components: sources: kubernetes_logs: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				name:     "Kubernetes"
-				thing:    "\(name) nodes"
-				url:      urls.kubernetes
-				versions: ">= 1.14"
+				service: {
+					name:     "Kubernetes"
+					thing:    "\(name) nodes"
+					url:      urls.kubernetes
+					versions: ">= 1.14"
+				}
 
 				interface: {
 					file_system: {
@@ -298,5 +300,10 @@ components: sources: kubernetes_logs: {
 					[Kubernetes provided access information](\(urls.kubernetes_accessing_api_from_pod)).
 					"""
 		}
+	}
+
+	telemetry: metrics: {
+		docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.docker_format_parse_failures_total
+		event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.event_annotation_failures_total
 	}
 }
