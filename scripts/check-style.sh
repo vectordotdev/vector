@@ -25,7 +25,7 @@ ised() {
 
 EXIT_CODE=0
 for FILE in $(git ls-files); do
-  # ignore binary files
+  # Ignore binary files and generated files.
   case "$FILE" in
     *png) continue;;
     *svg) continue;;
@@ -33,7 +33,7 @@ for FILE in $(git ls-files); do
     *ico) continue;;
     *sig) continue;;
     tests/data*) continue;;
-    distribution/kubernetes/vector.yaml) continue;;
+    distribution/kubernetes/*/*.yaml) continue;;
   esac
 
   # check that the file contains trailing newline
