@@ -1,17 +1,38 @@
 use crate::{event::Metric, Event};
-use metrics::{Key, Label, Recorder, Unit};
+use metrics::{Key, KeyData, Label, Recorder, Unit};
 use metrics_tracing_context::{LabelFilter, TracingContextLayer};
 use metrics_util::layers::Layer;
 use metrics_util::{CompositeKey, Handle, MetricKind, Registry};
 use once_cell::sync::OnceCell;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 static CONTROLLER: OnceCell<Controller> = OnceCell::new();
+
+// Cardinality counter parameters, expose the internal metrics registry
+// cardinality.
+// Useful for the end users to help understand the characteristics of their
+// environment and how vectors acts in it.
+const CARDINALITY_KEY_NAME: &str = "internal_metrics_cardinality";
+static CARDINALITY_KEY_DATA: KeyData = KeyData::from_static_name(CARDINALITY_KEY_NAME);
+static CARDINALITY_KEY: CompositeKey =
+    CompositeKey::new(MetricKind::Counter, Key::Borrowed(&CARDINALITY_KEY_DATA));
 
 pub fn init() -> crate::Result<()> {
     // Prepare the registry.
     let registry = Registry::new();
     let registry = Arc::new(registry);
+
+    // Init the cardinality counter.
+    let cardinality_counter = Arc::new(AtomicU64::new(1));
+    // Inject the cardinality counter into the registry.
+    registry.op(
+        CARDINALITY_KEY.clone(),
+        |_| {},
+        || Handle::Counter(Arc::clone(&cardinality_counter)),
+    );
 
     // Initialize the controller.
     let controller = Controller {
@@ -25,6 +46,7 @@ pub fn init() -> crate::Result<()> {
     // Initialize the recorder.
     let recorder = VectorRecorder {
         registry: Arc::clone(&registry),
+        cardinality_counter: Arc::clone(&cardinality_counter),
     };
     // Apply a layer to capture tracing span fields as labels.
     let recorder = TracingContextLayer::new(VectorLabelFilter).layer(recorder);
@@ -39,16 +61,35 @@ pub fn init() -> crate::Result<()> {
 /// for the advanced usage that we have in Vector.
 struct VectorRecorder {
     registry: Arc<Registry<CompositeKey, Handle>>,
+    cardinality_counter: Arc<AtomicU64>,
+}
+
+impl VectorRecorder {
+    fn bump_cardinality_counter_and<F, O>(&self, f: F) -> O
+    where
+        F: FnOnce() -> O,
+    {
+        self.cardinality_counter.fetch_add(1, Ordering::Relaxed);
+        f()
+    }
 }
 
 impl Recorder for VectorRecorder {
     fn register_counter(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Counter, key);
-        self.registry.op(ckey, |_| {}, Handle::counter)
+        self.registry.op(
+            ckey,
+            |_| {},
+            || self.bump_cardinality_counter_and(Handle::counter),
+        )
     }
     fn register_gauge(&self, key: Key, _unit: Option<Unit>, _description: Option<&'static str>) {
         let ckey = CompositeKey::new(MetricKind::Gauge, key);
-        self.registry.op(ckey, |_| {}, Handle::gauge)
+        self.registry.op(
+            ckey,
+            |_| {},
+            || self.bump_cardinality_counter_and(Handle::gauge),
+        )
     }
     fn register_histogram(
         &self,
@@ -57,7 +98,11 @@ impl Recorder for VectorRecorder {
         _description: Option<&'static str>,
     ) {
         let ckey = CompositeKey::new(MetricKind::Histogram, key);
-        self.registry.op(ckey, |_| {}, Handle::histogram)
+        self.registry.op(
+            ckey,
+            |_| {},
+            || self.bump_cardinality_counter_and(Handle::histogram),
+        )
     }
 
     fn increment_counter(&self, key: Key, value: u64) {
@@ -65,20 +110,23 @@ impl Recorder for VectorRecorder {
         self.registry.op(
             ckey,
             |handle| handle.increment_counter(value),
-            Handle::counter,
+            || self.bump_cardinality_counter_and(Handle::counter),
         )
     }
     fn update_gauge(&self, key: Key, value: f64) {
         let ckey = CompositeKey::new(MetricKind::Gauge, key);
-        self.registry
-            .op(ckey, |handle| handle.update_gauge(value), Handle::gauge)
+        self.registry.op(
+            ckey,
+            |handle| handle.update_gauge(value),
+            || self.bump_cardinality_counter_and(Handle::gauge),
+        )
     }
     fn record_histogram(&self, key: Key, value: u64) {
         let ckey = CompositeKey::new(MetricKind::Histogram, key);
         self.registry.op(
             ckey,
             |handle| handle.record_histogram(value),
-            Handle::histogram,
+            || self.bump_cardinality_counter_and(Handle::histogram),
         )
     }
 }
@@ -152,7 +200,7 @@ mod tests {
 
         let metric = super::capture_metrics(super::get_controller().unwrap())
             .map(|e| e.into_metric())
-            .find(|metric| metric.name == "labels_injected")
+            .find(|metric| metric.name == "labels_injected_total")
             .unwrap();
 
         let expected_tags = Some(
@@ -166,5 +214,39 @@ mod tests {
         );
 
         assert_eq!(metric.tags, expected_tags);
+    }
+
+    #[test]
+    fn test_cardinality_metric() {
+        trace_init();
+        let _ = super::init();
+
+        let capture_value = || {
+            let metric = super::capture_metrics(super::get_controller().unwrap())
+                .map(|e| e.into_metric())
+                .find(|metric| metric.name == super::CARDINALITY_KEY_NAME)
+                .unwrap();
+            match metric.value {
+                crate::event::MetricValue::Counter { value } => value,
+                _ => panic!("invalid metric value type, expected coutner, got something else"),
+            }
+        };
+
+        let intial_value = capture_value();
+
+        counter!("cardinality_test_metric_1", 1);
+        assert_eq!(capture_value(), intial_value + 1.0);
+
+        counter!("cardinality_test_metric_1", 1);
+        assert_eq!(capture_value(), intial_value + 1.0);
+
+        counter!("cardinality_test_metric_2", 1);
+        counter!("cardinality_test_metric_3", 1);
+        assert_eq!(capture_value(), intial_value + 3.0);
+
+        counter!("cardinality_test_metric_1", 1);
+        counter!("cardinality_test_metric_2", 1);
+        counter!("cardinality_test_metric_3", 1);
+        assert_eq!(capture_value(), intial_value + 3.0);
     }
 }
