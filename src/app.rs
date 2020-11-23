@@ -202,6 +202,7 @@ impl Application {
 
                 Some(api::Server::start(topology.config()))
             } else {
+                info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None
             };
 
