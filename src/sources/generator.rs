@@ -274,7 +274,8 @@ mod tests {
     async fn copies_lines() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
-            r#"format.round_robin.items = ["one", "two"]
+            r#"format = "round_robin"
+               items = ["one", "two"]
                count = 1"#,
         )
         .await;
@@ -298,7 +299,8 @@ mod tests {
     #[tokio::test]
     async fn limits_count() {
         let mut rx = runit(
-            r#"format.round_robin.items = ["one", "two"]
+            r#"format = "round_robin"
+               items = ["one", "two"]
                count = 5"#,
         )
         .await;
@@ -313,8 +315,9 @@ mod tests {
     async fn adds_sequence() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
-            r#"format.round_robin.items = ["one", "two"]=
-               format.round_robin.sequence = true
+            r#"format = "round_robin"
+               items = ["one", "two"]
+               sequence = true
                count = 2"#,
         )
         .await;
@@ -339,7 +342,8 @@ mod tests {
     async fn obeys_batch_interval() {
         let start = Instant::now();
         let mut rx = runit(
-            r#"format.round_robin.items = ["one", "two"]
+            r#"format = "round_robin"
+               items = ["one", "two"]
                count = 3
                batch_interval = 1.0"#,
         )
