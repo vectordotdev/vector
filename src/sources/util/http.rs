@@ -15,7 +15,7 @@ use snap::raw::Decoder as SnappyDecoder;
 use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, io::Read, net::SocketAddr};
 use tracing_futures::Instrument;
 use warp::{
-    filters::BoxedFilter,
+    filters::{path::FullPath, BoxedFilter},
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
@@ -180,6 +180,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
+        full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
@@ -203,14 +204,15 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 }
             }
             let svc = filter
-                .and(warp::path::end())
+                .and(warp::path::full())
                 .and(warp::header::optional::<String>("authorization"))
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
                 .and(warp::body::bytes())
                 .and(warp::query::<HashMap<String, String>>())
                 .and_then(
-                    move |auth_header,
+                    move |path: FullPath,
+                          auth_header,
                           encoding_header,
                           headers: HeaderMap,
                           body: Bytes,
@@ -219,13 +221,12 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
 
                         let mut out = out.clone();
-
                         let events = auth
                             .is_valid(&auth_header)
                             .and_then(|()| decode(&encoding_header, body))
                             .and_then(|body| {
                                 let body_len=body.len();
-                                self.build_event(body, headers, query_parameters)
+                                self.build_event(body, headers, query_parameters, path.as_str())
                                     .map(|events| (events, body_len))
                             });
 

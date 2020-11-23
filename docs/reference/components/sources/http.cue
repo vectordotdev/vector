@@ -123,6 +123,11 @@ components: sources: http: {
 					}
 				}
 				timestamp: fields._current_timestamp
+				vector_http_path: {
+					description: "The HTTP path the event was received from."
+					required:     false
+					type: string: examples: ["/event/foo"]
+				}
 			}
 		}
 		structured: {
@@ -136,6 +141,11 @@ components: sources: http: {
 					type: "*": {}
 				}
 				timestamp: fields._current_timestamp
+				vector_http_path: {
+					description: "The HTTP path the event was received from."
+					required:     false
+					type: string: examples: ["/event/foo"]
+				}
 			}
 		}
 	}

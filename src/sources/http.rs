@@ -73,10 +73,18 @@ impl HttpSource for SimpleHttpSource {
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
+        request_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage> {
         decode_body(body, self.encoding)
             .map(|events| add_headers(events, &self.headers, header_map))
             .map(|events| add_query_parameters(events, &self.query_parameters, query_parameters))
+            .map(|events| {
+                if request_path.len() > 1 {
+                    add_path(events, request_path)
+                } else {
+                    events
+                }
+            })
             .map(|mut events| {
                 // Add source type
                 let key = log_schema().source_type_key();
@@ -117,6 +125,16 @@ impl SourceConfig for SimpleHttpConfig {
     fn resources(&self) -> Vec<Resource> {
         vec![Resource::tcp(self.address)]
     }
+}
+
+fn add_path(mut events: Vec<Event>, path: &str) -> Vec<Event> {
+    for event in events.iter_mut() {
+        event
+            .as_mut_log()
+            .insert("vector_http_path", Value::from(path.to_string()));
+    }
+
+    events
 }
 
 fn add_headers(
@@ -314,6 +332,17 @@ mod tests {
     async fn send_with_query(address: SocketAddr, body: &str, query: &str) -> u16 {
         reqwest::Client::new()
             .post(&format!("http://{}?{}", address, query))
+            .body(body.to_owned())
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
+    async fn send_with_path(address: SocketAddr, body: &str, path: &str) -> u16 {
+        reqwest::Client::new()
+            .post(&format!("http://{}{}", address, path))
             .body(body.to_owned())
             .send()
             .await
@@ -592,6 +621,45 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(log[log_schema().message_key()], "test body".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_path() {
+        trace_init();
+        let (rx, addr) = source(Encoding::Ndjson, vec![], vec![]).await;
+
+        assert_eq!(
+            200,
+            send_with_path(addr, "{\"key1\":\"value1\"}", "/event/path").await
+        );
+
+        let mut events = collect_n(rx, 1).await.unwrap();
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log["vector_http_path"], "/event/path".into());
+            assert!(log.get(log_schema().timestamp_key()).is_some());
+            assert_eq!(log[log_schema().source_type_key()], "http".into());
+        }
+    }
+
+    #[tokio::test]
+    async fn http_path_default() {
+        trace_init();
+        let (rx, addr) = source(Encoding::Ndjson, vec![], vec![]).await;
+
+        assert_eq!(200, send(addr, "{\"key1\":\"value1\"}").await);
+
+        let mut events = collect_n(rx, 1).await.unwrap();
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log.get("vector_http_path"), None);
             assert!(log.get(log_schema().timestamp_key()).is_some());
             assert_eq!(log[log_schema().source_type_key()], "http".into());
         }
