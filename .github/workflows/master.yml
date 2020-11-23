@@ -414,6 +414,51 @@ jobs:
         env:
           RUSTFLAGS: "-D warnings"
 
+  checks:
+    name: Checks
+    runs-on: ubuntu-20.04
+    container: timberio/ci_image
+    needs: changes
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          # check-version needs tags
+          fetch-depth: 0 # fetch everything
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Enable Rust matcher
+        run: echo "::add-matcher::.github/matchers/rust.json"
+      - name: Make slim-builds
+        run: make slim-builds
+      - name: Check markdown
+        run: make check-markdown
+      - name: Check Cue docs
+        run: make check-docs
+      - name: Check code format
+        run: make check-fmt
+      - name: Check clippy
+        run: make check-clippy
+      - name: Check version
+        run: make check-version
+      - name: Check scripts
+        run: make check-scripts
+      - name: Check helm dependencies
+        run: make check-helm-dependencies
+      - name: Check helm lint
+        run: make check-helm-lint
+      - name: Check that generated Kubernetes YAML doesn't diverge from Helm
+        run: make check-kubernetes-yaml
+      - name: Check events
+        run: make check-events
+      - name: Check cargo deny
+        uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check advisories
+
   master-failure:
     name: master-failure
     if: failure()
@@ -436,6 +481,7 @@ jobs:
       - test-integration-pulsar
       - test-integration-splunk
       - check-component-features
+      - checks
     runs-on: ubuntu-latest
     steps:
     - name: Discord notification
