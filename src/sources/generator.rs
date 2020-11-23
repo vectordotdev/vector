@@ -195,7 +195,7 @@ async fn syslog_generate(
 
 impl GeneratorConfig {
     pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
-        Box::new(self.inner(shutdown, out).boxed().compat())
+        Box::pin(self.inner(shutdown, out))
     }
 
     #[allow(dead_code)] // to make check-component-features pass
