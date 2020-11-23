@@ -207,7 +207,6 @@ mod tests {
         Pipeline,
     };
     use chrono::{DateTime, Utc};
-    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
@@ -238,7 +237,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap()
         });

@@ -18,17 +18,20 @@ components: sources: splunk_hec: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Splunk HEC"
-				thing:    "a \(name) client"
-				url:      urls.splunk_hec
-				versions: null
+				service: {
+					name:     "Splunk HEC"
+					thing:    "a \(name) client"
+					url:      urls.splunk_hec
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
 						title: "Splunk HEC"
 						url:   urls.splunk_hec_protocol
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["http"]
 					ssl: "optional"
 				}

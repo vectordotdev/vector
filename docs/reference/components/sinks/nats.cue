@@ -28,10 +28,12 @@ components: sinks: nats: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				name:     "NATS"
-				thing:    "a \(name) server"
-				url:      urls.nats
-				versions: null
+				service: {
+					name:     "NATS"
+					thing:    "a \(name) server"
+					url:      urls.nats
+					versions: null
+				}
 
 				interface: {
 					socket: {

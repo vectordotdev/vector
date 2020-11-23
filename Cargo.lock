@@ -754,7 +754,7 @@ checksum = "8504b63dd1249fd1745b7b4ef9b6f7b107ddeb3c95370043c7dbcc38653a2679"
 dependencies = [
  "semver 0.9.0",
  "serde",
- "toml 0.5.6",
+ "toml",
  "url",
 ]
 
@@ -775,9 +775,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.0.62"
+version = "1.0.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1770ced377336a88a67c473594ccc14eca6f4559217c34f64aac8f83d641b40"
+checksum = "95752358c8f7552394baf48cd82695b345628ad3f170d607de3ca03b8dacca15"
 dependencies = [
  "jobserver",
 ]
@@ -2386,7 +2386,7 @@ dependencies = [
  "lazy_static",
  "libc",
  "mach",
- "nix 0.17.0",
+ "nix",
  "pin-utils",
  "uom 0.28.0",
  "winapi 0.3.9",
@@ -2473,7 +2473,7 @@ dependencies = [
  "heim-runtime",
  "libc",
  "macaddr",
- "nix 0.17.0",
+ "nix",
 ]
 
 [[package]]
@@ -3226,7 +3226,7 @@ dependencies = [
  "lucet-module",
  "lucet-runtime-macros",
  "memoffset",
- "nix 0.17.0",
+ "nix",
  "num-derive",
  "num-traits",
  "rand 0.7.3",
@@ -3260,7 +3260,7 @@ dependencies = [
  "lucet-runtime-internals",
  "lucet-wasi-generate",
  "lucet-wiggle",
- "nix 0.17.0",
+ "nix",
  "rand 0.6.5",
  "wasi-common",
 ]
@@ -3724,9 +3724,9 @@ dependencies = [
 
 [[package]]
 name = "nats"
-version = "0.8.3"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0878cee9db789cbafacd36ac25ae2faf2dab1241882a124c970454a13b2989b7"
+checksum = "14b716f15b711daea70d5da9195f5c10063d2a14d74b8dba256f8eb6d45d8b29"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -3767,19 +3767,6 @@ dependencies = [
  "cfg-if 0.1.10",
  "libc",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "nix"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd0eaf8df8bab402257e0a5c17a254e4cc1f72a93588a1ddfb5d356c801aa7cb"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if 0.1.10",
- "libc",
- "void",
 ]
 
 [[package]]
@@ -4442,7 +4429,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d6ea3c4595b96363c13943497db34af4460fb474a95c43f4446ad341b8c9785"
 dependencies = [
- "toml 0.5.6",
+ "toml",
 ]
 
 [[package]]
@@ -6411,18 +6398,9 @@ dependencies = [
 
 [[package]]
 name = "toml"
-version = "0.4.10"
+version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "toml"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffc92d160b1eef40665be3a05630d003936a3bc7da7421277846c2613e92c71a"
+checksum = "75cf45bb0bef80604d001caaec0d09da99611b3c0fd39d3080468875cdb65645"
 dependencies = [
  "serde",
 ]
@@ -6894,7 +6872,7 @@ checksum = "e394bc3ecd454f68f04803a7b527b36956413120fa06420dc1329cda49340763"
 dependencies = [
  "bitflags",
  "libc",
- "nix 0.17.0",
+ "nix",
  "thiserror",
  "userfaultfd-sys",
 ]
@@ -7029,7 +7007,7 @@ dependencies = [
  "metrics-util",
  "mongodb",
  "nats",
- "nix 0.16.1",
+ "nix",
  "nom 5.1.2",
  "notify",
  "num-format",
@@ -7038,6 +7016,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "percent-encoding",
  "pest",
  "pest_derive",
  "pin-project 1.0.1",
@@ -7090,7 +7069,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "tokio01-test",
- "toml 0.4.10",
+ "toml",
  "tower",
  "tower-test",
  "tracing 0.1.21",
@@ -7151,7 +7130,7 @@ dependencies = [
  "regex",
  "semver-parser 0.9.0",
  "syn 1.0.48",
- "toml 0.5.6",
+ "toml",
  "url",
 ]
 
