@@ -56,9 +56,9 @@ components: sources: docker_logs: {
 
 							If you receive an error it's likely that you do not have
 							the proper Docker logging drivers installed. The Docker
-							Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
-							or [`journald`](docker_logging_driver_journald) Docker
-							logging driver to be installed.
+							Engine requires the [`json-file`](\(urls.docker_logging_driver_json_file)) (default),
+							[`journald`](docker_logging_driver_journald), or [`local`](\(urls.docker_logging_driver_local)) Docker
+							logging drivers to be installed.
 							""",
 					]
 				}
