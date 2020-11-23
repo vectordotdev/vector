@@ -127,66 +127,75 @@ impl LogEvent {
     /// Insert a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
-        unimplemented!()
-        // let mut lookup_iter = lookup.iter().peekable();
-        // let value = value.into();
-        // // The first step should always be a field.
-        // let first_step = lookup_iter.next()?;
-        // // This is good, since the first step into a LogEvent will also be a field.
-        //
-        // // This step largely exists so that we can make `cursor` a `Value` right off the bat.
-        // // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
-        // let mut cursor = match first_step {
-        //     Segment::Field(f) => self.fields.get_mut(*f),
-        //     // In this case, the user has passed us an invariant.
-        //     Segment::Index(_) => {
-        //         error!(
-        //             "Lookups into LogEvents should never start with indexes.\
-        //                 Please report your config."
-        //         );
-        //         return None;
-        //     }
-        // };
-        //
-        // let mut retval = None;
-        // for segment in lookup_iter {
-        //     cursor = match (segment, cursor) {
-        //         // Fields access maps.
-        //         (Segment::Field(f), Some(Value::Map(map))) => {
-        //             match lookup_iter.peek() {
-        //                 None => {
-        //                     trace!("Creating field inside map.");
-        //                     retval = map.insert(f.to_string(), value);
-        //                     break;
-        //                 }
-        //                 Some(v) => {
-        //                     trace!("Matched field into map.");
-        //                     cursor.get_mut(f)
-        //                 }
-        //             }
-        //         }
-        //         // Indexes access arrays.
-        //         (Segment::Index(i), Some(Value::Array(array))) => {
-        //             match lookup_iter.peek() {
-        //                 None => {
-        //                     trace!("Creating index inside array.");
-        //                     unimplemented!()
-        //                 }
-        //                 Some(v) => {
-        //                     trace!("Matched index into array.");
-        //                     cursor.get_mut(f)
-        //                 }
-        //             }
-        //         }
-        //         // The rest, it's not good.
-        //         (Segment::Index(_), _) | (Segment::Field(_), _) => {
-        //             trace!("Unmatched lookup.");
-        //             None
-        //         }
-        //     }
-        // };
-        //
-        // retval
+        let lookup_len = lookup.len();
+        let mut lookup_iter = lookup.into_iter().enumerate();
+        let value = value.into();
+        // The first step should always be a field.
+        let (_zero, first_step) = lookup_iter.next()?;
+        // This is good, since the first step into a LogEvent will also be a field.
+
+        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
+        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
+        let mut cursor = match first_step {
+            SegmentBuf::Field(f) => self.fields.get_mut(&*f),
+            // In this case, the user has passed us an invariant.
+            SegmentBuf::Index(_) => {
+                error!(
+                    "Lookups into LogEvents should never start with indexes.\
+                        Please report your config."
+                );
+                return None;
+            }
+        };
+
+        let mut retval = None;
+        for (index, segment) in lookup_iter {
+            cursor = match (segment, cursor) {
+                // Fields access maps.
+                (SegmentBuf::Field(ref f), Some(Value::Map(map))) => {
+                    if index == lookup_len {
+                        trace!("Creating field inside map.");
+                        retval = map.insert(f.clone(), value);
+                        break;
+                    } else {
+                        trace!("Matched field into map.");
+                        map.get_mut(&*f)
+                    }
+                },
+                // Indexes access arrays.
+                (SegmentBuf::Index(i), Some(Value::Array(array))) => {
+                    if index == lookup_len {
+                        trace!("Creating index inside array.");
+                        match array.get_mut(i) {
+                            None => {
+                                // We have to create space in the array here!
+                                // We fill the prior indexes with `Value::Null`.
+                                array.resize_with(i.saturating_sub(1), || Value::Null);
+                                array.insert(i, value);
+                                break;
+
+                            }
+                            Some(target) => {
+                                let mut removed = Value::Null;
+                                core::mem::swap(target, &mut removed);
+                                retval = Some(removed);
+                                break;
+                            }
+                        }
+                    } else {
+                        trace!("Matched index into array.");
+                        array.get_mut(i)
+                    }
+                },
+                // The rest, it's not good.
+                (SegmentBuf::Index(_), _) | (SegmentBuf::Field(_), _) => {
+                    trace!("Unmatched lookup.");
+                    None
+                }
+            }
+        };
+
+        retval
     }
 
     /// Remove a value that exists at a given lookup.
@@ -198,7 +207,79 @@ impl LogEvent {
         lookup: impl Into<Lookup<'a>> + Debug,
         prune: bool,
     ) -> Option<Value> {
-        unimplemented!()
+        let lookup = lookup.into();
+        let lookup_len = lookup.len();
+        let mut lookup_iter = lookup.iter().enumerate();
+        // The first step should always be a field.
+        let (_zero, first_step) = lookup_iter.next()?;
+        // This is good, since the first step into a LogEvent will also be a field.
+
+        // This step largely exists so that we can make `cursor` a `Value` right off the bat.
+        // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
+        let mut cursor = match first_step {
+            Segment::Field(f) => self.fields.get_mut(*f),
+            // In this case, the user has passed us an invariant.
+            Segment::Index(_) => {
+                error!(
+                    "Lookups into LogEvents should never start with indexes.\
+                        Please report your config."
+                );
+                return None;
+            }
+        };
+
+        let mut retval = None;
+        let mut needs_prune = None;
+        for (index, segment) in lookup_iter {
+            cursor = match (segment, cursor) {
+                // Fields access maps.
+                (Segment::Field(f), Some(Value::Map(map))) => {
+                    if index == lookup_len {
+                        trace!("Removing field inside map.");
+                        retval = map.remove(*f);
+                        if map.is_empty() && prune {
+                            let mut cloned = lookup.clone();
+                            cloned.pop();
+                            needs_prune = Some(cloned);
+                        }
+                        break;
+                    } else {
+                        trace!("Matched field into map.");
+                        map.get_mut(*f)
+                    }
+                },
+                // Indexes access arrays.
+                (Segment::Index(i), Some(Value::Array(array))) => {
+                    if index == lookup_len {
+                        trace!("Removing index inside array.");
+                        match array.get_mut(*i) {
+                            None => None,
+                            Some(target) => {
+                                let mut removed = Value::Null;
+                                core::mem::swap(target, &mut removed);
+                                retval = Some(removed);
+                                break;
+                            }
+                        }
+
+                    } else {
+                        trace!("Matched index into array.");
+                        array.get_mut(*i)
+                    }
+                },
+                // The rest, it's not good.
+                (Segment::Index(_), _) | (Segment::Field(_), _) => {
+                    trace!("Unmatched lookup.");
+                    None
+                }
+            }
+        };
+
+        if let Some(prune_here) = needs_prune {
+            self.remove(prune_here, true);
+        }
+
+        retval
     }
 
     /// Iterate over the lookups available in this log event.

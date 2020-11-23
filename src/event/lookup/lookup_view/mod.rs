@@ -1,3 +1,5 @@
+#![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
+
 #[cfg(test)]
 mod test;
 
@@ -80,30 +82,35 @@ impl<'a> Display for Lookup<'a> {
 
 impl<'a> Lookup<'a> {
     /// Push onto the internal list of segments.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn push(&mut self, segment: Segment<'a>) {
         trace!(length = %self.segments.len(), "Pushing.");
         self.segments.push(segment)
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn pop(&mut self) -> Option<Segment<'a>> {
         trace!(length = %self.segments.len(), "Popping.");
         self.segments.pop()
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
+    pub fn len(&self) -> usize {
+        self.segments.len()
+    }
+
+    #[instrument(level = "trace")]
     pub fn iter(&self) -> Iter<'_, Segment<'a>> {
         self.segments.iter()
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn into_iter(self) -> IntoIter<Segment<'a>> {
         self.segments.into_iter()
     }
 
     /// Raise any errors that might stem from the lookup being invalid.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn is_valid(&self) -> crate::Result<()> {
         if self.segments.is_empty() {
             return Err("Lookups must have at least 1 segment to be valid.".into());
@@ -113,7 +120,7 @@ impl<'a> Lookup<'a> {
     }
 
     /// Parse the lookup from a str.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn from_str(input: &'a str) -> Result<Self, crate::Error> {
         let mut pairs = MappingParser::parse(Rule::lookup, input)?;
         let pair = pairs.next().ok_or("No tokens found.")?;
@@ -121,31 +128,31 @@ impl<'a> Lookup<'a> {
     }
 
     /// Dump the value to a `String`.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn to_string(&self) -> String {
         format!("{}", self)
     }
 
     /// Become a `LookupBuf` (by allocating).
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn into_buf(self) -> LookupBuf {
         LookupBuf::from(self)
     }
 
     /// Return a borrow of the Segment set.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn as_segments(&self) -> &Vec<Segment<'_>> {
         &self.segments
     }
 
     /// Return the Segment set.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn into_segments(self) -> Vec<Segment<'a>> {
         self.segments
     }
 
     /// Merge a lookup.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn extend(&mut self, other: Self) {
         self.segments.extend(other.segments)
     }

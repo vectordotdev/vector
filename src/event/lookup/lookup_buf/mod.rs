@@ -1,3 +1,5 @@
+#![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
+
 use crate::{event::Value, mapping::parser::Rule};
 use pest::iterators::Pair;
 use std::{
@@ -104,24 +106,24 @@ impl Display for LookupBuf {
 
 impl LookupBuf {
     /// Push onto the internal list of segments.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn push(&mut self, segment: SegmentBuf) {
         trace!(length = %self.segments.len(), "Pushing.");
         self.segments.push(segment);
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn pop(&mut self) -> Option<SegmentBuf> {
         trace!(length = %self.segments.len(), "Popping.");
         self.segments.pop()
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn iter(&self) -> Iter<'_, SegmentBuf> {
         self.segments.iter()
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn from_indexmap(
         values: IndexMap<String, TomlValue>,
     ) -> crate::Result<IndexMap<LookupBuf, Value>> {
@@ -132,7 +134,12 @@ impl LookupBuf {
         Ok(discoveries)
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
+    pub fn len(&self) -> usize {
+        self.segments.len()
+    }
+
+    #[instrument(level = "trace")]
     pub fn from_toml_table(value: TomlValue) -> crate::Result<IndexMap<LookupBuf, Value>> {
         let mut discoveries = IndexMap::new();
         match value {
@@ -150,7 +157,7 @@ impl LookupBuf {
         }
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     fn recursive_step(
         lookup: LookupBuf,
         value: TomlValue,
@@ -184,7 +191,7 @@ impl LookupBuf {
     }
 
     /// Raise any errors that might stem from the lookup being invalid.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn is_valid(&self) -> crate::Result<()> {
         if self.segments.is_empty() {
             return Err("Lookups must have at least 1 segment to be valid.".into());
@@ -193,36 +200,36 @@ impl LookupBuf {
         Ok(())
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn clone_lookup(&self) -> Lookup {
         Lookup::from(self)
     }
 
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn from_str(value: &str) -> Result<LookupBuf, crate::Error> {
         Lookup::from_str(value).map(|l| l.into_buf())
     }
 
     /// Return a borrow of the SegmentBuf set.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn as_segments(&self) -> &Vec<SegmentBuf> {
         self.segments.as_ref()
     }
 
     /// Return the SegmentBuf set.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn into_segments(self) -> Vec<SegmentBuf> {
         self.segments
     }
 
     /// Merge a lookup.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn extend(&mut self, other: Self) {
         self.segments.extend(other.segments)
     }
 
     /// Returns `true` if `needle` is a prefix of the lookup.
-    #[instrument]
+    #[instrument(level = "trace")]
     pub fn starts_with(&self, needle: &LookupBuf) -> bool {
         self.segments.starts_with(&needle.segments)
     }
