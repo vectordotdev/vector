@@ -159,6 +159,7 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
 url = "2.2.0"
+percent-encoding = "2.1.0"
 base64 = { version = "0.13.0", optional = true }
 bollard = { version = "0.8.0", optional = true }
 listenfd = { version = "0.3.3", optional = true }
@@ -216,6 +217,7 @@ prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
+base64 = "0.13"
 approx = "0.3.0"
 criterion = "0.3"
 tempfile = "3.0.6"
@@ -451,7 +453,7 @@ sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = ["bytesize"]
-sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
+sinks-elasticsearch = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
 sinks-honeycomb = ["bytesize"]
