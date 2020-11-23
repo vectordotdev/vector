@@ -32,11 +32,19 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Download baseline benchmarks
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          github_token: ${{secrets.GITHUB_TOKEN}}
+          workflow: benches.yml
+          branch: run-benches-in-ci # TODO update to master
+          name: vector-benches
+          path: target/criterion
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make bench
+      - run: make bench # TODO check output for "Performance has regressed"
       - uses: actions/upload-artifact@v2
         with:
           name: "vector-benches"
