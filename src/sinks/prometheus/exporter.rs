@@ -289,10 +289,8 @@ impl StreamSink for PrometheusExporter {
                     Poll::Ready(Some(event)) => {
                         received += 1;
 
-                        if metrics.is_none() {
-                            metrics.replace(self.metrics.write().unwrap());
-                        }
-                        let metrics = metrics.as_mut().unwrap();
+                        let metrics = metrics
+                            .get_or_insert_with(|| self.metrics.write().expect("poisoned lock"));
 
                         let item = event.into_metric();
                         match item.kind {
@@ -302,18 +300,18 @@ impl StreamSink for PrometheusExporter {
                                     if item.value.is_set() {
                                         // sets need to be expired from time to time
                                         // because otherwise they could grow infinitelly
-                                        if reset_existing.is_none() {
+                                        let reset = reset_existing.get_or_insert_with(|| {
                                             let now = Utc::now().timestamp();
                                             let interval =
                                                 now - *self.last_flush_timestamp.read().unwrap();
-                                            if interval > self.config.flush_period_secs as i64 {
+                                            let expired =
+                                                interval > self.config.flush_period_secs as i64;
+                                            if expired {
                                                 *self.last_flush_timestamp.write().unwrap() = now;
-                                                reset_existing = Some(true);
-                                            } else {
-                                                reset_existing = Some(false);
                                             }
-                                        }
-                                        if reset_existing == Some(true) {
+                                            expired
+                                        });
+                                        if *reset {
                                             existing.reset();
                                         }
                                     }
