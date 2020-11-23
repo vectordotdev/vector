@@ -36,6 +36,11 @@ for FILE in $(git ls-files); do
     distribution/kubernetes/*/*.yaml) continue;;
   esac
 
+  # Skip all directories (usually theis only happens when we have symlinks).
+  if [[ -d "$FILE" ]]; then
+    continue
+  fi
+
   # check that the file contains trailing newline
   if [ -n "$(tail -c1 "$FILE" | tr -d $'\n')" ]; then
     case "$MODE" in
