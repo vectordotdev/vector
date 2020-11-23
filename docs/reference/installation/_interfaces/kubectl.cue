@@ -18,41 +18,54 @@ installation: _interfaces: kubectl: {
 
 	roles: [Name=string]: {
 		commands: {
+			_deployment_variant:       string
+			_namespace:                string | *"vector"
 			_controller_resource_type: string
-			_controller_resource_name: string
+			_controller_resource_name: string | *_deployment_variant
+			_kustomization_base:       string | *"github.com/timberio/vector/distribution/kubernetes/\(_deployment_variant)"
+			_configmap_name:           string | *"\(_controller_resource_name)-config"
+			_configmap_file_name:      string | *"\(_controller_resource_name).toml"
+			_config_header:            string | *""
 			install:                   "kubectl apply -k ."
-			logs:                      "kubectl logs -n vector \(_controller_resource_type)/\(_controller_resource_name)"
+			logs:                      "kubectl logs -n \(_namespace) \(_controller_resource_type)/\(_controller_resource_name)"
 			reload:                    null
-			restart:                   "kubectl rollout restart -n vector \(_controller_resource_type)/\(_controller_resource_name)"
+			restart:                   "kubectl rollout restart -n \(_namespace) \(_controller_resource_type)/\(_controller_resource_name)"
 			start:                     null
 			stop:                      null
 			top:                       null
 			uninstall:                 "kubectl delete -k ."
 			upgrade:                   null
 			verify_config:             "kubectl kustomize"
+			prepare_namespace:         "kubectl create namespace --dry-run=client -oyaml \(_namespace) > namespace.yaml"
+			prepare_kustomization:     #"""
+				cat <<-KUSTOMIZATION > kustomization.yaml
+				namespace: \#(_namespace)
+				bases:
+				  - \#(_kustomization_base)
+				resources:
+				  - namespace.yaml
+				configMapGenerator:
+				  - name: \#(_configmap_name)
+				    files:
+				      - \#(_configmap_file_name)
+				KUSTOMIZATION
+				"""#
+			configure:                 #"""
+				cat <<-'VECTORCFG' > \#(_configmap_file_name)
+				\#(_config_header){config}
+				VECTORCFG
+				"""#
 		}
 
 		tutorials: {
 			installation: [
 				{
 					title:   "Define Vector's namespace"
-					command: "kubectl create namespace --dry-run=client -oyaml vector > namespace.yaml"
+					command: commands.prepare_namespace
 				},
 				{
-					title: "Prepare kustomization"
-					command: #"""
-						cat <<-KUSTOMIZATION > kustomization.yaml
-						namespace: vector
-						bases:
-						  - github.com/timberio/vector/distribution/kubernetes
-						resources:
-						  - namespace.yaml
-						configMapGenerator:
-						  - name: vector-agent-config
-						    files:
-						      - vector-agent.toml
-						KUSTOMIZATION
-						"""#
+					title:   "Prepare kustomization"
+					command: commands.prepare_kustomization
 				},
 				{
 					title:   "Configure Vector"
@@ -88,17 +101,14 @@ installation: _interfaces: kubectl: {
 						"""#
 
 			commands: {
+				_deployment_variant:       "vector-agent"
 				_controller_resource_type: "daemonset"
-				_controller_resource_name: "vector-agent"
-				configure: #"""
-					cat <<-'VECTORCFG' > vector-agent.toml
+				_config_header: """
 					# The Vector Kubernetes integration automatically defines a
-					# kubernetes_logs source that is made available to you.
+					# `kubernetes_logs` source that is made available to you.
 					# You do not need to define a log source.
-
-					{config}
-					VECTORCFG
-					"""#
+					\n
+					"""
 			}
 			variables: config: sinks: out: inputs: ["kubernetes_logs"]
 		}
@@ -119,13 +129,8 @@ installation: _interfaces: kubectl: {
 		//   """#
 
 		//  commands: {
+		//   _deployment_variant:       "vector-aggregator"
 		//   _controller_resource_type: "statefulset"
-		//   _controller_resource_name:          "vector-aggregator"
-		//   configure: #"""
-		//    cat <<-'VECTORCFG' > vector-aggregator.toml
-		//    {config}
-		//    VECTORCFG
-		//    """#
 		//  }
 		//  variables: config: sources: in_upstream: type: "vector"
 		// }
