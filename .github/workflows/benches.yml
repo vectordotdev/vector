@@ -3,7 +3,7 @@ name: Benchmark Suite
 on:
   push:
     branches:
-      - run-benches-in-ci
+      - master
   workflow_dispatch:
 
 env:
@@ -37,14 +37,14 @@ jobs:
         with:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: benches.yml
-          branch: run-benches-in-ci # TODO update to master
+          branch: master
           name: vector-benches
           path: target/criterion
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make bench # TODO check output for "Performance has regressed"
+      - run: make bench
       - uses: actions/upload-artifact@v2
         with:
           name: "vector-benches"
