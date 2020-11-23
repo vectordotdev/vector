@@ -45,16 +45,45 @@ pub struct Checkpointer {
 pub struct CheckpointsView {
     checkpoints: DashMap<FileFingerprint, FilePosition>,
     modified_times: DashMap<FileFingerprint, DateTime<Utc>>,
+    removed_times: DashMap<FileFingerprint, DateTime<Utc>>,
 }
 
 impl CheckpointsView {
     pub fn update(&self, fng: FileFingerprint, pos: FilePosition) {
         self.checkpoints.insert(fng, pos);
         self.modified_times.insert(fng, Utc::now());
+        self.removed_times.remove(&fng);
     }
 
     pub fn get(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(&fng).map(|r| *r.value())
+    }
+
+    pub fn set_dead(&self, fng: FileFingerprint) {
+        self.removed_times.insert(fng, Utc::now());
+    }
+
+    pub fn remove_expired(&self) {
+        let now = Utc::now();
+
+        // Collect all of the expired keys. Removing them while iterating can lead to deadlocks,
+        // the set should be small, and this is not a performance-sensitive path.
+        let to_remove = self
+            .removed_times
+            .iter()
+            .filter(|entry| {
+                let ts = entry.value();
+                let duration = now - *ts;
+                duration >= chrono::Duration::seconds(60)
+            })
+            .map(|entry| *entry.key())
+            .collect::<Vec<FileFingerprint>>();
+
+        for fng in to_remove {
+            self.checkpoints.remove(&fng);
+            self.modified_times.remove(&fng);
+            self.removed_times.remove(&fng);
+        }
     }
 
     fn load(&self, checkpoint: Checkpoint) {
@@ -202,7 +231,12 @@ impl Checkpointer {
     /// Persist the current checkpoints state to disk, making our best effort to do so in an atomic
     /// way that allow for recovering the previous state in the event of a crash.
     pub fn write_checkpoints(&self) -> Result<usize, io::Error> {
-        // First write the new checkpoints to a tmp file and flush it fully to disk. If vector
+        // First drop any checkpoints for files that were removed more than 60 seconds ago. This
+        // keeps our working set as small as possible and makes sure we don't spend time and IO
+        // writing checkpoints that don't matter anymore.
+        self.checkpoints.remove_expired();
+
+        // Write the new checkpoints to a tmp file and flush it fully to disk. If vector
         // dies anywhere during this section, the existing stable file will still be in its current
         // valid state and we'll be able to recover.
         let mut f = io::BufWriter::new(fs::File::create(&self.tmp_file_path)?);
@@ -338,7 +372,7 @@ mod test {
     }
 
     #[test]
-    fn test_checkpointer_expiration() {
+    fn test_checkpointer_ignore_before() {
         let newer = (
             FileFingerprint::DevInode(1, 2),
             Utc::now() - Duration::seconds(5),
@@ -479,5 +513,42 @@ mod test {
             chkptr.read_checkpoints(None);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
         }
+    }
+
+    #[test]
+    fn test_checkpointer_expiration() {
+        let cases = vec![
+            // (checkpoint, position, seconds since removed)
+            (FileFingerprint::Checksum(123), 0, 30),
+            (FileFingerprint::Checksum(456), 1, 60),
+            (FileFingerprint::Checksum(789), 2, 90),
+            (FileFingerprint::Checksum(101112), 3, 120),
+        ];
+
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(&data_dir.path());
+
+        for (fingerprint, position, removed) in cases.clone() {
+            chkptr.update_checkpoint(fingerprint, position);
+
+            // slide these in manually so we don't have to sleep for a long time
+            chkptr
+                .checkpoints
+                .removed_times
+                .insert(fingerprint, Utc::now() - chrono::Duration::seconds(removed));
+
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        }
+
+        // Update one that would otherwise be expired to ensure it sticks around
+        chkptr.update_checkpoint(cases[2].0, 42);
+
+        // Expiration is piggybacked on the persistence interval, so do a write to trigger it
+        chkptr.write_checkpoints().unwrap();
+
+        assert_eq!(chkptr.get_checkpoint(cases[0].0), Some(0));
+        assert_eq!(chkptr.get_checkpoint(cases[1].0), None);
+        assert_eq!(chkptr.get_checkpoint(cases[2].0), Some(42));
+        assert_eq!(chkptr.get_checkpoint(cases[3].0), None);
     }
 }

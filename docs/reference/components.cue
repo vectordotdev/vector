@@ -189,15 +189,19 @@ components: {
 			enabled: bool
 		})
 
-		from?: #Service
-		tls?:  #FeaturesTLS & {_args: {mode: "connect"}}
+		from?: {
+			service:    #Service
+			interface?: #Interface
+		}
+
+		tls?: #FeaturesTLS & {_args: {mode: "connect"}}
 	}
 
 	#FeaturesConvert: {
 	}
 
 	#FeaturesEnrich: {
-		from: close({
+		from: service: close({
 			name:     string
 			url:      string
 			versions: string | null
@@ -205,7 +209,10 @@ components: {
 	}
 
 	#FeaturesExpose: {
-		for: #Service
+		for: {
+			service:    #Service
+			interface?: #Interface
+		}
 	}
 
 	#FeaturesFilter: {
@@ -231,8 +238,12 @@ components: {
 	}
 
 	#FeaturesReceive: {
-		from?: #Service
-		tls:   #FeaturesTLS & {_args: {mode: "accept"}}
+		from?: {
+			service:    #Service
+			interface?: #Interface
+		}
+
+		tls: #FeaturesTLS & {_args: {mode: "accept"}}
 	}
 
 	#FeaturesReduce: {
@@ -313,7 +324,10 @@ components: {
 		// via TLS.
 		tls: #FeaturesTLS & {_args: {mode: "connect"}}
 
-		to?: #Service
+		to?: {
+			service:    #Service
+			interface?: #Interface
+		}
 	}
 
 	#FeaturesTLS: {
@@ -380,7 +394,7 @@ components: {
 		//
 		// For example, the `journald` source is only available on Linux
 		// environments.
-		platforms: #Platforms
+		platforms: #TargetTriples
 
 		// `requirements` describes any external requirements that the component
 		// needs to function properly.
@@ -773,7 +787,7 @@ components: {
 
 				if features.collect != _|_ {
 					if features.collect.from != _|_ {
-						collect_context: "Enriches data with useful \(features.collect.from.name) context."
+						collect_context: "Enriches data with useful \(features.collect.from.service.name) context."
 					}
 
 					if features.collect.checkpoint.enabled != _|_ {
@@ -793,7 +807,7 @@ components: {
 
 				if features.receive != _|_ {
 					if features.receive.from != _|_ {
-						receive_context: "Enriches data with useful \(features.receive.from.name) context."
+						receive_context: "Enriches data with useful \(features.receive.from.service.name) context."
 					}
 
 					if features.receive.tls.enabled != _|_ {

@@ -14,7 +14,7 @@ mod tests {
         sync::Once,
         time::{Duration, Instant},
     };
-    use tokio::{select, sync::oneshot};
+    use tokio::sync::oneshot;
     use url::Url;
     use vector::{
         self,
@@ -41,19 +41,13 @@ mod tests {
             let _ = vector::metrics::init();
         });
 
-        let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
             let since = Instant::now();
-            let mut timer = tokio::time::interval(Duration::from_secs(1));
-
-            loop {
-                select! {
-                    _ = &mut shutdown_rx => break,
-                    _ = timer.tick() => {
-                        emit(Heartbeat { since });
-                    }
-                }
-            }
+            tokio::time::interval(Duration::from_secs(1))
+                .take_until(shutdown_rx)
+                .for_each(|_| async move { emit(Heartbeat { since }) })
+                .await
         });
 
         shutdown_tx
@@ -132,18 +126,12 @@ mod tests {
 
     // Emits fake generate events every 10ms until the returned shutdown falls out of scope
     fn emit_fake_generator_events() -> oneshot::Sender<()> {
-        let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         tokio::spawn(async move {
-            let mut timer = tokio::time::interval(Duration::from_millis(10));
-
-            loop {
-                select! {
-                    _ = &mut shutdown_rx => break,
-                    _ = timer.tick() => {
-                        emit(GeneratorEventProcessed);
-                    }
-                }
-            }
+            tokio::time::interval(Duration::from_millis(10))
+                .take_until(shutdown_rx)
+                .for_each(|_| async { emit(GeneratorEventProcessed) })
+                .await
         });
 
         shutdown_tx

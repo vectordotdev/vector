@@ -15,7 +15,7 @@ components: sources: host_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: {
+			from: service: {
 				name:     "host"
 				thing:    "a \(name)"
 				url:      urls.host
@@ -387,7 +387,7 @@ components: sources: host_metrics: {
 			}
 		}
 		_memory_linux: _memory_gauge & {relevant_when: "OS is Linux"}
-		_memory_macos: _memory_gauge & {relevant_when: "OS is MacOS X"}
+		_memory_macos: _memory_gauge & {relevant_when: "OS is macOS X"}
 		_memory_nowin: {relevant_when: "OS is not Windows"}
 		_network_gauge: {
 			type: "gauge"
@@ -400,6 +400,6 @@ components: sources: host_metrics: {
 				}
 			}
 		}
-		_network_nomac: _network_gauge & {relevant_when: "OS is not MacOS"}
+		_network_nomac: _network_gauge & {relevant_when: "OS is not macOS"}
 	}
 }

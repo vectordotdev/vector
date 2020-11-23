@@ -114,11 +114,12 @@ scopes:
   - apache_metrics source # Anything `apache_metrics` source related
   - aws_kinesis_firehose source # Anything `aws_kinesis_firehose` source related
   - aws_s3 source # Anything `aws_s3` source related
-  - docker source # Anything `docker` source related
+  - docker_logs source # Anything `docker_logs` source related
   - file source # Anything `file` source related
   - generator source # Anything `generator` source related
   - host_metrics source # Anything `host_metrics` source related
   - http source # Anything `http` source related
+  - internal_metrics source # Anything `internal_metrics` source related
   - journald source # Anything `journald` source related
   - kafka source # Anything `kafka` source related
   - kubernetes_logs source # Anything `kubernetes_logs` source related

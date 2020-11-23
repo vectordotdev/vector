@@ -296,7 +296,7 @@ fn benchmark_complex(c: &mut Criterion) {
                     transforms::sampler::SamplerConfig {
                         rate: sample_rate,
                         key_field: None,
-                        pass_list: vec![],
+                        exclude: None,
                     },
                 );
                 config.add_sink(

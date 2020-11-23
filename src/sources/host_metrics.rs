@@ -9,11 +9,7 @@ use crate::{
     BoolAndSome, Pipeline,
 };
 use chrono::{DateTime, Utc};
-use futures::{
-    compat::Future01CompatExt,
-    future::{FutureExt, TryFutureExt},
-    stream::{self, StreamExt},
-};
+use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
 use futures01::Sink;
 use glob::{Pattern, PatternError};
 #[cfg(target_os = "macos")]
@@ -39,8 +35,7 @@ use serde::{
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::Path;
-use std::time::Duration;
-use tokio::{select, time};
+use tokio::time;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -131,7 +126,7 @@ impl SourceConfig for HostMetricsConfig {
         let mut config = self.clone();
         config.namespace.0 = config.namespace.0.filter(|namespace| !namespace.is_empty());
 
-        Ok(Box::new(config.run(out, shutdown).boxed().compat()))
+        Ok(Box::pin(config.run(out, shutdown)))
     }
 
     fn output_type(&self) -> DataType {
@@ -153,25 +148,16 @@ macro_rules! tags {
 }
 
 impl HostMetricsConfig {
-    async fn run(self, mut out: Pipeline, mut shutdown: ShutdownSignal) -> Result<(), ()> {
-        let interval = Duration::from_secs(self.scrape_interval_secs);
-        let mut interval = time::interval(interval).map(|_| ());
+    async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+        let mut out = out
+            .sink_map_err(|error| error!(message = "Error sending host metrics.", %error))
+            .sink_compat();
 
-        loop {
-            select! {
-                Some(()) = interval.next() => (),
-                _ = &mut shutdown => break,
-                else => break,
-            };
-
+        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        let mut interval = time::interval(duration).take_until(shutdown);
+        while interval.next().await.is_some() {
             let metrics = self.capture_metrics().await;
-
-            let (sink, _) = out
-                .send_all(futures01::stream::iter_ok(metrics))
-                .compat()
-                .await
-                .map_err(|error| error!(message = "Error sending host metrics.", %error))?;
-            out = sink;
+            out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
         }
 
         Ok(())

@@ -48,10 +48,7 @@ components: sinks: aws_kinesis_streams: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "AWS Kinesis Data Streams"
-				thing:    "a \(name) stream"
-				url:      urls.aws_kinesis_streams
-				versions: null
+				service: services.aws_kinesis_data_streams
 
 				interface: {
 					socket: {

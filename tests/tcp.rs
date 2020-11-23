@@ -70,8 +70,8 @@ async fn sample() {
         &["in"],
         transforms::sampler::SamplerConfig {
             rate: 10,
-            key_field: None,
-            pass_list: vec![],
+            key_field: Some(config::log_schema().message_key().into()),
+            exclude: None,
         },
     );
     config.add_sink(
