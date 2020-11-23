@@ -64,7 +64,18 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
-							default:      string
+							default:      null
+							templateable: true
+						}
+					}
+					namespace: {
+						description: "The namespace of the metric."
+						required:    false
+						common:      true
+						warnings: []
+						type: string: {
+							examples: ["service"]
+							default:      null
 							templateable: true
 						}
 					}
@@ -132,9 +143,10 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type:  "counter"
-						field: "status"
-						name:  "response_total"
+						type:      "counter"
+						field:     "status"
+						name:      "response_total"
+						namespace: "service"
 						tags: {
 							status: "{{status}}"
 							host:   "{{host}}"
@@ -148,8 +160,9 @@ components: transforms: log_to_metric: {
 				status:  200
 			}
 			output: [{metric: {
-				kind: "incremental"
-				name: "response_total"
+				kind:      "incremental"
+				name:      "response_total"
+				namespace: "service"
 				tags: {
 					status: "200"
 					host:   "10.22.11.222"
@@ -336,8 +349,9 @@ components: transforms: log_to_metric: {
 			configuration: {
 				metrics: [
 					{
-						type:  "set"
-						field: "remote_addr"
+						type:      "set"
+						field:     "remote_addr"
+						namespace: "{{branch}}"
 						tags: {
 							host: "{{host}}"
 						}
@@ -348,10 +362,12 @@ components: transforms: log_to_metric: {
 				host:        "10.22.11.222"
 				message:     "Sent 200 in 54.2ms"
 				remote_addr: "233.221.232.22"
+				branch:      "dev"
 			}
 			output: [{metric: {
-				kind: "incremental"
-				name: "remote_addr"
+				kind:      "incremental"
+				name:      "remote_addr"
+				namespace: "dev"
 				tags: {
 					host: "10.22.11.222"
 				}
@@ -379,7 +395,7 @@ components: transforms: log_to_metric: {
 				to a single metric. Instead, this transform converts logs into granular
 				individual metrics that can then be reduced at the edge. Where the reduction
 				happens depends on your metrics storage. For example, the
-				[`prometheus` sink][docs.sinks.prometheus] will reduce logs in the sink itself
+				[`prometheus_exporter` sink][docs.sinks.prometheus_exporter] will reduce logs in the sink itself
 				for the next scrape, while other metrics sinks will proceed to forward the
 				individual metrics for reduction in the metrics storage itself.
 				"""

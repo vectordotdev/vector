@@ -16,10 +16,12 @@ components: sources: prometheus: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Prometheus"
-				thing:    "one or more \(name) endpoints"
-				url:      urls.prometheus_client
-				versions: null
+				service: {
+					name:     "Prometheus"
+					thing:    "one or more \(name) endpoints"
+					url:      urls.prometheus_client
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
@@ -30,6 +32,13 @@ components: sources: prometheus: {
 					protocols: ["http"]
 					ssl: "optional"
 				}
+			}
+			tls: {
+				enabled:                true
+				can_enable:             false
+				can_verify_certificate: true
+				can_verify_hostname:    true
+				enabled_default:        false
 			}
 		}
 		multiline: enabled: false
@@ -69,6 +78,10 @@ components: sources: prometheus: {
 				unit:    "seconds"
 			}
 		}
+		auth: configuration._http_auth & {_args: {
+			password_example: "${PROMETHEUS_PASSWORD}"
+			username_example: "${PROMETHEUS_USERNAME}"
+		}}
 	}
 
 	output: metrics: {

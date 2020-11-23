@@ -38,7 +38,8 @@ async fn happy_path() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -57,7 +58,7 @@ async fn happy_path() {
         in = {type = "socket", mode = "tcp", address = "127.0.0.1:1235"}
 
         [transforms]
-        sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
+        sampler = {type = "sampler", inputs = ["in"], rate = 10, key_field = "message", exclude."message.contains" = "error"}
 
         [sinks]
         out = {type = "socket", mode = "tcp", inputs = ["sampler"], encoding = "text", address = "127.0.0.1:9999"}
@@ -71,7 +72,10 @@ async fn happy_path() {
 async fn early_eof() {
     let err = load("[sinks]\n[sin").await.unwrap_err();
 
-    assert_eq!(err, vec!["expected a right bracket, found eof at line 2"]);
+    assert_eq!(
+        err,
+        vec!["expected a right bracket, found eof at line 2 column 5"]
+    );
 }
 
 #[tokio::test]
@@ -80,7 +84,7 @@ async fn bad_syntax() {
 
     assert_eq!(
         err,
-        vec!["expected a table key, found a left brace at line 1"]
+        vec!["expected a table key, found a left brace at line 1 column 1"]
     );
 }
 
@@ -102,7 +106,10 @@ async fn missing_key() {
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["missing field `mode` for key `sources.in`"]);
+    assert_eq!(
+        err,
+        vec!["missing field `mode` for key `sources.in` at line 5 column 9"]
+    );
 }
 
 #[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
@@ -124,7 +131,10 @@ async fn missing_key2() {
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["missing field `address` for key `sources.in`"]);
+    assert_eq!(
+        err,
+        vec!["missing field `address` for key `sources.in` at line 6 column 9"]
+    );
 }
 
 #[cfg(feature = "sources-socket")]
@@ -172,7 +182,8 @@ async fn nonexistant_input() {
         type = "sampler"
         inputs = ["qwerty"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -212,7 +223,8 @@ async fn bad_regex() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = ["(["]
+        key_field = "message"
+        exclude."message.regex" = "(["
 
         [sinks.out]
         type = "socket"
@@ -382,7 +394,7 @@ async fn bad_s3_region() {
         err,
         vec![
             "Sink \"out1\": Must set either 'region' or 'endpoint'",
-            "Sink \"out2\": Not a valid AWS region: moonbase-alpha",
+            "Sink \"out2\": Failed to parse region: Not a valid AWS region: moonbase-alpha",
             "Sink \"out3\": Only one of 'region' or 'endpoint' can be specified",
             "Sink \"out4\": Failed to parse custom endpoint as URI: invalid uri character"
         ]
@@ -412,13 +424,15 @@ async fn warnings() {
         type = "sampler"
         inputs = ["in1"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [transforms.sampler2]
         type = "sampler"
         inputs = ["in1"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -458,25 +472,25 @@ async fn cycle() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.two]
         type = "sampler"
         inputs = ["one", "four"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.three]
         type = "sampler"
         inputs = ["two"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.four]
         type = "sampler"
         inputs = ["three"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [sinks.out]
         type = "socket"

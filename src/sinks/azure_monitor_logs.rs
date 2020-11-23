@@ -13,8 +13,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytesize::ByteSize;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{
     header, header::HeaderMap, header::HeaderName, header::HeaderValue, Request, StatusCode, Uri,
 };
@@ -111,7 +110,7 @@ impl SinkConfig for AzureMonitorLogsConfig {
         }
 
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), Some(tls_settings))?;
+        let client = HttpClient::new(Some(tls_settings))?;
 
         let sink = AzureMonitorLogsSink::new(self)?;
         let request_settings = self.request.unwrap_with(&REQUEST_DEFAULTS);
@@ -126,9 +125,9 @@ impl SinkConfig for AzureMonitorLogsConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal azure_monitor_logs sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal azure_monitor_logs sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -281,7 +280,7 @@ impl AzureMonitorLogsSink {
     }
 }
 
-async fn healthcheck(sink: AzureMonitorLogsSink, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(sink: AzureMonitorLogsSink, client: HttpClient) -> crate::Result<()> {
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let res = client.send(request).await?;

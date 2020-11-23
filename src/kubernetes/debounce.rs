@@ -3,7 +3,7 @@
 //! Call [`Debounce::signal`] multiple times within the debounce time window,
 //! and the [`Debounce::debounced`] will be resolved only once.
 
-use std::time::Duration;
+use std::{future::pending, time::Duration};
 use tokio::time::{delay_until, Instant};
 
 /// Provides an arbitrary signal debouncing.
@@ -37,7 +37,7 @@ impl Debounce {
     pub async fn debounced(&mut self) {
         let sequence_start = match self.sequence_start {
             Some(val) => val,
-            None => futures::future::pending().await,
+            None => pending().await,
         };
 
         delay_until(sequence_start).await;

@@ -22,10 +22,9 @@ use crate::{
 use core::task::Context;
 use futures::{
     compat::Future01CompatExt,
-    future::{self, pending, BoxFuture},
-    FutureExt,
+    future::{self, BoxFuture},
+    FutureExt, SinkExt,
 };
-use futures01::Sink;
 use rand::{thread_rng, Rng};
 use rand_distr::Exp1;
 use serde::{Deserialize, Serialize};
@@ -34,6 +33,7 @@ use std::{
     collections::{HashMap, VecDeque},
     fmt,
     fs::{read_dir, File},
+    future::pending,
     io::Read,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -157,7 +157,7 @@ impl SinkConfig for TestConfig {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| panic!("Fatal test sink error: {}", e));
+            .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
@@ -172,7 +172,7 @@ impl SinkConfig for TestConfig {
         );
         *self.controller_stats.lock().unwrap() = stats;
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -630,7 +630,7 @@ async fn all_tests() {
     // The first delay takes just slightly longer than all the rest,
     // which causes the first test to run differently than all the
     // others. Throw in a dummy delay to take up this delay "slack".
-    let _ = tokio::spawn(async move { delay_for(Duration::from_millis(1)) }).await;
+    delay_for(Duration::from_millis(1)).await;
     time::advance(Duration::from_millis(1)).await;
 
     // Then run all the tests

@@ -1,10 +1,10 @@
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
     Pipeline,
 };
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
@@ -35,7 +35,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
         let tls = MaybeTlsSettings::from_config(&self.tls, true)?;
         let listener = tls.bind(&self.address).await?;
 
-        let fut = async move {
+        Ok(Box::pin(async move {
             let _ = warp::serve(svc)
                 .serve_incoming_with_graceful_shutdown(
                     listener.accept_stream(),
@@ -45,8 +45,7 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
             drop(shutdown);
             Ok(())
-        };
-        Ok(Box::new(fut.boxed().compat()))
+        }))
     }
 
     fn output_type(&self) -> DataType {
@@ -55,6 +54,10 @@ impl SourceConfig for AwsKinesisFirehoseConfig {
 
     fn source_type(&self) -> &'static str {
         "aws_kinesis_firehose"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 
@@ -77,13 +80,12 @@ impl GenerateConfig for AwsKinesisFirehoseConfig {
 mod tests {
     use super::*;
     use crate::{
-        event::{Event, LogEvent},
+        event::Event,
         log_event,
         test_util::{collect_ready, next_addr, wait_for_tcp},
     };
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::{read::GzEncoder, Compression};
-    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::{
@@ -113,7 +115,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap()
         });

@@ -187,6 +187,14 @@ build-x86_64-unknown-linux-musl: target/x86_64-unknown-linux-musl/release/vector
 build-aarch64-unknown-linux-musl: target/aarch64-unknown-linux-musl/release/vector ## Build a release binary for the aarch64-unknown-linux-gnu triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-armv7-unknown-linux-gnueabihf
+build-armv7-unknown-linux-gnueabihf: target/armv7-unknown-linux-gnueabihf/release/vector ## Build a release binary for the armv7-unknown-linux-gnueabihf triple.
+	@echo "Output to ${<}"
+
+.PHONY: build-armv7-unknown-linux-musleabihf
+build-armv7-unknown-linux-musleabihf: target/armv7-unknown-linux-musleabihf/release/vector ## Build a release binary for the armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}"
+
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
@@ -264,7 +272,14 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --workspace --features ${DEFAULT_FEATURES} ${SCOPE} --all-targets -- --nocapture
+
+.PHONY: test-components
+test-components: ## Test with all components enabled
+test-components: $(WASM_MODULE_OUTPUTS)
+# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches"
+test-components: test
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -283,48 +298,54 @@ test-behavior: ## Runs behaviorial test
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
-test-integration: test-integration-aws test-integration-clickhouse test-integration-docker test-integration-elasticsearch
+test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
-test-integration: test-integration-mongodb_metrics test-integration-pulsar test-integration-splunk
+test-integration: test-integration-mongodb_metrics test-integration-nats test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
 start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
-start-test-integration: start-integration-mongodb_metrics start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-mongodb_metrics start-integration-nats start-integration-pulsar
+start-test-integratino: start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
 stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
-stop-test-integration: stop-integration-mongodb_metrics stop-integration-pulsar stop-integration-splunk
+stop-test-integration: stop-integration-mongodb_metrics stop-integration-nats stop-integration-pulsar
+stop-test-integration: stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:
 ifeq ($(CONTAINER_TOOL),podman)
-	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-aws -p 4566:4566 -p 4571:4571 -p 6000:6000
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-aws -p 4566:4566 -p 4571:4571 -p 6000:6000 -p 9088:80
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -v /var/run:/var/run --name vector_local_ecs \
+	 -e RUST_LOG=trace amazon/amazon-ecs-local-container-endpoints:latest
 else
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-aws
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 8111:8111 --name vector_ec2_metadata \
 	 timberiodev/mock-ec2-metadata:latest
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws --name vector_localstack_aws \
 	 -p 4566:4566 -p 4571:4571 \
-	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose \
+	 -e SERVICES=kinesis,s3,cloudwatch,elasticsearch,es,firehose,sqs \
 	 localstack/localstack-full:0.11.6
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -p 6000:6000 --name vector_mockwatchlogs \
 	 -e RUST_LOG=trace luciofranco/mockwatchlogs:latest
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-aws -v /var/run:/var/run -p 9088:80 --name vector_local_ecs \
+	 -e RUST_LOG=trace amazon/amazon-ecs-local-container-endpoints:latest
 endif
 
 .PHONY: stop-integration-aws
 stop-integration-aws:
-	$(CONTAINER_TOOL) rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws 2>/dev/null; true
+	$(CONTAINER_TOOL) rm --force vector_ec2_metadata vector_mockwatchlogs vector_localstack_aws vector_local_ecs 2>/dev/null; true
 ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-aws 2>/dev/null; true
 	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name=vector-test-integration-aws 2>/dev/null; true
@@ -376,9 +397,9 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-clickhouse
 endif
 
-.PHONY: test-integration-docker
-test-integration-docker: ## Runs Docker integration tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-integration-tests --lib ::docker:: -- --nocapture
+.PHONY: test-integration-docker-logs
+test-integration-docker-logs: ## Runs Docker Logs integration tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features docker-logs-integration-tests --lib ::docker_logs:: -- --nocapture
 
 .PHONY: start-integration-elasticsearch
 start-integration-elasticsearch:
@@ -504,7 +525,7 @@ ifeq ($(CONTAINER_TOOL),podman)
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1 \
 	 -e INFLUXDB_REPORTING_DISABLED=true influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v1_tls \
-	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 \
+	 -e INFLUXDB_REPORTING_DISABLED=true -e INFLUXDB_HTTP_HTTPS_ENABLED=true -e INFLUXDB_HTTP_BIND_ADDRESS=:8087 -e INFLUXDB_BIND_ADDRESS=:8089 \
 	 -e INFLUXDB_HTTP_HTTPS_CERTIFICATE=/etc/ssl/localhost.crt -e INFLUXDB_HTTP_HTTPS_PRIVATE_KEY=/etc/ssl/localhost.key \
 	 -v $(PWD)/tests/data:/etc/ssl:ro influxdb:1.8
 	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-influxdb --name vector_influxdb_v2 \
@@ -671,6 +692,64 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-mongodb_metrics
 endif
 
+.PHONY: start-integration-nats
+start-integration-nats:
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-nats -p 4222:4222
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-nats  --name vector_nats \
+	 nats
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-nats
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-nats -p 4222:4222 --name vector_nats \
+	 nats
+endif
+
+.PHONY: stop-integration-nats
+stop-integration-nats:
+	$(CONTAINER_TOOL) rm --force vector_nats 2>/dev/null; true
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-nats 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-nats 2>/dev/null; true
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-nats 2>/dev/null; true
+endif
+
+.PHONY: test-integration-nats
+test-integration-nats: ## Runs NATS integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-nats
+	$(MAKE) start-integration-nats
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nats-integration-tests --lib ::nats:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-nats
+endif
+
+.PHONY: start-integration-prometheus stop-integration-prometheus test-integration-prometheus
+start-integration-prometheus:
+	$(CONTAINER_TOOL) run -d --name vector_prometheus --net=host \
+	 --volume $(PWD)/tests/data:/etc/vector:ro \
+	 prom/prometheus --config.file=/etc/vector/prometheus.yaml
+
+stop-integration-prometheus:
+	$(CONTAINER_TOOL) rm --force vector_prometheus 2>/dev/null; true
+
+.PHONY: test-integration-prometheus
+test-integration-prometheus: ## Runs Prometheus integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-influxdb
+	-$(MAKE) -k stop-integration-prometheus
+	$(MAKE) start-integration-influxdb
+	$(MAKE) start-integration-prometheus
+	sleep 10 # Many services are very slow... Give them a sec..
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features prometheus-integration-tests --lib ::prometheus:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-influxdb
+	$(MAKE) -k stop-integration-prometheus
+endif
+
 .PHONY: start-integration-pulsar
 start-integration-pulsar:
 ifeq ($(CONTAINER_TOOL),podman)
@@ -777,18 +856,23 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "wasm" --lib -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields" --lib --all-targets -- --nocapture
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
 .PHONY: bench
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}" | tee bench_output.txt
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches"
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
+.PHONY: bench-all
+bench-all: ### Run default and WASM benches
+bench-all: $(WASM_MODULE_OUTPUTS)
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches wasm-benches"
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} transforms-wasm transforms-lua" --bench wasm wasm
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm
 
 ##@ Checking
 
@@ -851,8 +935,8 @@ check-helm-dependencies: ## Check that Helm charts have up-to-date dependencies
 check-kubernetes-yaml: ## Check that the generated Kubernetes YAML config is up to date
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/kubernetes-yaml.sh check
 
-check-internal-events: ## Check that internal events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
-	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-internal-events.sh
+check-events: ## Check that events satisfy patterns set in https://github.com/timberio/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
+	${MAYBE_ENVIRONMENT_EXEC} ./scripts/check-events.sh
 
 ##@ Packaging
 
@@ -876,6 +960,9 @@ package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-d
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
 
+.PHONY: package-armv7-unknown-linux-gnueabihf-all
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
@@ -892,6 +979,14 @@ package-aarch64-unknown-linux-musl: target/artifacts/vector-aarch64-unknown-linu
 package-aarch64-unknown-linux-gnu: target/artifacts/vector-aarch64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `aarch64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
 
+.PHONY: package-armv7-unknown-linux-gnueabihf
+package-armv7-unknown-linux-gnueabihf: target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-gnueabihf` triple.
+	@echo "Output to ${<}."
+
+.PHONY: package-armv7-unknown-linux-musleabihf
+package-armv7-unknown-linux-musleabihf: target/artifacts/vector-armv7-unknown-linux-musleabihf.tar.gz ## Build an archive suitable for the `armv7-unknown-linux-musleabihf triple.
+	@echo "Output to ${<}."
+
 # debs
 
 .PHONY: package-deb-x86_64
@@ -902,6 +997,10 @@ package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb pac
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
+.PHONY: package-deb-armv7-gnu
+package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-deb.sh
+
 # rpms
 
 .PHONY: package-rpm-x86_64
@@ -911,6 +1010,10 @@ package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm pac
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=aarch64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
+
+.PHONY: package-rpm-armv7-gnu
+package-rpm-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-unknown-linux-gnueabihf rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=armv7-unknown-linux-gnueabihf timberio/ci_image ./scripts/package-rpm.sh
 
 ##@ Releasing
 

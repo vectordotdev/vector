@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
@@ -25,6 +26,7 @@ pub struct SimpleHttpConfig {
     encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
+    #[serde(default)]
     query_parameters: Vec<String>,
     tls: Option<TlsConfig>,
     auth: Option<HttpSourceAuthConfig>,
@@ -111,6 +113,10 @@ impl SourceConfig for SimpleHttpConfig {
     fn source_type(&self) -> &'static str {
         "http"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
+    }
 }
 
 fn add_headers(
@@ -139,9 +145,9 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     let mut decoder = BytesDelimitedCodec::new(b'\n');
     std::iter::from_fn(move || {
         match decoder.decode_eof(&mut body) {
-            Err(e) => Some(Err(ErrorMessage::new(
+            Err(error) => Some(Err(ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
-                format!("Bad request: {}", e),
+                format!("Bad request: {}", error),
             ))),
             Ok(Some(b)) => Some(Ok(b)),
             Ok(None) => None, // actually done
@@ -162,13 +168,13 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
                 let parsed_json = serde_json::from_slice(&j?)
-                    .map_err(|e| json_error(format!("Error parsing Ndjson: {:?}", e)))?;
+                    .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))?;
                 json_parse_object(parsed_json)
             })
             .collect::<Result<_, _>>(),
         Encoding::Json => {
             let parsed_json = serde_json::from_slice(&body)
-                .map_err(|e| json_error(format!("Error parsing Json: {:?}", e)))?;
+                .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))?;
             json_parse_array_of_object(parsed_json)
         }
     }
@@ -235,7 +241,6 @@ mod tests {
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},
         Pipeline,
     };
-    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use http::HeaderMap;
     use pretty_assertions::assert_eq;
@@ -271,7 +276,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap();
         });

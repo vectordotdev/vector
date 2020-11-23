@@ -1,4 +1,4 @@
-use super::{Config, DataType};
+use super::{Config, DataType, Resource};
 use std::collections::HashMap;
 
 pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
@@ -43,6 +43,33 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
         Ok(())
     } else {
         Err(errors)
+    }
+}
+
+pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
+    let source_resources = config
+        .sources
+        .iter()
+        .map(|(name, config)| (name, config.resources()));
+    let sink_resources = config
+        .sinks
+        .iter()
+        .map(|(name, config)| (name, config.inner.resources()));
+
+    let conflicting_componenets = Resource::conflicts(source_resources.chain(sink_resources));
+
+    if conflicting_componenets.is_empty() {
+        Ok(())
+    } else {
+        Err(conflicting_componenets
+            .into_iter()
+            .map(|(resource, components)| {
+                format!(
+                    "Resource `{}` is claimed by multiple components: {:?}",
+                    resource, components
+                )
+            })
+            .collect())
     }
 }
 
@@ -273,8 +300,7 @@ fn capitalize(s: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use super::Graph;
-    use crate::config::DataType;
+    use super::*;
     use pretty_assertions::assert_eq;
 
     #[test]

@@ -45,10 +45,12 @@ components: sinks: gcp_stackdriver_logs: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "GCP Operations (formerly Stackdriver) logs"
-				thing:    "a \(name) account"
-				url:      urls.gcp_stackdriver_logging
-				versions: null
+				service: {
+					name:     "GCP Operations (formerly Stackdriver) logs"
+					thing:    "a \(name) account"
+					url:      urls.gcp_stackdriver_logging
+					versions: null
+				}
 
 				interface: {
 					socket: {

@@ -96,6 +96,11 @@ where
         self.expiration_queue.is_empty()
     }
 
+    /// Returns the number of elements in the map.
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
     /// If the [`ExpiringHashMap`] is empty, immediately returns `None`.
     /// Otherwise, waits for the closest deadline, removes expired item and
     /// returns it.
@@ -166,7 +171,7 @@ where
     ///                 println!("Expired: {}", val);
     ///                 break;
     ///             }
-    ///             Some(Err(err)) => panic!(format!("Timer error: {:?}", err)),
+    ///             Some(Err(error)) => panic!(format!("Timer error: {:?}", error)),
     ///         },
     ///         _ = tokio::time::delay_for(Duration::from_millis(100)) => map.insert(
     ///             "key".to_owned(),

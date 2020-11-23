@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     emit,
     event::Event,
-    http::HttpClient,
+    http::{Auth, HttpClient},
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
@@ -15,8 +15,7 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{
     header::{HeaderName, HeaderValue},
     uri::InvalidUri,
@@ -85,16 +84,6 @@ pub enum ElasticSearchAuth {
     Aws { assume_role: Option<String> },
 }
 
-impl ElasticSearchAuth {
-    pub fn apply<B>(&self, req: &mut Request<B>) {
-        if let Self::Basic { user, password } = &self {
-            use headers::{Authorization, HeaderMapExt};
-            let auth = Authorization::basic(&user, &password);
-            req.headers_mut().typed_insert(auth);
-        }
-    }
-}
-
 inventory::submit! {
     SinkDescription::new::<ElasticSearchConfig>("elasticsearch")
 }
@@ -109,7 +98,7 @@ impl SinkConfig for ElasticSearchConfig {
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
         let common = ElasticSearchCommon::parse_config(&self)?;
-        let client = HttpClient::new(cx.resolver(), common.tls_settings.clone())?;
+        let client = HttpClient::new(common.tls_settings.clone())?;
 
         let healthcheck = healthcheck(client.clone(), common).boxed();
 
@@ -130,12 +119,9 @@ impl SinkConfig for ElasticSearchConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal elasticsearch sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal elasticsearch sink error.", %error));
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -151,7 +137,7 @@ impl SinkConfig for ElasticSearchConfig {
 pub struct ElasticSearchCommon {
     pub base_url: String,
     bulk_uri: Uri,
-    authorization: Option<String>,
+    authorization: Option<Auth>,
     credentials: Option<rusoto::AwsCredentialsProvider>,
     index: Template,
     doc_type: String,
@@ -170,8 +156,6 @@ enum ParseError {
     HostMustIncludeHostname { host: String },
     #[snafu(display("Could not generate AWS credentials: {:?}", source))]
     AWSCredentialsGenerateFailed { source: CredentialsError },
-    #[snafu(display("Compression can not be used with AWS hosted Elasticsearch"))]
-    AWSCompressionNotAllowed,
     #[snafu(display("Index template parse error: {}", source))]
     IndexTemplate { source: TemplateError },
 }
@@ -262,7 +246,7 @@ impl HttpSink for ElasticSearchCommon {
             }
 
             if let Some(auth) = &self.authorization {
-                builder = builder.header("Authorization", &auth[..]);
+                builder = auth.apply_builder(builder);
             }
 
             builder.body(events).map_err(Into::into)
@@ -346,31 +330,31 @@ fn get_error_reason(body: &str) -> String {
 
 impl ElasticSearchCommon {
     pub fn parse_config(config: &ElasticSearchConfig) -> crate::Result<Self> {
-        let authorization = match &config.auth {
-            Some(ElasticSearchAuth::Basic { user, password }) => {
-                let token = format!("{}:{}", user, password);
-                Some(format!("Basic {}", base64::encode(token.as_bytes())))
-            }
-            _ => None,
-        };
-
-        let base_url = config.endpoint.clone();
-        let region = match &config.aws {
-            Some(region) => Region::try_from(region)?,
-            None => region_from_endpoint(&config.endpoint)?,
-        };
-
         // Test the configured host, but ignore the result
         let uri = format!("{}/_test", &config.endpoint);
-        let uri = uri
-            .parse::<Uri>()
-            .with_context(|| InvalidHost { host: &base_url })?;
+        let uri = uri.parse::<Uri>().with_context(|| InvalidHost {
+            host: &config.endpoint,
+        })?;
         if uri.host().is_none() {
             return Err(ParseError::HostMustIncludeHostname {
                 host: config.endpoint.clone(),
             }
             .into());
         }
+
+        let (base_url, mut authorization) = Auth::get_and_strip_basic_auth(&config.endpoint);
+
+        if let Some(ElasticSearchAuth::Basic { user, password }) = config.auth.clone() {
+            if authorization.is_some() {
+                warn!("Overwriting authorization config in `endpoint`.");
+            }
+            authorization = Some(Auth::Basic { user, password });
+        }
+
+        let region = match &config.aws {
+            Some(region) => Region::try_from(region)?,
+            None => region_from_endpoint(&base_url)?,
+        };
 
         let credentials = match &config.auth {
             Some(ElasticSearchAuth::Basic { .. }) | None => None,
@@ -379,12 +363,7 @@ impl ElasticSearchCommon {
             ),
         };
 
-        // Only allow compression if we are running with no AWS credentials.
         let compression = config.compression;
-        if credentials.is_some() && compression != Compression::None {
-            return Err(ParseError::AWSCompressionNotAllowed.into());
-        }
-
         let index = config.index.as_deref().unwrap_or("vector-%Y.%m.%d");
         let index = Template::try_from(index).context(IndexTemplate)?;
 
@@ -435,13 +414,13 @@ impl ElasticSearchCommon {
     }
 }
 
-async fn healthcheck(mut client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, common: ElasticSearchCommon) -> crate::Result<()> {
     let mut builder = Request::get(format!("{}/_cluster/health", common.base_url));
 
     match &common.credentials {
         None => {
             if let Some(authorization) = &common.authorization {
-                builder = builder.header("Authorization", authorization.clone());
+                builder = authorization.apply_builder(builder);
             }
         }
         Some(credentials_provider) => {
@@ -590,18 +569,16 @@ mod integration_tests {
     use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
-        dns::Resolver,
         http::HttpClient,
         test_util::{random_events_with_stream, random_string, trace_init},
         tls::TlsOptions,
         Event,
     };
-    use futures::{future, stream, StreamExt};
+    use futures::{stream, StreamExt};
     use http::{Request, StatusCode};
     use hyper::Body;
     use serde_json::{json, Value};
-    use std::fs::File;
-    use std::io::Read;
+    use std::{fs::File, future::ready, io::Read};
 
     #[test]
     fn ensure_pipeline_in_params() {
@@ -640,12 +617,12 @@ mod integration_tests {
         input_event.as_mut_log().insert("my_id", "42");
         input_event.as_mut_log().insert("foo", "bar");
 
-        sink.run(stream::once(future::ready(input_event.clone())))
+        sink.run(stream::once(ready(input_event.clone())))
             .await
             .unwrap();
 
         // make sure writes all all visible
-        flush(cx.resolver(), common).await.unwrap();
+        flush(common).await.unwrap();
 
         let response = reqwest::Client::new()
             .get(&format!("{}/{}/_search", base_url, index))
@@ -783,9 +760,7 @@ mod integration_tests {
         }
 
         // make sure writes all all visible
-        flush(cx.resolver(), common)
-            .await
-            .expect("Flushing writes failed");
+        flush(common).await.expect("Flushing writes failed");
 
         let mut test_ca = Vec::<u8>::new();
         File::open("tests/data/Vector_CA.crt")
@@ -840,12 +815,12 @@ mod integration_tests {
         format!("test-{}", random_string(10).to_lowercase())
     }
 
-    async fn flush(resolver: Resolver, common: ElasticSearchCommon) -> crate::Result<()> {
+    async fn flush(common: ElasticSearchCommon) -> crate::Result<()> {
         let uri = format!("{}/_flush", common.base_url);
         let request = Request::post(uri).body(Body::empty()).unwrap();
 
-        let mut client = HttpClient::new(resolver, common.tls_settings.clone())
-            .expect("Could not build client to flush");
+        let client =
+            HttpClient::new(common.tls_settings.clone()).expect("Could not build client to flush");
         let response = client.send(request).await?;
         match response.status() {
             StatusCode::OK => Ok(()),

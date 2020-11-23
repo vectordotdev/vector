@@ -48,11 +48,15 @@ pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
                     failed_files.push((path_str.to_owned(), aggregated_test_errors));
                 }
                 if tests.is_empty() {
-                    println!("{}", "no tests found".yellow());
+                    println!("{}", "No tests found.".yellow());
                 }
             }
             Err(errs) => {
-                error!("Failed to execute {} tests:\n{}", path_str, errs.join("\n"));
+                error!(
+                    "Failed to execute {} tests:\n{}.",
+                    path_str,
+                    errs.join("\n")
+                );
                 return exitcode::CONFIG;
             }
         }

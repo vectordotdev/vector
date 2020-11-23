@@ -16,7 +16,7 @@ impl InternalEvent for MongoDBMetricsCollectCompleted {
 
     fn emit_metrics(&self) {
         counter!("collect_completed_total", 1);
-        histogram!("collect_duration_nanoseconds", self.end - self.start);
+        histogram!("request_duration_nanoseconds", self.end - self.start);
     }
 }
 
@@ -27,7 +27,7 @@ pub struct MongoDBMetricsRequestError<'a> {
 
 impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
     fn emit_logs(&self) {
-        error!(message = "MongoDB request error.", endpoint = %self.endpoint, error = %self.error)
+        error!(message = "MongoDB request error.", endpoint = %self.endpoint, error = ?self.error)
     }
 
     fn emit_metrics(&self) {

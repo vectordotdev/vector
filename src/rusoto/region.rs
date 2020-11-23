@@ -32,7 +32,7 @@ impl RegionOrEndpoint {
 pub enum ParseError {
     #[snafu(display("Failed to parse custom endpoint as URI: {}", source))]
     EndpointParseError { source: InvalidUri },
-    #[snafu(display("{}", source))]
+    #[snafu(display("Failed to parse region: {}", source))]
     RegionParseError { source: ParseRegionError },
     #[snafu(display("Only one of 'region' or 'endpoint' can be specified"))]
     BothRegionAndEndpoint,

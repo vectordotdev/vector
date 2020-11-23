@@ -1,5 +1,5 @@
 use crate::{
-    config::{self, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{self, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     internal_events::{StatsdEventReceived, StatsdInvalidRecord, StatsdSocketError},
     shutdown::ShutdownSignal,
     sources::util::{SocketListenAddr, TcpSource},
@@ -8,7 +8,7 @@ use crate::{
 };
 use bytes::Bytes;
 use codec::BytesDelimitedCodec;
-use futures::{compat::Sink01CompatExt, stream, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use tokio::net::UdpSocket;
@@ -73,9 +73,7 @@ impl SourceConfig for StatsdConfig {
         out: Pipeline,
     ) -> crate::Result<super::Source> {
         match self {
-            StatsdConfig::Udp(config) => Ok(Box::new(
-                statsd_udp(config.clone(), shutdown, out).boxed().compat(),
-            )),
+            StatsdConfig::Udp(config) => Ok(Box::pin(statsd_udp(config.clone(), shutdown, out))),
             StatsdConfig::Tcp(config) => {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 StatsdTcpSource.run(
@@ -91,12 +89,21 @@ impl SourceConfig for StatsdConfig {
         }
     }
 
-    fn output_type(&self) -> crate::config::DataType {
+    fn output_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 
     fn source_type(&self) -> &'static str {
         "statsd"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self.clone() {
+            Self::Tcp(tcp) => vec![tcp.address.into()],
+            Self::Udp(udp) => vec![udp.address.into()],
+            #[cfg(unix)]
+            Self::Unix(_) => vec![],
+        }
     }
 }
 
@@ -138,7 +145,7 @@ async fn statsd_udp(config: UdpConfig, shutdown: ShutdownSignal, out: Pipeline) 
                 // https://github.com/rust-lang/rust/issues/64552#issuecomment-669728225
                 let mut metrics = stream::iter(metrics).boxed();
                 if let Err(error) = out.send_all(&mut metrics).await {
-                    error!("Error sending metric: {:?}", error);
+                    error!(message = "Error sending metric.", %error);
                     break;
                 }
             }
@@ -174,7 +181,7 @@ mod test {
     use super::*;
     use crate::{
         config,
-        sinks::prometheus::PrometheusSinkConfig,
+        sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{next_addr, start_topology},
     };
     use futures::{compat::Future01CompatExt, TryStreamExt};
@@ -282,9 +289,9 @@ mod test {
         config.add_sink(
             "out",
             &["in"],
-            PrometheusSinkConfig {
+            PrometheusExporterConfig {
                 address: out_addr,
-                namespace: Some("vector".into()),
+                default_namespace: Some("vector".into()),
                 buckets: vec![1.0, 2.0, 4.0],
                 quantiles: vec![],
                 flush_period_secs: 1,

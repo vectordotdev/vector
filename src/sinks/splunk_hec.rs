@@ -14,8 +14,7 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -100,7 +99,7 @@ impl SinkConfig for HecSinkConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = BatchedHttpSink::new(
             self.clone(),
@@ -110,14 +109,11 @@ impl SinkConfig for HecSinkConfig {
             client.clone(),
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal splunk_hec sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal splunk_hec sink error.", %error));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -246,7 +242,7 @@ enum HealthcheckError {
     QueuesFull,
 }
 
-pub async fn healthcheck(config: HecSinkConfig, mut client: HttpClient) -> crate::Result<()> {
+pub async fn healthcheck(config: HecSinkConfig, client: HttpClient) -> crate::Result<()> {
     let uri = build_uri(&config.endpoint, "/services/collector/health/1.0")
         .context(super::UriParseError)?;
 
@@ -428,9 +424,9 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
-    use futures::{future, stream};
+    use futures::stream;
     use serde_json::Value as JsonValue;
-    use std::net::SocketAddr;
+    use std::{future::ready, net::SocketAddr};
     use tokio::time::{delay_for, Duration};
     use warp::Filter;
 
@@ -462,7 +458,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -481,7 +477,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -498,7 +494,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -546,7 +542,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -567,7 +563,7 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -591,7 +587,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -618,7 +614,7 @@ mod integration_tests {
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
         event.as_mut_log().insert("roast", "beef.example.com:1234");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -631,11 +627,9 @@ mod integration_tests {
 
     #[tokio::test]
     async fn splunk_healthcheck() {
-        let resolver = crate::dns::Resolver;
-
         let config_to_healthcheck = move |config: HecSinkConfig| {
             let tls_settings = TlsSettings::from_options(&config.tls).unwrap();
-            let client = HttpClient::new(resolver, tls_settings).unwrap();
+            let client = HttpClient::new(tls_settings).unwrap();
             sinks::splunk_hec::healthcheck(config, client)
         };
 

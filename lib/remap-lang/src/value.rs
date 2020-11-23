@@ -1,59 +1,71 @@
+mod kind;
+
 use bytes::Bytes;
+use chrono::{DateTime, Utc};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
-use std::string::String as StdString;
+
+pub use kind::Kind;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
-    String(Bytes),
+    Bytes(Bytes),
     Integer(i64),
     Float(f64),
     Boolean(bool),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
+    Timestamp(DateTime<Utc>),
     Null,
 }
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error(r#"expected "{0}", got "{1}""#)]
-    Expected(&'static str, &'static str),
+    Expected(Kind, Kind),
 
     #[error(r#"unable to coerce "{0}" into "{1}""#)]
-    Coerce(&'static str, &'static str),
+    Coerce(Kind, Kind),
 
     #[error("unable to calculate remainder of values type {0} and {1}")]
-    Rem(&'static str, &'static str),
+    Rem(Kind, Kind),
 
     #[error("unable to multiply value type {0} by {1}")]
-    Mul(&'static str, &'static str),
+    Mul(Kind, Kind),
 
     #[error("unable to divide value type {0} by {1}")]
-    Div(&'static str, &'static str),
+    Div(Kind, Kind),
 
     #[error("unable to add value type {1} to {0}")]
-    Add(&'static str, &'static str),
+    Add(Kind, Kind),
 
     #[error("unable to subtract value type {1} from {0}")]
-    Sub(&'static str, &'static str),
+    Sub(Kind, Kind),
 
     #[error("unable to OR value type {0} with {1}")]
-    Or(&'static str, &'static str),
+    Or(Kind, Kind),
 
     #[error("unable to AND value type {0} with {1}")]
-    And(&'static str, &'static str),
+    And(Kind, Kind),
 
     #[error("unable to compare {0} > {1}")]
-    Gt(&'static str, &'static str),
+    Gt(Kind, Kind),
 
     #[error("unable to compare {0} >= {1}")]
-    Ge(&'static str, &'static str),
+    Ge(Kind, Kind),
 
     #[error("unable to compare {0} < {1}")]
-    Lt(&'static str, &'static str),
+    Lt(Kind, Kind),
 
     #[error("unable to compare {0} <= {1}")]
-    Le(&'static str, &'static str),
+    Le(Kind, Kind),
+}
+
+impl From<i32> for Value {
+    fn from(v: i32) -> Self {
+        Value::Integer(v as i64)
+    }
 }
 
 impl From<i64> for Value {
@@ -70,19 +82,31 @@ impl From<f64> for Value {
 
 impl From<Bytes> for Value {
     fn from(v: Bytes) -> Self {
-        Value::String(v)
+        Value::Bytes(v)
+    }
+}
+
+impl From<Cow<'_, str>> for Value {
+    fn from(v: Cow<'_, str>) -> Self {
+        v.as_ref().into()
     }
 }
 
 impl From<Vec<u8>> for Value {
     fn from(v: Vec<u8>) -> Self {
-        Value::String(v.into())
+        v.as_slice().into()
+    }
+}
+
+impl From<&[u8]> for Value {
+    fn from(v: &[u8]) -> Self {
+        Value::Bytes(Bytes::copy_from_slice(v))
     }
 }
 
 impl From<String> for Value {
     fn from(v: String) -> Self {
-        Value::String(v.into())
+        Value::Bytes(v.into())
     }
 }
 
@@ -100,7 +124,25 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 
 impl From<&str> for Value {
     fn from(v: &str) -> Self {
-        Value::String(Vec::from(v.as_bytes()).into())
+        Value::Bytes(Bytes::copy_from_slice(v.as_bytes()))
+    }
+}
+
+impl From<()> for Value {
+    fn from(_: ()) -> Self {
+        Value::Null
+    }
+}
+
+impl From<BTreeMap<String, Value>> for Value {
+    fn from(value: BTreeMap<String, Value>) -> Self {
+        Value::Map(value)
+    }
+}
+
+impl From<DateTime<Utc>> for Value {
+    fn from(v: DateTime<Utc>) -> Self {
+        Value::Timestamp(v)
     }
 }
 
@@ -111,7 +153,7 @@ impl TryFrom<&Value> for f64 {
         match value {
             Value::Integer(v) => Ok(*v as f64),
             Value::Float(v) => Ok(*v),
-            _ => Err(Error::Coerce(value.kind(), Value::Float(0.0).kind())),
+            _ => Err(Error::Coerce(value.kind(), Kind::Float)),
         }
     }
 }
@@ -123,7 +165,7 @@ impl TryFrom<&Value> for i64 {
         match value {
             Value::Integer(v) => Ok(*v),
             Value::Float(v) => Ok(*v as i64),
-            _ => Err(Error::Coerce(value.kind(), Value::Integer(0).kind())),
+            _ => Err(Error::Coerce(value.kind(), Kind::Integer)),
         }
     }
 }
@@ -135,12 +177,12 @@ impl TryFrom<&Value> for String {
         use Value::*;
 
         match value {
-            String(v) => Ok(StdString::from_utf8_lossy(&v).into_owned()),
+            Bytes(v) => Ok(String::from_utf8_lossy(&v).into_owned()),
             Integer(v) => Ok(format!("{}", v)),
             Float(v) => Ok(format!("{}", v)),
             Boolean(v) => Ok(format!("{}", v)),
             Null => Ok("".to_owned()),
-            _ => Err(Error::Coerce(value.kind(), Value::String("".into()).kind())),
+            _ => Err(Error::Coerce(value.kind(), Kind::Bytes)),
         }
     }
 }
@@ -161,19 +203,72 @@ impl TryFrom<Value> for i64 {
     }
 }
 
-impl Value {
-    pub fn kind(&self) -> &'static str {
-        use Value::*;
+macro_rules! value_impl {
+    ($(($func:expr, $variant:expr, $ret:ty)),+ $(,)*) => {
+        impl Value {
+            $(paste::paste! {
+            pub fn [<as_ $func>](&self) -> Option<&$ret> {
+                match self {
+                    Value::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
 
-        match self {
-            String(_) => "string",
-            Integer(_) => "integer",
-            Float(_) => "float",
-            Boolean(_) => "boolean",
-            Map(_) => "map",
-            Array(_) => "array",
-            Null => "null",
+            pub fn [<as_ $func _mut>](&mut self) -> Option<&mut $ret> {
+                match self {
+                    Value::$variant(v) => Some(v),
+                    _ => None,
+                }
+            }
+
+            pub fn [<try_ $func>](self) -> Result<$ret, Error> {
+                match self {
+                    Value::$variant(v) => Ok(v),
+                    v => Err(Error::Expected(Kind::$variant, v.kind())),
+                }
+            }
+
+            pub fn [<unwrap_ $func>](self) -> $ret {
+                self.[<try_ $func>]().expect(stringify!($func))
+            }
+            })+
+
+            pub fn as_null(&self) -> Option<()> {
+                match self {
+                    Value::Null => Some(()),
+                    _ => None,
+                }
+            }
+
+            pub fn try_null(self) -> Result<(), Error> {
+                match self {
+                    Value::Null => Ok(()),
+                    v => Err(Error::Expected(Kind::Null, v.kind())),
+                }
+            }
+
+            pub fn unwrap_null(self) -> () {
+                self.try_null().expect("null")
+            }
         }
+    };
+}
+
+value_impl! {
+    (bytes, Bytes, Bytes),
+    (integer, Integer, i64),
+    (float, Float, f64),
+    (boolean, Boolean, bool),
+    (map, Map, BTreeMap<String, Value>),
+    (array, Array, Vec<Value>),
+    (timestamp, Timestamp, DateTime<Utc>),
+    // manually implemented due to no variant value
+    // (null, Null, ()),
+}
+
+impl Value {
+    pub fn kind(&self) -> Kind {
+        self.into()
     }
 
     /// Similar to [`std::ops::Mul`], but fallible (e.g. `TryMul`).
@@ -181,7 +276,7 @@ impl Value {
         let err = || Error::Mul(self.kind(), rhs.kind());
 
         let value = match &self {
-            Value::String(lhv) => lhv
+            Value::Bytes(lhv) => lhv
                 .repeat(i64::try_from(&rhs).map_err(|_| err())? as usize)
                 .into(),
             Value::Integer(lhv) => (lhv * i64::try_from(&rhs).map_err(|_| err())?).into(),
@@ -210,7 +305,7 @@ impl Value {
         let err = || Error::Add(self.kind(), rhs.kind());
 
         let value = match &self {
-            Value::String(lhv) => format!(
+            Value::Bytes(lhv) => format!(
                 "{}{}",
                 String::from_utf8_lossy(&lhv),
                 String::try_from(&rhs).map_err(|_| err())?
@@ -229,8 +324,8 @@ impl Value {
         let err = || Error::Sub(self.kind(), rhs.kind());
 
         let value = match self {
-            Value::Integer(lhv) => (lhv + i64::try_from(&rhs).map_err(|_| err())?).into(),
-            Value::Float(lhv) => (lhv + f64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Integer(lhv) => (lhv - i64::try_from(&rhs).map_err(|_| err())?).into(),
+            Value::Float(lhv) => (lhv - f64::try_from(&rhs).map_err(|_| err())?).into(),
             _ => return Err(err()),
         };
 

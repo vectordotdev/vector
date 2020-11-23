@@ -5,8 +5,6 @@ use std::sync::{
     Arc,
 };
 
-pub type OpenTokenDyn = OpenToken<Box<dyn Fn(usize) + 'static + Send>>;
-
 #[derive(Debug)]
 pub struct ConnectionOpen {
     pub count: usize,

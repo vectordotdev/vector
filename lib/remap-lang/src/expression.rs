@@ -1,30 +1,34 @@
-use crate::{Object, Result, State, Value};
+use crate::{state, Object, Result, TypeDef, Value};
+use std::convert::TryFrom;
 
-pub(super) mod arithmetic;
-pub(super) mod assignment;
+mod argument;
+mod arithmetic;
+mod assignment;
 mod block;
-pub(super) mod function;
-pub(super) mod if_statement;
+pub(crate) mod function;
+mod if_statement;
 mod literal;
 mod noop;
-pub(super) mod not;
-pub(super) mod path;
-pub(super) mod variable;
+mod not;
+pub(crate) mod path;
+mod variable;
 
-pub(super) use arithmetic::Arithmetic;
-pub(super) use assignment::{Assignment, Target};
-pub(super) use block::Block;
-pub(super) use function::Function;
-pub(super) use if_statement::IfStatement;
-pub(super) use literal::Literal;
-pub(super) use noop::Noop;
-pub(super) use not::Not;
-pub(super) use path::Path;
+pub use argument::Argument;
+pub use arithmetic::Arithmetic;
+pub use assignment::{Assignment, Target};
+pub use block::Block;
+pub use function::Function;
+pub use if_statement::IfStatement;
+pub use literal::Literal;
+pub use noop::Noop;
+pub use not::Not;
+pub use path::Path;
+pub use variable::Variable;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error("expected expression, got none")]
-    Missing,
+    #[error("unexpected expression")]
+    Unexpected(#[from] ExprError),
 
     #[error(r#"error for function "{0}""#)]
     Function(String, #[source] function::Error),
@@ -40,14 +44,14 @@ pub enum Error {
 
     #[error("if-statement error")]
     IfStatement(#[from] if_statement::Error),
-
-    #[error("variable error")]
-    Variable(#[from] variable::Error),
 }
 
-pub trait Expression: std::fmt::Debug {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>>;
+pub trait Expression: Send + Sync + std::fmt::Debug + dyn_clone::DynClone {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value>;
+    fn type_def(&self, state: &state::Compiler) -> TypeDef;
 }
+
+dyn_clone::clone_trait_object!(Expression);
 
 macro_rules! expression_dispatch {
     ($($expr:tt),+ $(,)?) => (
@@ -61,15 +65,37 @@ macro_rules! expression_dispatch {
         ///
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
-        #[derive(Debug)]
-        pub(crate) enum Expr {
+        #[derive(Debug, Clone)]
+        pub enum Expr {
             $($expr($expr)),+
         }
 
+        impl Expr {
+            pub fn as_str(&self) -> &'static str {
+                match self {
+                    $(Expr::$expr(_) => stringify!($expr)),+
+                }
+            }
+        }
+
+        #[derive(thiserror::Error, Clone, Debug, PartialEq)]
+        pub enum ExprError {
+            $(
+                #[error(r#"expected {}, got {0}"#, stringify!($expr))]
+                $expr(&'static str)
+            ),+
+        }
+
         impl Expression for Expr {
-            fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+            fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
                 match self {
                     $(Expr::$expr(expression) => expression.execute(state, object)),+
+                }
+            }
+
+            fn type_def(&self, state: &state::Compiler) -> TypeDef {
+                match self {
+                    $(Expr::$expr(expression) => expression.type_def(state)),+
                 }
             }
         }
@@ -78,6 +104,19 @@ macro_rules! expression_dispatch {
             impl From<$expr> for Expr {
                 fn from(expression: $expr) -> Self {
                     Expr::$expr(expression)
+                }
+            }
+
+            impl TryFrom<Expr> for $expr {
+                type Error = Error;
+
+                fn try_from(expr: Expr) -> std::result::Result<Self, Self::Error> {
+                    #[allow(unreachable_patterns)]
+                    match expr {
+                        Expr::$expr(v) => Ok(v),
+                        Expr::Argument(v) => $expr::try_from(v.into_expr()),
+                        _ => Err(Error::from(ExprError::$expr(expr.as_str()))),
+                    }
                 }
             }
         )+
@@ -94,4 +133,51 @@ expression_dispatch![
     Noop,
     Not,
     Path,
+    Variable,
+    Argument,
 ];
+
+#[cfg(test)]
+mod tests {
+    use crate::value;
+    use value::Kind;
+
+    #[test]
+    fn test_contains() {
+        let cases = vec![
+            (true, Kind::all(), Kind::all()),
+            (true, Kind::all(), Kind::Bytes),
+            (true, Kind::all(), Kind::Integer),
+            (true, Kind::all(), Kind::Float | Kind::Boolean),
+            (true, Kind::all(), Kind::Map),
+            (true, Kind::Bytes, Kind::Bytes),
+            (true, Kind::Bytes, Kind::Bytes),
+            (false, Kind::Bytes, Kind::Array),
+            (false, Kind::Bytes, Kind::Integer),
+            (false, Kind::Bytes, Kind::Integer | Kind::Float),
+        ];
+
+        for (expect, this, other) in cases {
+            assert_eq!(this.contains(other), expect);
+        }
+    }
+
+    #[test]
+    fn test_merge() {
+        let cases = vec![
+            (Kind::all(), Kind::all(), Kind::all()),
+            (Kind::all(), Kind::Integer | Kind::Bytes, Kind::all()),
+            (Kind::Integer | Kind::Float, Kind::Integer, Kind::Float),
+            (Kind::Integer, Kind::Integer, Kind::Integer),
+            (
+                Kind::Bytes | Kind::Integer | Kind::Float | Kind::Boolean,
+                Kind::Integer | Kind::Bytes,
+                Kind::Float | Kind::Boolean,
+            ),
+        ];
+
+        for (expect, this, other) in cases {
+            assert_eq!(this | other, expect);
+        }
+    }
+}

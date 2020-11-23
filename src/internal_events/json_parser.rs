@@ -28,7 +28,7 @@ impl<'a> InternalEvent for JsonParserFailedParse<'a> {
             message = "Event failed to parse as JSON.",
             field = %self.field,
             value = %self.value,
-            error = %self.error,
+            error = ?self.error,
             rate_limit_secs = 30
         )
     }

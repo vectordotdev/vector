@@ -24,7 +24,7 @@ pub struct KafkaOffsetUpdateFailed {
 
 impl InternalEvent for KafkaOffsetUpdateFailed {
     fn emit_logs(&self) {
-        error!(message = "Unable to update consumer offset.", error = %self.error);
+        error!(message = "Unable to update consumer offset.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {
@@ -39,7 +39,7 @@ pub struct KafkaEventFailed {
 
 impl InternalEvent for KafkaEventFailed {
     fn emit_logs(&self) {
-        error!(message = "Failed to read message.", error = %self.error);
+        error!(message = "Failed to read message.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {

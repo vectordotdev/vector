@@ -1,4 +1,4 @@
-use super::{broker::Broker, metrics};
+use super::metrics;
 use crate::config::{Config, DataType};
 use async_graphql::{Enum, Interface, Object, Subscription};
 use lazy_static::lazy_static;
@@ -8,8 +8,31 @@ use std::{
 };
 use tokio::stream::{Stream, StreamExt};
 
-const INVARIANT: &str =
-    "It is an invariant for the API to be active but not have COMPONENTS. Please report this.";
+pub const INVARIANT: &str = "Couldn't acquire lock on Vector components. Please report this.";
+
+lazy_static! {
+    pub static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
+        Arc::new(RwLock::new(HashMap::new()));
+}
+
+#[derive(Debug, Clone, Interface)]
+#[graphql(
+    field(name = "name", type = "String"),
+    field(name = "component_type", type = "String"),
+    field(
+        name = "events_processed_total",
+        type = "Option<metrics::EventsProcessedTotal>"
+    ),
+    field(
+        name = "bytes_processed_total",
+        type = "Option<metrics::BytesProcessedTotal>"
+    )
+)]
+pub enum Component {
+    Source(Source),
+    Transform(Transform),
+    Sink(Sink),
+}
 
 #[derive(Enum, Eq, PartialEq, Copy, Clone)]
 pub enum SourceOutputType {
@@ -28,20 +51,26 @@ impl From<DataType> for SourceOutputType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct SourceData {
     name: String,
+    component_type: String,
     output_type: DataType,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Source(SourceData);
 
 #[Object]
 impl Source {
     /// Source name
-    async fn name(&self) -> String {
-        self.0.name.clone()
+    async fn name(&self) -> &str {
+        &*self.0.name
+    }
+
+    /// Source type
+    async fn component_type(&self) -> &str {
+        &*self.0.component_type
     }
 
     /// Source output type
@@ -67,24 +96,35 @@ impl Source {
 
     /// Metric indicating events processed for the current source
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(&self.0.name)
+    }
+
+    /// Metric indicating bytes processed for the current source
+    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
+        metrics::component_bytes_processed_total(&self.0.name)
     }
 }
 
-#[derive(Clone)]
-pub struct InputsData {
+#[derive(Debug, Clone)]
+pub struct TransformData {
     name: String,
+    component_type: String,
     inputs: Vec<String>,
 }
 
-#[derive(Clone)]
-pub struct Transform(InputsData);
+#[derive(Debug, Clone)]
+pub struct Transform(TransformData);
 
 #[Object]
 impl Transform {
     /// Transform name
-    async fn name(&self) -> String {
-        self.0.name.clone()
+    async fn name(&self) -> &str {
+        &self.0.name
+    }
+
+    /// Transform type
+    async fn component_type(&self) -> &str {
+        &*self.0.component_type
     }
 
     /// Source inputs
@@ -102,6 +142,14 @@ impl Transform {
             .collect()
     }
 
+    /// Transform outputs
+    async fn transforms(&self) -> Vec<Transform> {
+        filter_components(|(_name, components)| match components {
+            Component::Transform(t) if t.0.inputs.contains(&self.0.name) => Some(t.clone()),
+            _ => None,
+        })
+    }
+
     /// Sink outputs
     async fn sinks(&self) -> Vec<Sink> {
         filter_components(|(_name, components)| match components {
@@ -112,18 +160,35 @@ impl Transform {
 
     /// Metric indicating events processed for the current transform
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(&self.0.name)
+    }
+
+    /// Metric indicating bytes processed for the current transform
+    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
+        metrics::component_bytes_processed_total(&self.0.name)
     }
 }
 
-#[derive(Clone)]
-pub struct Sink(InputsData);
+#[derive(Debug, Clone)]
+pub struct SinkData {
+    name: String,
+    component_type: String,
+    inputs: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Sink(SinkData);
 
 #[Object]
 impl Sink {
     /// Sink name
-    async fn name(&self) -> String {
-        self.0.name.clone()
+    async fn name(&self) -> &str {
+        &self.0.name
+    }
+
+    /// Sink type
+    async fn component_type(&self) -> &str {
+        &*self.0.component_type
     }
 
     /// Source inputs
@@ -158,35 +223,14 @@ impl Sink {
 
     /// Metric indicating events processed for the current sink
     async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(self.0.name.clone())
+        metrics::component_events_processed_total(&self.0.name)
+    }
+
+    /// Metric indicating bytes processed for the current sink
+    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
+        metrics::component_bytes_processed_total(&self.0.name)
     }
 }
-
-#[derive(Clone, Interface)]
-#[graphql(
-    field(name = "name", type = "String"),
-    field(
-        name = "events_processed_total",
-        type = "Option<metrics::EventsProcessedTotal>"
-    )
-)]
-pub enum Component {
-    Source(Source),
-    Transform(Transform),
-    Sink(Sink),
-}
-
-#[derive(Clone)]
-pub struct ComponentAdded(Component);
-
-#[derive(Clone)]
-pub struct ComponentRemoved(Component);
-
-lazy_static! {
-    static ref COMPONENTS: Arc<RwLock<HashMap<String, Component>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
-
 #[derive(Default)]
 pub struct ComponentsQuery;
 
@@ -213,22 +257,48 @@ impl ComponentsQuery {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Debug)]
+enum ComponentChanged {
+    Added(Component),
+    Removed(Component),
+}
+
+lazy_static! {
+    static ref COMPONENT_CHANGED: tokio::sync::broadcast::Sender<ComponentChanged> = {
+        let (tx, _) = tokio::sync::broadcast::channel(10);
+        tx
+    };
+}
+
+#[derive(Debug, Default)]
 pub struct ComponentsSubscription;
 
 #[Subscription]
 impl ComponentsSubscription {
     /// Subscribes to all newly added components
     async fn component_added(&self) -> impl Stream<Item = Component> {
-        Broker::<ComponentAdded>::subscribe().map(|t| t.0)
+        COMPONENT_CHANGED
+            .subscribe()
+            .into_stream()
+            .filter_map(|c| match c {
+                Ok(ComponentChanged::Added(c)) => Some(c),
+                _ => None,
+            })
     }
 
     /// Subscribes to all removed components
     async fn component_removed(&self) -> impl Stream<Item = Component> {
-        Broker::<ComponentRemoved>::subscribe().map(|t| t.0)
+        COMPONENT_CHANGED
+            .subscribe()
+            .into_stream()
+            .filter_map(|c| match c {
+                Ok(ComponentChanged::Removed(c)) => Some(c),
+                _ => None,
+            })
     }
 }
 
+/// Filter components with the provided `map_func`
 fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T>) -> Vec<T> {
     COMPONENTS
         .read()
@@ -238,6 +308,7 @@ fn filter_components<T>(map_func: impl Fn((&String, &Component)) -> Option<T>) -
         .collect()
 }
 
+/// Filters components, and returns a clone of sources
 fn get_sources() -> Vec<Source> {
     filter_components(|(_, components)| match components {
         Component::Source(s) => Some(s.clone()),
@@ -245,6 +316,7 @@ fn get_sources() -> Vec<Source> {
     })
 }
 
+/// Filters components, and returns a clone of transforms
 fn get_transforms() -> Vec<Transform> {
     filter_components(|(_, components)| match components {
         Component::Transform(t) => Some(t.clone()),
@@ -252,6 +324,7 @@ fn get_transforms() -> Vec<Transform> {
     })
 }
 
+/// Filters components, and returns a clone of sinks
 fn get_sinks() -> Vec<Sink> {
     filter_components(|(_, components)| match components {
         Component::Sink(s) => Some(s.clone()),
@@ -279,6 +352,7 @@ pub fn update_config(config: &Config) {
             name.to_owned(),
             Component::Source(Source(SourceData {
                 name: name.to_owned(),
+                component_type: source.source_type().to_string(),
                 output_type: source.output_type(),
             })),
         );
@@ -288,8 +362,9 @@ pub fn update_config(config: &Config) {
     for (name, transform) in config.transforms.iter() {
         new_components.insert(
             name.to_string(),
-            Component::Transform(Transform(InputsData {
+            Component::Transform(Transform(TransformData {
                 name: name.to_owned(),
+                component_type: transform.inner.transform_type().to_string(),
                 inputs: transform.inputs.clone(),
             })),
         );
@@ -299,8 +374,9 @@ pub fn update_config(config: &Config) {
     for (name, sink) in config.sinks.iter() {
         new_components.insert(
             name.to_string(),
-            Component::Sink(Sink(InputsData {
+            Component::Sink(Sink(SinkData {
                 name: name.to_owned(),
+                component_type: sink.inner.sink_type().to_string(),
                 inputs: sink.inputs.clone(),
             })),
         );
@@ -317,23 +393,25 @@ pub fn update_config(config: &Config) {
     existing_component_names
         .difference(&new_component_names)
         .for_each(|name| {
-            Broker::publish(ComponentRemoved(
+            let _ = COMPONENT_CHANGED.send(ComponentChanged::Removed(
                 COMPONENTS
                     .read()
                     .expect(INVARIANT)
                     .get(name)
                     .expect(INVARIANT)
                     .clone(),
-            ))
+            ));
         });
 
     // Publish all components that have been added
     new_component_names
         .difference(&existing_component_names)
         .for_each(|name| {
-            Broker::publish(ComponentAdded(new_components.get(name).unwrap().clone()));
+            let _ = COMPONENT_CHANGED.send(ComponentChanged::Added(
+                new_components.get(name).unwrap().clone(),
+            ));
         });
 
-    // override the old hashmap
+    // Override the old hashmap
     *COMPONENTS.write().expect(INVARIANT) = new_components;
 }

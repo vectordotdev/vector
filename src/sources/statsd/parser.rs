@@ -87,7 +87,7 @@ pub fn parse(packet: &str) -> Result<Metric, ParseError> {
                 .chars()
                 .next()
                 .map(|c| c.is_ascii_digit())
-                .ok_or_else(|| ParseError::Malformed("empty first body component"))?
+                .ok_or(ParseError::Malformed("empty first body component"))?
             {
                 parts[0].parse()?
             } else {
@@ -172,7 +172,7 @@ fn parse_direction(input: &str) -> Result<Option<f64>, ParseError> {
     match input
         .chars()
         .next()
-        .ok_or_else(|| ParseError::Malformed("empty body component"))?
+        .ok_or(ParseError::Malformed("empty body component"))?
     {
         '+' => Ok(Some(1.0)),
         '-' => Ok(Some(-1.0)),

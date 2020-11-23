@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_cloudwatch_metrics: {
 	title:       "AWS Cloudwatch Metrics"
-	description: "[Amazon CloudWatch](\(urls.aws_cloudwatch)) is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in the form of logs and metrics from a single platform."
+	description: sinks._aws_cloudwatch.description
 
 	classes: {
 		commonly_used: false
@@ -33,10 +33,7 @@ components: sinks: aws_cloudwatch_metrics: {
 			request: enabled:  false
 			tls: enabled:      false
 			to: {
-				name:     "AWS Cloudwatch metrics"
-				thing:    "an \(name) namespace"
-				url:      urls.aws_cloudwatch_metrics
-				versions: null
+				service: services.aws_cloudwatch_metrics
 
 				interface: {
 					socket: {
@@ -89,9 +86,12 @@ components: sinks: aws_cloudwatch_metrics: {
 	}
 
 	configuration: {
-		namespace: {
-			description: "A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other."
-			required:    true
+		default_namespace: {
+			description: """
+				A [namespace](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Namespace) that will isolate different metrics from each other.
+				Used as a namespace for metrics that don't have it.
+				"""
+			required: true
 			warnings: []
 			type: string: {
 				examples: ["service"]

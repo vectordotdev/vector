@@ -1,6 +1,5 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    dns::Resolver,
     event::Event,
     internal_events::AwsKinesisStreamsEventSent,
     rusoto::{self, RegionOrEndpoint},
@@ -12,8 +11,7 @@ use crate::{
     },
 };
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, TryFutureExt};
-use futures01::{stream::iter_ok, Sink};
+use futures::{future::BoxFuture, stream, FutureExt, Sink, SinkExt, StreamExt, TryFutureExt};
 use lazy_static::lazy_static;
 use rand::random;
 use rusoto_core::RusotoError;
@@ -28,7 +26,6 @@ use std::{
     fmt,
     task::{Context, Poll},
 };
-
 use tower::Service;
 use tracing_futures::Instrument;
 
@@ -91,13 +88,10 @@ impl SinkConfig for KinesisSinkConfig {
         &self,
         cx: SinkContext,
     ) -> crate::Result<(super::VectorSink, super::Healthcheck)> {
-        let client = self.create_client(cx.resolver())?;
+        let client = self.create_client()?;
         let healthcheck = self.clone().healthcheck(client.clone()).boxed();
         let sink = KinesisService::new(self.clone(), client, cx)?;
-        Ok((
-            super::VectorSink::Futures01Sink(Box::new(sink)),
-            healthcheck,
-        ))
+        Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -132,10 +126,10 @@ impl KinesisSinkConfig {
         }
     }
 
-    fn create_client(&self, resolver: Resolver) -> crate::Result<KinesisClient> {
+    fn create_client(&self) -> crate::Result<KinesisClient> {
         let region = (&self.region).try_into()?;
 
-        let client = rusoto::client(resolver)?;
+        let client = rusoto::client()?;
         let creds = rusoto::AwsCredentialsProvider::new(&region, self.assume_role.clone())?;
 
         let client = rusoto_core::Client::new_with_encoding(creds, client, self.compression.into());
@@ -148,7 +142,7 @@ impl KinesisService {
         config: KinesisSinkConfig,
         client: KinesisClient,
         cx: SinkContext,
-    ) -> crate::Result<impl Sink<SinkItem = Event, SinkError = ()>> {
+    ) -> crate::Result<impl Sink<Event, Error = ()>> {
         let batch = BatchSettings::default()
             .bytes(5_000_000)
             .events(500)
@@ -168,8 +162,10 @@ impl KinesisService {
                 batch.timeout,
                 cx.acker(),
             )
-            .sink_map_err(|e| error!("Fatal kinesis streams sink error: {}", e))
-            .with_flat_map(move |e| iter_ok(encode_event(e, &partition_key_field, &encoding)));
+            .sink_map_err(|error| error!(message = "Fatal kinesis streams sink error.", %error))
+            .with_flat_map(move |e| {
+                stream::iter(encode_event(e, &partition_key_field, &encoding)).map(Ok)
+            });
 
         Ok(sink)
     }
@@ -186,7 +182,7 @@ impl Service<Vec<PutRecordsRequestEntry>> for KinesisService {
 
     fn call(&mut self, records: Vec<PutRecordsRequestEntry>) -> Self::Future {
         debug!(
-            message = "sending records.",
+            message = "Sending records.",
             events = %records.len(),
         );
 
@@ -245,10 +241,8 @@ impl RetryLogic for KinesisRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            RusotoError::HttpDispatch(_) => true,
             RusotoError::Service(PutRecordsError::ProvisionedThroughputExceeded(_)) => true,
-            RusotoError::Unknown(res) if res.status.is_server_error() => true,
-            _ => false,
+            error => rusoto::is_retriable_error(error),
         }
     }
 }
@@ -398,7 +392,6 @@ mod integration_tests {
         rusoto::RegionOrEndpoint,
         test_util::{random_lines_with_stream, random_string},
     };
-    use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
     use rusoto_core::Region;
     use rusoto_kinesis::{Kinesis, KinesisClient};
     use std::sync::Arc;
@@ -431,15 +424,15 @@ mod integration_tests {
 
         let cx = SinkContext::new_test();
 
-        let client = config.create_client(cx.resolver()).unwrap();
-        let sink = KinesisService::new(config, client, cx).unwrap();
+        let client = config.create_client().unwrap();
+        let mut sink = KinesisService::new(config, client, cx).unwrap();
 
         let timestamp = chrono::Utc::now().timestamp_millis();
 
         let (mut input_lines, events) = random_lines_with_stream(100, 11);
         let mut events = events.map(Ok);
 
-        let _ = sink.sink_compat().send_all(&mut events).await.unwrap();
+        let _ = sink.send_all(&mut events).await.unwrap();
 
         delay_for(Duration::from_secs(1)).await;
 
@@ -504,7 +497,7 @@ mod integration_tests {
 
         match client.create_stream(req).await {
             Ok(_) => (),
-            Err(e) => panic!("Unable to check the stream {:?}", e),
+            Err(error) => panic!("Unable to check the stream {:?}", error),
         };
 
         // Wait for localstack to persist stream, otherwise it returns ResourceNotFound errors

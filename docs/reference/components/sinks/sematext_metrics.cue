@@ -56,7 +56,16 @@ components: sinks: sematext_metrics: {
 		notices: []
 	}
 
-	configuration: sinks._sematext.configuration
+	configuration: sinks._sematext.configuration & {
+		default_namespace: {
+			description: "Used as a namespace for metrics that don't have it."
+			required:    true
+			warnings: []
+			type: string: {
+				examples: ["service"]
+			}
+		}
+	}
 
 	input: {
 		logs: false
@@ -70,13 +79,7 @@ components: sinks: sematext_metrics: {
 		}
 	}
 
-	how_it_works: {
-		metric_types: {
-			title: "Metric Namespaces"
-			body: """
-				All metrics are sent with a namespace. If no namespace is included with the metric, the metric name becomes
-				the namespace and the metric is named `value`.
-				"""
-		}
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

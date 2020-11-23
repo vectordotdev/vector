@@ -1,24 +1,27 @@
 mod error;
-mod expression;
-mod function;
 mod operator;
 mod parser;
 mod program;
 mod runtime;
-mod state;
-mod value;
+mod test_util;
+mod type_def;
 
-use expression::{Expr, Expression};
-use function::{Argument, ArgumentList, Function, Parameter};
-use operator::Operator;
-use state::State;
+pub mod expression;
+pub mod function;
+pub mod prelude;
+pub mod state;
+pub mod value;
 
-pub use error::Error;
+pub use error::{Error, RemapError};
+pub use expression::{Expr, Expression};
+pub use function::{Function, Parameter};
+pub use operator::Operator;
 pub use program::Program;
 pub use runtime::Runtime;
+pub use type_def::TypeDef;
 pub use value::Value;
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// Any object you want to map through the remap language has to implement this
 /// trait.
@@ -58,69 +61,113 @@ pub trait Object: std::fmt::Debug {
     /// When inserting into a coalesced path, the implementor is encouraged to
     /// insert into the right-most segment if none exists, but can return an
     /// error if needed.
-    fn insert(&mut self, path: &str, value: Value) -> std::result::Result<(), String>;
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String>;
 
     /// Find a value for a given path.
     ///
     /// See [`Object::insert`] for more details.
-    fn find(&self, path: &str) -> std::result::Result<Option<Value>, String>;
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String>;
+
+    /// Get the list of paths in the object.
+    ///
+    /// Paths are represented similar to what's documented in [`Object::insert`].
+    fn paths(&self) -> Vec<String>;
+
+    /// Remove the given path from the object.
+    ///
+    /// If `compact` is true, after deletion, if an empty object or array is
+    /// left behind, it should be removed as well.
+    fn remove(&mut self, path: &str, compact: bool);
+}
+
+impl Object for std::collections::HashMap<String, Value> {
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
+        self.insert(vec_path_to_string(path), value);
+
+        Ok(())
+    }
+
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
+        Ok(self.get(&vec_path_to_string(path)).cloned())
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.keys().cloned().collect::<Vec<_>>()
+    }
+
+    fn remove(&mut self, path: &str, _: bool) {
+        self.remove(path);
+    }
+}
+
+impl Object for std::collections::BTreeMap<String, Value> {
+    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
+        self.insert(vec_path_to_string(path), value);
+
+        Ok(())
+    }
+
+    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
+        Ok(self.get(&vec_path_to_string(path)).cloned())
+    }
+
+    fn paths(&self) -> Vec<String> {
+        self.keys().cloned().collect::<Vec<_>>()
+    }
+
+    fn remove(&mut self, path: &str, _: bool) {
+        self.remove(path);
+    }
+}
+
+fn vec_path_to_string(path: &[Vec<String>]) -> String {
+    path.iter()
+        .map(|v| v.join("."))
+        .collect::<Vec<_>>()
+        .join(".")
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::function::ArgumentList;
     use std::collections::HashMap;
-    use std::str::FromStr;
-
-    #[derive(Debug, Default)]
-    struct Event {
-        paths: HashMap<String, Value>,
-    }
-
-    impl Object for Event {
-        fn insert(&mut self, path: &str, value: Value) -> std::result::Result<(), String> {
-            self.paths.insert(path.to_owned(), value);
-            Ok(())
-        }
-
-        fn find(&self, path: &str) -> std::result::Result<Option<Value>, String> {
-            Ok(self.paths.get(path).cloned())
-        }
-    }
 
     #[test]
     fn it_works() {
-        let cases: Vec<(&str, Result<Option<Value>>)> = vec![
-            (r#".foo = null || "bar""#, Ok(Some("bar".into()))),
-            // (r#".foo == .bar"#, Ok(Some(Value::Boolean(false)))),
+        let cases = vec![
+            (r#".foo = null || "bar""#, Ok(()), Ok("bar".into())),
+            (r#"$foo = null || "bar""#, Ok(()), Ok("bar".into())),
+            // (r#".foo == .bar"#, Ok(Value::Boolean(false))),
             (
                 r#".foo == .bar"#,
-                Err(
-                    expression::Error::Path(expression::path::Error::Missing(".foo".to_owned()))
-                        .into(),
-                ),
+                Ok(()),
+                Ok(true.into()),
             ),
-            (r#".foo = (null || "bar")"#, Ok(Some("bar".into()))),
-            (r#"!false"#, Ok(Some(true.into()))),
-            (r#"!!false"#, Ok(Some(false.into()))),
-            (r#"!!!true"#, Ok(Some(false.into()))),
-            (r#"if true { "yes" } else { "no" }"#, Ok(Some("yes".into()))),
+            (
+                r#"if "foo" { "bar" }"#,
+                Ok(()),
+                Err(r#"remap error: value error: expected "boolean", got "string""#),
+            ),
+            (r#".foo = (null || "bar")"#, Ok(()), Ok("bar".into())),
+            (r#"!false"#, Ok(()), Ok(true.into())),
+            (r#"!!false"#, Ok(()), Ok(false.into())),
+            (r#"!!!true"#, Ok(()), Ok(false.into())),
+            (r#"if true { "yes" } else { "no" }"#, Ok(()), Ok("yes".into())),
             // (
             //     r#".a.b.(c | d) == .e."f.g"[2].(h | i)"#,
-            //     Ok(Some(Value::Boolean(false))),
+            //     Ok(Value::Boolean(false)),
             // ),
-            (".bar = true\n.foo = .bar", Ok(Some(Value::Boolean(true)))),
-            (
-                r#"split("bar", pattern = /a/)"#,
-                Ok(Some(vec!["b", "r"].into())),
-            ),
+            ("$bar = true\n.foo = $bar", Ok(()), Ok(Value::Boolean(true))),
             (
                 r#"{
-                    .foo = "foo"
-                    .foo = .foo + "bar"
+                    $foo = "foo"
+                    .foo = $foo + "bar"
                     .foo
                 }"#,
-                Ok(Some("foobar".into())),
+                Ok(()),
+
+                Ok("foobar".into()),
             ),
             (
                 r#"
@@ -128,21 +175,165 @@ mod tests {
                     false || (.foo = true) && true
                     .foo
                 "#,
-                Ok(Some(true.into())),
+
+                Ok(()),
+
+                Ok(true.into()),
+            ),
+            (r#"if false { 1 }"#, Ok(()), Ok(Value::Null)),
+            (r#"if true { 1 }"#, Ok(()), Ok(1.into())),
+            (r#"if false { 1 } else { 2 }"#, Ok(()), Ok(2.into())),
+            (r#"if false { 1 } else if false { 2 }"#, Ok(()), Ok(Value::Null)),
+            (r#"if false { 1 } else if true { 2 }"#, Ok(()), Ok(2.into())),
+            (
+                r#"if false { 1 } else if false { 2 } else { 3 }"#,
+                Ok(()), Ok(3.into()),
+            ),
+            (
+                r#"if false { 1 } else if true { 2 } else { 3 }"#,
+                Ok(()), Ok(2.into()),
+            ),
+            (
+                r#"if false { 1 } else if false { 2 } else if false { 3 }"#,
+                Ok(()), Ok(Value::Null),
+            ),
+            (
+                r#"if false { 1 } else if false { 2 } else if true { 3 }"#,
+                Ok(()), Ok(3.into()),
+            ),
+            (
+                r#"if false { 1 } else if true { 2 } else if false { 3 } else { 4 }"#,
+                Ok(()), Ok(2.into()),
+            ),
+            (
+                r#"if false { 1 } else if false { 2 } else if false { 3 } else { 4 }"#,
+                Ok(()), Ok(4.into()),
+            ),
+            (
+                r#"regex_printer(/escaped\/forward slash/)"#,
+                Ok(()), Ok("regex: escaped/forward slash".into()),
+            ),
+            (
+                r#"enum_validator("foo")"#,
+                Ok(()),
+                Ok("valid: foo".into()),
+            ),
+            (
+                r#"enum_validator("bar")"#,
+                Ok(()),
+                Ok("valid: bar".into()),
+            ),
+            (
+                r#"enum_validator("baz")"#,
+                Err("remap error: function error: unknown enum variant: baz, must be one of: foo, bar"),
+                Ok("valid: baz".into()),
             ),
         ];
 
-        for (script, result) in cases {
-            let program = Program::from_str(script)
-                .map_err(|e| {
-                    println!("{}", &e);
-                    e
-                })
-                .unwrap();
-            let mut runtime = Runtime::new(State::default());
-            let event = Event::default();
+        for (script, compile_expected, runtime_expected) in cases {
+            let accept = TypeDef {
+                fallible: true,
+                optional: true,
+                kind: value::Kind::all(),
+            };
 
-            assert_eq!(runtime.execute(event, program), result);
+            let program = Program::new(
+                script,
+                &[
+                    Box::new(test_functions::RegexPrinter),
+                    Box::new(test_functions::EnumValidator),
+                ],
+                accept,
+            );
+
+            assert_eq!(
+                program.as_ref().map(|_| ()).map_err(|e| e.to_string()),
+                compile_expected.map_err(|e| e.to_string())
+            );
+
+            if program.is_err() {
+                return;
+            }
+
+            let program = program.unwrap();
+            let mut runtime = Runtime::new(state::Program::default());
+            let mut event = HashMap::default();
+
+            let result = runtime
+                .execute(&mut event, &program)
+                .map_err(|e| e.to_string());
+
+            assert_eq!(result, runtime_expected.map_err(|e| e.to_string()));
+        }
+    }
+
+    mod test_functions {
+        use super::*;
+
+        #[derive(Debug, Clone)]
+        pub(super) struct EnumValidator;
+        impl Function for EnumValidator {
+            fn identifier(&self) -> &'static str {
+                "enum_validator"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(EnumValidatorFn(
+                    arguments.required_enum("value", &["foo", "bar"])?,
+                )))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: true,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct EnumValidatorFn(String);
+        impl Expression for EnumValidatorFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(format!("valid: {}", self.0).into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct RegexPrinter;
+        impl Function for RegexPrinter {
+            fn identifier(&self) -> &'static str {
+                "regex_printer"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(RegexPrinterFn(arguments.required_regex("value")?)))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: true,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct RegexPrinterFn(regex::Regex);
+        impl Expression for RegexPrinterFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(format!("regex: {:?}", self.0).into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
+            }
         }
     }
 }

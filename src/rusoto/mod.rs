@@ -1,4 +1,4 @@
-use crate::{dns::Resolver, tls::MaybeTlsSettings};
+use crate::{http::HttpError, tls::MaybeTlsSettings};
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::StreamExt;
@@ -11,7 +11,7 @@ use rusoto_core::{
     request::{
         DispatchSignedRequest, DispatchSignedRequestFuture, HttpDispatchError, HttpResponse,
     },
-    ByteStream, Region,
+    ByteStream, Region, RusotoError,
 };
 use rusoto_credential::{
     AutoRefreshingProvider, AwsCredentials, ChainProvider, CredentialsError, ProvideAwsCredentials,
@@ -33,14 +33,14 @@ pub use region::{region_from_endpoint, RegionOrEndpoint};
 
 pub type Client = HttpClient<super::http::HttpClient<RusotoBody>>;
 
-pub fn client(resolver: Resolver) -> crate::Result<Client> {
+pub fn client() -> crate::Result<Client> {
     let settings = MaybeTlsSettings::enable_client()?;
-    let client = super::http::HttpClient::new(resolver, settings)?;
+    let client = super::http::HttpClient::new(settings)?;
     Ok(HttpClient { client })
 }
 
 #[derive(Debug, Snafu)]
-enum RusotoError {
+enum AwsRusotoError {
     #[snafu(display("Failed to create request dispatcher"))]
     DispatcherError,
 
@@ -113,10 +113,10 @@ impl fmt::Debug for AwsCredentialsProvider {
 impl AwsCredentialsProvider {
     pub fn new(region: &Region, assume_role: Option<String>) -> crate::Result<Self> {
         if let Some(role) = assume_role {
-            debug!("using sts assume role credentials for AWS.");
+            debug!("Using STS assume role credentials for AWS.");
 
             let dispatcher = rusoto_core::request::HttpClient::new()
-                .map_err(|_| RusotoError::DispatcherError)?;
+                .map_err(|_| AwsRusotoError::DispatcherError)?;
 
             let mut credentials = CustomChainProvider::new();
             credentials.set_timeout(Duration::from_secs(8));
@@ -136,7 +136,7 @@ impl AwsCredentialsProvider {
             let creds = AutoRefreshingProvider::new(provider).context(InvalidAWSCredentials)?;
             Ok(Self::Role(creds))
         } else {
-            debug!("using default credentials provider for AWS.");
+            debug!("Using default credentials provider for AWS.");
             let mut chain = CustomChainProvider::new();
             // 8 seconds because our default healthcheck timeout
             // is 10 seconds.
@@ -186,7 +186,7 @@ impl<T> HttpClient<T> {
 
 impl<T> DispatchSignedRequest for HttpClient<T>
 where
-    T: Service<Request<RusotoBody>, Response = Response<Body>, Error = hyper::Error>
+    T: Service<Request<RusotoBody>, Response = Response<Body>, Error = HttpError>
         + Clone
         + Send
         + 'static,
@@ -257,15 +257,14 @@ where
                 .method(method)
                 .uri(uri)
                 .body(RusotoBody::from(request.payload))
-                .map_err(|e| format!("error building request: {}", e))
+                .map_err(|error| format!("error building request: {}", error))
                 .map_err(HttpDispatchError::new)?;
 
             *request.headers_mut() = headers;
 
-            let response = client
-                .oneshot(request)
-                .await
-                .map_err(|e| HttpDispatchError::new(format!("Error during dispatch: {}", e)))?;
+            let response = client.oneshot(request).await.map_err(|error| {
+                HttpDispatchError::new(format!("Error during dispatch: {}", error))
+            })?;
 
             let status = StatusCode::from_u16(response.status().as_u16()).unwrap();
             let headers = response
@@ -280,11 +279,9 @@ where
                 })
                 .collect();
 
-            let body = response.into_body().map(|try_chunk| {
-                try_chunk
-                    .map(|c| c)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e))
-            });
+            let body = response
+                .into_body()
+                .map(|try_chunk| try_chunk.map_err(|e| io::Error::new(io::ErrorKind::Other, e)));
 
             Ok(HttpResponse {
                 status,
@@ -335,5 +332,18 @@ impl HttpBody for RusotoBody {
 impl From<Option<SignedRequestPayload>> for RusotoBody {
     fn from(inner: Option<SignedRequestPayload>) -> Self {
         RusotoBody { inner }
+    }
+}
+
+pub fn is_retriable_error<T>(error: &RusotoError<T>) -> bool {
+    match error {
+        RusotoError::HttpDispatch(_) => true,
+        RusotoError::Unknown(res)
+            if res.status.is_server_error()
+                || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
+        {
+            true
+        }
+        _ => false,
     }
 }

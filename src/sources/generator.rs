@@ -5,11 +5,7 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{
-    compat::Future01CompatExt,
-    future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
-};
+use futures::{compat::Future01CompatExt, stream::StreamExt};
 use futures01::{stream::iter_ok, Sink};
 use serde::{Deserialize, Serialize};
 use std::task::Poll;
@@ -69,7 +65,7 @@ impl SourceConfig for GeneratorConfig {
 
 impl GeneratorConfig {
     pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
-        Box::new(self.inner(shutdown, out).boxed().compat())
+        Box::pin(self.inner(shutdown, out))
     }
 
     async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
@@ -105,7 +101,7 @@ impl GeneratorConfig {
                 .send_all(iter_ok(events))
                 .compat()
                 .await
-                .map_err(|error| error!(message="error sending generated lines", %error))?;
+                .map_err(|error| error!(message="Error sending generated lines.", %error))?;
             out = sink;
         }
         Ok(())
@@ -116,7 +112,6 @@ impl GeneratorConfig {
 mod tests {
     use super::*;
     use crate::{config::log_schema, shutdown::ShutdownSignal, Pipeline};
-    use futures::compat::Future01CompatExt;
     use futures01::{stream::Stream, sync::mpsc, Async::*};
     use std::time::{Duration, Instant};
 
@@ -128,11 +123,7 @@ mod tests {
     async fn runit(config: &str) -> mpsc::Receiver<Event> {
         let (tx, rx) = Pipeline::new_test();
         let config: GeneratorConfig = toml::from_str(config).unwrap();
-        config
-            .generator(ShutdownSignal::noop(), tx)
-            .compat()
-            .await
-            .unwrap();
+        config.generator(ShutdownSignal::noop(), tx).await.unwrap();
         rx
     }
 

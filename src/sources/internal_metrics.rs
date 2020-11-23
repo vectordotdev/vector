@@ -5,18 +5,29 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{
-    compat::Future01CompatExt,
-    future::{FutureExt, TryFutureExt},
-    stream::StreamExt,
-};
+use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use tokio::{select, time::interval};
+use tokio::time;
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
-pub struct InternalMetricsConfig {}
+#[serde(deny_unknown_fields)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct InternalMetricsConfig {
+    #[serde(default = "default_scrape_interval_secs")]
+    scrape_interval_secs: u64,
+}
+
+pub const fn default_scrape_interval_secs() -> u64 {
+    2
+}
+
+impl Default for InternalMetricsConfig {
+    fn default() -> Self {
+        Self {
+            scrape_interval_secs: default_scrape_interval_secs(),
+        }
+    }
+}
 
 inventory::submit! {
     SourceDescription::new::<InternalMetricsConfig>("internal_metrics")
@@ -34,8 +45,12 @@ impl SourceConfig for InternalMetricsConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let fut = run(get_controller()?, out, shutdown).boxed().compat();
-        Ok(Box::new(fut))
+        Ok(Box::pin(run(
+            get_controller()?,
+            self.scrape_interval_secs,
+            out,
+            shutdown,
+        )))
     }
 
     fn output_type(&self) -> DataType {
@@ -49,27 +64,19 @@ impl SourceConfig for InternalMetricsConfig {
 
 async fn run(
     controller: &Controller,
-    mut out: Pipeline,
-    mut shutdown: ShutdownSignal,
+    interval: u64,
+    out: Pipeline,
+    shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut interval = interval(Duration::from_secs(2)).map(|_| ());
+    let mut out = out
+        .sink_map_err(|error| error!(message = "Error sending internal metrics.", %error))
+        .sink_compat();
 
-    let mut run = true;
-    while run {
-        run = select! {
-            Some(()) = interval.next() => true,
-            _ = &mut shutdown => false,
-            else => false,
-        };
-
+    let duration = time::Duration::from_secs(interval);
+    let mut interval = time::interval(duration).take_until(shutdown);
+    while interval.next().await.is_some() {
         let metrics = capture_metrics(controller);
-
-        let (sink, _) = out
-            .send_all(futures01::stream::iter_ok(metrics))
-            .compat()
-            .await
-            .map_err(|error| error!(message = "Error sending internal metrics", %error))?;
-        out = sink;
+        out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
     }
 
     Ok(())

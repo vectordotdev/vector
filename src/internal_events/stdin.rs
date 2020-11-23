@@ -24,7 +24,7 @@ pub struct StdinReadFailed {
 
 impl InternalEvent for StdinReadFailed {
     fn emit_logs(&self) {
-        error!(message = "Unable to read from source.", error = %self.error);
+        error!(message = "Unable to read from source.", error = ?self.error);
     }
 
     fn emit_metrics(&self) {

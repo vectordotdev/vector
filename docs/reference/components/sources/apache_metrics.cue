@@ -19,10 +19,41 @@ components: sources: apache_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Apache HTTP server (HTTPD)"
-				thing:    "an \(name)"
-				url:      urls.apache
-				versions: null
+				service: {
+					name:     "Apache HTTP server (HTTPD)"
+					thing:    "an \(name)"
+					url:      urls.apache
+					versions: null
+
+					setup: [
+						"""
+							[Install the Apache HTTP server](\(urls.apache_install)).
+							""",
+						"""
+							Enable the [Apache Status module](\(urls.apache_mod_status))
+							in your Apache config:
+
+							```text file="\(_config_path)"
+							<Location "\(_path)">
+							    SetHandler server-status
+							    Require host example.com
+							</Location>
+							```
+							""",
+						"""
+							Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
+							for more detailed metrics (see [Output](#output)). Note,
+							this defaults to `On` in Apache >= 2.3.6.
+
+							```text file="\(_config_path)"
+							ExtendedStatus On
+							```
+							""",
+						"""
+							Start or reload Apache to apply the config changes.
+							""",
+					]
+				}
 
 				interface: {
 					socket: {
@@ -35,35 +66,6 @@ components: sources: apache_metrics: {
 						ssl: "disabled"
 					}
 				}
-
-				setup: [
-					"""
-						[Install the Apache HTTP server](\(urls.apache_install)).
-						""",
-					"""
-						Enable the [Apache Status module](\(urls.apache_mod_status))
-						in your Apache config:
-
-						```text file="\(_config_path)"
-						<Location "\(_path)">
-						    SetHandler server-status
-						    Require host example.com
-						</Location>
-						```
-						""",
-					"""
-						Optionally enable [`ExtendedStatus` option](\(urls.apache_extended_status))
-						for more detailed metrics (see [Output](#output)). Note,
-						this defaults to `On` in Apache >= 2.3.6.
-
-						```text file="\(_config_path)"
-						ExtendedStatus On
-						```
-						""",
-					"""
-						Start or reload Apache to apply the config changes.
-						""",
-				]
 			}
 		}
 	}
@@ -100,34 +102,44 @@ components: sources: apache_metrics: {
 				unit:    "seconds"
 			}
 		}
+		namespace: {
+			description: "The namespace of the metric. Disabled if empty."
+			required:    false
+			common:      false
+			warnings: []
+			type: string: {
+				default: "apache"
+			}
+		}
 	}
 
 	output: metrics: {
-		_endpoint: {
-			description: "The absolute path of originating file."
-			required:    true
-			examples: ["http://localhost:8080/server-status?auto"]
-		}
-		_host: {
-			description: "The hostname of the Apache HTTP server"
-			required:    true
-			examples: [_values.local_host]
-		}
-		apache_access_total: {
-			description:   "The total number of time the Apache server has been accessed."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+		// Default Apache metrics tags
+		_apache_metrics_tags: {
+			endpoint: {
+				description: "The absolute path of originating file."
+				required:    true
+				examples: ["http://localhost:8080/server-status?auto"]
+			}
+			host: {
+				description: "The hostname of the Apache HTTP server."
+				required:    true
+				examples: [_values.local_host]
 			}
 		}
-		apache_connections: {
-			description: "The total number of time the Apache server has been accessed."
-			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+
+		access_total: {
+			description:       "The total number of time the Apache server has been accessed."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
+		}
+		connections: {
+			description:       "The total number of time the Apache server has been accessed."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
 				state: {
 					description: "The state of the connection"
 					required:    true
@@ -135,44 +147,38 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_cpu_load: {
-			description:   "The current CPU of the Apache server."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+		cpu_load: {
+			description:       "The current CPU of the Apache server."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_cpu_seconds_total: {
-			description:   "The CPU time of various Apache processes."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-				type: {
+		cpu_seconds_total: {
+			description:       "The CPU time of various Apache processes."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
+				state: {
 					description: "The state of the connection"
 					required:    true
 					examples: ["children_system", "children_user", "system", "user"]
 				}
 			}
 		}
-		apache_duration_seconds_total: {
-			description:   "The amount of time the Apache server has been running."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+		duration_seconds_total: {
+			description:       "The amount of time the Apache server has been running."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_scoreboard: {
-			description: "The amount of times various Apache server tasks have been run."
-			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+		scoreboard: {
+			description:       "The amount of times various Apache server tasks have been run."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
 				state: {
 					description: "The connect state"
 					required:    true
@@ -180,42 +186,35 @@ components: sources: apache_metrics: {
 				}
 			}
 		}
-		apache_sent_bytes_total: {
-			description:   "The amount of bytes sent by the Apache server."
-			relevant_when: "`ExtendedStatus On`"
-			type:          "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+		sent_bytes_total: {
+			description:       "The amount of bytes sent by the Apache server."
+			relevant_when:     "`ExtendedStatus On`"
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_uptime_seconds_total: {
-			description: "The amount of time the Apache server has been running."
-			type:        "counter"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
-			}
+		up: {
+			description:       "If the Apache server is up or not."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
 		}
-		apache_workers: {
-			description: "Apache worker statuses."
-			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
+		uptime_seconds_total: {
+			description:       "The amount of time the Apache server has been running."
+			type:              "counter"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags
+		}
+		workers: {
+			description:       "Apache worker statuses."
+			type:              "gauge"
+			default_namespace: "apache"
+			tags:              _apache_metrics_tags & {
 				state: {
 					description: "The state of the worker"
 					required:    true
 					examples: ["busy", "idle"]
 				}
-			}
-		}
-		apache_up: {
-			description: "If the Apache server is up or not."
-			type:        "gauge"
-			tags: {
-				endpoint: _endpoint
-				host:     _host
 			}
 		}
 	}

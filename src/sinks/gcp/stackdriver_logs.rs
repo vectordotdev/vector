@@ -13,8 +13,7 @@ use crate::{
     },
     tls::{TlsOptions, TlsSettings},
 };
-use futures::FutureExt;
-use futures01::Sink;
+use futures::{FutureExt, SinkExt};
 use http::{Request, Uri};
 use hyper::Body;
 use lazy_static::lazy_static;
@@ -121,7 +120,7 @@ impl SinkConfig for StackdriverConfig {
             .parse_config(self.batch)?;
         let request = self.request.unwrap_with(&REQUEST_DEFAULTS);
         let tls_settings = TlsSettings::from_options(&self.tls)?;
-        let client = HttpClient::new(cx.resolver(), tls_settings)?;
+        let client = HttpClient::new(tls_settings)?;
 
         let sink = StackdriverSink {
             config: self.clone(),
@@ -139,9 +138,9 @@ impl SinkConfig for StackdriverConfig {
             client,
             cx.acker(),
         )
-        .sink_map_err(|e| error!("Fatal stackdriver sink error: {}", e));
+        .sink_map_err(|error| error!(message = "Fatal gcp_stackdriver_logs sink error.", %error));
 
-        Ok((VectorSink::Futures01Sink(Box::new(sink)), healthcheck))
+        Ok((VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
     fn input_type(&self) -> DataType {
@@ -228,7 +227,7 @@ fn remap_severity(severity: Value) -> Value {
                     s if s.starts_with("DEFAULT") => 0,
                     _ => {
                         warn!(
-                            message = "Unknown severity value string, using DEFAULT",
+                            message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
                             rate_limit_secs = 10
                         );
@@ -239,7 +238,7 @@ fn remap_severity(severity: Value) -> Value {
         }
         value => {
             warn!(
-                message = "Unknown severity value type, using DEFAULT",
+                message = "Unknown severity value type, using DEFAULT.",
                 ?value,
                 rate_limit_secs = 10
             );
@@ -249,7 +248,7 @@ fn remap_severity(severity: Value) -> Value {
     Value::Integer(n)
 }
 
-async fn healthcheck(mut client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;

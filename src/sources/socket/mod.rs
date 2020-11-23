@@ -6,7 +6,8 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
@@ -136,25 +137,33 @@ impl SourceConfig for SocketConfig {
     fn source_type(&self) -> &'static str {
         "socket"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self.mode.clone() {
+            Mode::Tcp(tcp) => vec![tcp.address.into()],
+            Mode::Udp(udp) => vec![udp.address.into()],
+            #[cfg(unix)]
+            Mode::Unix(_) => vec![],
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
-        config::{log_schema, GlobalOptions, SourceConfig},
-        dns::Resolver,
+        config::{log_schema, GlobalOptions, SinkContext, SourceConfig},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
-        sinks::util::tcp::TcpSink,
+        sinks::util::tcp::TcpSinkConfig,
         test_util::{
             collect_n, next_addr, random_string, send_lines, send_lines_tls, wait_for_tcp,
         },
-        tls::{MaybeTlsSettings, TlsConfig, TlsOptions},
-        Pipeline,
+        tls::{TlsConfig, TlsOptions},
+        Event, Pipeline,
     };
     use bytes::Bytes;
     use futures::{
-        compat::{Future01CompatExt, Sink01CompatExt, Stream01CompatExt},
+        compat::{Future01CompatExt, Stream01CompatExt},
         stream, StreamExt,
     };
     use std::{
@@ -198,8 +207,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -224,8 +232,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -257,8 +264,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -305,8 +311,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -355,8 +360,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -401,8 +405,7 @@ mod test {
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         let source_handle = tokio::spawn(server);
 
         // Send data to Source.
@@ -429,7 +432,7 @@ mod test {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = Pipeline::new_with_buffer(10_000);
+        let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
@@ -443,27 +446,25 @@ mod test {
         })
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .await
-        .unwrap()
-        .compat();
+        .unwrap();
         let source_handle = tokio::spawn(server);
 
         wait_for_tcp(addr).await;
 
-        // Spawn future that keeps sending lines to the TCP source forever.
-        let sink = TcpSink::new(
-            "localhost".to_owned(),
-            addr.port(),
-            Resolver,
-            MaybeTlsSettings::Raw(()),
-        );
         let message = random_string(512);
-        let message_event = Bytes::from(message.clone() + "\n");
+        let message_bytes = Bytes::from(message.clone() + "\n");
+
+        let cx = SinkContext::new_test();
+        let encode_event = move |_event| Some(message_bytes.clone());
+        let sink_config = TcpSinkConfig::new(format!("localhost:{}", addr.port()), None);
+        let (sink, _healthcheck) = sink_config.build(cx, encode_event).unwrap();
+
+        // Spawn future that keeps sending lines to the TCP source forever.
         tokio::spawn(async move {
-            let _ = stream::repeat(())
-                .map(move |_| Ok(message_event.clone()))
-                .forward(sink.sink_compat())
-                .await
-                .unwrap();
+            let input = stream::repeat(())
+                .map(move |_| Event::new_empty_log())
+                .boxed();
+            sink.run(input).await.unwrap();
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
@@ -489,7 +490,7 @@ mod test {
     fn send_lines_udp(addr: SocketAddr, lines: impl IntoIterator<Item = String>) -> SocketAddr {
         let bind = next_addr();
         let socket = UdpSocket::bind(bind)
-            .map_err(|e| panic!("{:}", e))
+            .map_err(|error| panic!("{:}", error))
             .ok()
             .unwrap();
 
@@ -497,7 +498,7 @@ mod test {
             assert_eq!(
                 socket
                     .send_to(line.as_bytes(), addr)
-                    .map_err(|e| panic!("{:}", e))
+                    .map_err(|error| panic!("{:}", error))
                     .ok()
                     .unwrap(),
                 line.as_bytes().len()
@@ -542,8 +543,7 @@ mod test {
                 sender,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         let source_handle = tokio::spawn(server);
 
         // Wait for UDP to start listening
@@ -708,8 +708,7 @@ mod test {
                 sender,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         // Wait for server to accept traffic

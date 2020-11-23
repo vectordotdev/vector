@@ -48,10 +48,7 @@ components: sinks: aws_kinesis_firehose: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "AWS Kinesis Firehose"
-				thing:    "a \(name) stream"
-				url:      urls.aws_kinesis_firehose
-				versions: null
+				service: services.aws_kinesis_firehose
 
 				interface: {
 					socket: {

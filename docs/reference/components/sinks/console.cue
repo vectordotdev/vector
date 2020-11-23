@@ -27,10 +27,7 @@ components: sinks: console: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				name:     "STDOUT"
-				thing:    "a \(name) stream"
-				url:      urls.stdout
-				versions: null
+				service: services.stdout
 
 				interface: stdout: {}
 			}
@@ -78,5 +75,9 @@ components: sinks: console: {
 			set:          true
 			summary:      true
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

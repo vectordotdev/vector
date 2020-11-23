@@ -144,4 +144,8 @@ components: transforms: reduce: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		stale_events_flushed_total: components.sources.internal_metrics.output.metrics.stale_events_flushed_total
+	}
 }
