@@ -19,7 +19,7 @@ if ! [ -x "$(command -v cue)" ]; then
   exit 1
 fi
 
-if [[ -z "${CI:-}" ]]; then
+if [[ "${CI:-"false"}" != "true" ]]; then
   echo "Skipping local formatting - reserved for CI"
 else
   echo "Validating ${DOCS_PATH}/**/*.cue formatting."
