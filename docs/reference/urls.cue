@@ -99,6 +99,7 @@ urls: {
 	docker_hub_vector:                                        "https://hub.docker.com/r/timberio/vector"
 	docker_logging_driver_journald:                           "https://docs.docker.com/config/containers/logging/journald/"
 	docker_logging_driver_json_file:                          "https://docs.docker.com/config/containers/logging/json-file/"
+	docker_logging_driver_local:                              "https://docs.docker.com/config/containers/logging/local/"
 	docker_logging_driver_splunk:                             "https://docs.docker.com/config/containers/logging/splunk/"
 	docker_logging_driver_syslog:                             "https://docs.docker.com/config/containers/logging/syslog/"
 	docker_logging_drivers:                                   "https://docs.docker.com/config/containers/logging/configure/"
