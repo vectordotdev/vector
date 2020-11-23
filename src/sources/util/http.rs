@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, error::Error, fmt, net::SocketAddr};
 use tracing_futures::Instrument;
 use warp::{
-    filters::BoxedFilter,
+    filters::{path::FullPath, BoxedFilter},
     http::{HeaderMap, StatusCode},
     reject::Rejection,
     Filter,
@@ -131,6 +131,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
         body: Bytes,
         header_map: HeaderMap,
         query_parameters: HashMap<String, String>,
+        full_path: &str,
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn run(
@@ -154,13 +155,14 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 }
             }
             let svc = filter
-                .and(warp::path::end())
+                .and(warp::path::full())
                 .and(warp::header::optional::<String>("authorization"))
                 .and(warp::header::headers_cloned())
                 .and(warp::body::bytes())
                 .and(warp::query::<HashMap<String, String>>())
                 .and_then(
-                    move |auth_header,
+                    move |full_path: FullPath,
+                          auth_header,
                           headers: HeaderMap,
                           body: Bytes,
                           query_parameters: HashMap<String, String>| {
@@ -170,7 +172,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
 
                         let body_size = body.len();
                         let events = match auth.is_valid(&auth_header) {
-                            Ok(()) => self.build_event(body, headers, query_parameters),
+                            Ok(()) => self.build_event(body, headers, query_parameters, full_path.as_str()),
                             Err(err) => Err(err),
                         };
 
