@@ -65,7 +65,7 @@ macro_rules! expression_dispatch {
         ///
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         pub enum Expr {
             $($expr($expr)),+
         }

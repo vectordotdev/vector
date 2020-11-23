@@ -10,13 +10,13 @@ pub enum Error {
     PathInsertion(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Target {
     Path(Path),
     Variable(Variable),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Assignment {
     target: Target,
     value: Box<Expr>,

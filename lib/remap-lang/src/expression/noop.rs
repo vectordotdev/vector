@@ -1,6 +1,6 @@
 use crate::{state, value, Expression, Object, Result, TypeDef, Value};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Noop;
 
 impl Expression for Noop {
