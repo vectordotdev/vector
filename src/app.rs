@@ -51,25 +51,21 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = opts.log_level();
+        let level = std::env::var("LOG").unwrap_or_else(|_| match opts.log_level() {
+            "off" => "off".to_owned(),
+            level => [
+                format!("vector={}", level),
+                format!("codec={}", level),
+                format!("file_source={}", level),
+                "tower_limit=trace".to_owned(),
+                format!("rdkafka={}", level),
+            ]
+            .join(","),
+        });
+
         let root_opts = opts.root;
 
         let sub_command = opts.sub_command;
-
-        let levels = match std::env::var("LOG").ok() {
-            Some(level) => level,
-            None => match level {
-                "off" => "off".to_string(),
-                _ => [
-                    format!("vector={}", level),
-                    format!("codec={}", level),
-                    format!("file_source={}", level),
-                    "tower_limit=trace".to_owned(),
-                    format!("rdkafka={}", level),
-                ]
-                .join(","),
-            },
-        };
 
         let color = match root_opts.color {
             #[cfg(unix)]
@@ -85,7 +81,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
-        trace::init(color, json, levels.as_str());
+        trace::init(color, json, &level);
 
         metrics::init().expect("metrics initialization failed");
 
