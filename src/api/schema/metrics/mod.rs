@@ -70,7 +70,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Events processed metrics.
+    /// Event processing metrics.
     async fn processed_events_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -81,7 +81,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Events processed throughput, sampled over a provided millisecond `interval`.
+    /// Event processing throughput sampled over the provided millisecond `interval`.
     async fn processed_events_throughput(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -90,7 +90,7 @@ impl MetricsSubscription {
             .map(|(_, throughput)| throughput as i64)
     }
 
-    /// Component events processed throughputs over `interval`.
+    /// Component event processing throughput metrics over `interval`.
     async fn component_processed_events_throughputs(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -107,7 +107,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Component events processed metrics over `interval`.
+    /// Component event processing metrics over `interval`.
     async fn component_processed_events_totals(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -119,7 +119,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Bytes processed metrics.
+    /// Byte processing metrics.
     async fn processed_bytes_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -130,7 +130,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Bytes processed throughput, sampled over a provided millisecond `interval`.
+    /// Byte processing throughput sampled over a provided millisecond `interval`.
     async fn processed_bytes_throughput(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -139,7 +139,7 @@ impl MetricsSubscription {
             .map(|(_, throughput)| throughput as i64)
     }
 
-    /// Component bytes processed metrics, over `interval`.
+    /// Component byte processing metrics over `interval`.
     async fn component_processed_bytes_totals(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -151,7 +151,7 @@ impl MetricsSubscription {
         })
     }
 
-    /// Component bytes processed throughputs, over `interval`
+    /// Component byte processing throughput over `interval`
     async fn component_processed_bytes_throughputs(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -178,7 +178,7 @@ impl MetricsSubscription {
             .map(ErrorsTotal::new)
     }
 
-    /// Component errors metrics, over `interval`.
+    /// Component error metrics over `interval`.
     async fn component_errors_totals(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
