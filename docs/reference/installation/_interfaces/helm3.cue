@@ -41,7 +41,7 @@ installation: _interfaces: "helm3": {
 				    encoding = "json"
 				VALUES
 				"""#
-			install:   #"helm install --namespace vector --create-namespace \#(_name) timberio/\#(_name) --devel --values values.yaml"#
+			install:   #"helm install --namespace vector --create-namespace \#(_name) timberio/\#(_name) --values values.yaml"#
 			logs:      #"kubectl logs --namespace vector \#(_controller_resource_type)/\#(_name)"#
 			reload:    null
 			restart:   #"kubectl rollout restart --namespace vector \#(_controller_resource_type)/\#(_name)"#
