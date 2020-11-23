@@ -25,19 +25,22 @@ the metric to determine how to process the tags.
 
 ## Internal Proposal
 
-Currently to access data via Paths, `Remap` requires an object that implements 
-the `remap::Object` trait. Currently, the implementation only works for log 
-events.
+Currently to access data via Paths, `Remap` requires an object that implements
+the `remap::Object` trait. Currently, the implementation only works for log
+events. Although the Object trait is implemented for `Event`, it assumes the
+event is a log event.
 
 In order to make this work with Metric events, this implementation will need
-to be updated. The paths that can be used for Metrics events are fairly fixed,
+to be updated. We can implement `Object` separately for `LogEvent` and
+`Metric`. The call to Remap will pass either `LogEvent` or `Metric`
+to Remap according to the type the event is.
+
+The paths that can be used for Metrics events are fairly fixed,
 luckily the core methods return a `Result`, so if an invalid path is specified
-the `Object` will just return `Error`.
+the `Object` will just return `Error`. At first, this will happen at runtime.
+The compiler will not be able to catch an invalid path at compile.
 
-At first, this will happen at runtime. The compiler will not be able to catch
-an invalid path at compile.
-
-There are future plans for introducing 
+There are future plans for introducing
 [schema metadata](https://github.com/timberio/vector/issues/4599). At this point
 we can introduce a schema for metadata events that will capture the usage of
 any invalid fields. This is out of scope for the current RFC, but should align
@@ -47,8 +50,8 @@ with future work nicely.
 
 The Remap language can work with the metadata around a metric.
 
-When the event the Remap function is working with, the metric metadata can be 
-accessed through a number of set fields in a similar way to how the language 
+When the event the Remap function is working with, the metric metadata can be
+accessed through a number of set fields in a similar way to how the language
 works with log events.
 
 The following fields are available:
@@ -58,12 +61,15 @@ The following fields are available:
 - `.timestamp` - Timestamp of the metric.
 - `.kind` - The kind of the metric - *Incremental* or *Absolute*
 - `.tags` - A map containing the tags set for the metric.
- 
-There are strict limitations to how this data can be represented. 
 
-Setting `name` or `namespace` to anything other than a string will be an 
-error. `.timestamp` has to be a timestamp. `tags` is a map of string keys to 
-string values. No nesting is allowed. 
+There are strict limitations to how this data can be represented.
+
+Setting `.name` or `.namespace` to anything other than a string will be an
+error. `.timestamp` has to be a timestamp. `tags` is a map of string keys to
+string values. No nesting is allowed.
+
+The `.namespace` and `.timestamp` fields can also be set to `None` to remove
+their values. To accomplish this the `del` function can be used.
 
 To add a tag, or change an existing tag you can set it:
 
@@ -92,7 +98,7 @@ have been falling back to that for anything but the most complex manipulation.
 
 In order to maintain the metric paths there will be a slight maintenance burden.
 
-By exposing the metric data to Remap, it may place some restrictions should we 
+By exposing the metric data to Remap, it may place some restrictions should we
 want to change the internal model in the future. The more we decide to expose to
 the language, the more it may restrict us going forwards if we need to ensure
 backwards compatibility for users configurations.
@@ -140,7 +146,7 @@ Rename the tag with the given key to the new key.
 ### `remove_tag(string)`
 Removes the tag with the given key from the metric.
 
-Note that accessing path values (identifiers starting with a `.`) are not 
+Note that accessing path values (identifiers starting with a `.`) are not
 available for metric events.
 
 
@@ -162,7 +168,7 @@ still be implemented later as a next stage.
 
 ### Allow conversion between metric and log events
 
-Currently the RFC just lays out methods to manipulate either log or metric 
+Currently the RFC just lays out methods to manipulate either log or metric
 events. It could also be possible to add functions to convert a log event into
 a metric event and viceversa.
 
@@ -170,7 +176,7 @@ For example:
 
 `. = to_log()`
 
-could take the current metric event and write the fields into the root path to 
+could take the current metric event and write the fields into the root path to
 create a log event out of the metric.
 
 To create metric events one function per metric type could be provided such as:
@@ -187,26 +193,26 @@ If we analyse the most likely scenarios where users would want to manipulate
 the metrics, we could provide functions that cover these scenarios.
 
 For example, one likely scenario would be to sample a stream of gauge values and
-convert this into a sampled distribution. A function could be provided that 
+convert this into a sampled distribution. A function could be provided that
 enables this: `sample_gauge_values([buckets], sample_rate)`.
 
 The complexities involved with providing such functions are that it means
-there is no longer a strict one-to-one correspondance between input and output 
+there is no longer a strict one-to-one correspondance between input and output
 events. Many input events would be summarised to a single output event.
 
-We would need to think about what would need to be done should 
+We would need to think about what would need to be done should
 `sample_gauge_values` be called twice in the script.
 
 This can be handled by the `Lua` transform, but the script to do this can get
 quite involved. If it could be brought into the `Remap` language and simplified
-so than 80% of the likely usecases are covered, it could be a big win for 
+so than 80% of the likely usecases are covered, it could be a big win for
 simplifying users configurations.
 
 Note that this could still be implemented later as a next stage.
 
 ## Outstanding Questions
 
-- Should we add an extra option to the Remap transform of event_type to force 
+- Should we add an extra option to the Remap transform of event_type to force
   the user to specify if their script is for log or metric events and error at
   load time if they use functions specified for the other type?
 
@@ -215,5 +221,4 @@ Note that this could still be implemented later as a next stage.
 Incremental steps that execute this change. Generally this is in the form of:
 
 - [ ] Adjust the Remap transform to allow it to handle both log and metric.
-- [ ] Implement `remap-lang::Object` to handle the paths for metric events. 
-
+- [ ] Implement `remap-lang::Object` to handle the paths for metric events.
