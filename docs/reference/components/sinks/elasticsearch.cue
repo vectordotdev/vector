@@ -166,7 +166,7 @@ components: sinks: elasticsearch: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["http://10.24.32.122:9000", "https://example.com"]
+				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
 			}
 		}
 		headers: {

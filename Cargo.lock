@@ -7016,6 +7016,7 @@ dependencies = [
  "once_cell",
  "openssl",
  "openssl-probe",
+ "percent-encoding",
  "pest",
  "pest_derive",
  "pin-project 1.0.1",
