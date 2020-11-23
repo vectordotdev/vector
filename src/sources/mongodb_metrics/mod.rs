@@ -11,7 +11,7 @@ use chrono::Utc;
 use futures::{
     compat::Sink01CompatExt,
     future::{join_all, try_join_all},
-    stream, FutureExt, SinkExt, StreamExt,
+    stream, SinkExt, StreamExt,
 };
 use futures01::Sink;
 use mongodb::{
@@ -23,10 +23,7 @@ use mongodb::{
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
 use std::{collections::BTreeMap, future::ready, time::Instant};
-use tokio::{
-    select,
-    time::{interval, Duration},
-};
+use tokio::time;
 
 mod types;
 use types::{CommandBuildInfo, CommandIsMaster, CommandServerStatus, NodeType};
@@ -123,11 +120,9 @@ impl SourceConfig for MongoDBMetricsConfig {
         &self,
         _name: &str,
         _globals: &GlobalOptions,
-        mut shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        let mut interval = interval(Duration::from_secs(self.scrape_interval_secs)).map(|_| ());
-
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
 
         let sources = try_join_all(
@@ -138,33 +133,26 @@ impl SourceConfig for MongoDBMetricsConfig {
         .await?;
 
         let mut out = out
-            .sink_map_err(|error| error!(message = "Error sending metric.", %error))
+            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error))
             .sink_compat();
 
-        Ok(Box::pin(
-            async move {
-                loop {
-                    select! {
-                        _ = &mut shutdown => break,
-                        Some(()) = interval.next() => (),
-                        else => break,
-                    };
+        let duration = time::Duration::from_secs(self.scrape_interval_secs);
+        Ok(Box::pin(async move {
+            let mut interval = time::interval(duration).take_until(shutdown);
+            while interval.next().await.is_some() {
+                let start = Instant::now();
+                let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
+                emit!(MongoDBMetricsCollectCompleted {
+                    start,
+                    end: Instant::now()
+                });
 
-                    let start = Instant::now();
-                    let metrics = join_all(sources.iter().map(|mongodb| mongodb.collect())).await;
-                    emit!(MongoDBMetricsCollectCompleted {
-                        start,
-                        end: Instant::now()
-                    });
-
-                    let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
-                    if let Err(()) = out.send_all(&mut stream).await {
-                        error!(message = "Error sending mongodb metrics.");
-                    }
-                }
+                let mut stream = stream::iter(metrics).flatten().map(Event::Metric).map(Ok);
+                out.send_all(&mut stream).await?;
             }
-            .map(Ok),
-        ))
+
+            Ok(())
+        }))
     }
 
     fn output_type(&self) -> config::DataType {

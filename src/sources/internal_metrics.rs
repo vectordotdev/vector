@@ -5,11 +5,10 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::{compat::Future01CompatExt, stream::StreamExt};
+use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
-use tokio::select;
+use tokio::time;
 
 #[serde(deny_unknown_fields)]
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -66,27 +65,18 @@ impl SourceConfig for InternalMetricsConfig {
 async fn run(
     controller: &Controller,
     interval: u64,
-    mut out: Pipeline,
-    mut shutdown: ShutdownSignal,
+    out: Pipeline,
+    shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let mut interval = tokio::time::interval(Duration::from_secs(interval)).map(|_| ());
+    let mut out = out
+        .sink_map_err(|error| error!(message = "Error sending internal metrics.", %error))
+        .sink_compat();
 
-    let mut run = true;
-    while run {
-        run = select! {
-            Some(()) = interval.next() => true,
-            _ = &mut shutdown => false,
-            else => false,
-        };
-
+    let duration = time::Duration::from_secs(interval);
+    let mut interval = time::interval(duration).take_until(shutdown);
+    while interval.next().await.is_some() {
         let metrics = capture_metrics(controller);
-
-        let (sink, _) = out
-            .send_all(futures01::stream::iter_ok(metrics))
-            .compat()
-            .await
-            .map_err(|error| error!(message = "Error sending internal metrics.", %error))?;
-        out = sink;
+        out.send_all(&mut stream::iter(metrics).map(Ok)).await?;
     }
 
     Ok(())
