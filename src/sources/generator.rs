@@ -30,6 +30,7 @@ pub enum OutputFormat {
     RoundRobin {
         #[serde(default)]
         sequence: bool,
+        #[serde(alias = "lines")]
         items: Vec<String>,
     },
     ApacheCommon,
