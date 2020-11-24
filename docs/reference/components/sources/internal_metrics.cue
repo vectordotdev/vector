@@ -126,7 +126,7 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 		adaptive_concurrency_limit: {
-			description:       "The concurrency limit that the auto-concurrency feature has decided on for this current window."
+			description:       "The concurrency limit that the adaptive concurrency feature has decided on for this current window."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags

@@ -601,7 +601,7 @@ async fn run_compare(file_path: PathBuf, input: TestInput) {
 
 #[tokio::test]
 async fn all_tests() {
-    const PATH: &str = "tests/data/auto-concurrency";
+    const PATH: &str = "tests/data/adaptive-concurrency";
 
     // Read and parse everything first
     let mut entries = read_dir(PATH)
