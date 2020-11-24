@@ -115,7 +115,7 @@ struct TestParams {
     jitter: f64,
 
     #[serde(default)]
-    concurrency: LimitParams,
+    concurrency_limit_params: LimitParams,
 
     #[serde(default)]
     rate: LimitParams,
@@ -205,7 +205,7 @@ impl TestSink {
     fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
         self.params.delay
             * (1.0
-                + self.params.concurrency.scale(in_flight)
+                + self.params.concurrency_limit_params.scale(in_flight)
                 + self.params.rate.scale(rate)
                 + thread_rng().sample::<f64, _>(Exp1) * self.params.jitter)
     }
@@ -239,7 +239,7 @@ impl Service<Vec<Event>> for TestSink {
 
         let action = self
             .params
-            .concurrency
+            .concurrency_limits
             .action_at_level(in_flight)
             .or_else(|| self.params.rate.action_at_level(rate));
         match action {
