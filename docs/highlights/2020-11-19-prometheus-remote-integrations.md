@@ -26,8 +26,9 @@ with a variety of Prometheus use cases:
 ### Backing up Prometheus data
 
 Using the new [`prometheus_remote_write` source][prometheus_remote_write_source],
-Prometheus operators can route a stream of Prometheus data to the Vector
-[sink][sinks] of their choice. For this use case, object stores are recommended:
+Prometheus operators can route a stream of Prometheus data to the archiving
+solution of their choice. For this use case we recommend object stores for their
+cheap and durable qualtiies:
 
 ```toml
 [sources.prometheus]
@@ -42,11 +43,21 @@ Prometheus operators can route a stream of Prometheus data to the Vector
   inputs = ["convert"]
 ```
 
-### Large scale, highly available setups
+Swap `aws_s3` with `gcp_cloud_storage` or other object stores.
 
-There are a lot of opinions in
+### Long-term, highly-available Prometheus setups
+
+For large setups it's common to couple Prometheus with another solution designed
+for long term storage and querying. This reduces the pressure on Prometheus for
+short-term, real-time data without sacrificing retention. Databases like
+[M3 (Chronosphere)][], [Victoria metrics][],
 
 ### Using Prometheus as a centralized export proxy
+
+Finally, because Prometheus is so tightly integrated into various ecosystems,
+namely Kubernetes, it is often used a central proxy for exporting metrics data.
+Using the new [`prometheus_remote_write` source][prometheus_remote_write_source],
+make it possible to export metrics to other solutions, using them e
 
 # Exporting Prometheus data to long term storage
 

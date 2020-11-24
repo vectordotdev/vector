@@ -14,35 +14,35 @@ tags: ["type: announcement"]
 After eight months of development, [83 pull requests][kubernetes_pull_requests],
 and intensive QA in clusters producing over 30 terabytes per day, we’re pleased
 to announce Vector's first-class Kubernetes integration. It is our intent for
-Vector to become the single, best platform for all Kubernetes observability
-data.
+Vector to become the single, best platform for collecting and processing all
+Kubernetes observability data.
 
 For more details, checkout the
 [Kubernetes announcement blog post][announcement_post].
+
+## Feature highlights
+
+1.  [**A new `kubernetes_logs` source**][kubernetes_logs_source] - A new source
+    designed to handle the intricacies of Kuberenetes log collection. It'll
+    collect all Pod logs, merge split logs together, and enrich them with k8s
+    metadata.
+2.  [**`file` source performance improvements**][file_source_improvements] -
+    Vector's [`file` source][file_source] powers the new `kubernetes_logs`
+    source, and to keep up with very large Kubernetes deployments we invested
+    in performance improvements. We were able to improve throughput by over 25%
+    across the board. This [further raises the bar][file_soure_benchmarks] in
+    file tailing performance.
+2.  [**Adaptive Request Currency (ARC)**][adaptive_concurrency_post] -
+    A new Vector feature designed to automatically optimize HTTP communication
+    in the fact of ever changing environments like Kubernetes. It does away with
+    static rate limits and raises the performance and reliability of your entire
+    observability infrastructure.
 
 ## Get Started
 
 To cut straight to the chase, check out our Kubernetes installation instructions:
 
 <Jump to="/docs/setup/installation/platforms/kubernetes/#install">Kubernetes Installation Instructions</Jump>
-
-## Notable features
-
-1. A new [`kubernetes_logs` source] that:
-   1. Automatically collects all Node logs.
-   2. Automatically merges split logs due to the 12kb Docker limit.
-   3. Enriches logs with Kubernetes metdata.
-   4. Provides robust filtering options for Pod inclusion/exclusion.
-   5. Is designed for scale. Vector is routinely benchmarked at 150k messages
-      per second tailing hundreds of files.
-2.
-3. Composable design that allows k8s operators to include Vector in restricted
-   and unrestricted setups.
-
-Prometheus integrations
-
-PS - we also launched a new [adapative concurrency feature][adative_concurrency_post]
-that compliments our Kubernetes integration.
 
 ## Future plans
 

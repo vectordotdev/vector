@@ -23,9 +23,9 @@ and 0.11 includes our initial efforts:
 
 ## Get Started
 
-To help you get started with these sources, we wrote [a guide][cloudwatch_guide]
-on collecting AWS CloudWatch logs via AWS Firehose. With this setup you can
-send your AWS CloudWatch logs to any supported Vector [sink][sinks].
+To help you get started, we wrote [a guide][cloudwatch_guide] on collecting AWS
+CloudWatch logs via AWS Firehose. With this setup you can send your AWS
+CloudWatch logs to any supported Vector [sink][sinks].
 
 We're eager to hear what you think about these sources! [Join our chat][chat]
 and let us know.
