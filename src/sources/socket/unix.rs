@@ -2,7 +2,10 @@ use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
-    sources::{util::build_unix_stream_source, Source},
+    sources::{
+        util::{build_unix_datagram_source, build_unix_stream_source},
+        Source,
+    },
     Pipeline,
 };
 use bytes::Bytes;
@@ -73,7 +76,15 @@ pub(super) fn unix_datagram(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    unimplemented!()
+    build_unix_datagram_source(
+        path,
+        max_length,
+        host_key,
+        LinesCodec::new_with_max_length(max_length),
+        shutdown,
+        out,
+        build_event,
+    )
 }
 
 pub(super) fn unix_stream(
