@@ -17,13 +17,9 @@ use std::time::Duration;
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct TcpKeepaliveConfig {
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(with = "duration")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "duration")]
     pub time: Option<Duration>,
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(with = "duration")]
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "duration")]
     pub interval: Option<Duration>,
     pub retries: Option<u32>,
 }
