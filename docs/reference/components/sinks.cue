@@ -203,7 +203,7 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							auto_concurrency: {
+							adaptive_concurrency: {
 								common:      false
 								description: "Configure the auto-concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
 								required:    false
@@ -231,17 +231,17 @@ components: sinks: [Name=string]: {
 									}
 								}
 							}
-							in_flight_limit: {
+							concurrency: {
 								common: true
-								if sinks[Name].features.send.request.auto_concurrency {
+								if sinks[Name].features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time, or \"auto\" to allow Vector to automatically set the limit based on current network and service conditions."
 								}
-								if !sinks[Name].features.send.request.auto_concurrency {
+								if !sinks[Name].features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time."
 								}
 								required: false
 								type: uint: {
-									default: sinks[Name].features.send.request.in_flight_limit
+									default: sinks[Name].features.send.request.concurrency
 									unit:    "requests"
 								}
 							}

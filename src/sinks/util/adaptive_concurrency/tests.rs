@@ -7,7 +7,7 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, EncodedLength, InFlightLimit, TowerRequestConfig,
+            retries::RetryLogic, BatchSettings, EncodedLength, Concurrency, TowerRequestConfig,
             VecBuffer,
         },
         Healthcheck, VectorSink,
@@ -120,12 +120,12 @@ struct TestParams {
     #[serde(default)]
     rate: LimitParams,
 
-    #[serde(default = "default_in_flight_limit")]
-    in_flight_limit: InFlightLimit,
+    #[serde(default = "default_concurrency")]
+    concurrency: Concurrency,
 }
 
-fn default_in_flight_limit() -> InFlightLimit {
-    InFlightLimit::Auto
+fn default_concurrency() -> Concurrency {
+    Concurrency::Adaptive
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -359,7 +359,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let test_config = TestConfig {
         request: TowerRequestConfig {
-            in_flight_limit: params.in_flight_limit,
+            concurrency: params.concurrency,
             rate_limit_num: Some(9999),
             timeout_secs: Some(1),
             ..Default::default()
@@ -408,21 +408,21 @@ async fn run_test(params: TestParams) -> TestResults {
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
     assert!(
-        matches!(metrics.get("auto_concurrency_observed_rtt").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_observed_rtt").unwrap().value,
                  MetricValue::Distribution { .. })
     );
     assert!(
-        matches!(metrics.get("auto_concurrency_averaged_rtt").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_averaged_rtt").unwrap().value,
                  MetricValue::Distribution { .. })
     );
-    if params.in_flight_limit == InFlightLimit::Auto {
+    if params.concurrency == Concurrency::Adaptive {
         assert!(
-            matches!(metrics.get("auto_concurrency_limit").unwrap().value,
+            matches!(metrics.get("adaptive_concurrency_limit").unwrap().value,
                      MetricValue::Distribution { .. })
         );
     }
     assert!(
-        matches!(metrics.get("auto_concurrency_in_flight").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_in_flight").unwrap().value,
                  MetricValue::Distribution { .. })
     );
 

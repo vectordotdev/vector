@@ -4,7 +4,7 @@ delay = 0.100
 concurrency.knee_start = 10
 concurrency.knee_exp = 1.1
 
-in_flight_limit = "auto"
+concurrency = "adaptive"
 
 [stats.in_flight]
 max = [12, 12]

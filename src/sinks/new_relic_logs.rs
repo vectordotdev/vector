@@ -4,7 +4,7 @@ use crate::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
             encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            BatchConfig, Compression, InFlightLimit, TowerRequestConfig,
+            BatchConfig, Compression, Concurrency, TowerRequestConfig,
         },
     },
 };
@@ -135,7 +135,7 @@ impl NewRelicLogsConfig {
         let request = TowerRequestConfig {
             // The default throughput ceiling defaults are relatively
             // conservative so we crank them up for New Relic.
-            in_flight_limit: (self.request.in_flight_limit).if_none(InFlightLimit::Fixed(100)),
+            concurrency: (self.request.concurrency).if_none(Concurrency::Fixed(100)),
             rate_limit_num: Some(self.request.rate_limit_num.unwrap_or(100)),
             ..self.request
         };
@@ -163,7 +163,7 @@ mod tests {
     use crate::{
         config::SinkConfig,
         event::Event,
-        sinks::util::{test::build_test_server, InFlightLimit},
+        sinks::util::{test::build_test_server, Concurrency},
         test_util::next_addr,
     };
     use bytes::buf::BufExt;
@@ -203,8 +203,8 @@ mod tests {
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(
-            http_config.request.in_flight_limit,
-            InFlightLimit::Fixed(100)
+            http_config.request.concurrency,
+            Concurrency::Fixed(100)
         );
         assert_eq!(http_config.request.rate_limit_num, Some(100));
         assert_eq!(
@@ -221,7 +221,7 @@ mod tests {
         nr_config.insert_key = Some("foo".to_owned());
         nr_config.region = Some(NewRelicLogsRegion::Eu);
         nr_config.batch.max_size = Some(MAX_PAYLOAD_SIZE);
-        nr_config.request.in_flight_limit = InFlightLimit::Fixed(12);
+        nr_config.request.concurrency = Concurrency::Fixed(12);
         nr_config.request.rate_limit_num = Some(24);
 
         let http_config = nr_config.create_config().unwrap();
@@ -234,8 +234,8 @@ mod tests {
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(MAX_PAYLOAD_SIZE));
         assert_eq!(
-            http_config.request.in_flight_limit,
-            InFlightLimit::Fixed(12)
+            http_config.request.concurrency,
+            Concurrency::Fixed(12)
         );
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
@@ -256,7 +256,7 @@ mod tests {
         max_size = 838860
 
         [request]
-        in_flight_limit = 12
+        concurrency = 12
         rate_limit_num = 24
     "#;
         let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();
@@ -271,8 +271,8 @@ mod tests {
         assert_eq!(http_config.encoding.codec(), &Encoding::Json.into());
         assert_eq!(http_config.batch.max_bytes, Some(838860));
         assert_eq!(
-            http_config.request.in_flight_limit,
-            InFlightLimit::Fixed(12)
+            http_config.request.concurrency,
+            Concurrency::Fixed(12)
         );
         assert_eq!(http_config.request.rate_limit_num, Some(24));
         assert_eq!(
@@ -294,7 +294,7 @@ mod tests {
         max_size = 8388600
 
         [request]
-        in_flight_limit = 12
+        concurrency = 12
         rate_limit_num = 24
     "#;
         let nr_config: NewRelicLogsConfig = toml::from_str(&config).unwrap();

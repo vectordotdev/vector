@@ -17,7 +17,7 @@ rate.knee_exp = 0.0
 rate.limit = 0
 rate.action = "defer" | "drop"
 
-in_flight_limit = "auto"
+concurrency = "auto"
 
 [stats.in_flight]
 max = [,]

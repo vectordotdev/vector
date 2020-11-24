@@ -4,7 +4,7 @@
 [params]
 requests = 500
 delay = 0.100
-in_flight_limit = 10
+concurrency = 10
 
 [stats.in_flight]
 max = [10, 10]
