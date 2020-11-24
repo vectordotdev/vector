@@ -7,8 +7,8 @@ pub struct Options {
     #[serde(default = "default_enabled")]
     pub enabled: bool,
 
-    #[serde(default = "default_bind")]
-    pub bind: Option<SocketAddr>,
+    #[serde(default = "default_address")]
+    pub address: Option<SocketAddr>,
 
     #[serde(default = "default_playground")]
     pub playground: bool,
@@ -19,7 +19,7 @@ impl Default for Options {
         Self {
             enabled: default_enabled(),
             playground: default_playground(),
-            bind: default_bind(),
+            address: default_address(),
         }
     }
 }
@@ -31,7 +31,7 @@ fn default_enabled() -> bool {
 /// By default, the API binds to 127.0.0.1:8686. This function should remain public;
 /// `vector top`  will use it to determine which to connect to by default, if no URL
 /// override is provided
-pub fn default_bind() -> Option<SocketAddr> {
+pub fn default_address() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8686))
 }
 
@@ -43,23 +43,25 @@ impl Options {
     pub fn merge(&mut self, other: Self) -> Result<(), String> {
         // Merge options
 
-        // Try to merge bind
-        let bind = match (self.bind, other.bind) {
+        // Try to merge address
+        let address = match (self.address, other.address) {
             (None, b) => b,
             (Some(a), None) => Some(a),
             (Some(a), Some(b)) if a == b => Some(a),
-            // Prefer non default bind
-            (Some(a), Some(b)) => match (Some(a) == default_bind(), Some(b) == default_bind()) {
-                (false, false) => {
-                    return Err(format!("Conflicting `api` bindings: {}, {} .", a, b))
+            // Prefer non default address
+            (Some(a), Some(b)) => {
+                match (Some(a) == default_address(), Some(b) == default_address()) {
+                    (false, false) => {
+                        return Err(format!("Conflicting `api` address: {}, {} .", a, b))
+                    }
+                    (false, true) => Some(a),
+                    (true, _) => Some(b),
                 }
-                (false, true) => Some(a),
-                (true, _) => Some(b),
-            },
+            }
         };
 
         let options = Options {
-            bind,
+            address,
             enabled: self.enabled | other.enabled,
             playground: self.playground & other.playground,
         };
@@ -73,7 +75,7 @@ impl Options {
 fn bool_merge() {
     let mut a = Options {
         enabled: true,
-        bind: None,
+        address: None,
         playground: false,
     };
 
@@ -83,7 +85,7 @@ fn bool_merge() {
         a,
         Options {
             enabled: true,
-            bind: default_bind(),
+            address: default_address(),
             playground: false,
         }
     );
@@ -94,7 +96,7 @@ fn bind_merge() {
     let address = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9000);
     let mut a = Options {
         enabled: true,
-        bind: Some(address),
+        address: Some(address),
         playground: true,
     };
 
@@ -104,7 +106,7 @@ fn bind_merge() {
         a,
         Options {
             enabled: true,
-            bind: Some(address),
+            address: Some(address),
             playground: true,
         }
     );
@@ -113,12 +115,12 @@ fn bind_merge() {
 #[test]
 fn bind_conflict() {
     let mut a = Options {
-        bind: Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9000)),
+        address: Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9000)),
         ..Options::default()
     };
 
     let b = Options {
-        bind: Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9001)),
+        address: Some(SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 9001)),
         ..Options::default()
     };
 
