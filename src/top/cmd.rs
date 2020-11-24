@@ -3,6 +3,7 @@ use super::{
     metrics, state,
 };
 use crate::config;
+use indoc::indoc;
 use url::Url;
 use vector_api_client::{connect_subscription_client, gql::HealthQueryExt, Client};
 
@@ -31,7 +32,18 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     match client.health_query().await {
         Ok(_) => (),
         _ => {
-            eprintln!("Vector API server not reachable. Have you enabled the API?");
+            eprintln!(
+                indoc! {"
+                    Vector API server isn't reachable ({}).
+
+                    Have you enabled the API?
+
+                    To enable the API, add the following to your `vector.toml` config file:
+
+                    [api]
+                      enabled = true"},
+                url
+            );
             return exitcode::UNAVAILABLE;
         }
     }
