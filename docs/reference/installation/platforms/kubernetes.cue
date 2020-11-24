@@ -20,7 +20,7 @@ installation: platforms: kubernetes: {
 					"""
 		}
 
-		kubernetes_api_access: {
+		kubernetes_api_access_control: {
 			title: "Kubernetes API access control"
 			body:  """
 				Vector requires access to the Kubernetes API.
