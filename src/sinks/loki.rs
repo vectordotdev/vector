@@ -19,8 +19,9 @@ use crate::{
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, TowerRequestConfig, UriSerde,
+        http::{HttpSink, PartitionHttpSink},
+        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -37,7 +38,7 @@ pub struct LokiConfig {
     #[serde(default)]
     encoding: EncodingConfigWithDefault<Encoding>,
 
-    tenant_id: Option<String>,
+    tenant_id: Option<Template>,
     labels: HashMap<String, Template>,
 
     #[serde(default = "crate::serde::default_false")]
@@ -99,9 +100,9 @@ impl SinkConfig for LokiConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
-        let sink = BatchedHttpSink::new(
+        let sink = PartitionHttpSink::new(
             self.clone(),
-            LokiBuffer::new(batch_settings.size),
+            PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -123,12 +124,30 @@ impl SinkConfig for LokiConfig {
     }
 }
 
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub struct PartitionKey {
+    tenant_id: Option<String>,
+}
+
 #[async_trait::async_trait]
 impl HttpSink for LokiConfig {
-    type Input = LokiRecord;
-    type Output = serde_json::Value;
+    type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
+    type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        let tenant_id = self.tenant_id.as_ref().and_then(|t| {
+            t.render_string(&event)
+                .map_err(|missing| {
+                    error!(
+                        message = "Error rendering `tenant_id` template.",
+                        ?missing,
+                        rate_limit_secs = 30
+                    );
+                })
+                .ok()
+        });
+        let key = PartitionKey { tenant_id };
+
         let mut labels = Vec::new();
 
         for (key, template) in &self.labels {
@@ -174,17 +193,20 @@ impl HttpSink for LokiConfig {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(LokiRecord { labels, event })
+        Some(PartitionInnerBuffer::new(LokiRecord { labels, event }, key))
     }
 
-    async fn build_request(&self, json: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+        let (json, key) = output.into_parts();
+        let tenant_id = key.tenant_id;
+
         let body = serde_json::to_vec(&json).unwrap();
 
         let uri = format!("{}loki/api/v1/push", self.endpoint);
 
         let mut req = http::Request::post(uri).header("Content-Type", "application/json");
 
-        if let Some(tenant_id) = &self.tenant_id {
+        if let Some(tenant_id) = tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
         }
 
@@ -246,7 +268,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = config.encode_event(e1).unwrap();
+        let mut record = config.encode_event(e1).unwrap().into_parts().0;
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -282,7 +304,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = config.encode_event(e1).unwrap();
+        let record = config.encode_event(e1).unwrap().into_parts().0;
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
