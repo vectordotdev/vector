@@ -368,8 +368,9 @@ components: sources: kubernetes_logs: {
 			title: "Kubernetes API access control"
 			body: """
 				Vector requires access to the Kubernetes API.
-				Specifically, the `kubernetes_logs` uses the `/api/v1/pods`
-				endpoint to "watch" the pods from all namespaces.
+				Specifically, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+				uses the `/api/v1/pods` endpoint to "watch" the pods from
+				all namespaces.
 
 				Modern Kubernetes clusters run with RBAC
 				(role-based access control) scheme.
