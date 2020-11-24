@@ -60,14 +60,14 @@ mod tests {
         config.add_source("in1", source_with_event_counter().1);
         config.add_sink("out1", &["in1"], sink(10).1);
         config.api.enabled = true;
-        config.api.bind = Some(next_addr());
+        config.api.address = Some(next_addr());
 
         config.build().unwrap()
     }
 
     async fn from_str_config(conf: &str) -> vector::topology::RunningTopology {
         let mut c = config::load_from_str(conf).unwrap();
-        c.api.bind = Some(next_addr());
+        c.api.address = Some(next_addr());
 
         let diff = config::ConfigDiff::initial(&c);
         let pieces = vector::topology::build_or_log_errors(&c, &diff)
@@ -95,7 +95,7 @@ mod tests {
     // Returns the result of a URL test against the API. Wraps the test in retry_until
     // to guard against the race condition of the TCP listener not being ready
     async fn url_test(config: Config, url: &'static str) -> reqwest::Response {
-        let addr = config.api.bind.unwrap();
+        let addr = config.api.address.unwrap();
         let url = format!("http://{}:{}/{}", addr.ip(), addr.port(), url);
 
         let _server = api::Server::start(&config);
