@@ -11,8 +11,7 @@ async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
                 config::warnings(&c),
                 topology::builder::build_pieces(&c, &diff).await,
             ) {
-                (Some(warnings), Ok(_pieces)) => Ok(warnings),
-                (None, Ok(_pieces)) => Ok(vec![]),
+                (warnings, Ok(_pieces)) => Ok(warnings),
                 (_, Err(errors)) => Err(errors),
             }
         }

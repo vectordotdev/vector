@@ -390,6 +390,19 @@ impl Config {
     }
 }
 
+fn handle_warnings(warnings: Vec<String>, deny_warnings: bool) -> Result<(), Vec<String>> {
+    if !warnings.is_empty() {
+        if deny_warnings {
+            return Err(warnings);
+        } else {
+            for warning in warnings {
+                warn!("{}", &warning);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn healthcheck_default() -> bool {
     true
 }
