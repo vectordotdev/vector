@@ -2,23 +2,23 @@ use crate::event::{Metric, MetricValue};
 use async_graphql::Object;
 use chrono::{DateTime, Utc};
 
-pub struct EventsProcessedTotal(Metric);
+pub struct ProcessedBytesTotal(Metric);
 
-impl EventsProcessedTotal {
+impl ProcessedBytesTotal {
     pub fn new(m: Metric) -> Self {
         Self(m)
     }
 }
 
 #[Object]
-impl EventsProcessedTotal {
+impl ProcessedBytesTotal {
     /// Metric timestamp
     pub async fn timestamp(&self) -> Option<DateTime<Utc>> {
         self.0.timestamp
     }
 
-    /// Total number of events processed
-    pub async fn events_processed_total(&self) -> f64 {
+    /// Total number of bytes processed
+    pub async fn processed_bytes_total(&self) -> f64 {
         match self.0.value {
             MetricValue::Counter { value } => value,
             _ => 0.00,
@@ -26,19 +26,19 @@ impl EventsProcessedTotal {
     }
 }
 
-impl From<Metric> for EventsProcessedTotal {
+impl From<Metric> for ProcessedBytesTotal {
     fn from(m: Metric) -> Self {
         Self(m)
     }
 }
 
-pub struct ComponentEventsProcessedTotal {
+pub struct ComponentProcessedBytesTotal {
     name: String,
     metric: Metric,
 }
 
-impl ComponentEventsProcessedTotal {
-    /// Returns a new `ComponentEventsProcessedTotal` struct, which is a GraphQL type. The
+impl ComponentProcessedBytesTotal {
+    /// Returns a new `ComponentProcessedBytesTotal` struct, which is a GraphQL type. The
     /// component name is hoisted for clear field resolution in the resulting payload
     pub fn new(metric: Metric) -> Self {
         let name = metric.tag_value("component_name").expect(
@@ -50,38 +50,38 @@ impl ComponentEventsProcessedTotal {
 }
 
 #[Object]
-impl ComponentEventsProcessedTotal {
+impl ComponentProcessedBytesTotal {
     /// Component name
     async fn name(&self) -> &str {
         &self.name
     }
 
-    /// Events processed total metric
-    async fn metric(&self) -> EventsProcessedTotal {
-        EventsProcessedTotal::new(self.metric.clone())
+    /// Bytes processed total metric
+    async fn metric(&self) -> ProcessedBytesTotal {
+        ProcessedBytesTotal::new(self.metric.clone())
     }
 }
 
-pub struct ComponentEventsProcessedThroughput {
+pub struct ComponentProcessedBytesThroughput {
     name: String,
     throughput: i64,
 }
 
-impl ComponentEventsProcessedThroughput {
-    /// Returns a new `ComponentEventsProcessedThroughput`, set to the provided name/throughput values
+impl ComponentProcessedBytesThroughput {
+    /// Returns a new `ComponentProcessedBytesThroughput`, set to the provided name/throughput values
     pub fn new(name: String, throughput: i64) -> Self {
         Self { name, throughput }
     }
 }
 
 #[Object]
-impl ComponentEventsProcessedThroughput {
+impl ComponentProcessedBytesThroughput {
     /// Component name
     async fn name(&self) -> &str {
         &self.name
     }
 
-    /// Events processed throughput
+    /// Bytes processed throughput
     async fn throughput(&self) -> i64 {
         self.throughput
     }
