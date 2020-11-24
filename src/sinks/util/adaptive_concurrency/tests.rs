@@ -239,7 +239,7 @@ impl Service<Vec<Event>> for TestSink {
 
         let action = self
             .params
-            .concurrency_limits
+            .concurrency_limit_params
             .action_at_level(in_flight)
             .or_else(|| self.params.rate.action_at_level(rate));
         match action {
