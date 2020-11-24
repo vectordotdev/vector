@@ -68,7 +68,7 @@ pub fn encode_event(mut event: Event, encoding: &EncodingConfig<Encoding>) -> Op
         Encoding::Text => {
             let bytes = log
                 .get(crate::config::log_schema().message_key())
-                .map(|v| v.as_bytes().to_vec())
+                .map(|v| v.clone_into_bytes().to_vec())
                 .unwrap_or_default();
             Ok(bytes)
         }

@@ -9,6 +9,7 @@ use std::{
     fmt::Debug,
     iter::FromIterator,
 };
+use std::ops::IndexMut;
 
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct LogEvent {
@@ -136,7 +137,7 @@ impl LogEvent {
         let mut seen_segments = vec![];
         let lookup_len = lookup.len();
         let mut lookup_iter = lookup.into_iter().enumerate();
-        let value = value.into();
+        let mut value = value.into();
         // The first step should always be a field.
         let (_zero, first_step) = lookup_iter.next()?;
         seen_segments.push(first_step.clone());
@@ -151,7 +152,10 @@ impl LogEvent {
                     return self.fields.insert(f, value);
                 } else {
                     trace!(key = %f, "Descending into map.");
-                    self.fields.get_mut(&*f)
+                    self.fields.entry(f.clone()).or_insert_with(|| {
+                        trace!(key = %f, "Entry not found, inserting a map to build up.");
+                        Value::Map(Default::default())
+                    })
                 }
             }
             // In this case, the user has passed us an invariant.
@@ -164,73 +168,76 @@ impl LogEvent {
             }
         };
 
-        let mut retval = None;
+        let retval = None;
 
         for (index, segment) in lookup_iter {
             cursor = match (segment.clone(), cursor) {
                 // Fields access maps.
-                (SegmentBuf::Field(ref f), Some(&mut Value::Map(ref mut map))) => {
-                    if index == lookup_len {
+                (SegmentBuf::Field(ref f), &mut Value::Map(ref mut map)) => {
+                    if index == lookup_len - 1 {
+                        // Terminus: We **must** insert here or abort.
                         trace!(key = %f, "Creating field inside map.");
-                        retval = map.insert(f.clone(), value);
-                        break;
+                        return map.insert(f.clone(), value);
                     } else {
                         trace!(key = %f, "Descending into map.");
-                        map.get_mut(&*f)
+                        map.entry(f.clone()).or_insert_with(|| {
+                            trace!(key = %f, "Entry not found, inserting a map to build up.");
+                            Value::Map(Default::default())
+                        })
                     }
                 }
                 // Indexes access arrays.
-                (SegmentBuf::Index(i), Some(&mut Value::Array(ref mut array))) => {
-                    if index == lookup_len {
-                        trace!(key = %i, "Creating index inside array.");
-                        match array.get_mut(i) {
+                (SegmentBuf::Index(i), &mut Value::Array(ref mut array)) => {
+                    if index == lookup_len - 1 {
+                        // Terminus: We **must** insert here or abort.
+                        trace!(key = %i, "Terminus array index segment, inserting into index unconditionally.");
+                        return match array.get_mut(i) {
                             None => {
-                                // We have to create space in the array here!
-                                // We fill the prior indexes with `Value::Null`.
-                                array.resize_with(i.saturating_sub(1), || Value::Null);
-                                array.insert(i, value);
-                                break;
+                                trace!(key = %i, "Resizing array with Null values up to index, then pushing value.");
+                                array.resize_with(i, || Value::Null);
+                                core::mem::swap(array.index_mut(i), &mut value);
+                                Some(Value::Null)
                             }
                             Some(target) => {
+                                trace!(key = %i, "Swapping existing value at index for inserted value, returning it.");
                                 let mut removed = Value::Null;
                                 core::mem::swap(target, &mut removed);
-                                retval = Some(removed);
-                                break;
+                                Some(removed)
                             }
                         }
                     } else {
                         trace!(key = %i, "Descending into array.");
-                        array.get_mut(i)
+                        let len = array.len();
+                        if len >= i {
+                            array.get_mut(i).expect(&*format!("Array of length {} is expected to have value at index {}", len, i))
+                        } else {
+                            trace!(key = %i, "Descendent array was not long enough, resizing and pushing new value.");
+                            array.resize_with(i.saturating_sub(1), || Value::Null);
+                            array.push(value);
+                            return Some(Value::Null);
+                        }
+
                     }
                 },
-                (SegmentBuf::Field(_f), Some(v )) => {
+                (SegmentBuf::Field(_f), v ) => {
                     match v {
-                        Value::Map(_) | Value::Array(_) | Value::Timestamp(_) | Value::Boolean(_) | Value::Float(_) | Value::Integer(_) | Value::Bytes(_) => {
-                            error!("Bailing on insert.");
+                        Value::Map(_) | Value::Array(_) => unreachable!("Value::Array and Value::Map alongside Segment::Fields are all already matched."),
+                        Value::Timestamp(_) | Value::Boolean(_) | Value::Float(_) | Value::Integer(_) | Value::Bytes(_) => {
+                            debug!("Bailing on insert. There is an existing value which is not an array or map being inserted into.");
+                            return None;
                         }
                         Value::Null => {
-                            trace!("Did not discover map to descend into. Inserting empty map.");
-                            let mut old = Value::Map(Default::default());
-                            core::mem::swap(&mut old, v);
-                            retval = Some(old);
+                            trace!("Did not discover map to descend into, but found a `null`, presuming intent and inserting a map instead.");
+                            let mut new = Value::Map(Default::default());
+                            core::mem::swap(v, &mut new);
+                            v
                         }
                     }
-                    None
-                },
-                (segment, None) => {
-                    debug!("Attempting to create neccessary parent which doesn't exist.");
-                    let mut target = LookupBuf::try_from(seen_segments).expect("seen_segments should always be len >1. Please report this.");
-                    let retval = self.insert(target.clone(), Value::Map(Default::default()));
-                    // This would be contrary to what the match arm says.
-                    debug_assert!(retval.is_none());
-                    target.push(segment);
-                    // With this new preparation, this new call will find wings in a new match arm above.
-                    return self.insert(target, value);
                 },
                 // The option of Index/Array was already caught. This is an error path but we can't fail.
-                (SegmentBuf::Index(i), Some(_v)) => {
+                (SegmentBuf::Index(i), _v) => {
                     error!(key = %i, value = ?value, "Attempt to insert into the index of a non-indexed value.");
-                    None
+                    return None;
                 }
             };
             seen_segments.push(segment.clone())
@@ -425,6 +432,18 @@ impl LogEvent {
     pub fn take(self) -> Value {
         Value::Map(self.fields)
     }
+
+    /// Get a borrow of the contained fields.
+    #[instrument(level = "trace", skip(self))]
+    pub fn inner(&mut self) -> &BTreeMap<String, Value> {
+        &self.fields
+    }
+
+    /// Get a mutable borrow of the contained fields.
+    #[instrument(level = "trace", skip(self))]
+    pub fn inner_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        &mut self.fields
+    }
 }
 
 impl From<BTreeMap<String, Value>> for LogEvent {
@@ -555,6 +574,76 @@ mod test {
     use crate::test_util::open_fixture;
     use serde_json::json;
     use tracing::trace;
+
+    mod insert {
+        use super::*;
+
+        #[test]
+        fn root() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup= LookupBuf::from_str("root")?;
+            let value = Value::Null;
+            event.insert(lookup, value.clone());
+            assert_eq!(event.inner()["root"], value);
+            Ok(())
+        }
+
+        #[test]
+        fn map_field() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup= LookupBuf::from_str("root.field")?;
+            let value = Value::Null;
+            event.insert(lookup, value.clone());
+            assert_eq!(event.inner()["root"].as_map()["field"], value);
+            Ok(())
+        }
+
+        #[test]
+        fn nested_map_field() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup= LookupBuf::from_str("root.field.subfield")?;
+            let value = Value::Null;
+            event.insert(lookup, value.clone());
+            assert_eq!(event.inner()["root"].as_map()["field"].as_map()["subfield"], value);
+            Ok(())
+        }
+
+        #[test]
+        fn array_field() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup= LookupBuf::from_str("root[0]")?;
+            let value = Value::Null;
+            event.insert(lookup, value.clone());
+            assert_eq!(event.inner()["root"].as_array()[0], value);
+            Ok(())
+        }
+
+        #[test]
+        fn array_field_nested_array() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup= LookupBuf::from_str("root[0][0]")?;
+            let value = Value::Null;
+            event.insert(lookup, value.clone());
+            assert_eq!(event.inner()["root"].as_array()[0], value);
+            Ok(())
+        }
+
+        #[test]
+        fn array_field_nested_map() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup= LookupBuf::from_str("root[0].nested")?;
+            let value = Value::Null;
+            event.insert(lookup, value.clone());
+            assert_eq!(event.inner()["root"].as_array()[0].as_map()["nested"], value);
+            Ok(())
+        }
+    }
 
     // This test iterates over the `tests/data/fixtures/log_event` folder and:
     //   * Ensures the EventLog parsed from bytes and turned into a serde_json::Value are equal to the

@@ -25,6 +25,118 @@ pub enum Value {
 
 impl Value {
     #[instrument(level = "trace")]
+    pub fn as_integer(&self) -> &i64 {
+        match self {
+            Value::Integer(ref i) => i,
+            _ => panic!("Tried to call `Value::as_integer` on a non-integer value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_integer_mut(&mut self) -> &mut i64 {
+        match self {
+            Value::Integer(ref mut i) => i,
+            _ => panic!("Tried to call `Value::as_integer` on a non-integer value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_float(&self) -> &f64 {
+        match self {
+            Value::Float(ref f) => f,
+            _ => panic!("Tried to call `Value::as_float` on a non-float value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_float_mut(&mut self) -> &mut f64 {
+        match self {
+            Value::Float(ref mut f) => f,
+            _ => panic!("Tried to call `Value::as_float` on a non-float value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_bool(&self) -> &bool {
+        match self {
+            Value::Boolean(ref b) => b,
+            _ => panic!("Tried to call `Value::as_bool` on a non-bool value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_bool_mut(&mut self) -> &mut bool {
+        match self {
+            Value::Boolean(ref mut b) => b,
+            _ => panic!("Tried to call `Value::as_bool` on a non-bool value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_timestamp(&self) -> &DateTime<Utc> {
+        match self {
+            Value::Timestamp(ref t) => t,
+            _ => panic!("Tried to call `Value::as_timestamp` on a non-timestamp value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_timestamp_mut(&mut self) -> &mut DateTime<Utc> {
+        match self {
+            Value::Timestamp(ref mut t) => t,
+            _ => panic!("Tried to call `Value::as_timestamp` on a non-timestamp value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_bytes(&self) -> &Bytes {
+        match self {
+            Value::Bytes(ref b) => b,
+            _ => panic!("Tried to call `Value::as_bytes` on a non-bytes value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_bytes_mut(&mut self) -> &mut Bytes {
+        match self {
+            Value::Bytes(ref mut b) => b,
+            _ => panic!("Tried to call `Value::as_bytes` on a non-bytes value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+        match self {
+            Value::Map(ref m) => m,
+            _ => panic!("Tried to call `Value::as_map` on a non-map value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+        match self {
+            Value::Map(ref mut m) => m,
+            _ => panic!("Tried to call `Value::as_map` on a non-map value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_array(&self) -> &Vec<Value> {
+        match self {
+            Value::Array(ref a) => a,
+            _ => panic!("Tried to call `Value::as_array` on a non-array value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn as_array_mut(&mut self) -> &mut Vec<Value> {
+        match self {
+            Value::Array(ref mut a) => a,
+            _ => panic!("Tried to call `Value::as_array` on a non-array value."),
+        }
+    }
+
+    #[instrument(level = "trace")]
     pub fn lookups<'a>(&'a self) -> Box<dyn Iterator<Item = Lookup<'a>> + 'a> {
         match &self {
             Value::Boolean(_)
@@ -306,6 +418,84 @@ impl TryInto<serde_json::Value> for Value {
     }
 }
 
+impl TryInto<bool> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<bool, Self::Error> {
+        match self {
+            Value::Boolean(v) => Ok(v),
+            _ => Err("Tried to call `Value::try_into` to get a bool from a type that was not a bool.".into())
+        }
+    }
+}
+
+impl TryInto<Bytes> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<Bytes, Self::Error> {
+        match self {
+            Value::Bytes(v) => Ok(v),
+            _ => Err("Tried to call `Value::try_into` to get a Bytes from a type that was not a Bytes.".into())
+        }
+    }
+}
+
+impl TryInto<f64> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<f64, Self::Error> {
+        match self {
+            Value::Float(v) => Ok(v),
+            _ => Err("Tried to call `Value::try_into` to get a f64 from a type that was not a f64.".into())
+        }
+    }
+}
+
+impl TryInto<i64> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<i64, Self::Error> {
+        match self {
+            Value::Integer(v) => Ok(v),
+            _ => Err("Tried to call `Value::try_into` to get a i64 from a type that was not a i64.".into())
+        }
+    }
+}
+
+impl TryInto<BTreeMap<String, Value>> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<BTreeMap<String, Value>, Self::Error> {
+        match self {
+            Value::Map(v) => Ok(v),
+            _ => Err("Tried to call `Value::try_into` to get a BTreeMap<String, Value> from a type that was not a BTreeMap<String, Value>.".into())
+        }
+    }
+}
+
+impl TryInto<Vec<Value>> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<Vec<Value>, Self::Error> {
+        match self {
+            Value::Array(v) => Ok(v),
+            _ => Err("Tried to call `Value::try_into` to get a Vec<Value> from a type that was not a Vec<Value>.".into())
+        }
+    }
+}
+
+
+impl TryInto<DateTime<Utc>> for Value {
+    type Error = crate::Error;
+
+    fn try_into(self) -> std::result::Result<DateTime<Utc>, Self::Error> {
+        match self {
+            Value::Timestamp(v) => Ok(v),
+            _ => Err("Tried to call `Value::try_into` to get a DateTime from a type that was not a DateTime.".into())
+        }
+    }
+}
+
 impl From<remap::Value> for Value {
     fn from(v: remap::Value) -> Self {
         use remap::Value::*;
@@ -355,7 +545,7 @@ impl Value {
         }
     }
 
-    pub fn as_bytes(&self) -> Bytes {
+    pub fn clone_into_bytes(&self) -> Bytes {
         match self {
             Value::Bytes(bytes) => bytes.clone(), // cloning a Bytes is cheap
             Value::Timestamp(timestamp) => Bytes::from(timestamp_to_string(timestamp)),
@@ -367,17 +557,6 @@ impl Value {
                 Bytes::from(serde_json::to_vec(arr).expect("Cannot serialize array"))
             }
             Value::Null => Bytes::from("<null>"),
-        }
-    }
-
-    pub fn into_bytes(self) -> Bytes {
-        self.as_bytes()
-    }
-
-    pub fn as_timestamp(&self) -> Option<&DateTime<Utc>> {
-        match &self {
-            Value::Timestamp(ts) => Some(ts),
-            _ => None,
         }
     }
 

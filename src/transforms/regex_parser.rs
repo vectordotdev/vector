@@ -239,7 +239,7 @@ impl RegexParser {
 impl FunctionTransform for RegexParser {
     fn transform(&mut self, output: &mut Vec<Event>, mut event: Event) {
         let log = event.as_mut_log();
-        let value = log.get(&self.field).map(|s| s.as_bytes());
+        let value = log.get(&self.field).map(|s| s.clone_into_bytes());
         emit!(RegexParserEventProcessed);
 
         if let Some(value) = &value {

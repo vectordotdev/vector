@@ -1,7 +1,7 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, TransformConfig, TransformDescription},
     event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-    event::{Event, LogEvent, LookupBuf, Value},
+    event::{Event, LogEvent, LookupBuf},
     internal_events::{
         LogToMetricEventProcessed, LogToMetricFieldNotFound, LogToMetricParseFloatError,
         LogToMetricTemplateParseError, LogToMetricTemplateRenderError,
@@ -12,8 +12,9 @@ use crate::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::num::ParseFloatError;
+use chrono::{DateTime, Utc};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
@@ -194,10 +195,9 @@ fn parse_field(log: &LogEvent, field: &LookupBuf) -> Result<f64, TransformError>
 fn to_metric(config: &MetricConfig, event: &Event) -> Result<Metric, TransformError> {
     let log = event.as_log();
 
-    let timestamp = log
+    let timestamp: Option<DateTime<Utc>> = log
         .get(log_schema().timestamp_key())
-        .and_then(Value::as_timestamp)
-        .cloned();
+        .and_then(|v| v.clone().try_into().ok());
 
     match config {
         MetricConfig::Counter(counter) => {

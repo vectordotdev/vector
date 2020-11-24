@@ -172,7 +172,7 @@ fn render_timestamp(src: &str, event: &Event) -> String {
     let timestamp = match event {
         Event::Log(log) => log
             .get(log_schema().timestamp_key())
-            .and_then(Value::as_timestamp),
+            .map(Value::as_timestamp),
         _ => None,
     };
     if let Some(ts) = timestamp {

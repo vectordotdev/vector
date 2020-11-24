@@ -54,7 +54,7 @@ mod test {
             merged_event
                 .get(Lookup::from("message"))
                 .unwrap()
-                .as_bytes()
+                .clone_into_bytes()
                 .as_ref(),
             b"hello world"
         );

@@ -120,7 +120,7 @@ impl Conversion {
     /// new `Value`. This will fail in unexpected ways if the
     /// `value` is not currently a `Value::Bytes`.
     pub fn convert(&self, value: Value) -> Result<Value, Error> {
-        let bytes = value.as_bytes();
+        let bytes = value.clone_into_bytes();
         Ok(match self {
             Conversion::Bytes => value,
             Conversion::Integer => {

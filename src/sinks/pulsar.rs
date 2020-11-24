@@ -247,7 +247,7 @@ fn encode_event(mut item: Event, encoding: &EncodingConfig<Encoding>) -> crate::
         Encoding::Json => serde_json::to_vec(&log)?,
         Encoding::Text => log
             .get(log_schema().message_key())
-            .map(|v| v.as_bytes().to_vec())
+            .map(|v| v.clone_into_bytes().to_vec())
             .unwrap_or_default(),
     })
 }

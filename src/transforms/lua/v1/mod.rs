@@ -224,7 +224,7 @@ impl rlua::UserData for LuaEvent {
         methods.add_meta_method(rlua::MetaMethod::Index, |ctx, this, key: String| {
             let key = LookupBuf::from(key);
             if let Some(value) = this.inner.as_log().get(&key) {
-                let string = ctx.create_string(&value.as_bytes())?;
+                let string = ctx.create_string(&value.clone_into_bytes())?;
                 Ok(Some(string))
             } else {
                 Ok(None)
@@ -250,7 +250,7 @@ impl rlua::UserData for LuaEvent {
                         .clone()
                         .and_then(|k| event.inner.as_log().get(&LookupBuf::from(k)))
                     {
-                        Some(value) => Ok((key, Some(ctx.create_string(&value.as_bytes())?))),
+                        Some(value) => Ok((key, Some(ctx.create_string(&value.clone_into_bytes())?))),
                         None => Ok((None, None)),
                     }
                 })?;

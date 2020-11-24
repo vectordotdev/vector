@@ -299,7 +299,7 @@ mod tests {
             .get(log_schema().timestamp_key())
             .unwrap()
             .clone();
-        let timestamp = timestamp.as_timestamp().unwrap();
+        let timestamp = timestamp.as_timestamp();
         event
             .as_mut_log()
             .insert(LookupBuf::from("another"), Value::Timestamp(*timestamp));

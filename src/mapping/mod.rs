@@ -288,7 +288,7 @@ impl Function for LogFn {
             QueryValue::Value(value) => value,
             _ => return Err("Can only log Value parameters".to_string()),
         };
-        let msg = msg.into_bytes();
+        let msg = msg.clone_into_bytes();
         let string = String::from_utf8_lossy(&msg);
         let level = self.level.unwrap_or(LogLevel::Info);
 
@@ -317,6 +317,8 @@ mod tests {
 
     #[test]
     fn check_mapping() {
+        crate::test_util::trace_init();
+
         let cases = vec![
             (
                 {
