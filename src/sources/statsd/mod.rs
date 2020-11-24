@@ -40,7 +40,7 @@ pub struct UdpConfig {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct TcpConfig {
     address: SocketListenAddr,
-    pub keepalive: Option<TcpKeepaliveConfig>,
+    keepalive: Option<TcpKeepaliveConfig>,
     #[serde(default)]
     tls: Option<TlsConfig>,
     #[serde(default = "default_shutdown_timeout_secs")]

@@ -51,11 +51,7 @@ impl SocketSinkConfig {
         tls: Option<TlsConfig>,
     ) -> Self {
         SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address,
-                keepalive,
-                tls,
-            }),
+            mode: Mode::Tcp(TcpSinkConfig::new(address, keepalive, tls)),
             encoding,
         }
     }
@@ -164,11 +160,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address: addr.to_string(),
-                keepalive: None,
-                tls: None,
-            }),
+            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
             encoding: Encoding::Json.into(),
         };
 
@@ -227,10 +219,10 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address: addr.to_string(),
-                keepalive: None,
-                tls: Some(TlsConfig {
+            mode: Mode::Tcp(TcpSinkConfig::new(
+                addr.to_string(),
+                None,
+                Some(TlsConfig {
                     enabled: Some(true),
                     options: TlsOptions {
                         verify_certificate: Some(false),
@@ -239,7 +231,7 @@ mod test {
                         ..Default::default()
                     },
                 }),
-            }),
+            )),
             encoding: Encoding::Text.into(),
         };
         let context = SinkContext::new_test();
@@ -346,11 +338,7 @@ mod test {
 
         let addr = next_addr();
         let config = SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig {
-                address: addr.to_string(),
-                keepalive: None,
-                tls: None,
-            }),
+            mode: Mode::Tcp(TcpSinkConfig::new(addr.to_string(), None, None)),
             encoding: Encoding::Text.into(),
         };
 
