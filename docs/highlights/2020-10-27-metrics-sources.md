@@ -3,11 +3,11 @@ last_modified_on: "2020-10-27"
 $schema: ".schema.json"
 title: "New `*_metrics` sources"
 description: "A foray into collecting metrics."
-author_github: "https://github.com/binarylogic"
+author_github: "https://github.com/jamtur01"
 pr_numbers: [1314]
-release: "0.11.0"https://github.com/Lusitaniae/apache_exporter
+release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "domain: metrics", "domain: sources"]
+tags: ["type: new feature", "domain: metrics", "domain: sources"]
 ---
 
 Vector 0.11 includes four new metrics sources:
