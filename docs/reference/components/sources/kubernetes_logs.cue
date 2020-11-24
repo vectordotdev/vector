@@ -289,16 +289,110 @@ components: sources: kubernetes_logs: {
 		},
 	]
 
+	// Note that these sections are also copied over the
+	// `installation.platforms.kubernetes.how_it_works` key. Therefore, full
+	// URLs should be used in links and language should be used that works in
+	// both contexts.
 	how_it_works: {
-		connecting_to_kubernetes_api: {
-			title: "Connecting To The Kubernetes API server"
+		enrichment: {
+			title: "Enrichment"
 			body:  """
-					Vector will automatically attempt to connect to the
-					[Kubernetes API server](\(urls.kubernetes_api_server)) for
-					you. If Vector is running in a Kubernetes cluster then
-					Vector will connect to that cluster using the
-					[Kubernetes provided access information](\(urls.kubernetes_accessing_api_from_pod)).
+					Vector will enrich data with Kubernetes context. A comprehensive
+					list of fields can be found in the
+					[`kubernetes_logs` source output docs](\(urls.vector_kubernetes_logs_source)#output)
+					for a comprehensive list of fields.
 					"""
+		}
+
+		filtering: {
+			title: "Filtering"
+			body:  """
+					Please refer to the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source)#output)
+					docs for filtering options.
+					"""
+		}
+
+		kubernetes_api_communication: {
+			title: "Kubernetes API communication"
+			body:  """
+					Vector communicates with the Kubernetes API to enrich the data it collects with
+					Kubernetes context. Therefore, Vector must have access to communicate with the
+					[Kubernetes API server](\(urls.kubernetes_api_server)). If Vector is running in
+					a Kubernetes cluster then Vector will connect to that cluster using the
+					[Kubernetes provided access information](\(urls.kubernetes_accessing_api_from_pod)).
+
+					In addition to access, Vector implements proper desync handling to ensure
+					communication is safe and reliable. This ensures that Vector will not overwhelm
+					the Kubernetes API or compromise its stability.
+					"""
+		}
+
+		partial_message_merging: {
+			title: "Partial message merging"
+			body:  """
+					Vector, by default, will merge partial messages that are split due to the Docker
+					size limit. For everything else, the
+					[`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source)) offers `multiline`
+					options to configure custom merging to handle merging things like stacktraces.
+					"""
+		}
+
+		pod_removal: {
+			title: "Pod removal"
+			body: """
+				To ensure all data is collected, Vector will continue to collect logs from the
+				`Pod` for some time after its removal. This ensures that Vector obtains some of
+				the most important data, such as crash details.
+				"""
+		}
+
+		state_management: {
+			title: "State management"
+			body: """
+				For the agent role, Vector stores its state at the host-mapped dir with a static
+				path, so if it's redeployed it'll continue from where it was interrupted.
+				"""
+		}
+
+		testing_and_reliability: {
+			title: "Testing & reliability"
+			body:  """
+					Vector is tested extensively against Kubernetes. In addition to Kubernetes
+					being Vector's most popular installation method, Vector implements a
+					comprehensive end-to-end test suite for all minor Kubernetes versions starting
+					with `\(installation.platforms.kubernetes.minimum_supported_version)`.
+					"""
+		}
+
+		kubernetes_api_access_control: {
+			title: "Kubernetes API access control"
+			body: """
+				Vector requires access to the Kubernetes API.
+				Specifically, the [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+				uses the `/api/v1/pods` endpoint to "watch" the pods from
+				all namespaces.
+
+				Modern Kubernetes clusters run with RBAC
+				(role-based access control) scheme.
+				RBAC-enabled clusters require some configuration to grant Vector
+				the authorization to access the Kubernetes API endpoints.
+				As RBAC is currently the standard way of controlling access to
+				the Kubernetes API, we ship the necessary configuration
+				out of the box: see `ClusterRole`, `ClusterRoleBinding` and
+				a `ServiceAccount` in our `kubectl` YAML config,
+				and the `rbac` configuration at the Helm chart.
+
+				If your cluster doesn't use any access control scheme
+				and doesn't restrict access to the Kubernetes API,
+				you don't need to do any extra configuration - Vector will
+				just work.
+				Clusters using legacy ABAC scheme are not officially supported
+				(although Vector might work if you configure access properly) -
+				we encourage switching to RBAC.
+				If you use a custom access control scheme -
+				make sure Vector `Pod`/`ServiceAccount` is granted access to
+				the `/api/v1/pods` resource.
+				"""
 		}
 	}
 

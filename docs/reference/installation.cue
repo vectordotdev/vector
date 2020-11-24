@@ -201,6 +201,7 @@ installation: close({
 
 	#Platforms: [Name=string]: {
 		description:               string
+		how_it_works:              #HowItWorks
 		minimum_supported_version: string | null
 		name:                      Name
 		title:                     string
