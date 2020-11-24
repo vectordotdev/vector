@@ -1,7 +1,10 @@
-name: Pull Request Test Suite
+name: Test Suite
 
 on:
   pull_request: {}
+  push:
+    branches:
+      - master
 
 env:
   AUTOINSTALL: true
@@ -37,13 +40,13 @@ jobs:
         internal_events: ${{ steps.filter.outputs.internal_events }}
         helm: ${{ steps.filter.outputs.helm }}
       steps:
-      # For pull requests it's not necessary to checkout the code
+      - uses: actions/checkout@v2
       - uses: dorny/paths-filter@v2
         id: filter
         with:
           filters: |
             source:
-              - ".github/workflows/pr.yml"
+              - ".github/workflows/test.yml"
               - ".cargo/**"
               - "benches/**"
               - "lib/**"
@@ -261,3 +264,26 @@ jobs:
         uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check advisories
+
+  master-failure:
+    name: master-failure
+    if: failure()
+    needs:
+      - cancel-previous
+      - changes
+      - cross-linux
+      - test-misc
+      - test-linux
+      - test-mac
+      - test-windows
+      - check-component-features
+      - checks
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.0
+      with:
+        args: "Master tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
