@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [3094]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "domain: networking", "domain: reliability", "domain: performance"]
+tags: ["type: new feature", "domain: networking", "domain: reliability", "domain: performance"]
 ---
 
 Vector 0.11 includes a new Adaptive Request Concurrency (ARC) feature that
