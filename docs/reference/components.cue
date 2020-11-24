@@ -49,6 +49,10 @@ components: {
 
 		env_vars: #EnvVars
 
+		// `alias` is used to register a component's former name when it
+		// undergoes a name change.
+		alias?: !=""
+
 		// `type` is the component identifier. This is set automatically.
 		type: string
 
@@ -921,7 +925,7 @@ components: {
 
 		telemetry: metrics: {
 			// Default metrics for each component
-			events_processed_total: components.sources.internal_metrics.output.metrics.events_processed_total
+			processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		}
 	}}

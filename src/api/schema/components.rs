@@ -20,12 +20,12 @@ lazy_static! {
     field(name = "name", type = "String"),
     field(name = "component_type", type = "String"),
     field(
-        name = "events_processed_total",
-        type = "Option<metrics::EventsProcessedTotal>"
+        name = "processed_events_total",
+        type = "Option<metrics::ProcessedEventsTotal>"
     ),
     field(
-        name = "bytes_processed_total",
-        type = "Option<metrics::BytesProcessedTotal>"
+        name = "processed_bytes_total",
+        type = "Option<metrics::ProcessedBytesTotal>"
     )
 )]
 pub enum Component {
@@ -95,13 +95,13 @@ impl Source {
     }
 
     /// Metric indicating events processed for the current source
-    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(&self.0.name)
+    async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
+        metrics::component_processed_events_total(&self.0.name)
     }
 
     /// Metric indicating bytes processed for the current source
-    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
-        metrics::component_bytes_processed_total(&self.0.name)
+    async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
+        metrics::component_processed_bytes_total(&self.0.name)
     }
 }
 
@@ -159,13 +159,13 @@ impl Transform {
     }
 
     /// Metric indicating events processed for the current transform
-    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(&self.0.name)
+    async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
+        metrics::component_processed_events_total(&self.0.name)
     }
 
     /// Metric indicating bytes processed for the current transform
-    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
-        metrics::component_bytes_processed_total(&self.0.name)
+    async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
+        metrics::component_processed_bytes_total(&self.0.name)
     }
 }
 
@@ -222,13 +222,13 @@ impl Sink {
     }
 
     /// Metric indicating events processed for the current sink
-    async fn events_processed_total(&self) -> Option<metrics::EventsProcessedTotal> {
-        metrics::component_events_processed_total(&self.0.name)
+    async fn processed_events_total(&self) -> Option<metrics::ProcessedEventsTotal> {
+        metrics::component_processed_events_total(&self.0.name)
     }
 
     /// Metric indicating bytes processed for the current sink
-    async fn bytes_processed_total(&self) -> Option<metrics::BytesProcessedTotal> {
-        metrics::component_bytes_processed_total(&self.0.name)
+    async fn processed_bytes_total(&self) -> Option<metrics::ProcessedBytesTotal> {
+        metrics::component_processed_bytes_total(&self.0.name)
     }
 }
 #[derive(Default)]

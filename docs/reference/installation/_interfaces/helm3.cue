@@ -63,7 +63,7 @@ installation: _interfaces: "helm3": {
 			description: #"""
 						The agent role is designed to collect all Kubernetes
 						log data on each Node. Vector runs as a
-						[Daemonset](\#(urls.kubernetes_daemonset)) and tails
+						[DaemonSet](\#(urls.kubernetes_daemonset)) and tails
 						logs for the entire Pod, automatically enriching them
 						with Kubernetes metadata via the
 						[Kubernetes API](\#(urls.kubernetes_api)). Collection
