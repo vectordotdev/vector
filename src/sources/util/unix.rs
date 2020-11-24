@@ -16,12 +16,11 @@ use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
 use tracing_futures::Instrument;
 
-/**
-* Returns a Source object corresponding to a Unix domain socket.  Passing in different functions
-* for build_event can allow for different source-specific logic (such as decoding syslog messages
-* in the syslog source).
-**/
-pub fn build_unix_source<D, E>(
+/// Returns a Source object corresponding to a Unix domain stream
+/// socket.  Passing in different functions for build_event can allow
+/// for different source-specific logic (such as decoding syslog
+/// messages in the syslog source).
+pub fn build_unix_stream_source<D, E>(
     listen_path: PathBuf,
     decoder: D,
     host_key: String,

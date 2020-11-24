@@ -14,4 +14,4 @@ pub use multiline_config::MultilineConfig;
 #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
 pub use tcp::{SocketListenAddr, TcpSource};
 #[cfg(all(unix, feature = "sources-utils-unix",))]
-pub use unix::build_unix_source;
+pub use unix::build_unix_stream_source;

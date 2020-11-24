@@ -2,7 +2,7 @@ use crate::{
     event::Event,
     internal_events::{SocketEventReceived, SocketMode},
     shutdown::ShutdownSignal,
-    sources::{util::build_unix_source, Source},
+    sources::{util::build_unix_stream_source, Source},
     Pipeline,
 };
 use bytes::Bytes;
@@ -83,7 +83,7 @@ pub(super) fn unix_stream(
     shutdown: ShutdownSignal,
     out: Pipeline,
 ) -> Source {
-    build_unix_source(
+    build_unix_stream_source(
         path,
         LinesCodec::new_with_max_length(max_length),
         host_key,
