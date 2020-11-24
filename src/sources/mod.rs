@@ -31,6 +31,8 @@ pub mod kubernetes_logs;
 pub mod logplex;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub mod mongodb_metrics;
+#[cfg(feature = "sources-nginx_metrics")]
+pub mod nginx;
 #[cfg(feature = "sources-prometheus")]
 pub mod prometheus;
 #[cfg(feature = "sources-socket")]
