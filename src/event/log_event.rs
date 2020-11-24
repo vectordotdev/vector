@@ -153,8 +153,8 @@ impl LogEvent {
                 } else {
                     trace!(key = %f, "Descending into map.");
                     self.fields.entry(f.clone()).or_insert_with(|| {
-                        trace!(key = %f, "Entry not found, inserting a map to build up.");
-                        Value::Map(Default::default())
+                        trace!(key = %f, "Entry not found, inserting a null to build up.");
+                        Value::Null
                     })
                 }
             }
@@ -219,26 +219,25 @@ impl LogEvent {
 
                     }
                 },
-                (SegmentBuf::Field(_f), v ) => {
-                    match v {
-                        Value::Map(_) | Value::Array(_) => unreachable!("Value::Array and Value::Map alongside Segment::Fields are all already matched."),
-                        Value::Timestamp(_) | Value::Boolean(_) | Value::Float(_) | Value::Integer(_) | Value::Bytes(_) => {
-                            debug!("Bailing on insert. There is an existing value which is not an array or map being inserted into.");
-                            return None;
-                        }
-                        Value::Null => {
-                            trace!("Did not discover map to descend into, but found a `null`, presuming intent and inserting a map instead.");
-                            let mut new = Value::Map(Default::default());
-                            core::mem::swap(v, &mut new);
-                            v
-                        }
-                    }
+                (SegmentBuf::Field(_f), v ) if v == &mut Value::Null => {
+                    trace!("Did not discover map to descend into, but found a `null`, presuming intent and inserting a map instead.");
+                    let mut new = Value::Map(Default::default());
+                    core::mem::swap(v, &mut new);
+                    v
                 },
                 // The option of Index/Array was already caught. This is an error path but we can't fail.
-                (SegmentBuf::Index(i), _v) => {
-                    error!(key = %i, value = ?value, "Attempt to insert into the index of a non-indexed value.");
+                (SegmentBuf::Index(i), v) if v == &mut Value::Null => {
+                    trace!("Did not discover map to descend into, but found a `null`, presuming intent and inserting an array instead.");
+                    let mut array = Vec::with_capacity(i.saturating_add(1));
+                    array.resize_with(i.saturating_add(1),|| Value::Null);
+                    let mut new = Value::Array(array);
+                    core::mem::swap(v, &mut new);
+                    v
+                },
+                (_segment, _v) => {
+                    debug!("Bailing on insert. There is an existing value which is not an array or map being inserted into.");
                     return None;
-                }
+                },
             };
             seen_segments.push(segment.clone())
         }
