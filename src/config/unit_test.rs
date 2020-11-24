@@ -43,7 +43,7 @@ async fn build_unit_tests(builder: ConfigBuilder) -> Result<Vec<UnitTest>, Vec<S
             Err(errs) => {
                 let mut test_err = errs
                     .iter()
-                    .map(|v| format!("{:?}", v))
+                    .map(|v| format!("{}", v))
                     .collect::<Vec<String>>()
                     .join("\n");
                 // Indent all line breaks
