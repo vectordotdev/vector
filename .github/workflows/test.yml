@@ -267,7 +267,7 @@ jobs:
 
   master-failure:
     name: master-failure
-    if: failure()
+    if: failure() && github.ref == 'refs/heads/master'
     needs:
       - cancel-previous
       - changes
@@ -279,7 +279,6 @@ jobs:
       - check-component-features
       - checks
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
     steps:
     - name: Discord notification
       env:
