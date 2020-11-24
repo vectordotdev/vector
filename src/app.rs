@@ -141,7 +141,7 @@ impl Application {
                 );
 
                 let config =
-                    config::load_from_paths(&config_paths).map_err(handle_config_errors)?;
+                    config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
                 config::LOG_SCHEMA
                     .set(config.global.log_schema.clone())
@@ -202,6 +202,7 @@ impl Application {
 
                 Some(api::Server::start(topology.config()))
             } else {
+                info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None
             };
 
@@ -217,7 +218,7 @@ impl Application {
                         // Reload paths
                         config_paths = config::process_paths(&opts.config_paths).unwrap_or(config_paths);
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths,false).map_err(handle_config_errors).ok();
 
                         if let Some(new_config) = new_config {
                             match topology

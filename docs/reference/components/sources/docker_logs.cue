@@ -56,9 +56,9 @@ components: sources: docker_logs: {
 
 							If you receive an error it's likely that you do not have
 							the proper Docker logging drivers installed. The Docker
-							Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
-							or [`journald`](docker_logging_driver_journald) Docker
-							logging driver to be installed.
+							Engine requires the [`json-file`](\(urls.docker_logging_driver_json_file)) (default),
+							[`journald`](docker_logging_driver_journald), or [`local`](\(urls.docker_logging_driver_local)) Docker
+							logging drivers to be installed.
 							""",
 					]
 				}
@@ -250,9 +250,9 @@ components: sources: docker_logs: {
 			body: """
 				Docker, by default, will split log messages that exceed 16kb. This can be a
 				rather frustrating problem because it produces malformed log messages that are
-				difficult to work with. Vector's `docker_logs` source solves this by default,
-				automatically merging these messages into a single message. You can turn this
-				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
+				difficult to work with. Vector's solves this by default, automatically merging
+				these messages into a single message. You can turn this off via the
+				`auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the
 				`partial_event_marker_field` option.
 				"""

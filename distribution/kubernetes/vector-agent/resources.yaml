@@ -1,12 +1,12 @@
 # This file is generated from the Helm Chart by "scripts/kubernetes-yaml.sh".
-# You might want to use the Helm Chart, see "distribution/helm/vector" or the
+# You might want to use the Helm Chart, see "distribution/helm/vector-agent" or the
 # documentation on our website at https://vector.dev/docs.
 # If you copied this file into you local setup - feel free to change it however
 # you please.
 # If you want to create a PR to the Vector's Kubernetes config - please do not
 # edit this file directly. Instead, apply your changes to the Helm Chart.
 ---
-# Source: vector/charts/vector-agent/templates/serviceaccount.yaml
+# Source: vector-agent/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -18,7 +18,7 @@ metadata:
     app.kubernetes.io/version: "0.0.0"
     app.kubernetes.io/managed-by: Helm
 ---
-# Source: vector/charts/vector-agent/templates/configmap.yaml
+# Source: vector-agent/templates/configmap.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -47,7 +47,7 @@ data:
     [sources.kubernetes_logs]
       type = "kubernetes_logs"
 ---
-# Source: vector/charts/vector-agent/templates/rbac.yaml
+# Source: vector-agent/templates/rbac.yaml
 # Permissions to use Kubernetes API.
 # Requires that RBAC authorization is enabled.
 apiVersion: rbac.authorization.k8s.io/v1
@@ -62,7 +62,7 @@ rules:
     verbs:
       - watch
 ---
-# Source: vector/charts/vector-agent/templates/rbac.yaml
+# Source: vector-agent/templates/rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -82,7 +82,7 @@ subjects:
     name: vector-agent
     namespace: vector
 ---
-# Source: vector/charts/vector-agent/templates/daemonset.yaml
+# Source: vector-agent/templates/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -117,7 +117,7 @@ spec:
         - name: vector
           securityContext:
             {}
-          image: "timberio/vector:latest-alpine"
+          image: "timberio/vector:latest-debian"
           imagePullPolicy: "IfNotPresent"
           args:
             - --config
