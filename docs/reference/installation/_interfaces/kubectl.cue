@@ -52,7 +52,7 @@ installation: _interfaces: kubectl: {
 				  - \#(_kustomization_base)
 
 				images:
-				  # Override the Vector image tag to avoid using sliding release.
+				  # Override the Vector image to avoid use of the sliding tag.
 				  - name: timberio/vector
 				    newName: timberio/vector
 				    newTag: #\(_vector_image_tag)
