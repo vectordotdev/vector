@@ -38,16 +38,27 @@ installation: _interfaces: kubectl: {
 			verify_config:             "kubectl kustomize"
 			prepare_namespace:         "kubectl create namespace --dry-run=client -oyaml \(_namespace) > namespace.yaml"
 			prepare_kustomization:     #"""
-				cat <<-KUSTOMIZATION > kustomization.yaml
+				cat <<-'KUSTOMIZATION' > kustomization.yaml
+				# Override the namespace of all of the resources we manage.
 				namespace: \#(_namespace)
+
 				bases:
+				  # Include Vector recommended base (from git).
 				  - \#(_kustomization_base)
+
 				resources:
+				  # A namespace to keep the resources at.
 				  - namespace.yaml
+
 				configMapGenerator:
+				  # Provide a custom `ConfigMap` for Vector.
 				  - name: \#(_configmap_name)
 				    files:
 				      - \#(_configmap_file_name)
+
+				generatorOptions:
+				  # We do not want a suffix at the `ConfigMap` name.
+				  disableNameSuffixHash: true
 				KUSTOMIZATION
 				"""#
 			configure:                 #"""
