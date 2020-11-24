@@ -436,4 +436,13 @@ mod tests {
         toml::from_str::<TowerRequestConfigTest>(r#"concurrency = -9"#)
             .expect_err("Invalid concurrency setting didn't fail on negative number");
     }
+
+    #[test]
+    fn backward_compatibility_with_in_flight_limit_param_works() {
+        type TowerRequestConfigTest = TowerRequestConfig<Concurrency>;
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
+            .expect("Fixed concurrency failed for in_flight_limit param");
+        assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
+    }
 }
