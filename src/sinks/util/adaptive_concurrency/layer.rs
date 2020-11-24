@@ -26,11 +26,6 @@ impl<S, L: RetryLogic> Layer<S> for AdaptiveConcurrencyLimitLayer<L> {
     type Service = AdaptiveConcurrencyLimit<S, L>;
 
     fn layer(&self, service: S) -> Self::Service {
-        AdaptiveConcurrencyLimit::new(
-            service,
-            self.logic.clone(),
-            self.concurrency,
-            self.options,
-        )
+        AdaptiveConcurrencyLimit::new(service, self.logic.clone(), self.concurrency, self.options)
     }
 }

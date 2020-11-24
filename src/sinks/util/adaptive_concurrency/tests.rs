@@ -7,7 +7,7 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, EncodedLength, Concurrency, TowerRequestConfig,
+            retries::RetryLogic, BatchSettings, Concurrency, EncodedLength, TowerRequestConfig,
             VecBuffer,
         },
         Healthcheck, VectorSink,
