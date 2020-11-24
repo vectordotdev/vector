@@ -93,7 +93,7 @@ components: sources: apache_metrics: {
 				items: type: string: examples: ["http://localhost:8080/server-status/?auto"]
 			}
 		}
-		interval_secs: {
+		scrape_interval_secs: {
 			description: "The interval between scrapes."
 			common:      true
 			required:    false

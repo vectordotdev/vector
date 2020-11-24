@@ -65,7 +65,7 @@ components: sources: mongodb_metrics: {
 				examples: ["mongodb://localhost:27017"]
 			}
 		}
-		interval_secs: {
+		scrape_interval_secs: {
 			description: "The interval between scrapes."
 			common:      true
 			required:    false
@@ -97,9 +97,10 @@ components: sources: mongodb_metrics: {
 	}
 
 	telemetry: metrics: {
-		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
 		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
 		request_error_total:          components.sources.internal_metrics.output.metrics.request_error_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
 	}
 
 	output: metrics: {
