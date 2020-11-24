@@ -80,13 +80,13 @@ impl<'de> Deserialize<'de> for Concurrency {
     where
         D: Deserializer<'de>,
     {
-        struct UsizeOrAuto;
+        struct UsizeOrAdaptive;
 
-        impl<'de> Visitor<'de> for UsizeOrAuto {
+        impl<'de> Visitor<'de> for UsizeOrAdaptive {
             type Value = Concurrency;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(r#"positive integer or "auto""#)
+                formatter.write_str(r#"positive integer or "adaptive""#)
             }
 
             fn visit_str<E: de::Error>(self, value: &str) -> Result<Concurrency, E> {
@@ -120,7 +120,7 @@ impl<'de> Deserialize<'de> for Concurrency {
             }
         }
 
-        deserializer.deserialize_any(UsizeOrAuto)
+        deserializer.deserialize_any(UsizeOrAdaptive)
     }
 }
 
@@ -420,7 +420,7 @@ mod tests {
             .expect("Fixed concurrency failed");
         assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
 
-        let cfg = toml::from_str::<TowerRequestConfigTest>(r#"concurrency = "auto""#)
+        let cfg = toml::from_str::<TowerRequestConfigTest>(r#"concurrency = "adaptive""#)
             .expect("Adaptive concurrency setting failed");
         assert_eq!(cfg.concurrency, Concurrency::Adaptive);
 
