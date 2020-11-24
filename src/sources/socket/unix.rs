@@ -17,6 +17,17 @@ pub struct UnixConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
+    #[serde(default)]
+    pub(super) mode: UnixMode,
+}
+
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(Default)]
+#[serde(rename_all = "lowercase")]
+pub enum UnixMode {
+    #[derivative(Default)]
+    Stream,
+    Datagram,
 }
 
 fn default_max_length() -> usize {
@@ -29,12 +40,13 @@ impl UnixConfig {
             path,
             max_length: default_max_length(),
             host_key: None,
+            mode: UnixMode::Stream,
         }
     }
 }
 
 /**
-* Function to pass to build_unix_source, specific to the basic unix source.
+* Function to pass to build_unix_*_source, specific to the basic unix source.
 * Takes a single line of a received message and builds an Event object.
 **/
 fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Option<Event> {
@@ -54,7 +66,17 @@ fn build_event(host_key: &str, received_from: Option<Bytes>, line: &str) -> Opti
     Some(event)
 }
 
-pub fn unix(
+pub(super) fn unix_datagram(
+    path: PathBuf,
+    max_length: usize,
+    host_key: String,
+    shutdown: ShutdownSignal,
+    out: Pipeline,
+) -> Source {
+    unimplemented!()
+}
+
+pub(super) fn unix_stream(
     path: PathBuf,
     max_length: usize,
     host_key: String,

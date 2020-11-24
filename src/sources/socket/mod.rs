@@ -30,7 +30,9 @@ pub enum Mode {
     Tcp(tcp::TcpConfig),
     Udp(udp::UdpConfig),
     #[cfg(unix)]
-    Unix(unix::UnixConfig),
+    UnixDatagram(unix::UnixConfig),
+    #[cfg(unix)]
+    UnixStream(unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -58,8 +60,13 @@ impl From<udp::UdpConfig> for SocketConfig {
 #[cfg(unix)]
 impl From<unix::UnixConfig> for SocketConfig {
     fn from(config: unix::UnixConfig) -> Self {
-        SocketConfig {
-            mode: Mode::Unix(config),
+        match config.mode {
+            unix::UnixMode::Datagram => SocketConfig {
+                mode: Mode::UnixDatagram(config),
+            },
+            unix::UnixMode::Stream => SocketConfig {
+                mode: Mode::UnixStream(config),
+            },
         }
     }
 }
@@ -115,11 +122,24 @@ impl SourceConfig for SocketConfig {
                 ))
             }
             #[cfg(unix)]
-            Mode::Unix(config) => {
+            Mode::UnixDatagram(config) => {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                Ok(unix::unix(
+                Ok(unix::unix_datagram(
+                    config.path,
+                    config.max_length,
+                    host_key,
+                    shutdown,
+                    out,
+                ))
+            }
+            #[cfg(unix)]
+            Mode::UnixStream(config) => {
+                let host_key = config
+                    .host_key
+                    .unwrap_or_else(|| log_schema().host_key().to_string());
+                Ok(unix::unix_stream(
                     config.path,
                     config.max_length,
                     host_key,
@@ -143,7 +163,9 @@ impl SourceConfig for SocketConfig {
             Mode::Tcp(tcp) => vec![tcp.address.into()],
             Mode::Udp(udp) => vec![udp.address.into()],
             #[cfg(unix)]
-            Mode::Unix(_) => vec![],
+            Mode::UnixDatagram(_) => vec![],
+            #[cfg(unix)]
+            Mode::UnixStream(_) => vec![],
         }
     }
 }
