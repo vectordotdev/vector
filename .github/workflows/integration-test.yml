@@ -1,11 +1,11 @@
-name: Master Test Suite
+name: Integration Test Suite
 
 on:
   push:
     branches:
       - master
     paths:
-      - ".github/workflows/master.yml"
+      - ".github/workflows/integration-test.yml"
       - ".cargo/**"
       - "benches/**"
       - "lib/**"
@@ -43,112 +43,6 @@ jobs:
       - uses: styfle/cancel-workflow-action@0.5.0
         with:
           access_token: ${{ secrets.GITHUB_TOKEN }}
-
-  cross-linux:
-    name: Cross - ${{ matrix.target }}
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-          - aarch64-unknown-linux-gnu
-          - aarch64-unknown-linux-musl
-    # We run cross checks when dependencies change to ensure they still build.
-    # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      # Why is this build, not check? Because we need to make sure the linking phase works.
-      # aarch64 and musl in particular are notoriously hard to link.
-      # While it may be tempting to slot a `check` in here for quickness, please don't.
-      - run: make cross-build-${{ matrix.target }}
-      - uses: actions/upload-artifact@v2
-        with:
-          name: "vector-debug-${{ matrix.target }}"
-          path: "./target/${{ matrix.target }}/debug/vector"
-
-  # Remove this once https://github.com/timberio/vector/issues/3771 is closed.
-  # Then, modify the `cross-linux` job to run `test` instead of `build`.
-  test-linux:
-    name: Unit - x86_64-unknown-linux-gnu
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test
-
-  test-mac:
-    name: Unit - Mac
-    # Full CI suites for this platform were only recently introduced.
-    # Some failures are permitted until we can properly correct them.
-    continue-on-error: true
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: bash scripts/environment/bootstrap-macos-10.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-components
-
-  test-windows:
-    name: Unit - Windows
-    # Full CI suites for this platform were only recently introduced.
-    # Some failures are permitted until we can properly correct them.
-    continue-on-error: true
-    runs-on: [self-hosted, windows, x64]
-    steps:
-      - uses: actions/checkout@v2
-      - env:
-          RUSTFLAGS: "-D warnings"
-        run: cargo test --no-fail-fast --no-default-features --features default-msvc
-
-  test-misc:
-    name: Miscellaneous - Linux
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - run: make ci-sweep
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-      - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: make test-shutdown
-      - run: make test-cli
-      - run: make test-behavior
 
   test-integration-aws:
     name: Integration - Linux, AWS
@@ -401,29 +295,11 @@ jobs:
       - run: make slim-builds
       - run: make test-integration-splunk
 
-  check-component-features:
-    name: Component Features - Linux
-    runs-on: ubuntu-20.04
-    container: timberio/ci_image
-    steps:
-      - uses: actions/checkout@v2
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: make slim-builds
-      - run: echo "home/runner/.local/bin" >> "$GITHUB_PATH"
-      - run: make check-component-features
-        env:
-          RUSTFLAGS: "-D warnings"
-
   master-failure:
     name: master-failure
     if: failure()
     needs:
       - cancel-previous
-      - cross-linux
-      - test-linux
-      - test-mac
-      - test-windows
-      - test-misc
       - test-integration-aws
       - test-integration-clickhouse
       - test-integration-docker-logs
@@ -435,7 +311,6 @@ jobs:
       - test-integration-loki
       - test-integration-pulsar
       - test-integration-splunk
-      - check-component-features
     runs-on: ubuntu-latest
     steps:
     - name: Discord notification
@@ -443,4 +318,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.0
       with:
-        args: "Master failed and is red: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+        args: "Master integration tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
