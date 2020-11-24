@@ -286,4 +286,4 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       uses: Ilshidur/action-discord@0.3.0
       with:
-        args: "Master test.yml failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
+        args: "Master tests failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
