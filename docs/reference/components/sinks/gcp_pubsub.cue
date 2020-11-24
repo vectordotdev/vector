@@ -30,7 +30,7 @@ components: sinks: gcp_pubsub: {
 			}
 			request: {
 				enabled:                    true
-				concurrency:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             100
 				retry_initial_backoff_secs: 1
