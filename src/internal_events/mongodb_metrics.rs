@@ -46,6 +46,6 @@ impl<'a> InternalEvent for MongoDBMetricsBsonParseError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("bson_parse_error_total", 1);
+        counter!("parse_errors_total", 1);
     }
 }
