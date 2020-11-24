@@ -11,7 +11,7 @@ hide_on_release_notes: false
 tags: ["type: announcement"]
 ---
 
-After eight months of development, [83 pull requests][kubernetes_pull_requests],
+After eight months of development, [100 pull requests][kubernetes_pull_requests],
 and intensive QA in clusters producing over 30 terabytes per day, we’re pleased
 to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for collecting and processing all
@@ -31,12 +31,13 @@ For more details, checkout the
     source, and to keep up with very large Kubernetes deployments we invested
     in performance improvements. We were able to improve throughput by over 25%
     across the board. This [further raises the bar][file_soure_benchmarks] in
-    file tailing performance.
+    file tailing performance to meet the high demands of large-scale Kubernetes
+    environments.
 2.  [**Adaptive Request Currency (ARC)**][adaptive_concurrency_post] -
     A new Vector feature designed to automatically optimize HTTP communication
-    in the fact of ever changing environments like Kubernetes. It does away with
+    in the face of ever changing environments like Kubernetes. It does away with
     static rate limits and raises the performance and reliability of your entire
-    observability infrastructure.
+    observability infrastructure by monitoring downstream service performance.
 
 ## Get Started
 
@@ -46,6 +47,8 @@ To cut straight to the chase, check out our Kubernetes installation instructions
 
 ## Future plans
 
-[announcement_post]: TODO
-[installation_docs]: TODO
-[kubernetes_pull_requests]: TODO
+[adaptive_concurrency_post]: /blog/...
+[announcement_post]: /blog/...
+[installation_docs]: /docs/setup/installation/platforms/kubernetes/
+[kubernetes_logs_source]: /docs/reference/sources/kubernetes_logs/
+[kubernetes_pull_requests]: https://github.com/timberio/vector/pulls?q=is%3Apr+sort%3Aupdated-desc+kubernetes+is%3Aclosed

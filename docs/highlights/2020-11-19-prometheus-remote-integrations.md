@@ -30,7 +30,7 @@ Prometheus operators can route a stream of Prometheus data to the archiving
 solution of their choice. For this use case we recommend object stores for their
 cheap and durable qualtiies:
 
-```toml
+```toml title="vector.toml"
 [sources.prometheus]
   type = "prometheus_remote_write"
 
@@ -48,32 +48,32 @@ Swap `aws_s3` with `gcp_cloud_storage` or other object stores.
 ### Long-term, highly-available Prometheus setups
 
 For large setups it's common to couple Prometheus with another solution designed
-for long term storage and querying. This reduces the pressure on Prometheus for
-short-term, real-time data without sacrificing retention. Databases like
-[M3 (Chronosphere)][], [Victoria metrics][],
+for long term storage and querying. This separates the concerns of fast short
+term querying and long-term low cost archiving.
+
+With the new [`prometheus_remote_write` source][prometheus_remote_write_source],
+users can only retain near-term data in Prometheus and store long term metrics
+in databases like [M3 (Chronosphere)][], [Victoria metrics][], and [Timescale][].
 
 ### Using Prometheus as a centralized export proxy
 
-Finally, because Prometheus is so tightly integrated into various ecosystems,
-namely Kubernetes, it is often used a central proxy for exporting metrics data.
-Using the new [`prometheus_remote_write` source][prometheus_remote_write_source],
-make it possible to export metrics to other solutions, using them e
+Not using Prometheus? It's very common to use Prometheus as a central proxy
+for exporting all metrics data. This is especially relevant in ecosystems like
+Kubernetes where Prometheus is tightly integrated.
 
-# Exporting Prometheus data to long term storage
+To get started, setup the new
+[`prometheus_remote_write` source][prometheus_remote_write_source] and send
+your metrics to [Datadog], [New Relic], [Influx], [Elasticsearch], and [more]:
 
-Many Prometheus users reach for
+```toml title="vector.toml"
+[sources.prometheus]
+  type = "prometheus_remote_write"
 
+[sinks.datadog]
+  type = "datadog_metrics"
+  inputs = ["prometheus"]
+```
 
-
-Here at Vector we're big fans of Prometheus. It's an excellent monitoring tool
-that has become a staple in the Kubernetes ecosystem. And after interviewing
-a nume
-
-We're big fans of Prometheus at Vector. It is a fantastic monitoring tool that
-has become the defactor standard in Kubernetes.
-
-
-
- it's desirable to
-export your metrics for long term storage to reduce cost and increase perofmrnace
-for near-term metrics data.
+[kubernetes_highlight]: /highlights/2020-10-27-kubernetes-integration
+[prometheus_remote_write_sink]: /docs/reference/sinks/prometheus_remote_write
+[prometheus_remote_write_source]: /docs/reference/sources/prometheus_remote_write
