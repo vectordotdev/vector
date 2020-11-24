@@ -4,6 +4,8 @@ components: sources: docker_logs: {
 	title:       "Docker"
 	description: installation.platforms.docker.description
 
+	alias: "docker"
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
