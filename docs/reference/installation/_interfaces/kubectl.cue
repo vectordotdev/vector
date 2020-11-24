@@ -19,14 +19,16 @@ installation: _interfaces: kubectl: {
 	roles: [Name=string]: {
 		commands: {
 			_deployment_variant:       string
+			_vector_version:           "0.10"
 			_namespace:                string | *"vector"
 			_controller_resource_type: string
 			_controller_resource_name: string | *_deployment_variant
-			_kustomization_base:       string | *"github.com/timberio/vector/distribution/kubernetes/\(_deployment_variant)"
+			_kustomization_ref:        "v\(_vector_version)"
+			_kustomization_base:       string | *"github.com/timberio/vector/distribution/kubernetes/\(_deployment_variant)?ref=\(_kustomization_ref)"
 			_configmap_name:           string | *"\(_controller_resource_name)-config"
 			_configmap_file_name:      string | *"\(_controller_resource_name).toml"
 			_config_header:            string | *""
-			_vector_image_version:     "0.10.X"
+			_vector_image_version:     "\(_vector_version).X"
 			_vector_image_flavor:      "debian"
 			_vector_image_tag:         "\(_vector_image_version)-\(_vector_image_flavor)"
 			install:                   "kubectl apply -k ."
