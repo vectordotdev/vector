@@ -4,6 +4,7 @@ $schema: ".schema.json"
 title: "First-class Kubernetes integration"
 description: "Vector officially support Kubernetes with a first-class integration."
 author_github: "https://github.com/binarylogic"
+featured: true
 pr_numbers: [1314]
 release: "0.11.0"
 hide_on_release_notes: false
@@ -16,8 +17,8 @@ to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for all Kubernetes observability
 data.
 
-For a deepdive into our Kubernetes integration, checkout the
-[announcement blog post][announcement_post].
+For more details, checkout the
+[Kubernetes announcement blog post][announcement_post].
 
 ## Get Started
 
@@ -25,7 +26,7 @@ To cut straight to the chase, check out our Kubernetes installation instructions
 
 <Jump to="/docs/setup/installation/platforms/kubernetes/#install">Kubernetes Installation Instructions</Jump>
 
-## Feature highlights
+## Notable features
 
 1. A new [`kubernetes_logs` source] that:
    1. Automatically collects all Node logs.

@@ -1,16 +1,19 @@
 ---
 last_modified_on: "2020-09-18"
 $schema: ".schema.json"
-title: "Adaptive concurrency. Optimizing performance & reliability."
-description: "How Vector optimizes performance and increases reliability of your entire observability infrastructure."
+title: "Adaptive request concurrency"
+description: "Increasing reliability and performance across your entire observability infrastructure."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [3094]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "domain: networking"]
+tags: ["type: announcement", "domain: networking", "domain: reliability", "domain: performance"]
 ---
 
-Vector 0.11 includes a new adaptive concurrency feature designed to
+Vector 0.11 includes a new adaptive concurrency feature does away with rate-limits and automatically optimizes HTTP concurrency limits based on downstream service performance. It's a simple feedback loop inspired by TCP congestion control algorithms.
+
+
+ designed to
 automatically optimize network bandwidth, back off when it senses trouble,
 and make your observability infrastructure significantly more performant and
 reliable.
