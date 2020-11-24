@@ -19,13 +19,18 @@ installation: _interfaces: kubectl: {
 	roles: [Name=string]: {
 		commands: {
 			_deployment_variant:       string
+			_vector_version:           "0.11"
 			_namespace:                string | *"vector"
 			_controller_resource_type: string
 			_controller_resource_name: string | *_deployment_variant
-			_kustomization_base:       string | *"github.com/timberio/vector/distribution/kubernetes/\(_deployment_variant)"
+			_kustomization_ref:        "v\(_vector_version)"
+			_kustomization_base:       string | *"github.com/timberio/vector/distribution/kubernetes/\(_deployment_variant)?ref=\(_kustomization_ref)"
 			_configmap_name:           string | *"\(_controller_resource_name)-config"
 			_configmap_file_name:      string | *"\(_controller_resource_name).toml"
 			_config_header:            string | *""
+			_vector_image_version:     "\(_vector_version).X"
+			_vector_image_flavor:      "debian"
+			_vector_image_tag:         "\(_vector_image_version)-\(_vector_image_flavor)"
 			install:                   "kubectl apply -k ."
 			logs:                      "kubectl logs -n \(_namespace) \(_controller_resource_type)/\(_controller_resource_name)"
 			reload:                    null
@@ -38,16 +43,33 @@ installation: _interfaces: kubectl: {
 			verify_config:             "kubectl kustomize"
 			prepare_namespace:         "kubectl create namespace --dry-run=client -oyaml \(_namespace) > namespace.yaml"
 			prepare_kustomization:     #"""
-				cat <<-KUSTOMIZATION > kustomization.yaml
+				cat <<-'KUSTOMIZATION' > kustomization.yaml
+				# Override the namespace of all of the resources we manage.
 				namespace: \#(_namespace)
+
 				bases:
+				  # Include Vector recommended base (from git).
 				  - \#(_kustomization_base)
+
+				images:
+				  # Override the Vector image to avoid use of the sliding tag.
+				  - name: timberio/vector
+				    newName: timberio/vector
+				    newTag: #\(_vector_image_tag)
+
 				resources:
+				  # A namespace to keep the resources at.
 				  - namespace.yaml
+
 				configMapGenerator:
+				  # Provide a custom `ConfigMap` for Vector.
 				  - name: \#(_configmap_name)
 				    files:
 				      - \#(_configmap_file_name)
+
+				generatorOptions:
+				  # We do not want a suffix at the `ConfigMap` name.
+				  disableNameSuffixHash: true
 				KUSTOMIZATION
 				"""#
 			configure:                 #"""
