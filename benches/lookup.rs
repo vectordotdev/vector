@@ -109,5 +109,4 @@ fn lookup_to_string(c: &mut Criterion) {
     group_deserialize.finish();
 }
 
-criterion_group!(lookup, lookup_to_string);
-criterion_main!(lookup);
+criterion_group!(benches, lookup_to_string);
