@@ -35,11 +35,11 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
             eprintln!(
                 indoc! {"
                     Vector API server isn't reachable ({}).
-                    
+
                     Have you enabled the API?
-                    
+
                     To enable the API, add the following to your `vector.toml` config file:
-    
+
                     [api]
                       enabled = true"},
                 url
