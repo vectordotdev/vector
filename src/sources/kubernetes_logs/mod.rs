@@ -104,7 +104,7 @@ pub struct Config {
     /// This is useful to compute the latency between important event processing
     /// stages, i.e. the time delta between log line was written and when it was
     /// processed by the `kubernetes_logs` source.
-    ingestion_timestamp_field: Option<String>,
+    ingestion_timestamp_field: Option<LookupBuf>,
 }
 
 inventory::submit! {
@@ -164,7 +164,7 @@ struct Source {
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     glob_minimum_cooldown: Duration,
-    ingestion_timestamp_field: Option<String>,
+    ingestion_timestamp_field: Option<LookupBuf>,
 }
 
 impl Source {
@@ -319,7 +319,7 @@ impl Source {
                 file: &file,
                 byte_size: bytes.len(),
             });
-            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
+            let mut event = create_event(bytes, &file, ingestion_timestamp_field.clone());
             if annotator.annotate(&mut event, &file).is_none() {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
@@ -386,7 +386,7 @@ impl Source {
     }
 }
 
-fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
+fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<LookupBuf>) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.

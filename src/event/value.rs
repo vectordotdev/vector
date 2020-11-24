@@ -40,6 +40,7 @@ impl Value {
                         let chain = v.lookups().map(move |l| {
                             let mut lookup = lookup.clone();
                             lookup.extend(l.clone());
+                            trace!(prefix = %lookup, "Enqueuing for iteration.");
                             lookup
                         });
                         chain
@@ -54,6 +55,7 @@ impl Value {
                         let chain = v.lookups().map(move |l| {
                             let mut lookup = lookup.clone();
                             lookup.extend(l.clone());
+                            trace!(prefix = %lookup, "Enqueuing for iteration.");
                             lookup
                         });
                         chain
@@ -76,7 +78,7 @@ impl Value {
                 m.iter()
                     .map(|(k, v)| {
                         let lookup = Lookup::from(k);
-                        trace!(prefix = %lookup, "Descending.");
+                        trace!(prefix = %lookup, "Enqueuing for iteration.");
                         let iter = Some((lookup.clone(), v)).into_iter();
                         let chain = v.pairs().map(move |(l, v)| {
                             let mut lookup = lookup.clone();
@@ -92,7 +94,7 @@ impl Value {
                     .enumerate()
                     .map(|(k, v)| {
                         let lookup = Lookup::from(k);
-                        trace!(prefix = %lookup, "Descending.");
+                        trace!(prefix = %lookup, "Enqueuing for iteration.");
                         let iter = Some((lookup.clone(), v)).into_iter();
                         let chain = v.pairs().map(move |(l, v)| {
                             let mut lookup = lookup.clone();

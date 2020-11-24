@@ -133,11 +133,13 @@ impl LogEvent {
     /// Insert a value at a given lookup.
     #[instrument(level = "trace", skip(self))]
     pub fn insert(&mut self, lookup: LookupBuf, value: impl Into<Value> + Debug) -> Option<Value> {
+        let mut seen_segments = vec![];
         let lookup_len = lookup.len();
         let mut lookup_iter = lookup.into_iter().enumerate();
         let value = value.into();
         // The first step should always be a field.
         let (_zero, first_step) = lookup_iter.next()?;
+        seen_segments.push(first_step.clone());
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
@@ -163,10 +165,11 @@ impl LogEvent {
         };
 
         let mut retval = None;
+
         for (index, segment) in lookup_iter {
-            cursor = match (segment, cursor) {
+            cursor = match (segment.clone(), cursor) {
                 // Fields access maps.
-                (SegmentBuf::Field(ref f), Some(Value::Map(ref mut map))) => {
+                (SegmentBuf::Field(ref f), Some(&mut Value::Map(ref mut map))) => {
                     if index == lookup_len {
                         trace!(key = %f, "Creating field inside map.");
                         retval = map.insert(f.clone(), value);
@@ -177,7 +180,7 @@ impl LogEvent {
                     }
                 }
                 // Indexes access arrays.
-                (SegmentBuf::Index(i), Some(Value::Array(ref mut array))) => {
+                (SegmentBuf::Index(i), Some(&mut Value::Array(ref mut array))) => {
                     if index == lookup_len {
                         trace!(key = %i, "Creating index inside array.");
                         match array.get_mut(i) {
@@ -199,13 +202,38 @@ impl LogEvent {
                         trace!(key = %i, "Descending into array.");
                         array.get_mut(i)
                     }
-                }
-                // The rest, it's not good.
-                (SegmentBuf::Index(_), _) | (SegmentBuf::Field(_), _) => {
-                    trace!("Unmatched lookup.");
+                },
+                (SegmentBuf::Field(_f), Some(v )) => {
+                    match v {
+                        Value::Map(_) | Value::Array(_) | Value::Timestamp(_) | Value::Boolean(_) | Value::Float(_) | Value::Integer(_) | Value::Bytes(_) => {
+                            error!("Bailing on insert.");
+                        }
+                        Value::Null => {
+                            trace!("Did not discover map to descend into. Inserting empty map.");
+                            let mut old = Value::Map(Default::default());
+                            core::mem::swap(&mut old, v);
+                            retval = Some(old);
+                        }
+                    }
+                    None
+                },
+                (segment, None) => {
+                    debug!("Attempting to create neccessary parent which doesn't exist.");
+                    let mut target = LookupBuf::try_from(seen_segments).expect("seen_segments should always be len >1. Please report this.");
+                    let retval = self.insert(target.clone(), Value::Map(Default::default()));
+                    // This would be contrary to what the match arm says.
+                    debug_assert!(retval.is_none());
+                    target.push(segment);
+                    // With this new preparation, this new call will find wings in a new match arm above.
+                    return self.insert(target, value);
+                },
+                // The option of Index/Array was already caught. This is an error path but we can't fail.
+                (SegmentBuf::Index(i), Some(_v)) => {
+                    error!(key = %i, value = ?value, "Attempt to insert into the index of a non-indexed value.");
                     None
                 }
-            }
+            };
+            seen_segments.push(segment.clone())
         }
 
         retval
@@ -231,8 +259,13 @@ impl LogEvent {
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
             Segment::Field(f) => {
-                trace!(key = %f, "Descending into map.");
-                self.fields.get_mut(*f)
+                if lookup_len == 1 {
+                    trace!(key = %f, "Removed from root.");
+                    return self.fields.remove(*f);
+                } else {
+                    trace!(key = %f, "Descending into map.");
+                    self.fields.get_mut(*f)
+                }
             }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
@@ -307,7 +340,7 @@ impl LogEvent {
             .iter()
             .map(|(k, v)| {
                 let lookup = Lookup::from(k);
-                trace!(prefix = %lookup, "Descending.");
+                trace!(prefix = %lookup, "Enqueuing for iteration.");
                 let iter = Some(lookup.clone()).into_iter();
                 let chain = v.lookups().map(move |l| {
                     let mut lookup = lookup.clone();
@@ -329,7 +362,7 @@ impl LogEvent {
             .iter()
             .map(|(k, v)| {
                 let lookup = Lookup::from(k);
-                trace!(prefix = %lookup, "Descending.");
+                trace!(prefix = %lookup, "Enqueuing for iteration.");
                 let iter = Some((lookup.clone(), v)).into_iter();
                 let chain = v.pairs().map(move |(l, v)| {
                     let mut lookup = lookup.clone();

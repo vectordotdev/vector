@@ -158,7 +158,19 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     })
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum ArrayOrNot<T> {
+    Array(Vec<T>),
+    Not(T),
+}
+
 fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
+    let annotater = |mut event: LogEvent| {
+        event.insert(log_schema().timestamp_key().clone(),  chrono::Utc::now());
+        event
+    };
+    let converter = |event: LogEvent| Event::Log(event);
     match enc {
         Encoding::Text => body_to_lines(body)
             .map(|r| Ok(Event::from(r?)))
@@ -166,14 +178,20 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
         Encoding::Ndjson => body_to_lines(body)
             .map(|j| {
                 serde_json::from_slice::<LogEvent>(&j?)
-                    .map(Event::Log)
+                    .map(annotater)
+                    .map(converter)
                     .map_err(|error| json_error(format!("Error parsing Ndjson: {:?}", error)))
             })
             .collect::<Result<Vec<_>, _>>(),
-        Encoding::Json => serde_json::from_slice::<LogEvent>(&body)
-            .map(Event::Log)
-            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error)))
-            .map(|v| vec![v]),
+        Encoding::Json => serde_json::from_slice::<ArrayOrNot<LogEvent>>(&body)
+            .map(|array_or_not| match array_or_not {
+                ArrayOrNot::Array(vec) => vec.into_iter()
+                    .map(annotater)
+                    .map(converter)
+                    .collect(),
+                ArrayOrNot::Not(item) => vec![converter(annotater(item))],
+            })
+            .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))),
     }
 }
 

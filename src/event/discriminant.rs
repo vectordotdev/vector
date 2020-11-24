@@ -27,7 +27,9 @@ impl Discriminant {
     pub fn from_log_event(event: &LogEvent, discriminant_fields: &[LookupBuf]) -> Self {
         let values: Vec<Option<Value>> = discriminant_fields
             .iter()
-            .map(|discriminant_field| event.get(&*discriminant_field).cloned())
+            .map(|discriminant_field| {
+                event.get(&*discriminant_field).cloned()
+            })
             .collect();
         Self { values }
     }
@@ -207,6 +209,7 @@ mod tests {
 
     #[test]
     fn field_order() {
+        crate::test_util::trace_init();
         let mut event_1 = LogEvent::default();
         event_1.insert(LookupBuf::from("a"), "a");
         event_1.insert(LookupBuf::from("b"), "b");
@@ -225,6 +228,7 @@ mod tests {
 
     #[test]
     fn map_values_key_order() {
+        crate::test_util::trace_init();
         let mut event_1 = LogEvent::default();
         event_1.insert(LookupBuf::from_str("nested.a").unwrap(), "a");
         event_1.insert(LookupBuf::from_str("nested.b").unwrap(), "b");
@@ -243,6 +247,7 @@ mod tests {
 
     #[test]
     fn array_values_insertion_order() {
+        crate::test_util::trace_init();
         let mut event_1 = LogEvent::default();
         event_1.insert(LookupBuf::from_str("array[0]").unwrap(), "a");
         event_1.insert(LookupBuf::from_str("array[1]").unwrap(), "b");
@@ -261,6 +266,7 @@ mod tests {
 
     #[test]
     fn map_values_matter_1() {
+        crate::test_util::trace_init();
         let mut event_1 = LogEvent::default();
         event_1.insert(LookupBuf::from_str("nested.a").unwrap(), "a"); // `nested` is a `Value::Map`
         let event_2 = LogEvent::default(); // empty event
@@ -276,6 +282,7 @@ mod tests {
 
     #[test]
     fn map_values_matter_2() {
+        crate::test_util::trace_init();
         let mut event_1 = LogEvent::default();
         event_1.insert(LookupBuf::from_str("nested.a").unwrap(), "a"); // `nested` is a `Value::Map`
         let mut event_2 = LogEvent::default();
@@ -292,6 +299,7 @@ mod tests {
 
     #[test]
     fn with_hash_map() {
+        crate::test_util::trace_init();
         let mut map: HashMap<Discriminant, usize> = HashMap::new();
 
         let event_stream_1 = {

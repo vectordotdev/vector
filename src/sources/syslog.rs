@@ -420,7 +420,7 @@ fn insert_fields_from_syslog(event: &mut Event, parsed: Message<&str>) {
     }
 
     for element in parsed.structured_data.into_iter() {
-        let element_lookup = LookupBuf::from(element.id);
+        let element_lookup = LookupBuf::from_str(element.id).unwrap_or_else(|_| LookupBuf::from(element.id));
         for (name, value) in element.params.into_iter() {
             let mut key_lookup = element_lookup.clone();
             key_lookup.push(SegmentBuf::from(name.to_string()));
@@ -525,6 +525,7 @@ mod test {
 
     #[test]
     fn handles_incorrect_sd_element() {
+        crate::test_util::trace_init();
         let msg = "qwerty";
         let raw = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} {}"#,
@@ -562,6 +563,7 @@ mod test {
 
     #[test]
     fn handles_empty_sd_element() {
+        crate::test_util::trace_init();
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
@@ -605,6 +607,7 @@ mod test {
 
     #[test]
     fn handles_weird_whitespace() {
+        crate::test_util::trace_init();
         // this should also match rsyslog omfwd with template=RSYSLOG_SyslogProtocol23Format
         let raw = r#"
             <13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - [meta sequenceId="1"] i am foobar
@@ -619,6 +622,7 @@ mod test {
 
     #[test]
     fn syslog_ng_default_network() {
+        crate::test_util::trace_init();
         let msg = "i am foobar";
         let raw = format!(r#"<13>Feb 13 20:07:26 74794bfb6795 root[8539]: {}"#, msg);
 
@@ -645,6 +649,7 @@ mod test {
 
     #[test]
     fn rsyslog_omfwd_tcp_default() {
+        crate::test_util::trace_init();
         let msg = "start";
         let raw = format!(
             r#"<190>Feb 13 21:31:56 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="8979" x-info="http://www.rsyslog.com"] {}"#,
@@ -677,6 +682,7 @@ mod test {
 
     #[test]
     fn rsyslog_omfwd_tcp_forward_format() {
+        crate::test_util::trace_init();
         let msg = "start";
         let raw = format!(
             r#"<190>2019-02-13T21:53:30.605850+00:00 74794bfb6795 liblogging-stdlog:  [origin software="rsyslogd" swVersion="8.24.0" x-pid="9043" x-info="http://www.rsyslog.com"] {}"#,

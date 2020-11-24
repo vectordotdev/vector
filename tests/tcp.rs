@@ -70,7 +70,7 @@ async fn sample() {
         &["in"],
         transforms::sampler::SamplerConfig {
             rate: 10,
-            key_field: Some(config::log_schema().message_key().into()),
+            key_field: Some(config::log_schema().message_key().clone()),
             exclude: None,
         },
     );

@@ -172,15 +172,15 @@ fn kafka_source(
                             }
 
                             if let Some(topic_key) = &topic_key {
-                                log.insert(topic_key, Value::from(msg.topic().to_string()));
+                                log.insert(topic_key.clone(), Value::from(msg.topic().to_string()));
                             }
 
                             if let Some(partition_key) = &partition_key {
-                                log.insert(partition_key, Value::from(msg.partition()));
+                                log.insert(partition_key.clone(), Value::from(msg.partition()));
                             }
 
                             if let Some(offset_key) = &offset_key {
-                                log.insert(offset_key, Value::from(msg.offset()));
+                                log.insert(offset_key.clone(), Value::from(msg.offset()));
                             }
 
                             consumer.store_offset(&msg).map_err(|error| {
@@ -265,9 +265,9 @@ mod test {
             session_timeout_ms: 10000,
             commit_interval_ms: 5000,
             key_field: Some(LookupBuf::from("message_key")),
-            topic_key: Some("topic".to_string()),
-            partition_key: Some("partition".to_string()),
-            offset_key: Some("offset".to_string()),
+            topic_key: Some(LookupBuf::from("topic")),
+            partition_key: Some(LookupBuf::from("partition")),
+            offset_key: Some(LookupBuf::from("offset")),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()
@@ -342,9 +342,9 @@ mod integration_test {
             session_timeout_ms: 6000,
             commit_interval_ms: 5000,
             key_field: Some(LookupBuf::from("message_key")),
-            topic_key: Some("topic".to_string()),
-            partition_key: Some("partition".to_string()),
-            offset_key: Some("offset".to_string()),
+            topic_key: Some(LookupBuf::from("topic")),
+            partition_key: Some(LookupBuf::from("partition")),
+            offset_key: Some(LookupBuf::from("offset")),
             socket_timeout_ms: 60000,
             fetch_wait_max_ms: 100,
             ..Default::default()

@@ -123,7 +123,7 @@ mod tests {
     use indexmap::IndexMap;
 
     fn condition_contains(pre: &str) -> Box<dyn Condition> {
-        condition(log_schema().message_key(), "contains", pre)
+        condition(&*log_schema().message_key().to_string(), "contains", pre)
     }
 
     fn condition(field: &str, condition: &str, value: &str) -> Box<dyn Condition> {
@@ -148,7 +148,7 @@ mod tests {
         let events = random_events(num_events);
         let mut sampler = Sampler::new(
             2,
-            Some(log_schema().message_key().into()),
+            Some(log_schema().message_key().clone()),
             Some(condition_contains("na")),
         );
         let total_passed = events
@@ -162,7 +162,7 @@ mod tests {
         let events = random_events(num_events);
         let mut sampler = Sampler::new(
             25,
-            Some(log_schema().message_key().into()),
+            Some(log_schema().message_key().clone()),
             Some(condition_contains("na")),
         );
         let total_passed = events
@@ -179,7 +179,7 @@ mod tests {
         let events = random_events(1000);
         let mut sampler = Sampler::new(
             2,
-            Some(log_schema().message_key().into()),
+            Some(log_schema().message_key().clone()),
             Some(condition_contains("na")),
         );
 
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn always_passes_events_matching_pass_list() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, Some(log_schema().message_key().clone())] {
             let event = Event::from("i am important");
             let mut sampler =
                 Sampler::new(0, key_field.clone(), Some(condition_contains("important")));
@@ -212,12 +212,12 @@ mod tests {
 
     #[test]
     fn handles_key_field() {
-        for key_field in &[None, Some(log_schema().timestamp_key().into())] {
+        for key_field in &[None, Some(log_schema().timestamp_key().clone())] {
             let event = Event::from("nananana");
             let mut sampler = Sampler::new(
                 0,
                 key_field.clone(),
-                Some(condition(log_schema().timestamp_key(), "contains", ":")),
+                Some(condition(&log_schema().timestamp_key().to_string(), "contains", ":")),
             );
             let iterations = 0..1000;
             let total_passed = iterations
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn sampler_adds_sampling_rate_to_event() {
-        for key_field in &[None, Some(log_schema().message_key().into())] {
+        for key_field in &[None, Some(log_schema().message_key().clone())] {
             let events = random_events(10000);
             let mut sampler = Sampler::new(10, key_field.clone(), Some(condition_contains("na")));
             let passing = events
