@@ -26,6 +26,9 @@ installation: _interfaces: kubectl: {
 			_configmap_name:           string | *"\(_controller_resource_name)-config"
 			_configmap_file_name:      string | *"\(_controller_resource_name).toml"
 			_config_header:            string | *""
+			_vector_image_version:     "0.10.X"
+			_vector_image_flavor:      "debian"
+			_vector_image_tag:         "\(_vector_image_version)-\(_vector_image_flavor)"
 			install:                   "kubectl apply -k ."
 			logs:                      "kubectl logs -n \(_namespace) \(_controller_resource_type)/\(_controller_resource_name)"
 			reload:                    null
@@ -45,6 +48,12 @@ installation: _interfaces: kubectl: {
 				bases:
 				  # Include Vector recommended base (from git).
 				  - \#(_kustomization_base)
+
+				images:
+				  # Override the Vector image tag to avoid using sliding release.
+				  - name: timberio/vector
+				    newName: timberio/vector
+				    newTag: #\(_vector_image_tag)
 
 				resources:
 				  # A namespace to keep the resources at.
