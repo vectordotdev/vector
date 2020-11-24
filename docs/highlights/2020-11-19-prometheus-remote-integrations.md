@@ -3,11 +3,11 @@ last_modified_on: "2020-11-19"
 $schema: ".schema.json"
 title: "New `prometheus_remote_write` sources and sinks"
 description: "Export metrics out of Prometheus."
-author_github: "https://github.com/binarylogic"
+author_github: "https://github.com/jamtur01"
 pr_numbers: [4856, 5144]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "domain: metrics", "domain: sources"]
+tags: ["type: new feature", "domain: metrics", "domain: sources"]
 ---
 
 We're big fans of Prometheus at Timber, and as an extension of our Kubernetes

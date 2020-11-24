@@ -7,7 +7,7 @@ author_github: "https://github.com/binarylogic"
 pr_numbers: [4101, 4779]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: announcement", "domain: sources", "platform: aws"]
+tags: ["type: new feature", "domain: sources", "platform: aws"]
 ---
 
 Getting observability data out of AWS can sometimes feel like you're in a
