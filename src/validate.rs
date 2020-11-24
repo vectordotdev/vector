@@ -16,7 +16,8 @@ pub struct Opts {
     #[structopt(long)]
     no_environment: bool,
 
-    /// Fail validation on warnings
+    /// Fail validation on warnings that are probably a mistake in the configuration
+    /// or are recommended to be fixed.
     #[structopt(short, long)]
     deny_warnings: bool,
 
@@ -38,7 +39,7 @@ pub async fn validate(opts: &Opts, color: bool) -> ExitCode {
 
     if !opts.no_environment {
         if let Some(tmp_directory) = create_tmp_directory(&mut config, &mut fmt) {
-            validated &= validate_environment(&config, &mut fmt).await;
+            validated &= validate_environment(opts, &config, &mut fmt).await;
             remove_tmp_directory(tmp_directory);
         } else {
             validated = false;
@@ -64,7 +65,7 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         return None;
     };
 
-    match config::load_from_paths(&paths) {
+    match config::load_from_paths(&paths, opts.deny_warnings) {
         Ok(config) => {
             fmt.success(format!("Loaded {:?}", &paths));
             Some(config)
@@ -77,7 +78,7 @@ fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
     }
 }
 
-async fn validate_environment(config: &Config, fmt: &mut Formatter) -> bool {
+async fn validate_environment(opts: &Opts, config: &Config, fmt: &mut Formatter) -> bool {
     let diff = ConfigDiff::initial(config);
 
     let mut pieces = if let Some(pieces) = validate_components(config, &diff, fmt).await {
@@ -86,7 +87,7 @@ async fn validate_environment(config: &Config, fmt: &mut Formatter) -> bool {
         return false;
     };
 
-    validate_healthchecks(config, &diff, &mut pieces, fmt).await
+    validate_healthchecks(opts, config, &diff, &mut pieces, fmt).await
 }
 
 async fn validate_components(
@@ -112,6 +113,7 @@ async fn validate_components(
 }
 
 async fn validate_healthchecks(
+    opts: &Opts,
     config: &Config,
     diff: &ConfigDiff,
     pieces: &mut Pieces,
@@ -138,6 +140,7 @@ async fn validate_healthchecks(
                     fmt.success(format!("Health check `{}`", name.as_str()));
                 } else {
                     fmt.warning(format!("Health check disabled for `{}`", name));
+                    validated &= !opts.deny_warnings;
                 }
             }
             Ok(Err(())) => failed(format!("Health check for `{}` failed", name.as_str())),
