@@ -921,7 +921,7 @@ components: {
 
 		telemetry: metrics: {
 			// Default metrics for each component
-			events_processed_total: components.sources.internal_metrics.output.metrics.events_processed_total
+			processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		}
 	}}

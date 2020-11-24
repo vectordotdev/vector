@@ -6,7 +6,7 @@ pub struct SwimlanesEventProcessed;
 
 impl InternalEvent for SwimlanesEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("processed_events_total", 1);
     }
 }
 

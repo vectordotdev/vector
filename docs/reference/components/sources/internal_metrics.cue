@@ -195,7 +195,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		container_events_processed_total: {
+		container_processed_events_total: {
 			description:       "The total number of container events processed."
 			type:              "counter"
 			default_namespace: "vector"
@@ -243,7 +243,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		events_processed_total: {
+		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"
 			default_namespace: "vector"
