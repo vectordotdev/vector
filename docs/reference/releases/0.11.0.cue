@@ -2,9 +2,22 @@ package metadata
 
 releases: "0.11.0": {
 	date:     "2020-10-18"
-	codename: ""
+	codename: "Hypercube"
 
-	whats_next: ["test"]
+	whats_next: [
+		{
+			title: "Kubernetes metrics support"
+			description: "..."
+		},
+		{
+			title: "Vector's own observability"
+			description: "..."
+		},
+		{
+			title: "Timber Remap Language (TRL)"
+			description: "..."
+		},
+	]
 
 	commits: [
 		{sha: "5308b865614987b50bbeecf2167d37ddfc326f55", date: "2020-07-22 11:15:07 -0400", description: "Initial `kubernetes_logs` implementation", pr_number:                                          2653, scopes: ["new source"], type:                                       "feat", breaking_change:        false, author: "MOZGIII", files_count:               60, insertions_count: 6078, deletions_count: 25},

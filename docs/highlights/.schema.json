@@ -31,6 +31,10 @@
       "type": "boolean",
       "description": "Draft mode ensure this guide is not included in releases."
     },
+    "featured": {
+      "type": "boolean",
+      "description": "Is this the feature of the release? Only one can be selected per release."
+    },
     "hide_pagination": {
       "type": "boolean",
       "description": "Hides the pagination nav"
