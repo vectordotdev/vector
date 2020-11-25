@@ -15,6 +15,7 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 use tokio::{
     io::{self, AsyncRead, AsyncWrite},
@@ -169,7 +170,15 @@ impl MaybeTlsIncomingStream<TcpStream> {
             )
         })?;
 
-        stream.set_keepalive(keepalive.and_then(|keepalive| keepalive.time))
+        if let Some(keepalive) = keepalive {
+            stream.set_keepalive(
+                keepalive
+                    .time_secs
+                    .map(|time_secs| Duration::from_secs(time_secs)),
+            )?;
+        }
+
+        Ok(())
     }
 
     fn poll_io<T, F>(self: Pin<&mut Self>, cx: &mut Context, poll_fn: F) -> Poll<io::Result<T>>

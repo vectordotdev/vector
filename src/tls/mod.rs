@@ -4,7 +4,7 @@ use openssl::{
     ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::{fmt::Debug, net::SocketAddr, path::PathBuf};
+use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::net::TcpStream;
 use tokio_openssl::{HandshakeError, SslStream};
 
@@ -132,7 +132,15 @@ impl MaybeTlsStream<TcpStream> {
             Self::Tls(tls) => tls.get_ref(),
         };
 
-        stream.set_keepalive(keepalive.and_then(|keepalive| keepalive.time))
+        if let Some(keepalive) = keepalive {
+            stream.set_keepalive(
+                keepalive
+                    .time_secs
+                    .map(|time_secs| Duration::from_secs(time_secs)),
+            )?;
+        }
+
+        Ok(())
     }
 }
 

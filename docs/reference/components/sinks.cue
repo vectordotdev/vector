@@ -316,7 +316,7 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							time: {
+							time_secs: {
 								common:      false
 								description: "The time a connection needs to be idle before sending TCP keepalive probes."
 								required:    false

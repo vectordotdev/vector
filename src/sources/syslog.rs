@@ -467,7 +467,7 @@ mod test {
             r#"
             mode = "tcp"
             address = "127.0.0.1:1235"
-            keepalive.time = 7200
+            keepalive.time_secs = 7200
           "#,
         )
         .unwrap();
@@ -479,8 +479,8 @@ mod test {
 
         let keepalive = keepalive.expect("keepalive config not set");
 
-        assert_eq!(keepalive.time, Some(std::time::Duration::from_secs(7200)));
-        assert_eq!(keepalive.interval, None);
+        assert_eq!(keepalive.time_secs, Some(7200));
+        assert_eq!(keepalive.interval_secs, None);
         assert_eq!(keepalive.retries, None);
     }
 
@@ -490,8 +490,8 @@ mod test {
             r#"
             mode = "tcp"
             address = "127.0.0.1:1235"
-            keepalive.time = 7200
-            keepalive.interval = 75
+            keepalive.time_secs = 7200
+            keepalive.interval_secs = 75
             keepalive.retries = 9
           "#,
         )
@@ -504,8 +504,8 @@ mod test {
 
         let keepalive = keepalive.expect("keepalive config not set");
 
-        assert_eq!(keepalive.time, Some(std::time::Duration::from_secs(7200)));
-        assert_eq!(keepalive.interval, Some(std::time::Duration::from_secs(75)));
+        assert_eq!(keepalive.time_secs, Some(7200));
+        assert_eq!(keepalive.interval_secs, Some(75));
         assert_eq!(keepalive.retries, Some(9));
     }
 
