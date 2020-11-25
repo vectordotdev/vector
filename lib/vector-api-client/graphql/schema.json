@@ -1785,7 +1785,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed metrics.",
+              "description": "Event processing metrics.",
               "isDeprecated": false,
               "name": "processedEventsTotal",
               "type": {
@@ -1816,7 +1816,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Events processed throughput, sampled over a provided millisecond `interval`.",
+              "description": "Event processing throughput sampled over the provided millisecond `interval`.",
               "isDeprecated": false,
               "name": "processedEventsThroughput",
               "type": {
@@ -1847,7 +1847,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component events processed throughputs over `interval`.",
+              "description": "Component event processing throughput metrics over `interval`.",
               "isDeprecated": false,
               "name": "componentProcessedEventsThroughputs",
               "type": {
@@ -1886,7 +1886,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component events processed metrics over `interval`.",
+              "description": "Component event processing metrics over `interval`.",
               "isDeprecated": false,
               "name": "componentProcessedEventsTotals",
               "type": {
@@ -1925,7 +1925,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Bytes processed metrics.",
+              "description": "Byte processing metrics.",
               "isDeprecated": false,
               "name": "processedBytesTotal",
               "type": {
@@ -1956,7 +1956,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Bytes processed throughput, sampled over a provided millisecond `interval`.",
+              "description": "Byte processing throughput sampled over a provided millisecond `interval`.",
               "isDeprecated": false,
               "name": "processedBytesThroughput",
               "type": {
@@ -1987,7 +1987,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component bytes processed metrics, over `interval`.",
+              "description": "Component byte processing metrics over `interval`.",
               "isDeprecated": false,
               "name": "componentProcessedBytesTotals",
               "type": {
@@ -2026,7 +2026,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component bytes processed throughputs, over `interval`",
+              "description": "Component byte processing throughput over `interval`",
               "isDeprecated": false,
               "name": "componentProcessedBytesThroughputs",
               "type": {
@@ -2096,7 +2096,7 @@
                 }
               ],
               "deprecationReason": null,
-              "description": "Component errors metrics, over `interval`.",
+              "description": "Component error metrics over `interval`.",
               "isDeprecated": false,
               "name": "componentErrorsTotals",
               "type": {
