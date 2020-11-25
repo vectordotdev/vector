@@ -378,6 +378,7 @@ mod integration_tests {
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
             encoding = "text"
+            tenant_id = "default"
         "#,
         )
         .unwrap();
@@ -398,7 +399,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string()).await;
+        let outputs = fetch_stream(stream.to_string(), "default").await;
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
@@ -414,6 +415,7 @@ mod integration_tests {
             labels = {test_name = "placeholder"}
             encoding = "json"
             remove_timestamp = false
+            tenant_id = "default"
         "#,
         )
         .unwrap();
@@ -435,7 +437,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string()).await;
+        let outputs = fetch_stream(stream.to_string(), "default").await;
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
             assert_eq!(output, &expected_json);
@@ -452,6 +454,7 @@ mod integration_tests {
             endpoint = "http://localhost:3100"
             labels = {test_name = "{{ stream_id }}"}
             encoding = "text"
+            tenant_id = "default"
         "#,
         )
         .unwrap();
@@ -482,8 +485,8 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs1 = fetch_stream(stream1.to_string()).await;
-        let outputs2 = fetch_stream(stream2.to_string()).await;
+        let outputs1 = fetch_stream(stream1.to_string(), "default").await;
+        let outputs2 = fetch_stream(stream2.to_string(), "default").await;
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
@@ -496,13 +499,78 @@ mod integration_tests {
         }
     }
 
-    async fn fetch_stream(stream: String) -> Vec<String> {
+    #[tokio::test]
+    async fn many_tenants() {
+        let stream = uuid::Uuid::new_v4();
+
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding = "text"
+            tenant_id = "{{ tenant_id }}"
+        "#,
+        )
+        .unwrap();
+
+        let test_name = config.labels.get_mut("test_name").unwrap();
+        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
+
+        *test_name = Template::try_from(stream.to_string()).unwrap();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
+
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        for i in 0..10 {
+            let event = events.get_mut(i).unwrap();
+
+            if i % 2 == 0 {
+                event.as_mut_log().insert("tenant_id", "tenant1");
+            } else {
+                event.as_mut_log().insert("tenant_id", "tenant2");
+            }
+        }
+
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
+            .await
+            .unwrap();
+
+        let outputs1 = fetch_stream(stream.to_string(), "tenant1").await;
+        let outputs2 = fetch_stream(stream.to_string(), "tenant2").await;
+
+        for (i, output) in outputs1.iter().enumerate() {
+            let index = (i % 5) * 2;
+            assert_eq!(output, &lines[index]);
+        }
+
+        for (i, output) in outputs2.iter().enumerate() {
+            let index = ((i % 5) * 2) + 1;
+            assert_eq!(output, &lines[index]);
+        }
+    }
+
+    async fn fetch_stream(stream: String, tenant: &str) -> Vec<String> {
         let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
         let query = format!(
             "http://localhost:3100/loki/api/v1/query_range?query={}&direction=forward",
             query
         );
-        let res = reqwest::get(&query).await.unwrap();
+
+        let res = reqwest::Client::new()
+            .get(&query)
+            .header("X-Scope-OrgID", tenant)
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(res.status(), 200);
 
