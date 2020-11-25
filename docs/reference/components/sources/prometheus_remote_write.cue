@@ -2,7 +2,7 @@ package metadata
 
 components: sources: prometheus_remote_write: {
 	title:       "Prometheus remote_write"
-	description: "FIXME [Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	description: "The [Prometheus](\(urls.prometheus)) remote_write protocol is a protobuf based encoding for sending metrics efficiently between agents."
 
 	classes: {
 		commonly_used: false
@@ -16,10 +16,12 @@ components: sources: prometheus_remote_write: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Prometheus remote_write client"
-				thing:    "a \(name)"
-				url:      urls.prometheus_remote_write
-				versions: null
+				service: {
+					name:     "Prometheus remote_write client"
+					thing:    "a \(name)"
+					url:      urls.prometheus_remote_integrations
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
