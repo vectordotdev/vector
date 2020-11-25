@@ -12,11 +12,11 @@ tags: ["type: new feature", "domain: metrics", "domain: sources"]
 
 Vector 0.11 includes four new metrics sources:
 
-1. The [`host_metrics` source][host_metrics_source]
-2. The [`apache_metrics` source][apache_metrics_source]
-3. The [`mongodb_metrics` source][mongodb_metrics_source]
-4. The [`aws_ecs_metrics` source][aws_ecs_metrics_source]
-5. The [`internal_metrics` source][internal_metrics_source]
+1. A new [**`host_metrics` source**][host_metrics_source]
+2. A new [**`apache_metrics` source**][apache_metrics_source]
+3. A new [**`mongodb_metrics` source**][mongodb_metrics_source]
+4. A new [**`aws_ecs_metrics` source**][aws_ecs_metrics_source]
+5. A new [**`internal_metrics` source**][internal_metrics_source]
 
 And while these are only five sources, they represent a broader initiative
 to replace metrics agents entirely. A lot of groundwork was laid to expedite

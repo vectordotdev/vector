@@ -3,7 +3,7 @@ package metadata
 releases: {
 	#Commit: {
 		author:           string
-		breaking_change:  bool | null
+		breaking_change:  bool
 		date:             #Date
 		description:      string
 		deletions_count:  uint
@@ -12,7 +12,7 @@ releases: {
 		pr_number:        uint | null
 		scopes:           [string, ...string] | *[]
 		sha:              #CommitSha
-		type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status" | null
+		type:             "chore" | "docs" | "enhancement" | "feat" | "fix" | "perf" | "status"
 	}
 
 	#CommitSha: =~"^[a-z0-9]{40}$"

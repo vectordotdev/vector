@@ -17,7 +17,7 @@ static rate-limits and automatically optimizes HTTP concurrency limits based on
 downstream service responses. The underlying [mechanism](#how-it-works) is a
 simple feedback loop inspired by TCP congestion control algorithms.
 
-We highly recommend reading the [announcement blog post][announcement].
+<Jump to="/blog/adaptive-request-concurrency/">Read the ARC announcement post</Jump>
 
 ## Get Started
 
@@ -29,4 +29,4 @@ be available on an opt-in basis. To get it, enable it for each sink:
 type = "..."
 ```
 
-[announcement]: /blog/...
+[announcement]: /blog/adaptive-request-concurrency/

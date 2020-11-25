@@ -1,29 +1,29 @@
 package metadata
 
 releases: "0.11.0": {
-	date:     "2020-11-24"
+	date:     "2020-11-25"
 	codename: "Kubernetes"
-	description:	"""
-					The Vector team is pleased to announce 0.11.0. This release
-					is focused on Kubernetes. In addition to the new,
-					first-class Kubernetes integration, we launched a number of
-					complementary features that make Vector a prime candidate
-					for collecting and processing your Kubernetes logs. Check
-					out the [highlights](#highlights) and [changelog](#changelog)
-					for more details.
-					"""
+	description: """
+		The Vector team is pleased to announce 0.11.0. This release
+		is focused on Kubernetes. In addition to the new,
+		first-class Kubernetes integration, we launched a number of
+		complementary features that make Vector a prime candidate
+		for collecting and processing your Kubernetes logs. Check
+		out the [highlights](#highlights) and [changelog](#changelog)
+		for more details.
+		"""
 
 	whats_next: [
 		{
-			title: "Kubernetes metrics support"
+			title:       "Kubernetes metrics support"
 			description: "..."
 		},
 		{
-			title: "Vector's own observability"
+			title:       "Vector's own observability"
 			description: "..."
 		},
 		{
-			title: "Timber Remap Language (TRL)"
+			title:       "Timber Remap Language (TRL)"
 			description: "..."
 		},
 	]
@@ -58,8 +58,8 @@ releases: "0.11.0": {
 		{sha: "8d1995d0d6243624a540b8dfc824e51ae5d77044", date: "2020-08-12 15:18:24 -0400", description: "Remove forwarding to syslog from distributed systemd unit", pr_number:                         3427, scopes: ["debian platform"], type:                                  "fix", breaking_change:         true, author:  "Jesse Szwedko", files_count:         1, insertions_count:  0, deletions_count:    3},
 		{sha: "3d434d190c5f6d454141f18922b59b1a5c6072c7", date: "2020-08-13 13:15:41 -0400", description: "Add more instrumentation", pr_number:                                                          3417, scopes: ["observability", "file source"], type:                     "enhancement", breaking_change: false, author: "Kruno Tomola Fabro", files_count:    10, insertions_count: 341, deletions_count:  41},
 		{sha: "86ccdeabd20edc66ac5a19f04a618cfcedc180e1", date: "2020-08-13 14:57:54 -0400", description: "Add instrumentation", pr_number:                                                               3421, scopes: ["observability", "ansi_stripper transform"], type:         "enhancement", breaking_change: false, author: "Kruno Tomola Fabro", files_count:    3, insertions_count:  101, deletions_count:  19},
-		{sha: "b4048d9131fc764c6457463b5a9c1768c4b0ae24", date: "2020-08-13 14:58:13 -0400", description: "enhancement(observability. sampler transform): Add instrumentation (#3419)", pr_number:        null, scopes: [], type:                                                   null, breaking_change:          null, author:  "Kruno Tomola Fabro", files_count:    3, insertions_count:  32, deletions_count:   0},
-		{sha: "bb601f5fae5ad5a7cd05adafd2d6dc84f0b3e868", date: "2020-08-13 16:56:50 -0400", description: "enhancement(observability. split transform): Add instrumentation (#3418)", pr_number:          null, scopes: [], type:                                                   null, breaking_change:          null, author:  "Kruno Tomola Fabro", files_count:    3, insertions_count:  70, deletions_count:   9},
+		{sha: "b4048d9131fc764c6457463b5a9c1768c4b0ae24", date: "2020-08-13 14:58:13 -0400", description: "Add instrumentation", pr_number:                                                               3419, scopes: ["observability"], type:                                    "enhancement", breaking_change: false, author: "Kruno Tomola Fabro", files_count:    3, insertions_count:  32, deletions_count:   0},
+		{sha: "bb601f5fae5ad5a7cd05adafd2d6dc84f0b3e868", date: "2020-08-13 16:56:50 -0400", description: "Add instrumentation", pr_number:                                                               3418, scopes: ["observability"], type:                                    "enhancement", breaking_change: false, author: "Kruno Tomola Fabro", files_count:    3, insertions_count:  70, deletions_count:   9},
 		{sha: "3ffc3c30b42a482ce1e1dd4bb68faeac7b4d4b76", date: "2020-08-13 14:48:29 -0400", description: "Add additional canned ACLs", pr_number:                                                        3439, scopes: ["aws_s3 sink"], type:                                      "enhancement", breaking_change: false, author: "Jesse Szwedko", files_count:         1, insertions_count:  2, deletions_count:    0},
 		{sha: "e4e597067bf001d96cf51a9259714debeeb7ca86", date: "2020-08-14 08:56:33 -0400", description: "Add \"text\" encoding for metrics", pr_number:                                                 3434, scopes: ["codecs", "console sink"], type:                           "enhancement", breaking_change: false, author: "Bruce Guenter", files_count:         2, insertions_count:  257, deletions_count:  10},
 		{sha: "40d7dd936a4155409282b5f9e2a43b2989e739ae", date: "2020-08-15 16:59:21 -0400", description: "Even more instrumentation", pr_number:                                                         3436, scopes: ["observability", "file source"], type:                     "enhancement", breaking_change: false, author: "Kruno Tomola Fabro", files_count:    3, insertions_count:  35, deletions_count:   9},
@@ -138,7 +138,7 @@ releases: "0.11.0": {
 		{sha: "5ad63f7d146727326300d96d6be5f8c0dbb747d1", date: "2020-09-30 13:38:09 -0400", description: "add `sha3` function", pr_number:                                                               4198, scopes: ["remap transform"], type:                                  "enhancement", breaking_change: false, author: "Jean Mertz", files_count:            7, insertions_count:  215, deletions_count:  10},
 		{sha: "2b52002740b1f595e1eeac77ca8b0326a70fd9e5", date: "2020-09-30 21:44:42 -0400", description: "add field's value in warn message when failing to parse", pr_number:                           4215, scopes: ["observability", "json_parser transform"], type:           "enhancement", breaking_change: false, author: "Mathieu Stefani", files_count:       2, insertions_count:  8, deletions_count:    4},
 		{sha: "d645cae992706340cd8abf84039c8a4c5b808499", date: "2020-09-30 22:25:14 -0400", description: "Added distroless-libc and distroless-static docker container bases", pr_number:                4236, scopes: ["docker platform"], type:                                  "enhancement", breaking_change: false, author: "Rick Richardson", files_count:       4, insertions_count:  51, deletions_count:   0},
-		{sha: "9fceb7ddf0504b475cc59f971d04d8905b241b23", date: "2020-10-01 15:07:51 -0400", description: "observability(remap transform): add `parse_duration` function (#4186)", pr_number:             null, scopes: [], type:                                                   null, breaking_change:          null, author:  "Jean Mertz", files_count:            7, insertions_count:  240, deletions_count:  4},
+		{sha: "9fceb7ddf0504b475cc59f971d04d8905b241b23", date: "2020-10-01 15:07:51 -0400", description: "Add `parse_duration` function", pr_number:                                                     4186, scopes: ["observability"], type:                                    "enhancement", breaking_change: false, author: "Jean Mertz", files_count:            7, insertions_count:  240, deletions_count:  4},
 		{sha: "1e7abc23850f3cae83b4672698f89f34a594038c", date: "2020-10-01 15:47:22 -0400", description: "Add support for `summary` metric", pr_number:                                                  4032, scopes: ["prometheus sink"], type:                                  "enhancement", breaking_change: false, author: "Kruno Tomola Fabro", files_count:    4, insertions_count:  150, deletions_count:  62},
 		{sha: "6b2e43cb29428ffa8a341e80a1efaf4bac589515", date: "2020-10-01 14:53:54 -0400", description: "Sink should emit event on invalid metric", pr_number:                                          3636, scopes: ["statsd sink"], type:                                      "fix", breaking_change:         false, author: "FungusHumungus", files_count:        4, insertions_count:  42, deletions_count:   6},
 		{sha: "6d585c96c0ccbfbed02eb883d3a8cf16d33786e0", date: "2020-10-01 07:14:21 -0400", description: "Ensure server starts immediately", pr_number:                                                  4239, scopes: ["prometheus sink"], type:                                  "fix", breaking_change:         false, author: "Rick Richardson", files_count:       1, insertions_count:  1, deletions_count:    2},
@@ -150,7 +150,7 @@ releases: "0.11.0": {
 		{sha: "f77faa5a31c6ce337604c3102fea6f89df816830", date: "2020-10-04 00:09:22 -0400", description: "Initial `azure_monitor_logs` sink", pr_number:                                                 2811, scopes: ["new sink"], type:                                         "feat", breaking_change:        false, author: "Nazar Mishturak", files_count:       6, insertions_count:  854, deletions_count:  0},
 		{sha: "9c3f09c172d3ae7f35c0707a60ffe6a874501112", date: "2020-10-05 09:30:56 -0400", description: "Improve error handling", pr_number:                                                            4288, scopes: ["console sink"], type:                                     "enhancement", breaking_change: false, author: "Do Duy", files_count:                3, insertions_count:  62, deletions_count:   27},
 		{sha: "51fd8679ac36b567c70b385e09b54b5bf59c5520", date: "2020-10-06 15:53:08 -0400", description: "add `format_number` function", pr_number:                                                      4220, scopes: ["remap transform"], type:                                  "enhancement", breaking_change: false, author: "Jean Mertz", files_count:            3, insertions_count:  275, deletions_count:  0},
-		{sha: "3e0eb97804874df96af548778db70b5d20418031", date: "2020-10-07 17:27:29 -0400", description: "fix(apache_metrics source) Use configured namespace for `up` metric (#4437)", pr_number:       null, scopes: [], type:                                                   null, breaking_change:          null, author:  "Jesse Szwedko", files_count:         2, insertions_count:  15, deletions_count:   14},
+		{sha: "3e0eb97804874df96af548778db70b5d20418031", date: "2020-10-07 17:27:29 -0400", description: "Use configured namespace for `up` metric", pr_number:                                          4437, scopes: ["apache_metrics source"], type:                            "fix", breaking_change:         false, author: "Jesse Szwedko", files_count:         2, insertions_count:  15, deletions_count:   14},
 		{sha: "e83c4cc2d7d1e37c8a0d6769e799345bc85e5ff3", date: "2020-10-07 16:11:54 -0400", description: "Add `host_metrics` source", pr_number:                                                         4157, scopes: ["new source"], type:                                       "feat", breaking_change:        false, author: "Bruce Guenter", files_count:         11, insertions_count: 2101, deletions_count: 15},
 		{sha: "a9b176b2f94df3a6996f2081c9a4bbc84c57e271", date: "2020-10-08 16:05:34 -0400", description: "Rename sink type and fallback on US region by default", pr_number:                             4447, scopes: ["sematext_logs sink"], type:                               "fix", breaking_change:         false, author: "Nedim Šabić²", files_count:          1, insertions_count:  7, deletions_count:    9},
 		{sha: "b6a331bbdedd570ab7e8ffdbd4f10e48c0d9afe9", date: "2020-10-08 17:45:44 -0400", description: "Add `metric_to_log` transform", pr_number:                                                     3552, scopes: ["new transform"], type:                                    "feat", breaking_change:        false, author: "Daniel Jin", files_count:            8, insertions_count:  451, deletions_count:  2},
@@ -169,7 +169,7 @@ releases: "0.11.0": {
 		{sha: "d4f9c0d33b03b7cf506d6dcb0cea41dcbabd7687", date: "2020-10-13 15:26:22 -0400", description: "Add a tags configuration options to add user-defined tags", pr_number:                         4068, scopes: ["influxdb_metrics sink"], type:                            "enhancement", breaking_change: false, author: "Mathieu Stefani", files_count:       2, insertions_count:  87, deletions_count:   15},
 		{sha: "594242f7c2550458eaa34e021be28668cb1be946", date: "2020-10-13 16:36:46 -0400", description: "Add vector user to adm in debian packaging", pr_number:                                        4544, scopes: ["debian platform"], type:                                  "enhancement", breaking_change: false, author: "James Turnbull", files_count:        1, insertions_count:  6, deletions_count:    1},
 		{sha: "1e95458540596b7e0058684afc8ac97caa84e992", date: "2020-10-14 17:21:43 -0400", description: "Support all socket types in statsd sink", pr_number:                                           3557, scopes: ["statsd sink"], type:                                      "enhancement", breaking_change: true, author:  "Do Duy", files_count:                9, insertions_count:  629, deletions_count:  365},
-		{sha: "dae23aa69f2190aa9de46ad375531cf31d3fa470", date: "2020-10-14 09:39:32 -0400", description: "fix!(prometheus source): Do not automatically append /metrics (#4276)", pr_number:             null, scopes: [], type:                                                   null, breaking_change:          null, author:  "Jesse Szwedko", files_count:         2, insertions_count:  23, deletions_count:   9},
+		{sha: "dae23aa69f2190aa9de46ad375531cf31d3fa470", date: "2020-10-14 09:39:32 -0400", description: "Do not automatically append /metrics", pr_number:                                              4276, scopes: ["prometheus_source"], type:                                "fix", breaking_change:         false, author: "Jesse Szwedko", files_count:         2, insertions_count:  23, deletions_count:   9},
 		{sha: "fe05027693a157269f089dbc3ebd5b9a251973b1", date: "2020-10-14 17:22:29 -0400", description: "Add support for dedicated Azure region", pr_number:                                            4507, scopes: ["azure_monitor_logs sink"], type:                          "feat", breaking_change:        false, author: "Nazar Mishturak", files_count:       2, insertions_count:  42, deletions_count:   2},
 		{sha: "2f2583b59062e686c9458d10c2679060c4600e4c", date: "2020-10-14 13:51:30 -0400", description: "Don't dedot keys", pr_number:                                                                  4103, scopes: ["http source"], type:                                      "fix", breaking_change:         true, author:  "Daniel Jin", files_count:            1, insertions_count:  30, deletions_count:   2},
 		{sha: "93dd72459df1bfdd6cd35499588d21859f15135c", date: "2020-10-15 18:47:13 -0400", description: "Add compression level", pr_number:                                                             3032, scopes: ["sinks", "networking", "compression"], type:               "enhancement", breaking_change: false, author: "Kirill Fomichev", files_count:       14, insertions_count: 221, deletions_count:  74},

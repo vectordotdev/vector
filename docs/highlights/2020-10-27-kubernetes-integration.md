@@ -17,8 +17,7 @@ to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for collecting and processing all
 Kubernetes observability data.
 
-For more details, checkout the
-[Kubernetes announcement blog post][announcement_post].
+<Jump to="/blog">Read the Kubernetes announcement post</Jump>
 
 ## Feature highlights
 
@@ -47,7 +46,7 @@ To cut straight to the chase, check out our Kubernetes installation instructions
 
 ## Future plans
 
-[adaptive_concurrency_post]: /blog/...
+[adaptive_concurrency_post]: /blog/adaptive-request-concurrency/
 [announcement_post]: /blog/...
 [installation_docs]: /docs/setup/installation/platforms/kubernetes/
 [kubernetes_logs_source]: /docs/reference/sources/kubernetes_logs/
