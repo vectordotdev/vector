@@ -17,10 +17,7 @@ extern crate derivative;
 #[macro_use]
 extern crate pest_derive;
 
-#[cfg(any(
-    feature = "jemallocator-plain",
-    feature = "jemallocator-background_threads"
-))]
+#[cfg(feature = "jemallocator")]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 

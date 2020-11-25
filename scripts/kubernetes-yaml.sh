@@ -10,13 +10,17 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-TARGET_FILE="distribution/kubernetes/vector.yaml"
+CONFIGURATIONS_DIR="scripts/kubernetes-yaml"
 
 generate() {
+  local RELEASE_NAME="$1"
+  local CHART="$2"
+  local VALUES_FILE="$3"
+
   # Print header.
   cat <<EOF
 # This file is generated from the Helm Chart by "scripts/kubernetes-yaml.sh".
-# You might want to use the Helm Chart, see "distribution/helm/vector" or the
+# You might want to use the Helm Chart, see "$CHART" or the
 # documentation on our website at https://vector.dev/docs.
 # If you copied this file into you local setup - feel free to change it however
 # you please.
@@ -27,26 +31,40 @@ EOF
   # Generate template.
   # TODO: use app-version when https://github.com/helm/helm/issues/8670 is solved
   helm template \
-    vector \
-    distribution/helm/vector \
+    "$RELEASE_NAME" \
+    "$CHART" \
     --namespace vector \
     --create-namespace \
-    --values scripts/kubernetes-yaml/values.yaml \
+    --values "$VALUES_FILE" \
     --version master
 }
 
 update() {
-  generate > "$TARGET_FILE"
+  for CONFIG_FILE in "$CONFIGURATIONS_DIR"/*/config.sh; do
+    VALUES_FILE="$(dirname "$CONFIG_FILE")/values.yaml"
+    (
+      # shellcheck disable=SC1090
+      source "$CONFIG_FILE"
+      generate "$RELEASE_NAME" "$CHART" "$VALUES_FILE" > "$TARGET_FILE"
+    )
+  done
 }
 
 check() {
-  GENERATED="$(generate)"
-  FILE="$(cat "$TARGET_FILE")"
+  for CONFIG_FILE in "$CONFIGURATIONS_DIR"/*/config.sh; do
+    VALUES_FILE="$(dirname "$CONFIG_FILE")/values.yaml"
+    (
+      # shellcheck disable=SC1090
+      source "$CONFIG_FILE"
+      GENERATED="$(generate "$RELEASE_NAME" "$CHART" "$VALUES_FILE")"
+      FILE="$(cat "$TARGET_FILE")"
 
-  if [[ "$GENERATED" != "$FILE" ]]; then
-    echo "Error: Kubernetes YAML config ($TARGET_FILE) does not match the generated version" >&2
-    exit 1
-  fi
+      if [[ "$GENERATED" != "$FILE" ]]; then
+        echo "Error: Kubernetes YAML config ($TARGET_FILE) does not match the generated version" >&2
+        exit 1
+      fi
+    )
+  done
 }
 
 usage() {
@@ -54,17 +72,16 @@ usage() {
 Usage: $0 MODE
 
 Modes:
-  check     - compare the current file contents and the generated config and
-              exit with non-zero exit code if they don't match
-  update    - update the file with the generated config
-  generate  - generate the config and print it to stdout
+  check  - compare the current file contents and the generated config and
+           exit with non-zero exit code if they don't match
+  update - update the file with the generated config
 EOF
   exit 1
 }
 
 MODE="${1:-}"
 case "$MODE" in
-  update|check|generate)
+  update|check)
     "$MODE"
     ;;
   *)

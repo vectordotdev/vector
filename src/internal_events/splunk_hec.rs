@@ -12,7 +12,7 @@ pub(crate) struct SplunkEventSent {
 
 impl InternalEvent for SplunkEventSent {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -89,7 +89,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("events_processed_total", 1);
+            counter!("processed_events_total", 1);
         }
     }
 

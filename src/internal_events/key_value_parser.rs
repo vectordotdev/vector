@@ -6,7 +6,7 @@ pub(crate) struct KeyValueEventProcessed;
 
 impl InternalEvent for KeyValueEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1,
+        counter!("processed_events_total", 1,
             "component_kind" => "transform",
             "component_type" => "key_value",
         );

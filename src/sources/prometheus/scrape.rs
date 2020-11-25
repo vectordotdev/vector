@@ -12,12 +12,15 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     Event, Pipeline,
 };
-use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::time::{Duration, Instant};
+use std::{
+    future::ready,
+    time::{Duration, Instant},
+};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusScrapeConfig {
@@ -112,7 +115,7 @@ impl SourceConfig for PrometheusCompatConfig {
         self.config.build(name, globals, shutdown, out).await
     }
 
-    fn output_type(&self) -> crate::config::DataType {
+    fn output_type(&self) -> config::DataType {
         self.config.output_type()
     }
 
@@ -157,7 +160,7 @@ fn prometheus(
                 })
                 .into_stream()
                 .filter_map(move |response| {
-                    future::ready(match response {
+                    ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(PrometheusRequestCompleted {
                                 start,

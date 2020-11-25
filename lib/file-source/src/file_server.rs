@@ -148,11 +148,11 @@ where
                 let emitter = emitter.clone();
                 let checkpointer = Arc::clone(&checkpointer);
                 tokio::task::spawn_blocking(move || {
-                    checkpointer
-                        .write_checkpoints()
-                        .map_err(|error| emitter.emit_file_checkpoint_write_failed(error))
-                        .map(|count| emitter.emit_file_checkpointed(count))
-                        .ok()
+                    let start = time::Instant::now();
+                    match checkpointer.write_checkpoints() {
+                        Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+                        Err(error) => emitter.emit_file_checkpoint_write_failed(error),
+                    }
                 })
                 .await
                 .ok();
@@ -317,9 +317,10 @@ where
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
-            fp_map.retain(|_file_id, watcher| {
+            fp_map.retain(|file_id, watcher| {
                 if watcher.dead() {
                     self.emitter.emit_file_unwatched(&watcher.path);
+                    checkpoints.set_dead(*file_id);
                     false
                 } else {
                     true
@@ -360,7 +361,7 @@ where
             // This works only if run inside tokio context since we are using
             // tokio's Timer. Outside of such context, this will panic on the first
             // call. Also since we are using block_on here and in the above code,
-            // this should be run in it's own thread. `spawn_blocking` fulfills
+            // this should be run in its own thread. `spawn_blocking` fulfills
             // all of these requirements.
             let sleep = async move {
                 if backoff > 0 {

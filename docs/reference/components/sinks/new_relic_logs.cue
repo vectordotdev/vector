@@ -44,10 +44,12 @@ components: sinks: new_relic_logs: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "New Relic logs"
-				thing:    "a \(name) account"
-				url:      urls.new_relic
-				versions: null
+				service: {
+					name:     "New Relic logs"
+					thing:    "a \(name) account"
+					url:      urls.new_relic
+					versions: null
+				}
 
 				interface: {
 					socket: {

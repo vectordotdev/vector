@@ -7,15 +7,12 @@ use crate::{
     shutdown::ShutdownSignal,
     Event, Pipeline,
 };
-use futures::{compat::Future01CompatExt, StreamExt};
+use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
 use futures01::Sink;
 use hyper::{Body, Client, Request};
 use serde::{Deserialize, Serialize};
-use std::{
-    env,
-    time::{Duration, Instant},
-};
-use tokio::{select, time};
+use std::{env, time::Instant};
+use tokio::time;
 
 mod parser;
 
@@ -126,19 +123,16 @@ async fn aws_ecs_metrics(
     url: String,
     interval: u64,
     namespace: Option<String>,
-    mut out: Pipeline,
-    mut shutdown: ShutdownSignal,
+    out: Pipeline,
+    shutdown: ShutdownSignal,
 ) -> Result<(), ()> {
-    let interval = Duration::from_secs(interval);
-    let mut interval = time::interval(interval).map(|_| ());
+    let mut out = out
+        .sink_map_err(|error| error!(message = "Error sending ECS metrics.", %error))
+        .sink_compat();
 
-    loop {
-        select! {
-            Some(()) = interval.next() => (),
-            _ = &mut shutdown => break,
-            else => break,
-        };
-
+    let interval = time::Duration::from_secs(interval);
+    let mut interval = time::interval(interval).take_until(shutdown);
+    while interval.next().await.is_some() {
         let client = Client::new();
 
         let request = Request::get(&url)
@@ -164,14 +158,8 @@ async fn aws_ecs_metrics(
                                     count: metrics.len(),
                                 });
 
-                                let metrics = metrics.into_iter().map(Event::Metric);
-
-                                let (sink, _) = out
-                                    .send_all(futures01::stream::iter_ok(metrics))
-                                    .compat()
-                                    .await
-                                    .map_err(|error| error!(message = "Error sending ECS metrics.", %error))?;
-                                out = sink;
+                                let mut events = stream::iter(metrics).map(Event::Metric).map(Ok);
+                                out.send_all(&mut events).await?;
                             }
                             Err(error) => {
                                 emit!(AwsEcsMetricsParseError {

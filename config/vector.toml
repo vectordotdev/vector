@@ -11,7 +11,7 @@
 # Docs: https://vector.dev/docs/
 # ------------------------------------------------------------------------------
 
-# Note: A full config spec is located at ./vector.spec.toml and examples
+# Note: A full configuration reference is located at https://vector.dev/docs/ and examples
 #       in the ./examples folder.
 
 data_dir = "/var/lib/vector"

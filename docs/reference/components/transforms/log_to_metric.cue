@@ -64,7 +64,7 @@ components: transforms: log_to_metric: {
 						warnings: []
 						type: string: {
 							examples: ["duration_total"]
-							default:      string
+							default:      null
 							templateable: true
 						}
 					}
@@ -395,7 +395,7 @@ components: transforms: log_to_metric: {
 				to a single metric. Instead, this transform converts logs into granular
 				individual metrics that can then be reduced at the edge. Where the reduction
 				happens depends on your metrics storage. For example, the
-				[`prometheus` sink][docs.sinks.prometheus] will reduce logs in the sink itself
+				[`prometheus_exporter` sink][docs.sinks.prometheus_exporter] will reduce logs in the sink itself
 				for the next scrape, while other metrics sinks will proceed to forward the
 				individual metrics for reduction in the metrics storage itself.
 				"""

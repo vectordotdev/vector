@@ -43,10 +43,12 @@ components: sinks: prometheus_remote_write: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "Prometheus"
-				thing:    "a \(name) or compatible server"
-				url:      urls.prometheus
-				versions: null
+				service: {
+					name:     "Prometheus"
+					thing:    "a \(name) or compatible server"
+					url:      urls.prometheus
+					versions: null
+				}
 
 				interface: {
 					socket: {

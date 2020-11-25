@@ -19,7 +19,7 @@ impl<'a> InternalEvent for DockerLogsEventReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("processed_events_total", 1);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
@@ -40,7 +40,7 @@ impl<'a> InternalEvent for DockerLogsContainerEventReceived<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("container_events_processed_total", 1);
+        counter!("container_processed_events_total", 1);
     }
 }
 

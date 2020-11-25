@@ -39,10 +39,12 @@ components: sinks: logdna: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "LogDNA"
-				thing:    "a \(name) account"
-				url:      urls.logdna
-				versions: null
+				service: {
+					name:     "LogDNA"
+					thing:    "a \(name) account"
+					url:      urls.logdna
+					versions: null
+				}
 
 				interface: {
 					socket: {
