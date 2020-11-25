@@ -362,6 +362,7 @@ transforms = [
   "transforms-grok_parser",
   "transforms-json_parser",
   "transforms-key_value_parser",
+  "transforms-kubernetes_metadata",
   "transforms-log_to_metric",
   "transforms-logfmt_parser",
   "transforms-lua",
@@ -393,6 +394,7 @@ transforms-geoip = ["maxminddb"]
 transforms-grok_parser = ["grok"]
 transforms-json_parser = []
 transforms-key_value_parser = []
+transforms-kubernetes_metadata = ["kubernetes"]
 transforms-log_to_metric = []
 transforms-logfmt_parser = ["logfmt"]
 transforms-lua = ["rlua"]
