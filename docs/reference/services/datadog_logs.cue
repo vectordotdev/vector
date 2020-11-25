@@ -2,7 +2,7 @@ package metadata
 
 services: datadog_logs: {
 	name:     "Datadog logs"
-	thing:    "a \(name) account"
+	thing:    "\(name)"
 	url:      urls.datadog_logs
 	versions: null
 }

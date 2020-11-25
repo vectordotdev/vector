@@ -19,7 +19,7 @@ components: sources: kubernetes_logs: {
 			from: {
 				service: {
 					name:     "Kubernetes"
-					thing:    "\(name) nodes"
+					thing:    "\(name) cluster"
 					url:      urls.kubernetes
 					versions: ">= 1.14"
 				}
