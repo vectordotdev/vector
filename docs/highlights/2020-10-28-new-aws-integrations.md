@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-10-27"
 $schema: ".schema.json"
-title: "New `aws_*` components"
+title: "New AWS integration"
 description: "Export observability data out of AWS with ease."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [4101, 4779]
@@ -15,11 +15,11 @@ Getting observability data out of AWS can sometimes feel like you're in a
 and hoping it all works in the end. We want to make this easier with Vector,
 and 0.11 includes our initial efforts:
 
-1. A new [**`aws_kinesis_firehose` source**][aws_kinesis_firehose_source]
-2. A new [**`aws_cloudwatch_logs_subscription_parser` transform**][aws_cloudwatch_logs_subscription_parser_transform]
-3. A new [**`aws_s3` source**][aws_s3_source]
-4. A new [**`aws_sqs` sink**][aws_sqs_sink]
-5. A new [**`aws_ecs_metrics` source**][aws_ecs_metrics_source]
+1. **A new [`aws_kinesis_firehose` source][aws_kinesis_firehose_source]**
+2. **A new [`aws_cloudwatch_logs_subscription_parser` transform][aws_cloudwatch_logs_subscription_parser_transform]**
+3. **A new [`aws_s3` source][aws_s3_source]**
+4. **A new [`aws_sqs` sink][aws_sqs_sink]**
+5. **A new [`aws_ecs_metrics` source][aws_ecs_metrics_source]**
 
 ## Get Started
 

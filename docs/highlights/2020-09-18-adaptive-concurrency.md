@@ -1,7 +1,7 @@
 ---
 last_modified_on: "2020-09-18"
 $schema: ".schema.json"
-title: "Adaptive request concurrency"
+title: "Adaptive Request Concurrency (ARC)"
 description: "Increasing reliability and performance across your entire observability infrastructure."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [3094]
@@ -17,6 +17,8 @@ static rate-limits and automatically optimizes HTTP concurrency limits based on
 downstream service responses. The underlying [mechanism](#how-it-works) is a
 simple feedback loop inspired by TCP congestion control algorithms.
 
+import Jump from '@site/src/components/Jump';
+
 <Jump to="/blog/adaptive-request-concurrency/">Read the ARC announcement post</Jump>
 
 ## Get Started
@@ -26,7 +28,9 @@ be available on an opt-in basis. To get it, enable it for each sink:
 
 ```toml
 [sinks.my-sink]
-type = "..."
+type = "..." # any http-based sink
+request.concurrency = "adaptive"
+# and remove the request.rate_limit_* settings
 ```
 
 [announcement]: /blog/adaptive-request-concurrency/
