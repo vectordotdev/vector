@@ -18,7 +18,7 @@ components: sources: mongodb_metrics: {
 			from: {
 				service: {
 					name:     "MongoDB Server"
-					thing:    "a \(name)"
+					thing:    "an \(name)"
 					url:      urls.mongodb
 					versions: null
 				}

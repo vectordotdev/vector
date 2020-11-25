@@ -18,7 +18,7 @@ components: sources: nginx_metrics: {
 			from: {
 				service: {
 					name:     "Nginx Server"
-					thing:    "a \(name)"
+					thing:    "an \(name)"
 					url:      urls.nginx
 					versions: null
 				}
