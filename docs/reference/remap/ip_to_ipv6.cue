@@ -4,7 +4,7 @@ remap: functions: ip_to_ipv6: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The IPv4 ip address to convert."
+			description: "The ip address to convert to IPv6."
 			required:    true
 			type: ["string"]
 		},
@@ -12,7 +12,10 @@ remap: functions: ip_to_ipv6: {
 	return: ["string"]
 	category: "ip"
 	description: #"""
-		Converts an IPv4 address to an IPv4 mapped IPv6 address.
+		Converts an address to an IPv6 address.
+		If the parameter is already an IPv6 address it is passed through
+		untouched. IPv4 addresses are converted to IPv4 mapped
+		IPv6 addresses.
 		"""#
 	examples: [
 		{

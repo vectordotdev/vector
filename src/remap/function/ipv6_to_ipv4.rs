@@ -3,11 +3,11 @@ use std::net::IpAddr;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
-pub struct Ipv6ToIp;
+pub struct Ipv6ToIpV4;
 
-impl Function for Ipv6ToIp {
+impl Function for Ipv6ToIpV4 {
     fn identifier(&self) -> &'static str {
-        "ipv6_to_ip"
+        "ipv6_to_ipv4"
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -21,23 +21,23 @@ impl Function for Ipv6ToIp {
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
 
-        Ok(Box::new(Ipv6ToIpFn { value }))
+        Ok(Box::new(Ipv6ToIpV4Fn { value }))
     }
 }
 
 #[derive(Debug, Clone)]
-struct Ipv6ToIpFn {
+struct Ipv6ToIpV4Fn {
     value: Box<dyn Expression>,
 }
 
-impl Ipv6ToIpFn {
+impl Ipv6ToIpV4Fn {
     #[cfg(test)]
     fn new(value: Box<dyn Expression>) -> Self {
         Self { value }
     }
 }
 
-impl Expression for Ipv6ToIpFn {
+impl Expression for Ipv6ToIpV4Fn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let ip = {
             let bytes = self.value.execute(state, object)?.try_bytes()?;
@@ -69,7 +69,7 @@ mod tests {
     use crate::map;
 
     remap::test_type_def![value_string {
-        expr: |_| Ipv6ToIpFn {
+        expr: |_| Ipv6ToIpV4Fn {
             value: Literal::from("192.168.0.1").boxed()
         },
         def: TypeDef {
@@ -79,27 +79,27 @@ mod tests {
     }];
 
     #[test]
-    fn ipv6_to_ip() {
+    fn ipv6_to_ipv4() {
         let cases = vec![
             (
                 map!["foo": "i am not an ipaddress"],
                 Err("function call error: unable to parse IP address: invalid IP address syntax".to_string()),
-                Ipv6ToIpFn::new(Box::new(Path::from("foo"))),
+                Ipv6ToIpV4Fn::new(Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "2001:0db8:85a3::8a2e:0370:7334"],
                 Err("function call error: IPV6 address 2001:db8:85a3::8a2e:370:7334 is not compatible with IPV4".to_string()),
-                Ipv6ToIpFn::new(Box::new(Path::from("foo"))),
+                Ipv6ToIpV4Fn::new(Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "::ffff:192.168.0.1"],
                 Ok(Value::from("192.168.0.1")),
-                Ipv6ToIpFn::new(Box::new(Path::from("foo"))),
+                Ipv6ToIpV4Fn::new(Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "0:0:0:0:0:ffff:c633:6410"],
                 Ok(Value::from("198.51.100.16")),
-                Ipv6ToIpFn::new(Box::new(Path::from("foo"))),
+                Ipv6ToIpV4Fn::new(Box::new(Path::from("foo"))),
             ),
         ];
 

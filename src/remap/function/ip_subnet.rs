@@ -1,8 +1,6 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 use remap::prelude::*;
-use std::cmp::min;
-use std::convert::TryInto;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 lazy_static! {
@@ -146,37 +144,16 @@ fn mask_ips(ip: IpAddr, mask: IpAddr) -> Result<IpAddr> {
     }
 }
 
-/// Returns a vector with the left `subnet_bits` set to 1,
-/// The remaining are set to 0, to make up a total length of `bytes`.
-fn get_mask_bits(mut subnet_bits: u32, bytes: usize) -> Vec<u8> {
-    let mut mask = Vec::with_capacity(bytes);
-    for _ in 0..bytes {
-        let bits = min(subnet_bits, 8);
-        let byte = 255 - (2u16.pow(8 - bits) - 1) as u8;
-        mask.push(byte);
-
-        subnet_bits -= bits
-    }
-
-    mask
-}
-
 /// Returns an ipv4 address that masks out the given number of bits.
 fn ipv4_mask(subnet_bits: u32) -> IpAddr {
-    let bits = get_mask_bits(subnet_bits, 4);
-    debug_assert!(bits.len() == 4);
-
-    let bytes: [u8; 4] = bits.try_into().expect("wrong length for ipv4 address");
-    Ipv4Addr::from(bytes).into()
+    let bits = !0u32 << (32 - subnet_bits);
+    Ipv4Addr::from(bits).into()
 }
 
 /// Returns an ipv4 address that masks out the given number of bits.
 fn ipv6_mask(subnet_bits: u32) -> IpAddr {
-    let bits = get_mask_bits(subnet_bits, 16);
-    debug_assert!(bits.len() == 16);
-
-    let bytes: [u8; 16] = bits.try_into().expect("wrong length for ipv6 address");
-    Ipv6Addr::from(bytes).into()
+    let bits = !0u128 << (128 - subnet_bits);
+    Ipv6Addr::from(bits).into()
 }
 
 #[cfg(test)]
@@ -194,18 +171,6 @@ mod tests {
             ..Default::default()
         },
     }];
-
-    #[test]
-    fn test_get_mask_bits() {
-        assert_eq!(vec![255, 240, 0, 0], get_mask_bits(12, 4));
-        assert_eq!(vec![255, 255, 0, 0], get_mask_bits(16, 4));
-        assert_eq!(vec![255, 128, 0, 0], get_mask_bits(9, 4));
-        assert_eq!(vec![255, 255, 255, 255], get_mask_bits(128, 4));
-        assert_eq!(
-            vec![255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0,],
-            get_mask_bits(64, 16)
-        );
-    }
 
     #[test]
     fn ip_subnet() {

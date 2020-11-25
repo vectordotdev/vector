@@ -3,14 +3,14 @@ package metadata
 remap: functions: ip_cidr_contains: {
 	arguments: [
 		{
-			name:        "value"
-			description: "The ip address - either a v4 or a v6 address."
+			name:        "cidr"
+			description: "The CIDR mask - either v4 or v6."
 			required:    true
 			type: ["string"]
 		},
 		{
-			name:        "cidr"
-			description: "The CIDR mask - either v4 or v6."
+			name:        "value"
+			description: "The ip address - either a v4 or a v6 address."
 			required:    true
 			type: ["string"]
 		},

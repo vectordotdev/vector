@@ -12,12 +12,12 @@ impl Function for IpCidrContains {
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
-                keyword: "value",
+                keyword: "cidr",
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
-                keyword: "cidr",
+                keyword: "value",
                 accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
@@ -25,22 +25,22 @@ impl Function for IpCidrContains {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
         let cidr = arguments.required_expr("cidr")?;
+        let value = arguments.required_expr("value")?;
 
-        Ok(Box::new(IpCidrContainsFn { value, cidr }))
+        Ok(Box::new(IpCidrContainsFn { cidr, value }))
     }
 }
 
 #[derive(Debug, Clone)]
 struct IpCidrContainsFn {
-    value: Box<dyn Expression>,
     cidr: Box<dyn Expression>,
+    value: Box<dyn Expression>,
 }
 
 impl IpCidrContainsFn {
     #[cfg(test)]
-    fn new(value: Box<dyn Expression>, cidr: Box<dyn Expression>) -> Self {
+    fn new(cidr: Box<dyn Expression>, value: Box<dyn Expression>) -> Self {
         Self { value, cidr }
     }
 }
@@ -100,28 +100,28 @@ mod tests {
                      "cidr": "192.168.0.0/16",
                 ],
                 Ok(Value::from(true)),
-                IpCidrContainsFn::new(Box::new(Path::from("foo")), Box::new(Path::from("cidr"))),
+                IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "192.168.10.32",
                      "cidr": "192.168.0.0/24",
                 ],
                 Ok(Value::from(false)),
-                IpCidrContainsFn::new(Box::new(Path::from("foo")), Box::new(Path::from("cidr"))),
+                IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
                      "cidr": "2001:4f8:3:ba::/64",
                 ],
                 Ok(Value::from(true)),
-                IpCidrContainsFn::new(Box::new(Path::from("foo")), Box::new(Path::from("cidr"))),
+                IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),
             (
                 map!["foo": "2001:4f8:3:ba:2e0:81ff:fe22:d1f1",
                      "cidr": "2001:4f8:4:ba::/64",
                 ],
                 Ok(Value::from(false)),
-                IpCidrContainsFn::new(Box::new(Path::from("foo")), Box::new(Path::from("cidr"))),
+                IpCidrContainsFn::new(Box::new(Path::from("cidr")), Box::new(Path::from("foo"))),
             ),
         ];
 

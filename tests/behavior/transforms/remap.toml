@@ -946,10 +946,10 @@
   inputs = []
   type = "remap"
   source = """
-    .a = ip_cidr_contains("192.168.10.2", cidr = "192.168.0.0/16")
-    .b = ip_cidr_contains("192.169.10.2", cidr = "192.168.0.0/16")
-    .c = ip_cidr_contains("2404:6800:4003:c02::aaaa", cidr = "2404:6800:4003:c02::/64")
-    .d = ip_cidr_contains("2404:6800:4004:c02::aaaa", "2404:6800:4003:c02::/64")
+    .a = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.168.10.2")
+    .b = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.169.10.2")
+    .c = ip_cidr_contains(cidr = "2404:6800:4003:c02::/64", value = "2404:6800:4003:c02::aaaa")
+    .d = ip_cidr_contains("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
   """
 [[tests]]
   name = "remap_function_ip_cidr_contains"
@@ -982,20 +982,20 @@
     [[tests.outputs.conditions]]
     "a.equals" = "::ffff:192.168.10.2"
 
-[transforms.remap_function_ipv6_to_ip]
+[transforms.remap_function_ipv6_to_ipv4]
   inputs = []
   type = "remap"
   source = """
-    .a = ipv6_to_ip("::ffff:192.168.10.2")
+    .a = ipv6_to_ipv4("::ffff:192.168.10.2")
   """
 [[tests]]
-  name = "remap_function_ipv6_to_ip"
+  name = "remap_function_ipv6_to_ipv4"
   [tests.input]
-    insert_at = "remap_function_ipv6_to_ip"
+    insert_at = "remap_function_ipv6_to_ipv4"
     type = "raw"
     value = ""
   [[tests.outputs]]
-    extract_from = "remap_function_ipv6_to_ip"
+    extract_from = "remap_function_ipv6_to_ipv4"
     [[tests.outputs.conditions]]
     "a.equals" = "192.168.10.2"
 

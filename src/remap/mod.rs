@@ -42,7 +42,7 @@ lazy_static! {
         Box::new(Match),
         Box::new(Replace),
         Box::new(IpToIpv6),
-        Box::new(Ipv6ToIp),
+        Box::new(Ipv6ToIpV4),
         Box::new(IpCidrContains),
         Box::new(IpSubnet),
     ];

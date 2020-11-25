@@ -1,6 +1,6 @@
 package metadata
 
-remap: functions: ipv6_to_ip: {
+remap: functions: ipv6_to_ipv4: {
 	arguments: [
 		{
 			name:        "value"
