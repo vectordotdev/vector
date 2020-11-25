@@ -20,7 +20,7 @@ use snafu::ResultExt;
 use std::time::{Duration, Instant};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-struct PrometheusMetricsConfig {
+struct PrometheusScrapeConfig {
     // Deprecated name
     #[serde(alias = "hosts")]
     endpoints: Vec<String>,
@@ -37,14 +37,14 @@ pub fn default_scrape_interval_secs() -> u64 {
 }
 
 inventory::submit! {
-    SourceDescription::new::<PrometheusMetricsConfig>("prometheus")
+    SourceDescription::new::<PrometheusScrapeConfig>("prometheus")
 }
 
 inventory::submit! {
-    SourceDescription::new::<PrometheusMetricsConfig>("prometheus_metrics")
+    SourceDescription::new::<PrometheusScrapeConfig>("prometheus_scrape")
 }
 
-impl GenerateConfig for PrometheusMetricsConfig {
+impl GenerateConfig for PrometheusScrapeConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             endpoints: vec!["http://localhost:9090/metrics".to_string()],
@@ -57,8 +57,8 @@ impl GenerateConfig for PrometheusMetricsConfig {
 }
 
 #[async_trait::async_trait]
-#[typetag::serde(name = "prometheus_metrics")]
-impl SourceConfig for PrometheusMetricsConfig {
+#[typetag::serde(name = "prometheus_scrape")]
+impl SourceConfig for PrometheusScrapeConfig {
     async fn build(
         &self,
         _name: &str,
@@ -87,7 +87,7 @@ impl SourceConfig for PrometheusMetricsConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "prometheus_metrics"
+        "prometheus_scrape"
     }
 }
 
@@ -96,7 +96,7 @@ impl SourceConfig for PrometheusMetricsConfig {
 #[serde(deny_unknown_fields)]
 struct PrometheusCompatConfig {
     #[serde(flatten)]
-    config: PrometheusMetricsConfig,
+    config: PrometheusScrapeConfig,
 }
 
 #[async_trait::async_trait]
@@ -117,7 +117,7 @@ impl SourceConfig for PrometheusCompatConfig {
     }
 
     fn source_type(&self) -> &'static str {
-        "prometheus_metrics"
+        "prometheus_scrape"
     }
 }
 
@@ -241,7 +241,7 @@ mod test {
 
     #[test]
     fn genreate_config() {
-        crate::test_util::test_generate_config::<PrometheusMetricsConfig>();
+        crate::test_util::test_generate_config::<PrometheusScrapeConfig>();
     }
 
     #[tokio::test]
@@ -293,7 +293,7 @@ mod test {
         let mut config = config::Config::builder();
         config.add_source(
             "in",
-            PrometheusMetricsConfig {
+            PrometheusScrapeConfig {
                 endpoints: vec![format!("http://{}", in_addr)],
                 scrape_interval_secs: 1,
                 tls: None,
@@ -372,7 +372,7 @@ mod integration_tests {
 
     #[tokio::test]
     async fn scrapes_metrics() {
-        let config = PrometheusMetricsConfig {
+        let config = PrometheusScrapeConfig {
             endpoints: vec!["http://localhost:9090/metrics".into()],
             scrape_interval_secs: 1,
             auth: None,
@@ -382,7 +382,7 @@ mod integration_tests {
         let (tx, rx) = Pipeline::new_test();
         let source = config
             .build(
-                "prometheus_metrics",
+                "prometheus_scrape",
                 &GlobalOptions::default(),
                 shutdown::ShutdownSignal::noop(),
                 tx,
