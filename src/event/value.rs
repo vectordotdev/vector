@@ -1,3 +1,4 @@
+use crate::event::Segment;
 use crate::{
     event::{timestamp_to_string, Lookup},
     Result,
@@ -137,7 +138,10 @@ impl Value {
     }
 
     #[instrument(level = "trace")]
-    pub fn lookups<'a>(&'a self) -> Box<dyn Iterator<Item = Lookup<'a>> + 'a> {
+    pub fn lookups<'a>(
+        &'a self,
+        prefix: Option<Lookup<'a>>,
+    ) -> Box<dyn Iterator<Item = Lookup<'a>> + 'a> {
         match &self {
             Value::Boolean(_)
             | Value::Bytes(_)
@@ -147,56 +151,16 @@ impl Value {
             | Value::Null => Box::new(Vec::<Lookup<'_>>::with_capacity(0).into_iter()),
             Value::Map(m) => Box::new(
                 m.iter()
-                    .map(|(k, v)| {
-                        let lookup = Lookup::from(k);
-                        let chain = v.lookups().map(move |l| {
-                            let mut lookup = lookup.clone();
-                            lookup.extend(l.clone());
-                            trace!(prefix = %lookup, "Enqueuing for iteration.");
-                            lookup
-                        });
-                        chain
-                    })
-                    .flatten(),
-            ),
-            Value::Array(a) => Box::new(
-                a.iter()
-                    .enumerate()
-                    .map(|(k, v)| {
-                        let lookup = Lookup::from(k);
-                        let chain = v.lookups().map(move |l| {
-                            let mut lookup = lookup.clone();
-                            lookup.extend(l.clone());
-                            trace!(prefix = %lookup, "Enqueuing for iteration.");
-                            lookup
-                        });
-                        chain
-                    })
-                    .flatten(),
-            ),
-        }
-    }
-
-    #[instrument(level = "trace")]
-    pub fn pairs<'a>(&'a self) -> Box<dyn Iterator<Item = (Lookup<'a>, &'a Value)> + 'a> {
-        match &self {
-            Value::Boolean(_)
-            | Value::Bytes(_)
-            | Value::Timestamp(_)
-            | Value::Float(_)
-            | Value::Integer(_)
-            | Value::Null => Box::new(Vec::<(Lookup<'_>, &'_ Value)>::with_capacity(0).into_iter()),
-            Value::Map(m) => Box::new(
-                m.iter()
-                    .map(|(k, v)| {
-                        let lookup = Lookup::from(k);
-                        trace!(prefix = %lookup, "Enqueuing for iteration.");
-                        let iter = Some((lookup.clone(), v)).into_iter();
-                        let chain = v.pairs().map(move |(l, v)| {
-                            let mut lookup = lookup.clone();
-                            lookup.extend(l.clone());
-                            (lookup, v)
-                        });
+                    .map(move |(k, v)| {
+                        let lookup = prefix.clone().map_or_else(
+                            || Lookup::from(k),
+                            |mut l| {
+                                l.push(Segment::field(k));
+                                l
+                            },
+                        );
+                        let iter = Some(lookup.clone()).into_iter();
+                        let chain = v.lookups(Some(lookup));
                         iter.chain(chain)
                     })
                     .flatten(),
@@ -204,15 +168,64 @@ impl Value {
             Value::Array(a) => Box::new(
                 a.iter()
                     .enumerate()
-                    .map(|(k, v)| {
-                        let lookup = Lookup::from(k);
-                        trace!(prefix = %lookup, "Enqueuing for iteration.");
+                    .map(move |(k, v)| {
+                        let lookup = prefix.clone().map_or_else(
+                            || Lookup::from(k),
+                            |mut l| {
+                                l.push(Segment::index(k));
+                                l
+                            },
+                        );
+                        let iter = Some(lookup.clone()).into_iter();
+                        let chain = v.lookups(Some(lookup));
+                        iter.chain(chain)
+                    })
+                    .flatten(),
+            ),
+        }
+    }
+
+    #[instrument(level = "trace")]
+    pub fn pairs<'a>(
+        &'a self,
+        prefix: Option<Lookup<'a>>,
+    ) -> Box<dyn Iterator<Item = (Lookup<'a>, &'a Value)> + 'a> {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => Box::new(std::iter::empty()),
+            Value::Map(m) => Box::new(
+                m.iter()
+                    .map(move |(k, v)| {
+                        let lookup = prefix.clone().map_or_else(
+                            || Lookup::from(k),
+                            |mut l| {
+                                l.push(Segment::field(k));
+                                l
+                            },
+                        );
                         let iter = Some((lookup.clone(), v)).into_iter();
-                        let chain = v.pairs().map(move |(l, v)| {
-                            let mut lookup = lookup.clone();
-                            lookup.extend(l.clone());
-                            (lookup, v)
-                        });
+                        let chain = v.pairs(Some(lookup));
+                        iter.chain(chain)
+                    })
+                    .flatten(),
+            ),
+            Value::Array(a) => Box::new(
+                a.iter()
+                    .enumerate()
+                    .map(move |(k, v)| {
+                        let lookup = prefix.clone().map_or_else(
+                            || Lookup::from(k),
+                            |mut l| {
+                                l.push(Segment::index(k));
+                                l
+                            },
+                        );
+                        let iter = Some((lookup.clone(), v)).into_iter();
+                        let chain = v.pairs(Some(lookup));
                         iter.chain(chain)
                     })
                     .flatten(),
@@ -424,7 +437,10 @@ impl TryInto<bool> for Value {
     fn try_into(self) -> std::result::Result<bool, Self::Error> {
         match self {
             Value::Boolean(v) => Ok(v),
-            _ => Err("Tried to call `Value::try_into` to get a bool from a type that was not a bool.".into())
+            _ => Err(
+                "Tried to call `Value::try_into` to get a bool from a type that was not a bool."
+                    .into(),
+            ),
         }
     }
 }
@@ -435,7 +451,10 @@ impl TryInto<Bytes> for Value {
     fn try_into(self) -> std::result::Result<Bytes, Self::Error> {
         match self {
             Value::Bytes(v) => Ok(v),
-            _ => Err("Tried to call `Value::try_into` to get a Bytes from a type that was not a Bytes.".into())
+            _ => Err(
+                "Tried to call `Value::try_into` to get a Bytes from a type that was not a Bytes."
+                    .into(),
+            ),
         }
     }
 }
@@ -446,7 +465,10 @@ impl TryInto<f64> for Value {
     fn try_into(self) -> std::result::Result<f64, Self::Error> {
         match self {
             Value::Float(v) => Ok(v),
-            _ => Err("Tried to call `Value::try_into` to get a f64 from a type that was not a f64.".into())
+            _ => Err(
+                "Tried to call `Value::try_into` to get a f64 from a type that was not a f64."
+                    .into(),
+            ),
         }
     }
 }
@@ -457,7 +479,10 @@ impl TryInto<i64> for Value {
     fn try_into(self) -> std::result::Result<i64, Self::Error> {
         match self {
             Value::Integer(v) => Ok(v),
-            _ => Err("Tried to call `Value::try_into` to get a i64 from a type that was not a i64.".into())
+            _ => Err(
+                "Tried to call `Value::try_into` to get a i64 from a type that was not a i64."
+                    .into(),
+            ),
         }
     }
 }
@@ -483,7 +508,6 @@ impl TryInto<Vec<Value>> for Value {
         }
     }
 }
-
 
 impl TryInto<DateTime<Utc>> for Value {
     type Error = crate::Error;

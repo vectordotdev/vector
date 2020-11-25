@@ -92,7 +92,7 @@ pub trait EncodingConfiguration<E> {
                     match timestamp_format {
                         TimestampFormat::Unix => {
                             let mut unix_timestamps = Vec::new();
-                            for (k, v) in log_event.all_fields() {
+                            for (k, v) in log_event.pairs() {
                                 if let Value::Timestamp(ts) = v {
                                     unix_timestamps
                                         .push((k.into_buf(), Value::Integer(ts.timestamp())));

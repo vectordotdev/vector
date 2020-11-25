@@ -167,7 +167,7 @@ enum ArrayOrNot<T> {
 
 fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
     let annotater = |mut event: LogEvent| {
-        event.insert(log_schema().timestamp_key().clone(),  chrono::Utc::now());
+        event.insert(log_schema().timestamp_key().clone(), chrono::Utc::now());
         event
     };
     let converter = |event: LogEvent| Event::Log(event);
@@ -185,10 +185,7 @@ fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {
             .collect::<Result<Vec<_>, _>>(),
         Encoding::Json => serde_json::from_slice::<ArrayOrNot<LogEvent>>(&body)
             .map(|array_or_not| match array_or_not {
-                ArrayOrNot::Array(vec) => vec.into_iter()
-                    .map(annotater)
-                    .map(converter)
-                    .collect(),
+                ArrayOrNot::Array(vec) => vec.into_iter().map(annotater).map(converter).collect(),
                 ArrayOrNot::Not(item) => vec![converter(annotater(item))],
             })
             .map_err(|error| json_error(format!("Error parsing Json: {:?}", error))),

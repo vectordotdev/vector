@@ -33,7 +33,9 @@ impl FunctionTransform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent) -> Option<()> {
-    let to_parse = log.remove(log_schema().message_key(), false)?.clone_into_bytes();
+    let to_parse = log
+        .remove(log_schema().message_key(), false)?
+        .clone_into_bytes();
 
     match serde_json::from_slice(to_parse.as_ref()) {
         Ok(JsonValue::Object(object)) => {

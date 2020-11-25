@@ -506,7 +506,7 @@ mod test {
 
         let all = event
             .as_log()
-            .all_fields()
+            .pairs()
             .map(|(k, v)| (k, v.to_string_lossy()))
             .collect::<HashSet<_>>();
         assert_eq!(
@@ -535,7 +535,7 @@ mod test {
         log.insert(LookupBuf::from("o9amkaRY"), Value::from("pGsfG7Nr"));
         log.insert(LookupBuf::from("YRjhxXcg"), Value::from("nw8iM5Jr"));
 
-        let collected: Vec<_> = log.all_fields().collect();
+        let collected: Vec<_> = log.pairs().collect();
         assert_eq!(
             collected,
             vec![

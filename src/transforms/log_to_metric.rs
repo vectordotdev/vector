@@ -9,12 +9,12 @@ use crate::{
     template::{Template, TemplateError},
     transforms::{FunctionTransform, Transform},
 };
+use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::num::ParseFloatError;
-use chrono::{DateTime, Utc};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]

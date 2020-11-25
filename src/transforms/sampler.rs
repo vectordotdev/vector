@@ -66,7 +66,11 @@ pub struct Sampler {
 }
 
 impl Sampler {
-    pub fn new(rate: u64, key_field: Option<LookupBuf>, exclude: Option<Box<dyn Condition>>) -> Self {
+    pub fn new(
+        rate: u64,
+        key_field: Option<LookupBuf>,
+        exclude: Option<Box<dyn Condition>>,
+    ) -> Self {
         Self {
             rate,
             key_field,
@@ -116,7 +120,9 @@ impl FunctionTransform for Sampler {
 mod tests {
     use super::*;
     use crate::{
-        conditions::check_fields::CheckFieldsPredicateArg, config::log_schema, event::{Event, Lookup},
+        conditions::check_fields::CheckFieldsPredicateArg,
+        config::log_schema,
+        event::{Event, Lookup},
         test_util::random_lines,
     };
     use approx::assert_relative_eq;
@@ -217,7 +223,11 @@ mod tests {
             let mut sampler = Sampler::new(
                 0,
                 key_field.clone(),
-                Some(condition(&log_schema().timestamp_key().to_string(), "contains", ":")),
+                Some(condition(
+                    &log_schema().timestamp_key().to_string(),
+                    "contains",
+                    ":",
+                )),
             );
             let iterations = 0..1000;
             let total_passed = iterations

@@ -180,7 +180,7 @@ impl HttpSink for InfluxDBLogsSink {
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
-        event.all_fields().for_each(|(key, value)| {
+        event.pairs().for_each(|(key, value)| {
             if self.tags.contains(&key.to_string()) {
                 tags.insert(key.to_string(), value.to_string_lossy());
             } else {

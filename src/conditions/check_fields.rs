@@ -583,7 +583,13 @@ impl Condition for CheckFields {
         if failed_preds.is_empty() {
             Ok(())
         } else {
-            Err(format!("predicates failed: {:?}", failed_preds.iter().map(|v| format!("{}", v)).collect::<Vec<_>>()))
+            Err(format!(
+                "predicates failed: {:?}",
+                failed_preds
+                    .iter()
+                    .map(|v| format!("{}", v))
+                    .collect::<Vec<_>>()
+            ))
         }
     }
 }
