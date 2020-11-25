@@ -2,7 +2,7 @@
 last_modified_on: "2020-10-27"
 $schema: ".schema.json"
 title: "First-class Kubernetes integration"
-description: "Vector officially support Kubernetes with a first-class integration."
+description: "Vector officially supports Kubernetes with a first-class integration."
 author_github: "https://github.com/binarylogic"
 featured: true
 pr_numbers: [1314]
