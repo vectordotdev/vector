@@ -16,10 +16,10 @@ use futures::{
 };
 use futures01::Sink;
 use http::{Request, StatusCode};
-use hyper::{body::to_bytes as body_to_bytes, Body};
+use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
-use std::{borrow::Cow, convert::TryFrom, future::ready, time::Instant};
+use snafu::{ResultExt, Snafu};
+use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, future::ready, time::Instant};
 use tokio::time;
 
 pub mod parser;
@@ -39,6 +39,12 @@ macro_rules! gauge {
             value: $value as f64,
         }
     };
+}
+
+#[derive(Debug, Snafu)]
+enum NginxBuildError {
+    #[snafu(display("Failed to parse endpoint: {}", source))]
+    HostInvalidUri { source: http::uri::InvalidUri },
 }
 
 #[derive(Debug, Snafu)]
@@ -87,16 +93,15 @@ impl SourceConfig for NginxMetricsConfig {
         let http_client = HttpClient::new(tls)?;
 
         let namespace = Some(self.namespace.clone()).filter(|namespace| !namespace.is_empty());
-        let sources: Vec<_> = self
-            .endpoints
-            .iter()
-            .map(|endpoint| NginxMetrics {
-                http_client: http_client.clone(),
-                endpoint: endpoint.clone(),
-                auth: self.auth.clone(),
-                namespace: namespace.clone(),
-            })
-            .collect();
+        let mut sources = Vec::with_capacity(self.endpoints.len());
+        for endpoint in self.endpoints.iter() {
+            sources.push(NginxMetrics::new(
+                http_client.clone(),
+                endpoint.clone(),
+                self.auth.clone(),
+                namespace.clone(),
+            )?);
+        }
 
         let mut out = out
             .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error))
@@ -136,9 +141,37 @@ struct NginxMetrics {
     endpoint: String,
     auth: Option<Auth>,
     namespace: Option<String>,
+    tags: BTreeMap<String, String>,
 }
 
 impl NginxMetrics {
+    fn new(
+        http_client: HttpClient,
+        endpoint: String,
+        auth: Option<Auth>,
+        namespace: Option<String>,
+    ) -> crate::Result<Self> {
+        let mut tags = BTreeMap::new();
+        tags.insert("endpoint".into(), endpoint.clone());
+        tags.insert("host".into(), Self::get_endpoint_host(&endpoint)?);
+
+        Ok(Self {
+            http_client,
+            endpoint,
+            auth,
+            namespace,
+            tags,
+        })
+    }
+
+    fn get_endpoint_host(endpoint: &str) -> crate::Result<String> {
+        let uri: Uri = endpoint.parse().context(HostInvalidUri)?;
+        Ok(match (uri.host().unwrap_or(""), uri.port()) {
+            (host, None) => format!("{}", host),
+            (host, Some(port)) => format!("{}:{}", host, port),
+        })
+    }
+
     async fn collect(&self) -> stream::BoxStream<'static, Metric> {
         let (up_value, metrics) = match self.collect_metrics().await {
             Ok(metrics) => (1.0, metrics),
@@ -199,7 +232,7 @@ impl NginxMetrics {
             name: name.into(),
             namespace: self.namespace.clone(),
             timestamp: Some(Utc::now()),
-            tags: None,
+            tags: Some(self.tags.clone()),
             kind: MetricKind::Absolute,
             value,
         }

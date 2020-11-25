@@ -111,45 +111,67 @@ components: sources: nginx_metrics: {
 	}
 
 	output: metrics: {
+		// Default Nginx tags
+		_nginx_metrics_tags: {
+			endpoint: {
+				description: "Nginx endpoint."
+				required:    true
+				examples: ["http://localhost:8000/basic_status"]
+			}
+			host: {
+				description: "The hostname of the Nginx server."
+				required:    true
+				examples: [_values.local_host]
+			}
+		}
+
 		up: {
 			description:       "If the Nginx server is up or not."
 			type:              "gauge"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 		connections_active: {
 			description:       "The current number of active client connections including `Waiting` connections."
 			type:              "gauge"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 		connections_accepted_total: {
 			description:       "The total number of accepted client connections."
 			type:              "counter"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 		connections_handled_total: {
 			description:       "The total number of handled connections. Generally, the parameter value is the same as `accepts` unless some resource limits have been reached (for example, the `worker_connections` limit)."
 			type:              "counter"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 		http_requests_total: {
 			description:       "The total number of client requests."
 			type:              "counter"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 		connections_reading: {
 			description:       "The current number of connections where nginx is reading the request header."
 			type:              "gauge"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 		connections_writing: {
 			description:       "The current number of connections where nginx is writing the response back to the client."
 			type:              "gauge"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 		connections_waiting: {
 			description:       "The current number of idle client connections waiting for a request."
 			type:              "gauge"
 			default_namespace: "nginx"
+			tags:              _nginx_metrics_tags
 		}
 	}
 }
