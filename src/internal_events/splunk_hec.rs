@@ -144,7 +144,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("request_errors_total", 1);
+            counter!("http_request_errors_total", 1);
         }
     }
 }
