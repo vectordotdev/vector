@@ -2,7 +2,7 @@ package metadata
 
 services: datadog_metrics: {
 	name:     "Datadog metrics"
-	thing:    "\(name)"
+	thing:    "a \(name) database"
 	url:      urls.datadog_metrics
 	versions: null
 }
