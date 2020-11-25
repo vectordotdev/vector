@@ -58,11 +58,11 @@ components: sources: mongodb_metrics: {
 	}
 
 	configuration: {
-		endpoint: {
+		endpoints: {
 			description: "MongoDB [Connection String URI Format][urls.mongodb_connection_string_uri_format]"
 			required:    true
-			type: "string": {
-				examples: ["mongodb://localhost:27017"]
+			type: array: {
+				items: type: string: examples: ["mongodb://localhost:27017"]
 			}
 		}
 		scrape_interval_secs: {

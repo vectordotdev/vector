@@ -58,11 +58,11 @@ components: sources: nginx_metrics: {
 	}
 
 	configuration: {
-		endpoint: {
+		endpoints: {
 			description: "HTTP/HTTPS endpoint to Nginx server with enabled `ngx_http_stub_status_module` module."
 			required:    true
-			type: "string": {
-				examples: ["http://localhost:8000/basic_status"]
+			type: array: {
+				items: type: string: examples: ["http://localhost:8000/basic_status"]
 			}
 		}
 		scrape_interval_secs: {
