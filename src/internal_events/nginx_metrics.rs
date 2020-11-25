@@ -1,15 +1,15 @@
 use super::InternalEvent;
+use crate::sources::nginx_metrics::parser::ParseError;
 use metrics::{counter, histogram};
-use mongodb::{bson, error::Error as MongoError};
 use std::time::Instant;
 
 #[derive(Debug)]
-pub struct MongoDBMetricsCollectCompleted {
+pub struct NginxMetricsCollectCompleted {
     pub start: Instant,
     pub end: Instant,
 }
 
-impl InternalEvent for MongoDBMetricsCollectCompleted {
+impl InternalEvent for NginxMetricsCollectCompleted {
     fn emit_logs(&self) {
         debug!(message = "Collection completed.");
     }
@@ -20,14 +20,14 @@ impl InternalEvent for MongoDBMetricsCollectCompleted {
     }
 }
 
-pub struct MongoDBMetricsRequestError<'a> {
-    pub error: MongoError,
+pub struct NginxMetricsRequestError<'a> {
+    pub error: crate::Error,
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
+impl<'a> InternalEvent for NginxMetricsRequestError<'a> {
     fn emit_logs(&self) {
-        error!(message = "MongoDB request error.", endpoint = %self.endpoint, error = ?self.error)
+        error!(message = "Nginx request error.", endpoint = %self.endpoint, error = ?self.error)
     }
 
     fn emit_metrics(&self) {
@@ -35,14 +35,14 @@ impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
     }
 }
 
-pub struct MongoDBMetricsBsonParseError<'a> {
-    pub error: bson::de::Error,
+pub struct NginxMetricsStubStatusParseError<'a> {
+    pub error: ParseError,
     pub endpoint: &'a str,
 }
 
-impl<'a> InternalEvent for MongoDBMetricsBsonParseError<'a> {
+impl<'a> InternalEvent for NginxMetricsStubStatusParseError<'a> {
     fn emit_logs(&self) {
-        error!(message = "BSON document parse error.", endpoint = %self.endpoint, error = ?self.error)
+        error!(message = "NginxStubStatus parse error.", endpoint = %self.endpoint, error = ?self.error)
     }
 
     fn emit_metrics(&self) {
