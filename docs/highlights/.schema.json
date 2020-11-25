@@ -56,7 +56,7 @@
     },
     "release": {
       "type": "string",
-      "description": "The release/version number this highlight is included in.",
+      "description": "The release/version number this highlight is included in."
     },
     "tags": {
       "type": "array",
