@@ -62,7 +62,9 @@ with a number of organizations to assist with this transition.
 
 [apache_metrics_source]: /docs/reference/sources/apache_metrics/
 [aws_ecs_metrics_source]: /docs/reference/sources/aws_ecs_metrics/
-[host_metrics]: /docs/reference/sources/host_metrics/
+[chat]: https://chat.vector.dev
+[docs]: /docs/
+[host_metrics_source]: /docs/reference/sources/host_metrics/
 [internal_metrics_source]: /docs/reference/sources/internal_metrics/
 [kubernetes_announcement]: /blog/...
 [mongodb_metrics_source]: /docs/reference/sources/mongodb_metrics/
