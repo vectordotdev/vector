@@ -8,7 +8,7 @@ featured: true
 pr_numbers: [1314]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: featured", "domain: paltforms", "platform: kubernetes"]
+tags: ["type: featured", "domain: platforms", "platform: kubernetes"]
 ---
 
 After eight months of development, [100 pull requests][kubernetes_pull_requests],
@@ -16,6 +16,8 @@ and intensive QA in clusters producing over 30 terabytes per day, we’re please
 to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for collecting and processing all
 Kubernetes observability data.
+
+import Jump from '@site/src/components/Jump';
 
 <Jump to="/blog">Read the Kubernetes announcement post</Jump>
 
