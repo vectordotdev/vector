@@ -26,6 +26,9 @@ jobs:
   bench:
     name: Bench - Linux
     runs-on: ubuntu-20.04
+    # Allow benchmarks show regressions until we can refine the thresholds for
+    # regression to reduce false positives.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
@@ -48,11 +51,12 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make bench
+      - run: make bench | tee target/criterion/out
       - uses: actions/upload-artifact@v2
         with:
           name: "vector-benches"
           path: "./target/criterion/*"
+      - run: cat target/criterion/out | scripts/check-criterion-output.sh
 
   master-failure:
     name: master-failure
