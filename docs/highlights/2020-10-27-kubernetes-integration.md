@@ -8,7 +8,7 @@ featured: true
 pr_numbers: [1314]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: paltforms", "platform: kubernetes"]
+tags: ["type: featured", "domain: paltforms", "platform: kubernetes"]
 ---
 
 After eight months of development, [100 pull requests][kubernetes_pull_requests],
