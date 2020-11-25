@@ -17,8 +17,6 @@ to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for collecting and processing all
 Kubernetes observability data.
 
-import Jump from '@site/src/components/Jump';
-
 <Jump to="/blog">Read the Kubernetes announcement post</Jump>
 
 ## Feature highlights
@@ -34,7 +32,7 @@ import Jump from '@site/src/components/Jump';
     across the board. This [further raises the bar][file_soure_benchmarks] in
     file tailing performance to meet the high demands of large-scale Kubernetes
     environments.
-2.  [**Adaptive Request Currency (ARC)**][adaptive_concurrency_post] -
+3.  [**Adaptive Request Currency (ARC)**][adaptive_concurrency_post] -
     A new Vector feature designed to automatically optimize HTTP communication
     in the face of ever changing environments like Kubernetes. It does away with
     static rate limits and raises the performance and reliability of your entire

@@ -17,8 +17,6 @@ static rate-limits and automatically optimizes HTTP concurrency limits based on
 downstream service responses. The underlying [mechanism](#how-it-works) is a
 simple feedback loop inspired by TCP congestion control algorithms.
 
-import Jump from '@site/src/components/Jump';
-
 <Jump to="/blog/adaptive-request-concurrency/">Read the ARC announcement post</Jump>
 
 ## Get Started
