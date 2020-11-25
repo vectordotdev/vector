@@ -6,7 +6,7 @@ mod support;
 
 #[cfg(all(feature = "api", feature = "vector-api-client"))]
 mod tests {
-    use crate::support::{sink, source_with_event_counter};
+    use crate::support::{sink, source_with_event_counter, transform};
     use chrono::Utc;
     use futures::StreamExt;
     use std::{
@@ -29,6 +29,7 @@ mod tests {
             ComponentsSubscriptionExt, HealthQueryExt, HealthSubscriptionExt, MetaQueryExt,
             MetricsSubscriptionExt,
         },
+        test::*,
         Client, SubscriptionClient,
     };
 
@@ -269,6 +270,84 @@ mod tests {
         let res = client.health_query().await.unwrap();
 
         assert!(res.data.unwrap().health);
+        assert_eq!(res.errors, None);
+    }
+
+    #[tokio::test]
+    /// Tests links between components
+    async fn test_component_links() {
+        let mut config_builder = Config::builder();
+        config_builder.add_source("in1", source_with_event_counter().1);
+        config_builder.add_transform("t1", &["in1"], transform("t1_", 1.1));
+        config_builder.add_transform("t2", &["t1"], transform("t2_", 1.1));
+        config_builder.add_sink("out1", &["in1", "t2"], sink(10).1);
+        config_builder.api.enabled = true;
+        config_builder.api.address = Some(next_addr());
+
+        let config = config_builder.build().unwrap();
+        let server = api::Server::start(&config);
+
+        let client = make_client(server.addr());
+
+        let res = client.component_links_query().await.unwrap();
+        let data = res.data.unwrap();
+
+        // should be a single source named "in1"
+        assert!(data.sources.len() == 1);
+        assert!(data.sources[0].name == "in1");
+
+        // "in1" source should link to exactly one transform named "t1"
+        assert!(data.sources[0].transforms.len() == 1);
+        assert!(data.sources[0].transforms[0].name == "t1");
+
+        // "in1" source should link to exactly one sink named "out2"
+        assert!(data.sources[0].sinks.len() == 1);
+        assert!(data.sources[0].sinks[0].name == "out1");
+
+        // there should be 2 transforms
+        assert!(data.transforms.len() == 2);
+
+        // get a reference to "t1" and "t2"
+        let mut t1 = &data.transforms[0];
+        let mut t2 = &data.transforms[1];
+
+        // swap if needed
+        if t1.name == "t2" {
+            t1 = &data.transforms[1];
+            t2 = &data.transforms[0];
+        }
+
+        // "t1" transform should link to exactly one source named "in1"
+        assert!(t1.sources.len() == 1);
+        assert!(t1.sources[0].name == "in1");
+
+        // "t1" transform should link to exactly one transform named "t2"
+        assert!(t1.transforms.len() == 1);
+        assert!(t1.transforms[0].name == "t2");
+
+        // "t1" transform should NOT link to any sinks
+        assert!(t1.sinks.is_empty());
+
+        // "t2" transform should link to exactly one sink named "out1"
+        assert!(t2.sinks.len() == 1);
+        assert!(t2.sinks[0].name == "out1");
+
+        // "t2" transform should NOT link to any sources or transforms
+        assert!(t2.sources.is_empty());
+        assert!(t2.transforms.is_empty());
+
+        // should be a single sink named "out1"
+        assert!(data.sinks.len() == 1);
+        assert!(data.sinks[0].name == "out1");
+
+        // "out1" sink should link to exactly one source named "in1"
+        assert!(data.sinks[0].sources.len() == 1);
+        assert!(data.sinks[0].sources[0].name == "in1");
+
+        // "out1" sink should link to exactly one transform named "t2"
+        assert!(data.sinks[0].transforms.len() == 1);
+        assert!(data.sinks[0].transforms[0].name == "t2");
+
         assert_eq!(res.errors, None);
     }
 
