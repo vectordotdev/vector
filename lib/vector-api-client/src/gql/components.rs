@@ -12,15 +12,6 @@ use serde::export::Formatter;
 )]
 pub struct ComponentsQuery;
 
-/// Component links query for returning linked components for sources, transforms, and sinks
-#[derive(GraphQLQuery, Debug, Copy, Clone)]
-#[graphql(
-    schema_path = "graphql/schema.json",
-    query_path = "graphql/queries/component_links.graphql",
-    response_derives = "Debug"
-)]
-pub struct ComponentLinksQuery;
-
 /// Components subscription for notification when a component has been added
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
@@ -49,19 +40,6 @@ impl ComponentsQueryExt for crate::Client {
     async fn components_query(&self) -> QueryResult<ComponentsQuery> {
         let request_body = ComponentsQuery::build_query(components_query::Variables);
         self.query::<ComponentsQuery>(&request_body).await
-    }
-}
-
-#[async_trait]
-pub trait ComponentLinksQueryExt {
-    async fn component_links_query(&self) -> crate::QueryResult<ComponentLinksQuery>;
-}
-
-#[async_trait]
-impl ComponentLinksQueryExt for crate::Client {
-    async fn component_links_query(&self) -> QueryResult<ComponentLinksQuery> {
-        let request_body = ComponentLinksQuery::build_query(component_links_query::Variables);
-        self.query::<ComponentLinksQuery>(&request_body).await
     }
 }
 

@@ -26,9 +26,10 @@ mod tests {
     use vector_api_client::{
         connect_subscription_client,
         gql::{
-            ComponentLinksQueryExt, ComponentsSubscriptionExt, HealthQueryExt,
-            HealthSubscriptionExt, MetaQueryExt, MetricsSubscriptionExt,
+            ComponentsSubscriptionExt, HealthQueryExt, HealthSubscriptionExt, MetaQueryExt,
+            MetricsSubscriptionExt,
         },
+        test::*,
         Client, SubscriptionClient,
     };
 
