@@ -1,5 +1,5 @@
 use super::InternalEvent;
-use crate::sources::nginx::parser::ParseError;
+use crate::sources::nginx_metrics::parser::ParseError;
 use metrics::{counter, histogram};
 use std::time::Instant;
 
