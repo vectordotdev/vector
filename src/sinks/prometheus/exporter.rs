@@ -282,10 +282,10 @@ impl StreamSink for PrometheusExporter {
         future::poll_fn(|cx| -> Poll<Result<(), ()>> {
             let mut received = 0;
             let mut metrics = None;
-            let mut reset_existing = None;
 
             let result = loop {
-                match Pin::new(&mut input).poll_next(cx) {
+                let polled = Pin::new(&mut input).poll_next(cx);
+                match polled {
                     Poll::Ready(Some(event)) => {
                         received += 1;
 
@@ -300,18 +300,11 @@ impl StreamSink for PrometheusExporter {
                                     if item.value.is_set() {
                                         // sets need to be expired from time to time
                                         // because otherwise they could grow infinitelly
-                                        let reset = reset_existing.get_or_insert_with(|| {
-                                            let now = Utc::now().timestamp();
-                                            let interval =
-                                                now - *self.last_flush_timestamp.read().unwrap();
-                                            let expired =
-                                                interval > self.config.flush_period_secs as i64;
-                                            if expired {
-                                                *self.last_flush_timestamp.write().unwrap() = now;
-                                            }
-                                            expired
-                                        });
-                                        if *reset {
+                                        let now = Utc::now().timestamp();
+                                        let interval =
+                                            now - *self.last_flush_timestamp.read().unwrap();
+                                        if interval > self.config.flush_period_secs as i64 {
+                                            *self.last_flush_timestamp.write().unwrap() = now;
                                             existing.reset();
                                         }
                                     }
@@ -329,6 +322,9 @@ impl StreamSink for PrometheusExporter {
                     }
                     Poll::Ready(None) => break Poll::Ready(Ok(())),
                     Poll::Pending => break Poll::Pending,
+                }
+                if received > 100 {
+                    break Poll::Pending;
                 }
             };
 
