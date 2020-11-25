@@ -15,9 +15,9 @@ pub struct ComponentsQuery;
 /// Component links query for returning linked components for sources, transforms, and sinks
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
-schema_path = "graphql/schema.json",
-query_path = "graphql/queries/component_links.graphql",
-response_derives = "Debug"
+    schema_path = "graphql/schema.json",
+    query_path = "graphql/queries/component_links.graphql",
+    response_derives = "Debug"
 )]
 pub struct ComponentLinksQuery;
 

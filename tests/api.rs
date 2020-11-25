@@ -6,7 +6,7 @@ mod support;
 
 #[cfg(all(feature = "api", feature = "vector-api-client"))]
 mod tests {
-    use crate::support::{sink, source_with_event_counter, transform };
+    use crate::support::{sink, source_with_event_counter, transform};
     use chrono::Utc;
     use futures::StreamExt;
     use std::{
@@ -26,8 +26,8 @@ mod tests {
     use vector_api_client::{
         connect_subscription_client,
         gql::{
-            ComponentsSubscriptionExt, HealthQueryExt, HealthSubscriptionExt, MetaQueryExt,
-            MetricsSubscriptionExt, ComponentLinksQueryExt
+            ComponentLinksQueryExt, ComponentsSubscriptionExt, HealthQueryExt,
+            HealthSubscriptionExt, MetaQueryExt, MetricsSubscriptionExt,
         },
         Client, SubscriptionClient,
     };
