@@ -11,7 +11,7 @@ pub struct NginxMetricsCollectCompleted {
 
 impl InternalEvent for NginxMetricsCollectCompleted {
     fn emit_logs(&self) {
-        debug!(message = "Collect completed.");
+        debug!(message = "Collection completed.");
     }
 
     fn emit_metrics(&self) {
