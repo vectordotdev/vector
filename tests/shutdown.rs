@@ -273,7 +273,7 @@ fn timely_shutdown_prometheus() {
                 create_file(
                     source_config(
                         r#"
-        type = "prometheus_metrics"
+        type = "prometheus_scrape"
         hosts = ["http://${VECTOR_TEST_ADDRESS}"]"#,
                     )
                     .as_str(),
