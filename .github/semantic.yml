@@ -125,6 +125,7 @@ scopes:
   - kubernetes_logs source # Anything `kubernetes_logs` source related
   - logplex source # Anything `logplex` source related
   - mongodb_metrics source # Anything `mongodb_metrics` source related
+  - nginx_metrics source # Anything `nginx_metrics` source related
   - prometheus source # Anything `prometheus` source related
   - socket source # Anything `socket` source related
   - splunk_hec source # Anything `splunk_hec` source related

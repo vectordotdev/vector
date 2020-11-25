@@ -307,8 +307,10 @@ sources = [
   "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
+  "sources-kubernetes-logs",
   "sources-logplex",
   "sources-mongodb_metrics",
+  "sources-nginx_metrics",
   "sources-prometheus",
   "sources-socket",
   "sources-splunk_hec",
@@ -316,11 +318,10 @@ sources = [
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
-  "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
-sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
+sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
 sources-docker_logs = ["bollard"]
 sources-file = ["bytesize", "file-source"]
@@ -330,18 +331,19 @@ sources-http = ["sources-utils-http"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
 sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
+sources-nginx_metrics = []
 sources-prometheus = ["prometheus-parser"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
-sources-splunk_hec = ["bytesize", "tls", "warp"]
-sources-statsd = ["tokio-util/udp", "listenfd", "tls", "sources-utils-unix"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
-tls = []
-sources-vector = ["listenfd" ,"tls"]
-sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
-sources-utils-http = ["tls", "warp"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-vector = ["listenfd" ,"sources-utils-tls"]
+sources-utils-http = ["sources-utils-tls", "warp"]
+sources-utils-tls = []
 sources-utils-unix = []
 
 # Transforms
@@ -493,6 +495,7 @@ all-integration-tests = [
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
+  "nginx-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
@@ -528,6 +531,7 @@ kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats"]
+nginx-integration-tests = ["sources-nginx_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]

@@ -255,6 +255,7 @@ urls: {
 	new_target:                                               "https://github.com/timberio/vector/issues/new?labels=type%3A+task&labels=domain%3A+operations"
 	new_transform:                                            "https://github.com/timberio/vector/issues/new?labels=type%3A+new+feature"
 	nginx:                                                    "https://www.nginx.com/"
+	nginx_stub_status_module:                                 "http://nginx.org/en/docs/http/ngx_http_stub_status_module.html"
 	nix:                                                      "https://nixos.org/nix/"
 	nixos:                                                    "https://nixos.org/"
 	nixpkgs_9682:                                             "https://github.com/NixOS/nixpkgs/issues/9682"
