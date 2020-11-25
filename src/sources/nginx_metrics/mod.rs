@@ -167,7 +167,7 @@ impl NginxMetrics {
     fn get_endpoint_host(endpoint: &str) -> crate::Result<String> {
         let uri: Uri = endpoint.parse().context(HostInvalidUri)?;
         Ok(match (uri.host().unwrap_or(""), uri.port()) {
-            (host, None) => format!("{}", host),
+            (host, None) => host.to_owned(),
             (host, Some(port)) => format!("{}:{}", host, port),
         })
     }
