@@ -19,7 +19,7 @@ use http::{Request, StatusCode};
 use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
 use serde::{Deserialize, Serialize};
 use snafu::{ResultExt, Snafu};
-use std::{borrow::Cow, collections::BTreeMap, convert::TryFrom, future::ready, time::Instant};
+use std::{collections::BTreeMap, convert::TryFrom, future::ready, time::Instant};
 use tokio::time;
 
 pub mod parser;
@@ -191,16 +191,13 @@ impl NginxMetrics {
             })
         })?;
 
-        let status = match String::from_utf8_lossy(&response) {
-            Cow::Borrowed(data) => NginxStubStatus::try_from(data),
-            Cow::Owned(data) => NginxStubStatus::try_from(data.as_str()),
-        }
-        .map_err(|error| {
-            emit!(NginxMetricsStubStatusParseError {
-                error,
-                endpoint: &self.endpoint,
-            })
-        })?;
+        let status = NginxStubStatus::try_from(String::from_utf8_lossy(&response).as_ref())
+            .map_err(|error| {
+                emit!(NginxMetricsStubStatusParseError {
+                    error,
+                    endpoint: &self.endpoint,
+                })
+            })?;
 
         Ok(vec![
             self.create_metric("connections_active", gauge!(status.active)),
