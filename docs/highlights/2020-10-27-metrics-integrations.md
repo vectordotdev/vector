@@ -10,15 +10,16 @@ hide_on_release_notes: false
 tags: ["type: new feature", "domain: metrics", "domain: sources"]
 ---
 
-Vector 0.11 includes four new metrics sources:
+Vector 0.11 includes new metrics sources:
 
 1. **A new [`host_metrics` source][host_metrics_source]**
 2. **A new [`apache_metrics` source][apache_metrics_source]**
-3. **A new [`mongodb_metrics` source][mongodb_metrics_source]**
-4. **A new [`aws_ecs_metrics` source][aws_ecs_metrics_source]**
-5. **A new [`internal_metrics` source][internal_metrics_source]**
+3. **A new [`nginx_metrics` source][nginx_metrics_source]**
+4. **A new [`mongodb_metrics` source][mongodb_metrics_source]**
+5. **A new [`aws_ecs_metrics` source][aws_ecs_metrics_source]**
+6. **A new [`internal_metrics` source][internal_metrics_source]**
 
-And while these are only five sources, they represent a broader initiative
+And while these are only six sources, they represent a broader initiative
 to replace metrics agents entirely. A lot of groundwork was laid to expedite
 these types of integrations, so you can expect many more of them in
 subsequent Vector releases.
@@ -60,8 +61,9 @@ a metrics integration or feature, [chat with us][chat]. We are working closely
 with a number of organizations to assist with this transition.
 
 [apache_metrics_source]: /docs/reference/sources/apache_metrics/
-[aws_ecs_metrics]: /docs/reference/sources/aws_ecs_metrics/
+[aws_ecs_metrics_source]: /docs/reference/sources/aws_ecs_metrics/
 [host_metrics]: /docs/reference/sources/host_metrics/
-[internal_metrics]: /docs/reference/sources/internal_metrics/
+[internal_metrics_source]: /docs/reference/sources/internal_metrics/
 [kubernetes_announcement]: /blog/...
 [mongodb_metrics_source]: /docs/reference/sources/mongodb_metrics/
+[nginx_metrics_source]: /docs/reference/sources/nginx_metrics/
