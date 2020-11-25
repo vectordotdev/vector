@@ -17,10 +17,12 @@ components: sources: http: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "HTTP client"
-				thing:    "an \(name)"
-				url:      urls.http_client
-				versions: null
+				service: {
+					name:     "HTTP client"
+					thing:    "an \(name)"
+					url:      urls.http_client
+					versions: null
+				}
 
 				interface: {
 					socket: {

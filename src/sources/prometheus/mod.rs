@@ -10,12 +10,15 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
     Event, Pipeline,
 };
-use futures::{compat::Sink01CompatExt, future, stream, FutureExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, stream, FutureExt, StreamExt, TryFutureExt};
 use futures01::Sink;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use std::time::{Duration, Instant};
+use std::{
+    future::ready,
+    time::{Duration, Instant},
+};
 
 pub mod parser;
 
@@ -124,7 +127,7 @@ fn prometheus(
                 })
                 .into_stream()
                 .filter_map(move |response| {
-                    future::ready(match response {
+                    ready(match response {
                         Ok((header, body)) if header.status == hyper::StatusCode::OK => {
                             emit!(PrometheusRequestCompleted {
                                 start,

@@ -419,12 +419,12 @@ mod integration_test {
         test_util::{random_lines_with_stream, random_string, wait_for},
         tls::TlsOptions,
     };
-    use futures::{future, StreamExt};
+    use futures::StreamExt;
     use rdkafka::{
         consumer::{BaseConsumer, Consumer},
         Message, Offset, TopicPartitionList,
     };
-    use std::{thread, time::Duration};
+    use std::{future::ready, thread, time::Duration};
 
     const TEST_CA: &str = "tests/data/Vector_CA.crt";
     const TEST_CRT: &str = "tests/data/localhost.crt";
@@ -572,7 +572,7 @@ mod integration_test {
             let (_low, high) = consumer
                 .fetch_watermarks(&topic, 0, Duration::from_secs(3))
                 .unwrap();
-            future::ready(high > 0)
+            ready(high > 0)
         })
         .await;
 

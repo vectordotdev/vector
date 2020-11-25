@@ -1,0 +1,3 @@
+package metadata
+
+installation: platforms: {}

@@ -5,8 +5,8 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, future, ready, stream, task::noop_waker_ref, FutureExt, SinkExt,
-    Stream, StreamExt, TryStreamExt,
+    compat::Stream01CompatExt, ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
+    StreamExt, TryStreamExt,
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -17,7 +17,7 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     fs::File,
-    future::Future,
+    future::{ready, Future},
     io::Read,
     iter,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
@@ -336,11 +336,7 @@ where
     F: Fn(usize) -> bool,
 {
     let value = value.as_ref();
-    wait_for(|| {
-        let result = unblock(value.load(Ordering::SeqCst));
-        future::ready(result)
-    })
-    .await
+    wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses

@@ -33,6 +33,7 @@ use std::{
     collections::{HashMap, VecDeque},
     fmt,
     fs::{read_dir, File},
+    future::pending,
     io::Read,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -252,7 +253,7 @@ impl Service<Vec<Event>> for TestSink {
             }
             Some(Action::Drop) => {
                 stats.end_request(now, false);
-                Box::pin(future::pending())
+                Box::pin(pending())
             }
         }
     }

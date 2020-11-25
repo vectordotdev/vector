@@ -39,10 +39,12 @@ components: sinks: honeycomb: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "Honeycomb"
-				thing:    "a \(name) dataset"
-				url:      urls.honeycomb
-				versions: null
+				service: {
+					name:     "Honeycomb"
+					thing:    "a \(name) dataset"
+					url:      urls.honeycomb
+					versions: null
+				}
 
 				interface: {
 					socket: {

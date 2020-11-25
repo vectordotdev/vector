@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_s3: {
 	title:       "AWS S3"
-	description: "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
+	description: "[Amazon Simple Storage Service (Amazon S3)](\(urls.aws_s3)) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
 
 	classes: {
 		commonly_used: true
@@ -48,10 +48,7 @@ components: sinks: aws_s3: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "AWS S3"
-				thing:    "a \(name) bucket"
-				url:      urls.aws_s3
-				versions: null
+				service: services.aws_s3
 
 				interface: {
 					socket: {
@@ -87,7 +84,7 @@ components: sinks: aws_s3: {
 		acl: {
 			category:    "ACL"
 			common:      false
-			description: "Canned ACL to apply to the created objects. For more information, see [Canned ACL][urls.aws_s3_canned_acl]."
+			description: "Canned ACL to apply to the created objects. For more information, see [Canned ACL](\(urls.aws_s3_canned_acl))."
 			required:    false
 			warnings: []
 			type: string: {
@@ -162,7 +159,7 @@ components: sinks: aws_s3: {
 		grant_full_control: {
 			category:    "ACL"
 			common:      false
-			description: "Gives the named [grantee][urls.aws_s3_grantee] READ, READ_ACP, and WRITE_ACP permissions on the created objects."
+			description: "Gives the named [grantee](\(urls.aws_s3_grantee)) READ, READ_ACP, and WRITE_ACP permissions on the created objects."
 			required:    false
 			warnings: []
 			type: string: {
@@ -173,7 +170,7 @@ components: sinks: aws_s3: {
 		grant_read: {
 			category:    "ACL"
 			common:      false
-			description: "Allows the named [grantee][urls.aws_s3_grantee] to read the created objects and their metadata."
+			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects and their metadata."
 			required:    false
 			warnings: []
 			type: string: {
@@ -184,7 +181,7 @@ components: sinks: aws_s3: {
 		grant_read_acp: {
 			category:    "ACL"
 			common:      false
-			description: "Allows the named [grantee][urls.aws_s3_grantee] to read the created objects' ACL."
+			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to read the created objects' ACL."
 			required:    false
 			warnings: []
 			type: string: {
@@ -195,7 +192,7 @@ components: sinks: aws_s3: {
 		grant_write_acp: {
 			category:    "ACL"
 			common:      false
-			description: "Allows the named [grantee][urls.aws_s3_grantee] to write the created objects' ACL."
+			description: "Allows the named [grantee](\(urls.aws_s3_grantee)) to write the created objects' ACL."
 			required:    false
 			warnings: []
 			type: string: {
@@ -283,7 +280,7 @@ components: sinks: aws_s3: {
 				If you're using Vector to write objects across AWS accounts then you should
 				consider setting the `grant_full_control` option to the bucket owner's
 				canonical user ID. AWS provides a
-				[full tutorial][urls.aws_s3_cross_account_tutorial] for this use case. If
+				[full tutorial](\(urls.aws_s3_cross_account_tutorial)) for this use case. If
 				don't know the bucket owner's canonical ID you can find it by following
 				[this tutorial](\(urls.aws_canonical_user_id)).
 				"""
@@ -291,8 +288,8 @@ components: sinks: aws_s3: {
 
 		object_acl: {
 			title: "Object Access Control List (ACL)"
-			body: """
-				AWS S3 supports [access control lists (ACL)][urls.aws_s3_acl] for buckets and
+			body:  """
+				AWS S3 supports [access control lists (ACL)](\(urls.aws_s3_acl)) for buckets and
 				objects. In the context of Vector, only object ACLs are relevant (Vector does
 				not create or modify buckets). You can set the object level ACL by using one
 				of the `acl`, `grant_full_control`, `grant_read`, `grant_read_acp`, or
@@ -301,9 +298,9 @@ components: sinks: aws_s3: {
 			sub_sections: [
 				{
 					title: "`acl.*` vs `grant_*` options"
-					body: """
+					body:  """
 						The `grant_*` options name a specific entity to grant access to. The `acl`
-						options is one of a set of [specific canned ACLs][urls.aws_s3_canned_acl] that
+						options is one of a set of [specific canned ACLs](\(urls.aws_s3_canned_acl)) that
 						can only name the owner or world.
 						"""
 				},
@@ -312,7 +309,7 @@ components: sinks: aws_s3: {
 
 		object_naming: {
 			title: "Object Naming"
-			body: """
+			body:  """
 				By default, Vector will name your S3 objects in the following format:
 
 				<Tabs
@@ -352,7 +349,7 @@ components: sinks: aws_s3: {
 				</TabItem>
 				</Tabs>
 
-				Vector appends a [UUIDV4][urls.uuidv4] token to ensure there are no name
+				Vector appends a [UUIDV4](\(urls.uuidv4)) token to ensure there are no name
 				conflicts in the unlikely event 2 Vector instances are writing data at the same
 				time.
 
@@ -363,8 +360,8 @@ components: sinks: aws_s3: {
 
 		server_side_encryption: {
 			title: "Server-side Encryption"
-			body: """
-				AWS S3 offers [server-side encryption][urls.aws_s3_sse]. You can apply defaults
+			body:  """
+				AWS S3 offers [server-side encryption](\(urls.aws_s3_sse)). You can apply defaults
 				at the bucket level or set the encryption at the object level. In the context,
 				of Vector only the object level is relevant (Vector does not create or modify
 				buckets). Although, we recommend setting defaults at the bucket level whne
@@ -375,8 +372,8 @@ components: sinks: aws_s3: {
 
 		storage_class: {
 			title: "Storage Class"
-			body: """
-				AWS S3 offers [storage classes][urls.aws_s3_storage_classes]. You can apply
+			body:  """
+				AWS S3 offers [storage classes](\(urls.aws_s3_storage_classes)). You can apply
 				defaults, and rules, at the bucket level or set the storage class at the object
 				level. In the context of Vector only the object level is relevant (Vector does
 				not create or modify buckets). You can set the storage class via the
@@ -386,10 +383,10 @@ components: sinks: aws_s3: {
 
 		tags_and_metadata: {
 			title: "Tags & Metadata"
-			body: """
-				Vector currently only supports [AWS S3 object tags][urls.aws_s3_tags] and does
-				_not_ support [object metadata][urls.aws_s3_metadata]. If you require metadata
-				support see [issue #1694][urls.issue_1694].
+			body:  """
+				Vector currently only supports [AWS S3 object tags](\(urls.aws_s3_tags)) and does
+				_not_ support [object metadata](\(urls.aws_s3_metadata)). If you require metadata
+				support see [issue #1694](\(urls.issue_1694)).
 
 				We believe tags are more flexible since they are separate from the actual S3
 				object. You can freely modify tags without modifying the object. Conversely,

@@ -85,7 +85,8 @@ impl FunctionTransform for JsonParser {
                         emit!(JsonParserFailedParse {
                             field: &self.field,
                             value: value.to_string_lossy().as_str(),
-                            error
+                            error,
+                            drop_invalid: self.drop_invalid,
                         })
                     })
                     .ok()

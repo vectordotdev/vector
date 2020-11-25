@@ -96,6 +96,12 @@ pub struct Config {
     /// a significant overhead.
     #[serde(default = "default_glob_minimum_cooldown_ms")]
     glob_minimum_cooldown_ms: usize,
+
+    /// A field to use to set the timestamp when Vector ingested the event.
+    /// This is useful to compute the latency between important event processing
+    /// stages, i.e. the time delta between log line was written and when it was
+    /// processed by the `kubernetes_logs` source.
+    ingestion_timestamp_field: Option<String>,
 }
 
 inventory::submit! {
@@ -155,6 +161,7 @@ struct Source {
     exclude_paths: Vec<glob::Pattern>,
     max_read_bytes: usize,
     glob_minimum_cooldown: Duration,
+    ingestion_timestamp_field: Option<String>,
 }
 
 impl Source {
@@ -193,6 +200,7 @@ impl Source {
             exclude_paths,
             max_read_bytes: config.max_read_bytes,
             glob_minimum_cooldown,
+            ingestion_timestamp_field: config.ingestion_timestamp_field.clone(),
         })
     }
 
@@ -211,6 +219,7 @@ impl Source {
             exclude_paths,
             max_read_bytes,
             glob_minimum_cooldown,
+            ingestion_timestamp_field,
         } = self;
 
         let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
@@ -307,7 +316,7 @@ impl Source {
                 file: &file,
                 byte_size: bytes.len(),
             });
-            let mut event = create_event(bytes, &file);
+            let mut event = create_event(bytes, &file, ingestion_timestamp_field.as_deref());
             if annotator.annotate(&mut event, &file).is_none() {
                 emit!(KubernetesLogsEventAnnotationFailed { event: &event });
             }
@@ -374,7 +383,7 @@ impl Source {
     }
 }
 
-fn create_event(line: Bytes, file: &str) -> Event {
+fn create_event(line: Bytes, file: &str, ingestion_timestamp_field: Option<&str>) -> Event {
     let mut event = Event::from(line);
 
     // Add source type.
@@ -385,6 +394,13 @@ fn create_event(line: Bytes, file: &str) -> Event {
 
     // Add file.
     event.as_mut_log().insert(FILE_KEY, file.to_owned());
+
+    // Add ingestion timestamp if requested.
+    if let Some(ingestion_timestamp_field) = ingestion_timestamp_field {
+        event
+            .as_mut_log()
+            .insert(ingestion_timestamp_field, chrono::Utc::now());
+    }
 
     event
 }
