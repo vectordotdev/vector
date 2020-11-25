@@ -6,7 +6,7 @@
 namespace: vector
 
 bases:
-  - distribution/kubernetes
+  - distribution/kubernetes/vector-agent
 
 resources:
   - skaffold/manifests/namespace.yaml
