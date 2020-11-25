@@ -308,7 +308,7 @@ start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
 start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
 start-test-integration: start-integration-mongodb_metrics start-integration-nats start-integration-nginx
-start-test-integratino: start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-pulsar start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
