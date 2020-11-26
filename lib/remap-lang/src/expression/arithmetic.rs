@@ -49,7 +49,7 @@ impl Expression for Arithmetic {
 
         match self.op {
             Or if lhs_def.kind.is_null() => rhs_def,
-            Or if !lhs_def.kind.is_null() && !lhs_def.kind.is_boolean() => lhs_def,
+            Or if !lhs_def.kind.is_boolean() => lhs_def,
             Or => type_def,
             And if lhs_def.kind.is_null() => lhs_def.with_constraint(Kind::Boolean),
             And => type_def

@@ -339,7 +339,7 @@ impl Value {
     pub fn or(self, rhs: Self) -> Self {
         match self {
             Value::Null => rhs,
-            Value::Boolean(lhv) if lhv == false => rhs,
+            Value::Boolean(lhv) if !lhv => rhs,
             value => value,
         }
     }
