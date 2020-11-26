@@ -111,6 +111,39 @@ mod test {
     }];
 
     #[test]
+    fn check_invalid_grok_error() {
+        let mut arguments = ArgumentList::default();
+        arguments.insert(
+            "value",
+            Argument::Expression(
+                expression::Argument::new(
+                    Box::new(Literal::from("foo").into()),
+                    "value",
+                    "value",
+                    |_| true,
+                    "parse_grok",
+                )
+                .into(),
+            ),
+        );
+        arguments.insert(
+            "pattern",
+            expression::Argument::new(
+                Box::new(Literal::from("%{NOG}").into()),
+                "pattern",
+                "pattern",
+                |_| true,
+                "parse_grok",
+            )
+            .into(),
+        );
+
+        let error = ParseGrok.compile(arguments);
+
+        assert_eq!(Error::Call("The given pattern definition name \"NOG\" could not be found in the definition map".to_string()), error.unwrap_err());
+    }
+
+    #[test]
     fn check_parse_grok() {
         let cases = vec![
             (
