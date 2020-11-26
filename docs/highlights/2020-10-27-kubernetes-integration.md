@@ -48,7 +48,7 @@ To cut straight to the chase, check out the:
 
 [adaptive_concurrency_post]: /blog/adaptive-request-concurrency/
 [config_formats_highlight]: /highlights/2020-11-25-json-yaml-config-formats/
-[announcement_post]: /blog/...
+[announcement_post]: /blog/kubernetes-integration/
 [installation_docs]: /docs/setup/installation/platforms/kubernetes/
 [kubernetes_logs_source]: /docs/reference/sources/kubernetes_logs/
 [kubernetes_pull_requests]: https://github.com/timberio/vector/pulls?q=is%3Apr+sort%3Aupdated-desc+kubernetes+is%3Aclosed
