@@ -17,7 +17,7 @@ static rate-limits and automatically optimizes HTTP concurrency limits based on
 downstream service responses. The underlying mechanis is a simple feedback loop
 inspired by TCP congestion control algorithms.
 
-[**Read the ARC announcement post**][announcement]
+[**Read the ARC announcement post →**][announcement]
 
 ## Get Started
 
