@@ -43,7 +43,7 @@ impl Expression for ParseJsonFn {
         let to_json = |value: Value| {
             let bytes = value.unwrap_bytes();
             let value = serde_json::from_slice(&bytes)
-                .map(|v: serde_json::Value| event::Value::from(v))
+                .map(event::Value::from)
                 .map_err(|e| format!("unable to parse json: {}", e))?;
 
             Ok(value.into())
