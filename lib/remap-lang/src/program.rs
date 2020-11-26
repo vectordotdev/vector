@@ -116,12 +116,12 @@ impl Program {
                 kind: value::Kind::Null,
             });
 
-            if !constraint.type_def.contains(&program_def) {
-                if !program_def.kind.is_all() || !constraint.allow_any {
-                    return Err(RemapError::from(E::from(Error::ResolvesTo(
-                        ResolvesToError(constraint.type_def, program_def),
-                    ))));
-                }
+            if !constraint.type_def.contains(&program_def)
+                && (!program_def.kind.is_all() || !constraint.allow_any)
+            {
+                return Err(RemapError::from(E::from(Error::ResolvesTo(
+                    ResolvesToError(constraint.type_def, program_def),
+                ))));
             }
 
             if !constraint.type_def.is_fallible() && type_defs.iter().any(TypeDef::is_fallible) {

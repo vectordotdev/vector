@@ -76,6 +76,7 @@ pub use uuid_v4::UuidV4;
 
 use remap::{Result, Value};
 
+#[inline]
 fn convert_value_or_default(
     value: Result<Value>,
     default: Option<Result<Value>>,
@@ -86,6 +87,7 @@ fn convert_value_or_default(
         .or_else(|err| default.ok_or(err)?.and_then(|value| convert(value)))
 }
 
+#[inline]
 fn is_scalar_value(value: &Value) -> bool {
     use Value::*;
 
@@ -98,6 +100,7 @@ fn is_scalar_value(value: &Value) -> bool {
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
 /// can be specified.
+#[inline]
 fn round_to_precision<F>(num: f64, precision: i64, fun: F) -> f64
 where
     F: Fn(f64) -> f64,

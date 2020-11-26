@@ -21,6 +21,8 @@ pub use runtime::Runtime;
 pub use type_def::TypeDef;
 pub use value::Value;
 
+pub use paste::paste;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Any object you want to map through the remap language has to implement this
@@ -237,6 +239,7 @@ mod tests {
             (r#"null || false"#, Ok(()), Ok(false.into())),
             (r#"false || null"#, Ok(()), Ok(().into())),
             (r#"null || "foo""#, Ok(()), Ok("foo".into())),
+            (r#". = "bar""#, Ok(()), Ok("bar".into())),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -251,11 +254,11 @@ mod tests {
 
             assert_eq!(
                 program.as_ref().map(|_| ()).map_err(|e| e.to_string()),
-                compile_expected.map_err(|e| e.to_string())
+                compile_expected.map_err(|e: &str| e.to_string())
             );
 
-            if program.is_err() {
-                return;
+            if program.is_err() && compile_expected.is_err() {
+                continue;
             }
 
             let program = program.unwrap();
@@ -266,7 +269,7 @@ mod tests {
                 .execute(&mut event, &program)
                 .map_err(|e| e.to_string());
 
-            assert_eq!(result, runtime_expected.map_err(|e| e.to_string()));
+            assert_eq!(result, runtime_expected.map_err(|e: &str| e.to_string()));
         }
     }
 

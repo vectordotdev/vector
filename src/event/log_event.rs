@@ -92,6 +92,11 @@ impl LogEvent {
         self.fields.is_empty()
     }
 
+    #[instrument(level = "trace", skip(self))]
+    pub fn as_map(&self) -> &BTreeMap<String, Value> {
+        &self.fields
+    }
+
     #[instrument(level = "trace", skip(self, lookup), fields(lookup = %lookup), err)]
     fn entry(&mut self, lookup: Lookup) -> crate::Result<Entry<String, Value>> {
         trace!("Seeking to entry.");
