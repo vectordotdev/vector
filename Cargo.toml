@@ -214,7 +214,7 @@ atty = "0.2"
 nix = "0.17.0"
 
 [build]
-jobs = 4 
+jobs = 2 
 
 [build-dependencies]
 prost-build = "0.6.1"
