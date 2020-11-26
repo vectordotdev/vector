@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use criterion::{criterion_group, BatchSize, Criterion};
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use indexmap::IndexMap;
 use remap::prelude::*;
 use vector::transforms::{
@@ -16,6 +16,7 @@ use vector::{
 };
 
 criterion_group!(benches, benchmark_remap, upcase, downcase, parse_json);
+criterion_main!(benches);
 
 bench_function! {
     upcase => vector::remap::Upcase;
