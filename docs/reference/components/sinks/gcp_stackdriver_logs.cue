@@ -147,11 +147,11 @@ components: sinks: gcp_stackdriver_logs: {
 			type: object: {
 				examples: [
 					{
-						type: "global",
-						projectId: "vector-123456",
-						instanceId: "Twilight",
-						zone: "us-central1-a"
-					}
+						type:       "global"
+						projectId:  "vector-123456"
+						instanceId: "Twilight"
+						zone:       "us-central1-a"
+					},
 				]
 				options: {
 					type: {
