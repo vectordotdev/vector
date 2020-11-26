@@ -418,7 +418,7 @@ mod tests {
             let event = events.remove(0);
             let log = event.as_log();
             assert_eq!(
-                log.get(Lookup::from_str("dotted.key").unwrap()).unwrap(),
+                log.get(Lookup::from("dotted.key")).unwrap(),
                 &Value::from("value")
             );
         }

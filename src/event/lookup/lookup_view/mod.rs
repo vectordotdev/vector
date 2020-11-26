@@ -40,6 +40,12 @@ use std::{
 /// something that's not able to be a `str`, you should consult `std::str::from_utf8` and handle the
 /// possible error.
 ///
+/// # Warnings
+///
+/// * You **can not** deserialize lookups (that is, views, the buffers are fine) out of str slices
+///   with escapes in serde_Json. [serde_json does not allow it.](https://github.com/serde-rs/json/blob/master/src/read.rs#L424-L476)
+///   You **must** use strings. This means it is **almost always not a good idea to deserialize a
+///   string into a `Lookup`. **Use a `LookupBuf` instead.**
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Hash)]
 pub struct Lookup<'a> {
     pub(super) segments: Vec<Segment<'a>>,
@@ -296,6 +302,8 @@ impl<'de> Deserialize<'de> for Lookup<'de> {
     }
 }
 
+/// **WARNING:**: You **can not** deserialize lookups (that is, views, the buffers
+/// are fine) out of str slices with escapes. It's invalid. You **must** use lookupbufs.
 struct LookupVisitor<'a> {
     // This must exist to make the lifetime bounded.
     _marker: std::marker::PhantomData<&'a ()>,
@@ -305,7 +313,7 @@ impl<'de> Visitor<'de> for LookupVisitor<'de> {
     type Value = Lookup<'de>;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("Expected valid Lookup path.")
+        formatter.write_str("Expected valid Lookup path. If deserializing a string, use a LookupBuf.")
     }
 
     fn visit_borrowed_str<E>(self, value: &'de str) -> Result<Self::Value, E>

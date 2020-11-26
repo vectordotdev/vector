@@ -341,13 +341,13 @@ impl<'de> Deserialize<'de> for LookupBuf {
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_string(LookupVisitor)
+        deserializer.deserialize_string(LookupBufVisitor)
     }
 }
 
-struct LookupVisitor;
+struct LookupBufVisitor;
 
-impl<'de> Visitor<'de> for LookupVisitor {
+impl<'de> Visitor<'de> for LookupBufVisitor {
     type Value = LookupBuf;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

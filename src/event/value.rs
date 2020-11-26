@@ -408,6 +408,16 @@ impl From<serde_json::Value> for Value {
     }
 }
 
+impl From<serde_json::Map<String, serde_json::Value>> for Value {
+    fn from(json_value: serde_json::Map<String, serde_json::Value>) -> Self {
+        Value::Map(
+            json_value.into_iter()
+                .map(|(key, value)| (key, Value::from(value)))
+                .collect(),
+        )
+    }
+}
+
 impl TryInto<serde_json::Value> for Value {
     type Error = crate::Error;
 

@@ -1,11 +1,10 @@
 use crate::{
     config::{log_schema, DataType, TransformConfig, TransformDescription},
-    event::{Event, LookupBuf},
+    event::{Event, Value, LookupBuf},
     internal_events::{JsonParserEventProcessed, JsonParserFailedParse, JsonParserTargetExists},
     transforms::{FunctionTransform, Transform},
 };
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
 #[serde(deny_unknown_fields, default)]
@@ -80,7 +79,7 @@ impl FunctionTransform for JsonParser {
         let parsed = value
             .and_then(|value| {
                 let to_parse = value.clone_into_bytes();
-                serde_json::from_slice::<Value>(to_parse.as_ref())
+                serde_json::from_slice::<serde_json::Value>(to_parse.as_ref())
                     .map_err(|error| {
                         emit!(JsonParserFailedParse {
                             field: &self.field,
@@ -91,7 +90,7 @@ impl FunctionTransform for JsonParser {
                     .ok()
             })
             .and_then(|value| {
-                if let Value::Object(object) = value {
+                if let serde_json::Value::Object(object) = value {
                     Some(object)
                 } else {
                     None
@@ -99,9 +98,9 @@ impl FunctionTransform for JsonParser {
             });
 
         if let Some(object) = parsed {
-            match self.target_field {
-                Some(ref target_field) => {
-                    let contains_target = log.contains(&*target_field);
+            match self.target_field.clone() {
+                Some(target_field) => {
+                    let contains_target = log.contains(&target_field);
 
                     if contains_target && !self.overwrite_target {
                         emit!(JsonParserTargetExists {
@@ -112,7 +111,7 @@ impl FunctionTransform for JsonParser {
                             log.remove(&self.field, false);
                         }
 
-                        log.insert(target_field.clone(), Value::Object(object));
+                        log.insert(target_field.clone(), Value::from(object));
                     }
                 }
                 None => {
@@ -195,6 +194,7 @@ mod test {
     // This is a regression test, see: https://github.com/timberio/vector/issues/2814
     #[test]
     fn json_parser_parse_periods() {
+        crate::test_util::trace_init();
         let mut parser = JsonParser::from(JsonParserConfig {
             drop_field: false,
             ..Default::default()
@@ -212,11 +212,11 @@ mod test {
         assert_eq!(
             event
                 .as_log()
-                .get(Lookup::from_str("field.with.dots").unwrap()),
+                .get(Lookup::from("field.with.dots")),
             Some(&crate::event::Value::from("hello")),
         );
         assert_eq!(
-            event.as_log().get(Lookup::from_str("sub.field").unwrap()),
+            event.as_log().get(Lookup::from("sub.field")),
             Some(&crate::event::Value::from(json!({ "another.one": "bob", }))),
         );
     }
@@ -242,6 +242,7 @@ mod test {
 
     #[test]
     fn json_parser_parse_field() {
+        crate::test_util::trace_init();
         let mut parser = JsonParser::from(JsonParserConfig {
             field: Some("data".into()),
             drop_field: false,
@@ -275,6 +276,7 @@ mod test {
 
     #[test]
     fn json_parser_parse_inner_json() {
+        crate::test_util::trace_init();
         let mut parser_outer = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
@@ -304,6 +306,7 @@ mod test {
 
     #[test]
     fn json_parser_invalid_json() {
+        crate::test_util::trace_init();
         let invalid = r#"{"greeting": "hello","#;
 
         // Raw
@@ -337,6 +340,7 @@ mod test {
 
     #[test]
     fn json_parser_drop_invalid() {
+        crate::test_util::trace_init();
         let valid = r#"{"greeting": "hello", "name": "bob"}"#;
         let invalid = r#"{"greeting": "hello","#;
         let not_object = r#""hello""#;
@@ -384,6 +388,7 @@ mod test {
 
     #[test]
     fn json_parser_chained() {
+        crate::test_util::trace_init();
         let mut parser1 = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
@@ -408,6 +413,7 @@ mod test {
 
     #[test]
     fn json_parser_types() {
+        crate::test_util::trace_init();
         let mut parser = JsonParser::from(JsonParserConfig {
             ..Default::default()
         });
@@ -441,11 +447,11 @@ mod test {
         );
         assert_eq!(event.as_log()[Lookup::from_str("int").unwrap()], 56.into());
         assert_eq!(
-            event.as_log()[Lookup::from_str("bool true").unwrap()],
+            event.as_log()[Lookup::from("bool true")],
             true.into()
         );
         assert_eq!(
-            event.as_log()[Lookup::from_str("bool false").unwrap()],
+            event.as_log()[Lookup::from("bool false")],
             false.into()
         );
         assert_eq!(
@@ -565,7 +571,7 @@ mod test {
             Some(crate::event::Value::Map(_)) => (),
             _ => panic!("\"message\" is not a map"),
         }
-        assert_eq!(event[Lookup::from("message.greeting")], "hello".into());
-        assert_eq!(event[Lookup::from("message.name")], "bob".into());
+        assert_eq!(event[Lookup::from_str("message.greeting").unwrap()], "hello".into());
+        assert_eq!(event[Lookup::from_str("message.name").unwrap()], "bob".into());
     }
 }

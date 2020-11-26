@@ -148,7 +148,7 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 
     let mut buf = Vec::new();
     test_file.read_to_end(&mut buf)?;
-    let string = String::from_utf8(buf).unwrap().trim().to_string();
+    let string = String::from_utf8(buf).unwrap().to_string();
     // remove trailing newline introduced by editors
     Ok(string.trim_end().to_owned())
 }
@@ -168,16 +168,26 @@ fn lookup_to_string_and_serialize() {
                 let path = fixture_file.path();
                 tracing::trace!(?path, "Opening.");
                 let buf = parse_artifact(&path).unwrap();
+
                 let buf_serialized =
                     serde_json::to_string(&serde_json::to_value(&buf).unwrap()).unwrap();
                 let lookup = Lookup::from_str(&buf).unwrap();
                 tracing::trace!(?path, ?lookup, ?buf, "Asserting equal.");
                 assert_eq!(lookup.to_string(), buf);
+
+                // **WARNING:**: You **can not** deserialize lookups (that is, views, the buffers
+                // are fine) out of str slices with escapes. It's invalid. You **must** use lookupbufs.
+                if lookup.to_string().contains('\"') {
+                    trace!("Need to filter this test, it contains escape chars and cannot be \
+                            deserialized into a lookup view. Use a LookupBuf.");
+                    return;
+                }
+
                 // Ensure serialization doesn't clobber.
                 let serialized = serde_json::to_string(&lookup.to_string()).unwrap();
                 assert_eq!(serialized, buf_serialized);
                 // Ensure deserializing doesn't clobber.
-                let deserialized = serde_json::from_str(&serialized).unwrap();
+                let deserialized: Lookup<'_> = serde_json::from_str(&serialized).unwrap();
                 assert_eq!(lookup, deserialized);
             }
             _ => panic!("This test should never read Err'ing test fixtures."),

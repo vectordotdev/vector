@@ -34,10 +34,10 @@ impl LogEvent {
             Segment::Field(f) => {
                 if lookup_len == 1 {
                     // Terminus: We **must** insert here or abort.
-                    trace!(key = %f, "Getting from root.");
+                    trace!(key = ?f, "Getting from root.");
                     return self.fields.get(f);
                 } else {
-                    trace!(key = %f, "Descending into map.");
+                    trace!(key = ?f, "Descending into map.");
                     self.fields.get(f)
                 }
             }
@@ -59,12 +59,12 @@ impl LogEvent {
             cursor = match (segment, cursor) {
                 // Fields access maps.
                 (Segment::Field(ref f), Some(Value::Map(map))) => {
-                    trace!(key = %f, "Descending into map.");
+                    trace!(key = ?f, "Descending into map.");
                     map.get(*f)
                 }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
-                    trace!(key = %i, "Descending into array.");
+                    trace!(key = ?i, "Descending into array.");
                     array.get(i)
                 }
                 // The rest, it's not good.
@@ -95,10 +95,10 @@ impl LogEvent {
             Segment::Field(f) => {
                 if lookup_len == 1 {
                     // Terminus: We **must** insert here or abort.
-                    trace!(key = %f, "Getting from root.");
+                    trace!(key = ?f, "Getting from root.");
                     return self.fields.get_mut(f);
                 } else {
-                    trace!(key = %f, "Descending into map.");
+                    trace!(key = ?f, "Descending into map.");
                     self.fields.get_mut(f)
                 }
             }
@@ -120,12 +120,12 @@ impl LogEvent {
             cursor = match (segment, cursor) {
                 // Fields access maps.
                 (Segment::Field(f), Some(Value::Map(map))) => {
-                    trace!(key = %f, "Descending into map.");
+                    trace!(key = ?f, "Descending into map.");
                     map.get_mut(f)
                 }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
-                    trace!(key = %i, "Descending into array.");
+                    trace!(key = ?i, "Descending into array.");
                     array.get_mut(i)
                 }
                 // The rest, it's not good.
@@ -164,12 +164,12 @@ impl LogEvent {
             SegmentBuf::Field(f) => {
                 if lookup_len == 1 {
                     // Terminus: We **must** insert here or abort.
-                    trace!(key = %f, value = ?value, "Inserted into root.");
+                    trace!(key = ?f, value = ?value, "Inserted into root.");
                     return self.fields.insert(f, value);
                 } else {
-                    trace!(key = %f, "Descending into map.");
+                    trace!(key = ?f, "Descending into map.");
                     self.fields.entry(f.clone()).or_insert_with(|| {
-                        trace!(key = %f, "Entry not found, inserting a null to build up.");
+                        trace!(key = ?f, "Entry not found, inserting a null to build up.");
                         Value::Null
                     })
                 }
@@ -192,12 +192,12 @@ impl LogEvent {
                 (SegmentBuf::Field(ref f), &mut Value::Map(ref mut map)) => {
                     if index == lookup_len.saturating_sub(1) {
                         // Terminus: We **must** insert here or abort.
-                        trace!(key = %f, "Creating field inside map.");
+                        trace!(key = ?f, "Creating field inside map.");
                         return map.insert(f.clone(), value);
                     } else {
-                        trace!(key = %f, "Descending into map.");
+                        trace!(key = ?f, "Descending into map.");
                         map.entry(f.clone()).or_insert_with(|| {
-                            trace!(key = %f, "Entry not found, inserting null to build up.");
+                            trace!(key = ?f, "Entry not found, inserting null to build up.");
                             Value::Null
                         })
                     }
@@ -206,23 +206,23 @@ impl LogEvent {
                 (SegmentBuf::Index(i), &mut Value::Array(ref mut array)) => {
                     if index == lookup_len.saturating_sub(1) {
                         // Terminus: We **must** insert here or abort.
-                        trace!(key = %i, "Terminus array index segment, inserting into index unconditionally.");
+                        trace!(key = ?i, "Terminus array index segment, inserting into index unconditionally.");
                         return match array.get_mut(i) {
                             None => {
-                                trace!(key = %i, "Resizing array with Null values up to index, then pushing value.");
+                                trace!(key = ?i, "Resizing array with Null values up to index, then pushing value.");
                                 array.resize_with(i.saturating_add(1), || Value::Null);
                                 array.push(value);
                                 None
                             }
                             Some(target) => {
-                                trace!(key = %i, "Swapping existing value at index for inserted value, returning it.");
+                                trace!(key = ?i, "Swapping existing value at index for inserted value, returning it.");
                                 let mut swapped_with_target = value;
                                 core::mem::swap(target, &mut swapped_with_target);
                                 Some(swapped_with_target)
                             }
                         };
                     } else {
-                        trace!(key = %i, "Descending into array.");
+                        trace!(key = ?i, "Descending into array.");
                         let len = array.len();
                         if i > len {
                             array.get_mut(i).expect(&*format!(
@@ -230,7 +230,7 @@ impl LogEvent {
                                 len, i
                             ))
                         } else {
-                            trace!(key = %i, "Descendent array was not long enough, resizing and pushing new value.");
+                            trace!(key = ?i, "Descendent array was not long enough, resizing and pushing new value.");
                             array.resize_with(i.saturating_add(1), || Value::Null);
                             array.index_mut(i)
                         }
@@ -239,22 +239,32 @@ impl LogEvent {
                 (SegmentBuf::Field(f), cursor_ref) if cursor_ref == &mut Value::Null => {
                     trace!(key = ?f, "Did not discover map to descend into, but found a `null`. Since a map is expected. Creating one.");
                     let mut map = BTreeMap::default();
-                    map.insert(f.clone(), Value::Null);
-                    *cursor_ref = Value::Map(map);
-                    cursor_ref
-                        .as_map_mut()
-                        .get_mut(&f)
-                        .expect("Failed to regain a ref to a map just created.")
+                    if index == lookup_len.saturating_sub(1) {
+                        trace!(index, "Terminus segment, inserting unconditionally.");
+                        map.insert(f.clone(), value);
+                        *cursor_ref = Value::Map(map);
+                        return None;
+                    } else {
+                        trace!("Non-terminus segment, scaffolding a null for later filling.");
+                        map.insert(f.clone(), Value::Null);
+                        *cursor_ref = Value::Map(map);
+                        cursor_ref
+                            .as_map_mut()
+                            .get_mut(&f)
+                            .expect("Failed to regain a ref to a map just created.")
+                    }
                 }
                 (SegmentBuf::Index(i), cursor_ref) if cursor_ref == &mut Value::Null => {
                     trace!(key = ?i, "Did not discover array to descend into, but found a `null`. Since an array is expected. Creating one.");
                     let mut array = Vec::with_capacity(i.saturating_add(1));
                     array.resize_with(i, || Value::Null);
                     if index == lookup_len.saturating_sub(1) {
+                        trace!(index, lookup_len, "Terminus segment, inserting unconditionally.");
                         array.push(value);
                         *cursor_ref = Value::Array(array);
                         return None;
                     } else {
+                        trace!(index, lookup_len, "Non-terminus segment, scaffolding a null for later filling.");
                         array.push(Value::Null);
                         *cursor_ref = Value::Array(array);
                         cursor_ref.as_array_mut().index_mut(i)
@@ -294,10 +304,10 @@ impl LogEvent {
         let mut cursor = match first_step {
             Segment::Field(f) => {
                 if lookup_len == 1 {
-                    trace!(key = %f, "Removed from root.");
+                    trace!(key = ?f, "Removed from root.");
                     return self.fields.remove(*f);
                 } else {
-                    trace!(key = %f, "Descending into map.");
+                    trace!(key = ?f, "Descending into map.");
                     self.fields.get_mut(*f)
                 }
             }
@@ -327,7 +337,7 @@ impl LogEvent {
                         }
                         break;
                     } else {
-                        trace!(key = %f, "Descending into map.");
+                        trace!(key = ?f, "Descending into map.");
                         map.get_mut(*f)
                     }
                 }
@@ -345,7 +355,7 @@ impl LogEvent {
                             }
                         }
                     } else {
-                        trace!(key = %i, "Descending into array.");
+                        trace!(key = ?i, "Descending into array.");
                         array.get_mut(*i)
                     }
                 }
