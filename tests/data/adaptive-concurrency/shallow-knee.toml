@@ -1,8 +1,8 @@
 [params]
 requests = 1000
 delay = 0.100
-concurrency.knee_start = 10
-concurrency.knee_exp = 1.1
+concurrency_limit_params.knee_start = 10
+concurrency_limit_params.knee_exp = 1.1
 
 concurrency = "adaptive"
 
