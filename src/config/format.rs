@@ -25,9 +25,15 @@ impl Default for Format {
 }
 
 impl Format {
-    fn refute_unknown(self) -> Self {
+    /// Returns the format as is unless it's unknown.
+    /// If the format is unknown - executes the function and return the result
+    /// of the function.
+    pub fn known_or<F>(self, f: F) -> Self
+    where
+        F: FnOnce() -> Self,
+    {
         match self {
-            Format::Unknown => Format::default(),
+            Format::Unknown => f(),
             _ => self,
         }
     }
@@ -50,7 +56,7 @@ pub fn deserialize<T>(content: &str, format: Format) -> Result<T, Vec<String>>
 where
     T: de::DeserializeOwned,
 {
-    match format.refute_unknown() {
+    match format.known_or(Format::default) {
         Format::Unknown => unreachable!(),
         Format::TOML => toml::from_str(content).map_err(|e| vec![e.to_string()]),
         Format::YAML => serde_yaml::from_str(content).map_err(|e| vec![e.to_string()]),

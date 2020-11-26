@@ -9,19 +9,29 @@ use std::{
 };
 
 lazy_static! {
-    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
-    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<PathBuf> = {
+    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<(PathBuf, Format)> =
+        vec![("/etc/vector/vector.toml".into(), Format::Unknown)];
+    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<(PathBuf, Format)> = {
         let program_files = std::env::var("ProgramFiles")
             .expect("%ProgramFiles% environment variable must be defined");
         let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-        vec![PathBuf::from(config_path)]
+        vec![(PathBuf::from(config_path), Format::Unknown)]
     };
-    pub static ref CONFIG_PATHS: Mutex<Vec<PathBuf>> = Mutex::default();
+    pub static ref CONFIG_PATHS: Mutex<Vec<(PathBuf, Format)>> = Mutex::default();
+}
+
+/// Merge the paths coming from different cli flags with different formats into
+/// a unified list of paths with formats.
+pub fn merge_path_lists<'a>(path_lists: Vec<(&'a [PathBuf], Format)>) -> Vec<(PathBuf, Format)> {
+    path_lists
+        .into_iter()
+        .flat_map(|(paths, format)| paths.iter().cloned().map(move |path| (path, format)))
+        .collect()
 }
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
-pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
+pub fn process_paths(config_paths: &[(PathBuf, Format)]) -> Option<Vec<(PathBuf, Format)>> {
     let default_paths = if cfg!(unix) {
         DEFAULT_UNIX_CONFIG_PATHS.clone()
     } else if cfg!(windows) {
@@ -38,7 +48,7 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 
     let mut paths = Vec::new();
 
-    for config_pattern in starting_paths {
+    for (config_pattern, format) in starting_paths {
         let matches: Vec<PathBuf> = match glob(config_pattern.to_str().expect("No ability to glob"))
         {
             Ok(glob_paths) => glob_paths.filter_map(Result::ok).collect(),
@@ -54,11 +64,11 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
         }
 
         for path in matches {
-            paths.push(path);
+            paths.push((path, *format));
         }
     }
 
-    paths.sort();
+    paths.sort_by(|(a, _), (b, _)| a.cmp(b));
     paths.dedup();
     // Ignore poison error and let the current main thread continue running to do the cleanup.
     std::mem::drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
@@ -67,23 +77,22 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 }
 
 pub fn load_from_paths(
-    config_paths: &[PathBuf],
+    config_paths: &[(PathBuf, Format)],
     deny_warnings: bool,
 ) -> Result<Config, Vec<String>> {
     load_builder_from_paths(config_paths, deny_warnings)?.build_with(deny_warnings)
 }
 
 pub fn load_builder_from_paths(
-    config_paths: &[PathBuf],
+    config_paths: &[(PathBuf, Format)],
     deny_warnings: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
-    for path in config_paths {
+    for (path, format) in config_paths {
         if let Some(file) = open_config(&path) {
-            let format = format::from_path(&path);
-            inputs.push((file, format));
+            inputs.push((file, format.known_or(move || format::from_path(&path))));
         } else {
             errors.push(format!("Config file not found in path: {:?}.", path));
         };

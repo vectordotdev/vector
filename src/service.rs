@@ -26,6 +26,18 @@ struct InstallOpts {
     #[structopt(long)]
     display_name: Option<String>,
 
+    /// Vector config files in TOML format to be used by the service.
+    #[structopt(name = "config-toml", long)]
+    config_paths_toml: Vec<PathBuf>,
+
+    /// Vector config files in JSON format to be used by the service.
+    #[structopt(name = "config-json", long)]
+    config_paths_json: Vec<PathBuf>,
+
+    /// Vector config files in YAML format to be used by the service.
+    #[structopt(name = "config-yaml", long)]
+    config_paths_yaml: Vec<PathBuf>,
+
     /// The configuration files that will be used by the service.
     /// If no configuration file is specified, will target default configuration file.
     #[structopt(name = "config", short, long)]
@@ -39,7 +51,8 @@ impl InstallOpts {
         let description = crate::built_info::PKG_DESCRIPTION;
 
         let current_exe = ::std::env::current_exe().unwrap();
-        let arguments = create_service_arguments(&self.config_paths).unwrap();
+        let config_paths = self.config_paths_with_formats();
+        let arguments = create_service_arguments(&config_paths).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -48,6 +61,15 @@ impl InstallOpts {
             executable_path: current_exe,
             launch_arguments: arguments,
         }
+    }
+
+    fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::Format)> {
+        config::merge_path_lists(vec![
+            (&self.config_paths, config::Format::Unknown),
+            (&self.config_paths_toml, config::Format::TOML),
+            (&self.config_paths_json, config::Format::JSON),
+            (&self.config_paths_yaml, config::Format::YAML),
+        ])
     }
 }
 
@@ -189,13 +211,21 @@ fn control_service(_service: &ServiceInfo, _action: ControlAction) -> exitcode::
     exitcode::UNAVAILABLE
 }
 
-fn create_service_arguments(config_paths: &[PathBuf]) -> Option<Vec<OsString>> {
+fn create_service_arguments(config_paths: &[(PathBuf, config::Format)]) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(&config_paths)?;
     match config::load_from_paths(&config_paths, false) {
         Ok(_) => Some(
             config_paths
                 .iter()
-                .flat_map(|p| vec![OsString::from("--config"), p.as_os_str().into()])
+                .flat_map(|(path, format)| {
+                    let key = match format {
+                        config::Format::Unknown => "--config",
+                        config::Format::TOML => "--config-toml",
+                        config::Format::JSON => "--config-json",
+                        config::Format::YAML => "--config-yaml",
+                    };
+                    vec![OsString::from(key), path.as_os_str().into()]
+                })
                 .collect::<Vec<OsString>>(),
         ),
         Err(errs) => {
