@@ -543,6 +543,7 @@ disable-resolv-conf = []
 # excluing API client due to running out of memory during linking in Github Actions
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
 
 [[bench]]
 name = "default"
@@ -554,6 +555,11 @@ name = "wasm"
 path = "benches/wasm/mod.rs"
 harness = false
 required-features = ["wasm-benches"]
+
+[[bench]]
+name = "remap"
+harness = false
+required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"
