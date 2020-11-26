@@ -425,10 +425,12 @@ mod tests {
                 let conf = r#"
                     [api]
                       enabled = true
+
                     [sources.processed_events_total_batch_source]
                       type = "generator"
                       lines = ["Random line", "And another"]
                       batch_interval = 0.01
+
                     [sinks.processed_events_total_batch_sink]
                       # General
                       type = "blackhole"
@@ -470,12 +472,12 @@ mod tests {
                 let conf = r#"
                     [api]
                       enabled = true
-        
+
                     [sources.processed_bytes_total_batch_source]
                       type = "generator"
                       lines = ["Random line", "And another"]
                       batch_interval = 0.1
-        
+
                     [sinks.processed_bytes_total_batch_sink]
                       # General
                       type = "blackhole"
@@ -512,12 +514,12 @@ mod tests {
             let conf = r#"
                 [api]
                   enabled = true
-    
+
                 [sources.component_added_source_1]
                   type = "generator"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
-    
+
                 [sinks.component_added_sink]
                   # General
                   type = "blackhole"
@@ -558,17 +560,17 @@ mod tests {
             let conf = r#"
                 [api]
                   enabled = true
-    
+
                 [sources.component_added_source_1]
                   type = "generator"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
-    
+
                 [sources.component_added_source_2]
                   type = "generator"
                   lines = ["3rd line", "4th line"]
                   batch_interval = 0.1
-    
+
                 [sinks.component_added_sink]
                   # General
                   type = "blackhole"
@@ -645,12 +647,12 @@ mod tests {
             conf = r#"
                 [api]
                   enabled = true
-    
+
                 [sources.component_removed_source_1]
                   type = "generator"
                   lines = ["Random line", "And another"]
                   batch_interval = 0.1
-    
+
                 [sinks.component_removed_sink]
                   # General
                   type = "blackhole"
