@@ -1,3 +1,4 @@
+use crate::event;
 use remap::prelude::*;
 
 #[derive(Clone, Copy, Debug)]
@@ -37,25 +38,15 @@ struct ParseJsonFn {
     default: Option<Box<dyn Expression>>,
 }
 
-impl ParseJsonFn {
-    #[cfg(test)]
-    fn new(value: Box<dyn Expression>, default: Option<Value>) -> Self {
-        let default = default.map(|v| Box::new(Literal::from(v)) as _);
-
-        Self { value, default }
-    }
-}
-
 impl Expression for ParseJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let to_json = |value| match value {
-            Value::Bytes(bytes) => serde_json::from_slice(&bytes)
-                .map(|v: serde_json::Value| {
-                    let v: crate::event::Value = v.into();
-                    v.into()
-                })
-                .map_err(|err| format!("unable to parse json {}", err).into()),
-            _ => Err(format!(r#"unable to convert value "{}" to json"#, value.kind()).into()),
+        let to_json = |value: Value| {
+            let bytes = value.unwrap_bytes();
+            let value = serde_json::from_slice(&bytes)
+                .map(|v: serde_json::Value| event::Value::from(v))
+                .map_err(|e| format!("unable to parse json: {}", e))?;
+
+            Ok(value.into())
         };
 
         super::convert_value_or_default(
@@ -93,10 +84,49 @@ impl Expression for ParseJsonFn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map;
     use value::Kind;
 
-    remap::test_type_def![
+    test_function![
+        parse_json => ParseJson;
+
+        number {
+            args: func_args![value: "42"],
+            want: Ok(42),
+        }
+
+        string {
+            args: func_args![value: r#""hello""#],
+            want: Ok("hello"),
+        }
+
+        json {
+            args: func_args![value: r#"{"field":"value"}"#],
+            want: Ok(map!["field": "value"]),
+        }
+
+        default {
+            args: func_args![
+                value: r#"{ INVALID }"#,
+                default: "42",
+            ],
+            want: Ok(42),
+        }
+
+        invalid_value {
+            args: func_args![value: r#"{ INVALID }"#],
+            want: Err("function call error: unable to parse json: key must be a string at line 1 column 3"),
+        }
+
+        invalid_value_and_default {
+            args: func_args![
+                value: r#"{ INVALID }"#,
+                default: r#"{ INVALID }"#,
+            ],
+            want: Err("function call error: unable to parse json: key must be a string at line 1 column 3"),
+        }
+    ];
+
+    test_type_def![
         value_string {
             expr: |_| ParseJsonFn {
                 value: Literal::from("foo").boxed(),
@@ -141,50 +171,4 @@ mod tests {
             },
         }
     ];
-
-    #[test]
-    fn parse_json() {
-        let cases = vec![
-            (
-                map!["foo": "42"],
-                Ok(42.into()),
-                ParseJsonFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map!["foo": "\"hello\""],
-                Ok("hello".into()),
-                ParseJsonFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map!["foo": r#"{"field":"value"}"#],
-                Ok(map!["field": "value"].into()),
-                ParseJsonFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map!["foo": r#"{ INVALID }"#],
-                Ok(42.into()),
-                ParseJsonFn::new(Box::new(Path::from("foo")), Some("42".into())),
-            ),
-            (
-                map!["foo": r#"{ INVALID }"#],
-                Err("function call error: unable to parse json key must be a string at line 1 column 3".into()),
-                ParseJsonFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map!["foo": r#"{ INVALID }"#],
-                Err("function call error: unable to parse json key must be a string at line 1 column 3".into()),
-                ParseJsonFn::new(Box::new(Path::from("foo")), Some("{ INVALID }".into())),
-            ),
-        ];
-
-        let mut state = state::Program::default();
-
-        for (mut object, exp, func) in cases {
-            let got = func
-                .execute(&mut state, &mut object)
-                .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
-
-            assert_eq!(got, exp);
-        }
-    }
 }
