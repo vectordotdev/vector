@@ -143,12 +143,11 @@ mod tests {
             ),
             (
                 "false || 2",
-
                 TypeDef {
                     fallible: false,
                     kind: Kind::Bytes | Kind::Float,
                 },
-                Err("expected to resolve to string or float values, but instead resolves to an error, or integer or boolean values".to_owned()),
+                Err("expected to resolve to string or float values, but instead resolves to integer or boolean values".to_owned()),
             ),
         ];
 

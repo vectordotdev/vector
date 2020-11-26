@@ -26,10 +26,7 @@ impl Expression for Arithmetic {
             Divide => lhs.try_div(rhs),
             Add => lhs.try_add(rhs),
             Subtract => lhs.try_sub(rhs),
-
-            // TODO: make `Or` infallible, `Null`, `false` and `None` resolve to
-            // rhs, everything else resolves to lhs
-            Or => lhs.try_or(rhs),
+            Or => Ok(lhs.or(rhs)),
             And => lhs.try_and(rhs),
             Remainder => lhs.try_rem(rhs),
             Equal => Ok(lhs.eq_lossy(&rhs).into()),
@@ -46,16 +43,28 @@ impl Expression for Arithmetic {
         use value::Kind;
         use Operator::*;
 
-        let kind = match self.op {
-            Or => self.lhs.type_def(state).kind | self.rhs.type_def(state).kind,
-            Multiply | Add => Kind::Bytes | Kind::Integer | Kind::Float,
-            Remainder | Subtract | Divide => Kind::Integer | Kind::Float,
-            And | Equal | NotEqual | Greater | GreaterOrEqual | Less | LessOrEqual => Kind::Boolean,
-        };
+        let lhs_def = self.lhs.type_def(state);
+        let rhs_def = self.rhs.type_def(state);
+        let type_def = lhs_def | rhs_def;
 
-        TypeDef {
-            fallible: true,
-            kind,
+        match self.op {
+            Or if lhs_def.kind.is_null() => rhs_def,
+            Or if !lhs_def.kind.is_boolean() => lhs_def,
+            Or => type_def,
+            And if lhs_def.kind.is_null() => lhs_def.with_constraint(Kind::Boolean),
+            And => type_def
+                .fallible_unless(Kind::Null | Kind::Boolean)
+                .with_constraint(Kind::Boolean),
+            Equal | NotEqual => type_def.with_constraint(Kind::Boolean),
+            Greater | GreaterOrEqual | Less | LessOrEqual => type_def
+                .fallible_unless(Kind::Integer | Kind::Float)
+                .with_constraint(Kind::Boolean),
+            Subtract | Divide | Remainder => type_def
+                .fallible_unless(Kind::Integer | Kind::Float)
+                .with_constraint(Kind::Integer | Kind::Float),
+            Multiply | Add => type_def
+                .fallible_unless(Kind::Bytes | Kind::Integer | Kind::Float)
+                .with_constraint(Kind::Bytes | Kind::Integer | Kind::Float),
         }
     }
 }
@@ -77,8 +86,8 @@ mod tests {
                 Operator::Or,
             ),
             def: TypeDef {
-                fallible: true,
-                kind: Kind::Bytes | Kind::Boolean,
+                fallible: false,
+                kind: Kind::Bytes,
             },
         }
 
@@ -89,8 +98,8 @@ mod tests {
                 Operator::Or,
             ),
             def: TypeDef {
-                fallible: true,
-                kind: Kind::Boolean | Kind::Null,
+                fallible: false,
+                kind: Kind::Boolean,
             },
         }
 
@@ -161,7 +170,7 @@ mod tests {
                 Operator::And,
             ),
             def: TypeDef {
-                fallible: true,
+                fallible: false,
                 kind: Kind::Boolean,
             },
         }
@@ -173,7 +182,7 @@ mod tests {
                 Operator::Equal,
             ),
             def: TypeDef {
-                fallible: true,
+                fallible: false,
                 kind: Kind::Boolean,
             },
         }
@@ -185,7 +194,7 @@ mod tests {
                 Operator::NotEqual,
             ),
             def: TypeDef {
-                fallible: true,
+                fallible: false,
                 kind: Kind::Boolean,
             },
         }
