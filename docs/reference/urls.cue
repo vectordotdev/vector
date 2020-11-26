@@ -335,6 +335,7 @@ urls: {
 	systemd_limit_resources:                                  "https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html"
 	systemd_resolved:                                         "https://wiki.archlinux.org/index.php/Systemd-resolved"
 	tcp:                                                      "https://en.wikipedia.org/wiki/Transmission_Control_Protocol"
+	team:                                                     "/community#team"
 	timber:                                                   "https://timber.io"
 	toml:                                                     "https://github.com/toml-lang/toml"
 	toml_array:                                               "https://github.com/toml-lang/toml#array"
