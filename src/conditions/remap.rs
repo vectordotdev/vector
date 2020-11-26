@@ -4,7 +4,7 @@ use crate::{
     internal_events::RemapConditionExecutionFailed,
     Event,
 };
-use remap::{value, Program, RemapError, Runtime, TypeDef, Value};
+use remap::{value, Program, RemapError, Runtime, TypeConstraint, TypeDef, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -21,12 +21,15 @@ impl_generate_config_from_default!(RemapConfig);
 #[typetag::serde(name = "remap")]
 impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
-        let expected_result = TypeDef {
-            fallible: true,
-            kind: value::Kind::Boolean,
+        let constraint = TypeConstraint {
+            allow_any: false,
+            type_def: TypeDef {
+                fallible: true,
+                kind: value::Kind::Boolean,
+            },
         };
 
-        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, expected_result)
+        let program = Program::new(&self.source, &crate::remap::FUNCTIONS, Some(constraint))
             .map_err(|e| e.to_string())?;
 
         Ok(Box::new(Remap { program }))

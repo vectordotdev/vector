@@ -16,7 +16,7 @@ pub use error::{Error, RemapError};
 pub use expression::{Expr, Expression};
 pub use function::{Function, Parameter};
 pub use operator::Operator;
-pub use program::Program;
+pub use program::{Program, TypeConstraint};
 pub use runtime::Runtime;
 pub use type_def::TypeDef;
 pub use value::Value;
@@ -240,18 +240,13 @@ mod tests {
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
-            let accept = TypeDef {
-                fallible: true,
-                kind: value::Kind::all(),
-            };
-
             let program = Program::new(
                 script,
                 &[
                     Box::new(test_functions::RegexPrinter),
                     Box::new(test_functions::EnumValidator),
                 ],
-                accept,
+                None,
             );
 
             assert_eq!(
