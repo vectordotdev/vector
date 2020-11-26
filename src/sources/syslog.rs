@@ -15,8 +15,7 @@ use crate::{
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::{Datelike, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use futures::{compat::Sink01CompatExt, StreamExt};
-use futures01::Sink;
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::io;
 use std::net::SocketAddr;
@@ -308,7 +307,7 @@ pub fn udp(
                     }
                 }
             })
-            .forward(out.sink_compat())
+            .forward(out)
             .await;
 
         info!("Finished sending.");

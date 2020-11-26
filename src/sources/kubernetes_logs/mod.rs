@@ -36,11 +36,7 @@ mod transform_utils;
 mod util;
 
 use futures::{
-    compat::{Sink01CompatExt, Stream01CompatExt},
-    future::FutureExt,
-    sink::Sink,
-    stream::StreamExt,
-    TryStreamExt,
+    compat::Stream01CompatExt, future::FutureExt, sink::Sink, stream::StreamExt, TryStreamExt,
 };
 use futures01::Stream as Stream01;
 use k8s_paths_provider::K8sPathsProvider;
@@ -132,13 +128,11 @@ impl SourceConfig for Config {
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
         let source = Source::new(self, globals, name)?;
-        Ok(Box::pin(source.run(out.sink_compat(), shutdown).map(
-            |result| {
-                result.map_err(|error| {
-                    error!(message = "Source future failed.", %error);
-                })
-            },
-        )))
+        Ok(Box::pin(source.run(out, shutdown).map(|result| {
+            result.map_err(|error| {
+                error!(message = "Source future failed.", %error);
+            })
+        })))
     }
 
     fn output_type(&self) -> DataType {

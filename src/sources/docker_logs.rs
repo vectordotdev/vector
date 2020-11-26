@@ -22,7 +22,7 @@ use bollard::{
 };
 use bytes::{Buf, Bytes};
 use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
-use futures::{compat::Sink01CompatExt, sink::SinkExt, Stream, StreamExt};
+use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -642,10 +642,7 @@ impl EventStreamBuilder {
                 Box::new(events_stream)
             };
 
-        let result = events_stream
-            .map(Ok)
-            .forward(self.out.clone().sink_compat().sink_map_err(|_| ()))
-            .await;
+        let result = events_stream.map(Ok).forward(self.out.clone()).await;
 
         // End of stream
         emit!(DockerLogsContainerUnwatch {
@@ -654,7 +651,7 @@ impl EventStreamBuilder {
 
         let result = match result {
             Ok(()) => Ok(info),
-            Err(()) => Err(info.id),
+            Err(crate::pipeline::ClosedError) => Err(info.id),
         };
         // This is %error because the API doesn't support Display.
         if let Err(error) = self.main_send.send(result) {

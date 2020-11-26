@@ -9,8 +9,7 @@ use crate::{
     BoolAndSome, Pipeline,
 };
 use chrono::{DateTime, Utc};
-use futures::{compat::Sink01CompatExt, stream, SinkExt, StreamExt};
-use futures01::Sink;
+use futures::{stream, SinkExt, StreamExt};
 use glob::{Pattern, PatternError};
 #[cfg(target_os = "macos")]
 use heim::memory::os::macos::MemoryExt;
@@ -149,9 +148,8 @@ macro_rules! tags {
 
 impl HostMetricsConfig {
     async fn run(self, out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
-        let mut out = out
-            .sink_map_err(|error| error!(message = "Error sending host metrics.", %error))
-            .sink_compat();
+        let mut out =
+            out.sink_map_err(|error| error!(message = "Error sending host metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         let mut interval = time::interval(duration).take_until(shutdown);

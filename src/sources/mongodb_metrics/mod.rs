@@ -9,11 +9,9 @@ use crate::{
 };
 use chrono::Utc;
 use futures::{
-    compat::Sink01CompatExt,
     future::{join_all, try_join_all},
     stream, SinkExt, StreamExt,
 };
-use futures01::Sink;
 use mongodb::{
     bson::{self, doc, from_document},
     error::Error as MongoError,
@@ -132,9 +130,8 @@ impl SourceConfig for MongoDBMetricsConfig {
         )
         .await?;
 
-        let mut out = out
-            .sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error))
-            .sink_compat();
+        let mut out =
+            out.sink_map_err(|error| error!(message = "Error sending mongodb metrics.", %error));
 
         let duration = time::Duration::from_secs(self.scrape_interval_secs);
         Ok(Box::pin(async move {

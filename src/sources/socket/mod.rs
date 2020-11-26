@@ -162,10 +162,7 @@ mod test {
         Event, Pipeline,
     };
     use bytes::Bytes;
-    use futures::{
-        compat::{Future01CompatExt, Stream01CompatExt},
-        stream, StreamExt,
-    };
+    use futures::{compat::Future01CompatExt, stream, StreamExt};
     use std::{
         net::{SocketAddr, UdpSocket},
         sync::{
@@ -196,7 +193,7 @@ mod test {
     //////// TCP TESTS ////////
     #[tokio::test]
     async fn tcp_it_includes_host() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
@@ -215,13 +212,13 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.compat().next().await.unwrap().unwrap();
+        let event = rx.recv().await.unwrap();
         assert_eq!(event.as_log()[log_schema().host_key()], "127.0.0.1".into());
     }
 
     #[tokio::test]
     async fn tcp_it_includes_source_type() {
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
@@ -240,7 +237,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.compat().next().await.unwrap().unwrap();
+        let event = rx.recv().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().source_type_key()],
             "socket".into()
@@ -249,8 +246,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_continue_after_long_line() {
-        let (tx, rx) = Pipeline::new_test();
-        let mut rx = rx.compat();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::new(addr.into());
@@ -276,10 +272,10 @@ mod test {
         wait_for_tcp(addr).await;
         send_lines(addr, lines.into_iter()).await.unwrap();
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             "more short".into()
@@ -288,8 +284,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls() {
-        let (tx, rx) = Pipeline::new_test();
-        let mut rx = rx.compat();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::new(addr.into());
@@ -318,10 +313,10 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "short".into());
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[log_schema().message_key()],
             "more short".into()
@@ -330,8 +325,7 @@ mod test {
 
     #[tokio::test]
     async fn tcp_with_tls_intermediate_ca() {
-        let (tx, rx) = Pipeline::new_test();
-        let mut rx = rx.compat();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut config = TcpConfig::new(addr.into());
@@ -372,13 +366,13 @@ mod test {
         .await
         .unwrap();
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
             "short".into()
         );
 
-        let event = rx.next().await.unwrap().unwrap();
+        let event = rx.next().await.unwrap();
         assert_eq!(
             event.as_log()[crate::config::log_schema().message_key()],
             "more short".into()
@@ -388,7 +382,7 @@ mod test {
     #[tokio::test]
     async fn tcp_shutdown_simple() {
         let source_name = "tcp_shutdown_simple";
-        let (tx, rx) = Pipeline::new_test();
+        let (tx, mut rx) = Pipeline::new_test();
         let addr = next_addr();
 
         let mut shutdown = SourceShutdownCoordinator::default();
@@ -407,7 +401,7 @@ mod test {
             .await
             .unwrap();
 
-        let event = rx.compat().next().await.unwrap().unwrap();
+        let event = rx.recv().await.unwrap();
         assert_eq!(event.as_log()[log_schema().message_key()], "test".into());
 
         // Now signal to the Source to shut down.
