@@ -16,7 +16,7 @@ pub use error::{Error, RemapError};
 pub use expression::{Expr, Expression};
 pub use function::{Function, Parameter};
 pub use operator::Operator;
-pub use program::Program;
+pub use program::{Program, TypeConstraint};
 pub use runtime::Runtime;
 pub use type_def::TypeDef;
 pub use value::Value;
@@ -228,21 +228,25 @@ mod tests {
                 Err("remap error: function error: unknown enum variant: baz, must be one of: foo, bar"),
                 Ok("valid: baz".into()),
             ),
+            (r#"false || true"#, Ok(()), Ok(true.into())),
+            (r#"false || false"#, Ok(()), Ok(false.into())),
+            (r#"true || false"#, Ok(()), Ok(true.into())),
+            (r#"true || true"#, Ok(()), Ok(true.into())),
+            (r#"false || "foo""#, Ok(()), Ok("foo".into())),
+            (r#""foo" || false"#, Ok(()), Ok("foo".into())),
+            (r#"null || false"#, Ok(()), Ok(false.into())),
+            (r#"false || null"#, Ok(()), Ok(().into())),
+            (r#"null || "foo""#, Ok(()), Ok("foo".into())),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
-            let accept = TypeDef {
-                fallible: true,
-                kind: value::Kind::all(),
-            };
-
             let program = Program::new(
                 script,
                 &[
                     Box::new(test_functions::RegexPrinter),
                     Box::new(test_functions::EnumValidator),
                 ],
-                accept,
+                None,
             );
 
             assert_eq!(
