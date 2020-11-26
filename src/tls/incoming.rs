@@ -1,9 +1,10 @@
+#[cfg(feature = "listenfd")]
+use super::Handshake;
+use super::MaybeTls;
 use super::{
     CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, TcpBind, TlsError,
     TlsSettings,
 };
-#[cfg(feature = "listenfd")]
-use super::{Handshake, MaybeTls};
 use crate::tcp::TcpKeepaliveConfig;
 use bytes::{Buf, BufMut};
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
@@ -159,6 +160,8 @@ impl MaybeTlsIncomingStream<TcpStream> {
         Ok(())
     }
 
+    // Required for `make check-component-features`
+    #[allow(dead_code)]
     pub(crate) fn set_keepalive(
         &mut self,
         keepalive: Option<TcpKeepaliveConfig>,
