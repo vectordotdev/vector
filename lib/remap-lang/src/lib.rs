@@ -21,6 +21,8 @@ pub use runtime::Runtime;
 pub use type_def::TypeDef;
 pub use value::Value;
 
+pub use paste::paste;
+
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Any object you want to map through the remap language has to implement this

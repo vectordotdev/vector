@@ -53,7 +53,7 @@ macro_rules! bench_function {
 #[macro_export]
 macro_rules! test_function {
     ($name:tt => $func:path; $($case:ident { args: $args:expr, want: $(Ok($ok:expr))? $(Err($err:expr))? $(,)* })+) => {
-        paste::paste!{$(
+        $crate::paste!{$(
         #[test]
         fn [<$name _ $case:snake:lower>]() {
             let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
