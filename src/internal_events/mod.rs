@@ -68,6 +68,8 @@ mod metric_to_log;
 mod mongodb_metrics;
 #[cfg(feature = "sinks-nats")]
 mod nats;
+#[cfg(feature = "sources-nginx_metrics")]
+mod nginx_metrics;
 mod open;
 mod process;
 #[cfg(feature = "sources-prometheus")]
@@ -180,6 +182,8 @@ pub use self::lua::*;
 pub(crate) use self::metric_to_log::*;
 #[cfg(feature = "sinks-nats")]
 pub use self::nats::*;
+#[cfg(feature = "sources-nginx_metrics")]
+pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
 pub use self::process::*;
 #[cfg(feature = "sources-prometheus")]

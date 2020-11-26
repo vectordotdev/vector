@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-11-19"
 $schema: ".schema.json"
-title: "New `prometheus_remote_write` sources and sinks"
-description: "Export metrics out of Prometheus."
+title: "Support for Prometheus remote write"
+description: "Easily export metrics out of Prometheus."
 author_github: "https://github.com/jamtur01"
 pr_numbers: [4856, 5144]
 release: "0.11.0"
@@ -18,8 +18,8 @@ observability data, and working with Prometheus is core to our
 metrics strategy. As a result, 0.11.0 includes two new components that assist
 with a variety of Prometheus use cases:
 
-1. [`prometheus_remote_write` source][prometheus_remote_write_source]
-2. [`prometheus_remote_write` sink][prometheus_remote_write_sink]
+1. **A new [`prometheus_remote_write` source][prometheus_remote_write_source]**
+2. **A new [`prometheus_remote_write` sink][prometheus_remote_write_sink]**
 
 ## Get Started
 
@@ -63,7 +63,8 @@ Kubernetes where Prometheus is tightly integrated.
 
 To get started, setup the new
 [`prometheus_remote_write` source][prometheus_remote_write_source] and send
-your metrics to [Datadog], [New Relic], [Influx], [Elasticsearch], and [more]:
+your metrics to [Datadog][datadog], [New Relic][new_relic], [Influx][influx],
+[Elasticsearch][elastic], and [more][sinks]:
 
 ```toml title="vector.toml"
 [sources.prometheus]
@@ -74,6 +75,11 @@ your metrics to [Datadog], [New Relic], [Influx], [Elasticsearch], and [more]:
   inputs = ["prometheus"]
 ```
 
+[datadog]: https://datadog.com
+[elastic]: https://www.elastic.co/
+[influx]: https://www.influxdata.com/
 [kubernetes_highlight]: /highlights/2020-10-27-kubernetes-integration
+[new_relic]: https://newrelic.com
 [prometheus_remote_write_sink]: /docs/reference/sinks/prometheus_remote_write
 [prometheus_remote_write_source]: /docs/reference/sources/prometheus_remote_write
+[sinks]: /docs/reference/sinks/

@@ -2,13 +2,13 @@
 last_modified_on: "2020-10-27"
 $schema: ".schema.json"
 title: "First-class Kubernetes integration"
-description: "Vector officially support Kubernetes with a first-class integration."
+description: "Vector officially supports Kubernetes with a first-class integration."
 author_github: "https://github.com/binarylogic"
 featured: true
 pr_numbers: [1314]
 release: "0.11.0"
 hide_on_release_notes: false
-tags: ["type: new feature", "domain: paltforms", "platform: kubernetes"]
+tags: ["type: featured", "domain: platforms", "platform: kubernetes"]
 ---
 
 After eight months of development, [100 pull requests][kubernetes_pull_requests],
@@ -17,8 +17,9 @@ to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for collecting and processing all
 Kubernetes observability data.
 
-For more details, checkout the
-[Kubernetes announcement blog post][announcement_post].
+import Jump from '@site/src/components/Jump';
+
+<Jump to="/blog">Read the Kubernetes announcement post</Jump>
 
 ## Feature highlights
 
@@ -47,7 +48,7 @@ To cut straight to the chase, check out our Kubernetes installation instructions
 
 ## Future plans
 
-[adaptive_concurrency_post]: /blog/...
+[adaptive_concurrency_post]: /blog/adaptive-request-concurrency/
 [announcement_post]: /blog/...
 [installation_docs]: /docs/setup/installation/platforms/kubernetes/
 [kubernetes_logs_source]: /docs/reference/sources/kubernetes_logs/
