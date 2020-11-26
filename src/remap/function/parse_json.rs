@@ -42,7 +42,7 @@ impl Expression for ParseJsonFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let to_json = |value: Value| {
             let bytes = value.unwrap_bytes();
-            let value = serde_json::from_slice(&bytes)
+            let value = serde_json::from_slice::<'_, serde_json::Value>(&bytes)
                 .map(event::Value::from)
                 .map_err(|e| format!("unable to parse json: {}", e))?;
 
