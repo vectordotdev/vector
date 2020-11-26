@@ -23,7 +23,6 @@ impl ConditionConfig for RemapConfig {
     fn build(&self) -> crate::Result<Box<dyn Condition>> {
         let expected_result = TypeDef {
             fallible: true,
-            optional: true,
             kind: value::Kind::Boolean,
         };
 
@@ -119,13 +118,13 @@ mod test {
             (
                 log_event![],
                 "",
-                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to null value"),
                 Ok(()),
             ),
             (
                 log_event!["foo" => "string"],
                 ".foo",
-                Err("remap error: program error: expected to resolve to boolean or no value, but instead resolves to any value"),
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
             ),
             (

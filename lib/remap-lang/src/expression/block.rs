@@ -1,4 +1,4 @@
-use crate::{state, Expr, Expression, Object, Result, TypeDef, Value};
+use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
 
 #[derive(Debug, Clone)]
 pub struct Block {
@@ -32,10 +32,9 @@ impl Expression for Block {
         let fallible = type_defs.iter().any(TypeDef::is_fallible);
 
         // The last expression determines the resulting value of the block.
-        let mut type_def = type_defs.pop().unwrap_or(TypeDef {
-            optional: true,
-            ..Default::default()
-        });
+        let mut type_def = type_defs
+            .pop()
+            .unwrap_or_else(|| TypeDef::default().with_constraint(value::Kind::Null));
 
         type_def.fallible = fallible;
         type_def
@@ -55,7 +54,10 @@ mod tests {
     test_type_def![
         no_expression {
             expr: |_| Block::new(vec![]),
-            def: TypeDef { optional: true, ..Default::default() },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Null,
+            },
         }
 
         one_expression {
@@ -84,7 +86,6 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes | Kind::Integer | Kind::Float,
-                ..Default::default()
             },
         }
 
@@ -101,7 +102,6 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
-                ..Default::default()
             },
         }
     ];

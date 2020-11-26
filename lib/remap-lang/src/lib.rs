@@ -233,7 +233,6 @@ mod tests {
         for (script, compile_expected, runtime_expected) in cases {
             let accept = TypeDef {
                 fallible: true,
-                optional: true,
                 kind: value::Kind::all(),
             };
 

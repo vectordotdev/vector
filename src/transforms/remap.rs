@@ -52,7 +52,6 @@ impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
         let accepts = TypeDef {
             fallible: true,
-            optional: true,
             kind: value::Kind::all(),
         };
 
