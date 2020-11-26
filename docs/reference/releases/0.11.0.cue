@@ -2,7 +2,7 @@ package metadata
 
 releases: "0.11.0": {
 	date:     "2020-11-25"
-	codename: "Kubernetes"
+	codename: "Kubernetes Pipes"
 	description: """
 		The Vector team is pleased to announce 0.11.0. This release
 		is focused on Kubernetes. In addition to the new,
@@ -15,16 +15,34 @@ releases: "0.11.0": {
 
 	whats_next: [
 		{
-			title:       "Kubernetes metrics support"
-			description: "..."
+			title: "Vector's own observability"
+			description: """
+				The next Vector release (0.12.0) will focus on Vector's own
+				internal observability. We've got some _very_ exciting
+				features planned for this.
+				"""
 		},
 		{
-			title:       "Vector's own observability"
-			description: "..."
+			title:       "Kubernetes aggregator role"
+			description: """
+										In addition to Vector's observability, 0.12 will include
+										support for	deploying Vector into the [aggregator role](\(urls.vector_aggregator_role))
+										within Kubernetes. This will allow you to build sophisticated
+										observability piplines with Vector. Distributing processing
+										on the edge, centralizing it with an aggregator, or both.
+										If you are interested in beta testing, please
+										[join our chat](\(urls.vector_chat)) and let us know.
+										"""
 		},
 		{
-			title:       "Timber Remap Language (TRL)"
-			description: "..."
+			title: "Timber Remap Language (TRL)"
+			description: """
+				Finally, 0.13 will introduce the new Timber Remap Language.
+				This is a Rust-native syntax designed for safe and efficient
+				data mapping. It's an ultra-performance middle ground between
+				fundamental transforms like `add_fields` and a full blow
+				runtime like `lua`.
+				"""
 		},
 	]
 

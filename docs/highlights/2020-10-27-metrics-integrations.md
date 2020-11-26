@@ -4,7 +4,7 @@ $schema: ".schema.json"
 title: "New metrics integrations"
 description: "Collect metrics from your host, Apache, Nginx, and Mongodb."
 author_github: "https://github.com/jamtur01"
-pr_numbers: [1314]
+pr_numbers: [3704, 4157, 4500, 4698, 5209]
 release: "0.11.0"
 hide_on_release_notes: false
 tags: ["type: new feature", "domain: metrics", "domain: sources"]
@@ -41,11 +41,8 @@ To get started with these sources, define them and go:
 ```toml
 [sources.host_metrics]
 type = "host_metrics" # or apache_metrics, mongodb_metrics, or internal_metrics
-```
 
-Then connect them to a sink:
-
-```toml
+# Then connect them to a sink:
 [sinks.prometheus]
 type = "prometheus"
 inputs = ["host_metrics"]
