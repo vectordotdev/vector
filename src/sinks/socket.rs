@@ -5,8 +5,6 @@ use crate::{
     sinks::util::{
         encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
-    tcp::TcpKeepaliveConfig,
-    tls::TlsConfig,
 };
 use serde::{Deserialize, Serialize};
 
@@ -44,20 +42,15 @@ impl GenerateConfig for SocketSinkConfig {
 }
 
 impl SocketSinkConfig {
-    pub fn make_tcp_config(
-        address: String,
-        encoding: EncodingConfig<Encoding>,
-        keepalive: Option<TcpKeepaliveConfig>,
-        tls: Option<TlsConfig>,
-    ) -> Self {
-        SocketSinkConfig {
-            mode: Mode::Tcp(TcpSinkConfig::new(address, keepalive, tls)),
-            encoding,
-        }
+    pub fn new(mode: Mode, encoding: EncodingConfig<Encoding>) -> Self {
+        SocketSinkConfig { mode, encoding }
     }
 
     pub fn make_basic_tcp_config(address: String) -> Self {
-        Self::make_tcp_config(address, EncodingConfig::from(Encoding::Text), None, None)
+        Self::new(
+            Mode::Tcp(TcpSinkConfig::new(address, None, None)),
+            EncodingConfig::from(Encoding::Text),
+        )
     }
 }
 

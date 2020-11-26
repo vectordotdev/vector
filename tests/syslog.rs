@@ -5,10 +5,8 @@ use futures::compat::Future01CompatExt;
 use rand::{thread_rng, Rng};
 use serde::Deserialize;
 use serde_json::Value;
-use sinks::{
-    socket::SocketSinkConfig,
-    util::{encoding::EncodingConfig, Encoding},
-};
+use sinks::socket::{self, SocketSinkConfig};
+use sinks::util::{encoding::EncodingConfig, tcp::TcpSinkConfig, Encoding};
 use std::{collections::HashMap, fmt, str::FromStr};
 use tokio_util::codec::BytesCodec;
 use vector::{
@@ -340,5 +338,8 @@ fn encode_priority(severity: Severity, facility: Facility) -> u8 {
 }
 
 fn tcp_json_sink(address: String) -> SocketSinkConfig {
-    SocketSinkConfig::make_tcp_config(address, EncodingConfig::from(Encoding::Json), None, None)
+    SocketSinkConfig::new(
+        socket::Mode::Tcp(TcpSinkConfig::new(address, None, None)),
+        EncodingConfig::from(Encoding::Json),
+    )
 }

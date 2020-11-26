@@ -34,7 +34,7 @@ pub enum Mode {
 }
 
 impl SocketConfig {
-    pub fn make_tcp_config(tcp_config: tcp::TcpConfig) -> Self {
+    pub fn new_tcp(tcp_config: tcp::TcpConfig) -> Self {
         tcp_config.into()
     }
 
