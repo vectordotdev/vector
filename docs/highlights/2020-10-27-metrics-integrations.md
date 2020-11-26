@@ -63,6 +63,6 @@ with a number of organizations to assist with this transition.
 [docs]: /docs/
 [host_metrics_source]: /docs/reference/sources/host_metrics/
 [internal_metrics_source]: /docs/reference/sources/internal_metrics/
-[kubernetes_announcement]: /blog/...
+[kubernetes_announcement]: /blog/kubernetes-integration/
 [mongodb_metrics_source]: /docs/reference/sources/mongodb_metrics/
 [nginx_metrics_source]: /docs/reference/sources/nginx_metrics/

@@ -52,4 +52,6 @@ vector --config-json /etc/vector/vector.json
 Head over to the [configuration docs][config] for more info.
 
 [config]: /docs/setup/configuration/
+[cue]: https://cuelang.org/
+[jsonnet]: https://jsonnet.org/
 [jsonnet_library]: https://github.com/xunleii/vector_jsonnet
