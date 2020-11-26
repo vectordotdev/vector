@@ -23,9 +23,9 @@ async fn component_added(client: Arc<SubscriptionClient>, mut tx: state::EventTx
                     kind: c.on.to_string(),
                     component_type: c.component_type,
                     processed_events_total: 0,
-                    processed_events_throughput: 0,
+                    processed_events_throughput_sec: 0,
                     processed_bytes_total: 0,
-                    processed_bytes_throughput: 0,
+                    processed_bytes_throughput_sec: 0,
                     errors: 0,
                 }))
                 .await;
@@ -90,6 +90,7 @@ async fn processed_events_throughputs(
             let c = d.component_processed_events_throughputs;
             let _ = tx
                 .send(state::EventType::ProcessedEventsThroughputs(
+                    interval,
                     c.into_iter().map(|c| (c.name, c.throughput)).collect(),
                 ))
                 .await;
@@ -138,6 +139,7 @@ async fn processed_bytes_throughputs(
             let c = d.component_processed_bytes_throughputs;
             let _ = tx
                 .send(state::EventType::ProcessedBytesThroughputs(
+                    interval,
                     c.into_iter().map(|c| (c.name, c.throughput)).collect(),
                 ))
                 .await;
@@ -198,13 +200,13 @@ pub async fn init_components(client: &Client) -> Result<state::State, ()> {
                         .as_ref()
                         .map(|ep| ep.processed_events_total as i64)
                         .unwrap_or(0),
-                    processed_events_throughput: 0,
+                    processed_events_throughput_sec: 0,
                     processed_bytes_total: d
                         .processed_bytes_total
                         .as_ref()
                         .map(|ep| ep.processed_bytes_total as i64)
                         .unwrap_or(0),
-                    processed_bytes_throughput: 0,
+                    processed_bytes_throughput_sec: 0,
                     errors: 0,
                 },
             )
