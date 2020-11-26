@@ -66,6 +66,10 @@ impl<'de> Visitor<'de> for ValueVisitor {
         Ok(Value::from(data.to_string()))
     }
 
+    fn visit_string<E>(self, data: String) -> Result<Self::Value, E> {
+        Ok(Value::from(data))
+    }
+
     fn visit_bytes<E>(self, data: &[u8]) -> Result<Self::Value, E> {
         Ok(Value::from(Bytes::from(data.to_vec())))
     }

@@ -2,7 +2,7 @@ use crate::event::{
     lookup::{Segment, SegmentBuf},
     Lookup, LookupBuf, Value,
 };
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::ops::IndexMut;
 use std::{
     collections::{btree_map::Entry, BTreeMap, HashMap},
@@ -11,8 +11,9 @@ use std::{
     iter::FromIterator,
 };
 
-#[derive(PartialEq, Debug, Clone, Default)]
+#[derive(PartialEq, Debug, Clone, Default, Serialize, Deserialize)]
 pub struct LogEvent {
+    #[serde(flatten)]
     fields: BTreeMap<String, Value>,
 }
 
@@ -21,17 +22,24 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn get<'a>(&self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&Value> {
         let lookup = lookup.into();
-        let mut lookup_iter = lookup.iter();
+        let lookup_len = lookup.len();
+        let mut lookup_iter = lookup.into_iter().enumerate();
         // The first step should always be a field.
-        let first_step = lookup_iter.next()?;
+        let (_zero, first_step) = lookup_iter.next()?;
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
-            Segment::Field(ref f) => {
-                trace!(key = f, "Descending into map.");
-                self.fields.get(*f)
+            Segment::Field(f) => {
+                if lookup_len == 1 {
+                    // Terminus: We **must** insert here or abort.
+                    trace!(key = %f, "Getting from root.");
+                    return self.fields.get(f);
+                } else {
+                    trace!(key = %f, "Descending into map.");
+                    self.fields.get(f)
+                }
             }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
@@ -43,7 +51,7 @@ impl LogEvent {
             }
         };
 
-        for segment in lookup_iter {
+        for (_index, segment) in lookup_iter {
             // Don't do extra work.
             if cursor.is_none() {
                 break;
@@ -57,7 +65,7 @@ impl LogEvent {
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
                     trace!(key = %i, "Descending into array.");
-                    array.get(*i)
+                    array.get(i)
                 }
                 // The rest, it's not good.
                 (Segment::Index(_), _) | (Segment::Field(_), _) => {
@@ -75,17 +83,24 @@ impl LogEvent {
     #[instrument(level = "trace", skip(self))]
     pub fn get_mut<'a>(&mut self, lookup: impl Into<Lookup<'a>> + Debug) -> Option<&mut Value> {
         let lookup = lookup.into();
-        let mut lookup_iter = lookup.iter();
+        let lookup_len = lookup.len();
+        let mut lookup_iter = lookup.into_iter().enumerate();
         // The first step should always be a field.
-        let first_step = lookup_iter.next()?;
+        let (_zero, first_step) = lookup_iter.next()?;
         // This is good, since the first step into a LogEvent will also be a field.
 
         // This step largely exists so that we can make `cursor` a `Value` right off the bat.
         // We couldn't go like `let cursor = Value::from(self.fields)` since that'd take the value.
         let mut cursor = match first_step {
             Segment::Field(f) => {
-                trace!(key = %f, "Descending into array.");
-                self.fields.get_mut(*f)
+                if lookup_len == 1 {
+                    // Terminus: We **must** insert here or abort.
+                    trace!(key = %f, "Getting from root.");
+                    return self.fields.get_mut(f);
+                } else {
+                    trace!(key = %f, "Descending into map.");
+                    self.fields.get_mut(f)
+                }
             }
             // In this case, the user has passed us an invariant.
             Segment::Index(_) => {
@@ -97,7 +112,7 @@ impl LogEvent {
             }
         };
 
-        for segment in lookup_iter {
+        for (_index, segment) in lookup_iter {
             // Don't do extra work.
             if cursor.is_none() {
                 break;
@@ -106,12 +121,12 @@ impl LogEvent {
                 // Fields access maps.
                 (Segment::Field(f), Some(Value::Map(map))) => {
                     trace!(key = %f, "Descending into map.");
-                    map.get_mut(*f)
+                    map.get_mut(f)
                 }
                 // Indexes access arrays.
                 (Segment::Index(i), Some(Value::Array(array))) => {
                     trace!(key = %i, "Descending into array.");
-                    array.get_mut(*i)
+                    array.get_mut(i)
                 }
                 // The rest, it's not good.
                 (Segment::Index(_), _) | (Segment::Field(_), _) => {
@@ -137,7 +152,7 @@ impl LogEvent {
         let mut seen_segments = vec![];
         let lookup_len = lookup.len();
         let mut lookup_iter = lookup.into_iter().enumerate();
-        let mut value = value.into();
+        let value = value.into();
         // The first step should always be a field.
         let (_zero, first_step) = lookup_iter.next()?;
         seen_segments.push(first_step.clone());
@@ -148,6 +163,7 @@ impl LogEvent {
         let mut cursor = match first_step {
             SegmentBuf::Field(f) => {
                 if lookup_len == 1 {
+                    // Terminus: We **must** insert here or abort.
                     trace!(key = %f, value = ?value, "Inserted into root.");
                     return self.fields.insert(f, value);
                 } else {
@@ -181,8 +197,8 @@ impl LogEvent {
                     } else {
                         trace!(key = %f, "Descending into map.");
                         map.entry(f.clone()).or_insert_with(|| {
-                            trace!(key = %f, "Entry not found, inserting a map to build up.");
-                            Value::Map(Default::default())
+                            trace!(key = %f, "Entry not found, inserting null to build up.");
+                            Value::Null
                         })
                     }
                 }
@@ -194,30 +210,29 @@ impl LogEvent {
                         return match array.get_mut(i) {
                             None => {
                                 trace!(key = %i, "Resizing array with Null values up to index, then pushing value.");
-                                array.resize_with(i, || Value::Null);
-                                core::mem::swap(array.index_mut(i), &mut value);
-                                Some(Value::Null)
+                                array.resize_with(i.saturating_add(1), || Value::Null);
+                                array.push(value);
+                                None
                             }
                             Some(target) => {
                                 trace!(key = %i, "Swapping existing value at index for inserted value, returning it.");
-                                let mut removed = Value::Null;
-                                core::mem::swap(target, &mut removed);
-                                Some(removed)
+                                let mut swapped_with_target = value;
+                                core::mem::swap(target, &mut swapped_with_target);
+                                Some(swapped_with_target)
                             }
                         };
                     } else {
                         trace!(key = %i, "Descending into array.");
                         let len = array.len();
-                        if len >= i {
+                        if i > len {
                             array.get_mut(i).expect(&*format!(
                                 "Array of length {} is expected to have value at index {}",
                                 len, i
                             ))
                         } else {
                             trace!(key = %i, "Descendent array was not long enough, resizing and pushing new value.");
-                            array.resize_with(i.saturating_sub(1), || Value::Null);
-                            array.push(value);
-                            return Some(Value::Null);
+                            array.resize_with(i.saturating_add(1), || Value::Null);
+                            array.index_mut(i)
                         }
                     }
                 }
@@ -548,24 +563,6 @@ impl IntoIterator for LogEvent {
     }
 }
 
-impl Serialize for LogEvent {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.collect_map(self.fields.iter())
-    }
-}
-
-impl<'de> Deserialize<'de> for LogEvent {
-    fn deserialize<D>(deserializer: D) -> Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_map(crate::event::util::LogEventVisitor)
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -584,6 +581,28 @@ mod test {
             let mut value = Value::Null;
             event.insert(lookup.clone(), value.clone());
             assert_eq!(event.inner()["root"], value);
+            assert_eq!(event.get(&lookup), Some(&value));
+            assert_eq!(event.get_mut(&lookup), Some(&mut value));
+            assert_eq!(event.remove(&lookup, false), Some(value));
+            Ok(())
+        }
+
+        #[test]
+        fn root_with_buddy() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup = LookupBuf::from_str("root")?;
+            let mut value = Value::Null;
+            event.insert(lookup.clone(), value.clone());
+            assert_eq!(event.inner()["root"], value);
+            assert_eq!(event.get(&lookup), Some(&value));
+            assert_eq!(event.get_mut(&lookup), Some(&mut value));
+            assert_eq!(event.remove(&lookup, false), Some(value));
+
+            let lookup = LookupBuf::from_str("scrubby")?;
+            let mut value = Value::Null;
+            event.insert(lookup.clone(), value.clone());
+            assert_eq!(event.inner()["scrubby"], value);
             assert_eq!(event.get(&lookup), Some(&value));
             assert_eq!(event.get_mut(&lookup), Some(&mut value));
             assert_eq!(event.remove(&lookup, false), Some(value));
@@ -700,6 +719,63 @@ mod test {
         }
     }
 
+    mod corner_cases {
+        use super::*;
+
+        // While authors should prefer to set an array via `event.insert(lookup_to_array, array)`,
+        // there are some cases where we want to insert 1 by one. Make sure this can happen.
+        #[test]
+        fn iteratively_populate_array() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookups = vec![
+                LookupBuf::from_str("root.nested[0]")?,
+                LookupBuf::from_str("root.nested[1]")?,
+                LookupBuf::from_str("root.nested[2]")?,
+                LookupBuf::from_str("other[1][0]")?,
+                LookupBuf::from_str("other[1][1].a")?,
+                LookupBuf::from_str("other[1][1].b")?,
+            ];
+            let value = Value::Null;
+            for lookup in lookups.clone() {
+                event.insert(lookup, value.clone());
+            }
+            let pairs = event.keys().collect::<Vec<_>>();
+            for lookup in lookups {
+                assert!(pairs.contains(&lookup.clone_lookup()), "Failed while looking for {}", lookup);
+            }
+            Ok(())
+        }
+
+        // While authors should prefer to set an map via `event.insert(lookup_to_map, map)`,
+        // there are some cases where we want to insert 1 by one. Make sure this can happen.
+        #[test]
+        fn iteratively_populate_map() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookups = vec![
+                LookupBuf::from_str("root.one")?,
+                LookupBuf::from_str("root.two")?,
+                LookupBuf::from_str("root.three")?,
+                LookupBuf::from_str("root.three.a")?,
+                LookupBuf::from_str("root.three.b")?,
+                LookupBuf::from_str("root.three.c")?,
+                LookupBuf::from_str("root.four[0]")?,
+                LookupBuf::from_str("root.four[1]")?,
+                LookupBuf::from_str("root.four[2]")?,
+            ];
+            let value = Value::Null;
+            for lookup in lookups.clone() {
+                event.insert(lookup, value.clone());
+            }
+            let pairs = event.keys().collect::<Vec<_>>();
+            for lookup in lookups {
+                assert!(pairs.contains(&lookup.clone_lookup()), "Failed while looking for {}", lookup);
+            }
+            Ok(())
+        }
+    }
+
     #[test]
     fn keys_and_pairs() -> crate::Result<()> {
         crate::test_util::trace_init();
@@ -709,6 +785,8 @@ mod test {
         let lookup = LookupBuf::from_str("snooper.booper[1][2]")?;
         event.insert(lookup, Value::Null);
         let lookup = LookupBuf::from_str("whomp[1].glomp[1]")?;
+        event.insert(lookup, Value::Null);
+        let lookup = LookupBuf::from_str("zoop")?;
         event.insert(lookup, Value::Null);
 
         // Collect and sort since we don't want a flaky test on iteration do we?
@@ -759,6 +837,9 @@ mod test {
         let expected = Lookup::from_str("whomp[1].glomp[1]").unwrap();
         assert_eq!(keys[12], expected);
         assert_eq!(pairs[12].0, expected);
+        let expected = Lookup::from_str("zoop").unwrap();
+        assert_eq!(keys[13], expected);
+        assert_eq!(pairs[13].0, expected);
 
         Ok(())
     }

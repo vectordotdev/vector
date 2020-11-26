@@ -6,19 +6,22 @@ use crate::{
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use derive_is_enum_variant::is_enum_variant;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::{BTreeMap, HashMap};
 use std::convert::{TryFrom, TryInto};
 use std::iter::FromIterator;
 use toml::value::Value as TomlValue;
 
-#[derive(PartialEq, Debug, Clone, is_enum_variant)]
+// The ordering of these fields, **particularly timestamps and bytes** is very important as serde's
+// untagged enum parser handes it in order.
+#[derive(PartialEq, Debug, Clone, Deserialize, is_enum_variant)]
+#[serde(untagged)]
 pub enum Value {
-    Bytes(Bytes),
     Integer(i64),
     Float(f64),
     Boolean(bool),
     Timestamp(DateTime<Utc>),
+    Bytes(Bytes),
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Null,
@@ -250,15 +253,6 @@ impl Serialize for Value {
             Value::Array(a) => serializer.collect_seq(a),
             Value::Null => serializer.serialize_none(),
         }
-    }
-}
-
-impl<'de> Deserialize<'de> for Value {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, <D as Deserializer<'de>>::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_map(crate::event::util::ValueVisitor)
     }
 }
 

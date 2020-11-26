@@ -158,11 +158,12 @@ fn body_to_lines(buf: Bytes) -> impl Iterator<Item = Result<Bytes, ErrorMessage>
     })
 }
 
+// A handy helper to let you decode an array, or a single thing.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum ArrayOrNot<T> {
-    Array(Vec<T>),
     Not(T),
+    Array(Vec<T>),
 }
 
 fn decode_body(body: Bytes, enc: Encoding) -> Result<Vec<Event>, ErrorMessage> {

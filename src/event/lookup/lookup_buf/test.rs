@@ -158,7 +158,7 @@ fn parse_artifact(path: impl AsRef<Path>) -> std::io::Result<String> {
 
     let mut buf = Vec::new();
     test_file.read_to_end(&mut buf)?;
-    let string = String::from_utf8(buf).unwrap();
+    let string = String::from_utf8(buf).unwrap().trim().to_string();
     Ok(string)
 }
 

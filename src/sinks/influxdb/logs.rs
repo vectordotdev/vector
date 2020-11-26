@@ -180,13 +180,14 @@ impl HttpSink for InfluxDBLogsSink {
         // Tags + Fields
         let mut tags: BTreeMap<String, String> = BTreeMap::new();
         let mut fields: HashMap<String, Field> = HashMap::new();
-        event.pairs().for_each(|(key, value)| {
+
+        for (key, value) in event.pairs() {
             if self.tags.contains(&key.to_string()) {
                 tags.insert(key.to_string(), value.to_string_lossy());
             } else {
                 fields.insert(key.to_string(), value.to_field());
             }
-        });
+        }
 
         influx_line_protocol(
             self.protocol_version,
@@ -435,6 +436,8 @@ mod tests {
 
     #[test]
     fn test_encode_nested_fields() {
+        crate::test_util::trace_init();
+
         let mut event = Event::new_empty_log();
 
         event

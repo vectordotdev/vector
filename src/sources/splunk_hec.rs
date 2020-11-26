@@ -31,11 +31,11 @@ lazy_static::lazy_static! {
     pub static ref SPLUNK_INDEX_LOOKUP: LookupBuf = LookupBuf::from("splunk_index");
     pub static ref SPLUNK_SOURCE_LOOKUP: LookupBuf = LookupBuf::from("splunk_source");
     pub static ref SPLUNK_SOURCETYPE_LOOKUP: LookupBuf = LookupBuf::from("splunk_sourcetype");
-    pub static ref HOST_LOOKUP: LookupBuf = LookupBuf::from("HOST");
-    pub static ref CHANNEL_LOOKUP: LookupBuf = LookupBuf::from("channel");
-    pub static ref INDEX_LOOKUP: LookupBuf = LookupBuf::from("index");
-    pub static ref SOURCE_LOOKUP: LookupBuf = LookupBuf::from("source");
-    pub static ref SOURCETYPE_LOOKUP: LookupBuf = LookupBuf::from("sourcetype");
+    pub static ref HOST_LOOKUP: String = String::from("HOST");
+    pub static ref CHANNEL_LOOKUP: String = String::from("channel");
+    pub static ref INDEX_LOOKUP: String = String::from("index");
+    pub static ref SOURCE_LOOKUP: String = String::from("source");
+    pub static ref SOURCETYPE_LOOKUP: String = String::from("sourcetype");
     pub static ref LINE_LOOKUP: LookupBuf = LookupBuf::from("line");
 }
 
@@ -552,13 +552,13 @@ fn parse_timestamp(t: i64) -> Option<DateTime<Utc>> {
 
 /// Maintains last known extracted value of field and uses it in the absence of field.
 struct DefaultExtractor {
-    field: LookupBuf,
+    field: String,
     to_field: LookupBuf,
     value: Option<Value>,
 }
 
 impl DefaultExtractor {
-    fn new(field: LookupBuf, to_field: LookupBuf) -> Self {
+    fn new(field: String, to_field: LookupBuf) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -566,7 +566,7 @@ impl DefaultExtractor {
         }
     }
 
-    fn new_with(field: LookupBuf, to_field: LookupBuf, value: impl Into<Option<Value>>) -> Self {
+    fn new_with(field: String, to_field: LookupBuf, value: impl Into<Option<Value>>) -> Self {
         DefaultExtractor {
             field,
             to_field,
@@ -576,15 +576,17 @@ impl DefaultExtractor {
 
     fn extract(&mut self, log: &mut LogEvent, value: &mut JsonValue) {
         // Process json_field
-        if let Some(JsonValue::String(new_value)) =
-            value.get_mut(&self.field.to_string()).map(JsonValue::take)
-        {
-            self.value = Some(new_value.into());
+        if let Some(new_value) = value.get_mut(&self.field) {
+            self.value = Some(new_value.clone().into());
+            trace!(?self.value, from = ?self.field, "Set new default value.");
         }
 
         // Add data field
-        if let Some(index) = self.value.as_ref() {
-            log.insert(self.to_field.clone(), index.clone());
+        if let Some(value) = &self.value {
+            log.insert(self.to_field.clone(), value.clone());
+            trace!(?value, from = ?self.to_field, "Inserted new default value.");
+        } else {
+            trace!(from = ?self.to_field, "Inserting new default value into field not required, since it exists.");
         }
     }
 }
@@ -1124,20 +1126,20 @@ mod tests {
             events[0].as_log()[log_schema().message_key()],
             "first".into()
         );
-        assert_eq!(events[0].as_log()[&*super::SOURCE_LOOKUP], "main".into());
+        assert_eq!(events[0].as_log()[&*super::SPLUNK_SOURCE_LOOKUP], "main".into());
 
         assert_eq!(
             events[1].as_log()[log_schema().message_key()],
             "second".into()
         );
-        assert_eq!(events[1].as_log()[&*super::SOURCE_LOOKUP], "main".into());
+        assert_eq!(events[1].as_log()[&*super::SPLUNK_SOURCE_LOOKUP], "main".into());
 
         assert_eq!(
             events[2].as_log()[log_schema().message_key()],
             "third".into()
         );
         assert_eq!(
-            events[2].as_log()[&*super::SOURCE_LOOKUP],
+            events[2].as_log()[&*super::SPLUNK_SOURCE_LOOKUP],
             "secondary".into()
         );
     }
