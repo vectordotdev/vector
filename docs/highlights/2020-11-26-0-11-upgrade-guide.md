@@ -26,7 +26,7 @@ We cover each below to help you upgrade quickly:
 ### The metrics emitted by the `internal_metrics` source have changed names<a name="first"></a>
 
 We have not officially announced the `internal_metrics` source (coming in 0.12)
-due to the high probabily of breaking changes. Specifically, the metric names
+due to the high probability of breaking changes. Specifically, the metric names
 and labels. Since then we've settled on a [metric naming convention][metric_naming_convention]
 that is largely inspired by the [Prometheus naming convention][prometheus_naming_convention].
 0.11 includes these naming changes.
@@ -38,13 +38,13 @@ To upgrade, please see the following:
 
 You'll likely need to update any downstream consumers of this data. We plan to
 ship official Vector dashboards in 0.12 that will relieve this maintenance
-burden from you in the future.
+burden for you in the future.
 
 ### The `statsd` sink now supports all socket types<a name="second"></a>
 
-If you're using the [`statsd` sink][statsd_sink] you'll need to add a new `mode`
-option that specified which protocol you'd like to use. Previously, the only
-protocol was UDP.
+If you're using the [`statsd` sink][statsd_sink] you'll need to add the new
+`mode` option that specifies which protocol you'd like to use. Previously, the
+only protocol available was UDP.
 
 ```diff title="vector.toml"
  [sinks.statsd]
@@ -114,7 +114,7 @@ Would turn into this after being ingested into Vector:
 ```
 
 This is incorrect as Vector should not alter your data in this way. This has
-been corrected and you're events will keep `.` in their key names.
+been corrected and your events will keep `.` in their key names.
 
 There is nothing you need to do to upgrade except understand that your data
 structure may change if it contained `.` characters in the keys.
