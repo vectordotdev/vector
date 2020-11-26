@@ -114,29 +114,28 @@ mod tests {
 
         string_fallible {
             expr: |_| ToFloatFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float },
         }
 
         map_fallible {
             expr: |_| ToFloatFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float },
         }
 
         array_fallible {
             expr: |_| ToFloatFn { value: Literal::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float },
         }
 
         timestamp_infallible {
             expr: |_| ToFloatFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Float, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Float },
         }
 
         fallible_value_without_default {
             expr: |_| ToFloatFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Float,
             },
         }
@@ -148,7 +147,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Float,
             },
         }
@@ -160,7 +158,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Float,
             },
         }
@@ -172,7 +169,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Float,
             },
         }
@@ -184,7 +180,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Float,
             },
         }

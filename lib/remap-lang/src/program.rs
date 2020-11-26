@@ -1,4 +1,4 @@
-use crate::{parser, state, Error as E, Expr, Expression, Function, RemapError, TypeDef};
+use crate::{parser, state, value, Error as E, Expr, Expression, Function, RemapError, TypeDef};
 use pest::Parser;
 use std::fmt;
 
@@ -19,13 +19,10 @@ impl fmt::Display for ResolvesToError {
         let want = &self.0;
         let got = &self.1;
 
-        let fallible_diff = want.is_fallible() != got.is_fallible();
-        let optional_diff = want.is_optional() != got.is_optional();
-
         let mut want_str = "".to_owned();
         let mut got_str = "".to_owned();
 
-        if fallible_diff {
+        if want.is_fallible() != got.is_fallible() {
             if want.is_fallible() {
                 want_str.push_str("an error, or ");
             }
@@ -35,21 +32,8 @@ impl fmt::Display for ResolvesToError {
             }
         }
 
-        want_str.push_str(&want.kind.to_string());
-        got_str.push_str(&got.kind.to_string());
-
-        if optional_diff {
-            if want.is_optional() {
-                want_str.push_str(" or no");
-            }
-
-            if got.is_optional() {
-                got_str.push_str(" or no");
-            }
-        }
-
-        want_str.push_str(" value");
-        got_str.push_str(" value");
+        want_str.push_str(&format!("{} value", want.kind));
+        got_str.push_str(&format!("{} value", got.kind));
 
         let want_kinds: Vec<_> = want.kind.into_iter().collect();
         let got_kinds: Vec<_> = got.kind.into_iter().collect();
@@ -106,9 +90,8 @@ impl Program {
             .collect::<Vec<_>>();
 
         let computed_result = type_defs.pop().unwrap_or(TypeDef {
-            optional: true,
             fallible: true,
-            ..Default::default()
+            kind: value::Kind::Null,
         });
 
         if !expected_result.contains(&computed_result) {
@@ -154,7 +137,6 @@ mod tests {
                 ".foo",
                 TypeDef {
                     fallible: false,
-                    optional: false,
                     kind: Kind::Bytes,
                 },
                 Err("expected to resolve to string value, but instead resolves to an error, or any value".to_owned()),
@@ -164,7 +146,6 @@ mod tests {
 
                 TypeDef {
                     fallible: false,
-                    optional: false,
                     kind: Kind::Bytes | Kind::Float,
                 },
                 Err("expected to resolve to string or float values, but instead resolves to an error, or integer or boolean values".to_owned()),
