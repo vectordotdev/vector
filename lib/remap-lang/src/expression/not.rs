@@ -27,7 +27,6 @@ impl Expression for Not {
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
             fallible: true,
-            optional: true,
             kind: value::Kind::Boolean,
         }
     }
@@ -71,7 +70,6 @@ mod tests {
         expr: |_| Not::new(Box::new(Noop.into())),
         def: TypeDef {
             fallible: true,
-            optional: true,
             kind: Kind::Boolean,
         },
     }];

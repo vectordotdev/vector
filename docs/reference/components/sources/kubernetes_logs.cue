@@ -260,9 +260,7 @@ components: sources: kubernetes_logs: {
 	examples: [
 		{
 			title: "Sample Output"
-			configuration: {
-				type: "kubernetes_logs"
-			}
+			configuration: {}
 			input: """
 				```text
 				F1015 11:01:46.499073       1 main.go:39] error getting server version: Get \"https://10.96.0.1:443/version?timeout=32s\": dial tcp 10.96.0.1:443: connect: network is unreachable

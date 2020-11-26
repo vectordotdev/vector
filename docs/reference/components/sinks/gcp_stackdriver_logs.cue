@@ -145,7 +145,14 @@ components: sinks: gcp_stackdriver_logs: {
 			required:    false
 			warnings: []
 			type: object: {
-				examples: []
+				examples: [
+					{
+						type: "global",
+						projectId: "vector-123456",
+						instanceId: "Twilight",
+						zone: "us-central1-a"
+					}
+				]
 				options: {
 					type: {
 						description: "The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.\n\nSee the [Google Cloud Platform monitored resource documentation][urls.gcp_resources] for more details."

@@ -64,7 +64,7 @@ mod tests {
 
         fallible_expression {
             expr: |_| StripWhitespaceFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Bytes, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Bytes },
         }
     ];
 
