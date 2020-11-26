@@ -133,11 +133,7 @@ impl MaybeTlsStream<TcpStream> {
         };
 
         if let Some(keepalive) = keepalive {
-            stream.set_keepalive(
-                keepalive
-                    .time_secs
-                    .map(|time_secs| Duration::from_secs(time_secs)),
-            )?;
+            stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
         }
 
         Ok(())
