@@ -68,6 +68,5 @@ We use self-hosted runners for Windows builds. You can see our [self-hosted runn
 The current Windows runner is an Amazon EC2 instance running Windows 2019. To prep the install, use RDP to connect and then:
 
 1. Install [Chocolatey](https://chocolatey.org/install).
-2. Install openssl, Perl, and make. (`choco install openssl strawberryperl make`)
-3. Install [Visual Studio 2019](https://visualstudio.microsoft.com/downloads/). Ensure you select C++ for Linux as an optional feature.
- 
+2. Install openssl, Perl, and make. (`choco install openssl strawberryperl make`).
+3. Install [Visual Studio 2019](https://visualstudio.microsoft.com/downloads/). Ensure you select C++ for Linux as an optional feature. 
