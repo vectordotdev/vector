@@ -26,7 +26,7 @@ impl Default for Format {
 
 impl Format {
     /// Returns the format as is unless it's unknown.
-    /// If the format is unknown - executes the function and return the result
+    /// If the format is unknown - executes the function and returns the result
     /// of the function.
     pub fn known_or<F>(self, f: F) -> Self
     where
