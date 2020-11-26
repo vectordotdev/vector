@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{criterion_group, BatchSize, Criterion};
 use indexmap::IndexMap;
 use remap::prelude::*;
 use vector::transforms::{
