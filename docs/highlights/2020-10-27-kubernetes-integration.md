@@ -17,9 +17,7 @@ to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for collecting and processing all
 Kubernetes observability data.
 
-import Jump from '@site/src/components/Jump';
-
-<Jump to="/blog">Read the Kubernetes announcement post</Jump>
+[**Read the Kubernetes announcement post**][announcement_post]
 
 ## Feature highlights
 
@@ -27,7 +25,7 @@ import Jump from '@site/src/components/Jump';
     designed to handle the intricacies of Kuberenetes log collection. It'll
     collect all Pod logs, merge split logs together, and enrich them with k8s
     metadata.
-2.  [**`file` source performance improvements**][file_source_improvements] -
+2.  [**YAML config support**][config_formats_highlight] -
     Vector's [`file` source][file_source] powers the new `kubernetes_logs`
     source, and to keep up with very large Kubernetes deployments we invested
     in performance improvements. We were able to improve throughput by over 25%
@@ -42,13 +40,14 @@ import Jump from '@site/src/components/Jump';
 
 ## Get Started
 
-To cut straight to the chase, check out our Kubernetes installation instructions:
+To cut straight to the chase, check out the:
 
-<Jump to="/docs/setup/installation/platforms/kubernetes/#install">Kubernetes Installation Instructions</Jump>
+[**Kubernetes Installation Instructions**][installation_docs]
 
 ## Future plans
 
 [adaptive_concurrency_post]: /blog/adaptive-request-concurrency/
+[config_formats_highlight]: /highlights/2020-11-25-json-yaml-config-formats/
 [announcement_post]: /blog/...
 [installation_docs]: /docs/setup/installation/platforms/kubernetes/
 [kubernetes_logs_source]: /docs/reference/sources/kubernetes_logs/
