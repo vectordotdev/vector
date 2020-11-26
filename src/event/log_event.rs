@@ -250,9 +250,15 @@ impl LogEvent {
                     trace!(key = ?i, "Did not discover array to descend into, but found a `null`. Since an array is expected. Creating one.");
                     let mut array = Vec::with_capacity(i.saturating_add(1));
                     array.resize_with(i, || Value::Null);
-                    array.push(Value::Null);
-                    *cursor_ref = Value::Array(array);
-                    cursor_ref.as_array_mut().index_mut(i)
+                    if index == lookup_len.saturating_sub(1) {
+                        array.push(value);
+                        *cursor_ref = Value::Array(array);
+                        return None;
+                    } else {
+                        array.push(Value::Null);
+                        *cursor_ref = Value::Array(array);
+                        cursor_ref.as_array_mut().index_mut(i)
+                    }
                 }
 
                 // This is an error path but we can't fail. So return none and spit an error.
@@ -578,7 +584,7 @@ mod test {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(event.inner()["root"], value);
             assert_eq!(event.get(&lookup), Some(&value));
@@ -592,7 +598,7 @@ mod test {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(event.inner()["root"], value);
             assert_eq!(event.get(&lookup), Some(&value));
@@ -600,7 +606,7 @@ mod test {
             assert_eq!(event.remove(&lookup, false), Some(value));
 
             let lookup = LookupBuf::from_str("scrubby")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(event.inner()["scrubby"], value);
             assert_eq!(event.get(&lookup), Some(&value));
@@ -614,7 +620,7 @@ mod test {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root.field")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(event.inner()["root"].as_map()["field"], value);
             assert_eq!(event.get(&lookup), Some(&value));
@@ -628,7 +634,7 @@ mod test {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root.field.subfield")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(
                 event.inner()["root"].as_map()["field"].as_map()["subfield"],
@@ -645,7 +651,38 @@ mod test {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root[0]")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
+            event.insert(lookup.clone(), value.clone());
+            assert_eq!(event.inner()["root"].as_array()[0], value);
+            assert_eq!(event.get(&lookup), Some(&value));
+            assert_eq!(event.get_mut(&lookup), Some(&mut value));
+            assert_eq!(event.remove(&lookup, false), Some(value));
+            Ok(())
+        }
+
+        #[test]
+        fn array_reverse_population() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookup = LookupBuf::from_str("root[2]")?;
+            let mut value = Value::Boolean(true);
+            event.insert(lookup.clone(), value.clone());
+            assert_eq!(event.inner()["root"].as_array()[2], value);
+            assert_eq!(event.get(&lookup), Some(&value));
+            assert_eq!(event.get_mut(&lookup), Some(&mut value));
+            assert_eq!(event.remove(&lookup, false), Some(value));
+
+            let lookup = LookupBuf::from_str("root[1]")?;
+            let mut value = Value::Boolean(true);
+            event.insert(lookup.clone(), value.clone());
+            assert_eq!(event.inner()["root"].as_array()[1], value);
+            assert_eq!(event.get(&lookup), Some(&value));
+            assert_eq!(event.get_mut(&lookup), Some(&mut value));
+            assert_eq!(event.remove(&lookup, false), Some(value));
+
+
+            let lookup = LookupBuf::from_str("root[0]")?;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(event.inner()["root"].as_array()[0], value);
             assert_eq!(event.get(&lookup), Some(&value));
@@ -659,7 +696,7 @@ mod test {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root[0][0]")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(event.inner()["root"].as_array()[0].as_array()[0], value);
             assert_eq!(event.get(&lookup), Some(&value));
@@ -673,7 +710,7 @@ mod test {
             crate::test_util::trace_init();
             let mut event = LogEvent::default();
             let lookup = LookupBuf::from_str("root[0].nested")?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(
                 event.inner()["root"].as_array()[0].as_map()["nested"],
@@ -692,7 +729,7 @@ mod test {
             let lookup = LookupBuf::from_str(
                 "root[10].nested[10].more[9].than[8].there[7][6][5].we.go.friends.look.at.this",
             )?;
-            let mut value = Value::Null;
+            let mut value = Value::Boolean(true);
             event.insert(lookup.clone(), value.clone());
             assert_eq!(
                 event.inner()["root"].as_array()[10].as_map()["nested"].as_array()[10].as_map()
