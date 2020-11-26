@@ -213,6 +213,9 @@ security-framework = "0.4"
 atty = "0.2"
 nix = "0.17.0"
 
+[build]
+jobs = 4 
+
 [build-dependencies]
 prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
