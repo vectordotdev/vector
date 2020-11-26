@@ -899,6 +899,7 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "foobar"
 
+<<<<<<< HEAD
 [transforms.remap_function_parse_grok]
   inputs = []
   type = "remap"
@@ -1105,20 +1106,20 @@
     [tests.input.log_fields]
       foo = false
 
-# [transforms.remap_function_log]
-#   inputs=[]
-#   type = "remap"
-#   source = """
-#     log(.foo, level=info)
-#   """
-# [[tests]]
-#   name = "remap_function_log"
-#   [tests.input]
-#     insert_at = "remap_function_log"
-#     type = "log"
-#     [tests.input.log_fields]
-#       foo = "this should be unchanged"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_log"
-#     [[tests.outputs.conditions]]
-#     "foo.equals" = "this should be unchanged"
+[transforms.remap_function_log]
+  inputs=[]
+  type = "remap"
+  source = """
+    log(.foo, level="info")
+  """
+[[tests]]
+  name = "remap_function_log"
+  [tests.input]
+    insert_at = "remap_function_log"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "this should be unchanged"
+  [[tests.outputs]]
+    extract_from = "remap_function_log"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "this should be unchanged"

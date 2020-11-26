@@ -48,6 +48,7 @@ lazy_static! {
         Box::new(IpSubnet),
         Box::new(Exists),
         Box::new(Compact),
+        Box::new(Log),
     ];
 
     // List of both mutable, and immutable functions that can be loaded into a
