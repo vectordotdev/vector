@@ -39,13 +39,18 @@ impl Format {
     }
 }
 
-/// Obtain the format from the file path using extension as a hint.
-pub fn from_path(path: impl AsRef<Path>) -> Format {
-    match path.as_ref().extension().and_then(|ext| ext.to_str()) {
-        Some("toml") => Format::TOML,
-        Some("yaml") | Some("yml") => Format::YAML,
-        Some("json") => Format::JSON,
-        _ => Format::Unknown,
+impl<T> From<T> for Format
+where
+    T: AsRef<Path>,
+{
+    /// Obtain the format from the file path using extension as a hint.
+    fn from(path: T) -> Self {
+        match path.as_ref().extension().and_then(|ext| ext.to_str()) {
+            Some("toml") => Format::TOML,
+            Some("yaml") | Some("yml") => Format::YAML,
+            Some("json") => Format::JSON,
+            _ => Format::Unknown,
+        }
     }
 }
 
@@ -125,7 +130,7 @@ mod tests {
         ];
 
         for (input, expected) in cases {
-            let output = from_path(input);
+            let output = Format::from(std::path::PathBuf::from(input));
             assert_eq!(expected, output, "{}", input)
         }
     }

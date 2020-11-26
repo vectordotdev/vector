@@ -92,7 +92,7 @@ pub fn load_builder_from_paths(
 
     for (path, format) in config_paths {
         if let Some(file) = open_config(&path) {
-            inputs.push((file, format.known_or(move || format::from_path(&path))));
+            inputs.push((file, format.known_or(move || Format::from(&path))));
         } else {
             errors.push(format!("Config file not found in path: {:?}.", path));
         };
