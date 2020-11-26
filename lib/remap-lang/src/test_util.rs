@@ -41,7 +41,8 @@ macro_rules! bench_function {
 
                     b.iter(|| {
                         let got = expression.execute(&mut state, &mut object).map_err(|e| e.to_string());
-                        assert_eq!(got, want);
+                        debug_assert_eq!(got, want);
+                        got
                     })
                 });
             )+
