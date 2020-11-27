@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use crate::Event;
-use bytes::Bytes;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -43,14 +42,14 @@ impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
 
 #[derive(Debug)]
 pub struct KubernetesLogsDockerFormatParseFailed<'a> {
-    pub message: &'a Bytes,
+    pub error: &'a dyn std::error::Error,
 }
 
 impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "Failed to parse message as JSON object.",
-            value = %String::from_utf8_lossy(self.message),
+            message = "Failed to parse log line in docker format.",
+            error = %self.error,
         );
     }
 
