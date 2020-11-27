@@ -197,7 +197,7 @@ mod test {
     #[cfg(all(feature = "sources-utils-tls", feature = "listenfd"))]
     #[tokio::test]
     async fn tcp_stream_detects_disconnect() {
-        use crate::tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
+        use crate::tls::{self, MaybeTlsIncomingStream, MaybeTlsSettings, TlsConfig, TlsOptions};
         use futures::{future, FutureExt, StreamExt};
         use std::{
             net::Shutdown,
@@ -227,7 +227,7 @@ mod test {
                     options: TlsOptions {
                         verify_certificate: Some(false),
                         verify_hostname: Some(false),
-                        ca_file: Some("tests/data/localhost.crt".into()),
+                        ca_file: Some(tls::TEST_PEM_CRT_PATH.into()),
                         ..Default::default()
                     },
                 }),
@@ -253,14 +253,7 @@ mod test {
         let (close_tx, close_rx) = tokio::sync::oneshot::channel::<()>();
         let mut close_rx = Some(close_rx.map(|x| x.unwrap()));
 
-        let config = Some(TlsConfig {
-            enabled: Some(true),
-            options: TlsOptions {
-                crt_file: Some("tests/data/localhost.crt".into()),
-                key_file: Some("tests/data/localhost.key".into()),
-                ..Default::default()
-            },
-        });
+        let config = Some(TlsConfig::test_config());
 
         // Only accept two connections.
         let jh2 = tokio::spawn(async move {

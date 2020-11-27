@@ -86,33 +86,7 @@ components: sources: http: {
 				items: type: string: examples: ["User-Agent", "X-My-Custom-Header"]
 			}
 		}
-		auth: {
-			common:      false
-			description: "Options for HTTP Basic Authentication."
-			required:    false
-			warnings: []
-			type: object: {
-				examples: []
-				options: {
-					username: {
-						description: "The basic authentication user name."
-						required:    true
-						warnings: []
-						type: string: {
-							examples: ["${HTTP_USERNAME}", "username"]
-						}
-					}
-					password: {
-						description: "The basic authentication password."
-						required:    true
-						warnings: []
-						type: string: {
-							examples: ["${HTTP_PASSWORD}", "password"]
-						}
-					}
-				}
-			}
-		}
+		auth: configuration._http_basic_auth
 		query_parameters: {
 			common:      false
 			description: "A list of URL query parameters to include in the log event. These will override any values included in the body with conflicting names."
