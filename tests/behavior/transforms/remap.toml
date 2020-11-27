@@ -899,6 +899,27 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "foobar"
 
+[transforms.remap_function_parse_grok]
+  inputs = []
+  type = "remap"
+  source = """
+    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+    """
+[[tests]]
+  name = "remap_function_parse_grok"
+  [tests.input]
+    insert_at = "remap_function_parse_grok"
+    type = "log"
+    [tests.input.log_fields]
+      message = "2020-10-02T23:22:12.223222Z info Hello world"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_grok"
+    [[tests.outputs.conditions]]
+    "grokked.timestamp.equals" = "2020-10-02T23:22:12.223222Z"
+    "grokked.level.equals" = "info"
+    "grokked.message.equals" = "Hello world"
+
+
 # [transforms.remap_function_log]
 #   inputs=[]
 #   type = "remap"
