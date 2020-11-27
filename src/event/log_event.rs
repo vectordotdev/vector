@@ -186,11 +186,11 @@ impl LogEvent {
 
         let retval = None;
 
-        for (index, segment) in lookup_iter {
+        for (lookup_index, segment) in lookup_iter {
             cursor = match (segment.clone(), cursor) {
                 // Fields access maps.
                 (SegmentBuf::Field(ref f), &mut Value::Map(ref mut map)) => {
-                    if index == lookup_len.saturating_sub(1) {
+                    if lookup_index == lookup_len.saturating_sub(1) {
                         // Terminus: We **must** insert here or abort.
                         trace!(key = ?f, "Creating field inside map.");
                         return map.insert(f.clone(), value);
@@ -204,18 +204,21 @@ impl LogEvent {
                 }
                 // Indexes access arrays.
                 (SegmentBuf::Index(i), &mut Value::Array(ref mut array)) => {
-                    if index == lookup_len.saturating_sub(1) {
+                    if lookup_index == lookup_len.saturating_sub(1) {
                         // Terminus: We **must** insert here or abort.
                         trace!(key = ?i, "Terminus array index segment, inserting into index unconditionally.");
                         return match array.get_mut(i) {
                             None => {
-                                trace!(key = ?i, "Resizing array with Null values up to index, then pushing value.");
-                                array.resize_with(i.saturating_add(1), || Value::Null);
+                                trace!(key = ?i, ?value, "Resizing array with Null values up to index, then pushing value.");
+                                while array.len() < i {
+                                    trace!("Pushing Null to meet required size.");
+                                    array.push(Value::Null);
+                                }
                                 array.push(value);
                                 None
                             }
                             Some(target) => {
-                                trace!(key = ?i, "Swapping existing value at index for inserted value, returning it.");
+                                trace!(key = ?i, ?value, "Swapping existing value at index for inserted value, returning it.");
                                 let mut swapped_with_target = value;
                                 core::mem::swap(target, &mut swapped_with_target);
                                 Some(swapped_with_target)
@@ -230,22 +233,27 @@ impl LogEvent {
                                 len, i
                             ))
                         } else {
-                            trace!(key = ?i, "Descendent array was not long enough, resizing and pushing new value.");
-                            array.resize_with(i.saturating_add(1), || Value::Null);
+                            trace!(key = ?i, "Descendent array was not long enough, resizing and pushing a null to build up.");
+                            // We already know the array is too small!
+                            while array.len() < i {
+                                trace!("Pushing Null to meet required size.");
+                                array.push(Value::Null);
+                            }
+                            array.push(Value::Null); // This wil get built up for the rest of the insert.
                             array.index_mut(i)
                         }
                     }
                 }
                 (SegmentBuf::Field(f), cursor_ref) if cursor_ref == &mut Value::Null => {
-                    trace!(key = ?f, "Did not discover map to descend into, but found a `null`. Since a map is expected. Creating one.");
+                    trace!(key = ?f, lookup_index, lookup_len, "Did not discover map to descend into, but found a `null`. Since a map is expected. Creating one.");
                     let mut map = BTreeMap::default();
-                    if index == lookup_len.saturating_sub(1) {
-                        trace!(index, "Terminus segment, inserting unconditionally.");
+                    if lookup_index == lookup_len.saturating_sub(1) {
+                        trace!(lookup_index, key = ?f, value = ?value, "Terminus field segment, inserting unconditionally.");
                         map.insert(f.clone(), value);
                         *cursor_ref = Value::Map(map);
                         return None;
                     } else {
-                        trace!("Non-terminus segment, scaffolding a null for later filling.");
+                        trace!(lookup_index, key = ?f, "Non-terminus field segment, scaffolding a null for later filling.");
                         map.insert(f.clone(), Value::Null);
                         *cursor_ref = Value::Map(map);
                         cursor_ref
@@ -255,25 +263,32 @@ impl LogEvent {
                     }
                 }
                 (SegmentBuf::Index(i), cursor_ref) if cursor_ref == &mut Value::Null => {
-                    trace!(key = ?i, "Did not discover array to descend into, but found a `null`. Since an array is expected. Creating one.");
-                    let mut array = Vec::with_capacity(i.saturating_add(1));
-                    array.resize_with(i, || Value::Null);
-                    if index == lookup_len.saturating_sub(1) {
-                        trace!(index, lookup_len, "Terminus segment, inserting unconditionally.");
-                        array.push(value);
-                        *cursor_ref = Value::Array(array);
+                    trace!(key = ?i, lookup_index, lookup_len, "Did not discover array to descend into, but found a `null`. Since an array is expected. Creating one.");
+                    let mut newly_created_array = Vec::with_capacity(i.saturating_add(1));
+                    if lookup_index == lookup_len.saturating_sub(1) {
+                        trace!(lookup_index, lookup_len, key = ?i, value = ?value, "Terminus array segment, inserting unconditionally.");
+                        while newly_created_array.len() < i {
+                            trace!("Pushing Null to meet required size.");
+                            newly_created_array.push(Value::Null);
+                        }
+                        newly_created_array.push(value);
+                        *cursor_ref = Value::Array(newly_created_array);
                         return None;
                     } else {
-                        trace!(index, lookup_len, "Non-terminus segment, scaffolding a null for later filling.");
-                        array.push(Value::Null);
-                        *cursor_ref = Value::Array(array);
+                        trace!(lookup_index, lookup_len, "Non-terminus array segment, scaffolding a null for later filling.");
+                        while newly_created_array.len() < i {
+                            trace!("Pushing Null to meet required size.");
+                            newly_created_array.push(Value::Null);
+                        }
+                        newly_created_array.push(Value::Null);
+                        *cursor_ref = Value::Array(newly_created_array);
                         cursor_ref.as_array_mut().index_mut(i)
                     }
                 }
 
                 // This is an error path but we can't fail. So return none and spit an error.
                 (segment, inner_cursor) => {
-                    debug!(?segment, ?inner_cursor, "Bailing on insert. There is an existing value which is not an array or map being inserted into.");
+                    debug!(?segment, ?inner_cursor, key = ?segment, "Bailing on insert. There is an existing value which is not an array or map being inserted into.");
                     return None;
                 }
             };
@@ -384,10 +399,7 @@ impl LogEvent {
             .iter()
             .map(|(k, v)| {
                 let lookup = Lookup::from(k);
-                trace!(prefix = %lookup, "Enqueuing for iteration.");
-                let iter = Some(lookup.clone()).into_iter();
-                let chain = v.lookups(Some(lookup));
-                iter.chain(chain)
+                v.lookups(Some(lookup))
             })
             .flatten()
     }
@@ -402,10 +414,7 @@ impl LogEvent {
             .iter()
             .map(|(k, v)| {
                 let lookup = Lookup::from(k);
-                trace!(prefix = %lookup, "Enqueuing for iteration.");
-                let iter = Some((lookup.clone(), v)).into_iter();
-                let chain = v.pairs(Some(lookup));
-                iter.chain(chain)
+                v.pairs(Some(lookup))
             })
             .flatten()
     }
@@ -783,13 +792,37 @@ mod test {
                 LookupBuf::from_str("other[1][1].a")?,
                 LookupBuf::from_str("other[1][1].b")?,
             ];
-            let value = Value::Null;
+            let value = Value::Boolean(true);
             for lookup in lookups.clone() {
                 event.insert(lookup, value.clone());
             }
             let pairs = event.keys().collect::<Vec<_>>();
             for lookup in lookups {
                 assert!(pairs.contains(&lookup.clone_lookup()), "Failed while looking for {}", lookup);
+            }
+            Ok(())
+        }
+
+        // While authors should prefer to set an array via `event.insert(lookup_to_array, array)`,
+        // there are some cases where we want to insert 1 by one. Make sure this can happen.
+        #[test]
+        fn iteratively_populate_array_reverse() -> crate::Result<()> {
+            crate::test_util::trace_init();
+            let mut event = LogEvent::default();
+            let lookups = vec![
+                LookupBuf::from_str("root.nested[1]")?,
+                LookupBuf::from_str("root.nested[0]")?,
+                LookupBuf::from_str("other[1][1]")?,
+                LookupBuf::from_str("other[0][1].a")?,
+            ];
+            let value = Value::Boolean(true);
+            for lookup in lookups.clone() {
+                event.insert(lookup, value.clone());
+            }
+            let pairs = event.keys().collect::<Vec<_>>();
+            trace!(?event);
+            for lookup in lookups.clone() {
+                assert!(pairs.contains(&lookup.clone_lookup()), "Failed while looking for {:?} in {:?}", lookup, pairs);
             }
             Ok(())
         }
@@ -803,7 +836,6 @@ mod test {
             let lookups = vec![
                 LookupBuf::from_str("root.one")?,
                 LookupBuf::from_str("root.two")?,
-                LookupBuf::from_str("root.three")?,
                 LookupBuf::from_str("root.three.a")?,
                 LookupBuf::from_str("root.three.b")?,
                 LookupBuf::from_str("root.three.c")?,
@@ -811,13 +843,15 @@ mod test {
                 LookupBuf::from_str("root.four[1]")?,
                 LookupBuf::from_str("root.four[2]")?,
             ];
-            let value = Value::Null;
+            let value = Value::Boolean(true);
             for lookup in lookups.clone() {
                 event.insert(lookup, value.clone());
             }
-            let pairs = event.keys().collect::<Vec<_>>();
+            // Note: Two Lookups are only the same if the string slices underneath are too.
+            //       LookupBufs this rule does not apply.
+            let pairs = event.keys().map(|k| k.into_buf()).collect::<Vec<_>>();
             for lookup in lookups {
-                assert!(pairs.contains(&lookup.clone_lookup()), "Failed while looking for {}", lookup);
+                assert!(pairs.contains(&lookup), "Failed while looking for {}", lookup);
             }
             Ok(())
         }

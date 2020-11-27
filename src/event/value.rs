@@ -140,6 +140,12 @@ impl Value {
         }
     }
 
+    /// Produce an iterator over all 'nodes' in the graph of this value.
+    ///
+    /// This includes leaf nodes as well as intermediaries.
+    ///
+    /// If provided a `prefix`, it will always produce with that prefix included, and all nodes
+    /// will be prefixed with that lookup.
     #[instrument(level = "trace")]
     pub fn lookups<'a>(
         &'a self,
@@ -151,9 +157,14 @@ impl Value {
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
-            | Value::Null => Box::new(Vec::<Lookup<'_>>::with_capacity(0).into_iter()),
-            Value::Map(m) => Box::new(
-                m.iter()
+            | Value::Null => Box::new(prefix.into_iter().inspect(|v| {
+                trace!(prefix = ?v, "Enqueuing leaf for iteration.");
+            })),
+            Value::Map(m) => {
+                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
+
+                let this = prefix.clone().into_iter();
+                let children = m.iter()
                     .map(move |(k, v)| {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
@@ -162,15 +173,17 @@ impl Value {
                                 l
                             },
                         );
-                        let iter = Some(lookup.clone()).into_iter();
-                        let chain = v.lookups(Some(lookup));
-                        iter.chain(chain)
-                    })
-                    .flatten(),
-            ),
-            Value::Array(a) => Box::new(
-                a.iter()
-                    .enumerate()
+                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
+                        v.lookups(Some(lookup))
+                    }).flatten();
+
+                Box::new(this.chain(children))
+            },
+            Value::Array(a) => {
+                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
+
+                let this = prefix.clone().into_iter();
+                let children = a.iter().enumerate()
                     .map(move |(k, v)| {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
@@ -179,15 +192,21 @@ impl Value {
                                 l
                             },
                         );
-                        let iter = Some(lookup.clone()).into_iter();
-                        let chain = v.lookups(Some(lookup));
-                        iter.chain(chain)
-                    })
-                    .flatten(),
-            ),
+                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
+                        v.lookups(Some(lookup))
+                    }).flatten();
+
+                Box::new(this.chain(children))
+            },
         }
     }
 
+    /// Produce an iterator over all 'nodes' in the graph of this value.
+    ///
+    /// This includes leaf nodes as well as intermediaries.
+    ///
+    /// If provided a `prefix`, it will always produce with that prefix included, and all nodes
+    /// will be prefixed with that lookup.
     #[instrument(level = "trace")]
     pub fn pairs<'a>(
         &'a self,
@@ -199,9 +218,15 @@ impl Value {
             | Value::Timestamp(_)
             | Value::Float(_)
             | Value::Integer(_)
-            | Value::Null => Box::new(std::iter::empty()),
-            Value::Map(m) => Box::new(
-                m.iter()
+            | Value::Null => Box::new(prefix.map(move |v| {
+                trace!(prefix = ?v, "Enqueuing leaf for iteration.");
+                (v, self)
+            }).into_iter()),
+            Value::Map(m) => {
+                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
+
+                let this = prefix.clone().map(|v| (v, self)).into_iter();
+                let children = m.iter()
                     .map(move |(k, v)| {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
@@ -210,15 +235,17 @@ impl Value {
                                 l
                             },
                         );
-                        let iter = Some((lookup.clone(), v)).into_iter();
-                        let chain = v.pairs(Some(lookup));
-                        iter.chain(chain)
-                    })
-                    .flatten(),
-            ),
-            Value::Array(a) => Box::new(
-                a.iter()
-                    .enumerate()
+                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
+                        v.pairs(Some(lookup))
+                    }).flatten();
+
+                Box::new(this.chain(children))
+            },
+            Value::Array(a) => {
+                trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
+
+                let this = prefix.clone().map(|v| (v, self)).into_iter();
+                let children = a.iter().enumerate()
                     .map(move |(k, v)| {
                         let lookup = prefix.clone().map_or_else(
                             || Lookup::from(k),
@@ -227,12 +254,12 @@ impl Value {
                                 l
                             },
                         );
-                        let iter = Some((lookup.clone(), v)).into_iter();
-                        let chain = v.pairs(Some(lookup));
-                        iter.chain(chain)
-                    })
-                    .flatten(),
-            ),
+                        trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
+                        v.pairs(Some(lookup))
+                    }).flatten();
+
+                Box::new(this.chain(children))
+            },
         }
     }
 }
