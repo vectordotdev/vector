@@ -78,6 +78,10 @@ remap: functions: merge: {
 				}
 					"parent2": {"child3": 3}
 				}
+				map2: {"parent1": {"child2": 4
+								"child5": 5
+				}
+				}
 			}
 		},
 		{
