@@ -131,6 +131,27 @@ cli: {
 			default: "/etc/vector/vector.toml"
 			env_var: "VECTOR_CONFIG"
 		}
+		"config-toml": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. TOML file format is assumed.
+				"""
+			type: "string"
+		}
+		"config-json": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. JSON file format is assumed.
+				"""
+			type: "string"
+		}
+		"config-yaml": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. YAML file format is assumed.
+				"""
+			type: "string"
+		}
 		"threads": {
 			_short: "t"
 			description: """
@@ -260,6 +281,27 @@ cli: {
 				"deny-warnings": {
 					_short:      "d"
 					description: "Fail validation on warnings"
+				}
+				"config-toml": {
+					description: """
+						Any number of Vector config files to validate.
+						TOML file format is assumed.
+						"""
+					type: "string"
+				}
+				"config-json": {
+					description: """
+						Any number of Vector config files to validate.
+						JSON file format is assumed.
+						"""
+					type: "string"
+				}
+				"config-yaml": {
+					description: """
+						Any number of Vector config files to validate.
+						YAML file format is assumed.
+						"""
+					type: "string"
 				}
 			}
 
