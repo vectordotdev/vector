@@ -30,7 +30,7 @@ remap: {
 
 			arguments: [...#Argument] // Allow for empty list
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "coerce" | "object" | "parse" | "text" | "hash" | "event"
+			category:    "coerce" | "object" | "parse" | "text" | "hash" | "event" | "networking"
 			description: string
 			examples: [#RemapExample, ...#RemapExample]
 			name: Name
