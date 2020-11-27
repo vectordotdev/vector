@@ -743,6 +743,34 @@ components: {
 				}
 			}
 
+			_http_basic_auth: {
+				common:      false
+				description: "Options for HTTP Basic Authentication."
+				required:    false
+				warnings: []
+				type: object: {
+					examples: []
+					options: {
+						username: {
+							description: "The basic authentication user name."
+							required:    true
+							warnings: []
+							type: string: {
+								examples: ["${HTTP_USERNAME}", "username"]
+							}
+						}
+						password: {
+							description: "The basic authentication password."
+							required:    true
+							warnings: []
+							type: string: {
+								examples: ["${HTTP_PASSWORD}", "password"]
+							}
+						}
+					}
+				}
+			}
+
 			_types: {
 				common:      true
 				description: "Key/value pairs representing mapped log field names and types. This is used to coerce log fields into their proper types."

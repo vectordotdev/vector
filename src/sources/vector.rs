@@ -194,17 +194,7 @@ mod test {
         let addr = next_addr();
         stream_test(
             addr,
-            VectorConfig::new(
-                addr.into(),
-                Some(TlsConfig {
-                    enabled: Some(true),
-                    options: TlsOptions {
-                        crt_file: Some("tests/data/localhost.crt".into()),
-                        key_file: Some("tests/data/localhost.key".into()),
-                        ..Default::default()
-                    },
-                }),
-            ),
+            VectorConfig::new(addr.into(), Some(TlsConfig::test_config())),
             VectorSinkConfig {
                 address: format!("localhost:{}", addr.port()),
                 tls: Some(TlsConfig {
