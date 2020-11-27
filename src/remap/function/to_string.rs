@@ -125,7 +125,7 @@ mod tests {
         }
 
         fallible_value_without_default {
-            expr: |_| ToStringFn { value: Variable::new("foo".to_owned()).boxed(), default: None},
+            expr: |_| ToStringFn { value: Variable::new("foo".to_owned(), None).boxed(), default: None},
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes,
@@ -134,8 +134,8 @@ mod tests {
 
         fallible_value_with_fallible_default {
             expr: |_| ToStringFn {
-                value: Variable::new("foo".to_owned()).boxed(),
-                default: Some(Variable::new("foo".to_owned()).boxed()),
+                value: Variable::new("foo".to_owned(), None).boxed(),
+                default: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
             def: TypeDef {
                 fallible: true,
@@ -145,7 +145,7 @@ mod tests {
 
        fallible_value_with_infallible_default {
             expr: |_| ToStringFn {
-                value: Variable::new("foo".to_owned()).boxed(),
+                value: Variable::new("foo".to_owned(), None).boxed(),
                 default: Some(Literal::from(true).boxed()),
             },
             def: TypeDef {
@@ -157,7 +157,7 @@ mod tests {
         infallible_value_with_fallible_default {
             expr: |_| ToStringFn {
                 value: Literal::from(true).boxed(),
-                default: Some(Variable::new("foo".to_owned()).boxed()),
+                default: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
             def: TypeDef {
                 fallible: false,

@@ -1,13 +1,26 @@
-use crate::{state, Expression, Object, Result, TypeDef, Value};
+use crate::{
+    expression::{path, Error as ExprErr, Path},
+    state, Error as E, Expression, Object, Result, TypeDef, Value,
+};
+
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
+pub enum Error {
+    #[error(transparent)]
+    Query(#[from] path::Error),
+
+    #[error("unknown error: {0}")]
+    Unknown(String),
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     ident: String,
+    path: Option<Path>,
 }
 
 impl Variable {
-    pub fn new(ident: String) -> Self {
-        Self { ident }
+    pub fn new(ident: String, path: Option<Path>) -> Self {
+        Self { ident, path }
     }
 
     pub fn boxed(self) -> Box<Self> {
@@ -21,7 +34,18 @@ impl Variable {
 
 impl Expression for Variable {
     fn execute(&self, state: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
-        let value = state.variable(&self.ident).cloned().unwrap_or(Value::Null);
+        let mut value = state.variable(&self.ident).cloned().unwrap_or(Value::Null);
+
+        if let Some(path) = &self.path {
+            return path.execute(state, &mut value).map_err(|err| {
+                let err = match err {
+                    E::Expression(ExprErr::Path(err)) => Error::Query(err),
+                    _ => Error::Unknown(err.to_string()),
+                };
+
+                ExprErr::Variable(self.ident.clone(), err).into()
+            });
+        }
 
         Ok(value)
     }
@@ -48,7 +72,7 @@ mod tests {
         ident_match {
             expr: |state: &mut state::Compiler| {
                 state.variable_types_mut().insert("foo".to_owned(), TypeDef::default());
-                Variable::new("foo".to_owned())
+                Variable::new("foo".to_owned(), None)
             },
             def: TypeDef::default(),
         }
@@ -60,7 +84,7 @@ mod tests {
                     kind: Kind::Bytes
                 });
 
-                Variable::new("foo".to_owned())
+                Variable::new("foo".to_owned(), None)
             },
             def: TypeDef {
                 fallible: true,
@@ -75,7 +99,7 @@ mod tests {
                     ..Default::default()
                 });
 
-                Variable::new("bar".to_owned())
+                Variable::new("bar".to_owned(), None)
             },
             def: TypeDef {
                 fallible: true,
@@ -84,7 +108,7 @@ mod tests {
         }
 
         empty_state {
-            expr: |_| Variable::new("foo".to_owned()),
+            expr: |_| Variable::new("foo".to_owned(), None),
             def: TypeDef {
                 fallible: true,
                 ..Default::default()

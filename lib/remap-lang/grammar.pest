@@ -12,7 +12,7 @@ if_statement = { "if" ~ boolean_expr ~ block ~ ("else if" ~ boolean_expr ~ block
 
 primary  =  { value | variable | path | group }
 value    =  { string | float | integer | boolean | null }
-variable = ${ "$" ~ ident }
+variable = ${ "$" ~ ident ~ path_index* ~ ("." ~ path_segments)?  }
 group    =  { "(" ~ expression ~ ")" }
 
 // Function Calls --------------------------------------------------------------
@@ -41,9 +41,15 @@ operator_not            = { "!" }
 
 // Paths -----------------------------------------------------------------------
 
-path             = ${ path_root | ("." ~ path_segment)+ }
-path_root        = ${ ". " }
-path_segment     = ${ (path_field | path_coalesce) ~ path_index* }
+path             = ${ "." ~ path_segments? ~ !(WHITESPACE* ~ ("." | "\"")) }
+path_segments    = ${
+    (
+        ((path_segment | path_index+) ~ path_index*)
+        ~ ("." ~ path_segment ~ path_index*)*
+    )
+    | path_index+
+}
+path_segment     = ${ path_field | path_coalesce }
 path_field       = ${ ident | string }
 path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
 path_index       =  { "[" ~ path_index_inner ~ "]" }

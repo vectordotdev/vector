@@ -133,7 +133,7 @@ mod tests {
         }
 
         fallible_value_without_default {
-            expr: |_| ToFloatFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
+            expr: |_| ToFloatFn { value: Variable::new("foo".to_owned(), None).boxed(), default: None },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Float,

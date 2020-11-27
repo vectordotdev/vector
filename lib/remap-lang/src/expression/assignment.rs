@@ -79,7 +79,7 @@ mod tests {
     test_type_def![
         variable {
             expr: |state: &mut state::Compiler| {
-                let target = Target::Variable(Variable::new("foo".to_owned()));
+                let target = Target::Variable(Variable::new("foo".to_owned(), None));
                 let value = Box::new(Literal::from(true).into());
 
                 Assignment::new(target, value, state)

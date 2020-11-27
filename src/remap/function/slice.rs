@@ -146,7 +146,7 @@ mod tests {
 
         value_unknown {
             expr: |_| SliceFn {
-                value: Variable::new("foo".to_owned()).boxed(),
+                value: Variable::new("foo".to_owned(), None).boxed(),
                 start: Literal::from(0).boxed(),
                 end: None,
             },
