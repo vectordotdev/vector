@@ -36,6 +36,7 @@ impl Expression for Not {
 mod tests {
     use super::*;
     use crate::{expression::*, test_type_def, value::Kind};
+    use std::collections::BTreeMap;
 
     #[test]
     fn not() {
@@ -55,7 +56,7 @@ mod tests {
         ];
 
         let mut state = state::Program::default();
-        let mut object = std::collections::HashMap::default();
+        let mut object: Value = BTreeMap::default().into();
 
         for (exp, func) in cases {
             let got = func

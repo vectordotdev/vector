@@ -1,4 +1,5 @@
 mod error;
+mod object;
 mod operator;
 mod parser;
 mod path;
@@ -16,6 +17,7 @@ pub mod value;
 pub use error::{Error, RemapError};
 pub use expression::{Expr, Expression};
 pub use function::{Function, Parameter};
+pub use object::Object;
 pub use operator::Operator;
 pub use path::{Field, Path, Segment};
 pub use program::{Program, TypeConstraint};
@@ -27,115 +29,11 @@ pub use paste::paste;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Any object you want to map through the remap language has to implement this
-/// trait.
-pub trait Object: std::fmt::Debug {
-    /// Insert a given [`Value`] in the provided [`Object`].
-    ///
-    /// The `path` parameter determines _where_ in the given object the value
-    /// should be inserted.
-    ///
-    /// A path contains dot-delimited segments, and can contain a combination
-    /// of:
-    ///
-    /// * regular path segments:
-    ///
-    ///   ```txt
-    ///   .foo.bar.baz
-    ///   ```
-    ///
-    /// * quoted path segments:
-    ///
-    ///   ```txt
-    ///   .foo."bar.baz"
-    ///   ```
-    ///
-    /// * coalesced path segments:
-    ///
-    ///   ```txt
-    ///   .foo.(bar.baz | foobar | "bar.baz").qux
-    ///   ```
-    ///
-    /// * path indices:
-    ///
-    ///   ```txt
-    ///   .foo[2]
-    ///   ```
-    ///
-    /// When inserting into a coalesced path, the implementor is encouraged to
-    /// insert into the right-most segment if none exists, but can return an
-    /// error if needed.
-    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String>;
-
-    /// Find a value for a given path.
-    ///
-    /// See [`Object::insert`] for more details.
-    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String>;
-
-    /// Get the list of paths in the object.
-    ///
-    /// Paths are represented similar to what's documented in [`Object::insert`].
-    fn paths(&self) -> Vec<String>;
-
-    /// Remove the given path from the object.
-    ///
-    /// If `compact` is true, after deletion, if an empty object or array is
-    /// left behind, it should be removed as well.
-    fn remove(&mut self, path: &str, compact: bool);
-}
-
-impl Object for std::collections::HashMap<String, Value> {
-    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
-        self.insert(vec_path_to_string(path), value);
-
-        Ok(())
-    }
-
-    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
-        Ok(self.get(&vec_path_to_string(path)).cloned())
-    }
-
-    fn paths(&self) -> Vec<String> {
-        self.keys().cloned().collect::<Vec<_>>()
-    }
-
-    fn remove(&mut self, path: &str, _: bool) {
-        self.remove(path);
-    }
-}
-
-impl Object for std::collections::BTreeMap<String, Value> {
-    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
-        self.insert(vec_path_to_string(path), value);
-
-        Ok(())
-    }
-
-    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
-        Ok(self.get(&vec_path_to_string(path)).cloned())
-    }
-
-    fn paths(&self) -> Vec<String> {
-        self.keys().cloned().collect::<Vec<_>>()
-    }
-
-    fn remove(&mut self, path: &str, _: bool) {
-        self.remove(path);
-    }
-}
-
-fn vec_path_to_string(path: &[Vec<String>]) -> String {
-    path.iter()
-        .map(|v| v.join("."))
-        .collect::<Vec<_>>()
-        .join(".")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::function::ArgumentList;
-    use std::collections::HashMap;
+    use crate::map;
 
     #[test]
     fn it_works() {
