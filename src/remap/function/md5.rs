@@ -65,12 +65,12 @@ mod tests {
 
         value_non_string {
             expr: |_| Md5Fn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes },
         }
 
         value_optional {
             expr: |_| Md5Fn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, optional: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes },
         }
     ];
 

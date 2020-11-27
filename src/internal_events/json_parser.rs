@@ -12,7 +12,7 @@ impl InternalEvent for JsonParserEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("processed_events_total", 1);
     }
 }
 
@@ -21,17 +21,28 @@ pub(crate) struct JsonParserFailedParse<'a> {
     pub field: &'a LookupBuf,
     pub value: &'a str,
     pub error: Error,
+    pub drop_invalid: bool,
 }
 
 impl<'a> InternalEvent for JsonParserFailedParse<'a> {
     fn emit_logs(&self) {
-        warn!(
-            message = "Event failed to parse as JSON.",
-            field = %self.field,
-            value = %self.value,
-            error = ?self.error,
-            rate_limit_secs = 30
-        )
+        if self.drop_invalid {
+            debug!(
+                message = "Event failed to parse as JSON.",
+                field = %self.field,
+                value = %self.value,
+                error = ?self.error,
+                rate_limit_secs = 30
+            )
+        } else {
+            warn!(
+                message = "Event failed to parse as JSON.",
+                field = %self.field,
+                value = %self.value,
+                error = ?self.error,
+                rate_limit_secs = 30
+            )
+        }
     }
 
     fn emit_metrics(&self) {

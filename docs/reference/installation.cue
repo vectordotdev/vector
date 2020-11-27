@@ -201,6 +201,7 @@ installation: close({
 
 	#Platforms: [Name=string]: {
 		description:               string
+		how_it_works:              #HowItWorks
 		minimum_supported_version: string | null
 		name:                      Name
 		title:                     string
@@ -245,7 +246,7 @@ installation: close({
 				encoding: codec: "json"
 			}
 		}
-		config_format: ["toml"]
+		config_format: ["toml", "yaml", "json"]
 		variant?: [string, ...string]
 		version: bool | *false
 	}

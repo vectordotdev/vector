@@ -7,7 +7,7 @@ use crate::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -118,7 +118,7 @@ enum GcsStorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: InFlightLimit::Fixed(25),
+        concurrency: Concurrency::Fixed(25),
         rate_limit_num: Some(1000),
         ..Default::default()
     };

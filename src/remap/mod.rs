@@ -32,6 +32,7 @@ lazy_static! {
         Box::new(Ceil),
         Box::new(Floor),
         Box::new(Round),
+        Box::new(ParseGrok),
         Box::new(ParseSyslog),
         Box::new(ParseTimestamp),
         Box::new(ParseJson),
@@ -40,6 +41,10 @@ lazy_static! {
         Box::new(StripAnsiEscapeCodes),
         Box::new(Match),
         Box::new(Replace),
+        Box::new(IpToIpv6),
+        Box::new(Ipv6ToIpV4),
+        Box::new(IpCidrContains),
+        Box::new(IpSubnet),
     ];
 
     // List of both mutable, and immutable functions that can be loaded into a

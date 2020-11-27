@@ -11,8 +11,7 @@ async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
                 config::warnings(&c),
                 topology::builder::build_pieces(&c, &diff).await,
             ) {
-                (Some(warnings), Ok(_pieces)) => Ok(warnings),
-                (None, Ok(_pieces)) => Ok(vec![]),
+                (warnings, Ok(_pieces)) => Ok(warnings),
                 (_, Err(errors)) => Err(errors),
             }
         }
@@ -566,7 +565,7 @@ async fn parses_sink_partial_request() {
         encoding = "json"
 
         [sinks.out.request]
-        in_flight_limit = 42
+        concurrency = 42
         "#,
     )
     .await
@@ -588,7 +587,7 @@ async fn parses_sink_full_request() {
         encoding = "json"
 
         [sinks.out.request]
-        in_flight_limit = 42
+        concurrency = 42
         timeout_secs = 2
         rate_limit_duration_secs = 3
         rate_limit_num = 4

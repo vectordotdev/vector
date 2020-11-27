@@ -128,7 +128,6 @@ mod tests {
             expr: |_| ToStringFn { value: Variable::new("foo".to_owned()).boxed(), default: None},
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Bytes,
             },
         }
@@ -140,7 +139,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Bytes,
             },
         }
@@ -152,7 +150,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Bytes,
             },
         }
@@ -164,7 +161,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Bytes,
             },
         }
@@ -176,7 +172,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Bytes,
             },
         }

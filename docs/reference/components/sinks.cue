@@ -203,9 +203,9 @@ components: sinks: [Name=string]: {
 					type: object: {
 						examples: []
 						options: {
-							auto_concurrency: {
+							adaptive_concurrency: {
 								common:      false
-								description: "Configure the auto-concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
+								description: "Configure the adaptive concurrency algorithms. These values have been tuned by optimizing simulated results. In general you should not need to adjust these."
 								required:    false
 								type: object: {
 									examples: []
@@ -218,7 +218,7 @@ components: sinks: [Name=string]: {
 										}
 										ewma_alpha: {
 											common:      false
-											description: "The auto-concurrency algorithm uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with the current RTT. This value controls how heavily new measurements are weighted compared to older ones. Valid values are greater than 0 and less than 1. Smaller values cause this reference to adjust more slowly, which may be useful if a service has unusually high response variability."
+											description: "The adaptive concurrency algorithm uses an exponentially weighted moving average (EWMA) of past RTT measurements as a reference to compare with the current RTT. This value controls how heavily new measurements are weighted compared to older ones. Valid values are greater than 0 and less than 1. Smaller values cause this reference to adjust more slowly, which may be useful if a service has unusually high response variability."
 											required:    false
 											type: float: default: 0.7
 										}
@@ -231,17 +231,17 @@ components: sinks: [Name=string]: {
 									}
 								}
 							}
-							in_flight_limit: {
+							concurrency: {
 								common: true
-								if sinks[Name].features.send.request.auto_concurrency {
+								if sinks[Name].features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time, or \"auto\" to allow Vector to automatically set the limit based on current network and service conditions."
 								}
-								if !sinks[Name].features.send.request.auto_concurrency {
+								if !sinks[Name].features.send.request.adaptive_concurrency {
 									description: "The maximum number of in-flight requests allowed at any given time."
 								}
 								required: false
 								type: uint: {
-									default: sinks[Name].features.send.request.in_flight_limit
+									default: sinks[Name].features.send.request.concurrency
 									unit:    "requests"
 								}
 							}

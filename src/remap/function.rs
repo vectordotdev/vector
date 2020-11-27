@@ -8,11 +8,16 @@ mod ends_with;
 mod floor;
 mod format_number;
 mod format_timestamp;
+mod ip_cidr_contains;
+mod ip_subnet;
+mod ip_to_ipv6;
+mod ipv6_to_ipv4;
 mod r#match;
 mod md5;
 mod now;
 mod only_fields;
 mod parse_duration;
+mod parse_grok;
 mod parse_json;
 mod parse_syslog;
 mod parse_timestamp;
@@ -49,9 +54,14 @@ pub use ends_with::EndsWith;
 pub use floor::Floor;
 pub use format_number::FormatNumber;
 pub use format_timestamp::FormatTimestamp;
+pub use ip_cidr_contains::IpCidrContains;
+pub use ip_subnet::IpSubnet;
+pub use ip_to_ipv6::IpToIpv6;
+pub use ipv6_to_ipv4::Ipv6ToIpV4;
 pub use now::Now;
 pub use only_fields::OnlyFields;
 pub use parse_duration::ParseDuration;
+pub use parse_grok::ParseGrok;
 pub use parse_json::ParseJson;
 pub use parse_syslog::ParseSyslog;
 pub use parse_timestamp::ParseTimestamp;
@@ -76,6 +86,7 @@ pub use uuid_v4::UuidV4;
 
 use remap::{Result, Value};
 
+#[inline]
 fn convert_value_or_default(
     value: Result<Value>,
     default: Option<Result<Value>>,
@@ -86,6 +97,7 @@ fn convert_value_or_default(
         .or_else(|err| default.ok_or(err)?.and_then(|value| convert(value)))
 }
 
+#[inline]
 fn is_scalar_value(value: &Value) -> bool {
     use Value::*;
 
@@ -98,6 +110,7 @@ fn is_scalar_value(value: &Value) -> bool {
 /// Rounds the given number to the given precision.
 /// Takes a function parameter so the exact rounding function (ceil, floor or round)
 /// can be specified.
+#[inline]
 fn round_to_precision<F>(num: f64, precision: i64, fun: F) -> f64
 where
     F: Fn(f64) -> f64,

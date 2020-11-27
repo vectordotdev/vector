@@ -49,6 +49,10 @@ components: {
 
 		env_vars: #EnvVars
 
+		// `alias` is used to register a component's former name when it
+		// undergoes a name change.
+		alias?: !=""
+
 		// `type` is the component identifier. This is set automatically.
 		type: string
 
@@ -310,8 +314,8 @@ components: {
 			enabled: bool
 
 			if enabled {
-				auto_concurrency:           bool | *true
-				in_flight_limit:            uint8 | *5
+				adaptive_concurrency:       bool | *true
+				concurrency:                uint8 | *5
 				rate_limit_duration_secs:   uint8
 				rate_limit_num:             uint16
 				retry_initial_backoff_secs: uint8
@@ -921,7 +925,7 @@ components: {
 
 		telemetry: metrics: {
 			// Default metrics for each component
-			events_processed_total: components.sources.internal_metrics.output.metrics.events_processed_total
+			processed_events_total: components.sources.internal_metrics.output.metrics.processed_events_total
 			processed_bytes_total:  components.sources.internal_metrics.output.metrics.processed_bytes_total
 		}
 	}}

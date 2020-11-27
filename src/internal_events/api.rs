@@ -13,7 +13,7 @@ impl InternalEvent for ApiStarted {
         let playground = &*format!("http://{}:{}/playground", self.addr.ip(), self.addr.port());
         info!(
             message="API server running.",
-            bind = ?self.addr,
+            address = ?self.addr,
             playground = %if self.playground { playground } else { "off" }
         );
     }
