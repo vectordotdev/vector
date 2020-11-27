@@ -47,9 +47,9 @@ impl Expression for Ipv6ToIpV4Fn {
         };
 
         match ip {
-            IpAddr::V4(addr) => Ok(Value::from(addr.to_ipv6_mapped().to_string())),
+            IpAddr::V4(addr) => Ok(addr.to_ipv6_mapped().to_string().into()),
             IpAddr::V6(addr) => match addr.to_ipv4() {
-                Some(addr) => Ok(Value::from(addr.to_string())),
+                Some(addr) => Ok(addr.to_string().into()),
                 None => Err(format!("IPV6 address {} is not compatible with IPV4", addr).into()),
             },
         }

@@ -41,7 +41,7 @@ struct IpCidrContainsFn {
 impl IpCidrContainsFn {
     #[cfg(test)]
     fn new(cidr: Box<dyn Expression>, value: Box<dyn Expression>) -> Self {
-        Self { value, cidr }
+        Self { cidr, value }
     }
 }
 
@@ -60,7 +60,7 @@ impl Expression for IpCidrContainsFn {
             IpCidr::from_str(cidr).map_err(|err| format!("unable to parse CIDR: {}", err))?
         };
 
-        Ok(Value::from(cidr.contains(value)))
+        Ok(cidr.contains(value).into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {

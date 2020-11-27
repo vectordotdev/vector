@@ -10,7 +10,7 @@ remap: functions: ipv6_to_ipv4: {
 		},
 	]
 	return: ["string"]
-	category: "ip"
+	category: "networking"
 	description: #"""
 		Converts an IPv4 mapped IPv6 address to an IPv4 address.
 		This function will raise an error if the input address is not a compatible address.
@@ -22,7 +22,7 @@ remap: functions: ipv6_to_ipv4: {
 				address: "::ffff:192.168.0.1"
 			}
 			source: #"""
-				.v4 = ipv6_to_ip(.address)
+				.v4 = ipv6_to_ipv4(.address)
 				"""#
 			output: {
 				address: "::ffff:192.168.0.1"
@@ -35,7 +35,7 @@ remap: functions: ipv6_to_ipv4: {
 				address: "2001:0db8:85a3::8a2e:0370:7334"
 			}
 			source: #"""
-				.v4 = ipv6_to_ip(.address)
+				.v4 = ipv6_to_ipv4(.address)
 				"""#
 			output: {
 				error: "function call error: IPV6 address 2001:db8:85a3::8a2e:370:7334 is not compatible with IPV4"

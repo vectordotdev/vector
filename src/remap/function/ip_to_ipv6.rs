@@ -47,8 +47,8 @@ impl Expression for IpToIpv6Fn {
         };
 
         match ip {
-            IpAddr::V4(addr) => Ok(Value::from(addr.to_ipv6_mapped().to_string())),
-            IpAddr::V6(addr) => Ok(Value::from(addr.to_string())),
+            IpAddr::V4(addr) => Ok(addr.to_ipv6_mapped().to_string().into()),
+            IpAddr::V6(addr) => Ok(addr.to_string().into()),
         }
     }
 

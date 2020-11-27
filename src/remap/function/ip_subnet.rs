@@ -88,7 +88,7 @@ impl Expression for IpSubnetFn {
                 .map_err(|err| format!("unable to parse mask: {}", err))?
         };
 
-        Ok(Value::from(mask_ips(value, mask)?.to_string()))
+        Ok(mask_ips(value, mask)?.to_string().into())
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -110,7 +110,7 @@ fn parse_subnet(subnet: &str) -> Result<u32> {
         .captures(subnet)
         .ok_or_else(|| format!("{} is not a valid subnet", subnet))?;
 
-    let subnet = subnet["subnet"].parse().unwrap(); // The regex ensures these are only digits.
+    let subnet = subnet["subnet"].parse().expect("digits ensured by regex");
 
     Ok(subnet)
 }
@@ -150,7 +150,7 @@ fn ipv4_mask(subnet_bits: u32) -> IpAddr {
     Ipv4Addr::from(bits).into()
 }
 
-/// Returns an ipv4 address that masks out the given number of bits.
+/// Returns an ipv6 address that masks out the given number of bits.
 fn ipv6_mask(subnet_bits: u32) -> IpAddr {
     let bits = !0u128 << (128 - subnet_bits);
     Ipv6Addr::from(bits).into()
