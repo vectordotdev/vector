@@ -13,8 +13,8 @@ impl InternalEvent for AwsSqsEventSent<'_> {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
-        counter!("bytes_processed_total", self.byte_size as u64);
+        counter!("processed_events_total", 1);
+        counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
 

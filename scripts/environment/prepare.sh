@@ -1,6 +1,8 @@
 #! /usr/bin/env bash
 set -e -o verbose
 
+PATH=$PATH:$HOME/.cargo/bin
+
 rustup toolchain install "$(cat rust-toolchain)"
 rustup default "$(cat rust-toolchain)"
 rustup component add rustfmt

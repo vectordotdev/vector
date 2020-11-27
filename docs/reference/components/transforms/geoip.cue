@@ -11,7 +11,7 @@ components: transforms: geoip: {
 
 	features: {
 		enrich: {
-			from: {
+			from: service: {
 				name:     "MaxMind GeoIP2 and GeoLite2 city databases"
 				url:      urls.maxmind_geoip2_isp
 				versions: ">= 2"

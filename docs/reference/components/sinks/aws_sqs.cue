@@ -36,10 +36,12 @@ components: sinks: aws_sqs: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "Amazon Simple Queue Service"
-				thing:    "an \(url) queue"
-				url:      urls.aws_sqs
-				versions: null
+				service: {
+					name:     "Amazon Simple Queue Service"
+					thing:    "an \(url) queue"
+					url:      urls.aws_sqs
+					versions: null
+				}
 
 				interface: {
 					socket: {

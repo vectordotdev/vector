@@ -24,7 +24,6 @@ conf-files = ["/etc/vector/vector.toml"]
 assets = [
   ["target/release/vector", "/usr/bin/", "755"],
   ["config/vector.toml", "/etc/vector/vector.toml", "644"],
-  ["config/vector.spec.toml", "/etc/vector/vector.spec.toml", "644"],
   ["config/examples/*", "/etc/vector/examples/", "644"],
   ["distribution/systemd/vector.service", "/etc/systemd/system/vector.service", "644"],
   ["distribution/systemd/vector.default", "/etc/default/vector", "600"]
@@ -145,8 +144,8 @@ headers = "0.3"
 rdkafka = { version = "0.24.0", features = ["libz", "ssl", "zstd"], optional = true }
 hostname = "0.3.1"
 seahash = { version = "3.0.6", optional = true }
-jemallocator = { version = "0.3.2", optional = true }
 semver = { version = "0.11.0", features = ["serde"] }
+jemallocator = { version = "0.3.0", optional = true }
 lazy_static = "1.3.0"
 rlua = { git = "https://github.com/kyren/rlua", optional = true }
 num_cpus = "1.10.0"
@@ -160,8 +159,9 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 exitcode = "1.1.2"
 snafu = { version = "0.6", features = ["futures-01", "futures"] }
 url = "2.2.0"
+percent-encoding = "2.1.0"
 base64 = { version = "0.13.0", optional = true }
-bollard = { version = "0.8.0", optional = true }
+bollard = { version = "0.9.0", features = ["ssl"], optional = true }
 listenfd = { version = "0.3.3", optional = true }
 inventory = "0.1"
 maxminddb = { version = "0.15.0", optional = true }
@@ -193,6 +193,7 @@ mongodb = { version = "1.1.1", optional = true }
 anyhow = { version = "1.0.28" }
 snap = { version = "1.0.1", optional = true }
 dyn-clone = "1.0.3"
+indoc = "1.0.3"
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -217,6 +218,7 @@ prost-build = "0.6.1"
 built = { version = "0.4", features = ["git2", "chrono"] }
 
 [dev-dependencies]
+base64 = "0.13"
 approx = "0.3.0"
 criterion = "0.3"
 tempfile = "3.0.6"
@@ -235,7 +237,6 @@ reqwest = { version = "0.10.6", features = ["json"] }
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
-default-macos = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "macos", "leveldb", "rdkafka-plain"]
 default-musl = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["api", "api-client", "sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-cmake"]
@@ -255,10 +256,8 @@ target-aarch64-unknown-linux-musl = ["api", "api-client", "sources", "transforms
 target-armv7-unknown-linux-musleabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "rdkafka-cmake"]
 target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "sources", "transforms", "sinks", "vendor-openssl", "vendor-libz", "unix", "leveldb", "rdkafka-cmake"]
 
-# Enables features that work only on systems providing `cfg(target_os = "macos")`
-macos = ["jemallocator-plain"]
-# Enables features that work only on systems providing `cfg(target_os = "linux")`
-unix = ["jemallocator-background_threads"]
+# Enables features that work only on systems providing `cfg(unix)`
+unix = ["jemallocator"]
 # These are **very** useful on Cross compilations!
 vendor-all = ["vendor-sasl", "vendor-openssl", "vendor-libz"]
 vendor-sasl = ["rdkafka/gssapi-vendored"]
@@ -273,10 +272,6 @@ rdkafka-plain = ["rdkafka"]
 rdkafka-cmake = ["rdkafka", "rdkafka/cmake_build"]
 # This feature enables the WASM foreign module support.
 wasm = ["lucetc", "lucet-runtime", "lucet-wasi", "vector-wasm"]
-# OSX doesn't support background-threads
-# https://github.com/jemalloc/jemalloc/issues/843
-jemallocator-plain = ["jemallocator"]
-jemallocator-background_threads = ["jemallocator", "jemallocator/background_threads"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -312,8 +307,10 @@ sources = [
   "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
+  "sources-kubernetes-logs",
   "sources-logplex",
   "sources-mongodb_metrics",
+  "sources-nginx_metrics",
   "sources-prometheus",
   "sources-socket",
   "sources-splunk_hec",
@@ -321,11 +318,10 @@ sources = [
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
-  "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
-sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
+sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
 sources-docker_logs = ["bollard"]
 sources-file = ["bytesize", "file-source"]
@@ -335,18 +331,19 @@ sources-http = ["sources-utils-http"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
 sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
+sources-nginx_metrics = []
 sources-prometheus = ["prometheus-parser"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
-sources-splunk_hec = ["bytesize", "tls", "warp"]
-sources-statsd = ["tokio-util/udp", "listenfd", "tls", "sources-utils-unix"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
-tls = []
-sources-vector = ["listenfd" ,"tls"]
-sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
-sources-utils-http = ["tls", "warp"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-vector = ["listenfd" ,"sources-utils-tls"]
+sources-utils-http = ["sources-utils-tls", "warp"]
+sources-utils-tls = []
 sources-utils-unix = []
 
 # Transforms
@@ -459,7 +456,7 @@ sinks-blackhole = []
 sinks-clickhouse = ["bytesize"]
 sinks-console = []
 sinks-datadog = ["bytesize"]
-sinks-elasticsearch = ["base64", "bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
+sinks-elasticsearch = ["bytesize", "rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts"]
 sinks-file = []
 sinks-gcp = ["base64", "bytesize", "goauth", "smpl_jwt"]
 sinks-honeycomb = ["bytesize"]
@@ -498,6 +495,7 @@ all-integration-tests = [
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
+  "nginx-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
@@ -533,6 +531,7 @@ kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats"]
+nginx-integration-tests = ["sources-nginx_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
@@ -544,6 +543,7 @@ disable-resolv-conf = []
 # excluing API client due to running out of memory during linking in Github Actions
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
 
 [[bench]]
 name = "default"
@@ -555,6 +555,11 @@ name = "wasm"
 path = "benches/wasm/mod.rs"
 harness = false
 required-features = ["wasm-benches"]
+
+[[bench]]
+name = "remap"
+harness = false
+required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"

@@ -114,29 +114,28 @@ mod tests {
 
         string_fallible {
             expr: |_| ToIntFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer },
         }
 
         map_fallible {
             expr: |_| ToIntFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer },
         }
 
         array_fallible {
             expr: |_| ToIntFn { value: Literal::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer },
         }
 
         timestamp_infallible {
             expr: |_| ToIntFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Integer },
         }
 
         fallible_value_without_default {
             expr: |_| ToIntFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Integer,
             },
         }
@@ -148,7 +147,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Integer,
             },
         }
@@ -160,7 +158,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Integer,
             },
         }
@@ -172,7 +169,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Integer,
             },
         }
@@ -184,7 +180,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Integer,
             },
         }

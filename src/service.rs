@@ -191,7 +191,7 @@ fn control_service(_service: &ServiceInfo, _action: ControlAction) -> exitcode::
 
 fn create_service_arguments(config_paths: &[PathBuf]) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(&config_paths)?;
-    match config::load_from_paths(&config_paths) {
+    match config::load_from_paths(&config_paths, false) {
         Ok(_) => Some(
             config_paths
                 .iter()

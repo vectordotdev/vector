@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: aws_cloudwatch_logs: {
 	title:       "AWS Cloudwatch Logs"
-	description: "[Amazon CloudWatch][urls.aws_cloudwatch] is a monitoring and management service that provides data and actionable insights for AWS, hybrid, and on-premises applications and infrastructure resources. With CloudWatch, you can collect and access all your performance and operational data in form of logs and metrics from a single platform."
+	description: sinks._aws_cloudwatch.description
 
 	classes: {
 		commonly_used: true
@@ -49,10 +49,7 @@ components: sinks: aws_cloudwatch_logs: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "AWS Cloudwatch logs"
-				thing:    "an \(name) stream"
-				url:      urls.aws_cloudwatch_logs
-				versions: null
+				service: services.aws_cloudwatch
 
 				interface: {
 					socket: {
@@ -87,18 +84,18 @@ components: sinks: aws_cloudwatch_logs: {
 	configuration: {
 		create_missing_group: {
 			common:      true
-			description: "Dynamically create a [log group][urls.aws_cloudwatch_logs_group_name] if it does not already exist. This will ignore `create_missing_stream` directly after creating the group and will create the first stream."
+			description: "Dynamically create a [log group](\(urls.aws_cloudwatch_logs_group_name)) if it does not already exist. This will ignore `create_missing_stream` directly after creating the group and will create the first stream."
 			required:    false
 			type: bool: default: true
 		}
 		create_missing_stream: {
 			common:      true
-			description: "Dynamically create a [log stream][urls.aws_cloudwatch_logs_stream_name] if it does not already exist."
+			description: "Dynamically create a [log stream](\(urls.aws_cloudwatch_logs_stream_name)) if it does not already exist."
 			required:    false
 			type: bool: default: true
 		}
 		group_name: {
-			description: "The [group name][urls.aws_cloudwatch_logs_group_name] of the target CloudWatch Logs stream."
+			description: "The [group name](\(urls.aws_cloudwatch_logs_group_name)) of the target CloudWatch Logs stream."
 			required:    true
 			type: string: {
 				examples: ["group-name", "{{ file }}"]
@@ -106,7 +103,7 @@ components: sinks: aws_cloudwatch_logs: {
 			}
 		}
 		stream_name: {
-			description: "The [stream name][urls.aws_cloudwatch_logs_stream_name] of the target CloudWatch Logs stream."
+			description: "The [stream name](\(urls.aws_cloudwatch_logs_stream_name)) of the target CloudWatch Logs stream."
 			required:    true
 			type: string: {
 				examples: ["{{ host }}", "%Y-%m-%d", "stream-name"]

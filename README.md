@@ -45,7 +45,7 @@ or [**install Vector**][docs.installation].
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
   **Tuple**, **Douban**, and many more.
 * Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 20TB daily**.
+* Vector's largest user **processes over 30TB daily**.
 * Vector has **over 100 contributors** and growing.
 
 ## [Documentation](https://vector.dev/docs/)
@@ -64,20 +64,20 @@ or [**install Vector**][docs.installation].
 
 ### Reference
 
-* [**Sources**][docs.sources] - [docker][docs.sources.docker], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [dozens more...][docs.sources]
+* [**Sources**][docs.sources] - [docker_logs][docs.sources.docker_logs], [file][docs.sources.file], [http][docs.sources.http], [journald][docs.sources.journald], [kafka][docs.sources.kafka], [socket][docs.sources.socket], and [dozens more...][docs.sources]
 * [**Transforms**][docs.transforms] - [filter][docs.transforms.filter], [json_parser][docs.transforms.json_parser], [log_to_metric][docs.transforms.log_to_metric], [logfmt_parser][docs.transforms.logfmt_parser], [lua][docs.transforms.lua], [regex_parser][docs.transforms.regex_parser], and [dozens more...][docs.transforms]
 * [**Sinks**][docs.sinks] - [aws_cloudwatch_logs][docs.sinks.aws_cloudwatch_logs], [aws_s3][docs.sinks.aws_s3], [clickhouse][docs.sinks.clickhouse], [elasticsearch][docs.sinks.elasticsearch], [gcp_cloud_storage][docs.sinks.gcp_cloud_storage], and [dozens more...][docs.sinks]
 
 ### Administration
 
 * [**Process management**][docs.process-management]
-* [**Monitoring**][docs.monitoring]
+* [**Monitoring & Observability**][docs.monitoring]
 * [**Updating**][docs.updating]
 * [**Validating**][docs.validating]
 
 ### Resources
 
-* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter], [mailing list][urls.mailing_list]
+* [**Community**][urls.vector_community] - [chat][urls.vector_chat], [@vectordotdev][urls.vector_twitter]
 * [**Releases**][urls.vector_releases] - [latest][urls.latest]
 * [**Roadmap**][urls.vector_roadmap] - [vote on new features][urls.vote_feature]
 * **Policies** - [Security][urls.vector_security_policy], [Privacy][urls.vector_privacy_policy], [Code of Conduct][urls.vector_code_of_conduct]
@@ -178,7 +178,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.sinks.gcp_cloud_storage]: https://vector.dev/docs/reference/sinks/gcp_cloud_storage/
 [docs.sinks.gcp_pubsub]: https://vector.dev/docs/reference/sinks/gcp_pubsub/
 [docs.sinks]: https://vector.dev/docs/reference/sinks/
-[docs.sources.docker]: https://vector.dev/docs/reference/sources/docker/
+[docs.sources.docker_logs]: https://vector.dev/docs/reference/sources/docker_logs/
 [docs.sources.file#multiline]: https://vector.dev/docs/reference/sources/file/#multiline
 [docs.sources.file]: https://vector.dev/docs/reference/sources/file/
 [docs.sources.http]: https://vector.dev/docs/reference/sources/http/
@@ -209,7 +209,6 @@ Vector is an end-to-end, unified, open data platform.
 [urls.getting_started]: https://vector.dev/guides/getting-started/
 [urls.issue_1802]: https://github.com/timberio/vector/issues/1802
 [urls.latest]: https://vector.dev/releases/latest/
-[urls.mailing_list]: https://vector.dev/community/
 [urls.pr_721]: https://github.com/timberio/vector/pull/721
 [urls.rust]: https://www.rust-lang.org/
 [urls.rust_memory_safety]: https://hacks.mozilla.org/2019/01/fearless-security-memory-safety/
@@ -228,4 +227,4 @@ Vector is an end-to-end, unified, open data platform.
 [urls.vector_security_policy]: https://github.com/timberio/vector/security/policy
 [urls.vector_test_harness]: https://github.com/timberio/vector-test-harness/
 [urls.vector_twitter]: https://twitter.com/vectordotdev
-[urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc+label%3A%22Type%3A+New+Feature%22
+[urls.vote_feature]: https://github.com/timberio/vector/issues?q=is%3Aissue+is%3Aopen+sort%3Areactions-%2B1-desc

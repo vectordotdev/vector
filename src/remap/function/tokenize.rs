@@ -75,7 +75,7 @@ mod tests {
 
         value_non_string {
             expr: |_| TokenizeFn { value: Literal::from(10).boxed() },
-            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Array },
         }
     ];
 

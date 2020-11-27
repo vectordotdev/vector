@@ -16,10 +16,12 @@ components: sources: mongodb_metrics: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "MongoDB Server"
-				thing:    "a \(name)"
-				url:      urls.mongodb
-				versions: null
+				service: {
+					name:     "MongoDB Server"
+					thing:    "an \(name)"
+					url:      urls.mongodb
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -56,14 +58,14 @@ components: sources: mongodb_metrics: {
 	}
 
 	configuration: {
-		endpoint: {
+		endpoints: {
 			description: "MongoDB [Connection String URI Format][urls.mongodb_connection_string_uri_format]"
 			required:    true
-			type: "string": {
-				examples: ["mongodb://localhost:27017"]
+			type: array: {
+				items: type: string: examples: ["mongodb://localhost:27017"]
 			}
 		}
-		interval_secs: {
+		scrape_interval_secs: {
 			description: "The interval between scrapes."
 			common:      true
 			required:    false
@@ -95,9 +97,10 @@ components: sources: mongodb_metrics: {
 	}
 
 	telemetry: metrics: {
-		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
 		collect_completed_total:      components.sources.internal_metrics.output.metrics.collect_completed_total
+		collect_duration_nanoseconds: components.sources.internal_metrics.output.metrics.collect_duration_nanoseconds
 		request_error_total:          components.sources.internal_metrics.output.metrics.request_error_total
+		parse_errors_total:           components.sources.internal_metrics.output.metrics.parse_errors_total
 	}
 
 	output: metrics: {

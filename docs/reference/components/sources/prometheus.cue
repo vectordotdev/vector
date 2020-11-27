@@ -16,10 +16,12 @@ components: sources: prometheus: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Prometheus"
-				thing:    "one or more \(name) endpoints"
-				url:      urls.prometheus_client
-				versions: null
+				service: {
+					name:     "Prometheus"
+					thing:    "one or more \(name) endpoints"
+					url:      urls.prometheus_client
+					versions: null
+				}
 
 				interface: socket: {
 					api: {

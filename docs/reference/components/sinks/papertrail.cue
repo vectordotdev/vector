@@ -34,10 +34,12 @@ components: sinks: papertrail: {
 				enabled_default:        true
 			}
 			to: {
-				name:     "Papertrail"
-				thing:    "an \(name) account"
-				url:      urls.papertrail
-				versions: null
+				service: {
+					name:     "Papertrail"
+					thing:    "an \(name) account"
+					url:      urls.papertrail
+					versions: null
+				}
 
 				interface: {
 					socket: {

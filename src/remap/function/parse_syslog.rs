@@ -131,12 +131,12 @@ mod tests {
 
         value_non_string {
             expr: |_| ParseSyslogFn { value: Literal::from(1).boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map },
         }
 
         value_optional {
             expr: |_| ParseSyslogFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, optional: true, kind: value::Kind::Map },
+            def: TypeDef { fallible: true, kind: value::Kind::Map },
         }
     ];
 
