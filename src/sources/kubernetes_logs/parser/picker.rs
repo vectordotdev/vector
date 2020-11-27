@@ -1,6 +1,7 @@
 use super::{cri::Cri, docker::Docker};
 use crate::{
     event::{Event, Value},
+    internal_events::KubernetesLogsFormatPickerEdgeCase,
     transforms::FunctionTransform,
 };
 
@@ -21,15 +22,29 @@ impl FunctionTransform for Picker {
     fn transform(&mut self, output: &mut Vec<Event>, event: Event) {
         match self {
             Picker::Init => {
-                let message = event
+                let message = match event
                     .as_log()
                     .get(crate::config::log_schema().message_key())
-                    .expect("message key must be present");
-                let bytes = if let Value::Bytes(bytes) = message {
-                    bytes
-                } else {
-                    panic!("Message value must be in Bytes");
+                {
+                    Some(message) => message,
+                    None => {
+                        emit!(KubernetesLogsFormatPickerEdgeCase {
+                            what: "got an event with no message field"
+                        });
+                        return;
+                    }
                 };
+
+                let bytes = match message {
+                    Value::Bytes(bytes) => bytes,
+                    _ => {
+                        emit!(KubernetesLogsFormatPickerEdgeCase {
+                            what: "got an event with non-bytes message field"
+                        });
+                        return;
+                    }
+                };
+
                 if bytes.len() > 1 && bytes[0] == b'{' {
                     *self = Picker::Docker(Docker)
                 } else {
@@ -68,6 +83,27 @@ mod tests {
 
         for message in cases {
             let input = Event::from(message);
+            let mut picker = Picker::new();
+            let mut output = Vec::new();
+            picker.transform(&mut output, input);
+            assert!(output.is_empty(), "Expected no events: {:?}", output);
+        }
+    }
+
+    #[test]
+    fn test_parsing_invalid_non_standard_events() {
+        let cases = vec![
+            // No `message` field.
+            Event::new_empty_log(),
+            // Non-bytes `message` field.
+            {
+                let mut input = Event::new_empty_log();
+                input.as_mut_log().insert("message", 123);
+                input
+            },
+        ];
+
+        for input in cases {
             let mut picker = Picker::new();
             let mut output = Vec::new();
             picker.transform(&mut output, input);

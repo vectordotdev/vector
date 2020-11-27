@@ -41,6 +41,24 @@ impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
 }
 
 #[derive(Debug)]
+pub struct KubernetesLogsFormatPickerEdgeCase {
+    pub what: &'static str,
+}
+
+impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Encountered format picker edge case.",
+            what = %self.what,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("k8s_format_picker_edge_cases_total", 1);
+    }
+}
+
+#[derive(Debug)]
 pub struct KubernetesLogsDockerFormatParseFailed<'a> {
     pub error: &'a dyn std::error::Error,
 }
