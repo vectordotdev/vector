@@ -1,4 +1,4 @@
-use super::{controller::Controller, future::ResponseFuture, AutoConcurrencySettings};
+use super::{controller::Controller, future::ResponseFuture, AdaptiveConcurrencySettings};
 use crate::sinks::util::retries::RetryLogic;
 
 use tower::Service;
@@ -17,7 +17,7 @@ use tokio::sync::OwnedSemaphorePermit;
 /// service can handle. Automatically expands and contracts the actual
 /// concurrency limit depending on observed request response behavior.
 #[derive(Debug)]
-pub struct AutoConcurrencyLimit<S, L> {
+pub struct AdaptiveConcurrencyLimit<S, L> {
     inner: S,
     pub(super) controller: Arc<Controller<L>>,
     state: State,
@@ -29,23 +29,23 @@ enum State {
     Empty,
 }
 
-impl<S, L> AutoConcurrencyLimit<S, L> {
+impl<S, L> AdaptiveConcurrencyLimit<S, L> {
     /// Create a new automated concurrency limiter.
     pub(crate) fn new(
         inner: S,
         logic: L,
-        in_flight_limit: Option<usize>,
-        options: AutoConcurrencySettings,
+        concurrency: Option<usize>,
+        options: AdaptiveConcurrencySettings,
     ) -> Self {
-        AutoConcurrencyLimit {
+        AdaptiveConcurrencyLimit {
             inner,
-            controller: Arc::new(Controller::new(in_flight_limit, options, logic)),
+            controller: Arc::new(Controller::new(concurrency, options, logic)),
             state: State::Empty,
         }
     }
 }
 
-impl<S, L, Request> Service<Request> for AutoConcurrencyLimit<S, L>
+impl<S, L, Request> Service<Request> for AdaptiveConcurrencyLimit<S, L>
 where
     S: Service<Request>,
     S::Error: Into<crate::Error>,
@@ -87,7 +87,7 @@ where
     }
 }
 
-impl<S, L> Clone for AutoConcurrencyLimit<S, L>
+impl<S, L> Clone for AdaptiveConcurrencyLimit<S, L>
 where
     S: Clone,
     L: Clone,
@@ -118,7 +118,7 @@ impl fmt::Debug for State {
 mod tests {
     use super::super::{
         controller::{ControllerStatistics, Inner},
-        AutoConcurrencyLimitLayer,
+        AdaptiveConcurrencyLimitLayer,
     };
     use super::*;
     use crate::assert_downcast_matches;
@@ -151,7 +151,7 @@ mod tests {
         }
     }
 
-    type TestInner = AutoConcurrencyLimit<Mock<String, String>, TestRetryLogic>;
+    type TestInner = AdaptiveConcurrencyLimit<Mock<String, String>, TestRetryLogic>;
     struct TestService {
         service: Spawn<TestInner>,
         handle: Handle<String, String>,
@@ -168,9 +168,9 @@ mod tests {
 
     impl TestService {
         fn start() -> Self {
-            let layer = AutoConcurrencyLimitLayer::new(
+            let layer = AdaptiveConcurrencyLimitLayer::new(
                 None,
-                AutoConcurrencySettings {
+                AdaptiveConcurrencySettings {
                     decrease_ratio: 0.5,
                     ..Default::default()
                 },

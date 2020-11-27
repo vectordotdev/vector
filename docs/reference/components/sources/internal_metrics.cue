@@ -113,25 +113,25 @@ components: sources: internal_metrics: {
 
 		// Metrics emitted by one or more components
 		// Reusable metric definitions
-		auto_concurrency_averaged_rtt: {
+		adaptive_concurrency_averaged_rtt: {
 			description:       "The average round-trip time (RTT) from the HTTP sink across the current window."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		auto_concurrency_in_flight: {
+		adaptive_concurrency_in_flight: {
 			description:       "The number of outbound requests from the HTTP sink currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		auto_concurrency_limit: {
-			description:       "The concurrency limit that the auto-concurrency feature has decided on for this current window."
+		adaptive_concurrency_limit: {
+			description:       "The concurrency limit that the adaptive concurrency feature has decided on for this current window."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		auto_concurrency_observed_rtt: {
+		adaptive_concurrency_observed_rtt: {
 			description:       "The observed round-trip time (RTT) for requests from this HTTP sink."
 			type:              "histogram"
 			default_namespace: "vector"

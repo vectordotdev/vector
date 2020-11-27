@@ -14,7 +14,7 @@ use std::{
 };
 use tokio::sync::OwnedSemaphorePermit;
 
-/// Future for the `AutoConcurrencyLimit` service.
+/// Future for the `AdaptiveConcurrencyLimit` service.
 ///
 /// This future runs the inner future, which is used to collect the
 /// response from the inner service, and then tells the controller to
