@@ -15,7 +15,7 @@ use crate::{
     Event, Pipeline,
 };
 use bytes::Bytes;
-use chrono::{DateTime, LocalResult, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -170,12 +170,10 @@ fn parse_labels(labels: Vec<proto::Label>) -> (Option<String>, Option<BTreeMap<S
 }
 
 fn parse_timestamp(timestamp: i64) -> Option<DateTime<Utc>> {
-    match Utc.timestamp_opt(timestamp / 1000, (timestamp % 1000) as u32 * 1000000) {
-        LocalResult::None => None,
-        LocalResult::Single(timestamp) => Some(timestamp),
-        // If the result is ambiguous, arbitrarily pick one of the possibilities.
-        LocalResult::Ambiguous(timestamp1, _timestamp2) => Some(timestamp1),
-    }
+    // Conversion into UTC should never produce an ambiguous time, but
+    // we still need to pick one so arbitrarily choose the latest.
+    Utc.timestamp_opt(timestamp / 1000, (timestamp % 1000) as u32 * 1000000)
+        .latest()
 }
 
 #[cfg(test)]
