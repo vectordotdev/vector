@@ -1,4 +1,4 @@
-use crate::{expression, function, parser::Rule, program, value};
+use crate::{expression, function, parser::Rule, path, program, value};
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -30,6 +30,9 @@ pub enum Error {
 
     #[error("assertion failed: {0}")]
     Assert(String),
+
+    #[error("path error")]
+    Path(#[from] path::Error),
 
     #[error("unknown error")]
     Unknown,

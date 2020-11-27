@@ -32,7 +32,7 @@ impl Assignment {
                 .insert(variable.ident().to_owned(), type_def),
             Target::Path(path) => state
                 .path_query_types_mut()
-                .insert(path.as_string(), type_def),
+                .insert(path.as_ref().clone(), type_def),
         };
 
         Self { target, value }
@@ -50,7 +50,7 @@ impl Expression for Assignment {
                     .insert(variable.ident().to_owned(), value.clone());
             }
             Target::Path(path) => object
-                .insert(path.segments(), value.clone())
+                .insert(path.as_ref(), value.clone())
                 .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
         }
 
@@ -64,7 +64,7 @@ impl Expression for Assignment {
                 .cloned()
                 .expect("variable must be assigned via Assignment::new"),
             Target::Path(path) => state
-                .path_query_type(&path.as_string())
+                .path_query_type(path)
                 .cloned()
                 .expect("path must be assigned via Assignment::new"),
         }

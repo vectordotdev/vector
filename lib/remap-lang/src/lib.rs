@@ -1,6 +1,7 @@
 mod error;
 mod operator;
 mod parser;
+mod path;
 mod program;
 mod runtime;
 mod test_util;
@@ -16,6 +17,7 @@ pub use error::{Error, RemapError};
 pub use expression::{Expr, Expression};
 pub use function::{Function, Parameter};
 pub use operator::Operator;
+pub use path::{Field, Path, Segment};
 pub use program::{Program, TypeConstraint};
 pub use runtime::Runtime;
 pub use type_def::TypeDef;

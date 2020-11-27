@@ -59,6 +59,41 @@ macro_rules! operation_fns {
 }
 
 impl Parser<'_> {
+    /// Parse a string path into a [`path::Path`] wrapper with easy access to
+    /// individual path [`path::Segment`]s.
+    ///
+    /// This function fails if the provided path is invalid, as defined by the
+    /// parser grammar.
+    pub(crate) fn path_from_str(&mut self, path: &str) -> Result<path::Path> {
+        use pest::Parser;
+
+        let mut pairs = Self::parse(R::rule_path, path)?;
+        let pair = pairs.next().ok_or(e(R::rule_path))?;
+
+        match pair.as_rule() {
+            R::path => self.path_from_pair(pair),
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn path_field_from_str(&mut self, field: &str) -> Result<path::Field> {
+        use pest::Parser;
+
+        if let Ok(mut pairs) = Self::parse(R::rule_ident, field) {
+            let field = pairs.next().ok_or(e(R::rule_ident))?.as_str().to_owned();
+
+            return Ok(path::Field::Regular(field));
+        }
+
+        let field = Self::parse(R::rule_string_inner, field)?
+            .next()
+            .ok_or(e(R::rule_string_inner))?
+            .as_str()
+            .to_owned();
+
+        Ok(path::Field::Quoted(field))
+    }
+
     /// Converts the set of known "root" rules into boxed [`Expression`] trait
     /// objects.
     pub(crate) fn pairs_to_expressions(&mut self, pairs: Pairs<R>) -> Result<Vec<Expr>> {

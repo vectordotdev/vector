@@ -3,6 +3,12 @@
 program    = _{ SOI ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ EOI }
 expression = _{ assignment | if_statement | boolean_expr | block }
 
+// Program Rules ---------------------------------------------------------------
+
+rule_path         = _{ SOI ~ path ~ EOI }
+rule_ident        = _{ SOI ~ ident ~ EOI }
+rule_string_inner = _{ SOI ~ string_inner ~ EOI }
+
 // Statements ------------------------------------------------------------------
 
 assignment   = { target ~ "=" ~ expression }
