@@ -71,4 +71,22 @@ components: sources: prometheus_remote_write: {
 		counter: output._passthrough_counter
 		gauge:   output._passthrough_gauge
 	}
+
+	how_it_works: {
+		metric_types: {
+			title: "Metric type interpretation"
+			body: """
+				The remote_write protocol used by this source transmits
+				only the metric tags, timestamp, and numerical value. No
+				explicit information about the original type of the
+				metric (ie counter, histogram, etc) is included. As
+				such, this source makes a guess as to what the original
+				metric type was.
+
+				For metrics named with a suffix of `_total`, this source
+				emits the value as a counter metric. All other metrics
+				are emitted as gauges.
+				"""
+		}
+	}
 }
