@@ -132,7 +132,7 @@ enum NormalizationError {
 #[cfg(test)]
 pub mod tests {
     use super::{super::test_util, *};
-    use crate::transforms::Transform;
+    use crate::{test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -196,11 +196,15 @@ pub mod tests {
 
     #[test]
     fn test_parsing() {
+        trace_init();
+
         test_util::test_parser(|| Transform::function(Docker), cases());
     }
 
     #[test]
     fn test_parsing_invalid() {
+        trace_init();
+
         let cases = vec![
             // Empty string.
             r#""#,

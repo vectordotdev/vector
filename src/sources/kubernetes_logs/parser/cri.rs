@@ -94,7 +94,7 @@ enum NormalizationError {
 pub mod tests {
     use super::super::test_util;
     use super::*;
-    use crate::{event::LogEvent, transforms::Transform};
+    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform};
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -158,6 +158,7 @@ pub mod tests {
 
     #[test]
     fn test_parsing() {
+        trace_init();
         test_util::test_parser(|| Transform::function(Cri::new()), cases());
     }
 }

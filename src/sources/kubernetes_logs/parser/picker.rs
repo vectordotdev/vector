@@ -62,7 +62,7 @@ impl FunctionTransform for Picker {
 mod tests {
     use super::super::{cri, docker, test_util};
     use super::*;
-    use crate::{event::LogEvent, transforms::Transform, Event};
+    use crate::{event::LogEvent, test_util::trace_init, transforms::Transform, Event};
 
     /// Picker has to work for all test cases for underlying parsers.
     fn cases() -> Vec<(String, Vec<LogEvent>)> {
@@ -74,11 +74,14 @@ mod tests {
 
     #[test]
     fn test_parsing() {
+        trace_init();
         test_util::test_parser(|| Transform::function(Picker::new()), cases());
     }
 
     #[test]
     fn test_parsing_invalid() {
+        trace_init();
+
         let cases = vec!["", "qwe", "{"];
 
         for message in cases {
@@ -92,6 +95,8 @@ mod tests {
 
     #[test]
     fn test_parsing_invalid_non_standard_events() {
+        trace_init();
+
         let cases = vec![
             // No `message` field.
             Event::new_empty_log(),
