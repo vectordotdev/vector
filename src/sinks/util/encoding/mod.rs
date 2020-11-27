@@ -39,7 +39,7 @@ use crate::{
     Event, Result,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, fmt::Debug};
+use std::collections::VecDeque;
 
 /// The behavior of a encoding configuration.
 pub trait EncodingConfiguration<E> {

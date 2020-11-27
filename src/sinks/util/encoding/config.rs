@@ -46,16 +46,16 @@ impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     }
 }
 
-impl<E> Into<EncodingConfigWithDefault<E>> for EncodingConfig<E>
+impl<E> From<EncodingConfigWithDefault<E>> for EncodingConfig<E>
 where
     E: Default + PartialEq,
 {
-    fn into(self) -> EncodingConfigWithDefault<E> {
-        EncodingConfigWithDefault {
-            codec: self.codec,
-            only_fields: self.only_fields,
-            except_fields: self.except_fields,
-            timestamp_format: self.timestamp_format,
+    fn from(encoding: EncodingConfigWithDefault<E>) -> Self {
+        Self {
+            codec: encoding.codec,
+            only_fields: encoding.only_fields,
+            except_fields: encoding.except_fields,
+            timestamp_format: encoding.timestamp_format,
         }
     }
 }

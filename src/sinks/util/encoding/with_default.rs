@@ -91,26 +91,6 @@ where
     }
 }
 
-impl<E> Into<EncodingConfig<E>> for EncodingConfigWithDefault<E>
-where
-    E: Default + PartialEq,
-{
-    fn into(self) -> EncodingConfig<E> {
-        let Self {
-            codec,
-            only_fields,
-            except_fields,
-            timestamp_format,
-        } = self;
-        EncodingConfig {
-            codec,
-            only_fields,
-            except_fields,
-            timestamp_format,
-        }
-    }
-}
-
 impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(codec: E) -> Self {
         Self {
@@ -190,7 +170,7 @@ where
             timestamp_format: inner.timestamp_format,
         };
 
-        concrete.validate().map_err(serde::de::Error::custom)?;
+        concrete.validate().map_err(de::Error::custom)?;
         Ok(concrete)
     }
 }
