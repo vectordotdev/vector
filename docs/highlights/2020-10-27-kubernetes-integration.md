@@ -17,7 +17,7 @@ to announce Vector's first-class Kubernetes integration. It is our intent for
 Vector to become the single, best platform for collecting and processing all
 Kubernetes observability data.
 
-[**Read the Kubernetes announcement post**][announcement_post]
+[**Read the Kubernetes announcement post →**][announcement_post]
 
 ## Feature highlights
 
@@ -26,12 +26,8 @@ Kubernetes observability data.
     collect all Pod logs, merge split logs together, and enrich them with k8s
     metadata.
 2.  [**YAML config support**][config_formats_highlight] -
-    Vector's [`file` source][file_source] powers the new `kubernetes_logs`
-    source, and to keep up with very large Kubernetes deployments we invested
-    in performance improvements. We were able to improve throughput by over 25%
-    across the board. This [further raises the bar][file_soure_benchmarks] in
-    file tailing performance to meet the high demands of large-scale Kubernetes
-    environments.
+    To ensure Vector fits cleanly into your existing K8s workflows, Vector now
+    accepts YAML and JSON config formats.
 3.  [**Adaptive Request Currency (ARC)**][adaptive_concurrency_post] -
     A new Vector feature designed to automatically optimize HTTP communication
     in the face of ever changing environments like Kubernetes. It does away with
@@ -40,11 +36,9 @@ Kubernetes observability data.
 
 ## Get Started
 
-To cut straight to the chase, check out the:
+To get started, follow the install instructions:
 
-[**Kubernetes Installation Instructions**][installation_docs]
-
-## Future plans
+[**Kubernetes Installation Instructions →**][installation_docs]
 
 [adaptive_concurrency_post]: /blog/adaptive-request-concurrency/
 [config_formats_highlight]: /highlights/2020-11-25-json-yaml-config-formats/
