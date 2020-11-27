@@ -328,11 +328,12 @@ components: sources: kubernetes_logs: {
 					can skip the logs from the individual `container`s of a particular `Pod`.
 					Add an *annotation* `vector.dev/exclude-containers` to
 					the `Pod`, and enumerate the `name`s of all the `container`s
-					of this `Pod` in the values of the annotation like so:
+					to exclude in the value of the annotation like so:
 					`vector.dev/exclude-containers: "container1,container2"`.
 					This annotation will make Vector skip logs originating from
-					the `container1` and `container2`, while logs from other
-					containers in the `Pod` will still be collected.
+					the `container1` and `container2` of the `Pod` marked with
+					the annotation, while logs from other `container`s in
+					the `Pod` will still be collected.
 					"""
 		}
 
