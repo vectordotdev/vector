@@ -16,11 +16,17 @@ use futures::{compat::Sink01CompatExt, stream, FutureExt, StreamExt, TryFutureEx
 use futures01::Sink;
 use hyper::{Body, Request};
 use serde::{Deserialize, Serialize};
-use snafu::ResultExt;
+use snafu::{ResultExt, Snafu};
 use std::{
     future::ready,
     time::{Duration, Instant},
 };
+
+#[derive(Debug, Snafu)]
+enum ConfigError {
+    #[snafu(display("Cannot set both `endpoints` and `hosts`"))]
+    BothEndpointsAndHosts,
+}
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 struct PrometheusScrapeConfig {
@@ -98,8 +104,16 @@ impl SourceConfig for PrometheusScrapeConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct PrometheusCompatConfig {
-    #[serde(flatten)]
-    config: PrometheusScrapeConfig,
+    // Clone of PrometheusScrapeConfig to work around serde bug
+    // https://github.com/serde-rs/serde/issues/1504
+    #[serde(alias = "hosts")]
+    endpoints: Vec<String>,
+    #[serde(default = "default_scrape_interval_secs")]
+    scrape_interval_secs: u64,
+
+    tls: Option<TlsOptions>,
+
+    auth: Option<Auth>,
 }
 
 #[async_trait::async_trait]
@@ -112,11 +126,20 @@ impl SourceConfig for PrometheusCompatConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<sources::Source> {
-        self.config.build(name, globals, shutdown, out).await
+        // Workaround for serde bug
+        // https://github.com/serde-rs/serde/issues/1504
+        PrometheusScrapeConfig {
+            endpoints: self.endpoints.clone(),
+            scrape_interval_secs: self.scrape_interval_secs,
+            tls: self.tls.clone(),
+            auth: self.auth.clone(),
+        }
+        .build(name, globals, shutdown, out)
+        .await
     }
 
     fn output_type(&self) -> config::DataType {
-        self.config.output_type()
+        config::DataType::Metric
     }
 
     fn source_type(&self) -> &'static str {
