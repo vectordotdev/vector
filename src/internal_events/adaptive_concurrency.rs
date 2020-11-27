@@ -3,7 +3,7 @@ use metrics::histogram;
 use std::time::Duration;
 
 #[derive(Debug)]
-pub struct AutoConcurrencyLimit {
+pub struct AdaptiveConcurrencyLimit {
     pub concurrency: u64,
     pub reached_limit: bool,
     pub had_back_pressure: bool,
@@ -11,7 +11,7 @@ pub struct AutoConcurrencyLimit {
     pub past_rtt: Duration,
 }
 
-impl InternalEvent for AutoConcurrencyLimit {
+impl InternalEvent for AdaptiveConcurrencyLimit {
     fn emit_logs(&self) {
         trace!(
             message = "Changed concurrency.",
@@ -24,39 +24,39 @@ impl InternalEvent for AutoConcurrencyLimit {
     }
 
     fn emit_metrics(&self) {
-        histogram!("auto_concurrency_limit", self.concurrency);
+        histogram!("adaptive_concurrency_limit", self.concurrency);
     }
 }
 
 #[derive(Debug)]
-pub struct AutoConcurrencyInFlight {
+pub struct AdaptiveConcurrencyInFlight {
     pub in_flight: u64,
 }
 
-impl InternalEvent for AutoConcurrencyInFlight {
+impl InternalEvent for AdaptiveConcurrencyInFlight {
     fn emit_metrics(&self) {
-        histogram!("auto_concurrency_in_flight", self.in_flight);
+        histogram!("adaptive_concurrency_in_flight", self.in_flight);
     }
 }
 
 #[derive(Debug)]
-pub struct AutoConcurrencyObservedRtt {
+pub struct AdaptiveConcurrencyObservedRtt {
     pub rtt: Duration,
 }
 
-impl InternalEvent for AutoConcurrencyObservedRtt {
+impl InternalEvent for AdaptiveConcurrencyObservedRtt {
     fn emit_metrics(&self) {
-        histogram!("auto_concurrency_observed_rtt", self.rtt);
+        histogram!("adaptive_concurrency_observed_rtt", self.rtt);
     }
 }
 
 #[derive(Debug)]
-pub struct AutoConcurrencyAveragedRtt {
+pub struct AdaptiveConcurrencyAveragedRtt {
     pub rtt: Duration,
 }
 
-impl InternalEvent for AutoConcurrencyAveragedRtt {
+impl InternalEvent for AdaptiveConcurrencyAveragedRtt {
     fn emit_metrics(&self) {
-        histogram!("auto_concurrency_averaged_rtt", self.rtt);
+        histogram!("adaptive_concurrency_averaged_rtt", self.rtt);
     }
 }

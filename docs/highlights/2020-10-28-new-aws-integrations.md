@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-10-27"
 $schema: ".schema.json"
-title: "New AWS integration"
-description: "Export observability data out of AWS with ease."
+title: "New AWS integrations"
+description: "Export observability data out of AWS."
 author_github: "https://github.com/binarylogic"
 pr_numbers: [4101, 4779]
 release: "0.11.0"

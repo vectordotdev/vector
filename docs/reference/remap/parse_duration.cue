@@ -4,13 +4,13 @@ remap: functions: parse_duration: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text of the duration."
+			description: "The string of the duration."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "output"
-			description: "The text of the duration unit the number should be output as."
+			description: "The string of the duration unit the number should be output as."
 			required:    true
 			type: ["string"]
 		},

@@ -1,8 +1,8 @@
 ---
 last_modified_on: "2020-11-19"
 $schema: ".schema.json"
-title: "Support for Prometheus remote write"
-description: "Easily export metrics out of Prometheus."
+title: "Support for the Prometheus remote write protocol"
+description: "Interoperability with the Prometheus ecosystem."
 author_github: "https://github.com/jamtur01"
 pr_numbers: [4856, 5144]
 release: "0.11.0"
@@ -53,7 +53,8 @@ term querying and long-term low cost archiving.
 
 With the new [`prometheus_remote_write` source][prometheus_remote_write_source],
 users can only retain near-term data in Prometheus and store long term metrics
-in databases like [M3 (Chronosphere)][], [Victoria metrics][], and [Timescale][].
+in databases like [M3 (Chronosphere)][chronosphere],
+[Victoria metrics][victoria_metrics], and [Timescale][timescale].
 
 ### Using Prometheus as a centralized export proxy
 
@@ -75,6 +76,7 @@ your metrics to [Datadog][datadog], [New Relic][new_relic], [Influx][influx],
   inputs = ["prometheus"]
 ```
 
+[chronosphere]: https://chronosphere.io/
 [datadog]: https://datadog.com
 [elastic]: https://www.elastic.co/
 [influx]: https://www.influxdata.com/
@@ -83,3 +85,5 @@ your metrics to [Datadog][datadog], [New Relic][new_relic], [Influx][influx],
 [prometheus_remote_write_sink]: /docs/reference/sinks/prometheus_remote_write
 [prometheus_remote_write_source]: /docs/reference/sources/prometheus_remote_write
 [sinks]: /docs/reference/sinks/
+[timescale]: https://www.timescale.com/
+[victoria_metrics]: https://victoriametrics.com/

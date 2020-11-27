@@ -137,6 +137,12 @@ expression_dispatch![
     Argument,
 ];
 
+impl<T: Into<Value>> From<T> for Expr {
+    fn from(value: T) -> Self {
+        Literal::from(value.into()).into()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::value;

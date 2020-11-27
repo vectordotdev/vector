@@ -131,7 +131,7 @@
 /src/sinks/statsd.rs @lukesteensen
 /src/sinks/tcp.rs @bruceg
 /src/sinks/tcp.rs @lukesteensen
-/src/sinks/util/auto_concurrency @bruceg
+/src/sinks/util/adaptive_concurrency @bruceg
 
 /src/sources/apache_metrics/ @jszwedko
 /src/sources/aws_kinesis_firehose/ @jszwedko

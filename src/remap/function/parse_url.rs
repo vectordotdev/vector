@@ -96,12 +96,12 @@ mod tests {
     remap::test_type_def![
         value_string {
             expr: |_| ParseUrlFn { value: Literal::from("foo").boxed() },
-            def: TypeDef { fallible: true, kind: value::Kind::Map, ..Default::default() },
+            def: TypeDef { fallible: true, kind: value::Kind::Map },
         }
 
         value_optional {
             expr: |_| ParseUrlFn { value: Box::new(Noop) },
-            def: TypeDef { fallible: true, optional: true, kind: value::Kind::Map },
+            def: TypeDef { fallible: true, kind: value::Kind::Map },
         }
     ];
 

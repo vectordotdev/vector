@@ -14,12 +14,6 @@ pub struct TypeDef {
     /// custom function designed to be infallible).
     pub fallible: bool,
 
-    /// True, if an expression can resolve to "nothing".
-    ///
-    /// For example, and if-statement without an else-condition can resolve to
-    /// nothing if the if-condition does not match.
-    pub optional: bool,
-
     /// The [`value::Kind`]s this definition represents.
     pub kind: value::Kind,
 }
@@ -28,7 +22,6 @@ impl Default for TypeDef {
     fn default() -> Self {
         Self {
             fallible: false,
-            optional: false,
             kind: value::Kind::all(),
         }
     }
@@ -40,7 +33,6 @@ impl BitOr for TypeDef {
     fn bitor(self, rhs: Self) -> Self {
         Self {
             fallible: self.fallible | rhs.fallible,
-            optional: self.optional | rhs.optional,
             kind: self.kind | rhs.kind,
         }
     }
@@ -52,7 +44,6 @@ impl BitAnd for TypeDef {
     fn bitand(self, rhs: Self) -> Self::Output {
         Self {
             fallible: self.fallible & rhs.fallible,
-            optional: self.optional & rhs.optional,
             kind: self.kind & rhs.kind,
         }
     }
@@ -64,7 +55,6 @@ impl BitXor for TypeDef {
     fn bitxor(self, rhs: Self) -> Self::Output {
         Self {
             fallible: self.fallible ^ rhs.fallible,
-            optional: self.optional ^ rhs.optional,
             kind: self.kind ^ rhs.kind,
         }
     }
@@ -80,28 +70,14 @@ impl TypeDef {
         self
     }
 
-    pub fn is_optional(&self) -> bool {
-        self.optional
-    }
-
-    pub fn into_optional(mut self, optional: bool) -> Self {
-        self.optional = optional;
-        self
-    }
-
     /// Returns `true` if the _other_ [`TypeDef`] is contained within the
     /// current one.
     ///
     /// That is to say, its constraints must be more strict or equal to the
     /// constraints of the current one.
     pub fn contains(&self, other: &Self) -> bool {
-        // If we don't expect none, but the other does, the other's requirement
-        // is less strict than ours.
-        if !self.is_optional() && other.is_optional() {
-            return false;
-        }
-
-        // The same applies to fallible checks.
+        // If we don't expect fallible, but the other does, the other's
+        // requirement is less strict than ours.
         if !self.is_fallible() && other.is_fallible() {
             return false;
         }
@@ -137,11 +113,11 @@ impl TypeDef {
     /// considered to be the "default" for the `self` `TypeDef`.
     ///
     /// The implication of this is that the resulting `TypeDef` will be equal to
-    /// `self` or `other`, if either of the two is infallible and non-optional.
+    /// `self` or `other`, if either of the two is infallible.
     ///
     /// If neither are, the two type definitions are merged as usual.
     pub fn merge_with_default_optional(self, other: Option<Self>) -> Self {
-        if !self.is_fallible() && !self.is_optional() {
+        if !self.is_fallible() {
             return self;
         }
 
@@ -149,7 +125,7 @@ impl TypeDef {
             None => self,
 
             // If `self` isn't exact, see if `other` is.
-            Some(other) if !other.is_fallible() && !other.is_optional() => other,
+            Some(other) if !other.is_fallible() => other,
 
             // Otherwise merge the optional as usual.
             Some(other) => self.merge(other),
