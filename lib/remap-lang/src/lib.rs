@@ -37,15 +37,11 @@ mod tests {
 
     #[test]
     fn it_works() {
+        #[rustfmt::skip]
         let cases = vec![
             (r#".foo = null || "bar""#, Ok(()), Ok("bar".into())),
             (r#"$foo = null || "bar""#, Ok(()), Ok("bar".into())),
-            // (r#".foo == .bar"#, Ok(Value::Boolean(false))),
-            (
-                r#".foo == .bar"#,
-                Ok(()),
-                Ok(true.into()),
-            ),
+            (r#".qux == .quux"#, Ok(()), Ok(true.into())),
             (
                 r#"if "foo" { "bar" }"#,
                 Ok(()),
@@ -68,7 +64,6 @@ mod tests {
                     .foo
                 }"#,
                 Ok(()),
-
                 Ok("foobar".into()),
             ),
             (
@@ -77,9 +72,7 @@ mod tests {
                     false || (.foo = true) && true
                     .foo
                 "#,
-
                 Ok(()),
-
                 Ok(true.into()),
             ),
             (r#"if false { 1 }"#, Ok(()), Ok(Value::Null)),
@@ -139,7 +132,49 @@ mod tests {
             (r#"null || false"#, Ok(()), Ok(false.into())),
             (r#"false || null"#, Ok(()), Ok(().into())),
             (r#"null || "foo""#, Ok(()), Ok("foo".into())),
-            (r#". = "bar""#, Ok(()), Ok("bar".into())),
+            (r#". = .foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#"."#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
+            (r#" . "#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
+            (r#".foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".foo.qux[0]"#, Ok(()), Ok(1.into())),
+            (r#".foo.bar"#, Ok(()), Ok("baz".into())),
+            (r#".(nope | foo)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".(foo | nope)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".(nope | foo).bar"#, Ok(()), Ok("baz".into())),
+            (r#".foo.(nope | bar)"#, Ok(()), Ok("baz".into())),
+            (r#".foo.(nope | no)"#, Ok(()), Ok(().into())),
+            (r#".foo.(nope | qux)[1]"#, Ok(()), Ok(2.into())),
+            (
+                r#"
+                    .foo.bar.(bar1 | bar2).baz[2] = "qux"
+                    .foo
+                "#,
+                Ok(()),
+                Ok(map![
+                    "bar": map![
+                        "bar2": map![
+                            "baz": vec![
+                                Value::Null,
+                                Value::Null,
+                                "qux".into(),
+                            ],
+                        ],
+                    ],
+                    "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()]),
+                ].into()),
+            ),
+            (
+                r#"
+                    .foo.bar = "baz"
+                    $foo = .foo
+                    .foo.bar
+                "#,
+                Ok(()),
+                Ok("baz".into()),
+            ),
+            ("$foo = .foo\n$foo.bar", Ok(()), Ok("baz".into())),
+            ("$foo = .foo.qux\n$foo[1]", Ok(()), Ok(2.into())),
+            ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -163,7 +198,20 @@ mod tests {
 
             let program = program.unwrap();
             let mut runtime = Runtime::new(state::Program::default());
-            let mut event = HashMap::default();
+            let mut event: Value = map![
+                "foo":
+                    map![
+                        "bar": "baz",
+                        "qux": Value::Array(vec![
+                            1.into(),
+                            2.into(),
+                            map![
+                                "quux": true,
+                            ].into(),
+                        ]),
+                    ],
+            ]
+            .into();
 
             let result = runtime
                 .execute(&mut event, &program)

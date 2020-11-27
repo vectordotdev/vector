@@ -505,8 +505,107 @@ mod tests {
     use pest::Parser as _;
 
     #[test]
+    fn rule_root_path() {
+        let cases = vec![
+            (
+                ".",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                " . ",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                ".\n",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                "\n.",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                "\n.\n",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                "..",
+                vec![" 1:2\n", "= expected path_segment"],
+                Ok(vec![]),
+            ),
+            (
+                ". bar",
+                vec![" 1:3\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+                Ok(vec![])
+            ),
+            (
+                r#". "bar""#,
+                vec![" 1:2\n", "= expected path_segment"], // TODO: improve error message
+                Ok(vec![]),
+            ),
+        ];
+
+        validate_rule(cases);
+    }
+
+    fn validate_rule(cases: Vec<(&'static str, Vec<&'static str>, Result<Vec<Expr>>)>) {
+        for (mut i, (source, compile_check, run_check)) in cases.into_iter().enumerate() {
+            let compile_check: Vec<&'static str> = compile_check;
+            i += 1;
+
+            let pairs = Parser::parse(Rule::program, source);
+
+            match pairs {
+                Ok(pairs) => {
+                    let got = Parser::default().pairs_to_expressions(pairs);
+
+                    if compile_check.is_empty() {
+                        assert_eq!(got, run_check, "test case: {}", i)
+                    } else {
+                        for exp in compile_check {
+                            assert!(
+                                "".contains(exp),
+                                "expected error: {}\nwith source: {}\nresult: {:?}\n test case {}",
+                                exp,
+                                source,
+                                got,
+                                i
+                            );
+                        }
+                    }
+                }
+                Err(err) if !compile_check.is_empty() => {
+                    for exp in compile_check {
+                        assert!(
+                            err.to_string().contains(exp),
+                            "expected: {}\nwith source: {}\nfull error message: {}\n test case {}",
+                            exp,
+                            source,
+                            err,
+                            i
+                        );
+                    }
+                }
+                Err(err) => panic!("expected no error, got \"{}\" for test case {}", err, i),
+            }
+        }
+    }
+
+    #[test]
     fn check_parser_errors() {
         let cases = vec![
+            (
+                ".foo bar",
+                vec![" 1:6\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+            ),
+            (
+                ".=",
+                vec![" 1:3\n", "= expected assignment, if_statement, not, or block"],
+            ),
             (
                 ".foo = !",
                 vec![" 1:9\n", "= expected primary, operator_not, or ident"],
@@ -573,7 +672,7 @@ mod tests {
             (
                 // Regexes can't be parsed as part of a path
                 r#".foo = split(.foo, ./[aa]/)"#,
-                vec![" 1:21\n", "= expected path_segment"],
+                vec![" 1:22\n", "= expected not"],
             ),
             (
                 // We cannot assign a regular expression to a field.
