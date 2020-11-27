@@ -32,6 +32,7 @@ lazy_static! {
         Box::new(Ceil),
         Box::new(Floor),
         Box::new(Round),
+        Box::new(ParseGrok),
         Box::new(ParseSyslog),
         Box::new(ParseTimestamp),
         Box::new(ParseJson),
