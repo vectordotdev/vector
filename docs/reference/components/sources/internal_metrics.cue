@@ -219,13 +219,19 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		docker_format_parse_failures_total: {
+		k8s_format_picker_edge_cases_total: {
+			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		k8s_docker_format_parse_failures_total: {
 			description:       "The total number of failures to parse a message as a JSON object."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		event_annotation_failures_total: {
+		k8s_event_annotation_failures_total: {
 			description:       "The total number of failures to annotate Vector events with Kubernetes Pod metadata."
 			type:              "counter"
 			default_namespace: "vector"
