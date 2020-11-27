@@ -310,6 +310,28 @@ components: sources: kubernetes_logs: {
 					"""
 		}
 
+		pod_exclusion: {
+			title: "Pod exclusion"
+			body:  """
+					By default, [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					will skip logs from the `Pod`s that have
+					a `vector.dev/exclude: "true"` *label*.
+					You can configure additional exclusion rules via label or field selectors,
+					see [the available options](urls.vector_kubernetes_logs_source)#configuration).
+					"""
+		}
+
+		container_exclusion: {
+			title: "Container exclusion"
+			body:  """
+					By default, [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					will skip logs from the `container`s of the `Pod`s that are enumerated in
+					a `vector.dev/exclude-containers: "container1,container2"` *annotation*.
+					You can configure additional exclusion rules via the exluded log file paths,
+					see [the available options](urls.vector_kubernetes_logs_source)#configuration).
+					"""
+		}
+
 		kubernetes_api_communication: {
 			title: "Kubernetes API communication"
 			body:  """
