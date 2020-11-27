@@ -3,7 +3,6 @@ use crate::{
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::MetricKind,
     internal_events::PrometheusServerRequestComplete,
-    prometheus,
     sinks::{
         util::{statistic::validate_quantiles, MetricEntry, StreamSink},
         Healthcheck, VectorSink,
@@ -45,9 +44,9 @@ pub struct PrometheusExporterConfig {
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
-    #[serde(default = "prometheus::default_histogram_buckets")]
+    #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
-    #[serde(default = "prometheus::default_summary_quantiles")]
+    #[serde(default = "super::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
     #[serde(default = "default_flush_period_secs")]
     pub flush_period_secs: u64,
@@ -58,8 +57,8 @@ impl std::default::Default for PrometheusExporterConfig {
         Self {
             default_namespace: None,
             address: default_address(),
-            buckets: prometheus::default_histogram_buckets(),
-            quantiles: prometheus::default_summary_quantiles(),
+            buckets: super::default_histogram_buckets(),
+            quantiles: super::default_summary_quantiles(),
             flush_period_secs: default_flush_period_secs(),
         }
     }

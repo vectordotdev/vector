@@ -330,11 +330,9 @@ impl MetricCollector for TimeSeries {
 
 #[cfg(test)]
 mod tests {
+    use super::super::default_summary_quantiles;
     use super::*;
-    use crate::{
-        event::metric::{Metric, MetricKind, MetricValue, StatisticKind},
-        prometheus::default_summary_quantiles,
-    };
+    use crate::event::metric::{Metric, MetricKind, MetricValue, StatisticKind};
     use pretty_assertions::assert_eq;
 
     fn encode_metric_header(default_namespace: Option<&str>, metric: &Metric) -> String {

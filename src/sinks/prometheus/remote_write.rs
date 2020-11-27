@@ -3,7 +3,7 @@ use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::Metric,
     http::HttpClient,
-    prometheus::{self, proto},
+    prometheus::proto,
     sinks::{
         self,
         util::{
@@ -32,9 +32,9 @@ pub(crate) struct RemoteWriteConfig {
 
     pub default_namespace: Option<String>,
 
-    #[serde(default = "prometheus::default_histogram_buckets")]
+    #[serde(default = "super::default_histogram_buckets")]
     pub buckets: Vec<f64>,
-    #[serde(default = "prometheus::default_summary_quantiles")]
+    #[serde(default = "super::default_summary_quantiles")]
     pub quantiles: Vec<f64>,
 
     #[serde(default)]
