@@ -392,7 +392,7 @@ components: sources: file: {
 			sub_sections: [
 				{
 					title: "Example 1: Ruy Exceptions"
-					body: """
+					body: #"""
 						Ruby exceptions, when logged, consist of multiple lines:
 
 						```text
@@ -411,21 +411,21 @@ components: sources: file: {
 							# ...
 
 							[sources.my_file_source.multiline]
-								start_pattern = "^[^\\s]"
+								start_pattern = '^[^\s]'
 								mode = "continue_through"
-								condition_pattern = "^[\\s]+from"
+								condition_pattern = '^[\s]+from'
 								timeout_ms = 1000
 						```
 
-						* `start_pattern`, set to `^[^\\s]`, tells Vector that new
+						* `start_pattern`, set to `^[^\s]`, tells Vector that new
 							multi-line events should _not_ start  with white-space.
 						* `mode`, set to `continue_through`, tells Vector continue
 							aggregating lines until the `condition_pattern` is no longer
 							valid (excluding the invalid line).
-						* `condition_pattern`, set to `^[\\s]+from`, tells Vector to
+						* `condition_pattern`, set to `^[\s]+from`, tells Vector to
 							continue aggregating lines if they start with white-space
 							followed by `from`.
-						"""
+						"""#
 				},
 				{
 					title: "Example 2: Line Continuations"
@@ -448,9 +448,9 @@ components: sources: file: {
 							# ...
 
 							[sources.my_file_source.multiline]
-								start_pattern = "\\$"
+								start_pattern = '\\$'
 								mode = "continue_past"
-								condition_pattern = "\\$"
+								condition_pattern = '\\$'
 								timeout_ms = 1000
 						```
 
@@ -484,9 +484,9 @@ components: sources: file: {
 							# ...
 
 							[sources.my_file_source.multiline]
-								start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								start_pattern = '^\[[0-9]{4}-[0-9]{2}-[0-9]{2}'
 								mode = "halt_before"
-								condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								condition_pattern = '^\[[0-9]{4}-[0-9]{2}-[0-9]{2}'
 								timeout_ms = 1000
 						```
 
