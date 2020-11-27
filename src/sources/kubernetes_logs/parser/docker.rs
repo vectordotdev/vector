@@ -111,25 +111,25 @@ pub mod tests {
     }
 
     /// Shared test cases.
-    pub fn cases() -> Vec<(String, LogEvent)> {
+    pub fn cases() -> Vec<(String, Vec<LogEvent>)> {
         vec![
             (
                 r#"{"log": "The actual log line\n", "stream": "stderr", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
-                test_util::make_log_event(
+                vec![test_util::make_log_event(
                     "The actual log line",
                     "2016-10-05T00:00:30.082640485Z",
                     "stderr",
                     false,
-                ),
+                )],
             ),
             (
                 r#"{"log": "A line without newline chan at the end", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#.into(),
-                test_util::make_log_event(
+                vec![test_util::make_log_event(
                     "A line without newline chan at the end",
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
-                ),
+                )],
             ),
             // Partial message due to message length.
             (
@@ -139,12 +139,12 @@ pub mod tests {
                     r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
                 ]
                 .join(""),
-                test_util::make_log_event(
+                vec![test_util::make_log_event(
                     make_long_string("partial ",16 * 1024).as_str(),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     true,
-                ),
+                )],
             ),
             // Non-partial message, because message length matches but
             // the message also ends with newline.
@@ -156,12 +156,12 @@ pub mod tests {
                     r#"", "stream": "stdout", "time": "2016-10-05T00:00:30.082640485Z"}"#,
                 ]
                 .join(""),
-                test_util::make_log_event(
+                vec![test_util::make_log_event(
                     make_long_string("non-partial ", 16 * 1024 - 1).as_str(),
                     "2016-10-05T00:00:30.082640485Z",
                     "stdout",
                     false,
-                ),
+                )],
             ),
         ]
     }

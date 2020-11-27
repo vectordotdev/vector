@@ -50,7 +50,7 @@ mod tests {
     use crate::{event::LogEvent, transforms::Transform, Event};
 
     /// Picker has to work for all test cases for underlying parsers.
-    fn cases() -> Vec<(String, LogEvent)> {
+    fn cases() -> Vec<(String, Vec<LogEvent>)> {
         let mut cases = vec![];
         cases.extend(docker::tests::cases());
         cases.extend(cri::tests::cases());
@@ -69,8 +69,9 @@ mod tests {
         for message in cases {
             let input = Event::from(message);
             let mut picker = Picker::new();
-            let output = picker.transform_one(input);
-            assert!(output.is_none(), "Expected none: {:?}", output);
+            let mut output = Vec::new();
+            picker.transform(&mut output, input);
+            assert!(output.is_empty(), "Expected no events: {:?}", output);
         }
     }
 }
