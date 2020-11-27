@@ -8,9 +8,9 @@ use crate::{
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{compat::Sink01CompatExt, future, FutureExt, SinkExt, StreamExt, TryFutureExt};
+use futures::{compat::Sink01CompatExt, FutureExt, SinkExt, StreamExt};
 use futures01::Sink;
-use std::path::PathBuf;
+use std::{future::ready, path::PathBuf};
 use tokio::net::{UnixListener, UnixStream};
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
@@ -35,7 +35,7 @@ where
 {
     let out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
-    let fut = async move {
+    Box::pin(async move {
         let mut listener =
             UnixListener::bind(&listen_path).expect("Failed to bind to listener socket");
         info!(message = "Listening.", path = ?listen_path, r#type = "unix");
@@ -72,7 +72,7 @@ where
 
             let stream = socket.allow_read_until(shutdown.clone().map(|_| ()));
             let mut stream = FramedRead::new(stream, decoder.clone()).filter_map(move |line| {
-                future::ready(match line {
+                ready(match line {
                     Ok(line) => build_event(&host_key, received_from.clone(), &line).map(Ok),
                     Err(error) => {
                         emit!(UnixSocketError {
@@ -100,7 +100,5 @@ where
         }
 
         Ok(())
-    };
-
-    Box::new(fut.boxed().compat())
+    })
 }

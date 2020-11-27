@@ -33,6 +33,14 @@ impl Compression {
         }
     }
 }
+impl fmt::Display for Compression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Compression::None => write!(f, "none"),
+            Compression::Gzip(ref level) => write!(f, "gzip({})", level.unwrap_or(GZIP_DEFAULT)),
+        }
+    }
+}
 
 #[cfg(feature = "rusoto_core")]
 impl From<Compression> for rusoto_core::encoding::ContentEncoding {

@@ -2,7 +2,7 @@ package metadata
 
 components: sinks: elasticsearch: {
 	title:       "Elasticsearch"
-	description: "[Elasticsearch][urls.elasticsearch] is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch."
+	description: "[Elasticsearch](\(urls.elasticsearch)) is a search engine based on the Lucene library. It provides a distributed, multitenant-capable full-text search engine with an HTTP web interface and schema-free JSON documents. As a result, it is very commonly used to store and analyze log data. It ships with Kibana which is a simple interface for visualizing and exploring data in Elasticsearch."
 
 	classes: {
 		commonly_used: true
@@ -49,6 +49,21 @@ components: sinks: elasticsearch: {
 				can_verify_hostname:    true
 				enabled_default:        false
 			}
+			to: {
+				service: services.elasticsearch
+
+				interface: {
+					socket: {
+						api: {
+							title: "Elasticsearch bulk API"
+							url:   urls.elasticsearch_bulk
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "optional"
+					}
+				}
+			}
 		}
 	}
 
@@ -78,7 +93,7 @@ components: sinks: elasticsearch: {
 				options: {
 					assume_role: {
 						common:      false
-						description: "The ARN of an [IAM role][urls.aws_iam_role] to assume at startup."
+						description: "The ARN of an [IAM role](\(urls.aws_iam_role)) to assume at startup."
 						required:    false
 						warnings: []
 						type: string: {
@@ -100,8 +115,8 @@ components: sinks: elasticsearch: {
 						warnings: []
 						type: string: {
 							enum: {
-								aws:   "Authentication strategy used for [AWS' hosted Elasticsearch service][urls.aws_elasticsearch]."
-								basic: "The [basic authentication strategy][urls.basic_auth]."
+								aws:   "Authentication strategy used for [AWS' hosted Elasticsearch service](\(urls.aws_elasticsearch))."
+								basic: "The [basic authentication strategy](\(urls.basic_auth))."
 							}
 						}
 					}
@@ -151,7 +166,7 @@ components: sinks: elasticsearch: {
 			required:    true
 			warnings: []
 			type: string: {
-				examples: ["http://10.24.32.122:9000", "https://example.com"]
+				examples: ["http://10.24.32.122:9000", "https://example.com", "https://user:password@example.com"]
 			}
 		}
 		headers: {
@@ -238,5 +253,9 @@ components: sinks: elasticsearch: {
 					[`ignore_malformed` setting](\(urls.elasticsearch_ignore_malformed)).
 					"""
 		}
+	}
+
+	telemetry: metrics: {
+		missing_keys_total: components.sources.internal_metrics.output.metrics.missing_keys_total
 	}
 }

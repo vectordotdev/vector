@@ -95,9 +95,6 @@ cp -av "$TARGET_DIR/release/vector" "$ARCHIVE_DIR/bin"
 
 cp -rv config "$ARCHIVE_DIR/config"
 
-# Remove templates sources
-rm "$ARCHIVE_DIR/config"/*.erb
-
 # Copy /etc useful files
 
 if [[ $TARGET == *linux* ]]; then

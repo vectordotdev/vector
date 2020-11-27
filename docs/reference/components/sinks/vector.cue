@@ -29,10 +29,12 @@ components: sinks: vector: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "Vector source"
-				thing:    "a \(name)"
-				url:      urls.vector_source
-				versions: null
+				service: {
+					name:     "Vector source"
+					thing:    "a \(name)"
+					url:      urls.vector_source
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -84,4 +86,8 @@ components: sinks: vector: {
 	}
 
 	how_it_works: components.sources.vector.how_it_works
+
+	telemetry: metrics: {
+		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
+	}
 }

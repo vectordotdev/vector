@@ -13,75 +13,75 @@ use graphql_client::GraphQLQuery;
 )]
 pub struct UptimeSubscription;
 
-/// EventsProcessedTotalSubscription contains metrics on the number of events
+/// ProcessedEventsTotalSubscription contains metrics on the number of events
 /// that have been processed by a Vector instance
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/events_processed_total.graphql",
+    query_path = "graphql/subscriptions/processed_events_total.graphql",
     response_derives = "Debug"
 )]
-pub struct EventsProcessedTotalSubscription;
+pub struct ProcessedEventsTotalSubscription;
 
-/// EventsProcessedThroughputSubscription contains metrics on the number of events
+/// ProcessedEventsThroughputSubscription contains metrics on the number of events
 /// that have been processed between `interval` samples
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/events_processed_throughput.graphql",
+    query_path = "graphql/subscriptions/processed_events_throughput.graphql",
     response_derives = "Debug"
 )]
-pub struct EventsProcessedThroughputSubscription;
+pub struct ProcessedEventsThroughputSubscription;
 
-/// BytesProcessedThroughputSubscription contains metrics on the number of bytes
+/// ProcessedBytesThroughputSubscription contains metrics on the number of bytes
 /// that have been processed between `interval` samples
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/bytes_processed_throughput.graphql",
+    query_path = "graphql/subscriptions/processed_bytes_throughput.graphql",
     response_derives = "Debug"
 )]
-pub struct BytesProcessedThroughputSubscription;
+pub struct ProcessedBytesThroughputSubscription;
 
-/// ComponentEventsProcessedThroughputsSubscription contains metrics on the number of events
+/// ComponentProcessedEventsThroughputsSubscription contains metrics on the number of events
 /// that have been processed between `interval` samples, against specific components
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_events_processed_throughputs.graphql",
+    query_path = "graphql/subscriptions/component_processed_events_throughputs.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentEventsProcessedThroughputsSubscription;
+pub struct ComponentProcessedEventsThroughputsSubscription;
 
-/// ComponentEventsProcessedTotalsSubscription contains metrics on the number of events
+/// ComponentProcessedEventsTotalsSubscription contains metrics on the number of events
 /// that have been processed by a Vector instance, against specific components
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_events_processed_totals.graphql",
+    query_path = "graphql/subscriptions/component_processed_events_totals.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentEventsProcessedTotalsSubscription;
+pub struct ComponentProcessedEventsTotalsSubscription;
 
-/// ComponentBytesProcessedThroughputsSubscription contains metrics on the number of bytes
+/// ComponentProcessedBytesThroughputsSubscription contains metrics on the number of bytes
 /// that have been processed between `interval` samples, against specific components
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_bytes_processed_throughputs.graphql",
+    query_path = "graphql/subscriptions/component_processed_bytes_throughputs.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentBytesProcessedThroughputsSubscription;
+pub struct ComponentProcessedBytesThroughputsSubscription;
 
-/// ComponentBytesProcessedTotalsSubscription contains metrics on the number of bytes
+/// ComponentProcessedBytesTotalsSubscription contains metrics on the number of bytes
 /// that have been processed by a Vector instance, against a specific component
 #[derive(GraphQLQuery, Debug, Copy, Clone)]
 #[graphql(
     schema_path = "graphql/schema.json",
-    query_path = "graphql/subscriptions/component_bytes_processed_totals.graphql",
+    query_path = "graphql/subscriptions/component_processed_bytes_totals.graphql",
     response_derives = "Debug"
 )]
-pub struct ComponentBytesProcessedTotalsSubscription;
+pub struct ComponentProcessedBytesTotalsSubscription;
 
 /// Extension methods for metrics subscriptions
 pub trait MetricsSubscriptionExt {
@@ -89,46 +89,46 @@ pub trait MetricsSubscriptionExt {
     fn uptime_subscription(&self) -> crate::BoxedSubscription<UptimeSubscription>;
 
     /// Executes an events processed metrics subscription
-    fn events_processed_total_subscription(
+    fn processed_events_total_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<EventsProcessedTotalSubscription>;
+    ) -> crate::BoxedSubscription<ProcessedEventsTotalSubscription>;
 
     /// Executes an events processed throughput subscription
-    fn events_processed_throughput_subscription(
+    fn processed_events_throughput_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<EventsProcessedThroughputSubscription>;
+    ) -> crate::BoxedSubscription<ProcessedEventsThroughputSubscription>;
 
     /// Executes a bytes processed throughput subscription
-    fn bytes_processed_throughput_subscription(
+    fn processed_bytes_throughput_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<BytesProcessedThroughputSubscription>;
+    ) -> crate::BoxedSubscription<ProcessedBytesThroughputSubscription>;
 
     /// Executes an component events processed totals subscription
-    fn component_events_processed_totals_subscription(
+    fn component_processed_events_totals_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentEventsProcessedTotalsSubscription>;
+    ) -> crate::BoxedSubscription<ComponentProcessedEventsTotalsSubscription>;
 
     /// Executes an component events processed throughputs subscription
-    fn component_events_processed_throughputs_subscription(
+    fn component_processed_events_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentEventsProcessedThroughputsSubscription>;
+    ) -> crate::BoxedSubscription<ComponentProcessedEventsThroughputsSubscription>;
 
     /// Executes an component bytes processed totals subscription
-    fn component_bytes_processed_totals_subscription(
+    fn component_processed_bytes_totals_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentBytesProcessedTotalsSubscription>;
+    ) -> crate::BoxedSubscription<ComponentProcessedBytesTotalsSubscription>;
 
     /// Executes an component bytes processed throughputs subscription
-    fn component_bytes_processed_throughputs_subscription(
+    fn component_processed_bytes_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> crate::BoxedSubscription<ComponentBytesProcessedThroughputsSubscription>;
+    ) -> crate::BoxedSubscription<ComponentProcessedBytesThroughputsSubscription>;
 }
 
 impl MetricsSubscriptionExt for crate::SubscriptionClient {
@@ -140,86 +140,86 @@ impl MetricsSubscriptionExt for crate::SubscriptionClient {
     }
 
     /// Executes an events processed metrics subscription
-    fn events_processed_total_subscription(
+    fn processed_events_total_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<EventsProcessedTotalSubscription> {
-        let request_body = EventsProcessedTotalSubscription::build_query(
-            events_processed_total_subscription::Variables { interval },
+    ) -> BoxedSubscription<ProcessedEventsTotalSubscription> {
+        let request_body = ProcessedEventsTotalSubscription::build_query(
+            processed_events_total_subscription::Variables { interval },
         );
 
-        self.start::<EventsProcessedTotalSubscription>(&request_body)
+        self.start::<ProcessedEventsTotalSubscription>(&request_body)
     }
 
     /// Executes an events processed throughput subscription
-    fn events_processed_throughput_subscription(
+    fn processed_events_throughput_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<EventsProcessedThroughputSubscription> {
-        let request_body = EventsProcessedThroughputSubscription::build_query(
-            events_processed_throughput_subscription::Variables { interval },
+    ) -> BoxedSubscription<ProcessedEventsThroughputSubscription> {
+        let request_body = ProcessedEventsThroughputSubscription::build_query(
+            processed_events_throughput_subscription::Variables { interval },
         );
 
-        self.start::<EventsProcessedThroughputSubscription>(&request_body)
+        self.start::<ProcessedEventsThroughputSubscription>(&request_body)
     }
 
     /// Executes a bytes processed throughput subscription
-    fn bytes_processed_throughput_subscription(
+    fn processed_bytes_throughput_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<BytesProcessedThroughputSubscription> {
-        let request_body = BytesProcessedThroughputSubscription::build_query(
-            bytes_processed_throughput_subscription::Variables { interval },
+    ) -> BoxedSubscription<ProcessedBytesThroughputSubscription> {
+        let request_body = ProcessedBytesThroughputSubscription::build_query(
+            processed_bytes_throughput_subscription::Variables { interval },
         );
 
-        self.start::<BytesProcessedThroughputSubscription>(&request_body)
+        self.start::<ProcessedBytesThroughputSubscription>(&request_body)
     }
 
     /// Executes an all component events processed totals subscription
-    fn component_events_processed_totals_subscription(
+    fn component_processed_events_totals_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentEventsProcessedTotalsSubscription> {
-        let request_body = ComponentEventsProcessedTotalsSubscription::build_query(
-            component_events_processed_totals_subscription::Variables { interval },
+    ) -> BoxedSubscription<ComponentProcessedEventsTotalsSubscription> {
+        let request_body = ComponentProcessedEventsTotalsSubscription::build_query(
+            component_processed_events_totals_subscription::Variables { interval },
         );
 
-        self.start::<ComponentEventsProcessedTotalsSubscription>(&request_body)
+        self.start::<ComponentProcessedEventsTotalsSubscription>(&request_body)
     }
 
     /// Executes an all component events processed throughputs subscription
-    fn component_events_processed_throughputs_subscription(
+    fn component_processed_events_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentEventsProcessedThroughputsSubscription> {
-        let request_body = ComponentEventsProcessedThroughputsSubscription::build_query(
-            component_events_processed_throughputs_subscription::Variables { interval },
+    ) -> BoxedSubscription<ComponentProcessedEventsThroughputsSubscription> {
+        let request_body = ComponentProcessedEventsThroughputsSubscription::build_query(
+            component_processed_events_throughputs_subscription::Variables { interval },
         );
 
-        self.start::<ComponentEventsProcessedThroughputsSubscription>(&request_body)
+        self.start::<ComponentProcessedEventsThroughputsSubscription>(&request_body)
     }
 
     /// Executes an all component bytes processed totals subscription
-    fn component_bytes_processed_totals_subscription(
+    fn component_processed_bytes_totals_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentBytesProcessedTotalsSubscription> {
-        let request_body = ComponentBytesProcessedTotalsSubscription::build_query(
-            component_bytes_processed_totals_subscription::Variables { interval },
+    ) -> BoxedSubscription<ComponentProcessedBytesTotalsSubscription> {
+        let request_body = ComponentProcessedBytesTotalsSubscription::build_query(
+            component_processed_bytes_totals_subscription::Variables { interval },
         );
 
-        self.start::<ComponentBytesProcessedTotalsSubscription>(&request_body)
+        self.start::<ComponentProcessedBytesTotalsSubscription>(&request_body)
     }
 
     /// Executes an all component bytes processed throughputs subscription
-    fn component_bytes_processed_throughputs_subscription(
+    fn component_processed_bytes_throughputs_subscription(
         &self,
         interval: i64,
-    ) -> BoxedSubscription<ComponentBytesProcessedThroughputsSubscription> {
-        let request_body = ComponentBytesProcessedThroughputsSubscription::build_query(
-            component_bytes_processed_throughputs_subscription::Variables { interval },
+    ) -> BoxedSubscription<ComponentProcessedBytesThroughputsSubscription> {
+        let request_body = ComponentProcessedBytesThroughputsSubscription::build_query(
+            component_processed_bytes_throughputs_subscription::Variables { interval },
         );
 
-        self.start::<ComponentBytesProcessedThroughputsSubscription>(&request_body)
+        self.start::<ComponentProcessedBytesThroughputsSubscription>(&request_body)
     }
 }

@@ -18,10 +18,12 @@ components: sinks: statsd: {
 			request: sinks.socket.features.send.request
 			tls:     sinks.socket.features.send.tls
 			to: {
-				name:     "Statsd receiver"
-				thing:    "a \(name)"
-				url:      urls.statsd
-				versions: null
+				service: {
+					name:     "Statsd receiver"
+					thing:    "a \(name)"
+					url:      urls.statsd
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -62,5 +64,9 @@ components: sinks: statsd: {
 				examples: ["service"]
 			}
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

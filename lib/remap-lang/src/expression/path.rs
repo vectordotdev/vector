@@ -89,7 +89,6 @@ mod tests {
             expr: |state: &mut state::Compiler| {
                 state.path_query_types_mut().insert("foo".to_owned(), TypeDef {
                     fallible: true,
-                    optional: false,
                     kind: Kind::Bytes
                 });
 
@@ -97,7 +96,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Bytes,
             },
         }

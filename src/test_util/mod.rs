@@ -5,8 +5,8 @@ use crate::{
 };
 use flate2::read::GzDecoder;
 use futures::{
-    compat::Stream01CompatExt, future, ready, stream, task::noop_waker_ref, FutureExt, SinkExt,
-    Stream, StreamExt, TryStreamExt,
+    compat::Stream01CompatExt, ready, stream, task::noop_waker_ref, FutureExt, SinkExt, Stream,
+    StreamExt, TryStreamExt,
 };
 use futures01::{sync::mpsc, Stream as Stream01};
 use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
@@ -17,7 +17,7 @@ use std::{
     collections::HashMap,
     convert::Infallible,
     fs::File,
-    future::Future,
+    future::{ready, Future},
     io::Read,
     iter,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr},
@@ -248,6 +248,22 @@ where
     }
 }
 
+pub async fn collect_ready03<S>(rx: &mut S) -> Result<Vec<S::Item>, ()>
+where
+    S: Stream + Unpin,
+{
+    let waker = noop_waker_ref();
+    let mut cx = Context::from_waker(waker);
+
+    let mut vec = Vec::new();
+    loop {
+        match rx.poll_next_unpin(&mut cx) {
+            Poll::Ready(Some(item)) => vec.push(item),
+            Poll::Ready(None) | Poll::Pending => return Ok(vec),
+        }
+    }
+}
+
 pub fn lines_from_file<P: AsRef<Path>>(path: P) -> Vec<String> {
     trace!(message = "Reading file.", path = %path.as_ref().display());
     let mut file = File::open(path).unwrap();
@@ -320,11 +336,7 @@ where
     F: Fn(usize) -> bool,
 {
     let value = value.as_ref();
-    wait_for(|| {
-        let result = unblock(value.load(Ordering::SeqCst));
-        future::ready(result)
-    })
-    .await
+    wait_for(|| ready(unblock(value.load(Ordering::SeqCst)))).await
 }
 
 // Retries a func every `retry` duration until given an Ok(T); panics after `until` elapses

@@ -54,10 +54,7 @@ components: sinks: gcp_cloud_storage: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "GCP Cloud Storage"
-				thing:    "a \(name) bucket"
-				url:      urls.gcp_cloud_storage
-				versions: null
+				service: services.gcp_cloud_storage
 
 				interface: {
 					socket: {
