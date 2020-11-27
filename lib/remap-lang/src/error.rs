@@ -1,4 +1,5 @@
 use crate::{expression, function, parser::Rule, path, program, value};
+use pest::error::Error as PestError;
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -47,6 +48,12 @@ impl From<String> for Error {
 impl From<&str> for Error {
     fn from(s: &str) -> Self {
         Error::Call(s.to_owned())
+    }
+}
+
+impl From<PestError<Rule>> for Error {
+    fn from(err: PestError<Rule>) -> Self {
+        Error::Parser(err.to_string())
     }
 }
 
