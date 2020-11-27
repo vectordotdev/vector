@@ -42,9 +42,10 @@ impl Expression for ExistsFn {
     }
 
     fn type_def(&self, _state: &state::Compiler) -> TypeDef {
-        TypeDef::default()
-            .into_optional(true)
-            .with_constraint(value::Kind::Boolean)
+        TypeDef {
+            fallible: false,
+            kind: value::Kind::Boolean,
+        }
     }
 }
 

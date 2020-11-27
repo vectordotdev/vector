@@ -1023,6 +1023,11 @@
       foo = 42
   [[tests.outputs]]
     extract_from = "remap_function_exists"
+    [[tests.outputs.conditions]]
+    "a.equals" = true
+    "b.equals" = false
+    "c.equals" = true
+    "d.equals" = false
     "e.equals" = true
     "f.equals" = false
 
