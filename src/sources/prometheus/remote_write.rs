@@ -179,16 +179,6 @@ fn parse_timestamp(timestamp: i64) -> Option<DateTime<Utc>> {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    #[test]
-    fn genreate_config() {
-        crate::test_util::test_generate_config::<PrometheusRemoteWriteConfig>();
-    }
-}
-
-#[cfg(all(test, feature = "prometheus-integration-tests"))]
-mod integration_tests {
-    use super::*;
     use crate::{
         config::{SinkConfig, SinkContext},
         event::{MetricKind, MetricValue},
@@ -197,6 +187,11 @@ mod integration_tests {
     };
     use chrono::{SubsecRound as _, Utc};
     use futures::stream;
+
+    #[test]
+    fn genreate_config() {
+        crate::test_util::test_generate_config::<PrometheusRemoteWriteConfig>();
+    }
 
     #[tokio::test]
     async fn receives_metrics_over_http() {
