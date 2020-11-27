@@ -1,5 +1,6 @@
 use crate::{
     event::{PathComponent, PathIter},
+    serde::skip_serializing_if_default,
     sinks::util::encoding::{
         with_default::EncodingConfigWithDefault, EncodingConfiguration, TimestampFormat,
     },
@@ -22,11 +23,11 @@ use std::{
 pub struct EncodingConfig<E> {
     pub(crate) codec: E,
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 

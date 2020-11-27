@@ -1,5 +1,6 @@
 use crate::{
     event::{PathComponent, PathIter},
+    serde::skip_serializing_if_default,
     sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat},
 };
 use serde::{
@@ -19,29 +20,17 @@ use std::{
 pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
     /// The format of the encoding.
     // TODO: This is currently sink specific.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) codec: E,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
     /// Remove the following fields of the message. (Items mutually exclusive with `only_fields`)
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) except_fields: Option<Vec<String>>,
     /// Format for outgoing timestamps.
-    #[serde(
-        default,
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
-    )]
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) timestamp_format: Option<TimestampFormat>,
 }
 
