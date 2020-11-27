@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::MetricKind,
+    internal_events::PrometheusServerRequestComplete,
     prometheus,
     sinks::{
         util::{statistic::validate_quantiles, MetricEntry, StreamSink},
@@ -194,11 +195,6 @@ fn handle(
         }
     }
 
-    info!(
-        message = "Request complete.",
-        response_code = ?response.status()
-    );
-
     response
 }
 
@@ -254,6 +250,10 @@ impl PrometheusExporter {
                             expired,
                             &metrics,
                         )
+                    });
+
+                    emit!(PrometheusServerRequestComplete {
+                        status_code: response.status(),
                     });
 
                     future::ok::<_, Infallible>(response)

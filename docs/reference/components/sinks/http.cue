@@ -39,7 +39,7 @@ components: sinks: http: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            10
+				concurrency:                10
 				rate_limit_duration_secs:   1
 				rate_limit_num:             1000
 				retry_initial_backoff_secs: 1
@@ -55,8 +55,8 @@ components: sinks: http: {
 			}
 			to: {
 				service: {
-					name:     "HTTP server"
-					thing:    "an \(name)"
+					name:     "HTTP"
+					thing:    "an \(name) server"
 					url:      urls.http_server
 					versions: null
 				}

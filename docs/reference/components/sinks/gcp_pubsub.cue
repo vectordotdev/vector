@@ -30,7 +30,7 @@ components: sinks: gcp_pubsub: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             100
 				retry_initial_backoff_secs: 1
@@ -43,6 +43,21 @@ components: sinks: gcp_pubsub: {
 				can_verify_certificate: true
 				can_verify_hostname:    true
 				enabled_default:        false
+			}
+			to: {
+				service: services.gcp_pubsub
+
+				interface: {
+					socket: {
+						api: {
+							title: "GCP XML Interface"
+							url:   urls.gcp_xml_interface
+						}
+						direction: "outgoing"
+						protocols: ["http"]
+						ssl: "required"
+					}
+				}
 			}
 		}
 	}
