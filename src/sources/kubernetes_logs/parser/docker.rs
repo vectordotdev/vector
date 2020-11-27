@@ -111,10 +111,16 @@ fn normalize_event(log: &mut LogEvent) -> Result<(), NormalizationError> {
 enum ParsingError {
     NoMessageField,
     MessageFieldNotInBytes,
+    #[snafu(display(
+        "Could not parse json: {} in message {:?}",
+        source,
+        String::from_utf8_lossy(message)
+    ))]
     InvalidJson {
         source: serde_json::Error,
         message: Bytes,
     },
+    #[snafu(display("Message was not an object: {:?}", String::from_utf8_lossy(message)))]
     NotAnObject {
         message: Bytes,
     },
