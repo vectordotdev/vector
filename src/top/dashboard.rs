@@ -73,14 +73,7 @@ impl HumanFormatter for i64 {
     }
 }
 
-static COMPONENT_HEADERS: [&str; 6] = [
-    "Name",
-    "Kind",
-    "Type",
-    "Events (Total/Sec)",
-    "Bytes (Total/Sec)",
-    "Errors",
-];
+static COMPONENT_HEADERS: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
 
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
