@@ -324,11 +324,15 @@ components: sources: kubernetes_logs: {
 		container_exclusion: {
 			title: "Container exclusion"
 			body:  """
-					By default, [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
-					will skip logs from the `container`s of the `Pod`s that are enumerated in
-					a `vector.dev/exclude-containers: "container1,container2"` *annotation*.
-					You can configure additional exclusion rules via the exluded log file paths,
-					see [the available options](urls.vector_kubernetes_logs_source)#configuration).
+					[`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					can skip the logs from the individual `container`s of a particular `Pod`.
+					Add an *annotation* `vector.dev/exclude-containers` to
+					the `Pod`, and enumerate the `name`s of all the `container`s
+					of this `Pod` in the values of the annotation like so:
+					`vector.dev/exclude-containers: "container1,container2"`.
+					This annotation will make Vector skip logs originating from
+					the `container1` and `container2`, while logs from other
+					containers in the `Pod` will still be collected.
 					"""
 		}
 
