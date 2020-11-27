@@ -20,17 +20,6 @@ pub struct UnixConfig {
     #[serde(default = "default_max_length")]
     pub max_length: usize,
     pub host_key: Option<String>,
-    #[serde(default)]
-    pub(super) mode: UnixMode,
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
-#[derivative(Default)]
-#[serde(rename_all = "lowercase")]
-pub enum UnixMode {
-    Datagram,
-    #[derivative(Default)]
-    Stream,
 }
 
 fn default_max_length() -> usize {
@@ -38,12 +27,11 @@ fn default_max_length() -> usize {
 }
 
 impl UnixConfig {
-    pub fn new(path: PathBuf, mode: UnixMode) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         Self {
             path,
             max_length: default_max_length(),
             host_key: None,
-            mode,
         }
     }
 }

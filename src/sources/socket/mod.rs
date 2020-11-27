@@ -32,6 +32,7 @@ pub enum Mode {
     #[cfg(unix)]
     UnixDatagram(unix::UnixConfig),
     #[cfg(unix)]
+    #[serde(alias = "unix")]
     UnixStream(unix::UnixConfig),
 }
 
@@ -53,20 +54,6 @@ impl From<udp::UdpConfig> for SocketConfig {
     fn from(config: udp::UdpConfig) -> Self {
         SocketConfig {
             mode: Mode::Udp(config),
-        }
-    }
-}
-
-#[cfg(unix)]
-impl From<unix::UnixConfig> for SocketConfig {
-    fn from(config: unix::UnixConfig) -> Self {
-        match config.mode {
-            unix::UnixMode::Datagram => SocketConfig {
-                mode: Mode::UnixDatagram(config),
-            },
-            unix::UnixMode::Stream => SocketConfig {
-                mode: Mode::UnixStream(config),
-            },
         }
     }
 }
@@ -172,7 +159,7 @@ impl SourceConfig for SocketConfig {
 
 #[cfg(test)]
 mod test {
-    use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
+    use super::{tcp::TcpConfig, udp::UdpConfig, Mode, SocketConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SinkContext, SourceConfig},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
@@ -203,7 +190,7 @@ mod test {
     };
     #[cfg(unix)]
     use {
-        super::unix::{UnixConfig, UnixMode},
+        super::unix::UnixConfig,
         futures::SinkExt,
         std::path::PathBuf,
         tokio::{
@@ -715,10 +702,16 @@ mod test {
 
     ////////////// UNIX TEST LIBS //////////////
     #[cfg(unix)]
-    async fn init_unix(sender: Pipeline, mode: UnixMode) -> PathBuf {
+    async fn init_unix(sender: Pipeline, stream: bool) -> PathBuf {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
-        let server = SocketConfig::from(UnixConfig::new(in_path.clone(), mode))
+        let config = UnixConfig::new(in_path.clone());
+        let mode = if stream {
+            Mode::UnixStream(config)
+        } else {
+            Mode::UnixDatagram(config)
+        };
+        let server = SocketConfig { mode }
             .build(
                 "default",
                 &GlobalOptions::default(),
@@ -730,12 +723,11 @@ mod test {
         tokio::spawn(server);
 
         // Wait for server to accept traffic
-        while match mode {
-            UnixMode::Datagram => {
-                let socket = std::os::unix::net::UnixDatagram::unbound().unwrap();
-                socket.connect(&in_path).is_err()
-            }
-            UnixMode::Stream => std::os::unix::net::UnixStream::connect(&in_path).is_err(),
+        while if stream {
+            std::os::unix::net::UnixStream::connect(&in_path).is_err()
+        } else {
+            let socket = std::os::unix::net::UnixDatagram::unbound().unwrap();
+            socket.connect(&in_path).is_err()
         } {
             yield_now().await;
         }
@@ -744,19 +736,19 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn unix_send_lines(mode: UnixMode, path: PathBuf, lines: &[&str]) {
-        match mode {
-            UnixMode::Datagram => send_lines_unix_datagram(path, lines).await,
-            UnixMode::Stream => send_lines_unix_stream(path, lines).await,
+    async fn unix_send_lines(stream: bool, path: PathBuf, lines: &[&str]) {
+        match stream {
+            false => send_lines_unix_datagram(path, lines).await,
+            true => send_lines_unix_stream(path, lines).await,
         }
     }
 
     #[cfg(unix)]
-    async fn unix_message(mode: UnixMode) {
+    async fn unix_message(stream: bool) {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx, mode).await;
+        let path = init_unix(tx, stream).await;
 
-        unix_send_lines(mode, path, &["test"]).await;
+        unix_send_lines(stream, path, &["test"]).await;
 
         let events = collect_n(rx, 1).await.unwrap();
 
@@ -772,11 +764,11 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn unix_multiple_messages(mode: UnixMode) {
+    async fn unix_multiple_messages(stream: bool) {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx, mode).await;
+        let path = init_unix(tx, stream).await;
 
-        unix_send_lines(mode, path, &["test\ntest2"]).await;
+        unix_send_lines(stream, path, &["test\ntest2"]).await;
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(2, events.len());
@@ -791,11 +783,11 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn unix_multiple_packets(mode: UnixMode) {
+    async fn unix_multiple_packets(stream: bool) {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx, mode).await;
+        let path = init_unix(tx, stream).await;
 
-        unix_send_lines(mode, path, &["test", "test2"]).await;
+        unix_send_lines(stream, path, &["test", "test2"]).await;
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(2, events.len());
@@ -807,6 +799,18 @@ mod test {
             events[1].as_log()[log_schema().message_key()],
             "test2".into()
         );
+    }
+
+    #[cfg(unix)]
+    fn parses_unix_config(name: &str) -> SocketConfig {
+        toml::from_str::<SocketConfig>(&format!(
+            r#"
+               mode = "{}"
+               path = "/does/not/exist"
+            "#,
+            name
+        ))
+        .unwrap()
     }
 
     ////////////// UNIX DATAGRAM TESTS //////////////
@@ -824,19 +828,26 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_message() {
-        unix_message(UnixMode::Datagram).await
+        unix_message(false).await
     }
 
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_multiple_messages() {
-        unix_multiple_messages(UnixMode::Datagram).await
+        unix_multiple_messages(false).await
     }
 
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_datagram_multiple_packets() {
-        unix_multiple_packets(UnixMode::Datagram).await
+        unix_multiple_packets(false).await
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_unix_datagram_config() {
+        let config = parses_unix_config("unix_datagram");
+        assert!(matches!(config.mode,Mode::UnixDatagram { .. }));
     }
 
     ////////////// UNIX STREAM TESTS //////////////
@@ -856,18 +867,32 @@ mod test {
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_message() {
-        unix_message(UnixMode::Stream).await
+        unix_message(true).await
     }
 
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_multiple_messages() {
-        unix_multiple_messages(UnixMode::Stream).await
+        unix_multiple_messages(true).await
     }
 
     #[cfg(unix)]
     #[tokio::test]
     async fn unix_stream_multiple_packets() {
-        unix_multiple_packets(UnixMode::Stream).await
+        unix_multiple_packets(true).await
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_new_unix_stream_config() {
+        let config = parses_unix_config("unix_stream");
+        assert!(matches!(config.mode,Mode::UnixStream { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_old_unix_stream_config() {
+        let config = parses_unix_config("unix");
+        assert!(matches!(config.mode,Mode::UnixStream { .. }));
     }
 }
