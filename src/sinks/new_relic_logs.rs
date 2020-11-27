@@ -3,8 +3,8 @@ use crate::{
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-            BatchConfig, Compression, Concurrency, TowerRequestConfig,
+            encoding::EncodingConfigWithDefault, BatchConfig, Compression, Concurrency,
+            TowerRequestConfig,
         },
     },
 };
@@ -44,7 +44,10 @@ pub struct NewRelicLogsConfig {
     pub license_key: Option<String>,
     pub insert_key: Option<String>,
     pub region: Option<NewRelicLogsRegion>,
-    #[serde(skip_serializing_if = "skip_serializing_if_default", default)]
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
     pub encoding: EncodingConfigWithDefault<Encoding>,
     #[serde(default)]
     pub compression: Compression,
@@ -75,13 +78,6 @@ impl From<Encoding> for crate::sinks::http::Encoding {
             Encoding::Json => crate::sinks::http::Encoding::Json,
         }
     }
-}
-
-// There is another one of these in `util::encoding`, but this one is specialized for New Relic.
-/// For encodings, answers "Is it possible to skip serializing this value, because it's the
-/// default?"
-pub(crate) fn skip_serializing_if_default(e: &EncodingConfigWithDefault<Encoding>) -> bool {
-    e.codec() == &Encoding::default()
 }
 
 #[async_trait::async_trait]
@@ -162,9 +158,9 @@ mod tests {
     use super::*;
     use crate::{
         config::SinkConfig,
-        event::Event,
-        sinks::util::{test::build_test_server, Concurrency},
+        sinks::util::{encoding::EncodingConfiguration, test::build_test_server, Concurrency},
         test_util::next_addr,
+        Event,
     };
     use bytes::buf::BufExt;
     use futures::{stream, StreamExt};
