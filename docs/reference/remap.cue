@@ -17,7 +17,7 @@ remap: {
 				description: string
 				required:    bool
 				multiple:    bool | *false
-				default?:    bool | string
+				default?:    bool | string | int
 				type: [#RemapParameterTypes, ...#RemapParameterTypes]
 			}
 			#RemapExample: {
@@ -30,7 +30,7 @@ remap: {
 
 			arguments: [...#Argument] // Allow for empty list
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "coerce" | "parse" | "text" | "hash" | "event"
+			category:    "coerce" | "object" | "parse" | "text" | "hash" | "event"
 			description: string
 			examples: [#RemapExample, ...#RemapExample]
 			name: Name
