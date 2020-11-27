@@ -1,13 +1,16 @@
 use super::semaphore::ShrinkableSemaphore;
 use super::{instant_now, AdaptiveConcurrencySettings};
-use crate::emit;
-use crate::internal_events::{
-    AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
-    AdaptiveConcurrencyObservedRtt,
-};
-use crate::sinks::util::retries::{RetryAction, RetryLogic};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
+use crate::{
+    emit,
+    http::HttpError,
+    internal_events::{
+        AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
+        AdaptiveConcurrencyObservedRtt,
+    },
+    sinks::util::retries::{RetryAction, RetryLogic},
+};
 use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -242,8 +245,16 @@ where
                     self.logic.is_retriable_error(error)
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     true
+                } else if error.downcast_ref::<HttpError>().is_some() {
+                    // HTTP protocol-level errors are not backpressure
+                    false
                 } else {
-                    unreachable!("Unhandled error response! {:?}", error)
+                    warn!(
+                        message = "Unhandled error response.",
+                        ?error,
+                        rate_limit_secs = 5
+                    );
+                    false
                 }
             }
         };
