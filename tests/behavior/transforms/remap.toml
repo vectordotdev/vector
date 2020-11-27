@@ -919,6 +919,86 @@
     "grokked.level.equals" = "info"
     "grokked.message.equals" = "Hello world"
 
+[transforms.remap_function_ip_subnet]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_subnet("192.168.10.23", "255.255.0.0")
+    .b = ip_subnet("192.168.10.23", "/8")
+    .c = ip_subnet("2404:6800:4003:c02::64", "ffff:ffff::")
+    .d = ip_subnet("2404:6800:4003:c02::64", "/16")
+  """
+[[tests]]
+  name = "remap_function_ip_subnet"
+  [tests.input]
+    insert_at = "remap_function_ip_subnet"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_subnet"
+    [[tests.outputs.conditions]]
+    "a.equals" = "192.168.0.0"
+    "b.equals" = "192.0.0.0"
+    "c.equals" = "2404:6800::"
+    "d.equals" = "2404::"
+
+[transforms.remap_function_ip_cidr_contains]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.168.10.2")
+    .b = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.169.10.2")
+    .c = ip_cidr_contains(cidr = "2404:6800:4003:c02::/64", value = "2404:6800:4003:c02::aaaa")
+    .d = ip_cidr_contains("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
+  """
+[[tests]]
+  name = "remap_function_ip_cidr_contains"
+  [tests.input]
+    insert_at = "remap_function_ip_cidr_contains"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_cidr_contains"
+    [[tests.outputs.conditions]]
+    "a.equals" = true
+    "b.equals" = false
+    "c.equals" = true
+    "d.equals" = false
+
+[transforms.remap_function_ip_to_ipv6]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_to_ipv6("192.168.10.2")
+  """
+[[tests]]
+  name = "remap_function_ip_to_ipv6"
+  [tests.input]
+    insert_at = "remap_function_ip_to_ipv6"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_to_ipv6"
+    [[tests.outputs.conditions]]
+    "a.equals" = "::ffff:192.168.10.2"
+
+[transforms.remap_function_ipv6_to_ipv4]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ipv6_to_ipv4("::ffff:192.168.10.2")
+  """
+[[tests]]
+  name = "remap_function_ipv6_to_ipv4"
+  [tests.input]
+    insert_at = "remap_function_ipv6_to_ipv4"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ipv6_to_ipv4"
+    [[tests.outputs.conditions]]
+    "a.equals" = "192.168.10.2"
+
 
 # [transforms.remap_function_log]
 #   inputs=[]
