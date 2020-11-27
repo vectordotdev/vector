@@ -6,9 +6,11 @@ type NamedMetric = (String, i64);
 #[derive(Debug)]
 pub enum EventType {
     ProcessedEventsTotals(Vec<NamedMetric>),
-    ProcessedEventsThroughputs(Vec<NamedMetric>),
+    /// Interval in ms + named metric
+    ProcessedEventsThroughputs(i64, Vec<NamedMetric>),
     ProcessedBytesTotals(Vec<NamedMetric>),
-    ProcessedBytesThroughputs(Vec<NamedMetric>),
+    /// Interval + named metric
+    ProcessedBytesThroughputs(i64, Vec<NamedMetric>),
     ComponentAdded(ComponentRow),
     ComponentRemoved(String),
 }
@@ -24,9 +26,9 @@ pub struct ComponentRow {
     pub kind: String,
     pub component_type: String,
     pub processed_events_total: i64,
-    pub processed_events_throughput: i64,
+    pub processed_events_throughput_sec: i64,
     pub processed_bytes_total: i64,
-    pub processed_bytes_throughput: i64,
+    pub processed_bytes_throughput_sec: i64,
     pub errors: i64,
 }
 
@@ -50,10 +52,11 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                             }
                         }
                     }
-                    EventType::ProcessedEventsThroughputs(rows) => {
+                    EventType::ProcessedEventsThroughputs(interval, rows) => {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
-                                r.processed_events_throughput = v;
+                                r.processed_events_throughput_sec =
+                                    (v as f64 * (1000.0 / interval as f64)) as i64;
                             }
                         }
                     }
@@ -64,10 +67,11 @@ pub async fn updater(mut state: State, mut event_rx: EventRx) -> StateRx {
                             }
                         }
                     }
-                    EventType::ProcessedBytesThroughputs(rows) => {
+                    EventType::ProcessedBytesThroughputs(interval, rows) => {
                         for (name, v) in rows {
                             if let Some(r) = state.get_mut(&name) {
-                                r.processed_bytes_throughput = v;
+                                r.processed_bytes_throughput_sec =
+                                    (v as f64 * (1000.0 / interval as f64)) as i64;
                             }
                         }
                     }

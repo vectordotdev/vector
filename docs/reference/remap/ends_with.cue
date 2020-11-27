@@ -4,13 +4,13 @@ remap: functions: ends_with: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text to search."
+			description: "The string to search."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "substring"
-			description: "The substring to search for in `value`."
+			description: "The substring `value` must end with."
 			required:    true
 			type: ["string"]
 		},
@@ -38,6 +38,7 @@ remap: functions: ends_with: {
 				.contains = ends_with(.message, "the haystack", case_sensitive = false)
 				"""#
 			output: {
+				message:  #"The Needle In The Haystack"#
 				contains: true
 			}
 		},

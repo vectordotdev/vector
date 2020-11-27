@@ -39,7 +39,7 @@ components: sinks: aws_s3: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            50
+				concurrency:                50
 				rate_limit_duration_secs:   1
 				rate_limit_num:             250
 				retry_initial_backoff_secs: 1

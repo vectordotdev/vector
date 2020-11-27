@@ -310,6 +310,33 @@ components: sources: kubernetes_logs: {
 					"""
 		}
 
+		pod_exclusion: {
+			title: "Pod exclusion"
+			body:  """
+					By default, [`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					will skip logs from the `Pod`s that have
+					a `vector.dev/exclude: "true"` *label*.
+					You can configure additional exclusion rules via label or field selectors,
+					see [the available options](urls.vector_kubernetes_logs_source)#configuration).
+					"""
+		}
+
+		container_exclusion: {
+			title: "Container exclusion"
+			body:  """
+					[`kubernetes_logs` source](\(urls.vector_kubernetes_logs_source))
+					can skip the logs from the individual `container`s of a particular `Pod`.
+					Add an *annotation* `vector.dev/exclude-containers` to
+					the `Pod`, and enumerate the `name`s of all the `container`s
+					to exclude in the value of the annotation like so:
+					`vector.dev/exclude-containers: "container1,container2"`.
+					This annotation will make Vector skip logs originating from
+					the `container1` and `container2` of the `Pod` marked with
+					the annotation, while logs from other `container`s in
+					the `Pod` will still be collected.
+					"""
+		}
+
 		kubernetes_api_communication: {
 			title: "Kubernetes API communication"
 			body:  """
@@ -395,7 +422,8 @@ components: sources: kubernetes_logs: {
 	}
 
 	telemetry: metrics: {
-		docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.docker_format_parse_failures_total
-		event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.event_annotation_failures_total
+		k8s_format_picker_edge_cases_total:     components.sources.internal_metrics.output.metrics.k8s_format_picker_edge_cases_total
+		k8s_docker_format_parse_failures_total: components.sources.internal_metrics.output.metrics.k8s_docker_format_parse_failures_total
+		k8s_event_annotation_failures_total:    components.sources.internal_metrics.output.metrics.k8s_event_annotation_failures_total
 	}
 }

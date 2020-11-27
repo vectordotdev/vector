@@ -1,6 +1,9 @@
 use super::InternalEvent;
+#[cfg(feature = "sources-prometheus")]
 use crate::sources::prometheus::parser::ParserError;
+use hyper::StatusCode;
 use metrics::{counter, histogram};
+#[cfg(feature = "sources-prometheus")]
 use std::borrow::Cow;
 use std::time::Instant;
 
@@ -38,6 +41,7 @@ impl InternalEvent for PrometheusRequestCompleted {
     }
 }
 
+#[cfg(feature = "sources-prometheus")]
 #[derive(Debug)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
@@ -45,6 +49,7 @@ pub struct PrometheusParseError<'a> {
     pub body: Cow<'a, str>,
 }
 
+#[cfg(feature = "sources-prometheus")]
 impl<'a> InternalEvent for PrometheusParseError<'a> {
     fn emit_logs(&self) {
         error!(message = "Parsing error.", url = %self.url, error = ?self.error);
@@ -89,5 +94,20 @@ impl InternalEvent for PrometheusHttpError {
 
     fn emit_metrics(&self) {
         counter!("http_request_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusServerRequestComplete {
+    pub status_code: StatusCode,
+}
+
+impl InternalEvent for PrometheusServerRequestComplete {
+    fn emit_logs(&self) {
+        error!(message = "Request to prometheus server complete.", status_code = %self.status_code);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("requests_received_total", 1);
     }
 }

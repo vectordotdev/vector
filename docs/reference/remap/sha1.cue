@@ -4,7 +4,7 @@ remap: functions: sha1: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text to calculate the hash for."
+			description: "The string to calculate the hash for."
 			required:    true
 			type: ["string"]
 		},
