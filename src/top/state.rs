@@ -6,7 +6,7 @@ type NamedMetric = (String, i64);
 #[derive(Debug)]
 pub enum EventType {
     ProcessedEventsTotals(Vec<NamedMetric>),
-    /// Interval + named metric
+    /// Interval in ms + named metric
     ProcessedEventsThroughputs(i64, Vec<NamedMetric>),
     ProcessedBytesTotals(Vec<NamedMetric>),
     /// Interval + named metric
