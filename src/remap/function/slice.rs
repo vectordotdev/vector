@@ -132,7 +132,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes },
         }
 
         value_array {
@@ -141,7 +141,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Array, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Array },
         }
 
         value_unknown {
@@ -150,7 +150,7 @@ mod tests {
                 start: Literal::from(0).boxed(),
                 end: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes | Kind::Array },
         }
     ];
 
