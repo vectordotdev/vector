@@ -28,7 +28,7 @@ components: sinks: prometheus_remote_write: {
 			encoding: enabled:    false
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1

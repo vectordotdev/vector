@@ -1,8 +1,8 @@
 [params]
 requests = 500
 delay = 0.100
-concurrency.limit = 5
-concurrency.action = "defer"
+concurrency_limit_params.limit = 5
+concurrency_limit_params.action = "defer"
 
 # With a constant time link that gives deferrals over a certain
 # concurrency, the limiter will ramp up to that concurrency and then

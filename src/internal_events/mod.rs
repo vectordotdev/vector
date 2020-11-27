@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
@@ -7,7 +8,6 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-mod auto_concurrency;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
@@ -113,6 +113,7 @@ mod wasm;
 
 pub mod kubernetes;
 
+pub use self::adaptive_concurrency::*;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
@@ -120,7 +121,6 @@ pub use self::ansi_stripper::*;
 pub use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
-pub use self::auto_concurrency::*;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
