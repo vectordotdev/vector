@@ -112,7 +112,7 @@ impl FunctionTransform for JsonParser {
                             log.remove(&self.field, false);
                         }
 
-                        log.insert(target_field.clone(), Value::from(object));
+                        log.insert(target_field, Value::from(object));
                     }
                 }
                 None => {

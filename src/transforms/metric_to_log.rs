@@ -149,7 +149,7 @@ mod tests {
         };
 
         let log = do_transform(counter).unwrap();
-        let collected: Vec<_> = log.pairs().collect();
+        let collected: Vec<_> = log.pairs(true).collect();
 
         assert_eq!(
             collected,
@@ -182,7 +182,7 @@ mod tests {
         };
 
         let log = do_transform(gauge).unwrap();
-        let collected: Vec<_> = log.pairs().collect();
+        let collected: Vec<_> = log.pairs(true).collect();
 
         assert_eq!(
             collected,
@@ -209,7 +209,7 @@ mod tests {
         };
 
         let log = do_transform(set).unwrap();
-        let collected: Vec<_> = log.pairs().collect();
+        let collected: Vec<_> = log.pairs(true).collect();
 
         assert_eq!(
             collected,
@@ -245,7 +245,7 @@ mod tests {
         };
 
         let log = do_transform(distro).unwrap();
-        let collected: Vec<_> = log.pairs().collect();
+        let collected: Vec<_> = log.pairs(true).collect();
 
         assert_eq!(
             collected,
@@ -294,7 +294,7 @@ mod tests {
         };
 
         let log = do_transform(histo).unwrap();
-        let collected: Vec<_> = log.pairs().collect();
+        let collected: Vec<_> = log.pairs(true).collect();
 
         assert_eq!(
             collected,
@@ -347,7 +347,7 @@ mod tests {
         };
 
         let log = do_transform(summary).unwrap();
-        let collected: Vec<_> = log.pairs().collect();
+        let collected: Vec<_> = log.pairs(true).collect();
 
         assert_eq!(
             collected,

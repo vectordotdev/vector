@@ -55,25 +55,16 @@ pub trait EncodingConfiguration<E> {
             match event {
                 Event::Log(log_event) => {
                     let to_remove = log_event
-                        .pairs()
-                        .filter(|(field, value)| {
-                            if !value.is_leaf() {
-                                trace!(?field, "Value not a leaf, skipping.");
-                                return false;
-                            }
+                        .keys(true)
+                        .filter(|field| {
                             !only_fields
                                 .iter()
                                 .any(|only| {
-                                    if field.starts_with(only.clone_lookup()) {
-                                        trace!(?field, only_field = ?only, "Matched an only_field setting.");
-                                        true
-                                    } else {
-                                        false
-                                    }
+                                    field.starts_with(only.clone_lookup())
                                 })
                         })
                         // We must clone here so we don't have a borrow into the logevent when we remove.
-                        .map(|(l, _v)| l.into_buf())
+                        .map(|l| l.into_buf())
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
                         log_event.remove(&removal, true);
@@ -104,7 +95,7 @@ pub trait EncodingConfiguration<E> {
                     match timestamp_format {
                         TimestampFormat::Unix => {
                             let mut unix_timestamps = Vec::new();
-                            for (k, v) in log_event.pairs() {
+                            for (k, v) in log_event.pairs(true) {
                                 if let Value::Timestamp(ts) = v {
                                     unix_timestamps
                                         .push((k.into_buf(), Value::Integer(ts.timestamp())));
@@ -229,8 +220,6 @@ mod tests {
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert(LookupBuf::from_str("a").unwrap(), 1);
-            log.insert(LookupBuf::from_str("a.b").unwrap(), 1);
             log.insert(LookupBuf::from_str("a.b.c").unwrap(), 1);
             log.insert(LookupBuf::from_str("a.b.d").unwrap(), 1);
             log.insert(LookupBuf::from_str("b[0]").unwrap(), 1);

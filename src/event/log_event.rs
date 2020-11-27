@@ -394,12 +394,12 @@ impl LogEvent {
     /// This is notably different than the keys in a map, as this descends into things like arrays
     /// and maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
-    pub fn keys<'a>(&'a self) -> impl Iterator<Item = Lookup<'a>> + 'a {
+    pub fn keys<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = Lookup<'a>> + 'a {
         self.fields
             .iter()
-            .map(|(k, v)| {
+            .map(move |(k, v)| {
                 let lookup = Lookup::from(k);
-                v.lookups(Some(lookup))
+                v.lookups(Some(lookup), only_leaves)
             })
             .flatten()
     }
@@ -409,12 +409,12 @@ impl LogEvent {
     /// This is notably different than pairs in a map, as this descends into things like arrays and
     /// maps. It also returns those array/map values during iteration.
     #[instrument(level = "trace", skip(self))]
-    pub fn pairs<'a>(&'a self) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> {
+    pub fn pairs<'a>(&'a self, only_leaves: bool) -> impl Iterator<Item = (Lookup<'a>, &'a Value)> {
         self.fields
             .iter()
-            .map(|(k, v)| {
+            .map(move |(k, v)| {
                 let lookup = Lookup::from(k);
-                v.pairs(Some(lookup))
+                v.pairs(Some(lookup), only_leaves)
             })
             .flatten()
     }
@@ -796,7 +796,7 @@ mod test {
             for lookup in lookups.clone() {
                 event.insert(lookup, value.clone());
             }
-            let pairs = event.keys().collect::<Vec<_>>();
+            let pairs = event.keys(true).collect::<Vec<_>>();
             for lookup in lookups {
                 assert!(pairs.contains(&lookup.clone_lookup()), "Failed while looking for {}", lookup);
             }
@@ -819,8 +819,7 @@ mod test {
             for lookup in lookups.clone() {
                 event.insert(lookup, value.clone());
             }
-            let pairs = event.keys().collect::<Vec<_>>();
-            trace!(?event);
+            let pairs = event.keys(false).collect::<Vec<_>>();
             for lookup in lookups.clone() {
                 assert!(pairs.contains(&lookup.clone_lookup()), "Failed while looking for {:?} in {:?}", lookup, pairs);
             }
@@ -849,7 +848,7 @@ mod test {
             }
             // Note: Two Lookups are only the same if the string slices underneath are too.
             //       LookupBufs this rule does not apply.
-            let pairs = event.keys().map(|k| k.into_buf()).collect::<Vec<_>>();
+            let pairs = event.keys(true).map(|k| k.into_buf()).collect::<Vec<_>>();
             for lookup in lookups {
                 assert!(pairs.contains(&lookup), "Failed while looking for {}", lookup);
             }
@@ -871,9 +870,9 @@ mod test {
         event.insert(lookup, Value::Null);
 
         // Collect and sort since we don't want a flaky test on iteration do we?
-        let mut keys = event.keys().collect::<Vec<_>>();
+        let mut keys = event.keys(false).collect::<Vec<_>>();
         keys.sort();
-        let mut pairs = event.pairs().collect::<Vec<_>>();
+        let mut pairs = event.pairs(false).collect::<Vec<_>>();
         pairs.sort_by(|v, x| v.0.cmp(&x.0));
 
         // Ensure a new field element that was injected is iterated over.

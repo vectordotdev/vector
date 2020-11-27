@@ -568,7 +568,7 @@ mod test {
         fn there_is_map_called_empty(event: Event) -> bool {
             event
                 .as_log()
-                .pairs()
+                .pairs(true)
                 .find(|(key, _)| (&key[..]).starts_with([Segment::field("empty")].as_ref()))
                 == None
         }
@@ -700,15 +700,15 @@ mod test {
                     .and_hms_micro(21, 53, 30, 605_850),
             );
             expected.insert(log_schema().source_type_key().clone(), "syslog");
-            expected.insert(LookupBuf::from("host"), "74794bfb6795");
-            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
-            expected.insert(LookupBuf::from("severity"), "info");
-            expected.insert(LookupBuf::from("facility"), "local7");
-            expected.insert(LookupBuf::from("appname"), "liblogging-stdlog");
-            expected.insert(LookupBuf::from("origin.software"), "rsyslogd");
-            expected.insert(LookupBuf::from("origin.swVersion"), "8.24.0");
-            expected.insert(LookupBuf::from("origin.x-pid"), "9043");
-            expected.insert(LookupBuf::from("origin.x-info"), "http://www.rsyslog.com");
+            expected.insert(LookupBuf::from_str("host").unwrap(), "74794bfb6795");
+            expected.insert(LookupBuf::from_str("hostname").unwrap(), "74794bfb6795");
+            expected.insert(LookupBuf::from_str("severity").unwrap(), "info");
+            expected.insert(LookupBuf::from_str("facility").unwrap(), "local7");
+            expected.insert(LookupBuf::from_str("appname").unwrap(), "liblogging-stdlog");
+            expected.insert(LookupBuf::from_str("origin.software").unwrap(), "rsyslogd");
+            expected.insert(LookupBuf::from_str("origin.swVersion").unwrap(), "8.24.0");
+            expected.insert(LookupBuf::from_str("origin.x-pid").unwrap(), "9043");
+            expected.insert(LookupBuf::from_str("origin.x-info").unwrap(), "http://www.rsyslog.com");
         }
 
         assert_eq!(

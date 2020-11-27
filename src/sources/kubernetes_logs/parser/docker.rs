@@ -40,10 +40,9 @@ impl FunctionTransform for Docker {
 
 /// Parses `message` as json object and removes it.
 fn parse_json(log: &mut LogEvent) -> Result<(), ParsingError> {
-    let to_parse = log
-        .remove(log_schema().message_key())
-        .ok_or(ParsingError::NoMessageField)?
-        .clone_into_bytes();
+    let message = log
+        .remove(log_schema().message_key(), true)
+        .ok_or(ParsingError::NoMessageField)?;
 
     let bytes = match message {
         Value::Bytes(bytes) => bytes,

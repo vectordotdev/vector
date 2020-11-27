@@ -220,7 +220,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(2, event.keys().count());
+        assert_eq!(2, event.keys(true).count());
         assert_eq!(
             event::Value::from("Help I'm stuck in an HTTP server"),
             event[log_schema().message_key()]
@@ -268,7 +268,7 @@ mod tests {
         )
         .await;
 
-        assert_eq!(2, event.keys().count());
+        assert_eq!(2, event.keys(true).count());
         assert_eq!(
             event::Value::from("i am the only field"),
             event[log_schema().message_key()]

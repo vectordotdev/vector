@@ -820,7 +820,7 @@ mod tests {
                 .0
                 .unwrap();
             assert_eq!(
-                received.as_log().keys().collect::<HashSet<_>>(),
+                received.as_log().keys(true).collect::<HashSet<_>>(),
                 vec![
                     log_schema().host_key().clone_lookup(),
                     log_schema().message_key().clone_lookup(),

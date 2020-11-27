@@ -36,13 +36,10 @@ impl TransformConfig for TokenizerConfig {
 
         let types = parse_check_conversion_map(&self.types, &self.field_names)?;
 
-        // don't drop the source field if it's getting overwritten by a parsed value
-        let drop_field = self.drop_field && !self.types.iter().any(|(f, _c)| *f == field);
-
         Ok(Transform::function(Tokenizer::new(
             self.field_names.clone(),
             field,
-            drop_field,
+            self.drop_field,
             types,
         )))
     }
@@ -74,13 +71,16 @@ impl Tokenizer {
         drop_field: bool,
         types: HashMap<LookupBuf, Conversion>,
     ) -> Self {
-        let types = field_names
+        let types: Vec<_> = field_names
             .into_iter()
             .map(|name| {
                 let conversion = types.get(&name).unwrap_or(&Conversion::Bytes).clone();
                 (name, conversion)
             })
             .collect();
+
+        // don't drop the source field if it's getting overwritten by a parsed value
+        let drop_field = drop_field && !types.iter().any(|(f, _c)| *f == field);
 
         Self {
             field,

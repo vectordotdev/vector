@@ -173,6 +173,7 @@ impl Value {
     pub fn lookups<'a>(
         &'a self,
         prefix: Option<Lookup<'a>>,
+        only_leaves: bool,
     ) -> Box<dyn Iterator<Item = Lookup<'a>> + 'a> {
         match &self {
             Value::Boolean(_)
@@ -185,7 +186,6 @@ impl Value {
             })),
             Value::Map(m) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-
                 let this = prefix.clone().into_iter();
                 let children = m.iter()
                     .map(move |(k, v)| {
@@ -197,14 +197,17 @@ impl Value {
                             },
                         );
                         trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
-                        v.lookups(Some(lookup))
+                        v.lookups(Some(lookup), only_leaves)
                     }).flatten();
 
-                Box::new(this.chain(children))
+                if only_leaves {
+                    Box::new(children)
+                } else {
+                    Box::new(this.chain(children))
+                }
             },
             Value::Array(a) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-
                 let this = prefix.clone().into_iter();
                 let children = a.iter().enumerate()
                     .map(move |(k, v)| {
@@ -216,10 +219,14 @@ impl Value {
                             },
                         );
                         trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
-                        v.lookups(Some(lookup))
+                        v.lookups(Some(lookup), only_leaves)
                     }).flatten();
 
-                Box::new(this.chain(children))
+                if only_leaves {
+                    Box::new(children)
+                } else {
+                    Box::new(this.chain(children))
+                }
             },
         }
     }
@@ -234,6 +241,7 @@ impl Value {
     pub fn pairs<'a>(
         &'a self,
         prefix: Option<Lookup<'a>>,
+        only_leaves: bool,
     ) -> Box<dyn Iterator<Item = (Lookup<'a>, &'a Value)> + 'a> {
         match &self {
             Value::Boolean(_)
@@ -247,7 +255,6 @@ impl Value {
             }).into_iter()),
             Value::Map(m) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-
                 let this = prefix.clone().map(|v| (v, self)).into_iter();
                 let children = m.iter()
                     .map(move |(k, v)| {
@@ -259,14 +266,17 @@ impl Value {
                             },
                         );
                         trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
-                        v.pairs(Some(lookup))
+                        v.pairs(Some(lookup), only_leaves)
                     }).flatten();
 
-                Box::new(this.chain(children))
+                if only_leaves {
+                    Box::new(children)
+                } else {
+                    Box::new(this.chain(children))
+                }
             },
             Value::Array(a) => {
                 trace!(prefix = ?prefix, "Enqueuing for iteration, may have children.");
-
                 let this = prefix.clone().map(|v| (v, self)).into_iter();
                 let children = a.iter().enumerate()
                     .map(move |(k, v)| {
@@ -278,10 +288,14 @@ impl Value {
                             },
                         );
                         trace!(lookup = ?lookup, "Seeking lookups inside non-leaf element.");
-                        v.pairs(Some(lookup))
+                        v.pairs(Some(lookup), only_leaves)
                     }).flatten();
 
-                Box::new(this.chain(children))
+                if only_leaves {
+                    Box::new(children)
+                } else {
+                    Box::new(this.chain(children))
+                }
             },
         }
     }
