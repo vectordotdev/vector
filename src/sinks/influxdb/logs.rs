@@ -182,6 +182,8 @@ impl HttpSink for InfluxDBLogsSink {
         let mut fields: HashMap<String, Field> = HashMap::new();
 
         for (key, value) in event.pairs() {
+            if !value.is_leaf() { continue; }
+
             if self.tags.contains(&key.to_string()) {
                 tags.insert(key.to_string(), value.to_string_lossy());
             } else {

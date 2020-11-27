@@ -129,7 +129,7 @@ impl LookupBuf {
     ) -> crate::Result<IndexMap<LookupBuf, Value>> {
         let mut discoveries = IndexMap::new();
         for (key, value) in values {
-            Self::recursive_step(LookupBuf::try_from(key)?, value, &mut discoveries)?;
+            Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, value, &mut discoveries)?;
         }
         Ok(discoveries)
     }
@@ -145,7 +145,7 @@ impl LookupBuf {
         match value {
             TomlValue::Table(map) => {
                 for (key, value) in map {
-                    Self::recursive_step(LookupBuf::try_from(key)?, value, &mut discoveries)?;
+                    Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, value, &mut discoveries)?;
                 }
                 Ok(discoveries)
             }
@@ -158,7 +158,7 @@ impl LookupBuf {
     }
 
     #[instrument(level = "trace")]
-    fn recursive_step(
+    fn from_toml_table_recursive_step(
         lookup: LookupBuf,
         value: TomlValue,
         discoveries: &mut IndexMap<LookupBuf, Value>,
@@ -175,14 +175,14 @@ impl LookupBuf {
             TomlValue::Array(vals) => {
                 for (i, val) in vals.into_iter().enumerate() {
                     let key = format!("{}[{}]", lookup, i);
-                    Self::recursive_step(LookupBuf::try_from(key)?, val, discoveries)?;
+                    Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, val, discoveries)?;
                 }
                 None
             }
             TomlValue::Table(map) => {
                 for (table_key, value) in map {
                     let key = format!("{}.{}", lookup, table_key);
-                    Self::recursive_step(LookupBuf::try_from(key)?, value, discoveries)?;
+                    Self::from_toml_table_recursive_step(LookupBuf::try_from(key)?, value, discoveries)?;
                 }
                 None
             }

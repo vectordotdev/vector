@@ -140,6 +140,29 @@ impl Value {
         }
     }
 
+    /// Return if the node is a leaf (meaning it has no children) or not.
+    ///
+    /// This is notably useful for things like influxdb logs where we list only leaves.
+    #[instrument(level = "trace")]
+    pub fn is_leaf<'a>(
+        &'a self,
+    ) -> bool {
+        match &self {
+            Value::Boolean(_)
+            | Value::Bytes(_)
+            | Value::Timestamp(_)
+            | Value::Float(_)
+            | Value::Integer(_)
+            | Value::Null => true,
+            Value::Map(_) => {
+                false
+            },
+            Value::Array(_) => {
+                false
+            },
+        }
+    }
+
     /// Produce an iterator over all 'nodes' in the graph of this value.
     ///
     /// This includes leaf nodes as well as intermediaries.

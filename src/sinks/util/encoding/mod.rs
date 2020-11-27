@@ -55,16 +55,28 @@ pub trait EncodingConfiguration<E> {
             match event {
                 Event::Log(log_event) => {
                     let to_remove = log_event
-                        .keys()
-                        .filter(|field| {
+                        .pairs()
+                        .filter(|(field, value)| {
+                            if !value.is_leaf() {
+                                trace!(?field, "Value not a leaf, skipping.");
+                                return false;
+                            }
                             !only_fields
                                 .iter()
-                                .any(|only| field.starts_with(only.into()))
+                                .any(|only| {
+                                    if field.starts_with(only.clone_lookup()) {
+                                        trace!(?field, only_field = ?only, "Matched an only_field setting.");
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                })
                         })
-                        .map(|v| v.into_buf())
+                        // We must clone here so we don't have a borrow into the logevent when we remove.
+                        .map(|(l, _v)| l.into_buf())
                         .collect::<VecDeque<_>>();
                     for removal in to_remove {
-                        log_event.remove(&removal, false);
+                        log_event.remove(&removal, true);
                     }
                 }
                 Event::Metric(_) => {
@@ -211,6 +223,7 @@ mod tests {
     "#;
     #[test]
     fn test_except() {
+        crate::test_util::trace_init();
         let config: TestConfig = toml::from_str(TOML_EXCEPT_FIELD).unwrap();
         config.encoding.validate().unwrap();
         let mut event = Event::new_empty_log();
@@ -251,13 +264,12 @@ mod tests {
     "#;
     #[test]
     fn test_only() {
+        crate::test_util::trace_init();
         let config: TestConfig = toml::from_str(TOML_ONLY_FIELD).unwrap();
         config.encoding.validate().unwrap();
         let mut event = Event::new_empty_log();
         {
             let log = event.as_mut_log();
-            log.insert(LookupBuf::from_str("a").unwrap(), 1);
-            log.insert(LookupBuf::from_str("a.b").unwrap(), 1);
             log.insert(LookupBuf::from_str("a.b.c").unwrap(), 1);
             log.insert(LookupBuf::from_str("a.b.d").unwrap(), 1);
             log.insert(LookupBuf::from_str("b[0]").unwrap(), 1);
@@ -291,6 +303,7 @@ mod tests {
     "#;
     #[test]
     fn test_timestamp() {
+        crate::test_util::trace_init();
         let config: TestConfig = toml::from_str(TOML_TIMESTAMP_FORMAT).unwrap();
         config.encoding.validate().unwrap();
         let mut event = Event::from("Demo");
