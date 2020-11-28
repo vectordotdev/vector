@@ -149,7 +149,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		checksum_errors: {
+		checksum_errors_total: {
 			description:       "The total number of errors identifying files via checksum."
 			type:              "counter"
 			default_namespace: "vector"
@@ -257,7 +257,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		file_delete_errors: {
+		file_delete_errors_total: {
 			description:       "The total number of failures to delete a file."
 			type:              "counter"
 			default_namespace: "vector"
@@ -265,7 +265,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		file_watch_errors: {
+		file_watch_errors_total: {
 			description:       "The total number of errors encountered when watching files."
 			type:              "counter"
 			default_namespace: "vector"
@@ -273,7 +273,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_added: {
+		files_added_total: {
 			description:       "The total number of files Vector has found to watch."
 			type:              "counter"
 			default_namespace: "vector"
@@ -281,7 +281,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_deleted: {
+		files_deleted_total: {
 			description:       "The total number of files deleted."
 			type:              "counter"
 			default_namespace: "vector"
@@ -289,7 +289,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_resumed: {
+		files_resumed_total: {
 			description:       "The total number of times Vector has resumed watching a file."
 			type:              "counter"
 			default_namespace: "vector"
@@ -297,7 +297,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_unwatched: {
+		files_unwatched_total: {
 			description:       "The total number of times Vector has stopped watching a file."
 			type:              "counter"
 			default_namespace: "vector"
@@ -305,7 +305,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		fingerprint_read_errors: {
+		fingerprint_read_errors_total: {
 			description:       "The total number of times Vector failed to read a file for fingerprinting."
 			type:              "counter"
 			default_namespace: "vector"
@@ -358,7 +358,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		memory_used: {
+		memory_used_bytes: {
 			description:       "The total memory currently being used by Vector (in bytes)."
 			type:              "gauge"
 			default_namespace: "vector"
@@ -468,7 +468,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-
 		sqs_message_receive_failed_total: {
 			description:       "The total number of failures to receive SQS messages."
 			type:              "counter"
