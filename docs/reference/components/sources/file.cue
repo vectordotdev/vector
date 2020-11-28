@@ -52,7 +52,7 @@ components: sources: file: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -64,6 +64,10 @@ components: sources: file: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -225,6 +229,7 @@ components: sources: file: {
 			_file: "\(_directory)/apache/access.log"
 			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
 			title: "Apache Access Log"
+
 			configuration: {
 				include: ["\(_directory)/**/*.log"]
 			}
