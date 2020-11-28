@@ -6,26 +6,50 @@ use structopt::StructOpt;
 #[derive(StructOpt, Debug)]
 #[structopt(rename_all = "kebab-case")]
 pub struct Opts {
+    /// Vector config files in TOML format to test.
+    #[structopt(name = "config-toml", long)]
+    paths_toml: Vec<PathBuf>,
+
+    /// Vector config files in JSON format to test.
+    #[structopt(name = "config-json", long)]
+    paths_json: Vec<PathBuf>,
+
+    /// Vector config files in YAML format to test.
+    #[structopt(name = "config-yaml", long)]
+    paths_yaml: Vec<PathBuf>,
+
     /// Any number of Vector config files to test. If none are specified the
     /// default config path `/etc/vector/vector.toml` will be targeted.
     paths: Vec<PathBuf>,
+}
+
+impl Opts {
+    fn paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+        config::merge_path_lists(vec![
+            (&self.paths, None),
+            (&self.paths_toml, Some(config::Format::TOML)),
+            (&self.paths_json, Some(config::Format::JSON)),
+            (&self.paths_yaml, Some(config::Format::YAML)),
+        ])
+    }
 }
 
 pub async fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let mut failed_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
     let mut inspected_files: Vec<(String, Vec<(String, Vec<String>)>)> = Vec::new();
 
-    let paths = config::process_paths(&opts.paths).unwrap_or_else(|| {
+    let paths = opts.paths_with_formats();
+    let paths = config::process_paths(&paths).unwrap_or_else(|| {
         std::process::exit(exitcode::CONFIG);
     });
 
-    for (i, path) in paths.iter().enumerate() {
+    for (i, (path, format)) in paths.iter().enumerate() {
         let path_str = path.to_str().unwrap_or("");
         if i > 0 {
             println!();
         }
         println!("Running {} tests", path_str);
-        match config::build_unit_tests(path.clone()).await {
+        match config::build_unit_tests(path.clone(), *format).await {
             Ok(mut tests) => {
                 let mut aggregated_test_errors = Vec::new();
                 let mut aggregated_test_inspections = Vec::new();
