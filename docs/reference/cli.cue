@@ -137,6 +137,7 @@ cli: {
 				supported. TOML file format is assumed.
 				"""
 			type: "string"
+			env_var: "VECTOR_CONFIG_TOML"
 		}
 		"config-json": {
 			description: """
@@ -144,6 +145,7 @@ cli: {
 				supported. JSON file format is assumed.
 				"""
 			type: "string"
+			env_var: "VECTOR_CONFIG_JSON"
 		}
 		"config-yaml": {
 			description: """
@@ -151,6 +153,7 @@ cli: {
 				supported. YAML file format is assumed.
 				"""
 			type: "string"
+			env_var: "VECTOR_CONFIG_YAML"
 		}
 		"threads": {
 			_short: "t"
@@ -282,6 +285,9 @@ cli: {
 					_short:      "d"
 					description: "Fail validation on warnings"
 				}
+			}
+
+			options: {
 				"config-toml": {
 					description: """
 						Any number of Vector config files to validate.
