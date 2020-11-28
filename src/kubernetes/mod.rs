@@ -20,6 +20,7 @@
 #![cfg(feature = "kubernetes")]
 #![warn(missing_docs)]
 
+pub mod any_resource;
 pub mod api_watcher;
 pub mod client;
 pub mod debounce;

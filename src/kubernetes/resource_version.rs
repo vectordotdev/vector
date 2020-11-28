@@ -1,5 +1,4 @@
 //! A resource version types to ensure proper usage protocol.
-
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent};
 use k8s_openapi::Metadata;
 
@@ -40,7 +39,7 @@ impl Candidate {
     /// Obtain a resource version [`Candidate`] from a [`WatchEvent`].
     pub fn from_watch_event<T>(event: &WatchEvent<T>) -> Option<Self>
     where
-        T: Metadata<Ty = ObjectMeta>,
+        T: Resource,
     {
         let object = match event {
             WatchEvent::Added(object)
@@ -51,15 +50,22 @@ impl Candidate {
             }
             WatchEvent::ErrorStatus(_) | WatchEvent::ErrorOther(_) => return None,
         };
-        Self::from_object(object)
+        object.resource_version()
     }
+}
 
-    /// Obtain a resource version [`Candidate`] from a object of type `T`.
-    pub fn from_object<T>(object: &T) -> Option<Self>
-    where
-        T: Metadata<Ty = ObjectMeta>,
-    {
-        let metadata = object.metadata();
+/// An abstract entity holding and exposing a resource version.
+pub trait Resource {
+    /// Extracts and returns resource version.
+    fn resource_version(&self) -> Option<Candidate>;
+}
+
+impl<T> Resource for T
+where
+    T: Metadata<Ty = ObjectMeta>,
+{
+    fn resource_version(&self) -> Option<Candidate> {
+        let metadata = self.metadata();
 
         let new_resource_version = match metadata.resource_version {
             Some(ref val) => val,
@@ -69,6 +75,6 @@ impl Candidate {
             }
         };
 
-        Some(Self(new_resource_version.clone()))
+        Some(Candidate(new_resource_version.clone()))
     }
 }
