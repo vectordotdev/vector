@@ -180,6 +180,19 @@ mod tests {
                 Err(r#"remap error: parser error: paths in variable assignment not supported. Use "$foo" without ".[0]""#),
                 Ok(().into()),
             ),
+            (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(vec!["foo", "bar", "baz"].into())),
+            (
+                r#"
+                    .foo = [
+                        "foo",
+                        5,
+                        ["bar"],
+                    ]
+                    .foo
+                "#,
+                Ok(()),
+                Ok(vec!["foo".into(), 5.into(), Value::Array(vec!["bar".into()])].into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
