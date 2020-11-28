@@ -961,7 +961,8 @@ If you have additional questions, please [contact us](#contact).
 Vector requires all contributors to agree to the DCO. DCO stands for Developer
 Certificate of Origin and is maintained by the
 [Linux Foundation](https://www.linuxfoundation.org). It is an attestation
-attached to every commit made by every developer.
+attached to every commit made by every developer. All contributions are covered
+by, and fall under, the DCO.
 
 #### Trivial changes
 
