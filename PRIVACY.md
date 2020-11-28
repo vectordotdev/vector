@@ -1,10 +1,10 @@
 # Privacy Policy
 
 It should go without saying, but Vector takes the privacy of your data,
-including how you use Vector, very seriously. Vector is used to collect and
-route some of your most sensitive data and we want you to know that we do not
-take that lightly. This document clarifies how the Vector project thinks about
-privacy now and in the future.
+including how you use Vector, very seriously. Vector collects and routes some
+of your most sensitive data, and therefore, Vector strives to be as transparent
+as possible with our privacy efforts. This document clarifies how the Vector
+project thinks about privacy now and in the future.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
@@ -15,7 +15,6 @@ privacy now and in the future.
 1. [Vector Community](#vector-community)
    1. [Vector Repository](#vector-repository)
    1. [Vector Chat](#vector-chat)
-   1. [Vector Mailing List](#vector-mailing-list)
 
 <!-- /MarkdownTOC -->
 
@@ -23,25 +22,24 @@ privacy now and in the future.
 
 ### Downloads
 
-Vector uses Amazon S3, Github assets, and Docker Hub to host release artifacts.
-Vector does track download counts in aggregate. For Github and Docker this data
-is anonymous, but for S3 IP addresses are logged. There is no way to disable IP
-address tracking within the S3 logs. If you are concerned about sharing your IP
-address we recommend using a proxy or downloading Vector from a different
-channel.
+Vector uses AWS S3, Github assets, [Cloudsmith][cloudsmith], and Docker Hub to host
+release artifacts. Vector does track download counts in aggregate. For Github, Cloudsmith,
+and Docker this data is anonymous, but for AWS S3 IP addresses are logged. There is no
+way to disable IP address tracking within the AWS S3 logs. If you are concerned about
+sharing your IP address we recommend using a proxy, or downloading Vector from a
+different channel.
 
 ### Phoning Home
 
-Vector, under no circumstances, now and in the future, will "phone home" and
-communicate with an external service that you did not explicitly configure as
-part of setting up Vector. This includes grey-area tactics such as version
+Vector will not "phone home" or communicate with an external service that you
+did not explicitly configure. This includes grey-area tactics such as version
 checks, capturing diagnostic information, and sharing crash reports.
 
 ## Vector Website & Docs
 
-The Vector website does not implement any front-end trackers. Aggregated
-analytics data is derived from backend server logs which are anonymized.
-Vector uses [Netlify analytics][netlify_analytics] for this.
+The Vector website does collect various analytics. Aggregated analytics data is
+derived from backend server logs which are anonymized. Vector uses
+[Netlify analytics][netlify_analytics] for this.
 
 ## Vector Community
 
@@ -58,13 +56,9 @@ ways Vector can improve.
 The Vector chat uses Discord; you can review their
 privacy policy [here][discord_pp].
 
-### Vector Mailing List
-
-The Vector mailing list uses Vero; you can review their privacy policy
-[here][vero_pp]. Additionally, Vector will never share your email with 3rd party
-for any reason, and Vector will not send you spam email.
-
 [github_pp]: https://help.github.com/en/github/site-policy/github-privacy-statement
 [discord_pp]: https://discord.com/privacy/
 [netlify_analytics]: https://www.netlify.com/products/analytics/
 [vero_pp]: https://www.getvero.com/privacy/
+[cloudsmith]: https://cloudsmith.com/
+
