@@ -261,6 +261,20 @@ mod tests {
                 Ok(()),
                 Ok(4.into())
             )
+            (r#"{ "foo": true, "bar": true, "baz": false }"#, Ok(()), Ok(map!["foo": true, "bar": true, "baz": false].into())),
+            (
+                r#"
+                    .result = {
+                        .foo = true
+                        $bar = 5
+                        { "foo": .foo, "bar": $bar, "baz": "qux" }
+                    }
+
+                    { "result": .result }
+                "#,
+                Ok(()),
+                Ok(map!["result": map!["foo": true, "bar": 5, "baz": "qux"]].into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
