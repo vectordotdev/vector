@@ -16,7 +16,7 @@ complex and hard. Fear not! We plan to add first-class support for solving
 this problem.
 
 In addition to the recently added [automatic merging of Docker
-logs][docs.sources.docker#auto_partial_merge], we also added [better multi-line
+logs][docs.sources.docker_logs#auto_partial_merge], we also added [better multi-line
 support][docs.sources.file#multiline] to our [`file` source][docs.sources.file].
 These options are very expressive and should solve the vast majority of
 multi-line merging problems.
@@ -47,7 +47,7 @@ You can merge them with the following config:
 And if this doesn't do it, you can always fallback
 to our [`lua` transform][docs.transforms.lua].
 
-[docs.sources.docker#auto_partial_merge]: /docs/reference/sources/docker/#auto_partial_merge
+[docs.sources.docker_logs#auto_partial_merge]: /docs/reference/sources/docker/#auto_partial_merge
 [docs.sources.file#multiline]: /docs/reference/sources/file/#multiline
 [docs.sources.file]: /docs/reference/sources/file/
 [docs.transforms.lua]: /docs/reference/transforms/lua/

@@ -47,28 +47,33 @@ pub fn check_shape(config: &Config) -> Result<(), Vec<String>> {
 }
 
 pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
-    let conflicting_componenets = Resource::conflicts(
-        config
-            .sinks
-            .iter()
-            .map(|(name, config)| (name, config.inner.resources())),
-    );
+    let source_resources = config
+        .sources
+        .iter()
+        .map(|(name, config)| (name, config.resources()));
+    let sink_resources = config
+        .sinks
+        .iter()
+        .map(|(name, config)| (name, config.inner.resources()));
+
+    let conflicting_componenets = Resource::conflicts(source_resources.chain(sink_resources));
+
     if conflicting_componenets.is_empty() {
         Ok(())
     } else {
-        let conflicting_componenets = conflicting_componenets
-            .iter()
-            .map(|s| s.as_str())
-            .collect::<Vec<_>>();
-        let error = format!(
-            "Multiple sinks own the same resource. Conflicting sinks: {}.",
-            conflicting_componenets.join(", ")
-        );
-        Err(vec![error])
+        Err(conflicting_componenets
+            .into_iter()
+            .map(|(resource, components)| {
+                format!(
+                    "Resource `{}` is claimed by multiple components: {:?}",
+                    resource, components
+                )
+            })
+            .collect())
     }
 }
 
-pub fn warnings(config: &Config) -> Option<Vec<String>> {
+pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
     let source_names = config.sources.keys().map(|name| ("source", name.clone()));
@@ -94,11 +99,7 @@ pub fn warnings(config: &Config) -> Option<Vec<String>> {
         }
     }
 
-    if warnings.is_empty() {
-        None
-    } else {
-        Some(warnings)
-    }
+    warnings
 }
 
 pub fn typecheck(config: &Config) -> Result<(), Vec<String>> {
@@ -295,8 +296,7 @@ fn capitalize(s: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use super::Graph;
-    use crate::config::DataType;
+    use super::*;
     use pretty_assertions::assert_eq;
 
     #[test]

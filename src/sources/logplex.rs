@@ -1,6 +1,7 @@
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     event::Event,
     internal_events::{HerokuLogplexRequestReadError, HerokuLogplexRequestReceived},
@@ -85,6 +86,10 @@ impl SourceConfig for LogplexConfig {
 
     fn source_type(&self) -> &'static str {
         "logplex"
+    }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
     }
 }
 
@@ -202,7 +207,6 @@ mod tests {
         Pipeline,
     };
     use chrono::{DateTime, Utc};
-    use futures::compat::Future01CompatExt;
     use futures01::sync::mpsc;
     use pretty_assertions::assert_eq;
     use std::net::SocketAddr;
@@ -233,7 +237,6 @@ mod tests {
             )
             .await
             .unwrap()
-            .compat()
             .await
             .unwrap()
         });

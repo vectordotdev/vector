@@ -17,13 +17,16 @@ components: sources: vector: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Vector"
-				thing:    "a \(name) sink"
-				url:      urls.vector_sink
-				versions: null
+				service: {
+					name:     "Vector"
+					thing:    "a \(name) sink"
+					url:      urls.vector_sink
+					versions: null
+				}
 
 				interface: socket: {
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["tcp"]
 					ssl: "optional"
 				}
@@ -109,5 +112,9 @@ components: sources: vector: {
 				"""
 		}
 
+	}
+
+	telemetry: metrics: {
+		protobuf_decode_errors_total: components.sources.internal_metrics.output.metrics.protobuf_decode_errors_total
 	}
 }

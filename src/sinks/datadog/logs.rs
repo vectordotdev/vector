@@ -251,7 +251,7 @@ impl HttpSink for DatadogLogsTextService {
 
 /// The healthcheck is performed by sending an empty request to Datadog and checking
 /// the return.
-async fn healthcheck<T, O>(sink: T, mut client: HttpClient) -> crate::Result<()>
+async fn healthcheck<T, O>(sink: T, client: HttpClient) -> crate::Result<()>
 where
     T: HttpSink<Output = Vec<O>>,
 {

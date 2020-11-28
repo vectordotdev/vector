@@ -1,14 +1,12 @@
 use crate::{
-    config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    config::{log_schema, DataType, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::Event,
     internal_events::{StdinEventReceived, StdinReadFailed},
     shutdown::ShutdownSignal,
     Pipeline,
 };
 use bytes::Bytes;
-use futures::{
-    compat::Sink01CompatExt, executor, FutureExt, StreamExt, TryFutureExt, TryStreamExt,
-};
+use futures::{compat::Sink01CompatExt, executor, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::{io, thread};
@@ -61,6 +59,10 @@ impl SourceConfig for StdinConfig {
     fn source_type(&self) -> &'static str {
         "stdin"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![Resource::Stdin]
+    }
 }
 
 pub fn stdin_source<R>(
@@ -91,22 +93,28 @@ where
         }
     });
 
-    let fut = receiver
-        .take_until(shutdown)
-        .map_err(|error| emit!(StdinReadFailed { error }))
-        .map_ok(move |line| {
-            emit!(StdinEventReceived {
-                byte_size: line.len()
-            });
-            create_event(Bytes::from(line), &host_key, &hostname)
-        })
-        .forward(
-            out.sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
-                .sink_compat(),
-        )
-        .inspect(|_| info!("Finished sending"));
+    Ok(Box::pin(async move {
+        let mut out = out
+            .sink_map_err(|error| error!(message = "Unable to send event to out.", %error))
+            .sink_compat();
 
-    Ok(Box::new(fut.boxed().compat()))
+        let res = receiver
+            .take_until(shutdown)
+            .map_err(|error| emit!(StdinReadFailed { error }))
+            .map_ok(move |line| {
+                emit!(StdinEventReceived {
+                    byte_size: line.len()
+                });
+                create_event(Bytes::from(line), &host_key, &hostname)
+            })
+            .forward(&mut out)
+            .inspect(|_| info!("Finished sending."))
+            .await;
+
+        let _ = out.flush().await; // error emitted by sink_map_err
+
+        res
+    }))
 }
 
 fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event {
@@ -128,7 +136,6 @@ fn create_event(line: Bytes, host_key: &str, hostname: &Option<String>) -> Event
 mod tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures::compat::Future01CompatExt;
     use futures01::{Async::*, Stream};
     use std::io::Cursor;
 
@@ -161,7 +168,6 @@ mod tests {
 
         stdin_source(buf, config, ShutdownSignal::noop(), tx)
             .unwrap()
-            .compat()
             .await
             .unwrap();
 

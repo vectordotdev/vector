@@ -1,7 +1,7 @@
-mod bytes_processed;
 mod errors;
-mod events_processed;
 mod host;
+mod processed_bytes;
+mod processed_events;
 mod uptime;
 
 use super::components::{self, Component, COMPONENTS};
@@ -20,10 +20,14 @@ use tokio::{
     time::Duration,
 };
 
-pub use bytes_processed::{BytesProcessedTotal, ComponentBytesProcessedTotal};
 pub use errors::{ComponentErrorsTotal, ErrorsTotal};
-pub use events_processed::{ComponentEventsProcessedTotal, EventsProcessedTotal};
 pub use host::HostMetrics;
+pub use processed_bytes::{
+    ComponentProcessedBytesThroughput, ComponentProcessedBytesTotal, ProcessedBytesTotal,
+};
+pub use processed_events::{
+    ComponentProcessedEventsThroughput, ComponentProcessedEventsTotal, ProcessedEventsTotal,
+};
 pub use uptime::Uptime;
 
 lazy_static! {
@@ -35,8 +39,8 @@ lazy_static! {
 #[graphql(field(name = "timestamp", type = "Option<DateTime<Utc>>"))]
 pub enum MetricType {
     Uptime(Uptime),
-    EventsProcessedTotal(EventsProcessedTotal),
-    BytesProcessedTotal(BytesProcessedTotal),
+    ProcessedEventsTotal(ProcessedEventsTotal),
+    ProcessedBytesTotal(ProcessedBytesTotal),
 }
 
 #[derive(Default)]
@@ -55,7 +59,7 @@ pub struct MetricsSubscription;
 
 #[Subscription]
 impl MetricsSubscription {
-    /// Metrics for how long the Vector instance has been running
+    /// Metrics for how long the Vector instance has been running.
     async fn uptime(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -66,73 +70,105 @@ impl MetricsSubscription {
         })
     }
 
-    /// Events processed metrics
-    async fn events_processed_total(
+    /// Event processing metrics.
+    async fn processed_events_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = EventsProcessedTotal> {
+    ) -> impl Stream<Item = ProcessedEventsTotal> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "events_processed_total" => Some(EventsProcessedTotal::new(m)),
+            "processed_events_total" => Some(ProcessedEventsTotal::new(m)),
             _ => None,
         })
     }
 
-    /// Component events processed metrics. Streams new data as the metric increases
-    async fn component_events_processed_total(
+    /// Event processing throughput sampled over the provided millisecond `interval`.
+    async fn processed_events_throughput(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = ComponentEventsProcessedTotal> {
-        component_counter_metrics(interval, &|m| m.name == "events_processed_total")
-            .map(ComponentEventsProcessedTotal::new)
+    ) -> impl Stream<Item = i64> {
+        counter_throughput(interval, &|m| m.name == "processed_events_total")
+            .map(|(_, throughput)| throughput as i64)
     }
 
-    /// Component events processed metrics, received in batches containing metrics over `interval`
-    async fn component_events_processed_total_batch(
+    /// Component event processing throughput metrics over `interval`.
+    async fn component_processed_events_throughputs(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = Vec<ComponentEventsProcessedTotal>> {
-        component_counter_metrics_batch(interval, &|m| m.name == "events_processed_total").map(
-            |m| {
-                m.into_iter()
-                    .map(ComponentEventsProcessedTotal::new)
-                    .collect()
-            },
-        )
-    }
-
-    /// Bytes processed metrics
-    async fn bytes_processed_total(
-        &self,
-        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = BytesProcessedTotal> {
-        get_metrics(interval).filter_map(|m| match m.name.as_str() {
-            "processed_bytes_total" => Some(BytesProcessedTotal::new(m)),
-            _ => None,
-        })
-    }
-
-    /// Component bytes processed metrics. Streams new data as the metric increases
-    async fn component_bytes_processed_total(
-        &self,
-        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = ComponentBytesProcessedTotal> {
-        component_counter_metrics(interval, &|m| m.name == "processed_bytes_total")
-            .map(ComponentBytesProcessedTotal::new)
-    }
-
-    /// Component bytes processed metrics, received in batches containing metrics over `interval`
-    async fn component_bytes_processed_total_batch(
-        &self,
-        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = Vec<ComponentBytesProcessedTotal>> {
-        component_counter_metrics_batch(interval, &|m| m.name == "processed_bytes_total").map(|m| {
+    ) -> impl Stream<Item = Vec<ComponentProcessedEventsThroughput>> {
+        component_counter_throughputs(interval, &|m| m.name == "processed_events_total").map(|m| {
             m.into_iter()
-                .map(ComponentBytesProcessedTotal::new)
+                .map(|(m, throughput)| {
+                    ComponentProcessedEventsThroughput::new(
+                        m.tag_value("component_name").unwrap(),
+                        throughput as i64,
+                    )
+                })
                 .collect()
         })
     }
 
-    /// Total error metrics
+    /// Component event processing metrics over `interval`.
+    async fn component_processed_events_totals(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = Vec<ComponentProcessedEventsTotal>> {
+        component_counter_metrics(interval, &|m| m.name == "processed_events_total").map(|m| {
+            m.into_iter()
+                .map(ComponentProcessedEventsTotal::new)
+                .collect()
+        })
+    }
+
+    /// Byte processing metrics.
+    async fn processed_bytes_total(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = ProcessedBytesTotal> {
+        get_metrics(interval).filter_map(|m| match m.name.as_str() {
+            "processed_bytes_total" => Some(ProcessedBytesTotal::new(m)),
+            _ => None,
+        })
+    }
+
+    /// Byte processing throughput sampled over a provided millisecond `interval`.
+    async fn processed_bytes_throughput(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = i64> {
+        counter_throughput(interval, &|m| m.name == "processed_bytes_total")
+            .map(|(_, throughput)| throughput as i64)
+    }
+
+    /// Component byte processing metrics over `interval`.
+    async fn component_processed_bytes_totals(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = Vec<ComponentProcessedBytesTotal>> {
+        component_counter_metrics(interval, &|m| m.name == "processed_bytes_total").map(|m| {
+            m.into_iter()
+                .map(ComponentProcessedBytesTotal::new)
+                .collect()
+        })
+    }
+
+    /// Component byte processing throughput over `interval`
+    async fn component_processed_bytes_throughputs(
+        &self,
+        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
+    ) -> impl Stream<Item = Vec<ComponentProcessedBytesThroughput>> {
+        component_counter_throughputs(interval, &|m| m.name == "processed_bytes_total").map(|m| {
+            m.into_iter()
+                .map(|(m, throughput)| {
+                    ComponentProcessedBytesThroughput::new(
+                        m.tag_value("component_name").unwrap(),
+                        throughput as i64,
+                    )
+                })
+                .collect()
+        })
+    }
+
+    /// Total error metrics.
     async fn errors_total(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
@@ -142,39 +178,30 @@ impl MetricsSubscription {
             .map(ErrorsTotal::new)
     }
 
-    /// Component errors metrics. Streams new data as the metric increases
-    async fn component_errors_total(
-        &self,
-        #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
-    ) -> impl Stream<Item = ComponentErrorsTotal> {
-        component_counter_metrics(interval, &|m| m.name.ends_with("_errors_total"))
-            .map(ComponentErrorsTotal::new)
-    }
-
-    /// Component errors metrics, received in batches containing metrics over `interval`
-    async fn component_errors_total_batch(
+    /// Component error metrics over `interval`.
+    async fn component_errors_totals(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = Vec<ComponentErrorsTotal>> {
-        component_counter_metrics_batch(interval, &|m| m.name.ends_with("_errors_total"))
+        component_counter_metrics(interval, &|m| m.name.ends_with("_errors_total"))
             .map(|m| m.into_iter().map(ComponentErrorsTotal::new).collect())
     }
 
-    /// All metrics
+    /// All metrics.
     async fn metrics(
         &self,
         #[graphql(default = 1000, validator(IntRange(min = "10", max = "60_000")))] interval: i32,
     ) -> impl Stream<Item = MetricType> {
         get_metrics(interval).filter_map(|m| match m.name.as_str() {
             "uptime_seconds" => Some(MetricType::Uptime(m.into())),
-            "events_processed_total" => Some(MetricType::EventsProcessedTotal(m.into())),
-            "processed_bytes_total" => Some(MetricType::BytesProcessedTotal(m.into())),
+            "processed_events_total" => Some(MetricType::ProcessedEventsTotal(m.into())),
+            "processed_bytes_total" => Some(MetricType::ProcessedBytesTotal(m.into())),
             _ => None,
         })
     }
 }
 
-/// Returns a stream of `Metric`s, collected at the provided millisecond interval
+/// Returns a stream of `Metric`s, collected at the provided millisecond interval.
 fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
     let controller = get_controller().unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
@@ -192,12 +219,12 @@ fn get_metrics(interval: i32) -> impl Stream<Item = Metric> {
 }
 
 /// Returns a stream of `Metrics`, sorted into source, transform and sinks, in that order.
-/// Metrics are 'batched' into a `Vec<Metric>`, yielding at `inverval` milliseconds
-fn get_metrics_sorted_batch(interval: i32) -> impl Stream<Item = Vec<Metric>> {
+/// Metrics are collected into a `Vec<Metric>`, yielding at `inverval` milliseconds.
+fn metrics_sorted(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     let controller = get_controller().unwrap();
     let mut interval = tokio::time::interval(Duration::from_millis(interval as u64));
 
-    // Sort each interval 'batch' of metrics by key
+    // Sort each interval of metrics by key
     stream! {
         loop {
             interval.tick().await;
@@ -224,23 +251,23 @@ fn get_metrics_sorted_batch(interval: i32) -> impl Stream<Item = Vec<Metric>> {
     }
 }
 
-/// Get the events processed by component name
-pub fn component_events_processed_total(component_name: &str) -> Option<EventsProcessedTotal> {
+/// Get the events processed by component name.
+pub fn component_processed_events_total(component_name: &str) -> Option<ProcessedEventsTotal> {
     capture_metrics(&GLOBAL_CONTROLLER)
         .find(|ev| match ev {
             Event::Metric(m)
-                if m.name.as_str().eq("events_processed_total")
+                if m.name.as_str().eq("processed_events_total")
                     && m.tag_matches("component_name", &component_name) =>
             {
                 true
             }
             _ => false,
         })
-        .map(|ev| EventsProcessedTotal::new(ev.into_metric()))
+        .map(|ev| ProcessedEventsTotal::new(ev.into_metric()))
 }
 
-/// Get the bytes processed by component name
-pub fn component_bytes_processed_total(component_name: &str) -> Option<BytesProcessedTotal> {
+/// Get the bytes processed by component name.
+pub fn component_processed_bytes_total(component_name: &str) -> Option<ProcessedBytesTotal> {
     capture_metrics(&GLOBAL_CONTROLLER)
         .find(|ev| match ev {
             Event::Metric(m)
@@ -251,23 +278,23 @@ pub fn component_bytes_processed_total(component_name: &str) -> Option<BytesProc
             }
             _ => false,
         })
-        .map(|ev| BytesProcessedTotal::new(ev.into_metric()))
+        .map(|ev| ProcessedBytesTotal::new(ev.into_metric()))
 }
 
 type MetricFilterFn = dyn Fn(&Metric) -> bool + Send + Sync;
 
 /// Returns a stream of `Vec<Metric>`, where `metric_name` matches the name of the metric
-/// (e.g. "events_processed"), and the value is derived from `MetricValue::Counter`. Uses a
+/// (e.g. "processed_events_total"), and the value is derived from `MetricValue::Counter`. Uses a
 /// local cache to match against the `component_name` of a metric, to return results only when
 /// the value of a current iteration is greater than the previous. This is useful for the client
 /// to be notified as metrics increase without returning 'empty' or identical results.
-pub fn component_counter_metrics_batch(
+pub fn component_counter_metrics(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
 ) -> impl Stream<Item = Vec<Metric>> {
     let mut cache = BTreeMap::new();
 
-    get_metrics_sorted_batch(interval).map(move |m| {
+    metrics_sorted(interval).map(move |m| {
         m.into_iter()
             .filter(filter_fn)
             .filter_map(|m| {
@@ -285,12 +312,53 @@ pub fn component_counter_metrics_batch(
     })
 }
 
-/// A flattened variant of `component_counter_metrics_batch`, returning a stream of `Metric`
-pub fn component_counter_metrics(
+/// Returns the throughput of a 'counter' metric, sampled over `interval` millseconds
+/// and filtered by the provided `filter_fn`.
+fn counter_throughput(
     interval: i32,
     filter_fn: &'static MetricFilterFn,
-) -> impl Stream<Item = Metric> {
-    futures::StreamExt::flatten(
-        component_counter_metrics_batch(interval, filter_fn).map(futures::stream::iter),
-    )
+) -> impl Stream<Item = (Metric, f64)> {
+    let mut last = 0.00;
+
+    get_metrics(interval)
+        .filter(filter_fn)
+        .filter_map(move |m| match m.value {
+            MetricValue::Counter { value } if value > last => {
+                let throughput = value - last;
+                last = value;
+                Some((m, throughput))
+            }
+            _ => None,
+        })
+        // Ignore the first, since we only care about sampling between `interval`
+        .skip(1)
+}
+
+/// Returns the throughput of a 'counter' metric, sampled over `interval` milliseconds
+/// and filtered by the provided `filter_fn`, aggregated against each component.
+fn component_counter_throughputs(
+    interval: i32,
+    filter_fn: &'static MetricFilterFn,
+) -> impl Stream<Item = Vec<(Metric, f64)>> {
+    let mut cache = BTreeMap::new();
+
+    metrics_sorted(interval)
+        .map(move |m| {
+            m.into_iter()
+                .filter(filter_fn)
+                .filter_map(|m| {
+                    let component_name = m.tag_value("component_name")?;
+                    match m.value {
+                        MetricValue::Counter { value } => {
+                            let last = cache.insert(component_name, value).unwrap_or(0.00);
+                            let throughput = value - last;
+                            Some((m, throughput))
+                        }
+                        _ => None,
+                    }
+                })
+                .collect()
+        })
+        // Ignore the first, since we only care about sampling between `interval`
+        .skip(1)
 }

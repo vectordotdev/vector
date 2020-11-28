@@ -13,7 +13,7 @@ impl Function for Match {
         &[
             Parameter {
                 keyword: "value",
-                accepts: |v| matches!(v, Value::String(_)),
+                accepts: |v| matches!(v, Value::Bytes(_)),
                 required: true,
             },
             Parameter {
@@ -46,15 +46,18 @@ impl MatchFn {
 }
 
 impl Expression for MatchFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
-        required!(
-            state, object, self.value,
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
+        let bytes = self.value.execute(state, object)?.try_bytes()?;
+        let value = String::from_utf8_lossy(&bytes);
 
-            Value::String(b) => {
-                let value = String::from_utf8_lossy(&b);
-                Ok(Some(self.pattern.is_match(&value).into()))
-            }
-        )
+        Ok(self.pattern.is_match(&value).into())
+    }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        self.value
+            .type_def(state)
+            .fallible_unless(value::Kind::Bytes)
+            .with_constraint(value::Kind::Boolean)
     }
 }
 
@@ -62,37 +65,53 @@ impl Expression for MatchFn {
 mod tests {
     use super::*;
     use crate::map;
+    use value::Kind;
+
+    remap::test_type_def![
+        value_string {
+            expr: |_| MatchFn {
+                value: Literal::from("foo").boxed(),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
+        }
+
+        value_non_string {
+            expr: |_| MatchFn {
+                value: Literal::from(1).boxed(),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Boolean },
+        }
+
+        value_optional {
+            expr: |_| MatchFn {
+                value: Box::new(Noop),
+                pattern: Regex::new("").unwrap(),
+            },
+            def: TypeDef { fallible: true, kind: Kind::Boolean },
+        }
+    ];
 
     #[test]
     fn r#match() {
         let cases = vec![
             (
-                map![],
-                Err("path error: missing path: foo".into()),
-                MatchFn::new(Box::new(Path::from("foo")), Regex::new("").unwrap()),
-            ),
-            (
                 map!["foo": "foobar"],
-                Ok(Some(false.into())),
+                Ok(false.into()),
                 MatchFn::new(Box::new(Path::from("foo")), Regex::new("\\s\\w+").unwrap()),
             ),
             (
                 map!["foo": "foo 2 bar"],
-                Ok(Some(true.into())),
+                Ok(true.into()),
                 MatchFn::new(
                     Box::new(Path::from("foo")),
                     Regex::new("foo \\d bar").unwrap(),
                 ),
             ),
-            // `Noop` returns `Ok(None)`, which is passed-through
-            (
-                map![],
-                Ok(None),
-                MatchFn::new(Box::new(Noop), Regex::new("true").unwrap()),
-            ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

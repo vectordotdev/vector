@@ -15,10 +15,12 @@ components: sources: stdin: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "STDIN"
-				thing:    "the \(name) stream"
-				url:      urls.stdin
-				versions: null
+				service: {
+					name:     "STDIN"
+					thing:    "the \(name) stream"
+					url:      urls.stdin
+					versions: null
+				}
 
 				interface: stdin: {}
 			}
@@ -99,5 +101,9 @@ components: sources: stdin: {
 				Each line is read until a new line delimiter, the `0xA` byte, is found.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		stdin_reads_failed_total: components.sources.internal_metrics.output.metrics.stdin_reads_failed_total
 	}
 }

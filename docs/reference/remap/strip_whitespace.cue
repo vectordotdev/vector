@@ -24,6 +24,7 @@ remap: functions: strip_whitespace: {
 				.trimmed = strip_whitespace(.text)
 				"""#
 			output: {
+				text:  #"  A sentence.  "#
 				slice: "A sentence."
 			}
 		},

@@ -218,4 +218,9 @@ components: transforms: tag_cardinality_limit: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		tag_value_limit_exceeded_total: components.sources.internal_metrics.output.metrics.tag_value_limit_exceeded_total
+		value_limit_reached_total:      components.sources.internal_metrics.output.metrics.value_limit_reached_total
+	}
 }

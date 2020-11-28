@@ -1,11 +1,9 @@
-use super::{
-    collector::{self, MetricCollector as _},
-    proto,
-};
+use super::collector::{self, MetricCollector as _};
 use crate::{
     config::{self, SinkConfig, SinkDescription},
     event::Metric,
     http::HttpClient,
+    prometheus::proto,
     sinks::{
         self,
         util::{
@@ -29,22 +27,22 @@ enum Errors {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-struct RemoteWriteConfig {
-    endpoint: String,
+pub(crate) struct RemoteWriteConfig {
+    pub endpoint: String,
 
-    default_namespace: Option<String>,
+    pub default_namespace: Option<String>,
 
     #[serde(default = "super::default_histogram_buckets")]
-    buckets: Vec<f64>,
+    pub buckets: Vec<f64>,
     #[serde(default = "super::default_summary_quantiles")]
-    quantiles: Vec<f64>,
+    pub quantiles: Vec<f64>,
 
     #[serde(default)]
-    batch: BatchConfig,
+    pub batch: BatchConfig,
     #[serde(default)]
-    request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
-    tls: Option<TlsOptions>,
+    pub tls: Option<TlsOptions>,
 }
 
 inventory::submit! {
@@ -96,7 +94,7 @@ impl SinkConfig for RemoteWriteConfig {
         Ok((sinks::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
 
-    fn input_type(&self) -> crate::config::DataType {
+    fn input_type(&self) -> config::DataType {
         config::DataType::Metric
     }
 
@@ -105,7 +103,7 @@ impl SinkConfig for RemoteWriteConfig {
     }
 }
 
-async fn healthcheck(endpoint: Uri, mut client: HttpClient) -> crate::Result<()> {
+async fn healthcheck(endpoint: Uri, client: HttpClient) -> crate::Result<()> {
     let request = http::Request::get(endpoint)
         .body(hyper::Body::empty())
         .unwrap();
@@ -167,10 +165,10 @@ impl tower::Service<Vec<Metric>> for RemoteWriteService {
             .header("Content-Type", "application/x-protobuf")
             .body(body.into())
             .unwrap();
-        let mut client = self.client.clone();
+        let client = self.client.clone();
 
         Box::pin(async move {
-            let response = client.call(request).await?;
+            let response = client.send(request).await?;
             let (parts, body) = response.into_parts();
             let body = hyper::body::to_bytes(body).await?;
             Ok(hyper::Response::from_parts(parts, body))
@@ -205,7 +203,8 @@ mod integration_tests {
         Event,
     };
     use futures::stream;
-    use std::ops::Range;
+    use serde_json::Value;
+    use std::{collections::HashMap, ops::Range};
 
     const HTTP_URL: &str = "http://localhost:8086";
     const HTTPS_URL: &str = "https://localhost:8087";
@@ -233,29 +232,92 @@ mod integration_tests {
             }),
             ..Default::default()
         };
-        let events = create_events(0..10);
+        let events = create_events(0..5, |n| n * 11.0);
 
         let (sink, _) = config.build(cx).await.expect("error building config");
-        sink.run(stream::iter(events)).await.unwrap();
+        sink.run(stream::iter(events.clone())).await.unwrap();
 
-        let result = query_v1(url, &format!("show series on {}", database)).await;
-        let text = result.text().await.unwrap();
-        let result: serde_json::Value =
-            serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON");
+        let result = query(url, &format!("show series on {}", database)).await;
 
         let values = &result["results"][0]["series"][0]["values"];
-        assert_eq!(values.as_array().unwrap().len(), 10);
+        assert_eq!(values.as_array().unwrap().len(), 5);
+
+        for event in events {
+            let metric = event.into_metric();
+            let result = query(
+                url,
+                &format!(r#"SELECT * FROM "{}".."{}""#, database, &metric.name),
+            )
+            .await;
+
+            let metrics = decode_metrics(&result["results"][0]["series"][0]);
+            assert_eq!(metrics.len(), 1);
+            let output = &metrics[0];
+
+            match metric.value {
+                MetricValue::Gauge { value } => {
+                    assert_eq!(output["value"], Value::Number((value as u32).into()))
+                }
+                _ => panic!("Unhandled metric value, fix the test"),
+            }
+            for (tag, value) in metric.tags.unwrap() {
+                assert_eq!(output[&tag], Value::String(value));
+            }
+            let timestamp = strip_timestamp(
+                metric
+                    .timestamp
+                    .unwrap()
+                    .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+                    .to_string(),
+            );
+            assert_eq!(output["time"], Value::String(timestamp));
+        }
 
         cleanup_v1(url, &database).await;
     }
 
-    fn create_events(range: Range<i32>) -> Vec<Event> {
-        range.map(create_event).collect()
+    async fn query(url: &str, query: &str) -> Value {
+        let result = query_v1(url, query).await;
+        let text = result.text().await.unwrap();
+        serde_json::from_str(&text).expect("error when parsing InfluxDB response JSON")
     }
 
-    fn create_event(i: i32) -> Event {
+    // InfluxDB strips off trailing zeros in
+    fn strip_timestamp(timestamp: String) -> String {
+        let strip_one = || format!("{}Z", &timestamp[..timestamp.len() - 2]);
+        match timestamp {
+            _ if timestamp.ends_with("0Z") => strip_timestamp(strip_one()),
+            _ if timestamp.ends_with(".Z") => strip_one(),
+            _ => timestamp,
+        }
+    }
+
+    fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
+        let data = data.as_object().expect("Data is not an object");
+        let columns = data["columns"].as_array().expect("Columns is not an array");
+        data["values"]
+            .as_array()
+            .expect("Values is not an array")
+            .iter()
+            .map(|values| {
+                columns
+                    .iter()
+                    .zip(values.as_array().unwrap().iter())
+                    .map(|(column, value)| (column.as_str().unwrap().to_owned(), value.clone()))
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn create_events(name_range: Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
+        name_range
+            .map(move |num| create_event(format!("metric_{}", num), value(num as f64)))
+            .collect()
+    }
+
+    fn create_event(name: String, value: f64) -> Event {
         Event::Metric(Metric {
-            name: format!("gauge-{}", i),
+            name,
             namespace: None,
             timestamp: Some(chrono::Utc::now()),
             tags: Some(
@@ -267,7 +329,7 @@ mod integration_tests {
                 .collect(),
             ),
             kind: MetricKind::Absolute,
-            value: MetricValue::Gauge { value: i as f64 },
+            value: MetricValue::Gauge { value },
         })
     }
 }

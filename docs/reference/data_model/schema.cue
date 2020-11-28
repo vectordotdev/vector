@@ -8,21 +8,27 @@ data_model: schema: {
 			point-in-time event. It contains an arbitrary set of
 			fields that describe the event.
 
-			A key tenet of Vector is to remain neutral in the way it
-			processes data. This ensures Vector can support a
-			variety of schemas without issue and it's why Vector's
-			log data model does not require any specific fields.
-			Instead, each Vector source will document it's output
-			schema allowing you work with data in any shape.
+			A key tenet of Vector is to remain schema neutral. This
+			ensures that Vector can work with any schema, supporting
+			legacy and future schemas as your needs evolve. Vector
+			does not require any specific fields, and each compoennt
+			will document the fields it provides.
 			"""
 		required: false
 		warnings: []
 		type: object: {
-			examples: []
+			examples: [
+				{
+					"host":      "my.host.com"
+					"message":   "Hello world"
+					"timestamp": "2020-11-01T21:15:47+00:00"
+					"custom":    "field"
+				},
+			]
 			options: {
 				"*": {
 					common:      true
-					description: "An arbitrary set of key/value pairs."
+					description: "An arbitrary set of key/value pairs that can be infinitely nested."
 					required:    false
 					type: "*": {}
 				}
@@ -34,10 +40,14 @@ data_model: schema: {
 		common: true
 		description: """
 			A Vector metric event represents a numerical operation
-			performed on a time series. Operations offered are
-			heavily inspired by the StatsD, Prometheus, and Datadog
-			data models, and determine the schema of the metric
-			structure within Vector.
+			performed on a time series. Unlike other tools, metrics
+			in Vector are first class citizens, they are not represented
+			as structured logs. This makes them interoperable with
+			various metrics services without the need for any
+			transformation.
+
+			Vector's metric data model is heavily inspried by Prometheus,
+			Statsd, and Datadog.
 			"""
 		required: false
 		warnings: []
@@ -185,6 +195,36 @@ data_model: schema: {
 					}
 				}
 
+				"kind": {
+					description: "The metric value kind."
+					required:    true
+					warnings: []
+					type: string: {
+						enum: {
+							absolute:    "The metric value is absolute and replaces values as it is received downstream."
+							incremental: "The metric value increments a cumulated value as it is received downstream."
+						}
+					}
+				}
+
+				"name": {
+					description: "The metric name."
+					required:    true
+					warnings: []
+					type: string: {
+						examples: ["memory_available_bytes"]
+					}
+				}
+
+				"namespace": {
+					description: "The metric namespace. Depending on the service, this will prepend the name or use native namespacing facilities."
+					required:    true
+					warnings: []
+					type: string: {
+						examples: ["host", "apache", "nginx"]
+					}
+				}
+
 				set: {
 					common: true
 					description: """
@@ -256,6 +296,35 @@ data_model: schema: {
 							}
 						}
 					}
+				}
+
+				tags: {
+					description: "The metric tags. Key/value pairs, nesting is not allowed."
+					required:    true
+					warnings: []
+					type: object: {
+						examples: [
+							{
+								"host":        "my.host.com"
+								"instance_id": "abcd1234"
+							},
+						]
+						options: {
+							"*": {
+								common:      true
+								description: "Key/value pairs, nesting is not allowed."
+								required:    false
+								type: "*": {}
+							}
+						}
+					}
+				}
+
+				"timestamp": {
+					description: "The metric timestamp; when the metric was created."
+					required:    true
+					warnings: []
+					type: timestamp: {}
 				}
 			}
 		}

@@ -1,13 +1,13 @@
 use super::{healthcheck_response, GcpAuthConfig, GcpCredentials, Scope};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    http::{HttpClient, HttpClientFuture},
+    http::{HttpClient, HttpClientFuture, HttpError},
     serde::to_string,
     sinks::{
         util::{
             encoding::{EncodingConfig, EncodingConfiguration},
             retries::{RetryAction, RetryLogic},
-            BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+            BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
         },
         Healthcheck, VectorSink,
@@ -118,7 +118,7 @@ enum GcsStorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: InFlightLimit::Fixed(25),
+        concurrency: Concurrency::Fixed(25),
         rate_limit_num: Some(1000),
         ..Default::default()
     };
@@ -233,7 +233,7 @@ impl GcsSink {
         Ok(VectorSink::Sink(Box::new(sink)))
     }
 
-    async fn healthcheck(mut self) -> crate::Result<()> {
+    async fn healthcheck(self) -> crate::Result<()> {
         let uri = self.base_url.parse::<Uri>()?;
         let mut request = http::Request::head(uri).body(Body::empty())?;
 
@@ -251,7 +251,7 @@ impl GcsSink {
 
 impl Service<RequestWrapper> for GcsSink {
     type Response = Response<Body>;
-    type Error = hyper::Error;
+    type Error = HttpError;
     type Future = HttpClientFuture;
 
     fn poll_ready(&mut self, _: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {

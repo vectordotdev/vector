@@ -1,11 +1,14 @@
-use crate::{expression, function, parser::Rule, value};
+use crate::{expression, function, parser::Rule, program, value};
 use std::error::Error as StdError;
 use std::fmt;
 
-#[derive(thiserror::Error, Debug, PartialEq)]
+#[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
     #[error("parser error: {0}")]
     Parser(String),
+
+    #[error("program error")]
+    Program(#[from] program::Error),
 
     #[error("unexpected token sequence")]
     Rule(#[from] Rule),
@@ -90,6 +93,7 @@ impl fmt::Display for Rule {
             path_field,
             path_index,
             path_index_inner,
+            path_root,
             path_segment,
             primary,
             program,
@@ -107,7 +111,7 @@ impl fmt::Display for Rule {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct RemapError(pub(crate) Error);
 
 impl StdError for RemapError {
@@ -127,6 +131,12 @@ impl fmt::Display for RemapError {
         }
 
         Ok(())
+    }
+}
+
+impl From<Error> for RemapError {
+    fn from(error: Error) -> Self {
+        RemapError(error)
     }
 }
 

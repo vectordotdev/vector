@@ -18,17 +18,20 @@ components: sources: splunk_hec: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Splunk HEC"
-				thing:    "a \(name) client"
-				url:      urls.splunk_hec
-				versions: null
+				service: {
+					name:     "Splunk HEC"
+					thing:    "a \(name) client"
+					url:      urls.splunk_hec
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
 						title: "Splunk HEC"
 						url:   urls.splunk_hec_protocol
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["http"]
 					ssl: "optional"
 				}
@@ -91,5 +94,10 @@ components: sources: splunk_hec: {
 			}
 			timestamp: fields._current_timestamp
 		}
+	}
+
+	telemetry: metrics: {
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

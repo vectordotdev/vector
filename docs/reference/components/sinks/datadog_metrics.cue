@@ -21,7 +21,7 @@ components: sinks: datadog_metrics: {
 			encoding: enabled:    false
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -30,10 +30,7 @@ components: sinks: datadog_metrics: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "Datadog metrics"
-				thing:    "a \(name) account"
-				url:      urls.datadog_metrics
-				versions: null
+				service: services.datadog_metrics
 
 				interface: {
 					socket: {

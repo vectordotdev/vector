@@ -8,7 +8,7 @@ components: sources: [Name=string]: {
 			if sources[Name].features.collect.checkpoint.enabled {
 				data_dir: {
 					common:      false
-					description: "The directory used to persist file checkpoint positions. By default, the [global `data_dir` option][docs.global-options#data_dir] is used. Please make sure the Vector project has write permissions to this dir."
+					description: "The directory used to persist file checkpoint positions. By default, the global `data_dir` option is used. Please make sure the Vector project has write permissions to this dir."
 					required:    false
 					type: string: {
 						default: null

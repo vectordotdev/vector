@@ -53,7 +53,7 @@ components: sinks: _humio: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            10
+				concurrency:                10
 				rate_limit_duration_secs:   1
 				rate_limit_num:             10
 				retry_initial_backoff_secs: 1
@@ -62,10 +62,12 @@ components: sinks: _humio: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "Humio"
-				thing:    "a \(name) database"
-				url:      urls.humio
-				versions: null
+				service: {
+					name:     "Humio"
+					thing:    "a \(name) database"
+					url:      urls.humio
+					versions: null
+				}
 
 				interface: {
 					socket: {

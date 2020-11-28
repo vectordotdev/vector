@@ -29,6 +29,9 @@ remap: functions: tokenize: {
 				.tokens = tokenize(.text)
 				"""#
 			output: {
+				text: #"""
+					A sentence "with \"a\" sentence inside" and [some brackets]
+					"""#
 				slice: ["A", "sentence", #"with \"a\" sentence inside"#, "and", "some brackets"]
 			}
 		},

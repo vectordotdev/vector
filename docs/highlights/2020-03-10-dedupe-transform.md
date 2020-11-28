@@ -10,8 +10,6 @@ hide_on_release_notes: false
 tags: ["type: new feature", "domain: sources", "source: vector"]
 ---
 
-import CodeExplanation from '@site/src/components/CodeExplanation';
-
 For certain use cases, log deduplication can be a useful tool. Not only does
 this promote your data integrity, but it can help protect against upstream
 mistakes that accidentally duplicate logs. This mistake can easily double

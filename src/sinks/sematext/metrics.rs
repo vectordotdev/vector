@@ -12,16 +12,14 @@ use crate::{
     sinks::{Healthcheck, HealthcheckError, VectorSink},
     vector_version, Result,
 };
-use futures::{
-    future::{ready, BoxFuture},
-    FutureExt, SinkExt,
-};
+use futures::{future::BoxFuture, FutureExt, SinkExt};
 use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashMap},
+    future::ready,
     task::Poll,
 };
 use tower::Service;
@@ -59,7 +57,7 @@ impl GenerateConfig for SematextMetricsConfig {
     }
 }
 
-async fn healthcheck(endpoint: String, mut client: HttpClient) -> Result<()> {
+async fn healthcheck(endpoint: String, client: HttpClient) -> Result<()> {
     let uri = format!("{}/health", endpoint);
 
     let request = Request::get(uri)

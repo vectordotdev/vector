@@ -248,7 +248,7 @@ fn remap_severity(severity: Value) -> Value {
     Value::Integer(n)
 }
 
-async fn healthcheck(mut client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, sink: StackdriverSink) -> crate::Result<()> {
     let request = sink.build_request(vec![]).await?.map(Body::from);
 
     let response = client.send(request).await?;

@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_kinesis_streams: {
+components: sinks: aws_kinesis_streams: components._aws & {
 	title:       "AWS Kinesis Data Streams"
 	description: "[Amazon Kinesis Data Streams](\(urls.aws_kinesis_streams)) is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
 
@@ -39,7 +39,7 @@ components: sinks: aws_kinesis_streams: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -48,10 +48,7 @@ components: sinks: aws_kinesis_streams: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "AWS Kinesis Data Streams"
-				thing:    "a \(name) stream"
-				url:      urls.aws_kinesis_streams
-				versions: null
+				service: services.aws_kinesis_data_streams
 
 				interface: {
 					socket: {
