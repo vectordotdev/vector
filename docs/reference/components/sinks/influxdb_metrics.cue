@@ -7,7 +7,7 @@ components: sinks: influxdb_metrics: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["InfluxData"]
 	}
@@ -30,7 +30,7 @@ components: sinks: influxdb_metrics: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1

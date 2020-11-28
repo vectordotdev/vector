@@ -45,7 +45,7 @@ components: sinks: kafka: {
 				can_verify_hostname:    false
 				enabled_default:        false
 			}
-			to: components._kafka.features.service
+			to: components._kafka.features.send.to
 		}
 	}
 

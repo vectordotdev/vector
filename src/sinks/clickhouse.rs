@@ -141,7 +141,7 @@ impl HttpSink for ClickhouseConfig {
     }
 }
 
-async fn healthcheck(mut client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
+async fn healthcheck(client: HttpClient, config: ClickhouseConfig) -> crate::Result<()> {
     // TODO: check if table exists?
     let uri = format!("{}/?query=SELECT%201", config.endpoint);
     let mut request = Request::get(uri).body(Body::empty()).unwrap();
@@ -257,15 +257,15 @@ mod integration_tests {
     use serde_json::Value;
     use std::{
         convert::Infallible,
+        future::ready,
         net::SocketAddr,
         sync::{
             atomic::{AtomicBool, Ordering},
             Arc,
         },
     };
-    use warp::Filter;
-
     use tokio::time::{timeout, Duration};
+    use warp::Filter;
 
     #[tokio::test]
     async fn insert_events() {
@@ -299,7 +299,7 @@ mod integration_tests {
         let mut input_event = Event::from("raw log line");
         input_event.as_mut_log().insert("host", "example.com");
 
-        sink.run(stream::once(future::ready(input_event.clone())))
+        sink.run(stream::once(ready(input_event.clone())))
             .await
             .unwrap();
 

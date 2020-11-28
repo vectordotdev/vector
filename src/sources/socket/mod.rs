@@ -6,7 +6,8 @@ mod unix;
 use super::util::TcpSource;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription,
+        log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
+        SourceDescription,
     },
     shutdown::ShutdownSignal,
     tls::MaybeTlsSettings,
@@ -136,6 +137,15 @@ impl SourceConfig for SocketConfig {
     fn source_type(&self) -> &'static str {
         "socket"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        match self.mode.clone() {
+            Mode::Tcp(tcp) => vec![tcp.address.into()],
+            Mode::Udp(udp) => vec![udp.address.into()],
+            #[cfg(unix)]
+            Mode::Unix(_) => vec![],
+        }
+    }
 }
 
 #[cfg(test)]
@@ -197,8 +207,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -223,8 +232,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -256,8 +264,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -287,14 +294,7 @@ mod test {
 
         let mut config = TcpConfig::new(addr.into());
         config.max_length = 10;
-        config.tls = Some(TlsConfig {
-            enabled: Some(true),
-            options: TlsOptions {
-                crt_file: Some("tests/data/localhost.crt".into()),
-                key_file: Some("tests/data/localhost.key".into()),
-                ..Default::default()
-            },
-        });
+        config.tls = Some(TlsConfig::test_config());
 
         let server = SocketConfig::from(config)
             .build(
@@ -304,8 +304,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -354,8 +353,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -400,8 +398,7 @@ mod test {
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         let source_handle = tokio::spawn(server);
 
         // Send data to Source.
@@ -428,7 +425,7 @@ mod test {
         // It's important that the buffer be large enough that the TCP source doesn't have
         // to block trying to forward its input into the Sender because the channel is full,
         // otherwise even sending the signal to shut down won't wake it up.
-        let (tx, rx) = Pipeline::new_with_buffer(10_000);
+        let (tx, rx) = Pipeline::new_with_buffer(10_000, vec![]);
         let source_name = "tcp_shutdown_infinite_stream";
 
         let addr = next_addr();
@@ -442,8 +439,7 @@ mod test {
         })
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .await
-        .unwrap()
-        .compat();
+        .unwrap();
         let source_handle = tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -540,8 +536,7 @@ mod test {
                 sender,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         let source_handle = tokio::spawn(server);
 
         // Wait for UDP to start listening
@@ -706,8 +701,7 @@ mod test {
                 sender,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         // Wait for server to accept traffic

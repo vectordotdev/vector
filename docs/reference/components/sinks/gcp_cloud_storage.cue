@@ -39,7 +39,7 @@ components: sinks: gcp_cloud_storage: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            25
+				concurrency:                25
 				rate_limit_duration_secs:   1
 				rate_limit_num:             1000
 				retry_initial_backoff_secs: 1
@@ -54,10 +54,7 @@ components: sinks: gcp_cloud_storage: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "GCP Cloud Storage"
-				thing:    "a \(name) bucket"
-				url:      urls.gcp_cloud_storage
-				versions: null
+				service: services.gcp_cloud_storage
 
 				interface: {
 					socket: {

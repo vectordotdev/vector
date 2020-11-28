@@ -12,10 +12,12 @@ components: sources: syslog: {
 
 		receive: {
 			from: {
-				name:     "Syslog"
-				thing:    "a \(name) client"
-				url:      urls.syslog
-				versions: null
+				service: {
+					name:     "Syslog"
+					thing:    "a \(name) client"
+					url:      urls.syslog
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
@@ -181,5 +183,10 @@ components: sources: syslog: {
 				requesting support for your specific format.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		connection_read_errors_total: components.sources.internal_metrics.output.metrics.connection_read_errors_total
+		utf8_convert_errors_total:    components.sources.internal_metrics.output.metrics.utf8_convert_errors_total
 	}
 }

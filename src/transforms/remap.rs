@@ -5,7 +5,7 @@ use crate::{
     transforms::{FunctionTransform, Transform},
     Result,
 };
-use remap::{Program, Runtime};
+use remap::{value, Program, Runtime, TypeConstraint, TypeDef};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug, Clone, Derivative)]
@@ -50,8 +50,18 @@ pub struct Remap {
 
 impl Remap {
     pub fn new(config: RemapConfig) -> crate::Result<Remap> {
+        let accepts = TypeConstraint {
+            allow_any: true,
+            type_def: TypeDef {
+                fallible: true,
+                kind: value::Kind::all(),
+            },
+        };
+
+        let program = Program::new(&config.source, &crate::remap::FUNCTIONS_MUT, Some(accepts))?;
+
         Ok(Remap {
-            program: Program::new(&config.source, &crate::remap::FUNCTIONS_MUT)?,
+            program,
             drop_on_err: config.drop_on_err,
         })
     }

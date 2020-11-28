@@ -16,7 +16,7 @@ use futures::{
     future, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::{sync::mpsc, Future as Future01, Stream as Stream01};
-use std::collections::HashMap;
+use std::{collections::HashMap, future::ready};
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
@@ -49,7 +49,7 @@ pub async fn build_pieces(
         .filter(|(name, _)| diff.sources.contains_new(&name))
     {
         let (tx, rx) = mpsc::channel(1000);
-        let pipeline = Pipeline::from_sender(tx);
+        let pipeline = Pipeline::from_sender(tx, vec![]);
 
         let typetag = source.source_type();
 
@@ -75,13 +75,9 @@ pub async fn build_pieces(
         // forcibly shut down. We accomplish this by select()-ing on the server Task with the
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
-        let server = server
-            .select(Box::new(
-                force_shutdown_tripwire.unit_error().boxed().compat(),
-            ))
-            .map(|_| debug!("Finished."))
-            .map_err(|_| ())
-            .compat();
+        let server = future::try_select(server, force_shutdown_tripwire.unit_error().boxed())
+            .map_ok(|_| debug!("Finished."))
+            .map_err(|_| ());
         let server = Task::new(name, typetag, server);
 
         outputs.insert(name.clone(), control);
@@ -179,7 +175,7 @@ pub async fn build_pieces(
             .run(
                 filter_event_type(rx, input_type)
                     .compat()
-                    .take_while(|e| future::ready(e.is_ok()))
+                    .take_while(|e| ready(e.is_ok()))
                     .map(|x| x.unwrap()),
             )
             .inspect(|_| debug!("Finished."));

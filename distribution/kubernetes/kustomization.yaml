@@ -1,4 +1,0 @@
-namespace: vector
-
-resources:
-  - vector.yaml

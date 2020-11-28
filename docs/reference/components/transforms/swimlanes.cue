@@ -5,7 +5,7 @@ components: transforms: swimlanes: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
@@ -70,4 +70,8 @@ components: transforms: swimlanes: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
+	}
 }

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
@@ -7,17 +8,20 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-mod auto_concurrency;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 mod aws_ec2_metadata;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+mod aws_ecs_metrics;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 mod aws_kinesis_firehose;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 mod aws_kinesis_streams;
 #[cfg(any(feature = "sources-aws_s3", feature = "sinks-aws_s3"))]
 pub(crate) mod aws_s3;
+#[cfg(feature = "sinks-aws_sqs")]
+mod aws_sqs;
 mod blackhole;
 #[cfg(feature = "transforms-coercer")]
 mod coercer;
@@ -27,17 +31,20 @@ mod concat;
 mod console;
 #[cfg(feature = "transforms-dedupe")]
 mod dedupe;
-#[cfg(feature = "sources-docker")]
-mod docker;
+#[cfg(feature = "sources-docker_logs")]
+mod docker_logs;
 mod elasticsearch;
 #[cfg(feature = "sources-generator")]
 mod generator;
+#[cfg(feature = "transforms-geoip")]
+mod geoip;
 #[cfg(feature = "transforms-grok_parser")]
 mod grok_parser;
 mod heartbeat;
 #[cfg(feature = "sources-host_metrics")]
 mod host_metrics;
 mod http;
+pub mod http_client;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
 #[cfg(feature = "transforms-json_parser")]
@@ -59,9 +66,13 @@ mod lua;
 mod metric_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
+#[cfg(feature = "sinks-nats")]
+mod nats;
+#[cfg(feature = "sources-nginx_metrics")]
+mod nginx_metrics;
 mod open;
 mod process;
-#[cfg(feature = "sources-prometheus")]
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
@@ -102,6 +113,7 @@ mod wasm;
 
 pub mod kubernetes;
 
+pub use self::adaptive_concurrency::*;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
@@ -109,15 +121,18 @@ pub use self::ansi_stripper::*;
 pub use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
-pub use self::auto_concurrency::*;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
 pub use self::aws_ec2_metadata::*;
+#[cfg(feature = "sources-aws_ecs_metrics")]
+pub use self::aws_ecs_metrics::*;
 #[cfg(feature = "sources-aws_kinesis_firehose")]
 pub use self::aws_kinesis_firehose::*;
 #[cfg(feature = "sinks-aws_kinesis_streams")]
 pub use self::aws_kinesis_streams::*;
+#[cfg(feature = "sinks-aws_sqs")]
+pub use self::aws_sqs::*;
 pub use self::blackhole::*;
 #[cfg(feature = "transforms-coercer")]
 pub(crate) use self::coercer::*;
@@ -127,13 +142,19 @@ pub use self::concat::*;
 pub use self::console::*;
 #[cfg(feature = "transforms-dedupe")]
 pub(crate) use self::dedupe::*;
-#[cfg(feature = "sources-docker")]
-pub use self::docker::*;
+#[cfg(feature = "sources-docker_logs")]
+pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes-logs",
+    feature = "sinks-file",
+))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
+#[cfg(feature = "transforms-geoip")]
+pub(crate) use self::geoip::*;
 #[cfg(feature = "transforms-grok_parser")]
 pub(crate) use self::grok_parser::*;
 pub use self::heartbeat::*;
@@ -159,10 +180,14 @@ pub use self::logplex::*;
 pub use self::lua::*;
 #[cfg(feature = "transforms-metric_to_log")]
 pub(crate) use self::metric_to_log::*;
+#[cfg(feature = "sinks-nats")]
+pub use self::nats::*;
+#[cfg(feature = "sources-nginx_metrics")]
+pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
 pub use self::process::*;
-#[cfg(feature = "sources-prometheus")]
-pub use self::prometheus::*;
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+pub(crate) use self::prometheus::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
@@ -222,7 +247,11 @@ macro_rules! emit {
 }
 
 // Modules that require emit! macro so they need to be defined after the macro.
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes-logs",
+    feature = "sinks-file",
+))]
 mod file;
 mod windows;
 

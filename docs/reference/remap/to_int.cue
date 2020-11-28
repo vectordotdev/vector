@@ -4,7 +4,7 @@ remap: functions: to_int: {
 			name:        "value"
 			description: "The string that is to be converted to an int. Must be the string representation of an `int`, otherwise, an `ArgumentError` will be raised."
 			required:    true
-			type: ["string"]
+			type: ["integer", "float", "boolean", "string"]
 		},
 	]
 	return: ["integer"]

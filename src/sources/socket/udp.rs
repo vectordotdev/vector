@@ -7,7 +7,7 @@ use crate::{
 };
 use bytes::{Bytes, BytesMut};
 use codec::BytesDelimitedCodec;
-use futures::{compat::Future01CompatExt, FutureExt, TryFutureExt};
+use futures::compat::Future01CompatExt;
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -48,55 +48,51 @@ pub fn udp(
 ) -> Source {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending event.", %error));
 
-    Box::new(
-        async move {
-            let mut socket = UdpSocket::bind(&address)
-                .await
-                .expect("Failed to bind to udp listener socket");
-            info!(message = "Listening.", address = %address);
+    Box::pin(async move {
+        let mut socket = UdpSocket::bind(&address)
+            .await
+            .expect("Failed to bind to udp listener socket");
+        info!(message = "Listening.", address = %address);
 
-            let mut buf = BytesMut::with_capacity(max_length);
-            loop {
-                buf.resize(max_length, 0);
-                tokio::select! {
-                    recv = socket.recv_from(&mut buf) => {
-                        let (byte_size, address) = recv.map_err(|error| {
-                            emit!(SocketReceiveError {
-                                error,
-                                mode: SocketMode::Udp
-                            });
-                        })?;
+        let mut buf = BytesMut::with_capacity(max_length);
+        loop {
+            buf.resize(max_length, 0);
+            tokio::select! {
+                recv = socket.recv_from(&mut buf) => {
+                    let (byte_size, address) = recv.map_err(|error| {
+                        emit!(SocketReceiveError {
+                            error,
+                            mode: SocketMode::Udp
+                        });
+                    })?;
 
-                        let mut payload = buf.split_to(byte_size);
+                    let mut payload = buf.split_to(byte_size);
 
-                        // UDP processes messages per payload, where messages are separated by newline
-                        // and stretch to end of payload.
-                        let mut decoder = BytesDelimitedCodec::new(b'\n');
-                        while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
-                            let mut event = Event::from(line);
+                    // UDP processes messages per payload, where messages are separated by newline
+                    // and stretch to end of payload.
+                    let mut decoder = BytesDelimitedCodec::new(b'\n');
+                    while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
+                        let mut event = Event::from(line);
 
-                            event
-                                .as_mut_log()
-                                .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
-                            event
-                                .as_mut_log()
-                                .insert(host_key.clone(), address.to_string());
+                        event
+                            .as_mut_log()
+                            .insert(crate::config::log_schema().source_type_key(), Bytes::from("socket"));
+                        event
+                            .as_mut_log()
+                            .insert(host_key.clone(), address.to_string());
 
-                            emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
+                        emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
 
-                            tokio::select!{
-                                result = out.send(event).compat() => {
-                                    out = result?;
-                                }
-                                _ = &mut shutdown => return Ok(()),
+                        tokio::select!{
+                            result = out.send(event).compat() => {
+                                out = result?;
                             }
+                            _ = &mut shutdown => return Ok(()),
                         }
                     }
-                    _ = &mut shutdown => return Ok(()),
                 }
+                _ = &mut shutdown => return Ok(()),
             }
         }
-        .boxed()
-        .compat(),
-    )
+    })
 }

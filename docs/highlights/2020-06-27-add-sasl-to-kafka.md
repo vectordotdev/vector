@@ -10,8 +10,6 @@ release: "0.10.0"
 tags: ["type: new feature", "domain: sinks", "sink: kafka"]
 ---
 
-import Alert from '@site/src/components/Alert';
-
 The Kafka source and sink now support [SASL authentication][urls.kafka_sasl].
 
 You can review the option in the [component docs][urls.vector_sink_kafka_sasl].

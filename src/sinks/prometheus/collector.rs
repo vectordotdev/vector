@@ -1,19 +1,17 @@
-use super::proto;
 use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
+    prometheus::{proto, METRIC_NAME_LABEL},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
-
-const METRIC_NAME_LABEL: &str = "__name__";
 
 pub(super) trait MetricCollector {
     fn new() -> Self;
 
     fn emit(
         &mut self,
-        timestamp: i64,
+        timestamp_millis: i64,
         name: &str,
         suffix: &str,
         value: f64,
@@ -35,7 +33,7 @@ pub(super) trait MetricCollector {
             &metric.name,
         );
         let name = &name;
-        let timestamp = metric.timestamp.map(|t| t.timestamp()).unwrap_or(0);
+        let timestamp = metric.timestamp.map(|t| t.timestamp_millis()).unwrap_or(0);
 
         if metric.kind.is_absolute() {
             let tags = &metric.tags;
@@ -197,7 +195,7 @@ impl MetricCollector for StringCollector {
 
     fn emit(
         &mut self,
-        _timestamp: i64,
+        _timestamp_millis: i64,
         name: &str,
         suffix: &str,
         value: f64,
@@ -313,7 +311,7 @@ impl MetricCollector for TimeSeries {
 
     fn emit(
         &mut self,
-        timestamp: i64,
+        timestamp_millis: i64,
         name: &str,
         suffix: &str,
         value: f64,
@@ -323,7 +321,10 @@ impl MetricCollector for TimeSeries {
         self.buffer
             .entry(Self::make_labels(tags, name, suffix, extra))
             .or_default()
-            .push(proto::Sample { value, timestamp });
+            .push(proto::Sample {
+                value,
+                timestamp: timestamp_millis,
+            });
     }
 }
 

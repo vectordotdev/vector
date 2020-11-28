@@ -14,6 +14,7 @@
 /docs/reference/components/sinks/*_metrics.cue @lukesteensen
 /docs/reference/components/sinks/aws_kinesis_streams.cue @jszwedko
 /docs/reference/components/sinks/aws_s3.cue @jszwedko
+/docs/reference/components/sinks/aws_sqs.cue @fanatid
 /docs/reference/components/sinks/console.cue @lukesteensen
 /docs/reference/components/sinks/gcp @bruceg
 /docs/reference/components/sinks/http.cue @jszwedko
@@ -21,6 +22,7 @@
 /docs/reference/components/sinks/splunk_hec.cue @ktff
 /docs/reference/components/sinks/kafka.cue @lukesteensen
 /docs/reference/components/sinks/prometheus_exporter.cue @lukesteensen
+/docs/reference/components/sinks/prometheus_remote_write.cue @bruceg
 /docs/reference/components/sinks/splunk_hec.cue @lukesteensen
 /docs/reference/components/sinks/statsd.cue @lukesteensen
 /docs/reference/components/sinks/tcp.cue @bruceg @lukesteensen
@@ -33,6 +35,9 @@
 /docs/reference/components/sources/journald.cue @bruceg
 /docs/reference/components/sources/kubernetes_logs.cue @vector-kubernetes
 /docs/reference/components/sources/mongodb_metrics.cue @fanatid
+/docs/reference/components/sources/nginx_metrics.cue @fanatid
+/docs/reference/components/sources/prometheus_scrape.cue @bruceg
+/docs/reference/components/sources/prometheus_remote_write.cue @bruceg
 /docs/reference/components/sources/stdin.cue @bruceg
 /docs/reference/components/sources/syslog.cue @lukesteensen
 /docs/reference/components/sources/tcp.cue @bruceg
@@ -129,7 +134,7 @@
 /src/sinks/statsd.rs @lukesteensen
 /src/sinks/tcp.rs @bruceg
 /src/sinks/tcp.rs @lukesteensen
-/src/sinks/util/auto_concurrency @bruceg
+/src/sinks/util/adaptive_concurrency @bruceg
 
 /src/sources/apache_metrics/ @jszwedko
 /src/sources/aws_kinesis_firehose/ @jszwedko
@@ -139,6 +144,8 @@
 /src/sources/host_metrics.rs @bruceg
 /src/sources/journald.rs @bruceg
 /src/sources/mongodb_metrics/ @fanatid
+/src/sources/nginx/ @fanatid
+/src/sources/prometheus @bruceg
 /src/sources/stdin.rs @bruceg
 /src/sources/syslog.rs @lukesteensen
 /src/sources/tcp.rs @bruceg

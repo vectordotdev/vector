@@ -19,7 +19,7 @@ impl Function for ToTimestamp {
                         v,
                         Value::Integer(_) |
                         Value::Float(_) |
-                        Value::String(_) |
+                        Value::Bytes(_) |
                         Value::Timestamp(_)
                     )
                 },
@@ -32,7 +32,7 @@ impl Function for ToTimestamp {
                         v,
                         Value::Integer(_) |
                         Value::Float(_) |
-                        Value::String(_) |
+                        Value::Bytes(_) |
                         Value::Timestamp(_)
                     )
                 },
@@ -64,18 +64,20 @@ impl ToTimestampFn {
 }
 
 impl Expression for ToTimestampFn {
-    fn execute(&self, state: &mut State, object: &mut dyn Object) -> Result<Option<Value>> {
+    fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         use Value::*;
 
         let to_timestamp = |value| match value {
             Timestamp(_) => Ok(value),
-            String(_) => Conversion::Timestamp
+            Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
+            Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
+            Bytes(_) => Conversion::Timestamp
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            Integer(v) => Ok(Timestamp(Utc.timestamp(v, 0))),
-            Float(v) => Ok(Timestamp(Utc.timestamp(v.round() as i64, 0))),
-            _ => Err("unable to convert value to timestamp".into()),
+            Boolean(_) | Array(_) | Map(_) | Null => {
+                Err("unable to convert value to timestamp".into())
+            }
         };
 
         super::convert_value_or_default(
@@ -84,29 +86,134 @@ impl Expression for ToTimestampFn {
             to_timestamp,
         )
     }
+
+    fn type_def(&self, state: &state::Compiler) -> TypeDef {
+        use value::Kind;
+
+        self.value
+            .type_def(state)
+            .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
+            .merge_with_default_optional(self.default.as_ref().map(|default| {
+                default
+                    .type_def(state)
+                    .fallible_unless(Kind::Timestamp | Kind::Integer | Kind::Float)
+            }))
+            .with_constraint(Kind::Timestamp)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map;
+    use std::collections::BTreeMap;
+    use value::Kind;
+
+    remap::test_type_def![
+        timestamp_infallible {
+            expr: |_| ToTimestampFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None},
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
+        }
+
+        integer_infallible {
+            expr: |_| ToTimestampFn { value: Literal::from(1).boxed(), default: None},
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
+        }
+
+        float_infallible {
+            expr: |_| ToTimestampFn { value: Literal::from(1.0).boxed(), default: None},
+            def: TypeDef { kind: Kind::Timestamp, ..Default::default() },
+        }
+
+        null_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(()).boxed(), default: None},
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+        }
+
+        string_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from("foo").boxed(), default: None},
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+        }
+
+        map_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(BTreeMap::new()).boxed(), default: None},
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+        }
+
+        array_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(vec![0]).boxed(), default: None},
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+        }
+
+        boolean_fallible {
+            expr: |_| ToTimestampFn { value: Literal::from(true).boxed(), default: None},
+            def: TypeDef { fallible: true, kind: Kind::Timestamp },
+        }
+
+        fallible_value_without_default {
+            expr: |_| ToTimestampFn { value: Variable::new("foo".to_owned()).boxed(), default: None},
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Timestamp,
+            },
+        }
+
+       fallible_value_with_fallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: true,
+                kind: Kind::Timestamp,
+            },
+        }
+
+       fallible_value_with_infallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(vec![0]).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Timestamp,
+            },
+        }
+
+        infallible_value_with_fallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(vec![0]).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Timestamp,
+            },
+        }
+
+        infallible_value_with_infallible_default {
+            expr: |_| ToTimestampFn {
+                value: Literal::from(1).boxed(),
+                default: Some(Literal::from(1).boxed()),
+            },
+            def: TypeDef {
+                fallible: false,
+                kind: Kind::Timestamp,
+            },
+        }
+    ];
 
     #[test]
     fn to_timestamp() {
         let cases = vec![
             (
                 map![],
-                Err("path error: missing path: foo".into()),
-                ToTimestampFn::new(Box::new(Path::from("foo")), None),
-            ),
-            (
-                map![],
-                Ok(Some(Utc.timestamp(10, 0).into())),
+                Ok(Utc.timestamp(10, 0).into()),
                 ToTimestampFn::new(Box::new(Path::from("foo")), Some(10.into())),
             ),
             (
                 map![],
-                Ok(Some(Utc.timestamp(10, 0).into())),
+                Ok(Utc.timestamp(10, 0).into()),
                 ToTimestampFn::new(
                     Box::new(Path::from("foo")),
                     Some(Utc.timestamp(10, 0).into()),
@@ -114,17 +221,17 @@ mod tests {
             ),
             (
                 map![],
-                Ok(Some(Value::Timestamp(Utc.timestamp(10, 0)))),
+                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
                 ToTimestampFn::new(Box::new(Path::from("foo")), Some("10".into())),
             ),
             (
                 map!["foo": Utc.timestamp(10, 0)],
-                Ok(Some(Value::Timestamp(Utc.timestamp(10, 0)))),
+                Ok(Value::Timestamp(Utc.timestamp(10, 0))),
                 ToTimestampFn::new(Box::new(Path::from("foo")), None),
             ),
         ];
 
-        let mut state = remap::State::default();
+        let mut state = state::Program::default();
 
         for (mut object, exp, func) in cases {
             let got = func

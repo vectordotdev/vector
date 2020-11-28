@@ -146,4 +146,8 @@ components: transforms: dedupe: {
 				"""
 		}
 	}
+
+	telemetry: metrics: {
+		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
+	}
 }

@@ -7,7 +7,7 @@ components: sinks: papertrail: {
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 		service_providers: ["Papertrail"]
 	}
@@ -34,10 +34,12 @@ components: sinks: papertrail: {
 				enabled_default:        true
 			}
 			to: {
-				name:     "Papertrail"
-				thing:    "an \(name) account"
-				url:      urls.papertrail
-				versions: null
+				service: {
+					name:     "Papertrail"
+					thing:    "an \(name) account"
+					url:      urls.papertrail
+					versions: null
+				}
 
 				interface: {
 					socket: {

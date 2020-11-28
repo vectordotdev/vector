@@ -2,6 +2,7 @@ use crate::{
     buffers::Acker,
     config::{DataType, GenerateConfig, Resource, SinkConfig, SinkContext, SinkDescription},
     event::metric::MetricKind,
+    internal_events::PrometheusServerRequestComplete,
     sinks::{
         util::{statistic::validate_quantiles, MetricEntry, StreamSink},
         Healthcheck, VectorSink,
@@ -114,7 +115,7 @@ impl SinkConfig for PrometheusExporterConfig {
     }
 
     fn resources(&self) -> Vec<Resource> {
-        vec![Resource::Port(self.address.port())]
+        vec![self.address.into()]
     }
 }
 
@@ -193,11 +194,6 @@ fn handle(
         }
     }
 
-    info!(
-        message = "Request complete.",
-        response_code = ?response.status()
-    );
-
     response
 }
 
@@ -253,6 +249,10 @@ impl PrometheusExporter {
                             expired,
                             &metrics,
                         )
+                    });
+
+                    emit!(PrometheusServerRequestComplete {
+                        status_code: response.status(),
                     });
 
                     future::ok::<_, Infallible>(response)
@@ -328,15 +328,17 @@ mod integration_tests {
     use crate::{
         config::SinkContext,
         event::{Metric, MetricValue},
+        http::HttpClient,
     };
     use futures::{stream, task::Poll};
-    use hyper::Client;
     use serde_json::Value;
     use std::{pin::Pin, task::Context};
     use tokio::time::Duration;
 
     #[tokio::test]
     async fn prometheus_scrapes_metrics() {
+        crate::test_util::trace_init();
+
         let start = Utc::now().timestamp();
         let address = "127.0.0.1:9101";
 
@@ -374,8 +376,9 @@ mod integration_tests {
         let request = Request::post(uri)
             .body(Body::empty())
             .expect("Error creating request.");
-        let result = Client::new()
-            .request(request)
+        let result = HttpClient::new(None)
+            .unwrap()
+            .send(request)
             .await
             .expect("Could not fetch query");
         let result = hyper::body::to_bytes(result.into_body())

@@ -1,5 +1,5 @@
 use crate::{
-    event::{Event, Value},
+    event::Event,
     internal_events::{HTTPBadRequest, HTTPEventsReceived},
     shutdown::ShutdownSignal,
     tls::{MaybeTlsSettings, TlsConfig},
@@ -20,7 +20,8 @@ use warp::{
     Filter,
 };
 
-pub fn add_query_parameters(
+#[cfg(any(feature = "sources-http", feature = "sources-logplex"))]
+pub(crate) fn add_query_parameters(
     mut events: Vec<Event>,
     query_parameters_config: &[String],
     query_parameters: HashMap<String, String>,
@@ -30,7 +31,7 @@ pub fn add_query_parameters(
         for event in events.iter_mut() {
             event.as_mut_log().insert(
                 query_parameter_name as &str,
-                Value::from(value.map(String::to_owned)),
+                crate::event::Value::from(value.map(String::to_owned)),
             );
         }
     }
@@ -144,7 +145,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let auth = HttpSourceAuth::try_from(auth.as_ref())?;
-        let fut = async move {
+        Ok(Box::pin(async move {
             let span = crate::trace::current_span();
 
             let mut filter: BoxedFilter<()> = warp::post().boxed();
@@ -233,8 +234,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
             // We need to drop the last copy of ShutdownSignalToken only after server has shut down.
             drop(shutdown);
             Ok(())
-        };
-
-        Ok(Box::new(fut.boxed().compat()))
+        }))
     }
 }

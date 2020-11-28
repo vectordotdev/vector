@@ -35,20 +35,22 @@ remap: functions: parse_timestamp: {
 		{
 			title: "Success"
 			input: {
-				timestamp_bad:  "I am not a timestamp"
-				timestamp_good: "10-Oct-2020 16:00"
+				".timestamp_bad":  "I am not a timestamp"
+				".timestamp_good": "10-Oct-2020 16:00"
 			}
 			source: #"""
 				.timestamp = parse_timestamp(.timestamp_bad, format="%v %R", default=.timestamp_bad)
 				"""#
 			output: {
-				".timestamp": "10-Oct-2020 16:00:00"
+				".timestamp":      "10-Oct-2020 16:00:00"
+				".timestamp_bad":  "I am not a timestamp"
+				".timestamp_good": "10-Oct-2020 16:00"
 			}
 		},
 		{
 			title: "Error"
 			input: {
-				timestamp_bad: "I am not a timestamp"
+				".timestamp_bad": "I am not a timestamp"
 			}
 			source: #"""
 				.timestamp = parse_timestamp(.timestamp_bad, format="%v %R", default=.timestamp_bad)

@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 use crate::{
-    config::{DataType, GenerateConfig, GlobalOptions, SourceConfig, SourceDescription},
+    config::{DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig, SourceDescription},
     event::proto,
     internal_events::{VectorEventReceived, VectorProtoDecodeError},
     shutdown::ShutdownSignal,
@@ -73,6 +73,10 @@ impl SourceConfig for VectorConfig {
     fn source_type(&self) -> &'static str {
         "vector"
     }
+
+    fn resources(&self) -> Vec<Resource> {
+        vec![self.address.into()]
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -117,7 +121,7 @@ mod test {
         tls::{TlsConfig, TlsOptions},
         Event, Pipeline,
     };
-    use futures::{compat::Future01CompatExt, stream};
+    use futures::stream;
     use std::net::SocketAddr;
     use tokio::time::{delay_for, Duration};
 
@@ -137,8 +141,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
         wait_for_tcp(addr).await;
 
@@ -191,17 +194,7 @@ mod test {
         let addr = next_addr();
         stream_test(
             addr,
-            VectorConfig::new(
-                addr.into(),
-                Some(TlsConfig {
-                    enabled: Some(true),
-                    options: TlsOptions {
-                        crt_file: Some("tests/data/localhost.crt".into()),
-                        key_file: Some("tests/data/localhost.key".into()),
-                        ..Default::default()
-                    },
-                }),
-            ),
+            VectorConfig::new(addr.into(), Some(TlsConfig::test_config())),
             VectorSinkConfig {
                 address: format!("localhost:{}", addr.port()),
                 tls: Some(TlsConfig {

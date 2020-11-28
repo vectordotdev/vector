@@ -35,7 +35,7 @@ components: sinks: clickhouse: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -50,10 +50,7 @@ components: sinks: clickhouse: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "Clickhouse"
-				thing:    "a \(name) database"
-				url:      urls.clickhouse
-				versions: null
+				service: services.clickhouse
 
 				interface: {
 					socket: {

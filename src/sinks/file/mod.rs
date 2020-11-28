@@ -3,6 +3,7 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
+    internal_events::FileOpen,
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         StreamSink,
@@ -220,6 +221,10 @@ impl FileSink {
                                 }
                             }
 
+                            emit!(FileOpen {
+                                count: 0
+                            });
+
                             break;
                         }
                     }
@@ -236,6 +241,9 @@ impl FileSink {
                                 error!(message = "Failed to close file.", path = ?path, %error);
                             }
                             drop(expired_file); // ignore close error
+                            emit!(FileOpen {
+                                count: self.files.len()
+                            });
                         }
                         Some(Err(error)) => error!(
                             message = "An error occurred while expiring a file.",
@@ -245,6 +253,7 @@ impl FileSink {
                 }
             }
         }
+
         Ok(())
     }
 
@@ -282,6 +291,9 @@ impl FileSink {
             let outfile = OutFile::new(file, self.compression);
 
             self.files.insert_at(path.clone(), outfile, next_deadline);
+            emit!(FileOpen {
+                count: self.files.len()
+            });
             self.files.get_mut(&path).unwrap()
         };
 

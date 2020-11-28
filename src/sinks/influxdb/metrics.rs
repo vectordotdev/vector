@@ -18,14 +18,14 @@ use crate::{
     tls::{TlsOptions, TlsSettings},
 };
 use bytes::Bytes;
-use futures::{
-    future::{self, BoxFuture},
-    SinkExt,
-};
+use futures::{future::BoxFuture, SinkExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, HashMap};
-use std::task::Poll;
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::ready,
+    task::Poll,
+};
 use tower::Service;
 
 #[derive(Clone)]
@@ -178,7 +178,7 @@ fn create_build_request(
 {
     let auth = format!("Token {}", token);
     move |body| {
-        Box::pin(future::ready(
+        Box::pin(ready(
             hyper::Request::post(uri.clone())
                 .header("Content-Type", "text/plain")
                 .header("Authorization", auth.clone())

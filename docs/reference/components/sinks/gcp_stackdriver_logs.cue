@@ -30,7 +30,7 @@ components: sinks: gcp_stackdriver_logs: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             1000
 				retry_initial_backoff_secs: 1
@@ -45,10 +45,12 @@ components: sinks: gcp_stackdriver_logs: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "GCP Operations (formerly Stackdriver) logs"
-				thing:    "a \(name) account"
-				url:      urls.gcp_stackdriver_logging
-				versions: null
+				service: {
+					name:     "GCP Operations (formerly Stackdriver) logs"
+					thing:    "a \(name) account"
+					url:      urls.gcp_stackdriver_logging
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -143,7 +145,14 @@ components: sinks: gcp_stackdriver_logs: {
 			required:    false
 			warnings: []
 			type: object: {
-				examples: []
+				examples: [
+					{
+						type:       "global"
+						projectId:  "vector-123456"
+						instanceId: "Twilight"
+						zone:       "us-central1-a"
+					},
+				]
 				options: {
 					type: {
 						description: "The monitored resource type. For example, the type of a Compute Engine VM instance is gce_instance.\n\nSee the [Google Cloud Platform monitored resource documentation][urls.gcp_resources] for more details."
