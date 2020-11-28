@@ -56,18 +56,4 @@ pub trait Object: std::fmt::Debug {
     /// If `compact` is true, after deletion, if an empty object or array is
     /// left behind, it should be removed as well.
     fn remove(&mut self, path: &Path, compact: bool) -> Result<(), String>;
-
-    /// Return the type schema belonging to the object.
-    ///
-    /// This schema informs Remap on which paths are expected to exist in the
-    /// object, and what value type(s) each path contains.
-    ///
-    /// FIXME: this can't live here, because we have to fetch this information
-    /// at compile-time, not runtime...
-    fn schema(&self) -> Option<Schema> {
-        None
-    }
 }
-
-// TODO
-pub struct Schema;
