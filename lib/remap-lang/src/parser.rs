@@ -76,6 +76,15 @@ impl Parser<'_> {
         }
     }
 
+    /// Parse a string into a [`path::Field`] wrapper.
+    ///
+    /// Depending on the provided string, this can result in three outcomes:
+    ///
+    /// - A `Field::Regular` if the string is a valid "identifier".
+    /// - A `Field::Quoted` if the string is a valid "quoted string".
+    /// - An error if neither is true.
+    ///
+    /// These rules are defined by the Remap parser.
     pub(crate) fn path_field_from_str(&mut self, field: &str) -> Result<path::Field> {
         use pest::Parser;
 
@@ -141,7 +150,19 @@ impl Parser<'_> {
     /// on the parser rule being processed.
     fn target_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
         match pair.as_rule() {
-            R::variable => self.variable_from_pair(pair).map(Target::Variable),
+            R::variable => self.variable_from_pair(pair).and_then(|variable| {
+                if let Some(path) = variable.path() {
+                    let err = format!(
+                        r#"paths in variable assignment not supported. Use "${}" without "{}""#,
+                        variable.ident(),
+                        path
+                    );
+
+                    return Err(Error::Parser(err));
+                }
+
+                Ok(Target::Variable(variable))
+            }),
             R::path => Ok(Target::Path(Path::new(self.path_from_pair(pair)?))),
             _ => Err(e(R::target)),
         }

@@ -30,6 +30,10 @@ impl Variable {
     pub fn ident(&self) -> &str {
         &self.ident
     }
+
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_ref()
+    }
 }
 
 impl Expression for Variable {

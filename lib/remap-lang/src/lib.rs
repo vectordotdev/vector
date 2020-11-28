@@ -175,10 +175,11 @@ mod tests {
             ("$foo = .foo\n$foo.bar", Ok(()), Ok("baz".into())),
             ("$foo = .foo.qux\n$foo[1]", Ok(()), Ok(2.into())),
             ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
-
-            // FIXME: make variable assignment behave like paths by implementing
-            // `remap::Object` for `store::Variable`.
-            ("$foo[0] = true\n$foo", Ok(()), Ok(true.into())),
+            (
+                "$foo[0] = true",
+                Err(r#"remap error: parser error: paths in variable assignment not supported. Use "$foo" without ".[0]""#),
+                Ok(().into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
