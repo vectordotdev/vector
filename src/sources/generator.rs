@@ -271,8 +271,12 @@ mod tests {
         rx
     }
 
+    async fn done_generating(mut rx: mpsc::Receiver<Event>) {
+        assert_eq!(rx.poll().unwrap(), Ready(None));
+    }
+
     #[tokio::test]
-    async fn copies_lines() {
+    async fn round_robin_copies_lines() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"format = "round_robin"
@@ -294,11 +298,11 @@ mod tests {
             }
         }
 
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        done_generating(rx).await;
     }
 
     #[tokio::test]
-    async fn limits_count() {
+    async fn round_robin_limits_count() {
         let mut rx = runit(
             r#"format = "round_robin"
                items = ["one", "two"]
@@ -309,11 +313,11 @@ mod tests {
         for _ in 0..10 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        done_generating(rx).await;
     }
 
     #[tokio::test]
-    async fn adds_sequence() {
+    async fn round_robin_adds_sequence() {
         let message_key = log_schema().message_key();
         let mut rx = runit(
             r#"format = "round_robin"
@@ -335,12 +339,11 @@ mod tests {
                 NotReady => panic!("Generator was not ready"),
             }
         }
-
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        done_generating(rx).await;
     }
 
     #[tokio::test]
-    async fn obeys_batch_interval() {
+    async fn round_robin_obeys_batch_interval() {
         let start = Instant::now();
         let mut rx = runit(
             r#"format = "round_robin"
@@ -353,7 +356,8 @@ mod tests {
         for _ in 0..6 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+        done_generating(rx).await;
+
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
     }
