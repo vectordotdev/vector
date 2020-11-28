@@ -385,7 +385,7 @@ components: sources: kubernetes_logs: {
 
 		testing_and_reliability: {
 			title: "Testing & reliability"
-			body:  """
+			body: """
 				Vector is tested extensively against Kubernetes. In addition to Kubernetes
 				being Vector's most popular installation method, Vector implements a
 				comprehensive end-to-end test suite for all minor Kubernetes versions starting
