@@ -8,7 +8,7 @@ components: sinks: kafka: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		development:   "stable"
-		egress_method: "stream"
+		egress_method: "dynamic"
 		service_providers: ["AWS", "Confluent"]
 	}
 

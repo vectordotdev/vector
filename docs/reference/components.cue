@@ -136,8 +136,10 @@ components: {
 	// `#EgressMethod` specified how a component outputs events.
 	//
 	// * `batch` - one or more events at a time
+	// * `dynamic` - can switch between batch and stream based on configuration.
+	// * `expose` - exposes data, ex: prometheus_exporter sink
 	// * `stream` - one event at a time
-	#EgressMethod: "batch" | "expose" | "stream"
+	#EgressMethod: "batch" | "dynamic" | "expose" | "stream"
 
 	#EnvVars: #Schema & {[Type=string]: {
 		common:   true
@@ -269,7 +271,7 @@ components: {
 		}
 		let Args = _args
 
-		if Args.egress_method == "batch" {
+		if Args.egress_method == "batch" || Args.egress_method == "dynamic" {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
 			batch: close({
@@ -277,7 +279,7 @@ components: {
 				common:       bool
 				max_bytes:    uint | null
 				max_events:   uint | null
-				timeout_secs: uint16
+				timeout_secs: uint16 | null
 			})
 		}
 
