@@ -131,7 +131,6 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Array,
-                ..Default::default()
             },
         }
 
@@ -156,7 +155,6 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Array,
-                ..Default::default()
             },
         }
 
@@ -181,7 +179,6 @@ mod test {
             def: TypeDef {
                 fallible: true,
                 kind: value::Kind::Array,
-                ..Default::default()
             },
         }
     ];

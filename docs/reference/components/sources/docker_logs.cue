@@ -4,6 +4,8 @@ components: sources: docker_logs: {
 	title:       "Docker"
 	description: installation.platforms.docker.description
 
+	alias: "docker"
+
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
@@ -250,9 +252,9 @@ components: sources: docker_logs: {
 			body: """
 				Docker, by default, will split log messages that exceed 16kb. This can be a
 				rather frustrating problem because it produces malformed log messages that are
-				difficult to work with. Vector's `docker_logs` source solves this by default,
-				automatically merging these messages into a single message. You can turn this
-				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
+				difficult to work with. Vector's solves this by default, automatically merging
+				these messages into a single message. You can turn this off via the
+				`auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the
 				`partial_event_marker_field` option.
 				"""
@@ -261,7 +263,7 @@ components: sources: docker_logs: {
 
 	telemetry: metrics: {
 		communication_errors_total:            components.sources.internal_metrics.output.metrics.communication_errors_total
-		container_events_processed_total:      components.sources.internal_metrics.output.metrics.container_events_processed_total
+		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total
 		container_metadata_fetch_errors_total: components.sources.internal_metrics.output.metrics.container_metadata_fetch_errors_total
 		containers_unwatched_total:            components.sources.internal_metrics.output.metrics.containers_unwatched_total
 		containers_watched_total:              components.sources.internal_metrics.output.metrics.containers_watched_total

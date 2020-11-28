@@ -106,7 +106,7 @@ mod tests {
                 value: Literal::from(1).boxed(),
                 variant: None,
             },
-            def: TypeDef { fallible: true, kind: Kind::Bytes, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Bytes },
         }
 
         value_optional {
@@ -114,7 +114,7 @@ mod tests {
                 value: Box::new(Noop),
                 variant: None,
             },
-            def: TypeDef { fallible: true, optional: true, kind: Kind::Bytes },
+            def: TypeDef { fallible: true, kind: Kind::Bytes },
         }
     ];
 

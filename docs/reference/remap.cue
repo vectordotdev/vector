@@ -1,7 +1,7 @@
 package metadata
 
 remap: {
-	#RemapParameterTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
+	#RemapParameterTypes: "path" | "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
 
 	#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 
@@ -17,7 +17,7 @@ remap: {
 				description: string
 				required:    bool
 				multiple:    bool | *false
-				default?:    bool | string
+				default?:    bool | string | int
 				type: [#RemapParameterTypes, ...#RemapParameterTypes]
 			}
 			#RemapExample: {
@@ -30,7 +30,7 @@ remap: {
 
 			arguments: [...#Argument] // Allow for empty list
 			return: [#RemapReturnTypes, ...#RemapReturnTypes]
-			category:    "coerce" | "parse" | "text" | "hash" | "event"
+			category:    "coerce" | "object" | "parse" | "text" | "hash" | "event" | "networking"
 			description: string
 			examples: [#RemapExample, ...#RemapExample]
 			name: Name

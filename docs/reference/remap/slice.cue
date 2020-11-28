@@ -28,8 +28,8 @@ remap: functions: slice: {
 		Returns a slice of the provided string or array between the `start` and `end` positions specified.
 
 		If the `start` and `end` parameters are negative, they refer to positions counting from the right of the
-		string or array. Both `start` and `end` must refer to positions that are not greater than the length of
-		the string or array.
+		string or array. If `end` refers to a position that is greater than the length of the string or array
+		a slice up to the end of the string or array is returned.
 		"""#
 	examples: [
 		{
@@ -41,6 +41,7 @@ remap: functions: slice: {
 				.slice = slice(.text, start=5, end=13)
 				"""#
 			output: {
+				text:  #"Supercalifragilisticexpialidocious"#
 				slice: "califrag"
 			}
 		},
@@ -53,6 +54,7 @@ remap: functions: slice: {
 				.slice = slice(.text, start=5, end=-14)
 				"""#
 			output: {
+				text:  #"Supercalifragilisticexpialidocious"#
 				slice: "califragilistic"
 			}
 		},
@@ -62,7 +64,7 @@ remap: functions: slice: {
 				text: #"Super"#
 			}
 			source: #"""
-					.slice = slice(.text, start=10)
+				.slice = slice(.text, start=10)
 				"""#
 			output: {
 				error: remap.errors.ArgumentError

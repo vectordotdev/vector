@@ -1256,22 +1256,6 @@ dependencies = [
 
 [[package]]
 name = "crossterm"
-version = "0.17.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f4919d60f26ae233e14233cc39746c8c8bb8cd7b05840ace83604917b51b6c7"
-dependencies = [
- "bitflags",
- "crossterm_winapi",
- "lazy_static",
- "libc",
- "mio 0.7.4",
- "parking_lot 0.10.2",
- "signal-hook",
- "winapi 0.3.9",
-]
-
-[[package]]
-name = "crossterm"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2fcdc3c9cf8ee446222e8ee8691a6d21b563b8fe1a64b1873080db7b5b23cf0"
@@ -2766,6 +2750,15 @@ dependencies = [
  "autocfg 1.0.1",
  "hashbrown 0.9.1",
  "serde",
+]
+
+[[package]]
+name = "indoc"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5a75aeaaef0ce18b58056d306c27b07436fbb34b8816c53094b76dd81803136"
+dependencies = [
+ "unindent",
 ]
 
 [[package]]
@@ -4967,6 +4960,7 @@ dependencies = [
  "bitflags",
  "bytes 0.5.6",
  "chrono",
+ "criterion",
  "dyn-clone",
  "paste",
  "pest",
@@ -5837,9 +5831,9 @@ dependencies = [
 
 [[package]]
 name = "snap"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da73c8f77aebc0e40c300b93f0a5f1bece7a248a36eee287d4e095f35c7b7d6e"
+checksum = "ecc7f2a13a88dc4f2afcce1887672ac733708040defb131c54cfd1839a3dbb88"
 
 [[package]]
 name = "socket2"
@@ -6672,13 +6666,13 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tui"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2eaeee894a1e9b90f80aa466fe59154fdb471980b5e104d8836fcea309ae17e"
+checksum = "5d4e6c82bb967df89f20b875fa8835fab5d5622c6a5efa574a1f0b6d0aa6e8f6"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm 0.17.7",
+ "crossterm",
  "unicode-segmentation",
  "unicode-width",
 ]
@@ -6821,6 +6815,12 @@ name = "unicode-xid"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
+
+[[package]]
+name = "unindent"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f14ee04d9415b52b3aeab06258a3f07093182b88ba0f9b8d203f211a7a7d41c7"
 
 [[package]]
 name = "unreachable"
@@ -6974,7 +6974,7 @@ dependencies = [
  "codec",
  "colored",
  "criterion",
- "crossterm 0.18.0",
+ "crossterm",
  "db-key",
  "derivative 2.1.1",
  "derive_is_enum_variant",
@@ -6997,6 +6997,7 @@ dependencies = [
  "hyper",
  "hyper-openssl",
  "indexmap",
+ "indoc",
  "inventory",
  "itertools 0.9.0",
  "jemallocator",

@@ -23,7 +23,7 @@ impl Server {
 
         let (_shutdown, rx) = oneshot::channel();
         let (addr, server) = warp::serve(routes).bind_with_graceful_shutdown(
-            config.api.bind.expect("Invalid socket address"),
+            config.api.address.expect("No socket address"),
             async {
                 rx.await.ok();
             },

@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_cloudwatch_logs: {
+components: sinks: aws_cloudwatch_logs: components._aws & {
 	title:       "AWS Cloudwatch Logs"
 	description: sinks._aws_cloudwatch.description
 
@@ -39,8 +39,8 @@ components: sinks: aws_cloudwatch_logs: {
 			}
 			request: {
 				enabled:                    true
-				auto_concurrency:           false
-				in_flight_limit:            5
+				adaptive_concurrency:       false
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1

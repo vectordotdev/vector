@@ -426,10 +426,6 @@ mod integration_test {
     };
     use std::{future::ready, thread, time::Duration};
 
-    const TEST_CA: &str = "tests/data/Vector_CA.crt";
-    const TEST_CRT: &str = "tests/data/localhost.crt";
-    const TEST_KEY: &str = "tests/data/localhost.key";
-
     #[tokio::test]
     async fn healthcheck() {
         let topic = format!("test-{}", random_string(10));
@@ -480,10 +476,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions {
-                    ca_file: Some(TEST_CA.into()),
-                    ..Default::default()
-                },
+                options: TlsOptions::test_options(),
             }),
             KafkaCompression::None,
         )
@@ -497,13 +490,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions {
-                    ca_file: Some(TEST_CA.into()),
-                    // Dummy key, not actually checked by server
-                    crt_file: Some(TEST_CRT.into()),
-                    key_file: Some(TEST_KEY.into()),
-                    ..Default::default()
-                },
+                options: TlsOptions::test_options(),
             }),
             KafkaCompression::None,
         )

@@ -20,6 +20,14 @@ remap: functions: replace: {
 			required:    true
 			type: ["string"]
 		},
+		{
+			name:        "count"
+			description: "The maximum number of replacements to perform. -1 means replace all matches."
+			required:    false
+			default:     -1
+			type: ["integer"]
+
+		},
 	]
 	return: ["string"]
 	category: "text"
@@ -29,8 +37,8 @@ remap: functions: replace: {
 			Regular expressions take the form `/<regex>/<flags> where flags are one of the following:
 
 			- *i* perform a case insensitive match.
-			- *g* global. If specified all occurrences of the pattern are replaced.
 			- *m* multiline. When enabled `^` and `$` match the beginning and end of multiline strings.
+			- *x* ignore whitespace and comments inside the regex.
 		"""#
 	examples: [
 		{
@@ -42,6 +50,7 @@ remap: functions: replace: {
 				.replaced = replace(.text, "and", "not")
 				"""#
 			output: {
+				text:     #"Apples and Bananas"#
 				replaced: "Apples not Bananas"
 			}
 		},
@@ -51,10 +60,24 @@ remap: functions: replace: {
 				text: #"Apples and Bananas"#
 			}
 			source: #"""
-				.replaced = replace(.text, /bananas/i, "Pineapples)
+				.replaced = replace(.text, /bananas/i, "Pineapples")
 				"""#
 			output: {
+				text:     #"Apples and Bananas"#
 				replaced: "apples and Pineapples"
+			}
+		},
+		{
+			title: "Replace first instance"
+			input: {
+				text: #"Bananas and Bananas"#
+			}
+			source: #"""
+				.replaced = replace(.text, "Bananas", "Pineapples", count = 1)
+				"""#
+			output: {
+				text:     #"Apples and Bananas"#
+				replaced: "Pineapples and Bananas"
 			}
 		},
 		{

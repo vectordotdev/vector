@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_cloudwatch_metrics: {
+components: sinks: aws_cloudwatch_metrics: components._aws & {
 	title:       "AWS Cloudwatch Metrics"
 	description: sinks._aws_cloudwatch.description
 

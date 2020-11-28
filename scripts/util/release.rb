@@ -5,7 +5,7 @@ module Vector
         release_meta_paths = Dir.glob("#{dir}/*.cue").to_a
 
         release_meta_paths.collect do |release_meta_path|
-          release_json = `cue export #{release_meta_path}`
+          release_json = `cue export #{release_meta_path}/../../urls.cue  #{release_meta_path}`
           release_hash = JSON.parse(release_json)
           name = release_hash.fetch("releases").keys.first
           hash = release_hash.fetch("releases").values.first
