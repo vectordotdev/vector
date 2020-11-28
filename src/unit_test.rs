@@ -24,12 +24,12 @@ pub struct Opts {
 }
 
 impl Opts {
-    fn paths_with_formats(&self) -> Vec<(PathBuf, config::Format)> {
+    fn paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
-            (&self.paths, config::Format::Unknown),
-            (&self.paths_toml, config::Format::TOML),
-            (&self.paths_json, config::Format::JSON),
-            (&self.paths_yaml, config::Format::YAML),
+            (&self.paths, None),
+            (&self.paths_toml, Some(config::Format::TOML)),
+            (&self.paths_json, Some(config::Format::JSON)),
+            (&self.paths_yaml, Some(config::Format::YAML)),
         ])
     }
 }

@@ -66,7 +66,10 @@ mod tests {
         config.build().unwrap()
     }
 
-    async fn from_str_config(conf: &str, format: Format) -> vector::topology::RunningTopology {
+    async fn from_str_config(
+        conf: &str,
+        format: config::FormatHint,
+    ) -> vector::topology::RunningTopology {
         let mut c = config::load_from_str(conf, format).unwrap();
         c.api.address = Some(next_addr());
 
@@ -431,7 +434,7 @@ mod tests {
               inputs = ["processed_events_total_batch_source"]
               print_amount = 100000
             "#,
-            Format::TOML,
+            Some(Format::TOML),
         )
         .await;
 
@@ -485,7 +488,7 @@ mod tests {
               inputs = ["processed_bytes_total_batch_source"]
               print_amount = 100000
             "#,
-            Format::TOML,
+            Some(Format::TOML),
         )
         .await;
 
@@ -534,7 +537,7 @@ mod tests {
               inputs = ["component_added_source_1"]
               print_amount = 100000
             "#,
-            Format::TOML,
+            Some(Format::TOML),
         )
         .await;
 
@@ -587,7 +590,7 @@ mod tests {
               inputs = ["component_added_source_1", "component_added_source_2"]
               print_amount = 100000
             "#,
-            Format::TOML,
+            Some(Format::TOML),
         )
         .unwrap();
 
@@ -626,7 +629,7 @@ mod tests {
               inputs = ["component_removed_source_1", "component_removed_source_2"]
               print_amount = 100000
             "#,
-            Format::TOML,
+            Some(Format::TOML),
         )
         .await;
 
@@ -674,7 +677,7 @@ mod tests {
               inputs = ["component_removed_source_1"]
               print_amount = 100000
             "#,
-            Format::TOML,
+            Some(Format::TOML),
         )
         .unwrap();
 

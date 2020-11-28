@@ -25,7 +25,7 @@ impl InternalEvent for VectorStarted {
 
 #[derive(Debug)]
 pub struct VectorReloaded<'a> {
-    pub config_paths: &'a [(PathBuf, config::Format)],
+    pub config_paths: &'a [(PathBuf, config::FormatHint)],
 }
 
 impl InternalEvent for VectorReloaded<'_> {

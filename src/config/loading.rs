@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, format, handle_warnings, vars, Config, Format};
+use super::{builder::ConfigBuilder, format, handle_warnings, vars, Config, Format, FormatHint};
 use glob::glob;
 use lazy_static::lazy_static;
 use std::{
@@ -9,20 +9,22 @@ use std::{
 };
 
 lazy_static! {
-    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<(PathBuf, Format)> =
-        vec![("/etc/vector/vector.toml".into(), Format::TOML)];
-    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<(PathBuf, Format)> = {
+    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> =
+        vec![("/etc/vector/vector.toml".into(), Some(Format::TOML))];
+    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> = {
         let program_files = std::env::var("ProgramFiles")
             .expect("%ProgramFiles% environment variable must be defined");
         let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-        vec![(PathBuf::from(config_path), Format::TOML)]
+        vec![(PathBuf::from(config_path), Some(Format::TOML))]
     };
-    pub static ref CONFIG_PATHS: Mutex<Vec<(PathBuf, Format)>> = Mutex::default();
+    pub static ref CONFIG_PATHS: Mutex<Vec<(PathBuf, FormatHint)>> = Mutex::default();
 }
 
 /// Merge the paths coming from different cli flags with different formats into
 /// a unified list of paths with formats.
-pub fn merge_path_lists<'a>(path_lists: Vec<(&'a [PathBuf], Format)>) -> Vec<(PathBuf, Format)> {
+pub fn merge_path_lists<'a>(
+    path_lists: Vec<(&'a [PathBuf], FormatHint)>,
+) -> Vec<(PathBuf, FormatHint)> {
     path_lists
         .into_iter()
         .flat_map(|(paths, format)| paths.iter().cloned().map(move |path| (path, format)))
@@ -31,7 +33,7 @@ pub fn merge_path_lists<'a>(path_lists: Vec<(&'a [PathBuf], Format)>) -> Vec<(Pa
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
-pub fn process_paths(config_paths: &[(PathBuf, Format)]) -> Option<Vec<(PathBuf, Format)>> {
+pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(PathBuf, FormatHint)>> {
     let default_paths = if cfg!(unix) {
         DEFAULT_UNIX_CONFIG_PATHS.clone()
     } else if cfg!(windows) {
@@ -77,14 +79,14 @@ pub fn process_paths(config_paths: &[(PathBuf, Format)]) -> Option<Vec<(PathBuf,
 }
 
 pub fn load_from_paths(
-    config_paths: &[(PathBuf, Format)],
+    config_paths: &[(PathBuf, FormatHint)],
     deny_warnings: bool,
 ) -> Result<Config, Vec<String>> {
     load_builder_from_paths(config_paths, deny_warnings)?.build_with(deny_warnings)
 }
 
 pub fn load_builder_from_paths(
-    config_paths: &[(PathBuf, Format)],
+    config_paths: &[(PathBuf, FormatHint)],
     deny_warnings: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     let mut inputs = Vec::new();
@@ -92,7 +94,7 @@ pub fn load_builder_from_paths(
 
     for (path, format) in config_paths {
         if let Some(file) = open_config(&path) {
-            inputs.push((file, format.known_or(move || Format::from(&path))));
+            inputs.push((file, format.or_else(move || Format::from_path(&path).ok())));
         } else {
             errors.push(format!("Config file not found in path: {:?}.", path));
         };
@@ -105,12 +107,12 @@ pub fn load_builder_from_paths(
     }
 }
 
-pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
+pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
     load_from_inputs(std::iter::once((input.as_bytes(), format)), false)?.build()
 }
 
 fn load_from_inputs(
-    inputs: impl IntoIterator<Item = (impl std::io::Read, Format)>,
+    inputs: impl IntoIterator<Item = (impl std::io::Read, FormatHint)>,
     deny_warnings: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     let mut config = Config::builder();
@@ -147,7 +149,7 @@ fn open_config(path: &Path) -> Option<File> {
 
 fn load(
     mut input: impl std::io::Read,
-    format: Format,
+    format: FormatHint,
     deny_warnings: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     let mut source_string = String::new();

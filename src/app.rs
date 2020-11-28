@@ -29,7 +29,7 @@ use tokio::runtime;
 use tokio::runtime::Runtime;
 
 pub struct ApplicationConfig {
-    pub config_paths: Vec<(PathBuf, config::Format)>,
+    pub config_paths: Vec<(PathBuf, config::FormatHint)>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]

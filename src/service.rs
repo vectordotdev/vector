@@ -63,12 +63,12 @@ impl InstallOpts {
         }
     }
 
-    fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::Format)> {
+    fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
-            (&self.config_paths, config::Format::Unknown),
-            (&self.config_paths_toml, config::Format::TOML),
-            (&self.config_paths_json, config::Format::JSON),
-            (&self.config_paths_yaml, config::Format::YAML),
+            (&self.config_paths, None),
+            (&self.config_paths_toml, Some(config::Format::TOML)),
+            (&self.config_paths_json, Some(config::Format::JSON)),
+            (&self.config_paths_yaml, Some(config::Format::YAML)),
         ])
     }
 }
@@ -211,7 +211,9 @@ fn control_service(_service: &ServiceInfo, _action: ControlAction) -> exitcode::
     exitcode::UNAVAILABLE
 }
 
-fn create_service_arguments(config_paths: &[(PathBuf, config::Format)]) -> Option<Vec<OsString>> {
+fn create_service_arguments(
+    config_paths: &[(PathBuf, config::FormatHint)],
+) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(&config_paths)?;
     match config::load_from_paths(&config_paths, false) {
         Ok(_) => Some(
@@ -219,10 +221,10 @@ fn create_service_arguments(config_paths: &[(PathBuf, config::Format)]) -> Optio
                 .iter()
                 .flat_map(|(path, format)| {
                     let key = match format {
-                        config::Format::Unknown => "--config",
-                        config::Format::TOML => "--config-toml",
-                        config::Format::JSON => "--config-json",
-                        config::Format::YAML => "--config-yaml",
+                        None => "--config",
+                        Some(config::Format::TOML) => "--config-toml",
+                        Some(config::Format::JSON) => "--config-json",
+                        Some(config::Format::YAML) => "--config-yaml",
                     };
                     vec![OsString::from(key), path.as_os_str().into()]
                 })

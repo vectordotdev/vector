@@ -10,7 +10,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 pub async fn build_unit_tests_main(
     path: PathBuf,
-    format: config::Format,
+    format: config::FormatHint,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
 

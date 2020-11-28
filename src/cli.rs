@@ -116,12 +116,12 @@ pub struct RootOpts {
 
 impl RootOpts {
     /// Return a list of config paths with the associated formats.
-    pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::Format)> {
+    pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
         config::merge_path_lists(vec![
-            (&self.config_paths, config::Format::Unknown),
-            (&self.config_paths_toml, config::Format::TOML),
-            (&self.config_paths_json, config::Format::JSON),
-            (&self.config_paths_yaml, config::Format::YAML),
+            (&self.config_paths, None),
+            (&self.config_paths_toml, Some(config::Format::TOML)),
+            (&self.config_paths_json, Some(config::Format::JSON)),
+            (&self.config_paths_yaml, Some(config::Format::YAML)),
         ])
     }
 }
