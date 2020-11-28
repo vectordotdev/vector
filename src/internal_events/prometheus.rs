@@ -98,6 +98,69 @@ impl InternalEvent for PrometheusHttpError {
 }
 
 #[derive(Debug)]
+pub struct PrometheusRemoteWriteParseError {
+    pub error: prost::DecodeError,
+}
+
+impl InternalEvent for PrometheusRemoteWriteParseError {
+    fn emit_logs(&self) {
+        error!(message = "Could not decode request body.", error = ?self.error);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("parse_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusRemoteWriteSnapError {
+    pub error: snap::Error,
+}
+
+impl InternalEvent for PrometheusRemoteWriteSnapError {
+    fn emit_logs(&self) {
+        error!(message = "Could not decompress request body.", error = ?self.error);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("parse_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusRemoteWriteReceived {
+    pub byte_size: usize,
+    pub count: usize,
+}
+
+impl InternalEvent for PrometheusRemoteWriteReceived {
+    fn emit_logs(&self) {
+        debug!(message = "Received remote_write events.", count = ?self.count);
+    }
+
+    fn emit_metrics(&self) {
+        counter!("events_processed_total", self.count as u64);
+        counter!("processed_bytes_total", self.byte_size as u64);
+    }
+}
+
+#[derive(Debug)]
+pub struct PrometheusNoNameError;
+
+impl InternalEvent for PrometheusNoNameError {
+    fn emit_logs(&self) {
+        error!(
+            message = "Decoded timeseries is missing the __name__ field.",
+            rate_limit_secs = 5
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("parse_errors_total", 1);
+    }
+}
+
+#[derive(Debug)]
 pub struct PrometheusServerRequestComplete {
     pub status_code: StatusCode,
 }

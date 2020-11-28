@@ -12,18 +12,23 @@ tags: ["type: breaking change"]
 
 0.11 includes some minor breaking changes:
 
-1. [The metrics emitted by the `internal_metrics` source have changed names.](#first)
-2. [The `statsd` sink now supports all socket types.](#second)
-3. [The `reduce` tranform `identifier_fields` was renamed to `group_by`.](#third)
-4. [The `source_type` field is now explicit in the `splunk_hec` sink.](#fourth)
-5. [Remove forwarding to syslog from distributed systemd unit.](#fifth)
-6. [The `http` source no longer dedots JSON fields.](#sixth)
+1. [Metrics sources and sinks include new namespace options](#first)
+1. [The metrics emitted by the `internal_metrics` source have changed names.](#second)
+1. [The `statsd` sink now supports all socket types.](#third)
+1. [The `reduce` tranform `identifier_fields` was renamed to `group_by`.](#fourth)
+1. [The `source_type` field is now explicit in the `splunk_hec` sink.](#fifth)
+1. [Remove forwarding to syslog from distributed systemd unit.](#sixth)
+1. [The `http` source no longer dedots JSON fields.](#seventh)
 
 We cover each below to help you upgrade quickly:
 
 ## Upgrade Guide
 
-### The metrics emitted by the `internal_metrics` source have changed names<a name="first"></a>
+### Metrics sources and sinks include new namespace options<a name="first"></a>
+
+
+
+### The metrics emitted by the `internal_metrics` source have changed names<a name="second"></a>
 
 We have not officially announced the `internal_metrics` source (coming in 0.12)
 due to the high probability of breaking changes. Specifically, the metric names
@@ -40,7 +45,7 @@ You'll likely need to update any downstream consumers of this data. We plan to
 ship official Vector dashboards in 0.12 that will relieve this maintenance
 burden for you in the future.
 
-### The `statsd` sink now supports all socket types<a name="second"></a>
+### The `statsd` sink now supports all socket types<a name="third"></a>
 
 If you're using the [`statsd` sink][statsd_sink] you'll need to add the new
 `mode` option that specifies which protocol you'd like to use. Previously, the
@@ -52,7 +57,7 @@ only protocol available was UDP.
 +  mode = "udp"
 ```
 
-### The `reduce` tranform `identifier_fields` was renamed to `group_by`<a name="third"></a>
+### The `reduce` tranform `identifier_fields` was renamed to `group_by`<a name="fourth"></a>
 
 We renamed the `reduce` transform's `identifier_fields` option to `group_by`
 for clarity. We are repositioning this transform to handle broad reduce
@@ -65,7 +70,7 @@ operations, such as merging multi-line logs together:
 +  group_by = ["my_field"]
 ```
 
-### The `source_type` field is now explicit in the `splunk_hec` sink<a name="fourth"></a>
+### The `source_type` field is now explicit in the `splunk_hec` sink<a name="fifth"></a>
 
 Previously, the `splunk_hec` sink was using the event's `source_type` field
 and mapping that to Splunk's expected `sourcetype` field. Splunk uses this
@@ -82,7 +87,7 @@ option:
 Only set this field if you want to explicitly inform Splunk of your `message`
 field's format. Most users will not want to set this field.
 
-### Remove forwarding to syslog from distributed systemd unit<a name="fifth"></a>
+### Remove forwarding to syslog from distributed systemd unit<a name="sixth"></a>
 
 Vector's previous Systemd unit file included configuration that forwarded
 Vector's logs over Syslog. This was presumptuous and we've removed these
@@ -92,7 +97,7 @@ If you'd like Vector to continue logging to Syslog, you'll need to add back
 the [removed options][removed_systemd_syslog_options], but most users should
 not have to do anything.
 
-### The `http` source no longer dedots JSON fields<a name="sixth"></a>
+### The `http` source no longer dedots JSON fields<a name="seventh"></a>
 
 Previously, the `http` source would dedot JSON keys in incoming data. This means
 that a JSON payload like this:

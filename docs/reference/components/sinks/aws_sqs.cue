@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_sqs: {
+components: sinks: aws_sqs: components._aws & {
 	title:       "Amazon Simple Queue Service (SQS)"
 	description: "[Amazon Simple Queue Service (SQS)](\(urls.aws_sqs)) is a fully managed message queuing service that enables you to decouple and scale microservices, distributed systems, and serverless applications."
 

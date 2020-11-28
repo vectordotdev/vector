@@ -999,6 +999,38 @@
     [[tests.outputs.conditions]]
     "a.equals" = "192.168.10.2"
 
+[transforms.remap_function_exists]
+  inputs = []
+  type = "remap"
+  source = """
+    .data = parse_json(.data)
+    .a = exists(.foo)
+    .b = exists(.bar)
+    .c = exists(.data.child)
+    .d = exists(.data.nochild)
+    .e = exists(.data.arr[2])
+    .f = exists(.data.arr[3])
+  """
+[[tests]]
+  name = "remap_function_exists"
+  [tests.input]
+    insert_at = "remap_function_exists"
+    type = "log"
+    [tests.input.log_fields]
+      data = """
+        { "child": 42, "arr": [1,3,3] }
+      """
+      foo = 42
+  [[tests.outputs]]
+    extract_from = "remap_function_exists"
+    [[tests.outputs.conditions]]
+    "a.equals" = true
+    "b.equals" = false
+    "c.equals" = true
+    "d.equals" = false
+    "e.equals" = true
+    "f.equals" = false
+
 
 # [transforms.remap_function_log]
 #   inputs=[]

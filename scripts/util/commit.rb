@@ -4,6 +4,13 @@ require_relative "git_log_commit"
 module Vector
   class Commit
     class << self
+      def fetch_since(last_version)
+        git_log = GitLogCommit.fetch_since!(last_version)
+        git_log.collect do |git_log_commit|
+          from_git_log_commit(git_log_commit)
+        end
+      end
+
       def fetch_since!(last_version)
         git_log = GitLogCommit.fetch_since!(last_version)
         git_log.collect do |git_log_commit|
@@ -18,8 +25,14 @@ module Vector
       end
 
       private
-        def from_git_log_commit!(git_log_commit)
+        def from_git_log_commit(git_log_commit)
           convetional_commit = ConventionalCommit.parse(git_log_commit.message)
+          hash = git_log_commit.to_h.merge(convetional_commit.to_h)
+          new(hash)
+        end
+
+        def from_git_log_commit!(git_log_commit)
+          convetional_commit = ConventionalCommit.parse!(git_log_commit.message)
           hash = git_log_commit.to_h.merge(convetional_commit.to_h)
           new(hash)
         end
@@ -82,6 +95,38 @@ module Vector
         "deletions_count: #{deletions_count.to_json}}"
     end
 
+    def validate!
+      if !type.nil? && !TYPES.include?(type)
+        raise <<~EOF
+        The following commit has an invalid type!
+
+          #{to_s}
+
+        The type must be one of #{TYPES.inspect}.
+
+          #{type.inspect}
+
+        Please correct in the release /.meta file and retry.
+        EOF
+      end
+
+      if TYPES_THAT_REQUIRE_SCOPES.include?(type) && scopes.empty?
+        raise <<~EOF
+        The following commit does not have a scope
+
+          #{to_s}
+
+        A scope is required for commits of type #{TYPES_THAT_REQUIRE_SCOPES.inspect}.
+
+          #{description}
+
+        Please correct in the release /.meta file and retry.
+        EOF
+      end
+
+      true
+    end
+
     def to_git_log_commit
       message = ""
 
@@ -112,6 +157,10 @@ module Vector
         "message" => message,
         "sha" => sha
       })
+    end
+
+    def to_s
+      "#{sha} #{type}(#{scopes.join(", ")})#{breaking_change? ? "!" : ""}: #{description} (##{pr_number})"
     end
   end
 end
