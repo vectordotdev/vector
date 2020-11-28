@@ -1,7 +1,7 @@
 package metadata
 
 remap: {
-	#RemapParameterTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
+	#RemapParameterTypes: "path" | "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "regex" | "any"
 
 	#RemapReturnTypes: "float" | "integer" | "string" | "timestamp" | "boolean" | "array" | "map" | "null"
 

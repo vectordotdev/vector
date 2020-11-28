@@ -45,6 +45,7 @@ lazy_static! {
         Box::new(Ipv6ToIpV4),
         Box::new(IpCidrContains),
         Box::new(IpSubnet),
+        Box::new(Exists),
     ];
 
     // List of both mutable, and immutable functions that can be loaded into a
