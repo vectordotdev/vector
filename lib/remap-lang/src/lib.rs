@@ -261,6 +261,8 @@ mod tests {
                 Ok(()),
                 Ok(4.into())
             )
+            (r#"{ "foo" }"#, Ok(()), Ok("foo".into())),
+            (r#"{ "foo": "bar" }"#, Ok(()), Ok(map!["foo": "bar"].into())),
             (r#"{ "foo": true, "bar": true, "baz": false }"#, Ok(()), Ok(map!["foo": true, "bar": true, "baz": false].into())),
             (
                 r#"
