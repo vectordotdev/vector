@@ -2384,7 +2384,7 @@ dependencies = [
  "mach",
  "nix",
  "pin-utils",
- "uom 0.28.0",
+ "uom",
  "winapi 0.3.9",
 ]
 
@@ -6849,16 +6849,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "uom"
-version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e76503e636584f1e10b9b3b9498538279561adcef5412927ba00c2b32c4ce5ed"
-dependencies = [
- "num-traits",
- "typenum",
-]
-
-[[package]]
 name = "url"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7093,7 +7083,6 @@ dependencies = [
  "tracing-tower",
  "tui",
  "typetag",
- "uom 0.30.0",
  "url",
  "uuid 0.8.1",
  "vector-api-client",
