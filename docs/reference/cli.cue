@@ -136,7 +136,7 @@ cli: {
 				Read configuration from one or more files. Wildcard paths are
 				supported. TOML file format is assumed.
 				"""
-			type: "string"
+			type:    "string"
 			env_var: "VECTOR_CONFIG_TOML"
 		}
 		"config-json": {
@@ -144,7 +144,7 @@ cli: {
 				Read configuration from one or more files. Wildcard paths are
 				supported. JSON file format is assumed.
 				"""
-			type: "string"
+			type:    "string"
 			env_var: "VECTOR_CONFIG_JSON"
 		}
 		"config-yaml": {
@@ -152,7 +152,7 @@ cli: {
 				Read configuration from one or more files. Wildcard paths are
 				supported. YAML file format is assumed.
 				"""
-			type: "string"
+			type:    "string"
 			env_var: "VECTOR_CONFIG_YAML"
 		}
 		"threads": {
