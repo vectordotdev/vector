@@ -35,6 +35,7 @@ expanding into more specifics.
       1. [Directory Structure](#directory-structure)
       1. [Makefile](#makefile)
       1. [Code Style](#code-style)
+         1. [Logging style](#logging-style)
       1. [Feature flags](#feature-flags)
       1. [Dependencies](#dependencies)
    1. [Guidelines](#guidelines)
