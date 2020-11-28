@@ -45,6 +45,8 @@ impl Path {
         Self { segments }
     }
 
+    /// Create a "root" path, containing no segments, which when written as a
+    /// string is represented as `"."`.
     pub fn root() -> Self {
         Self { segments: vec![] }
     }

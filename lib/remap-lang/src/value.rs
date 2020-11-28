@@ -593,11 +593,11 @@ impl Value {
     /// let mut value = Value::Map(map);
     /// let path = Path::from_str(".foo").unwrap();
     ///
-    /// value.insert_by_path(&path, Value::Null);
+    /// value.insert_by_path(&path, true.into());
     ///
     /// assert_eq!(
     ///     value.get_by_path(&path),
-    ///     Some(&Value::Null),
+    ///     Some(&true.into()),
     /// )
     /// ```
     ///
@@ -612,7 +612,7 @@ impl Value {
     /// let mut value = Value::Array(vec![false.into(), true.into()]);
     /// let path = Path::from_str(".[1].foo").unwrap();
     ///
-    /// value.insert_by_path(&path, Value::from("bar"));
+    /// value.insert_by_path(&path, "bar".into());
     ///
     /// assert_eq!(
     ///     value.get_by_path(&Path::from_str(".").unwrap()),
