@@ -64,7 +64,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "checksum_errors", 1,
+                "checksum_errors_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
@@ -87,7 +87,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "fingerprint_read_errors", 1,
+                "fingerprint_read_errors_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
@@ -111,7 +111,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "file_delete_errors", 1,
+                "file_delete_errors_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
@@ -132,7 +132,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "files_deleted", 1,
+                "files_deleted_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
@@ -153,7 +153,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "files_unwatched", 1,
+                "files_unwatched_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
@@ -176,7 +176,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "file_watch_errors", 1,
+                "file_watch_errors_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
@@ -199,7 +199,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "files_resumed", 1,
+                "files_resumed_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
@@ -220,7 +220,7 @@ mod source {
 
         fn emit_metrics(&self) {
             counter!(
-                "files_added", 1,
+                "files_added_total", 1,
                 "file" => self.path.to_string_lossy().into_owned(),
             );
         }
