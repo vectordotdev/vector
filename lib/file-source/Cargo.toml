@@ -6,7 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
-bytes = "0.5"
+bytes = "0.6"
 crc = "1.8.1"
 futures = { version = "0.3", default-features = false, features = ["executor"] }
 glob = "0.3.0"
