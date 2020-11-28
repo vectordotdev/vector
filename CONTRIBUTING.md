@@ -35,6 +35,7 @@ expanding into more specifics.
       1. [Directory Structure](#directory-structure)
       1. [Makefile](#makefile)
       1. [Code Style](#code-style)
+         1. [Logging style](#logging-style)
       1. [Feature flags](#feature-flags)
       1. [Dependencies](#dependencies)
    1. [Guidelines](#guidelines)
@@ -960,8 +961,7 @@ If you have additional questions, please [contact us](#contact).
 Vector requires all contributors to agree to the DCO. DCO stands for Developer
 Certificate of Origin and is maintained by the
 [Linux Foundation](https://www.linuxfoundation.org). It is an attestation
-attached to every commit made by every developer. All contributions are covered
-by, and fall under, the DCO.
+attached to every commit made by every developer.
 
 #### Trivial changes
 
