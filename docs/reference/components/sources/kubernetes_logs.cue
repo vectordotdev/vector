@@ -35,7 +35,7 @@ components: sources: kubernetes_logs: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -47,6 +47,10 @@ components: sources: kubernetes_logs: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: "kubernetes"
 	}
 
 	configuration: {
@@ -382,11 +386,11 @@ components: sources: kubernetes_logs: {
 		testing_and_reliability: {
 			title: "Testing & reliability"
 			body:  """
-					Vector is tested extensively against Kubernetes. In addition to Kubernetes
-					being Vector's most popular installation method, Vector implements a
-					comprehensive end-to-end test suite for all minor Kubernetes versions starting
-					with `\(installation.platforms.kubernetes.minimum_supported_version)`.
-					"""
+				Vector is tested extensively against Kubernetes. In addition to Kubernetes
+				being Vector's most popular installation method, Vector implements a
+				comprehensive end-to-end test suite for all minor Kubernetes versions starting
+				with `1.14.
+				"""
 		}
 
 		kubernetes_api_access_control: {

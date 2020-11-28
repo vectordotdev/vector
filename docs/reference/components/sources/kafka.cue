@@ -31,6 +31,10 @@ components: sources: kafka: {
 
 	support: components._kafka.support
 
+	installation: {
+		platform_name: null
+	}
+
 	configuration: {
 		auto_offset_reset: {
 			common:      false

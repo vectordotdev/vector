@@ -41,6 +41,10 @@ components: {
 		kind: #ComponentKind
 		let Kind = kind
 
+		installation?: {
+			platform_name: string | null
+		}
+
 		configuration: #Schema
 
 		// `description` describes the components with a single paragraph.
@@ -394,18 +398,15 @@ components: {
 	#Support: {
 		_args: kind: string
 
-		// `platforms` describes which platforms this component is available on.
-		//
-		// For example, the `journald` source is only available on Linux
-		// environments.
-		platforms: #TargetTriples
-
 		// `requirements` describes any external requirements that the component
 		// needs to function properly.
 		//
 		// For example, the `journald` source requires the presence of the
 		// `journalctl` binary.
 		requirements: [...string] | null // Allow for empty list
+
+		// `targets` describes which targets this component is available on.
+		targets: #TargetTriples
 
 		// `warnings` describes any warnings the user should know about the
 		// component.

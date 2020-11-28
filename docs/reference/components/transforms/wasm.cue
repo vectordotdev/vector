@@ -20,7 +20,7 @@ components: transforms: wasm: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  false
 			"aarch64-unknown-linux-musl": false
 			"x86_64-apple-darwin":        false

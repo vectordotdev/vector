@@ -14,7 +14,7 @@ installation: _interfaces: kubectl: {
 		bin_in_path: null
 		config:      "vector.toml"
 	}
-	platform_name: installation.platforms.kubernetes.name
+	platform_name: "kubernetes"
 
 	roles: [Name=string]: {
 		commands: {

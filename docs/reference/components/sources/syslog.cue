@@ -7,6 +7,7 @@ components: sources: syslog: {
 	description: "[Syslog](\(urls.syslog)) stands for System Logging Protocol and is a standard protocol used to send system log or event messages to a specific server, called a syslog server. It is used to collect various device logs from different machines and send them to a central location for monitoring and review."
 
 	classes: sources.socket.classes
+
 	features: {
 		multiline: sources.socket.features.multiline
 
@@ -36,11 +37,15 @@ components: sources: syslog: {
 	}
 
 	support: {
-		platforms: sources.socket.support.platforms
+		targets: sources.socket.support.targets
 
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: sources.socket.configuration
@@ -133,7 +138,7 @@ components: sources: syslog: {
 			_msgid:        "ID931"
 			_procid:       "2426"
 			_timestamp:    "2020-03-13T20:45:38.119Z"
-			title:         "Syslog Event"
+			title:         "Syslog Eve"
 			configuration: {}
 			input: """
 				```text

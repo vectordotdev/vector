@@ -17,7 +17,7 @@ installation: _interfaces: "helm3": {
 	}
 
 	package_manager_name: installation.package_managers.helm.name
-	platform_name:        installation.platforms.kubernetes.name
+	platform_name:        "kubernetes"
 
 	roles: [Name=string]: {
 		commands: {
