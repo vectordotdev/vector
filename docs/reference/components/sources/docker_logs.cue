@@ -10,7 +10,7 @@ components: sources: docker_logs: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
