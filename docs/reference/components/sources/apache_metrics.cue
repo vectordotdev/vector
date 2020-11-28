@@ -71,7 +71,7 @@ components: sources: apache_metrics: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -85,6 +85,10 @@ components: sources: apache_metrics: {
 		notices: []
 	}
 
+	installation: {
+		platform_name: null
+	}
+
 	configuration: {
 		endpoints: {
 			description: "mod_status endpoints to scrape metrics from."
@@ -93,7 +97,7 @@ components: sources: apache_metrics: {
 				items: type: string: examples: ["http://localhost:8080/server-status/?auto"]
 			}
 		}
-		interval_secs: {
+		scrape_interval_secs: {
 			description: "The interval between scrapes."
 			common:      true
 			required:    false

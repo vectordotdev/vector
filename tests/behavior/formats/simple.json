@@ -1,0 +1,37 @@
+{
+  "transforms": {
+    "add_fields_nested": {
+      "inputs": [],
+      "type": "add_fields",
+      "fields": {
+        "a.b": 123,
+        "x": {
+          "y": 456
+        },
+        "x.z": 789
+      }
+    }
+  },
+  "tests": [
+    {
+      "name": "add_fields_nested",
+      "input": {
+        "insert_at": "add_fields_nested",
+        "type": "raw",
+        "value": ""
+      },
+      "outputs": [
+        {
+          "extract_from": "add_fields_nested",
+          "conditions": [
+            {
+              "a.b.equals": 123,
+              "x.y.equals": 456,
+              "x.z.equals": 789
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

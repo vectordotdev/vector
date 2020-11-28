@@ -4,7 +4,7 @@ remap: functions: strip_ansi_escape_codes: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text to strip."
+			description: "The string to strip."
 			required:    true
 			type: ["string"]
 		},

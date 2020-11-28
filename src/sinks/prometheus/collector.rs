@@ -1,12 +1,10 @@
-use super::proto;
 use crate::{
     event::metric::{Metric, MetricValue, StatisticKind},
+    prometheus::{proto, METRIC_NAME_LABEL},
     sinks::util::{encode_namespace, statistic::DistributionStatistic},
 };
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;
-
-const METRIC_NAME_LABEL: &str = "__name__";
 
 pub(super) trait MetricCollector {
     fn new() -> Self;

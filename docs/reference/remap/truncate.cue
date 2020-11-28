@@ -38,9 +38,10 @@ remap: functions: truncate: {
 				text: #"A rather long sentence."#
 			}
 			source: #"""
-				.truncated = truncate(.text, limit=11, ellipsis=true)
+				.truncated = truncate(.text, limit = 11, ellipsis = true)
 				"""#
 			output: {
+				text:      #"A rather long sentence."#
 				truncated: "A rather lo..."
 			}
 		},
@@ -50,7 +51,7 @@ remap: functions: truncate: {
 				text: 42
 			}
 			source: #"""
-				.truncated = truncate(.text, limit =11, ellipsis = true)
+				.truncated = truncate(.text, limit = 11, ellipsis = true)
 				"""#
 			output: {
 				error: remap.errors.ArgumentError

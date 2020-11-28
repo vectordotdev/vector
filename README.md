@@ -45,7 +45,7 @@ or [**install Vector**][docs.installation].
   **Comcast**, **Zendesk**, **Discord**, **Fastly**, **CVS**, **Trivago**,
   **Tuple**, **Douban**, and many more.
 * Vector is **downloaded over 100,000 times per day**.
-* Vector's largest user **processes over 20TB daily**.
+* Vector's largest user **processes over 30TB daily**.
 * Vector has **over 100 contributors** and growing.
 
 ## [Documentation](https://vector.dev/docs/)

@@ -1,5 +1,7 @@
 use super::{
-    auto_concurrency::{AutoConcurrencyLimit, AutoConcurrencyLimitLayer, AutoConcurrencySettings},
+    adaptive_concurrency::{
+        AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
+    },
     retries::{FixedRetryPolicy, RetryLogic},
     sink::Response,
     Batch, BatchSink, Partition, PartitionBatchSink,
@@ -19,7 +21,7 @@ use tower::{
     Service, ServiceBuilder,
 };
 
-pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AutoConcurrencyLimit<Timeout<S>, L>>>;
+pub type Svc<S, L> = RateLimit<Retry<FixedRetryPolicy<L>, AdaptiveConcurrencyLimit<Timeout<S>, L>>>;
 pub type TowerBatchedSink<S, B, L, Request> = BatchSink<Svc<S, L>, B, Request>;
 pub type TowerPartitionSink<S, B, L, K, Request> = PartitionBatchSink<Svc<S, L>, B, K, Request>;
 
@@ -58,14 +60,14 @@ impl<L> ServiceBuilderExt<L> for ServiceBuilder<L> {
 
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Serialize)]
 #[derivative(Default)]
-pub enum InFlightLimit {
+pub enum Concurrency {
     #[derivative(Default)]
     None,
-    Auto,
+    Adaptive,
     Fixed(usize),
 }
 
-impl InFlightLimit {
+impl Concurrency {
     pub fn if_none(self, other: Self) -> Self {
         match self {
             Self::None => other,
@@ -74,32 +76,32 @@ impl InFlightLimit {
     }
 }
 
-impl<'de> Deserialize<'de> for InFlightLimit {
-    // Deserialize either a positive integer or the string "auto"
+impl<'de> Deserialize<'de> for Concurrency {
+    // Deserialize either a positive integer or the string "adaptive"
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct UsizeOrAuto;
+        struct UsizeOrAdaptive;
 
-        impl<'de> Visitor<'de> for UsizeOrAuto {
-            type Value = InFlightLimit;
+        impl<'de> Visitor<'de> for UsizeOrAdaptive {
+            type Value = Concurrency;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str(r#"positive integer or "auto""#)
+                formatter.write_str(r#"positive integer or "adaptive""#)
             }
 
-            fn visit_str<E: de::Error>(self, value: &str) -> Result<InFlightLimit, E> {
-                if value == "auto" {
-                    Ok(InFlightLimit::Auto)
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<Concurrency, E> {
+                if value == "adaptive" {
+                    Ok(Concurrency::Adaptive)
                 } else {
-                    Err(de::Error::unknown_variant(value, &["auto"]))
+                    Err(de::Error::unknown_variant(value, &["adaptive"]))
                 }
             }
 
-            fn visit_i64<E: de::Error>(self, value: i64) -> Result<InFlightLimit, E> {
+            fn visit_i64<E: de::Error>(self, value: i64) -> Result<Concurrency, E> {
                 if value > 0 {
-                    Ok(InFlightLimit::Fixed(value as usize))
+                    Ok(Concurrency::Fixed(value as usize))
                 } else {
                     Err(de::Error::invalid_value(
                         Unexpected::Signed(value),
@@ -108,9 +110,9 @@ impl<'de> Deserialize<'de> for InFlightLimit {
                 }
             }
 
-            fn visit_u64<E: de::Error>(self, value: u64) -> Result<InFlightLimit, E> {
+            fn visit_u64<E: de::Error>(self, value: u64) -> Result<Concurrency, E> {
                 if value > 0 {
-                    Ok(InFlightLimit::Fixed(value as usize))
+                    Ok(Concurrency::Fixed(value as usize))
                 } else {
                     Err(de::Error::invalid_value(
                         Unexpected::Unsigned(value),
@@ -120,17 +122,17 @@ impl<'de> Deserialize<'de> for InFlightLimit {
             }
         }
 
-        deserializer.deserialize_any(UsizeOrAuto)
+        deserializer.deserialize_any(UsizeOrAdaptive)
     }
 }
 
-pub trait InFlightLimitOption {
-    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize>;
+pub trait ConcurrencyOption {
+    fn parse_concurrency(&self, default: &Self) -> Option<usize>;
     fn is_none(&self) -> bool;
 }
 
-impl InFlightLimitOption for Option<usize> {
-    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
+impl ConcurrencyOption for Option<usize> {
+    fn parse_concurrency(&self, default: &Self) -> Option<usize> {
         let limit = match self {
             None => *default,
             Some(x) => Some(*x),
@@ -143,26 +145,29 @@ impl InFlightLimitOption for Option<usize> {
     }
 }
 
-impl InFlightLimitOption for InFlightLimit {
-    fn parse_in_flight_limit(&self, default: &Self) -> Option<usize> {
+impl ConcurrencyOption for Concurrency {
+    fn parse_concurrency(&self, default: &Self) -> Option<usize> {
         match self.if_none(*default) {
-            InFlightLimit::None => Some(5),
-            InFlightLimit::Auto => None,
-            InFlightLimit::Fixed(limit) => Some(limit),
+            Concurrency::None => Some(5),
+            Concurrency::Adaptive => None,
+            Concurrency::Fixed(limit) => Some(limit),
         }
     }
 
     fn is_none(&self) -> bool {
-        matches!(self, InFlightLimit::None)
+        matches!(self, Concurrency::None)
     }
 }
 
 /// Tower Request based configuration
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize)]
-pub struct TowerRequestConfig<T: InFlightLimitOption = InFlightLimit> {
+pub struct TowerRequestConfig<T: ConcurrencyOption = Concurrency> {
     #[serde(default)]
-    #[serde(skip_serializing_if = "InFlightLimitOption::is_none")]
-    pub in_flight_limit: T, // 5
+    #[serde(
+        alias = "in_flight_limit",
+        skip_serializing_if = "ConcurrencyOption::is_none"
+    )]
+    pub concurrency: T, // 5
     pub timeout_secs: Option<u64>,             // 60
     pub rate_limit_duration_secs: Option<u64>, // 1
     pub rate_limit_num: Option<u64>,           // 5
@@ -170,15 +175,13 @@ pub struct TowerRequestConfig<T: InFlightLimitOption = InFlightLimit> {
     pub retry_max_duration_secs: Option<u64>,
     pub retry_initial_backoff_secs: Option<u64>, // 1
     #[serde(default)]
-    pub auto_concurrency: AutoConcurrencySettings,
+    pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
-impl<T: InFlightLimitOption> TowerRequestConfig<T> {
+impl<T: ConcurrencyOption> TowerRequestConfig<T> {
     pub fn unwrap_with(&self, defaults: &Self) -> TowerRequestSettings {
         TowerRequestSettings {
-            in_flight_limit: self
-                .in_flight_limit
-                .parse_in_flight_limit(&defaults.in_flight_limit),
+            concurrency: self.concurrency.parse_concurrency(&defaults.concurrency),
             timeout: Duration::from_secs(self.timeout_secs.or(defaults.timeout_secs).unwrap_or(60)),
             rate_limit_duration: Duration::from_secs(
                 self.rate_limit_duration_secs
@@ -200,21 +203,21 @@ impl<T: InFlightLimitOption> TowerRequestConfig<T> {
                     .or(defaults.retry_initial_backoff_secs)
                     .unwrap_or(1),
             ),
-            auto_concurrency: self.auto_concurrency,
+            adaptive_concurrency: self.adaptive_concurrency,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct TowerRequestSettings {
-    pub in_flight_limit: Option<usize>,
+    pub concurrency: Option<usize>,
     pub timeout: Duration,
     pub rate_limit_duration: Duration,
     pub rate_limit_num: u64,
     pub retry_attempts: usize,
     pub retry_max_duration_secs: Duration,
     pub retry_initial_backoff_secs: Duration,
-    pub auto_concurrency: AutoConcurrencySettings,
+    pub adaptive_concurrency: AdaptiveConcurrencySettings,
 }
 
 impl TowerRequestSettings {
@@ -292,9 +295,9 @@ impl TowerRequestSettings {
         ServiceBuilder::new()
             .rate_limit(self.rate_limit_num, self.rate_limit_duration)
             .retry(policy)
-            .layer(AutoConcurrencyLimitLayer::new(
-                self.in_flight_limit,
-                self.auto_concurrency,
+            .layer(AdaptiveConcurrencyLimitLayer::new(
+                self.concurrency,
+                self.adaptive_concurrency,
                 retry_logic,
             ))
             .timeout(self.timeout)
@@ -324,7 +327,7 @@ where
         let policy = self.settings.retry_policy(self.retry_logic.clone());
 
         let l = ServiceBuilder::new()
-            .concurrency_limit(self.settings.in_flight_limit.unwrap_or(5))
+            .concurrency_limit(self.settings.concurrency.unwrap_or(5))
             .rate_limit(
                 self.settings.rate_limit_num,
                 self.settings.rate_limit_duration,
@@ -406,31 +409,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn in_flight_limit_works() {
-        type TowerRequestConfigTest = TowerRequestConfig<InFlightLimit>;
+    fn concurrency_param_works() {
+        type TowerRequestConfigTest = TowerRequestConfig<Concurrency>;
 
         let cfg = TowerRequestConfigTest::default();
         let toml = toml::to_string(&cfg).unwrap();
         toml::from_str::<TowerRequestConfigTest>(&toml).expect("Default config failed");
 
         let cfg = toml::from_str::<TowerRequestConfigTest>("").expect("Empty config failed");
-        assert_eq!(cfg.in_flight_limit, InFlightLimit::None);
+        assert_eq!(cfg.concurrency, Concurrency::None);
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>("concurrency = 10")
+            .expect("Fixed concurrency failed");
+        assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
+
+        let cfg = toml::from_str::<TowerRequestConfigTest>(r#"concurrency = "adaptive""#)
+            .expect("Adaptive concurrency setting failed");
+        assert_eq!(cfg.concurrency, Concurrency::Adaptive);
+
+        toml::from_str::<TowerRequestConfigTest>(r#"concurrency = "broken""#)
+            .expect_err("Invalid concurrency setting didn't fail");
+
+        toml::from_str::<TowerRequestConfigTest>(r#"concurrency = 0"#)
+            .expect_err("Invalid concurrency setting didn't fail on zero");
+
+        toml::from_str::<TowerRequestConfigTest>(r#"concurrency = -9"#)
+            .expect_err("Invalid concurrency setting didn't fail on negative number");
+    }
+
+    #[test]
+    fn backward_compatibility_with_in_flight_limit_param_works() {
+        type TowerRequestConfigTest = TowerRequestConfig<Concurrency>;
 
         let cfg = toml::from_str::<TowerRequestConfigTest>("in_flight_limit = 10")
-            .expect("Fixed in_flight_limit failed");
-        assert_eq!(cfg.in_flight_limit, InFlightLimit::Fixed(10));
-
-        let cfg = toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = "auto""#)
-            .expect("Auto in_flight_limit failed");
-        assert_eq!(cfg.in_flight_limit, InFlightLimit::Auto);
-
-        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = "broken""#)
-            .expect_err("Invalid in_flight_limit didn't fail");
-
-        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = 0"#)
-            .expect_err("Invalid in_flight_limit didn't fail on zero");
-
-        toml::from_str::<TowerRequestConfigTest>(r#"in_flight_limit = -9"#)
-            .expect_err("Invalid in_flight_limit didn't fail on negative number");
+            .expect("Fixed concurrency failed for in_flight_limit param");
+        assert_eq!(cfg.concurrency, Concurrency::Fixed(10));
     }
 }

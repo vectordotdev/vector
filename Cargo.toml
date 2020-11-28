@@ -92,6 +92,7 @@ tower = { version = "0.3.1", git = "https://github.com/tower-rs/tower", rev = "4
 # Serde
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = { version = "1.0.33", features = ["raw_value"] }
+serde_yaml = "0.8.13"
 
 # Prost
 prost = "0.6.1"
@@ -110,7 +111,7 @@ itertools = { version = "0.9.0", optional = true }
 num-format = { version = "0.4.0", optional = true }
 number_prefix = { version = "0.4", optional = true }
 crossterm = { version = "0.18.0", optional = true }
-tui = { version = "0.12.0", optional = true, default-features = false, features = ["crossterm"] }
+tui = { version = "0.13.0", optional = true, default-features = false, features = ["crossterm"] }
 bus = { version = "2.2.3", optional = true }
 
 # Remap Lang
@@ -151,7 +152,7 @@ rlua = { git = "https://github.com/kyren/rlua", optional = true }
 num_cpus = "1.10.0"
 bytesize = { version = "1.0.0", optional = true }
 glob = "0.3.0"
-grok = { version = "~1.0.1", optional = true }
+grok = { version = "~1.0.1" }
 nom = { version = "5.1.2" }
 pest = "2.1.3"
 pest_derive = "2.1.0"
@@ -187,11 +188,10 @@ sha3 = "0.9"
 md-5 = "0.9"
 hex = "0.4.2"
 heim = { version = "0.1.0-beta.3", optional = true, features = ["full"] }
-uom = { version = "0.30.0", optional = true }
 rust_decimal = "1.8.1"
 mongodb = { version = "1.1.1", optional = true }
 anyhow = { version = "1.0.28" }
-snap = { version = "1.0.1", optional = true }
+snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
 fakedata_generator = "0.2.4"
@@ -308,8 +308,10 @@ sources = [
   "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
+  "sources-kubernetes-logs",
   "sources-logplex",
   "sources-mongodb_metrics",
+  "sources-nginx_metrics",
   "sources-prometheus",
   "sources-socket",
   "sources-splunk_hec",
@@ -317,32 +319,32 @@ sources = [
   "sources-stdin",
   "sources-syslog",
   "sources-vector",
-  "sources-kubernetes-logs",
 ]
 sources-apache_metrics = []
 sources-aws_ecs_metrics = []
-sources-aws_kinesis_firehose = ["base64", "tls", "warp"]
+sources-aws_kinesis_firehose = ["base64", "sources-utils-tls", "warp"]
 sources-aws_s3 = ["rusoto_core", "rusoto_credential", "rusoto_signature", "rusoto_sts", "rusoto_s3", "rusoto_sqs"]
 sources-docker_logs = ["bollard"]
 sources-file = ["bytesize", "file-source"]
 sources-generator = []
-sources-host_metrics = ["heim", "uom"]
+sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]
+sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
 sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
-sources-prometheus = ["prometheus-parser"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
-sources-splunk_hec = ["bytesize", "tls", "warp"]
-sources-statsd = ["tokio-util/udp", "listenfd", "tls", "sources-utils-unix"]
+sources-nginx_metrics = []
+sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "tls", "sources-utils-unix"]
-tls = []
-sources-vector = ["listenfd" ,"tls"]
-sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_parser", "file-source"]
-sources-utils-http = ["tls", "warp"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-vector = ["listenfd" ,"sources-utils-tls"]
+sources-utils-http = ["sources-utils-tls", "warp"]
+sources-utils-tls = []
 sources-utils-unix = []
 
 # Transforms
@@ -389,7 +391,7 @@ transforms-dedupe = []
 transforms-filter = []
 transforms-field_filter = []
 transforms-geoip = ["maxminddb"]
-transforms-grok_parser = ["grok"]
+transforms-grok_parser = []
 transforms-json_parser = []
 transforms-key_value_parser = []
 transforms-log_to_metric = []
@@ -494,6 +496,7 @@ all-integration-tests = [
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
+  "nginx-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
@@ -529,6 +532,7 @@ kafka-integration-tests = ["sources-kafka", "sinks-kafka"]
 loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats"]
+nginx-integration-tests = ["sources-nginx_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
@@ -540,6 +544,7 @@ disable-resolv-conf = []
 # excluing API client due to running out of memory during linking in Github Actions
 benches = ["sources", "transforms", "sinks", "vendor-all", "unix", "leveldb", "rdkafka-plain"]
 wasm-benches = ["transforms-add_fields", "transforms-field_filter", "transforms-wasm", "transforms-lua"]
+remap-benches = ["transforms-add_fields", "transforms-remap", "transforms-coercer", "transforms-json_parser"]
 
 [[bench]]
 name = "default"
@@ -551,6 +556,11 @@ name = "wasm"
 path = "benches/wasm/mod.rs"
 harness = false
 required-features = ["wasm-benches"]
+
+[[bench]]
+name = "remap"
+harness = false
+required-features = ["remap-benches"]
 
 [patch.'https://github.com/tower-rs/tower']
 tower-layer = "0.3"

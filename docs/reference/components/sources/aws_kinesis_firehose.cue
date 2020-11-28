@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_kinesis_firehose: {
+components: sources: aws_kinesis_firehose: components._aws & {
 	_port: 443
 
 	title:       "AWS Kinesis Firehose"
@@ -54,7 +54,7 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -66,6 +66,10 @@ components: sources: aws_kinesis_firehose: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -117,6 +121,7 @@ components: sources: aws_kinesis_firehose: {
 	examples: [
 		{
 			title: "AWS CloudWatch Subscription message"
+
 			configuration: {
 				address: "0.0.0.0:443"
 			}

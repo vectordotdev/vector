@@ -15,7 +15,11 @@ module Vector
         def parse_commit_message(message)
           begin
             parse_commit_message!(message)
-          rescue
+          rescue Exception => e
+            if message.include?("Use `namespace` field in metric sources")
+              raise e
+            end
+
             {
               "breaking_change" => nil,
               "description" => message,
@@ -61,32 +65,6 @@ module Vector
             else
               nil
             end
-
-          type = attributes.fetch("type")
-          scopes = attributes["scopes"]
-
-          if !type.nil? && !TYPES.include?(type)
-            raise <<~EOF
-            Commit has an invalid type!
-            The type must be one of #{TYPES.inspect}.
-
-              #{type.inspect}
-
-            Please correct in the release /.meta file and retry.
-            EOF
-          end
-
-          if TYPES_THAT_REQUIRE_SCOPES.include?(type) && scopes.empty?
-            raise <<~EOF
-            Commit does not have a scope!
-
-            A scope is required for commits of type #{TYPES_THAT_REQUIRE_SCOPES.inspect}.
-
-              #{description}
-
-            Please correct in the release /.meta file and retry.
-            EOF
-          end
 
           attributes
         end

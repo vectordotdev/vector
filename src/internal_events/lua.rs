@@ -6,7 +6,7 @@ pub struct LuaEventProcessed;
 
 impl InternalEvent for LuaEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("processed_events_total", 1);
     }
 }
 
@@ -17,7 +17,7 @@ pub struct LuaGcTriggered {
 
 impl InternalEvent for LuaGcTriggered {
     fn emit_metrics(&self) {
-        gauge!("memory_used", self.used_memory as f64);
+        gauge!("memory_used_bytes", self.used_memory as f64);
     }
 }
 

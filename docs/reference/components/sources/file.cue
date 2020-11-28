@@ -52,7 +52,7 @@ components: sources: file: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -64,6 +64,10 @@ components: sources: file: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -225,6 +229,7 @@ components: sources: file: {
 			_file: "\(_directory)/apache/access.log"
 			_line: "53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"
 			title: "Apache Access Log"
+
 			configuration: {
 				include: ["\(_directory)/**/*.log"]
 			}
@@ -392,7 +397,7 @@ components: sources: file: {
 			sub_sections: [
 				{
 					title: "Example 1: Ruy Exceptions"
-					body: """
+					body: #"""
 						Ruby exceptions, when logged, consist of multiple lines:
 
 						```text
@@ -411,21 +416,21 @@ components: sources: file: {
 							# ...
 
 							[sources.my_file_source.multiline]
-								start_pattern = "^[^\\s]"
+								start_pattern = '^[^\s]'
 								mode = "continue_through"
-								condition_pattern = "^[\\s]+from"
+								condition_pattern = '^[\s]+from'
 								timeout_ms = 1000
 						```
 
-						* `start_pattern`, set to `^[^\\s]`, tells Vector that new
+						* `start_pattern`, set to `^[^\s]`, tells Vector that new
 							multi-line events should _not_ start  with white-space.
 						* `mode`, set to `continue_through`, tells Vector continue
 							aggregating lines until the `condition_pattern` is no longer
 							valid (excluding the invalid line).
-						* `condition_pattern`, set to `^[\\s]+from`, tells Vector to
+						* `condition_pattern`, set to `^[\s]+from`, tells Vector to
 							continue aggregating lines if they start with white-space
 							followed by `from`.
-						"""
+						"""#
 				},
 				{
 					title: "Example 2: Line Continuations"
@@ -448,9 +453,9 @@ components: sources: file: {
 							# ...
 
 							[sources.my_file_source.multiline]
-								start_pattern = "\\$"
+								start_pattern = '\\$'
 								mode = "continue_past"
-								condition_pattern = "\\$"
+								condition_pattern = '\\$'
 								timeout_ms = 1000
 						```
 
@@ -484,9 +489,9 @@ components: sources: file: {
 							# ...
 
 							[sources.my_file_source.multiline]
-								start_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								start_pattern = '^\[[0-9]{4}-[0-9]{2}-[0-9]{2}'
 								mode = "halt_before"
-								condition_pattern = "^\[[0-9]{4}-[0-9]{2}-[0-9]{2}"
+								condition_pattern = '^\[[0-9]{4}-[0-9]{2}-[0-9]{2}'
 								timeout_ms = 1000
 						```
 
@@ -521,13 +526,13 @@ components: sources: file: {
 	telemetry: metrics: {
 		checkpoint_write_errors_total: components.sources.internal_metrics.output.metrics.checkpoint_write_errors_total
 		checkpoints_total:             components.sources.internal_metrics.output.metrics.checkpoints_total
-		checksum_errors:               components.sources.internal_metrics.output.metrics.checksum_errors
-		file_delete_errors:            components.sources.internal_metrics.output.metrics.file_delete_errors
-		file_watch_errors:             components.sources.internal_metrics.output.metrics.file_watch_errors
-		files_added:                   components.sources.internal_metrics.output.metrics.files_added
-		files_deleted:                 components.sources.internal_metrics.output.metrics.files_deleted
-		files_resumed:                 components.sources.internal_metrics.output.metrics.files_resumed
-		files_unwatched:               components.sources.internal_metrics.output.metrics.files_unwatched
-		fingerprint_read_errors:       components.sources.internal_metrics.output.metrics.fingerprint_read_errors
+		checksum_errors_total:         components.sources.internal_metrics.output.metrics.checksum_errors_total
+		file_delete_errors_total:      components.sources.internal_metrics.output.metrics.file_delete_errors_total
+		file_watch_errors_total:       components.sources.internal_metrics.output.metrics.file_watch_errors_total
+		files_added_total:             components.sources.internal_metrics.output.metrics.files_added_total
+		files_deleted_total:           components.sources.internal_metrics.output.metrics.files_deleted_total
+		files_resumed_total:           components.sources.internal_metrics.output.metrics.files_resumed_total
+		files_unwatched_total:         components.sources.internal_metrics.output.metrics.files_unwatched_total
+		fingerprint_read_errors_total: components.sources.internal_metrics.output.metrics.fingerprint_read_errors_total
 	}
 }

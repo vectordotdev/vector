@@ -93,6 +93,7 @@ impl fmt::Display for Rule {
             path_field,
             path_index,
             path_index_inner,
+            path_root,
             path_segment,
             primary,
             program,

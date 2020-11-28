@@ -7,9 +7,13 @@ process is dependent on the version change.
 
 <!-- MarkdownTOC autolink="true" style="ordered" indent="   " -->
 
-1. [Quick Start](#quick-start)
-   1. [Patch Releases](#patch-releases)
-   1. [Major/Minor Releases](#majorminor-releases)
+- [Releasing](#releasing)
+  - [Quick Start](#quick-start)
+    - [Patch Releases](#patch-releases)
+    - [Major/Minor Releases](#majorminor-releases)
+  - [Fixing Up a Release](#fixing-up-a-release)
+  - [Github Actions Self-hosted runners](#github-actions-self-hosted-runners)
+    - [Windows runner](#windows-runner)
 
 <!-- /MarkdownTOC -->
 
@@ -54,3 +58,15 @@ If you tried to cut a release and the CI failed for some unexpected reason, you 
 [All done]: https://i.giphy.com/media/3ohzdIvnUKKjiAZTSU/giphy.webp
 [`/Cargo.toml`]: /Cargo.toml
 [`/CHANGELOG.md`]: /CHANGELOG.md
+
+## Github Actions Self-hosted runners
+
+We use self-hosted runners for Windows builds. You can see our [self-hosted runners here](https://github.com/timberio/vector/settings/actions).
+
+### Windows runner
+
+The current Windows runner is an Amazon EC2 instance running Windows 2019. To prep the install, use RDP to connect and then:
+
+1. Install [Chocolatey](https://chocolatey.org/install).
+2. Install openssl, Perl, and make. (`choco install openssl strawberryperl make`).
+3. Install [Visual Studio 2019](https://visualstudio.microsoft.com/downloads/). Ensure you select C++ for Linux as an optional feature.

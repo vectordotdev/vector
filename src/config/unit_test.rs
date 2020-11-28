@@ -1,5 +1,5 @@
 use super::{Config, ConfigBuilder, TestCondition, TestDefinition, TestInput, TestInputValue};
-use crate::config::TransformConfig;
+use crate::config::{self, TransformConfig};
 use crate::{
     conditions::{Condition, ConditionConfig},
     event::{Event, Value},
@@ -8,8 +8,11 @@ use crate::{
 use indexmap::IndexMap;
 use std::{collections::HashMap, path::PathBuf};
 
-pub async fn build_unit_tests_main(path: PathBuf) -> Result<Vec<UnitTest>, Vec<String>> {
-    let config = super::loading::load_builder_from_paths(&[path], false)?;
+pub async fn build_unit_tests_main(
+    path: PathBuf,
+    format: config::FormatHint,
+) -> Result<Vec<UnitTest>, Vec<String>> {
+    let config = super::loading::load_builder_from_paths(&[(path, format)], false)?;
 
     // Ignore failures on calls other than the first
     crate::config::LOG_SCHEMA

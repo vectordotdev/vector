@@ -26,7 +26,7 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -38,6 +38,10 @@ components: sources: internal_metrics: {
 		notices: []
 		requirements: []
 		warnings: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	output: metrics: {
@@ -113,25 +117,25 @@ components: sources: internal_metrics: {
 
 		// Metrics emitted by one or more components
 		// Reusable metric definitions
-		auto_concurrency_averaged_rtt: {
+		adaptive_concurrency_averaged_rtt: {
 			description:       "The average round-trip time (RTT) from the HTTP sink across the current window."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		auto_concurrency_in_flight: {
+		adaptive_concurrency_in_flight: {
 			description:       "The number of outbound requests from the HTTP sink currently awaiting a response."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		auto_concurrency_limit: {
-			description:       "The concurrency limit that the auto-concurrency feature has decided on for this current window."
+		adaptive_concurrency_limit: {
+			description:       "The concurrency limit that the adaptive concurrency feature has decided on for this current window."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		auto_concurrency_observed_rtt: {
+		adaptive_concurrency_observed_rtt: {
 			description:       "The observed round-trip time (RTT) for requests from this HTTP sink."
 			type:              "histogram"
 			default_namespace: "vector"
@@ -149,7 +153,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
-		checksum_errors: {
+		checksum_errors_total: {
 			description:       "The total number of errors identifying files via checksum."
 			type:              "counter"
 			default_namespace: "vector"
@@ -195,7 +199,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		container_events_processed_total: {
+		container_processed_events_total: {
 			description:       "The total number of container events processed."
 			type:              "counter"
 			default_namespace: "vector"
@@ -219,13 +223,19 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		docker_format_parse_failures_total: {
+		k8s_format_picker_edge_cases_total: {
+			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		k8s_docker_format_parse_failures_total: {
 			description:       "The total number of failures to parse a message as a JSON object."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		event_annotation_failures_total: {
+		k8s_event_annotation_failures_total: {
 			description:       "The total number of failures to annotate Vector events with Kubernetes Pod metadata."
 			type:              "counter"
 			default_namespace: "vector"
@@ -243,7 +253,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		events_processed_total: {
+		processed_events_total: {
 			description:       "The total number of events processed by this component."
 			type:              "counter"
 			default_namespace: "vector"
@@ -251,7 +261,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		file_delete_errors: {
+		file_delete_errors_total: {
 			description:       "The total number of failures to delete a file."
 			type:              "counter"
 			default_namespace: "vector"
@@ -259,7 +269,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		file_watch_errors: {
+		file_watch_errors_total: {
 			description:       "The total number of errors encountered when watching files."
 			type:              "counter"
 			default_namespace: "vector"
@@ -267,7 +277,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_added: {
+		files_added_total: {
 			description:       "The total number of files Vector has found to watch."
 			type:              "counter"
 			default_namespace: "vector"
@@ -275,7 +285,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_deleted: {
+		files_deleted_total: {
 			description:       "The total number of files deleted."
 			type:              "counter"
 			default_namespace: "vector"
@@ -283,7 +293,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_resumed: {
+		files_resumed_total: {
 			description:       "The total number of times Vector has resumed watching a file."
 			type:              "counter"
 			default_namespace: "vector"
@@ -291,7 +301,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		files_unwatched: {
+		files_unwatched_total: {
 			description:       "The total number of times Vector has stopped watching a file."
 			type:              "counter"
 			default_namespace: "vector"
@@ -299,7 +309,7 @@ components: sources: internal_metrics: {
 				file: _file
 			}
 		}
-		fingerprint_read_errors: {
+		fingerprint_read_errors_total: {
 			description:       "The total number of times Vector failed to read a file for fingerprinting."
 			type:              "counter"
 			default_namespace: "vector"
@@ -352,7 +362,7 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		memory_used: {
+		memory_used_bytes: {
 			description:       "The total memory currently being used by Vector (in bytes)."
 			type:              "gauge"
 			default_namespace: "vector"
@@ -462,7 +472,6 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-
 		sqs_message_receive_failed_total: {
 			description:       "The total number of failures to receive SQS messages."
 			type:              "counter"

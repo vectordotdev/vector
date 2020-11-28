@@ -39,7 +39,7 @@ components: sinks: splunk_hec: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            10
+				concurrency:                10
 				rate_limit_duration_secs:   1
 				rate_limit_num:             10
 				retry_initial_backoff_secs: 1
@@ -88,7 +88,7 @@ components: sinks: splunk_hec: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

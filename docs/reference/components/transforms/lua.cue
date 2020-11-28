@@ -5,7 +5,7 @@ components: transforms: lua: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
@@ -20,7 +20,7 @@ components: transforms: lua: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -472,7 +472,7 @@ components: transforms: lua: {
 	}
 
 	telemetry: metrics: {
-		memory_used:             components.sources.internal_metrics.output.metrics.memory_used
+		memory_used_bytes:       components.sources.internal_metrics.output.metrics.memory_used_bytes
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

@@ -5,11 +5,12 @@ components: sinks: prometheus_exporter: {
 
 	title:       "Prometheus Exporter"
 	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	alias:       "prometheus"
 
 	classes: {
 		commonly_used: true
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "expose"
 		service_providers: []
 	}
@@ -43,7 +44,7 @@ components: sinks: prometheus_exporter: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

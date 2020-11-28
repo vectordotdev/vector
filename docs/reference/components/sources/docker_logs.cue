@@ -2,13 +2,15 @@ package metadata
 
 components: sources: docker_logs: {
 	title:       "Docker"
-	description: installation.platforms.docker.description
+	description: "Test."
+
+	alias: "docker"
 
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
@@ -79,7 +81,7 @@ components: sources: docker_logs: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-pc-windows-msv":      true
@@ -100,6 +102,10 @@ components: sources: docker_logs: {
 				""",
 		]
 		notices: []
+	}
+
+	installation: {
+		platform_name: "docker"
 	}
 
 	configuration: {
@@ -261,7 +267,7 @@ components: sources: docker_logs: {
 
 	telemetry: metrics: {
 		communication_errors_total:            components.sources.internal_metrics.output.metrics.communication_errors_total
-		container_events_processed_total:      components.sources.internal_metrics.output.metrics.container_events_processed_total
+		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total
 		container_metadata_fetch_errors_total: components.sources.internal_metrics.output.metrics.container_metadata_fetch_errors_total
 		containers_unwatched_total:            components.sources.internal_metrics.output.metrics.containers_unwatched_total
 		containers_watched_total:              components.sources.internal_metrics.output.metrics.containers_watched_total

@@ -26,11 +26,11 @@ const RETRY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 /// Has best effort guarantee of detecting all file changes from the end of
 /// this function until the main thread stops.
 #[cfg(unix)]
-pub fn spawn_thread(
-    config_paths: &[PathBuf],
+pub fn spawn_thread<'a>(
+    config_paths: impl IntoIterator<Item = &'a PathBuf> + 'a,
     delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {
-    let config_paths = config_paths.to_vec();
+    let config_paths: Vec<_> = config_paths.into_iter().cloned().collect();
     let delay = delay.into().unwrap_or(CONFIG_WATCH_DELAY);
 
     // Create watcher now so not to miss any changes happening between
@@ -83,8 +83,8 @@ pub fn spawn_thread(
 
 #[cfg(windows)]
 /// Errors on Windows.
-pub fn spawn_thread(
-    _config_paths: &[PathBuf],
+pub fn spawn_thread<'a>(
+    _config_paths: impl IntoIterator<Item = &'a PathBuf> + 'a,
     _delay: impl Into<Option<Duration>>,
 ) -> Result<(), Error> {
     Err("Reloading config on Windows isn't currently supported. Related issue https://github.com/timberio/vector/issues/938 .".into())

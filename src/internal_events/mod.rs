@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
@@ -7,7 +8,6 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-mod auto_concurrency;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
@@ -68,9 +68,11 @@ mod metric_to_log;
 mod mongodb_metrics;
 #[cfg(feature = "sinks-nats")]
 mod nats;
+#[cfg(feature = "sources-nginx_metrics")]
+mod nginx_metrics;
 mod open;
 mod process;
-#[cfg(feature = "sources-prometheus")]
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
@@ -111,6 +113,7 @@ mod wasm;
 
 pub mod kubernetes;
 
+pub use self::adaptive_concurrency::*;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
@@ -118,7 +121,6 @@ pub use self::ansi_stripper::*;
 pub use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
-pub use self::auto_concurrency::*;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
@@ -180,10 +182,12 @@ pub use self::lua::*;
 pub(crate) use self::metric_to_log::*;
 #[cfg(feature = "sinks-nats")]
 pub use self::nats::*;
+#[cfg(feature = "sources-nginx_metrics")]
+pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
 pub use self::process::*;
-#[cfg(feature = "sources-prometheus")]
-pub use self::prometheus::*;
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+pub(crate) use self::prometheus::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]

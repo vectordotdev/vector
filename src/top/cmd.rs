@@ -20,7 +20,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // provided by the API config. This will work despite `api` and `api-client` being distinct
     // features; the config is available even if `api` is disabled
     let url = opts.url.clone().unwrap_or_else(|| {
-        let addr = config::api::default_bind().unwrap();
+        let addr = config::api::default_address().unwrap();
         Url::parse(&*format!("http://{}/graphql", addr))
             .expect("Couldn't parse default API URL. Please report this.")
     });

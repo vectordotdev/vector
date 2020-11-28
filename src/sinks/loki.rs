@@ -19,8 +19,9 @@ use crate::{
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
-        http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, TowerRequestConfig, UriSerde,
+        http::{HttpSink, PartitionHttpSink},
+        BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
+        UriSerde,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -37,7 +38,7 @@ pub struct LokiConfig {
     #[serde(default)]
     encoding: EncodingConfigWithDefault<Encoding>,
 
-    tenant_id: Option<String>,
+    tenant_id: Option<Template>,
     labels: HashMap<String, Template>,
 
     #[serde(default = "crate::serde::default_false")]
@@ -99,9 +100,9 @@ impl SinkConfig for LokiConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
-        let sink = BatchedHttpSink::new(
+        let sink = PartitionHttpSink::new(
             self.clone(),
-            LokiBuffer::new(batch_settings.size),
+            PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
             client.clone(),
@@ -123,12 +124,30 @@ impl SinkConfig for LokiConfig {
     }
 }
 
+#[derive(Hash, Eq, PartialEq, Clone)]
+pub struct PartitionKey {
+    tenant_id: Option<String>,
+}
+
 #[async_trait::async_trait]
 impl HttpSink for LokiConfig {
-    type Input = LokiRecord;
-    type Output = serde_json::Value;
+    type Input = PartitionInnerBuffer<LokiRecord, PartitionKey>;
+    type Output = PartitionInnerBuffer<serde_json::Value, PartitionKey>;
 
     fn encode_event(&self, mut event: Event) -> Option<Self::Input> {
+        let tenant_id = self.tenant_id.as_ref().and_then(|t| {
+            t.render_string(&event)
+                .map_err(|missing| {
+                    error!(
+                        message = "Error rendering `tenant_id` template.",
+                        ?missing,
+                        rate_limit_secs = 30
+                    );
+                })
+                .ok()
+        });
+        let key = PartitionKey { tenant_id };
+
         let mut labels = Vec::new();
 
         for (key, template) in &self.labels {
@@ -174,17 +193,20 @@ impl HttpSink for LokiConfig {
         }
 
         let event = LokiEvent { timestamp, event };
-        Some(LokiRecord { labels, event })
+        Some(PartitionInnerBuffer::new(LokiRecord { labels, event }, key))
     }
 
-    async fn build_request(&self, json: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+    async fn build_request(&self, output: Self::Output) -> crate::Result<http::Request<Vec<u8>>> {
+        let (json, key) = output.into_parts();
+        let tenant_id = key.tenant_id;
+
         let body = serde_json::to_vec(&json).unwrap();
 
         let uri = format!("{}loki/api/v1/push", self.endpoint);
 
         let mut req = http::Request::post(uri).header("Content-Type", "application/json");
 
-        if let Some(tenant_id) = &self.tenant_id {
+        if let Some(tenant_id) = tenant_id {
             req = req.header("X-Scope-OrgID", tenant_id);
         }
 
@@ -246,7 +268,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let mut record = config.encode_event(e1).unwrap();
+        let mut record = config.encode_event(e1).unwrap().into_parts().0;
 
         // HashMap -> Vec doesn't like keeping ordering
         record.labels.sort();
@@ -282,7 +304,7 @@ mod tests {
 
         e1.as_mut_log().insert("foo", "bar");
 
-        let record = config.encode_event(e1).unwrap();
+        let record = config.encode_event(e1).unwrap().into_parts().0;
 
         let expected_line = serde_json::to_string(&serde_json::json!({
             "message": "hello world",
@@ -356,6 +378,7 @@ mod integration_tests {
             endpoint = "http://localhost:3100"
             labels = {test_name = "placeholder"}
             encoding = "text"
+            tenant_id = "default"
         "#,
         )
         .unwrap();
@@ -376,7 +399,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string()).await;
+        let outputs = fetch_stream(stream.to_string(), "default").await;
         for (i, output) in outputs.iter().enumerate() {
             assert_eq!(output, &lines[i]);
         }
@@ -392,6 +415,7 @@ mod integration_tests {
             labels = {test_name = "placeholder"}
             encoding = "json"
             remove_timestamp = false
+            tenant_id = "default"
         "#,
         )
         .unwrap();
@@ -413,7 +437,7 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs = fetch_stream(stream.to_string()).await;
+        let outputs = fetch_stream(stream.to_string(), "default").await;
         for (i, output) in outputs.iter().enumerate() {
             let expected_json = serde_json::to_string(&events[i].as_log().all_fields()).unwrap();
             assert_eq!(output, &expected_json);
@@ -430,6 +454,7 @@ mod integration_tests {
             endpoint = "http://localhost:3100"
             labels = {test_name = "{{ stream_id }}"}
             encoding = "text"
+            tenant_id = "default"
         "#,
         )
         .unwrap();
@@ -460,8 +485,8 @@ mod integration_tests {
             .await
             .unwrap();
 
-        let outputs1 = fetch_stream(stream1.to_string()).await;
-        let outputs2 = fetch_stream(stream2.to_string()).await;
+        let outputs1 = fetch_stream(stream1.to_string(), "default").await;
+        let outputs2 = fetch_stream(stream2.to_string(), "default").await;
 
         for (i, output) in outputs1.iter().enumerate() {
             let index = (i % 5) * 2;
@@ -474,13 +499,78 @@ mod integration_tests {
         }
     }
 
-    async fn fetch_stream(stream: String) -> Vec<String> {
+    #[tokio::test]
+    async fn many_tenants() {
+        let stream = uuid::Uuid::new_v4();
+
+        let (mut config, cx) = load_sink::<LokiConfig>(
+            r#"
+            endpoint = "http://localhost:3100"
+            labels = {test_name = "placeholder"}
+            encoding = "text"
+            tenant_id = "{{ tenant_id }}"
+        "#,
+        )
+        .unwrap();
+
+        let test_name = config.labels.get_mut("test_name").unwrap();
+        assert_eq!(test_name.get_ref(), &Bytes::from("placeholder"));
+
+        *test_name = Template::try_from(stream.to_string()).unwrap();
+
+        let (sink, _) = config.build(cx).await.unwrap();
+
+        let lines = random_lines(100).take(10).collect::<Vec<_>>();
+
+        let mut events = lines
+            .clone()
+            .into_iter()
+            .map(Event::from)
+            .collect::<Vec<_>>();
+
+        for i in 0..10 {
+            let event = events.get_mut(i).unwrap();
+
+            if i % 2 == 0 {
+                event.as_mut_log().insert("tenant_id", "tenant1");
+            } else {
+                event.as_mut_log().insert("tenant_id", "tenant2");
+            }
+        }
+
+        let _ = sink
+            .into_sink()
+            .send_all(&mut stream::iter(events).map(Ok))
+            .await
+            .unwrap();
+
+        let outputs1 = fetch_stream(stream.to_string(), "tenant1").await;
+        let outputs2 = fetch_stream(stream.to_string(), "tenant2").await;
+
+        for (i, output) in outputs1.iter().enumerate() {
+            let index = (i % 5) * 2;
+            assert_eq!(output, &lines[index]);
+        }
+
+        for (i, output) in outputs2.iter().enumerate() {
+            let index = ((i % 5) * 2) + 1;
+            assert_eq!(output, &lines[index]);
+        }
+    }
+
+    async fn fetch_stream(stream: String, tenant: &str) -> Vec<String> {
         let query = format!("%7Btest_name%3D\"{}\"%7D", stream);
         let query = format!(
             "http://localhost:3100/loki/api/v1/query_range?query={}&direction=forward",
             query
         );
-        let res = reqwest::get(&query).await.unwrap();
+
+        let res = reqwest::Client::new()
+            .get(&query)
+            .header("X-Scope-OrgID", tenant)
+            .send()
+            .await
+            .unwrap();
 
         assert_eq!(res.status(), 200);
 
