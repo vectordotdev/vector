@@ -19,6 +19,7 @@ mod builder;
 mod compiler;
 pub mod component;
 mod diff;
+mod format;
 mod loading;
 mod log_schema;
 mod unit_test;
@@ -28,7 +29,8 @@ pub mod watcher;
 
 pub use builder::ConfigBuilder;
 pub use diff::ConfigDiff;
-pub use loading::{load_from_paths, load_from_str, process_paths, CONFIG_PATHS};
+pub use format::{Format, FormatHint};
+pub use loading::{load_from_paths, load_from_str, merge_path_lists, process_paths, CONFIG_PATHS};
 pub use log_schema::{log_schema, LogSchema, LOG_SCHEMA};
 pub use unit_test::build_unit_tests_main as build_unit_tests;
 pub use validation::warnings;
@@ -414,22 +416,23 @@ fn healthcheck_default() -> bool {
     feature = "transforms-json_parser"
 ))]
 mod test {
-    use super::{builder::ConfigBuilder, load_from_str};
+    use super::{builder::ConfigBuilder, format, load_from_str, Format};
     use std::path::PathBuf;
 
     #[test]
     fn default_data_dir() {
         let config = load_from_str(
             r#"
-      [sources.in]
-      type = "file"
-      include = ["/var/log/messages"]
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-      [sinks.out]
-      type = "console"
-      inputs = ["in"]
-      encoding = "json"
-      "#,
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
+            Some(Format::TOML),
         )
         .unwrap();
 
@@ -443,15 +446,16 @@ mod test {
     fn default_schema() {
         let config = load_from_str(
             r#"
-      [sources.in]
-      type = "file"
-      include = ["/var/log/messages"]
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-      [sinks.out]
-      type = "console"
-      inputs = ["in"]
-      encoding = "json"
-      "#,
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
+            Some(Format::TOML),
         )
         .unwrap();
 
@@ -470,20 +474,21 @@ mod test {
     fn custom_schema() {
         let config = load_from_str(
             r#"
-      [log_schema]
-      host_key = "this"
-      message_key = "that"
-      timestamp_key = "then"
+            [log_schema]
+            host_key = "this"
+            message_key = "that"
+            timestamp_key = "then"
 
-      [sources.in]
-      type = "file"
-      include = ["/var/log/messages"]
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-      [sinks.out]
-      type = "console"
-      inputs = ["in"]
-      encoding = "json"
-      "#,
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
+            Some(Format::TOML),
         )
         .unwrap();
 
@@ -494,42 +499,44 @@ mod test {
 
     #[test]
     fn config_append() {
-        let mut config: ConfigBuilder = toml::from_str(
+        let mut config: ConfigBuilder = format::deserialize(
             r#"
-      [sources.in]
-      type = "file"
-      include = ["/var/log/messages"]
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-      [sinks.out]
-      type = "console"
-      inputs = ["in"]
-      encoding = "json"
-      "#,
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
+            Some(Format::TOML),
         )
         .unwrap();
 
         assert_eq!(
             config.append(
-                toml::from_str(
+                format::deserialize(
                     r#"
-        data_dir = "/foobar"
+                    data_dir = "/foobar"
 
-        [transforms.foo]
-        type = "json_parser"
-        inputs = [ "in" ]
+                    [transforms.foo]
+                    type = "json_parser"
+                    inputs = [ "in" ]
 
-        [[tests]]
-        name = "check_simple_log"
-        [tests.input]
-        insert_at = "foo"
-        type = "raw"
-        value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
-        [[tests.outputs]]
-        extract_from = "foo"
-        [[tests.outputs.conditions]]
-        type = "check_fields"
-        "message.equals" = "Sorry, I'm busy this week Cecil"
-            "#,
+                    [[tests]]
+                    name = "check_simple_log"
+                    [tests.input]
+                    insert_at = "foo"
+                    type = "raw"
+                    value = "2019-11-28T12:00:00+00:00 info Sorry, I'm busy this week Cecil"
+                    [[tests.outputs]]
+                    extract_from = "foo"
+                    [[tests.outputs.conditions]]
+                    type = "check_fields"
+                    "message.equals" = "Sorry, I'm busy this week Cecil"
+                    "#,
+                    Some(Format::TOML),
                 )
                 .unwrap()
             ),
@@ -545,37 +552,39 @@ mod test {
 
     #[test]
     fn config_append_collisions() {
-        let mut config: ConfigBuilder = toml::from_str(
+        let mut config: ConfigBuilder = format::deserialize(
             r#"
-      [sources.in]
-      type = "file"
-      include = ["/var/log/messages"]
+            [sources.in]
+            type = "file"
+            include = ["/var/log/messages"]
 
-      [sinks.out]
-      type = "console"
-      inputs = ["in"]
-      encoding = "json"
-      "#,
+            [sinks.out]
+            type = "console"
+            inputs = ["in"]
+            encoding = "json"
+            "#,
+            Some(Format::TOML),
         )
         .unwrap();
 
         assert_eq!(
             config.append(
-                toml::from_str(
+                format::deserialize(
                     r#"
-        [sources.in]
-        type = "file"
-        include = ["/var/log/messages"]
+                    [sources.in]
+                    type = "file"
+                    include = ["/var/log/messages"]
 
-        [transforms.foo]
-        type = "json_parser"
-        inputs = [ "in" ]
+                    [transforms.foo]
+                    type = "json_parser"
+                    inputs = [ "in" ]
 
-        [sinks.out]
-        type = "console"
-        inputs = ["in"]
-        encoding = "json"
-            "#,
+                    [sinks.out]
+                    type = "console"
+                    inputs = ["in"]
+                    encoding = "json"
+                    "#,
+                    Some(Format::TOML),
                 )
                 .unwrap()
             ),
@@ -589,7 +598,7 @@ mod test {
 
 #[cfg(all(test, feature = "sources-stdin", feature = "sinks-console"))]
 mod resource_tests {
-    use super::{load_from_str, Resource};
+    use super::{load_from_str, Format, Resource};
     use std::collections::{HashMap, HashSet};
     use std::net::{Ipv4Addr, SocketAddr};
 
@@ -679,17 +688,18 @@ mod resource_tests {
     fn config_conflict_detected() {
         assert!(load_from_str(
             r#"
-        [sources.in0]
-        type = "stdin"
+            [sources.in0]
+            type = "stdin"
 
-        [sources.in1]
-        type = "stdin"
+            [sources.in1]
+            type = "stdin"
 
-        [sinks.out]
-        type = "console"
-        inputs = ["in0","in1"]
-        encoding = "json"
-        "#
+            [sinks.out]
+            type = "console"
+            inputs = ["in0","in1"]
+            encoding = "json"
+            "#,
+            Some(Format::TOML),
         )
         .is_err());
     }

@@ -29,7 +29,7 @@ use tokio::runtime;
 use tokio::runtime::Runtime;
 
 pub struct ApplicationConfig {
-    pub config_paths: Vec<PathBuf>,
+    pub config_paths: Vec<(PathBuf, config::FormatHint)>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -103,7 +103,7 @@ impl Application {
         };
 
         let config = {
-            let config_paths = root_opts.config_paths.clone();
+            let config_paths = root_opts.config_paths_with_formats();
             let watch_config = root_opts.watch_config;
             let require_healthy = root_opts.require_healthy;
 
@@ -129,10 +129,11 @@ impl Application {
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(&config_paths, None).map_err(|error| {
-                        error!(message = "Unable to start config watcher.", %error);
-                        exitcode::CONFIG
-                    })?;
+                    config::watcher::spawn_thread(config_paths.iter().map(|(path, _)| path), None)
+                        .map_err(|error| {
+                            error!(message = "Unable to start config watcher.", %error);
+                            exitcode::CONFIG
+                        })?;
                 }
 
                 info!(
@@ -216,9 +217,9 @@ impl Application {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload paths
-                        config_paths = config::process_paths(&opts.config_paths).unwrap_or(config_paths);
+                        config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths,false).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
 
                         if let Some(new_config) = new_config {
                             match topology

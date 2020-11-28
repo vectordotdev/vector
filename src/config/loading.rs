@@ -1,4 +1,4 @@
-use super::{builder::ConfigBuilder, handle_warnings, vars, Config};
+use super::{builder::ConfigBuilder, format, handle_warnings, vars, Config, Format, FormatHint};
 use glob::glob;
 use lazy_static::lazy_static;
 use std::{
@@ -9,19 +9,31 @@ use std::{
 };
 
 lazy_static! {
-    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<PathBuf> = vec!["/etc/vector/vector.toml".into()];
-    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<PathBuf> = {
+    pub static ref DEFAULT_UNIX_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> =
+        vec![("/etc/vector/vector.toml".into(), Some(Format::TOML))];
+    pub static ref DEFAULT_WINDOWS_CONFIG_PATHS: Vec<(PathBuf, FormatHint)> = {
         let program_files = std::env::var("ProgramFiles")
             .expect("%ProgramFiles% environment variable must be defined");
         let config_path = format!("{}\\Vector\\config\\vector.toml", program_files);
-        vec![PathBuf::from(config_path)]
+        vec![(PathBuf::from(config_path), Some(Format::TOML))]
     };
-    pub static ref CONFIG_PATHS: Mutex<Vec<PathBuf>> = Mutex::default();
+    pub static ref CONFIG_PATHS: Mutex<Vec<(PathBuf, FormatHint)>> = Mutex::default();
+}
+
+/// Merge the paths coming from different cli flags with different formats into
+/// a unified list of paths with formats.
+pub fn merge_path_lists<'a>(
+    path_lists: Vec<(&'a [PathBuf], FormatHint)>,
+) -> Vec<(PathBuf, FormatHint)> {
+    path_lists
+        .into_iter()
+        .flat_map(|(paths, format)| paths.iter().cloned().map(move |path| (path, format)))
+        .collect()
 }
 
 /// Expand a list of paths (potentially containing glob patterns) into real
 /// config paths, replacing it with the default paths when empty.
-pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
+pub fn process_paths(config_paths: &[(PathBuf, FormatHint)]) -> Option<Vec<(PathBuf, FormatHint)>> {
     let default_paths = if cfg!(unix) {
         DEFAULT_UNIX_CONFIG_PATHS.clone()
     } else if cfg!(windows) {
@@ -38,7 +50,7 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 
     let mut paths = Vec::new();
 
-    for config_pattern in starting_paths {
+    for (config_pattern, format) in starting_paths {
         let matches: Vec<PathBuf> = match glob(config_pattern.to_str().expect("No ability to glob"))
         {
             Ok(glob_paths) => glob_paths.filter_map(Result::ok).collect(),
@@ -54,11 +66,11 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
         }
 
         for path in matches {
-            paths.push(path);
+            paths.push((path, *format));
         }
     }
 
-    paths.sort();
+    paths.sort_by(|(a, _), (b, _)| a.cmp(b));
     paths.dedup();
     // Ignore poison error and let the current main thread continue running to do the cleanup.
     std::mem::drop(CONFIG_PATHS.lock().map(|mut guard| *guard = paths.clone()));
@@ -67,22 +79,22 @@ pub fn process_paths(config_paths: &[PathBuf]) -> Option<Vec<PathBuf>> {
 }
 
 pub fn load_from_paths(
-    config_paths: &[PathBuf],
+    config_paths: &[(PathBuf, FormatHint)],
     deny_warnings: bool,
 ) -> Result<Config, Vec<String>> {
     load_builder_from_paths(config_paths, deny_warnings)?.build_with(deny_warnings)
 }
 
 pub fn load_builder_from_paths(
-    config_paths: &[PathBuf],
+    config_paths: &[(PathBuf, FormatHint)],
     deny_warnings: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     let mut inputs = Vec::new();
     let mut errors = Vec::new();
 
-    for path in config_paths {
+    for (path, format) in config_paths {
         if let Some(file) = open_config(&path) {
-            inputs.push(file);
+            inputs.push((file, format.or_else(move || Format::from_path(&path).ok())));
         } else {
             errors.push(format!("Config file not found in path: {:?}.", path));
         };
@@ -95,19 +107,19 @@ pub fn load_builder_from_paths(
     }
 }
 
-pub fn load_from_str(input: &str) -> Result<Config, Vec<String>> {
-    load_from_inputs(std::iter::once(input.as_bytes()), false)?.build()
+pub fn load_from_str(input: &str, format: FormatHint) -> Result<Config, Vec<String>> {
+    load_from_inputs(std::iter::once((input.as_bytes(), format)), false)?.build()
 }
 
 fn load_from_inputs(
-    inputs: impl IntoIterator<Item = impl std::io::Read>,
+    inputs: impl IntoIterator<Item = (impl std::io::Read, FormatHint)>,
     deny_warnings: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     let mut config = Config::builder();
     let mut errors = Vec::new();
 
-    for input in inputs {
-        if let Err(errs) = load(input, deny_warnings).and_then(|n| config.append(n)) {
+    for (input, format) in inputs {
+        if let Err(errs) = load(input, format, deny_warnings).and_then(|n| config.append(n)) {
             // TODO: add back paths
             errors.extend(errs.iter().map(|e| e.to_string()));
         }
@@ -135,7 +147,11 @@ fn open_config(path: &Path) -> Option<File> {
     }
 }
 
-fn load(mut input: impl std::io::Read, deny_warnings: bool) -> Result<ConfigBuilder, Vec<String>> {
+fn load(
+    mut input: impl std::io::Read,
+    format: FormatHint,
+    deny_warnings: bool,
+) -> Result<ConfigBuilder, Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
@@ -150,5 +166,5 @@ fn load(mut input: impl std::io::Read, deny_warnings: bool) -> Result<ConfigBuil
     let (with_vars, warnings) = vars::interpolate(&source_string, &vars);
     handle_warnings(warnings, deny_warnings)?;
 
-    toml::from_str(&with_vars).map_err(|e| vec![e.to_string()])
+    format::deserialize(&with_vars, format)
 }

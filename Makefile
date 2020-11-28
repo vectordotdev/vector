@@ -294,7 +294,7 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 
 .PHONY: test-behavior
 test-behavior: ## Runs behaviorial test
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*.toml
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
