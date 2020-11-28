@@ -8,7 +8,7 @@ components: sources: journald: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 	}
 

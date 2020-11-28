@@ -246,7 +246,7 @@ installation: close({
 				encoding: codec: "json"
 			}
 		}
-		config_format: ["toml", "yaml", "json"]
+		config_format: ["toml"]
 		variant?: [string, ...string]
 		version: bool | *false
 	}

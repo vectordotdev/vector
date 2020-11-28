@@ -10,7 +10,7 @@ components: sinks: prometheus_exporter: {
 	classes: {
 		commonly_used: true
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "expose"
 		service_providers: []
 	}
