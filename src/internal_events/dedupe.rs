@@ -6,7 +6,7 @@ pub(crate) struct DedupeEventProcessed;
 
 impl InternalEvent for DedupeEventProcessed {
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("processed_events_total", 1);
     }
 }
 

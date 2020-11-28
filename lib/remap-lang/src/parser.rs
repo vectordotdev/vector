@@ -302,7 +302,13 @@ impl Parser<'_> {
 
     /// Parse a [`Path`] value, e.g. ".foo.bar"
     fn path_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
-        let segments = self.path_segments_from_pairs(pair.into_inner())?;
+        let inner = pair.into_inner();
+
+        let segments = match inner.peek().map(|p| p.as_rule()) {
+            Some(R::path_root) => vec![vec![]],
+            Some(R::path_segment) => self.path_segments_from_pairs(inner)?,
+            _ => return Err(e(R::path)),
+        };
 
         Ok(Expr::from(Path::new(segments)))
     }
@@ -432,7 +438,6 @@ mod tests {
     #[test]
     fn check_parser_errors() {
         let cases = vec![
-            (r#". = "bar""#, vec![" 1:2\n", "= expected path_segment"]),
             (
                 ".foo = !",
                 vec![" 1:9\n", "= expected primary, operator_not, or ident"],

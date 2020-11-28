@@ -10,7 +10,7 @@ impl InternalEvent for AwsEc2MetadataEventProcessed {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", 1);
+        counter!("processed_events_total", 1);
     }
 }
 

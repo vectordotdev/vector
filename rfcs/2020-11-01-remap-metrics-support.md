@@ -73,13 +73,13 @@ their values. To accomplish this the `del` function can be used.
 
 To add a tag, or change an existing tag you can set it:
 
-```
+```coffeescript
 .tags.host = "localhost"
 ```
 
 To delete a tag, use the `del` function:
 
-```
+```coffeescript
 del(.tags.host)
 ```
 
@@ -110,40 +110,52 @@ backwards compatibility for users configurations.
 The following functions are provided:
 
 ### `get_name() -> string`
+
 Returns the name of the metric.
 
 ### `set_name(string)`
+
 Allows you to change the name of the metric.
 
 ### `get_namespace() -> string`
+
 Returns the namepace of the metric.
 
 ### `set_namespace(string)`
+
 Allows you to change the namespace of the metric.
 
 ### `get_timestamp() -> timestamp`
+
 Returns the timestamp of the metric.
 
 ### `set_timestamp(timestamp)`
+
 Allows you to change the timestamp of the metric.
 
 ### `get_kind() -> string`
+
 Returns the kind of the metric, will either be "Incremental" or "Absolute".
 
 ### `set_kind(string)`
+
 Allows you to set the kind of the metric. Any string other than "Incremental" or
 "Absolute" will result in an error.
 
 ### `get_tag(string) -> string`
+
 Returns the value of the given tag.
 
 ### `add_tag(string, string)`
+
 Allows you to set the value of a given tag.
 
 ### `rename_tag(string, string)`
+
 Rename the tag with the given key to the new key.
 
 ### `remove_tag(string)`
+
 Removes the tag with the given key from the metric.
 
 Note that accessing path values (identifiers starting with a `.`) are not

@@ -196,7 +196,7 @@ impl Application {
             // assigned to prevent the API terminating when falling out of scope
             let api_server = if api_config.enabled {
                 emit!(ApiStarted {
-                    addr: api_config.bind.unwrap(),
+                    addr: api_config.address.unwrap(),
                     playground: api_config.playground
                 });
 

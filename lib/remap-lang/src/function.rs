@@ -101,11 +101,7 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
-    pub fn optional_enum(
-        &mut self,
-        keyword: &str,
-        variants: &'static [&'static str],
-    ) -> Result<Option<String>> {
+    pub fn optional_literal(&mut self, keyword: &str) -> Result<Option<expression::Literal>> {
         let expr = self.optional(keyword).map(Expr::try_from).transpose()?;
 
         let argument = match expr {
@@ -113,16 +109,35 @@ impl ArgumentList {
             None => return Ok(None),
         };
 
-        let variant = expression::Literal::try_from(argument.into_expr())?
-            .as_value()
-            .clone()
-            .try_bytes()
-            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())?;
+        let variant = expression::Literal::try_from(argument.into_expr())?;
+        Ok(Some(variant))
+    }
 
-        if variants.contains(&variant.as_str()) {
-            Ok(Some(variant))
-        } else {
-            Err(Error::UnknownEnumVariant(variant, &variants).into())
+    pub fn required_literal(&mut self, keyword: &str) -> Result<expression::Literal> {
+        self.optional_literal(keyword)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
+    pub fn optional_enum(
+        &mut self,
+        keyword: &str,
+        variants: &'static [&'static str],
+    ) -> Result<Option<String>> {
+        match self.optional_literal(keyword)? {
+            None => Ok(None),
+            Some(variant) => {
+                let variant = variant
+                    .as_value()
+                    .clone()
+                    .try_bytes()
+                    .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())?;
+
+                if variants.contains(&variant.as_str()) {
+                    Ok(Some(variant))
+                } else {
+                    Err(Error::UnknownEnumVariant(variant, &variants).into())
+                }
+            }
         }
     }
 

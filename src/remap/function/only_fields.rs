@@ -51,7 +51,10 @@ impl Expression for OnlyFieldsFn {
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
-        TypeDef::default().into_optional(true)
+        TypeDef {
+            fallible: false,
+            kind: value::Kind::Null,
+        }
     }
 }
 
@@ -64,8 +67,8 @@ mod tests {
             paths: vec![Path::from("foo")]
         },
         def: TypeDef {
-            optional: true,
-            ..Default::default()
+            fallible: false,
+            kind: value::Kind::Null,
         },
     }];
 }

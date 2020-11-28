@@ -4,7 +4,7 @@ remap: functions: parse_json: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text representation of the JSON to parse."
+			description: "The string representation of the JSON to parse."
 			required:    true
 			type: ["string"]
 		},
@@ -34,7 +34,7 @@ remap: functions: parse_json: {
 		{
 			title: "Error"
 			input: {
-				message: "malformed"
+				message: "{\"malformed\":"
 			}
 			source: "parse_json(.message)"
 			output: {

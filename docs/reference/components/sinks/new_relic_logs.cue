@@ -35,7 +35,7 @@ components: sinks: new_relic_logs: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            100
+				concurrency:                100
 				rate_limit_duration_secs:   1
 				rate_limit_num:             100
 				retry_initial_backoff_secs: 1

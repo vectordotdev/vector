@@ -8,7 +8,6 @@ mod http;
 mod isolated_buffering;
 mod lua;
 mod regex;
-mod remap;
 mod template;
 mod topology;
 
@@ -21,7 +20,6 @@ criterion_main!(
     isolated_buffering::benches,
     lua::benches,
     regex::benches,
-    remap::benches,
     template::benches,
     topology::benches,
 );
