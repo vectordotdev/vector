@@ -142,7 +142,7 @@ _values: {
 
 	name:  Name
 	title: string
-	body:  string
+	body:  string | null
 	sub_sections?: [#Subsection, ...#Subsection]
 })
 

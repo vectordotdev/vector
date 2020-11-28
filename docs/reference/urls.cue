@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	adaptive_request_concurrency_post:                        "/blog/adaptive-request-concurrency/"
 	amazon_linux:                                             "https://aws.amazon.com/amazon-linux-ami/"
 	apache:                                                   "https://httpd.apache.org/"
 	apache_extended_status:                                   "https://httpd.apache.org/docs/current/mod/core.html#extendedstatus"
