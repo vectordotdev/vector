@@ -50,14 +50,14 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     }
 }
 
-impl<E> EncodingConfigWithDefault<E>
+#[cfg(any(feature = "sinks-new_relic_logs", feature = "sinks-humio"))]
+impl<E1> EncodingConfigWithDefault<E1>
 where
-    E: Default + PartialEq,
+    E1: Default + PartialEq,
 {
-    #[allow(dead_code)] // Required for `make check-component-features`
-    pub(crate) fn without_default<X>(self) -> EncodingConfig<X>
+    pub(crate) fn without_default<E2>(self) -> EncodingConfig<E2>
     where
-        X: From<E> + PartialEq,
+        E2: From<E1> + PartialEq,
     {
         EncodingConfig {
             codec: self.codec.into(),
