@@ -31,7 +31,8 @@ else
   STATE_AFTER="$(read-all-docs)"
 
   if [[ "$STATE_BEFORE" != "$STATE_AFTER" ]]; then
-    echo "Incorrectly formatted CUE files"
+    printf "Incorrectly formatted CUE files\n\n"
+    diff --unified <(echo "$STATE_BEFORE") <(echo "$STATE_AFTER")
     exit 1
   fi
 fi
