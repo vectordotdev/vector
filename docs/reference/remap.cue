@@ -14,11 +14,11 @@ remap: {
 			and a full blown runtime like Lua. Principles of TRL include:
 
 			1. **Performance** - Beyond extremely fast execution, TRL is designed to
-				 prevent operators from writing slow scripts.
+			   prevent operators from writing slow scripts.
 			2. **Safety** - TRL is Rust-native and performs compile-time checks on
-			   boot that ensure TRL scripts work. In addition, TRL is intentionally
-			   simple, this avoids footguns introduced through complexity and ensures
-			   TRL remain safe when collaborated on across a team.
+			   boot that ensure safety. In addition, TRL is designed for
+			   collaboration. It is intentionally simple, avoiding footguns introduced
+			   through complexity.
 			3. **Easy** - A TRL script is obvious at first glance. It is designed to
 			   have little, if any, learning curve.
 
