@@ -1031,6 +1031,44 @@
     "e.equals" = true
     "f.equals" = false
 
+[transforms.remap_function_compact]
+  inputs = []
+  type = "remap"
+  source = """
+    .compactarr = compact(parse_json(.arr))
+    .compactmap = compact(parse_json(.map))
+    .a = exists(.compactmap.field1)
+    .b = exists(.compactmap.field2)
+    .c = exists(.compactmap.field3)
+    .d = exists(.compactmap.field4.nested1)
+    .e = exists(.compactmap.field4.nested2)
+  """
+[[tests]]
+  name = "remap_function_compact"
+  [tests.input]
+    insert_at = "remap_function_compact"
+    type = "log"
+    [tests.input.log_fields]
+      arr = """
+          [null, "", [], 1]
+          """
+      map = """
+          {"field1": null,
+           "field2": 32,
+           "field3": "",
+           "field4": { "nested1": 3,
+                       "nested2": null } }
+            """
+  [[tests.outputs]]
+    extract_from = "remap_function_compact"
+    [[tests.outputs.conditions]]
+    "a.equals" = false
+    "b.equals" = true
+    "c.equals" = false
+    "d.equals" = true
+    "e.equals" = false
+    "compactarr[0].equals" = 1
+
 
 # [transforms.remap_function_log]
 #   inputs=[]

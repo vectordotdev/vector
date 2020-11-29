@@ -1,6 +1,7 @@
 #![macro_use]
 
 mod ceil;
+mod compact;
 mod contains;
 mod del;
 mod downcase;
@@ -48,6 +49,7 @@ pub use self::sha1::Sha1;
 pub use self::sha2::Sha2;
 pub use self::sha3::Sha3;
 pub use ceil::Ceil;
+pub use compact::Compact;
 pub use contains::Contains;
 pub use del::Del;
 pub use downcase::Downcase;
