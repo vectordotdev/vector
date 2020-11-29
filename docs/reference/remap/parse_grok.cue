@@ -18,9 +18,9 @@ remap: functions: parse_grok: {
 	return: ["map"]
 	category: "parse"
 	description: #"""
-			Parses a string using the Rust [`grok` library](https://github.com/daschl/grok). All patterns
-			[listed here](https://github.com/daschl/grok/tree/master/patterns) are supported. It is recommended
-			to use maintained patterns when possible since they will be improved over time by the community.
+		Parses a string using the Rust [`grok` library](https://github.com/daschl/grok). All patterns
+		[listed here](https://github.com/daschl/grok/tree/master/patterns) are supported. It is recommended
+		to use maintained patterns when possible since they will be improved over time by the community.
 		"""#
 	examples: [
 		{
