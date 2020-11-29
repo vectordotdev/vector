@@ -6,7 +6,7 @@ use crate::{
     internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration, EncodingJson as Encoding},
         http::{BatchedHttpSink, HttpSink},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
@@ -67,14 +67,6 @@ lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
         ..Default::default()
     };
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -542,7 +534,6 @@ mod tests {
         let config = ElasticSearchConfig {
             index: Some(String::from("{{ idx }}")),
             encoding: EncodingConfigWithDefault {
-                codec: Encoding::Default,
                 except_fields: Some(vec!["idx".to_string(), "timestamp".to_string()]),
                 ..Default::default()
             },

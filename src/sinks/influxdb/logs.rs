@@ -9,7 +9,10 @@ use crate::{
         },
         util::{
             encode_namespace,
-            encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::{
+                EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration,
+                EncodingText as Encoding,
+            },
             http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
         },
@@ -61,14 +64,6 @@ lazy_static! {
         retry_attempts: Some(5),
         ..Default::default()
     };
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
 }
 
 inventory::submit! {

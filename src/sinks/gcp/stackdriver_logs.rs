@@ -5,7 +5,9 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::{
+                EncodingConfigWithDefault, EncodingConfiguration, EncodingJson as Encoding,
+            },
             http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -59,14 +61,6 @@ struct StackdriverSink {
     config: StackdriverConfig,
     creds: Option<GcpCredentials>,
     severity_key: Option<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]

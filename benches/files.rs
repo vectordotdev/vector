@@ -54,7 +54,7 @@ fn benchmark_files_without_partitions(c: &mut Criterion) {
                     sinks::file::FileSinkConfig {
                         path: output.try_into().unwrap(),
                         idle_timeout_secs: None,
-                        encoding: sinks::file::Encoding::Text.into(),
+                        encoding: sinks::util::encoding::EncodingTextNdjson::Text.into(),
                         compression: sinks::file::Compression::None,
                     },
                 );

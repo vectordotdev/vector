@@ -5,7 +5,7 @@ use crate::{
     serde::to_string,
     sinks::{
         util::{
-            encoding::{EncodingConfig, EncodingConfiguration},
+            encoding::{EncodingConfig, EncodingConfiguration, EncodingTextNdjson as Encoding},
             retries::{RetryAction, RetryLogic},
             BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
             PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
@@ -122,22 +122,6 @@ lazy_static! {
         rate_limit_num: Some(1000),
         ..Default::default()
     };
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]
-#[serde(rename_all = "snake_case")]
-enum Encoding {
-    Text,
-    Ndjson,
-}
-
-impl Encoding {
-    fn content_type(&self) -> &'static str {
-        match self {
-            Self::Text => "text/plain",
-            Self::Ndjson => "application/x-ndjson",
-        }
-    }
 }
 
 inventory::submit! {
@@ -349,7 +333,7 @@ impl RequestSettings {
         let acl = config
             .acl
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
-        let content_type = HeaderValue::from_str(config.encoding.codec().content_type()).unwrap();
+        let content_type = get_content_type(&config.encoding.codec());
         let content_encoding = config
             .compression
             .content_encoding()
@@ -386,6 +370,14 @@ impl RequestSettings {
             append_uuid,
         })
     }
+}
+
+fn get_content_type(encoding: &Encoding) -> HeaderValue {
+    let ctype = match encoding {
+        Encoding::Text => "text/plain",
+        Encoding::Ndjson => "application/x-ndjson",
+    };
+    HeaderValue::from_str(ctype).unwrap()
 }
 
 // Make a header pair from a key-value string pair

@@ -1,5 +1,5 @@
 use crate::{
-    config::{log_schema, DataType, SinkConfig, SinkContext, SinkDescription},
+    config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::{Event, LogEvent, Value},
     http::HttpClient,
     internal_events::{
@@ -7,7 +7,7 @@ use crate::{
         SplunkSourceTypeMissingKeys,
     },
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
         http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
@@ -29,7 +29,7 @@ pub enum BuildError {
     UriMissingScheme,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Default)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields)]
 pub struct HecSinkConfig {
     pub token: String,
@@ -43,11 +43,7 @@ pub struct HecSinkConfig {
     pub index: Option<String>,
     pub sourcetype: Option<Template>,
     pub source: Option<Template>,
-    #[serde(
-        skip_serializing_if = "crate::serde::skip_serializing_if_default",
-        default
-    )]
-    pub encoding: EncodingConfigWithDefault<Encoding>,
+    pub encoding: EncodingConfig<Encoding>,
     #[serde(default)]
     pub compression: Compression,
     #[serde(default)]
@@ -65,15 +61,6 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Text,
-    Json,
-}
-
 fn default_host_key() -> String {
     crate::config::LogSchema::default().host_key().to_string()
 }
@@ -82,7 +69,25 @@ inventory::submit! {
     SinkDescription::new::<HecSinkConfig>("splunk_hec")
 }
 
-impl_generate_config_from_default!(HecSinkConfig);
+impl GenerateConfig for HecSinkConfig {
+    fn generate_config() -> toml::Value {
+        toml::Value::try_from(Self {
+            token: "".to_owned(),
+            endpoint: "".to_owned(),
+            host_key: default_host_key(),
+            indexed_fields: vec![],
+            index: None,
+            sourcetype: None,
+            source: None,
+            encoding: Encoding::Text.into(),
+            compression: Compression::default(),
+            batch: BatchConfig::default(),
+            request: TowerRequestConfig::default(),
+            tls: None,
+        })
+        .unwrap()
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "splunk_hec")]
@@ -714,21 +719,25 @@ mod integration_tests {
     }
 
     async fn config(
-        encoding: impl Into<EncodingConfigWithDefault<Encoding>>,
+        encoding: impl Into<EncodingConfig<Encoding>>,
         indexed_fields: Vec<String>,
     ) -> HecSinkConfig {
         HecSinkConfig {
-            endpoint: "http://localhost:8088/".into(),
             token: get_token().await,
+            endpoint: "http://localhost:8088/".into(),
             host_key: "host".into(),
-            compression: Compression::None,
+            indexed_fields,
+            index: None,
+            sourcetype: None,
+            source: None,
             encoding: encoding.into(),
+            compression: Compression::None,
             batch: BatchConfig {
                 max_events: Some(1),
                 ..Default::default()
             },
-            indexed_fields,
-            ..Default::default()
+            request: TowerRequestConfig::default(),
+            tls: None,
         }
     }
 

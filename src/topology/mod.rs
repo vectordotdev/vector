@@ -697,7 +697,10 @@ fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
 mod tests {
     use crate::{
         config::Config,
-        sinks::console::{ConsoleSinkConfig, Encoding, Target},
+        sinks::{
+            console::{ConsoleSinkConfig, Target},
+            util::encoding::EncodingTextJson as Encoding,
+        },
         sources::socket::SocketConfig,
         test_util::{next_addr, start_topology},
     };
@@ -743,16 +746,22 @@ mod tests {
     feature = "transforms-log_to_metric"
 ))]
 mod reload_tests {
-    use crate::config::Config;
-    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
-    use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
-    use crate::sources::generator::GeneratorConfig;
-    use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, start_topology, wait_for_tcp};
-    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
+    use crate::{
+        config::Config,
+        sinks::{
+            console::{ConsoleSinkConfig, Target},
+            prometheus::exporter::PrometheusExporterConfig,
+            util::encoding::EncodingTextJson as Encoding,
+        },
+        sources::{generator::GeneratorConfig, splunk_hec::SplunkConfig},
+        test_util::{next_addr, start_topology, wait_for_tcp},
+        transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig},
+    };
     use futures::{compat::Stream01CompatExt, StreamExt};
-    use std::net::{SocketAddr, TcpListener};
-    use std::time::Duration;
+    use std::{
+        net::{SocketAddr, TcpListener},
+        time::Duration,
+    };
     use tokio::time::delay_for;
 
     #[tokio::test]
@@ -982,7 +991,10 @@ mod reload_tests {
 mod source_finished_tests {
     use crate::{
         config::Config,
-        sinks::console::{ConsoleSinkConfig, Encoding, Target},
+        sinks::{
+            console::{ConsoleSinkConfig, Target},
+            util::encoding::EncodingTextJson as Encoding,
+        },
         sources::generator::GeneratorConfig,
         test_util::start_topology,
     };

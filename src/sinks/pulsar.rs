@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+    sinks::util::encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
 };
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::{
@@ -29,7 +29,7 @@ pub struct PulsarSinkConfig {
     #[serde(alias = "address")]
     endpoint: String,
     topic: String,
-    encoding: EncodingConfigWithDefault<Encoding>,
+    encoding: EncodingConfig<Encoding>,
     auth: Option<AuthConfig>,
 }
 
@@ -37,15 +37,6 @@ pub struct PulsarSinkConfig {
 pub struct AuthConfig {
     name: String,  // "token"
     token: String, // <jwt token>
-}
-
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
-#[derivative(Default)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    #[derivative(Default)]
-    Text,
-    Json,
 }
 
 type PulsarProducer = Producer<TokioExecutor>;
@@ -96,7 +87,7 @@ impl SinkConfig for PulsarSinkConfig {
             .create_pulsar_producer()
             .await
             .context(CreatePulsarSink)?;
-        let sink = PulsarSink::new(producer, self.encoding.clone().into(), cx.acker());
+        let sink = PulsarSink::new(producer, self.encoding.clone(), cx.acker());
 
         let producer = self
             .create_pulsar_producer()
@@ -290,12 +281,12 @@ mod tests {
 
         let event = encode_event(
             evt,
-            &EncodingConfigWithDefault {
+            &EncodingConfig {
                 codec: Encoding::Json,
+                only_fields: None,
                 except_fields: Some(vec!["key".into()]),
-                ..Default::default()
-            }
-            .into(),
+                timestamp_format: None,
+            },
         )
         .unwrap();
 
@@ -343,7 +334,7 @@ mod integration_tests {
 
         let (acker, ack_counter) = Acker::new_for_testing();
         let producer = cnf.create_pulsar_producer().await.unwrap();
-        let sink = PulsarSink::new(producer, cnf.encoding.clone().into(), acker);
+        let sink = PulsarSink::new(producer, cnf.encoding.clone(), acker);
         events.map(Ok).forward(sink).await.unwrap();
 
         assert_eq!(

@@ -18,8 +18,7 @@ pub mod uri;
 
 use crate::event::Event;
 use bytes::Bytes;
-use encoding::{EncodingConfig, EncodingConfiguration};
-use serde::{Deserialize, Serialize};
+use encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding};
 use snafu::Snafu;
 use std::borrow::Cow;
 
@@ -42,16 +41,6 @@ enum SinkBuildError {
     MissingHost,
     #[snafu(display("Missing port in address field"))]
     MissingPort,
-}
-
-/**
- * Enum representing different ways to encode events as they are sent into a Sink.
- */
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
 }
 
 /**

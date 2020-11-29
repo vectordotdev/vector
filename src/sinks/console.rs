@@ -4,7 +4,7 @@ use crate::{
     event::Event,
     internal_events::{ConsoleEventProcessed, ConsoleFieldNotFound},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
         StreamSink,
     },
 };
@@ -33,13 +33,6 @@ pub struct ConsoleSinkConfig {
     #[serde(default)]
     pub target: Target,
     pub encoding: EncodingConfig<Encoding>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
 }
 
 inventory::submit! {

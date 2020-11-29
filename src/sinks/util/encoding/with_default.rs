@@ -55,18 +55,6 @@ where
     E: Default + PartialEq,
 {
     #[allow(dead_code)] // Required for `make check-component-features`
-    pub(crate) fn transmute<X>(self) -> EncodingConfigWithDefault<X>
-    where
-        X: From<E> + Default + PartialEq,
-    {
-        EncodingConfigWithDefault {
-            codec: self.codec.into(),
-            only_fields: self.only_fields,
-            except_fields: self.except_fields,
-            timestamp_format: self.timestamp_format,
-        }
-    }
-    #[allow(dead_code)] // Required for `make check-component-features`
     pub(crate) fn without_default<X>(self) -> EncodingConfig<X>
     where
         X: From<E> + PartialEq,

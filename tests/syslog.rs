@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use sinks::{
     socket::SocketSinkConfig,
-    util::{encoding::EncodingConfig, Encoding},
+    util::encoding::{EncodingConfig, EncodingTextJson as Encoding},
 };
 use std::{collections::HashMap, fmt, str::FromStr};
 use tokio_util::codec::BytesCodec;

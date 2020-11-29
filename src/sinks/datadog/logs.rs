@@ -6,9 +6,9 @@ use crate::{
         util::{
             batch::{Batch, BatchError},
             encode_event,
-            encoding::{EncodingConfig, EncodingConfiguration},
+            encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
             http::{BatchedHttpSink, HttpSink},
-            BatchConfig, BatchSettings, BoxedRawValue, Compression, Encoding, JsonArrayBuffer,
+            BatchConfig, BatchSettings, BoxedRawValue, Compression, JsonArrayBuffer,
             TowerRequestConfig, VecBuffer,
         },
         Healthcheck, VectorSink,

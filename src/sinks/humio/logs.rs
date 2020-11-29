@@ -1,9 +1,10 @@
-use super::{default_host_key, Encoding};
+use super::default_host_key;
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::HecSinkConfig,
     sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
+        encoding::{EncodingConfigWithDefault, EncodingTextJsonDefaultJson as Encoding},
+        BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,
@@ -69,14 +70,16 @@ impl HumioLogsConfig {
         HecSinkConfig {
             token: self.token.clone(),
             endpoint,
-            source: self.source.clone(),
+            host_key: self.host_key.clone(),
+            indexed_fields: vec![],
+            index: None,
             sourcetype: self.event_type.clone(),
-            encoding: self.encoding.clone().transmute(),
+            source: self.source.clone(),
+            encoding: self.encoding.clone().without_default(),
             compression: self.compression,
             batch: self.batch,
             request: self.request,
-            host_key: self.host_key.clone(),
-            ..Default::default()
+            tls: None,
         }
     }
 }

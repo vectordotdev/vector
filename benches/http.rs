@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use tokio::runtime::Runtime;
 use vector::{
     config, sinks,
-    sinks::util::Compression,
+    sinks::util::{encoding::EncodingTextJsonNdjson as Encoding, Compression},
     sources,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,
@@ -53,7 +53,7 @@ fn benchmark_http(c: &mut Criterion) {
                                     max_bytes: Some(num_lines * line_size),
                                     ..Default::default()
                                 },
-                                encoding: sinks::http::Encoding::Text.into(),
+                                encoding: Encoding::Text.into(),
                                 request: Default::default(),
                                 tls: Default::default(),
                             },

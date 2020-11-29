@@ -1,8 +1,9 @@
-use super::{default_host_key, logs::HumioLogsConfig, Encoding};
+use super::{default_host_key, logs::HumioLogsConfig};
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription, TransformConfig},
     sinks::util::{
-        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
+        encoding::{EncodingConfigWithDefault, EncodingTextJsonDefaultJson as Encoding},
+        BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,

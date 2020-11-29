@@ -5,7 +5,9 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
+            encoding::{
+                EncodingConfigWithDefault, EncodingConfiguration, EncodingJson as Encoding,
+            },
             http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -52,14 +54,6 @@ pub struct PubsubConfig {
 
 fn default_skip_authentication() -> bool {
     false
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Default,
 }
 
 inventory::submit! {

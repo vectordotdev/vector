@@ -1,9 +1,9 @@
 use crate::{
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
         tcp::TcpSinkConfig,
-        Encoding, UriSerde,
+        UriSerde,
     },
     tls::TlsConfig,
     Event,

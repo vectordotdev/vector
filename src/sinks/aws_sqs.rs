@@ -3,7 +3,7 @@ use crate::{
     internal_events::{AwsSqsEventSent, AwsSqsMessageGroupIdMissingKeys},
     rusoto,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration},
+        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
         retries::RetryLogic,
         sink::Response,
         BatchSettings, EncodedLength, TowerRequestConfig, VecBuffer,
@@ -69,13 +69,6 @@ lazy_static! {
         timeout_secs: Some(30),
         ..Default::default()
     };
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
-#[serde(rename_all = "snake_case")]
-pub enum Encoding {
-    Text,
-    Json,
 }
 
 inventory::submit! {
