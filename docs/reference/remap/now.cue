@@ -5,7 +5,7 @@ remap: functions: now: {
 	category: "text"
 	return: ["timestamp"]
 	description: #"""
-			Returns the current timestamp in the Utc timezone.
+		Returns the current timestamp in the Utc timezone.
 		"""#
 	examples: [
 		{

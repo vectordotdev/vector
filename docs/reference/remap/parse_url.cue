@@ -12,7 +12,7 @@ remap: functions: parse_url: {
 	return: ["map"]
 	category: "parse"
 	description: #"""
-			Parses a url into it's constituent components.
+		Parses a url into it's constituent components.
 		"""#
 	examples: [
 		{
