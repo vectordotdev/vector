@@ -1,4 +1,4 @@
-use crate::Event;
+use crate::{config::Resource, Event};
 use futures01::{sync::mpsc, task::AtomicTask, AsyncSink, Poll, Sink, StartSend, Stream};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -131,6 +131,14 @@ impl BufferConfig {
                 let rx = Box::new(rx);
                 Ok((tx, rx, acker))
             }
+        }
+    }
+
+    /// Resources that the sink is using.
+    pub fn resources(&self, sink_name: &str) -> Vec<Resource> {
+        match self {
+            BufferConfig::Memory { .. } => Vec::new(),
+            BufferConfig::Disk { .. } => vec![Resource::DiskBuffer(sink_name.to_string())],
         }
     }
 }

@@ -87,7 +87,7 @@ pub async fn start_validated(
 pub async fn build_or_log_errors(
     config: &Config,
     diff: &ConfigDiff,
-    buffers: HashMap<String, (BuildedBuffer, buffers::BufferConfig)>,
+    buffers: HashMap<String, BuildedBuffer>,
 ) -> Option<Pieces> {
     match builder::build_pieces(config, diff, buffers).await {
         Err(errors) => {
@@ -233,50 +233,8 @@ impl RunningTopology {
 
         let diff = ConfigDiff::new(&self.config, &new_config);
 
-        // At this point both the old and the new config don't have
-        // conflicts in their resource usage. So if we combine their
-        // resources, all found conflicts are between
-        // to be removed and to be added components.
-        let remove_sink = diff
-            .sinks
-            .removed_and_changed()
-            .map(|name| (name, self.config.sinks[name].inner.resources()));
-        let add_source = diff
-            .sources
-            .changed_and_added()
-            .map(|name| (name, new_config.sources[name].resources()));
-        let add_sink = diff
-            .sinks
-            .changed_and_added()
-            .map(|name| (name, new_config.sinks[name].inner.resources()));
-        let conflicts = Resource::conflicts(
-            remove_sink.map(|(key, value)| ((true, key), value)).chain(
-                add_sink
-                    .chain(add_source)
-                    .map(|(key, value)| ((false, key), value)),
-            ),
-        )
-        .into_iter()
-        .flat_map(|(_, components)| components)
-        .collect::<HashSet<_>>();
-        let wait_for_sinks = conflicts
-            .into_iter()
-            .filter(|&(existing_sink, _)| existing_sink)
-            .map(|(_, name)| name.clone())
-            .collect();
-
-        // TODO: Wait for sink should be extended with those changed sinks whose
-        // buffers we want to reuse
-
         // Checks passed so let's shutdown the difference.
-        let buffers = self.shutdown_diff(&diff, &wait_for_sinks).await;
-        let buffers = buffers
-            .into_iter()
-            .map(|(name, buffer)| {
-                let buffer_config = self.config.sinks.get(&name).unwrap().buffer.clone();
-                (name, (buffer, buffer_config))
-            })
-            .collect::<HashMap<_, _>>();
+        let buffers = self.shutdown_diff(&diff, &new_config).await;
 
         // Gives windows some time to make available any port
         // released by shutdown componenets.
@@ -351,11 +309,11 @@ impl RunningTopology {
     }
 
     /// Shutdowns removed and replaced pieces of topology.
-    /// Returns Buffers of changed sinks that we waited for to finish.
+    /// Returns buffers to be reused.
     async fn shutdown_diff(
         &mut self,
         diff: &ConfigDiff,
-        wait_for_sinks: &HashSet<String>,
+        new_config: &Config,
     ) -> HashMap<String, BuildedBuffer> {
         // Sources
         let timeout = Duration::from_secs(30); //sec
@@ -422,24 +380,78 @@ impl RunningTopology {
         }
 
         // Sinks
-        // First pass to detach sinks
+
+        // Resource conflicts
+        // At this point both the old and the new config don't have
+        // conflicts in their resource usage. So if we combine their
+        // resources, all found conflicts are between
+        // to be removed and to be added components.
+        let remove_sink = diff
+            .sinks
+            .removed_and_changed()
+            .map(|name| (name, self.config.sinks[name].resources(name)));
+        let add_source = diff
+            .sources
+            .changed_and_added()
+            .map(|name| (name, new_config.sources[name].resources()));
+        let add_sink = diff
+            .sinks
+            .changed_and_added()
+            .map(|name| (name, new_config.sinks[name].resources(name)));
+        let conflicts = Resource::conflicts(
+            remove_sink.map(|(key, value)| ((true, key), value)).chain(
+                add_sink
+                    .chain(add_source)
+                    .map(|(key, value)| ((false, key), value)),
+            ),
+        )
+        .into_iter()
+        .flat_map(|(_, components)| components)
+        .collect::<HashSet<_>>();
+        // Existing conflicting sinks
+        let conflicting_sinks = conflicts
+            .into_iter()
+            .filter(|&(existing_sink, _)| existing_sink)
+            .map(|(_, name)| name.clone());
+
+        // Buffer reuse
+        // We can reuse buffers whose configuration wasn't changed.
+        let reuse_buffers = diff
+            .sinks
+            .to_change
+            .iter()
+            .filter(|&name| self.config.sinks[name].buffer == new_config.sinks[name].buffer)
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        let wait_for_sinks = conflicting_sinks
+            .chain(reuse_buffers.iter().cloned())
+            .collect::<HashSet<_>>();
+
+        // First pass
+
+        // Detach removed sinks
         for name in &diff.sinks.to_remove {
             info!(message = "Removing sink.", name = ?name);
             self.remove_inputs(&name);
         }
 
-        // Detach changed sinks that we have to wait for.
+        // Detach changed sinks
         for name in &diff.sinks.to_change {
-            if wait_for_sinks.contains(name) {
+            if reuse_buffers.contains(name) {
                 self.detach_triggers
                     .remove(name)
                     .unwrap()
                     .into_inner()
                     .cancel();
+            } else if wait_for_sinks.contains(name) {
+                self.detach_inputs(name);
             }
         }
 
         // Second pass for final cleanup
+
+        // Cleanup removed
         for name in &diff.sinks.to_remove {
             let previous = self.tasks.remove(name).unwrap();
             if wait_for_sinks.contains(name) {
@@ -449,19 +461,22 @@ impl RunningTopology {
             }
         }
 
+        // Cleanup changed and collect buffers to be reused
         let mut buffers = HashMap::new();
         for name in &diff.sinks.to_change {
             if wait_for_sinks.contains(name) {
                 let previous = self.tasks.remove(name).unwrap();
                 let buffer = previous.await.unwrap().unwrap();
 
-                let tx = self.inputs.remove(name).unwrap();
-                let (rx, acker) = match buffer {
-                    TaskBuffer::Sink(rx, acker) => (rx, acker),
-                    _ => unreachable!(),
-                };
+                if reuse_buffers.contains(name) {
+                    let tx = self.inputs.remove(name).unwrap();
+                    let (rx, acker) = match buffer {
+                        TaskBuffer::Sink(rx, acker) => (rx, acker),
+                        _ => unreachable!(),
+                    };
 
-                buffers.insert(name.clone(), (tx, Arc::new(Mutex::new(Some(rx))), acker));
+                    buffers.insert(name.clone(), (tx, Arc::new(Mutex::new(Some(rx))), acker));
+                }
             }
         }
 
@@ -705,19 +720,19 @@ impl RunningTopology {
     }
 
     // TODO: remove replace None
-    fn detach_inputs(&mut self, name: &str) -> buffers::BufferInputCloner {
+    fn detach_inputs(&mut self, name: &str) {
+        self.inputs.remove(name);
         self.detach_triggers.remove(name);
-        self.inputs.remove(name).unwrap()
 
-        // let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
-        // let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
-        // let old_inputs = sink_inputs.or(trans_inputs).unwrap();
+        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
+        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        let old_inputs = sink_inputs.or(trans_inputs).unwrap();
 
-        // for input in old_inputs {
-        //     // This can only fail if we are disconnected, which is a valid situation.
-        //     let _ = self.outputs[input]
-        //         .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
-        // }
+        for input in old_inputs {
+            // This can only fail if we are disconnected, which is a valid situation.
+            let _ = self.outputs[input]
+                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+        }
     }
 
     /// Borrows the Config

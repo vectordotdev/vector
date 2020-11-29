@@ -38,7 +38,7 @@ pub struct Pieces {
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
-    mut buffers: HashMap<String, (BuildedBuffer, buffers::BufferConfig)>,
+    mut buffers: HashMap<String, BuildedBuffer>,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
@@ -166,11 +166,7 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
 
-        let (tx, rx, acker) = if let Some((buffer, old_buffer_config)) = buffers.remove(name) {
-            if old_buffer_config != sink.buffer {
-                // This situation should have been dealt with in reload logic.
-                warn!(message = "Reusing old buffer when new buffer configuration was provided.", component_name = %name);
-            }
+        let (tx, rx, acker) = if let Some(buffer) = buffers.remove(name) {
             buffer
         } else {
             let buffer = sink.buffer.build(&config.global.data_dir, &name);
@@ -195,14 +191,6 @@ pub async fn build_pieces(
             Ok(builded) => builded,
         };
 
-        // Idea:
-        // A valve which when closed will prevent pulling of any more
-        // events from the stream, then when the sink naturally shuts down
-        // we return the stream through regular return way.
-        // We catch that stream and acker in topology reload and then pass
-        // it back here to be reused at which point we can open the valve.
-
-        // Tx ?
         let (trigger, tripwire) = Tripwire::new();
 
         let sink = async move {

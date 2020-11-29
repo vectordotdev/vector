@@ -185,6 +185,14 @@ pub struct SinkOuter {
     pub inner: Box<dyn SinkConfig>,
 }
 
+impl SinkOuter {
+    pub fn resources(&self, name: &str) -> Vec<Resource> {
+        let mut resources = self.inner.resources();
+        resources.append(&mut self.buffer.resources(name));
+        resources
+    }
+}
+
 #[async_trait]
 #[typetag::serde(tag = "type")]
 pub trait SinkConfig: core::fmt::Debug + Send + Sync {
@@ -261,6 +269,7 @@ pub enum Resource {
     Port(SocketAddr),
     SystemFdOffset(usize),
     Stdin,
+    DiskBuffer(String),
 }
 
 impl Resource {
@@ -318,6 +327,7 @@ impl Display for Resource {
             Resource::Port(address) => write!(fmt, "{}", address),
             Resource::SystemFdOffset(offset) => write!(fmt, "systemd {}th socket", offset + 1),
             Resource::Stdin => write!(fmt, "stdin"),
+            Resource::DiskBuffer(name) => write!(fmt, "disk buffer {:?}", name),
         }
     }
 }
