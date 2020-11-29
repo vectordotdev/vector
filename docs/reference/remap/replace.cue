@@ -34,7 +34,7 @@ remap: functions: replace: {
 	description: #"""
 		Replaces any matches of pattern with the provided string. Pattern can be either a fixed string or a regular expression.
 
-		Regular expressions take the form `/<regex>/<flags> where flags are one of the following:
+		Regular expressions take the form `/regex/flags` where flags are one of the following:
 
 		- *i* perform a case insensitive match.
 		- *m* multiline. When enabled `^` and `$` match the beginning and end of multiline strings.
