@@ -12,35 +12,35 @@ remap: functions: compact: {
 			name:        "recursive"
 			description: "Should the compact be recursive."
 			required:    false
-			default:     false
+			default:     true
 			type: ["boolean"]
 		},
 		{
 			name:        "null"
 			description: "Should null be treated as an empty value."
 			required:    false
-			default:     false
+			default:     true
 			type: ["boolean"]
 		},
 		{
 			name:        "string"
 			description: "Should an empty string be treated as an empty value."
 			required:    false
-			default:     false
+			default:     true
 			type: ["boolean"]
 		},
 		{
 			name:        "map"
 			description: "Should an empty map be treated as an empty value."
 			required:    false
-			default:     false
+			default:     true
 			type: ["boolean"]
 		},
 		{
 			name:        "array"
 			description: "Should an empty array be treated as an empty value."
 			required:    false
-			default:     false
+			default:     true
 			type: ["boolean"]
 		},
 	]
