@@ -59,7 +59,7 @@ or [**install Vector**][docs.installation].
 ### Setup
 
 * [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms], [from archives][docs.from-archives], [from source][docs.from-source]
-* [**Configuration**][docs.configuration]
+* [**Configuration**][docs.setup.configuration]
 * [**Deployment**][docs.deployment] - [strategies][docs.strategies], [topologies][docs.topologies]
 
 ### Reference
@@ -148,7 +148,7 @@ Vector is an end-to-end, unified, open data platform.
 [docs.administration.process-management]: https://vector.dev/docs/administration/process-management/
 [docs.administration.validating]: https://vector.dev/docs/administration/validating/
 [docs.concepts]: https://vector.dev/docs/about/concepts/
-[docs.configuration]: https://vector.dev/docs/setup/configuration/
+[docs.setup.configuration]: https://vector.dev/docs/setup/configuration/
 [docs.data-model.log#timestamps]: https://vector.dev/docs/about/data-model/log/#timestamps
 [docs.data-model.log#types]: https://vector.dev/docs/about/data-model/log/#types
 [docs.data-model.log]: https://vector.dev/docs/about/data-model/log/
