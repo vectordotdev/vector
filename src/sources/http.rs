@@ -5,6 +5,7 @@ use crate::{
     },
     event::{Event, Value},
     shutdown::ShutdownSignal,
+    sinks::util::encoding::EncodingTextJsonNdjson as Encoding,
     sources::util::{add_query_parameters, ErrorMessage, HttpSource, HttpSourceAuthConfig},
     tls::TlsConfig,
     Pipeline,
@@ -22,7 +23,6 @@ use warp::http::{HeaderMap, HeaderValue, StatusCode};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SimpleHttpConfig {
     address: SocketAddr,
-    #[serde(default)]
     encoding: Encoding,
     #[serde(default)]
     headers: Vec<String>,
@@ -40,7 +40,7 @@ impl GenerateConfig for SimpleHttpConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "0.0.0.0:80".parse().unwrap(),
-            encoding: Default::default(),
+            encoding: Encoding::Text,
             headers: Vec::new(),
             query_parameters: Vec::new(),
             tls: None,
@@ -55,16 +55,6 @@ struct SimpleHttpSource {
     encoding: Encoding,
     headers: Vec<String>,
     query_parameters: Vec<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative, Copy)]
-#[serde(rename_all = "snake_case")]
-#[derivative(Default)]
-pub enum Encoding {
-    #[derivative(Default)]
-    Text,
-    Ndjson,
-    Json,
 }
 
 impl HttpSource for SimpleHttpSource {
@@ -323,7 +313,7 @@ mod tests {
 
         let body = "test body\n\ntest body 2";
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::Text, vec![], vec![]).await;
 
         assert_eq!(200, send(addr, body).await);
 
@@ -351,7 +341,7 @@ mod tests {
         //same as above test but with a newline at the end
         let body = "test body\n\ntest body 2\n";
 
-        let (rx, addr) = source(Encoding::default(), vec![], vec![]).await;
+        let (rx, addr) = source(Encoding::Text, vec![], vec![]).await;
 
         assert_eq!(200, send(addr, body).await);
 
