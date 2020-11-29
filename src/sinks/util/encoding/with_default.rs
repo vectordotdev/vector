@@ -1,7 +1,7 @@
 use crate::{
     event::{PathComponent, PathIter},
     serde::skip_serializing_if_default,
-    sinks::util::encoding::{EncodingConfig, EncodingConfiguration, TimestampFormat},
+    sinks::util::encoding::{EncodingConfiguration, TimestampFormat},
 };
 use serde::{
     de::{self, DeserializeOwned, Deserializer, IntoDeserializer, MapAccess, Visitor},
@@ -55,11 +55,11 @@ impl<E1> EncodingConfigWithDefault<E1>
 where
     E1: Default + PartialEq,
 {
-    pub(crate) fn without_default<E2>(self) -> EncodingConfig<E2>
+    pub(crate) fn without_default<E2>(self) -> crate::sinks::util::encoding::EncodingConfig<E2>
     where
         E2: From<E1> + PartialEq,
     {
-        EncodingConfig {
+        crate::sinks::util::encoding::EncodingConfig {
             codec: self.codec.into(),
             only_fields: self.only_fields,
             except_fields: self.except_fields,
