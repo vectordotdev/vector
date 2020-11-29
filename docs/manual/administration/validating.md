@@ -35,7 +35,7 @@ within a configuration file, including:
 
 1. That [sources][docs.sources], [transforms][docs.transforms], and
    [sinks][docs.sinks] include all non-optional fields.
-2. All fields are of the proper [type][docs.configuration#types].
+2. All fields are of the proper [type][docs.setup.configuration#types].
 
 The following group of checks verifies that the configuration file contains a valid topology,
 and can be disabled with flags such as `--no-topology`, expanding the above checks with the following:
@@ -58,7 +58,7 @@ Vector will exit with an exit code of `0`.
 To see other customization options for the `validate` subcommand run
 `vector validate --help`.
 
-[docs.configuration#types]: /docs/setup/configuration/#types
+[docs.setup.configuration#types]: /docs/setup/configuration/#types
 [docs.sinks]: /docs/reference/sinks/
 [docs.sources]: /docs/reference/sources/
 [docs.transforms]: /docs/reference/transforms/
