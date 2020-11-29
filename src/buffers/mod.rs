@@ -10,7 +10,7 @@ use std::sync::{
 #[cfg(feature = "leveldb")]
 pub mod disk;
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum BufferConfig {
@@ -50,6 +50,7 @@ impl Default for WhenFull {
     }
 }
 
+#[derive(Clone)]
 pub enum BufferInputCloner {
     Memory(mpsc::Sender<Event>, WhenFull),
     #[cfg(feature = "leveldb")]

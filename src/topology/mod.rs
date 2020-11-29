@@ -13,21 +13,33 @@ mod task;
 use crate::{
     buffers,
     config::{Config, ConfigDiff, Resource},
+    event::Event,
     shutdown::SourceShutdownCoordinator,
-    topology::{builder::Pieces, task::Task},
+    topology::{
+        builder::Pieces,
+        task::{Task, TaskBuffer},
+    },
+    trigger::DisabledTrigger,
 };
 use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFutureExt};
-use futures01::{sync::mpsc, Future};
+use futures01::{sync::mpsc, Future, Stream as Stream01};
 use std::{
     collections::{HashMap, HashSet},
     future::ready,
     panic::AssertUnwindSafe,
+    sync::{Arc, Mutex},
 };
 use tokio::time::{delay_until, interval, Duration, Instant};
 use tracing_futures::Instrument;
 
 // TODO: Result is only for compat, remove when not needed
-type TaskHandle = tokio::task::JoinHandle<Result<(), ()>>;
+type TaskHandle = tokio::task::JoinHandle<Result<TaskBuffer, ()>>;
+
+type BuildedBuffer = (
+    buffers::BufferInputCloner,
+    Arc<Mutex<Option<Box<dyn Stream01<Item = Event, Error = ()> + Send>>>>,
+    buffers::Acker,
+);
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -36,6 +48,7 @@ pub struct RunningTopology {
     source_tasks: HashMap<String, TaskHandle>,
     tasks: HashMap<String, TaskHandle>,
     shutdown_coordinator: SourceShutdownCoordinator,
+    detach_triggers: HashMap<String, DisabledTrigger>,
     config: Config,
     abort_tx: mpsc::UnboundedSender<()>,
 }
@@ -53,6 +66,7 @@ pub async fn start_validated(
         outputs: HashMap::new(),
         config,
         shutdown_coordinator: SourceShutdownCoordinator::default(),
+        detach_triggers: HashMap::new(),
         source_tasks: HashMap::new(),
         tasks: HashMap::new(),
         abort_tx,
@@ -70,8 +84,12 @@ pub async fn start_validated(
     Some((running_topology, abort_rx))
 }
 
-pub async fn build_or_log_errors(config: &Config, diff: &ConfigDiff) -> Option<Pieces> {
-    match builder::build_pieces(config, diff).await {
+pub async fn build_or_log_errors(
+    config: &Config,
+    diff: &ConfigDiff,
+    buffers: HashMap<String, (BuildedBuffer, buffers::BufferConfig)>,
+) -> Option<Pieces> {
+    match builder::build_pieces(config, diff, buffers).await {
         Err(errors) => {
             for error in errors {
                 error!(message = "Configuration error.", %error);
@@ -247,8 +265,18 @@ impl RunningTopology {
             .map(|(_, name)| name.clone())
             .collect();
 
+        // TODO: Wait for sink should be extended with those changed sinks whose
+        // buffers we want to reuse
+
         // Checks passed so let's shutdown the difference.
-        self.shutdown_diff(&diff, &wait_for_sinks).await;
+        let buffers = self.shutdown_diff(&diff, &wait_for_sinks).await;
+        let buffers = buffers
+            .into_iter()
+            .map(|(name, buffer)| {
+                let buffer_config = self.config.sinks.get(&name).unwrap().buffer.clone();
+                (name, (buffer, buffer_config))
+            })
+            .collect::<HashMap<_, _>>();
 
         // Gives windows some time to make available any port
         // released by shutdown componenets.
@@ -259,7 +287,8 @@ impl RunningTopology {
         }
 
         // Now let's actually build the new pieces.
-        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&new_config, &diff, buffers.clone()).await
+        {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
@@ -275,7 +304,7 @@ impl RunningTopology {
         // We need to rebuild the removed.
         info!("Rebuilding old configuration.");
         let diff = diff.flip();
-        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff).await {
+        if let Some(mut new_pieces) = build_or_log_errors(&self.config, &diff, buffers).await {
             if self
                 .run_healthchecks(&diff, &mut new_pieces, require_healthy)
                 .await
@@ -322,7 +351,12 @@ impl RunningTopology {
     }
 
     /// Shutdowns removed and replaced pieces of topology.
-    async fn shutdown_diff(&mut self, diff: &ConfigDiff, wait_for_sinks: &HashSet<String>) {
+    /// Returns Buffers of changed sinks that we waited for to finish.
+    async fn shutdown_diff(
+        &mut self,
+        diff: &ConfigDiff,
+        wait_for_sinks: &HashSet<String>,
+    ) -> HashMap<String, BuildedBuffer> {
         // Sources
         let timeout = Duration::from_secs(30); //sec
 
@@ -397,7 +431,11 @@ impl RunningTopology {
         // Detach changed sinks that we have to wait for.
         for name in &diff.sinks.to_change {
             if wait_for_sinks.contains(name) {
-                self.detach_inputs(&name);
+                self.detach_triggers
+                    .remove(name)
+                    .unwrap()
+                    .into_inner()
+                    .cancel();
             }
         }
 
@@ -411,12 +449,23 @@ impl RunningTopology {
             }
         }
 
+        let mut buffers = HashMap::new();
         for name in &diff.sinks.to_change {
             if wait_for_sinks.contains(name) {
                 let previous = self.tasks.remove(name).unwrap();
-                previous.await.unwrap().unwrap();
+                let buffer = previous.await.unwrap().unwrap();
+
+                let tx = self.inputs.remove(name).unwrap();
+                let (rx, acker) = match buffer {
+                    TaskBuffer::Sink(rx, acker) => (rx, acker),
+                    _ => unreachable!(),
+                };
+
+                buffers.insert(name.clone(), (tx, Arc::new(Mutex::new(Some(rx))), acker));
             }
         }
+
+        buffers
     }
 
     /// Rewires topology
@@ -547,6 +596,7 @@ impl RunningTopology {
 
     fn remove_inputs(&mut self, name: &str) {
         self.inputs.remove(name);
+        self.detach_triggers.remove(name);
 
         let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
         let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
@@ -603,6 +653,10 @@ impl RunningTopology {
         }
 
         self.inputs.insert(name.to_string(), tx);
+        new_pieces.detach_triggers.remove(name).map(|trigger| {
+            self.detach_triggers
+                .insert(name.to_string(), trigger.into())
+        });
     }
 
     fn replace_inputs(&mut self, name: &str, new_pieces: &mut builder::Pieces) {
@@ -644,20 +698,26 @@ impl RunningTopology {
         }
 
         self.inputs.insert(name.to_string(), tx);
+        new_pieces.detach_triggers.remove(name).map(|trigger| {
+            self.detach_triggers
+                .insert(name.to_string(), trigger.into())
+        });
     }
 
-    fn detach_inputs(&mut self, name: &str) {
-        self.inputs.remove(name);
+    // TODO: remove replace None
+    fn detach_inputs(&mut self, name: &str) -> buffers::BufferInputCloner {
+        self.detach_triggers.remove(name);
+        self.inputs.remove(name).unwrap()
 
-        let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
-        let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
-        let old_inputs = sink_inputs.or(trans_inputs).unwrap();
+        // let sink_inputs = self.config.sinks.get(name).map(|s| &s.inputs);
+        // let trans_inputs = self.config.transforms.get(name).map(|t| &t.inputs);
+        // let old_inputs = sink_inputs.or(trans_inputs).unwrap();
 
-        for input in old_inputs {
-            // This can only fail if we are disconnected, which is a valid situation.
-            let _ = self.outputs[input]
-                .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
-        }
+        // for input in old_inputs {
+        //     // This can only fail if we are disconnected, which is a valid situation.
+        //     let _ = self.outputs[input]
+        //         .unbounded_send(fanout::ControlMessage::Replace(name.to_string(), None));
+        // }
     }
 
     /// Borrows the Config
@@ -666,10 +726,10 @@ impl RunningTopology {
     }
 }
 
-fn handle_errors(
-    task: impl Future<Item = (), Error = ()>,
+fn handle_errors<T>(
+    task: impl Future<Item = T, Error = ()>,
     abort_tx: mpsc::UnboundedSender<()>,
-) -> impl Future<Item = (), Error = ()> {
+) -> impl Future<Item = T, Error = ()> {
     AssertUnwindSafe(task)
         .catch_unwind()
         .map_err(|_| ())

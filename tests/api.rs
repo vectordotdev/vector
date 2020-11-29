@@ -10,6 +10,7 @@ mod tests {
     use chrono::Utc;
     use futures::StreamExt;
     use std::{
+        collections::HashMap,
         net::SocketAddr,
         sync::Once,
         time::{Duration, Instant},
@@ -71,7 +72,7 @@ mod tests {
         c.api.address = Some(next_addr());
 
         let diff = config::ConfigDiff::initial(&c);
-        let pieces = vector::topology::build_or_log_errors(&c, &diff)
+        let pieces = vector::topology::build_or_log_errors(&c, &diff, &mut HashMap::new())
             .await
             .unwrap();
 

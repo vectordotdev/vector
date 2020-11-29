@@ -69,6 +69,7 @@ pub mod top;
 pub mod topology;
 pub mod trace;
 pub mod transforms;
+pub mod trigger;
 pub mod types;
 pub mod unit_test;
 pub mod validate;

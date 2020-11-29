@@ -1,7 +1,7 @@
 use super::{
     fanout::{self, Fanout},
-    task::Task,
-    ConfigDiff,
+    task::{Task, TaskBuffer},
+    BuildedBuffer, ConfigDiff,
 };
 use crate::{
     buffers,
@@ -16,7 +16,12 @@ use futures::{
     future, FutureExt, StreamExt, TryFutureExt,
 };
 use futures01::{sync::mpsc, Future as Future01, Stream as Stream01};
-use std::{collections::HashMap, future::ready};
+use std::{
+    collections::HashMap,
+    future::ready,
+    sync::{Arc, Mutex},
+};
+use stream_cancel::{Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
@@ -26,12 +31,14 @@ pub struct Pieces {
     pub source_tasks: HashMap<String, Task>,
     pub healthchecks: HashMap<String, Task>,
     pub shutdown_coordinator: SourceShutdownCoordinator,
+    pub detach_triggers: HashMap<String, Trigger>,
 }
 
 /// Builds only the new pieces, and doesn't check their topology.
 pub async fn build_pieces(
     config: &super::Config,
     diff: &ConfigDiff,
+    mut buffers: HashMap<String, (BuildedBuffer, buffers::BufferConfig)>,
 ) -> Result<Pieces, Vec<String>> {
     let mut inputs = HashMap::new();
     let mut outputs = HashMap::new();
@@ -39,6 +46,7 @@ pub async fn build_pieces(
     let mut source_tasks = HashMap::new();
     let mut healthchecks = HashMap::new();
     let mut shutdown_coordinator = SourceShutdownCoordinator::default();
+    let mut detach_triggers = HashMap::new();
 
     let mut errors = vec![];
 
@@ -67,7 +75,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx.forward(output).map(|_| ()).compat();
+        let pump = rx.forward(output).map(|_| TaskBuffer::Other).compat();
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
@@ -76,7 +84,10 @@ pub async fn build_pieces(
         // force_shutdown_tripwire. That means that if the force_shutdown_tripwire resolves while
         // the server Task is still running the Task will simply be dropped on the floor.
         let server = future::try_select(server, force_shutdown_tripwire.unit_error().boxed())
-            .map_ok(|_| debug!("Finished."))
+            .map_ok(|_| {
+                debug!("Finished.");
+                TaskBuffer::Other
+            })
             .map_err(|_| ());
         let server = Task::new(name, typetag, server);
 
@@ -131,7 +142,10 @@ pub async fn build_pieces(
                 transformed.forward(output)
             }
         }
-        .map(|_| debug!("Finished."))
+        .map(|_| {
+            debug!("Finished.");
+            TaskBuffer::Other
+        })
         .compat();
         let task = Task::new(name, typetag, transform);
 
@@ -152,33 +166,70 @@ pub async fn build_pieces(
         let typetag = sink.inner.sink_type();
         let input_type = sink.inner.input_type();
 
-        let buffer = sink.buffer.build(&config.global.data_dir, &name);
-        let (tx, rx, acker) = match buffer {
-            Err(error) => {
-                errors.push(format!("Sink \"{}\": {}", name, error));
-                continue;
+        let (tx, rx, acker) = if let Some((buffer, old_buffer_config)) = buffers.remove(name) {
+            if old_buffer_config != sink.buffer {
+                // This situation should have been dealt with in reload logic.
+                warn!(message = "Reusing old buffer when new buffer configuration was provided.", component_name = %name);
             }
-            Ok(buffer) => buffer,
+            buffer
+        } else {
+            let buffer = sink.buffer.build(&config.global.data_dir, &name);
+            match buffer {
+                Err(error) => {
+                    errors.push(format!("Sink \"{}\": {}", name, error));
+                    continue;
+                }
+                Ok((tx, rx, acker)) => (tx, Arc::new(Mutex::new(Some(rx))), acker),
+            }
         };
 
-        let cx = SinkContext { acker };
+        let cx = SinkContext {
+            acker: acker.clone(),
+        };
 
         let (sink, healthcheck) = match sink.inner.build(cx).await {
             Err(error) => {
                 errors.push(format!("Sink \"{}\": {}", name, error));
                 continue;
             }
-            Ok((sink, healthcheck)) => (sink, healthcheck),
+            Ok(builded) => builded,
         };
 
-        let sink = sink
-            .run(
-                filter_event_type(rx, input_type)
+        // Idea:
+        // A valve which when closed will prevent pulling of any more
+        // events from the stream, then when the sink naturally shuts down
+        // we return the stream through regular return way.
+        // We catch that stream and acker in topology reload and then pass
+        // it back here to be reused at which point we can open the valve.
+
+        // Tx ?
+        let (trigger, tripwire) = Tripwire::new();
+
+        let sink = async move {
+            let mut rx = rx
+                .lock()
+                .unwrap()
+                .take()
+                .expect("Task started but input has been taken.");
+
+            sink.run(
+                (&mut rx)
+                    .filter(|event| match input_type {
+                        DataType::Any => true,
+                        DataType::Log => matches!(event, Event::Log(_)),
+                        DataType::Metric => matches!(event, Event::Metric(_)),
+                    })
                     .compat()
                     .take_while(|e| ready(e.is_ok()))
+                    .take_until(tripwire)
                     .map(|x| x.unwrap()),
             )
-            .inspect(|_| debug!("Finished."));
+            .await
+            .map(|_| {
+                debug!("Finished.");
+                TaskBuffer::Sink(rx, acker)
+            })
+        };
         let task = Task::new(name, typetag, sink);
 
         let healthcheck_task = async move {
@@ -188,7 +239,7 @@ pub async fn build_pieces(
                     .map(|result| match result {
                         Ok(Ok(_)) => {
                             info!("Healthcheck: Passed.");
-                            Ok(())
+                            Ok(TaskBuffer::Other)
                         }
                         Ok(Err(error)) => {
                             error!(message = "Healthcheck: Failed Reason.", %error);
@@ -202,7 +253,7 @@ pub async fn build_pieces(
                     .await
             } else {
                 info!("Healthcheck: Disabled.");
-                Ok(())
+                Ok(TaskBuffer::Other)
             }
         };
         let healthcheck_task = Task::new(name, typetag, healthcheck_task);
@@ -210,6 +261,7 @@ pub async fn build_pieces(
         inputs.insert(name.clone(), (tx, sink_inputs.clone()));
         healthchecks.insert(name.clone(), healthcheck_task);
         tasks.insert(name.clone(), task);
+        detach_triggers.insert(name.clone(), trigger);
     }
 
     if errors.is_empty() {
@@ -220,6 +272,7 @@ pub async fn build_pieces(
             source_tasks,
             healthchecks,
             shutdown_coordinator,
+            detach_triggers,
         };
 
         Ok(pieces)
