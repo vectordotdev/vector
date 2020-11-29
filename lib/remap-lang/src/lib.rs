@@ -121,7 +121,7 @@ mod tests {
             (
                 r#"enum_validator("baz")"#,
                 Err("remap error: function error: unknown enum variant: baz, must be one of: foo, bar"),
-                Ok("valid: baz".into()),
+                Ok(().into()),
             ),
             (r#"false || true"#, Ok(()), Ok(true.into())),
             (r#"false || false"#, Ok(()), Ok(false.into())),
@@ -210,7 +210,7 @@ mod tests {
                     .foo = ["foo", "bar"]
                     array_printer(.foo)
                 "#,
-                Err("remap error: function error: expected array argument, got expression"),
+                Err("remap error: function error: expected array literal argument, got expression"),
                 Ok(().into()),
             ),
         ];

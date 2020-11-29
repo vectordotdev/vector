@@ -36,13 +36,13 @@ pub enum Error {
     #[error(r#"expected regex argument, got array"#)]
     ArgumentRegexArray,
 
-    #[error(r#"expected array argument, got expression"#)]
+    #[error(r#"expected array literal argument, got expression"#)]
     ArgumentArrayExpr,
 
-    #[error(r#"expected array argument, got regex"#)]
+    #[error(r#"expected array literal argument, got regex"#)]
     ArgumentArrayRegex,
 
-    #[error(r#"expected expression or regex argument, got array"#)]
+    #[error(r#"expected expression or regex argument, got array literal"#)]
     ArgumentExprOrRegexArray,
 
     #[error(r#"missing required argument "{0}""#)]
