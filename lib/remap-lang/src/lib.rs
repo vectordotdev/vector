@@ -32,7 +32,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::function::ArgumentList;
+    use crate::function::{Argument, ArgumentList};
     use crate::map;
 
     #[test]
@@ -193,6 +193,26 @@ mod tests {
                 Ok(()),
                 Ok(vec!["foo".into(), 5.into(), Value::Array(vec!["bar".into()])].into()),
             ),
+            (
+                r#"array_printer(["foo", /bar/, 5, ["baz", 4.2], true, /qu+x/])"#,
+                Ok(()),
+                Ok(vec![
+                    r#"Expression(Bytes(b"foo"))"#,
+                    r#"Regex(bar)"#,
+                    r#"Expression(Integer(5))"#,
+                    r#"Expression([Bytes(b"baz"), Float(4.2)])"#,
+                    r#"Expression(Boolean(true))"#,
+                    r#"Regex(qu+x)"#,
+                ].into()),
+            ),
+            (
+                r#"
+                    .foo = ["foo", "bar"]
+                    array_printer(.foo)
+                "#,
+                Err("remap error: function error: expected array argument, got expression"),
+                Ok(().into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -201,6 +221,7 @@ mod tests {
                 &[
                     Box::new(test_functions::RegexPrinter),
                     Box::new(test_functions::EnumValidator),
+                    Box::new(test_functions::ArrayPrinter),
                 ],
                 None,
             );
@@ -301,6 +322,43 @@ mod tests {
         impl Expression for RegexPrinterFn {
             fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
                 Ok(format!("regex: {:?}", self.0).into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct ArrayPrinter;
+        impl Function for ArrayPrinter {
+            fn identifier(&self) -> &'static str {
+                "array_printer"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(ArrayPrinterFn(arguments.required_array("value")?)))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: true,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct ArrayPrinterFn(Vec<Argument>);
+        impl Expression for ArrayPrinterFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(self
+                    .0
+                    .iter()
+                    .map(|v| format!("{:?}", v))
+                    .collect::<Vec<_>>()
+                    .into())
             }
 
             fn type_def(&self, _: &state::Compiler) -> TypeDef {

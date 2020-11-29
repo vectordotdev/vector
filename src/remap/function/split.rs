@@ -31,7 +31,7 @@ impl Function for Split {
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
-        let pattern = arguments.required("pattern")?;
+        let pattern = arguments.required_expr_or_regex("pattern")?;
         let limit = arguments.optional_expr("limit")?;
 
         Ok(Box::new(SplitFn {
@@ -77,6 +77,7 @@ impl Expression for SplitFn {
                     .collect::<Vec<_>>()
                     .into()
             }
+            Argument::Array(_) => unreachable!(),
         };
 
         Ok(value)
@@ -94,6 +95,7 @@ impl Expression for SplitFn {
         let pattern_def = match &self.pattern {
             Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
+            Argument::Array(_) => unreachable!(),
         };
 
         self.value

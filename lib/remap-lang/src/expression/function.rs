@@ -112,7 +112,7 @@ impl Function {
                     )
                     .into(),
                 ),
-                Argument::Regex(_) => argument,
+                Argument::Regex(_) | Argument::Array(_) => argument,
             };
 
             list.insert(param.keyword, argument);

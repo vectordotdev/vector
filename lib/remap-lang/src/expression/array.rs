@@ -1,6 +1,8 @@
 use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
+use std::fmt;
+use std::iter::IntoIterator;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Array {
     expressions: Vec<Expr>,
 }
@@ -8,6 +10,21 @@ pub struct Array {
 impl Array {
     pub fn new(expressions: Vec<Expr>) -> Self {
         Self { expressions }
+    }
+}
+
+impl fmt::Debug for Array {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.expressions.fmt(f)
+    }
+}
+
+impl IntoIterator for Array {
+    type Item = Expr;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.expressions.into_iter()
     }
 }
 
