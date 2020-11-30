@@ -1069,6 +1069,41 @@
     "e.equals" = false
     "compactarr[0].equals" = 1
 
+[transforms.remap_function_assert_pass]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    assert(.foo, message = "assert failed")
+    .check = "checked"
+  """
+[[tests]]
+  name = "remap_function_assert_pass"
+  [tests.input]
+    insert_at = "remap_function_assert_pass"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+  [[tests.outputs]]
+  extract_from = "remap_function_assert_pass"
+  [[tests.outputs.conditions]]
+  "check.equals" = "checked"
+
+[transforms.remap_function_assert_fail]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    assert(.foo, message = "assert failed")
+  """
+[[tests]]
+  name = "remap_function_assert_fail"
+  no_outputs_from = ["remap_function_assert_fail"]
+  [tests.input]
+    insert_at = "remap_function_assert_fail"
+    type = "log"
+    [tests.input.log_fields]
+      foo = false
 
 # [transforms.remap_function_log]
 #   inputs=[]
