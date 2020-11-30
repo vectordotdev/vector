@@ -44,6 +44,7 @@ installation: close({
 		arch:                 #Arch
 		file_name:            string
 		file_type:            string
+		library:              string | null
 		os:                   #OperatingSystemFamily
 		package_manager?:     string
 		title:                "\(os) (\(arch))"
