@@ -899,7 +899,6 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "foobar"
 
-<<<<<<< HEAD
 [transforms.remap_function_parse_grok]
   inputs = []
   type = "remap"

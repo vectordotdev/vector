@@ -18,14 +18,14 @@ impl Function for Assert {
             Parameter {
                 keyword: "message",
                 accepts: |v| matches!(v, Value::Bytes(_)),
-                required: true,
+                required: false,
             },
         ]
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let condition = arguments.required_expr("condition")?;
-        let message = arguments.required_expr("message")?;
+        let message = arguments.optional_expr("message")?;
 
         Ok(Box::new(AssertFn { condition, message }))
     }
@@ -34,12 +34,12 @@ impl Function for Assert {
 #[derive(Debug, Clone)]
 struct AssertFn {
     condition: Box<dyn Expression>,
-    message: Box<dyn Expression>,
+    message: Option<Box<dyn Expression>>,
 }
 
 impl AssertFn {
     #[cfg(test)]
-    fn new(condition: Box<dyn Expression>, message: Box<dyn Expression>) -> Self {
+    fn new(condition: Box<dyn Expression>, message: Option<Box<dyn Expression>>) -> Self {
         Self { condition, message }
     }
 }
@@ -47,12 +47,19 @@ impl AssertFn {
 impl Expression for AssertFn {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         let condition = self.condition.execute(state, object)?.try_boolean()?;
-        let bytes = self.message.execute(state, object)?.try_bytes()?;
-        let message = String::from_utf8_lossy(&bytes).into_owned();
-
         if condition {
             Ok(Value::Null)
         } else {
+            let message = match self.message.as_ref() {
+                Some(message) => {
+                    let bytes = message.execute(state, object)?.try_bytes()?;
+                    String::from_utf8_lossy(&bytes).into_owned()
+                }
+                None => {
+                    // If Expression implemented Display, we could could return the expression here.
+                    "evaluated to false".to_string()
+                }
+            };
             Err(Error::Assert(message))
         }
     }
@@ -61,10 +68,10 @@ impl Expression for AssertFn {
         self.condition
             .type_def(state)
             .fallible_unless(value::Kind::Boolean)
-            .merge(
+            .merge_with_default_optional(
                 self.message
-                    .type_def(state)
-                    .fallible_unless(value::Kind::Bytes),
+                    .as_ref()
+                    .map(|message| message.type_def(state).fallible_unless(value::Kind::Bytes)),
             )
             .with_constraint(value::Kind::Null)
     }
@@ -77,14 +84,28 @@ mod tests {
 
     #[test]
     fn assert() {
-        let cases = vec![(
-            map!["test": false],
-            Err("assertion failed: This has not gone well".to_string()),
-            AssertFn::new(
-                Box::new(Path::from("test")),
-                Box::new(Literal::from(Value::from("This has not gone well"))),
+        let cases = vec![
+            (
+                map!["test": false],
+                Err("assertion failed: This has not gone well".to_string()),
+                AssertFn::new(
+                    Box::new(Path::from("test")),
+                    Some(Box::new(Literal::from(Value::from(
+                        "This has not gone well",
+                    )))),
+                ),
             ),
-        )];
+            (
+                map!["test": false],
+                Err("assertion failed: evaluated to false".to_string()),
+                AssertFn::new(Box::new(Path::from("test")), None),
+            ),
+            (
+                map!["test": true],
+                Ok(Value::Null),
+                AssertFn::new(Box::new(Path::from("test")), None),
+            ),
+        ];
 
         let mut state = state::Program::default();
 
