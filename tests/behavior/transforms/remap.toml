@@ -1179,3 +1179,29 @@
     "arr[5].equals" = 6
     "a.equals" = 1
     "b.equals" = 2
+
+[transforms.remap_function_redact]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = redact(.input, filters = ["pattern"], patterns = ["hello"])
+    .b = redact(.input, filters = ["pattern"], patterns = ["hello", "wor"])
+    .c = redact(.input, filters = ["pattern"], patterns = [/world|universe/])
+    .d = redact(.input, filters = ["pattern"], patterns = [])
+    .e = redact(.input, filters = ["pattern"], patterns = ["hello", /[uieao]/])
+  """
+[[tests]]
+  name = "remap_function_redact"
+  [tests.input]
+    insert_at = "remap_function_redact"
+    type = "log"
+    [tests.input.log_fields]
+      input = "hello world, hello universe"
+  [[tests.outputs]]
+    extract_from = "remap_function_redact"
+    [[tests.outputs.conditions]]
+    "a.equals" = "**** world, **** universe"
+    "b.equals" = "**** ****ld, **** universe"
+    "c.equals" = "hello ****, hello ****"
+    "d.equals" = "hello world, hello universe"
+    "e.equals" = "**** w****rld, **** ****n****v****rs****"
