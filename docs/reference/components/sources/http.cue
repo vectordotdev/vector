@@ -73,7 +73,7 @@ components: sources: http: {
 			description: "The expected encoding of received data. Note that for `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields."
 			required:    false
 			type: string: {
-				default: "text"
+				default: null
 				enum: {
 					text:   "Newline-delimited text, with each line forming a message."
 					ndjson: "Newline-delimited JSON objects, where each line must contain a JSON object."

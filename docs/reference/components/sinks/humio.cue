@@ -47,7 +47,7 @@ components: sinks: _humio: {
 				enabled: true
 				codec: {
 					enabled: true
-					default: null
+					default: "json"
 					enum: ["json", "text"]
 				}
 			}
