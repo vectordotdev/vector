@@ -96,11 +96,11 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		metrics: null
 	}
 
-	iam: {
+	permissions: iam: {
 		platform: "aws"
-		service:  "firehose"
+		_service: "firehose"
 
-		_stream: "deliveryStream/<stream-name>"
+		_stream: "deliveryStream/<stream-name>" // Helper
 
 		policies: [
 			{

@@ -117,7 +117,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		metrics: null
 	}
 
-	iam: {
+	permissions: iam: {
 		platform: "aws"
 		_service: "logs"
 

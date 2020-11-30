@@ -147,9 +147,9 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		}
 	}
 
-	iam: {
+	permissions: iam: {
 		platform: "aws"
-		service:  "kinesis"
+		_service: "kinesis"
 
 		_stream: "<stream-name>" // Helper
 

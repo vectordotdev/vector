@@ -128,7 +128,7 @@ components: {
 
 		// Platform-specific policies, e.g. AWS IAM policies, that are
 		// required or recommended when using the component.
-		iam?: #IAM
+		permissions?: iam: #IAM
 
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput
@@ -405,7 +405,8 @@ components: {
 				if _resource != _|_ {
 					if _service == "s3" {
 						resource: "arn:aws:s3:::\(_resource)"
-					} else {
+					}
+					if _service != "s3" {
 						resource: "arn:aws:\(_service):<region-id>:<account-id>:\(_resource)"
 					}
 				}

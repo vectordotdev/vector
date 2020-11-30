@@ -395,21 +395,21 @@ components: sinks: aws_s3: components._aws & {
 		}
 	}
 
-	iam: {
+	permissions: iam: {
 		platform: "aws"
-		service: "s3"
+		_service: "s3"
 
 		_bucket: "<bucket-name>:*" // Helper
 
 		policies: [
 			{
-				_action: "HeadBucket"
+				_action:   "HeadBucket"
 				_resource: _bucket
 			},
 			{
-				_action: "PutObject"
+				_action:   "PutObject"
 				_resource: _bucket
-			}
+			},
 		]
 	}
 }
