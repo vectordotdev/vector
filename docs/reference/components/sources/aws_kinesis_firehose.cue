@@ -26,10 +26,10 @@ components: sources: aws_kinesis_firehose: components._aws & {
 
 					setup: [
 						"""
-							[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
-							in your preferred AWS region. Point the endpoint to your
-							Vector instance's address.
-							""",
+						[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
+						in your preferred AWS region. Point the endpoint to your
+						Vector instance's address.
+						""",
 					]
 				}
 
@@ -81,10 +81,10 @@ components: sources: aws_kinesis_firehose: components._aws & {
 		access_key: {
 			common: true
 			description: """
-					AWS Kinesis Firehose can be configured to pass along an access
-					key to authenticate requests. If configured, `access_key` should
-					be set to the same value. If not specified, vector will treat
-					all requests as authenticated.
+				AWS Kinesis Firehose can be configured to pass along an access
+				key to authenticate requests. If configured, `access_key` should
+				be set to the same value. If not specified, vector will treat
+				all requests as authenticated.
 				"""
 			required: false
 			type: "string": {
