@@ -8,5 +8,5 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nom = "5.1.2"
+nom = "6.0.1"
 snafu = { version = "0.6" }
