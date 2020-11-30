@@ -117,28 +117,32 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		metrics: null
 	}
 
-	policies: {
-		required_prefix: "arn:aws:logs:<region-id>:<account-id>:"
+	iam: {
+		platform: "aws"
+		_namespace: "logs"
+
+		_stream: "log-group:<group-name>:log-stream:<stream-name>" // Helper
+
 		policies: [
 			{
-				action:   "logs:DescribeLogGroups"
-				resource: "log-group::log-stream:"
+				_action:   "CreateLogGroup"
+				_resource: "log-group:<group-name>:log-stream:*"
 			},
 			{
-				action:   "logs:DescribeLogStreams"
-				resource: "log-group:<group-name>:log-stream:"
+				_action:   "CreateLogStream"
+				_resource: _stream
 			},
 			{
-				action:   "logs:PutLogEvents"
-				resource: "log-group:<group-name>:log-stream:<stream-name>"
+				_action:   "DescribeLogGroups"
+				_resource: "log-group:<group-id>:*"
 			},
 			{
-				action:   "logs:CreateLogGroup"
-				resource: "log-group:<group-name>:log-stream:"
+				_action:   "DescribeLogStreams"
+				_resource: _stream
 			},
 			{
-				action:   "logs:CreateLogStream"
-				resource: "log-group:<group-name>:log-stream:<stream-name>"
+				_action:   "PutLogEvents"
+				_resource: _stream
 			},
 		]
 	}

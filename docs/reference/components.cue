@@ -128,7 +128,7 @@ components: {
 
 		// Platform-specific policies, e.g. AWS IAM policies, that are
 		// required or recommended when using the component.
-		policies?: #Policies
+		iam?: #IAM
 
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput
@@ -395,13 +395,19 @@ components: {
 		metrics?: #MetricOutput
 	}
 
-	#IAMPolicies: #Policies & {
+	#IAM: {
 		#Policy: {
-			action:   string
-			resource: string
+			_action:   string
+			_resource: string
+
+			if platform == "aws" {
+				arn:    "arn:aws:\(_namespace):<region-id>:<account-id>:\(_resource)"
+				action: "\(namespace):\(_action)"
+			}
 		}
 
-		required_prefix: string
+		_namespace: string
+		platform:  "aws" | "gcp"
 		policies: [#Policy, ...#Policy]
 	}
 
