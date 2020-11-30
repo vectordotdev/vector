@@ -12,6 +12,21 @@ env:
   CI: true
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    # Set job outputs to values from filter step
+    outputs:
+      version:
+        description: "Vector version"
+        value: ${{ steps.make-version.outputs.version }}
+    runs:
+      using: "composite"
+      steps:
+        - uses: actions/checkout@v1
+        - id: make-version
+          run: echo "::set-output name=version::$(make version)"
+          shell: bash
+
   build-x86_64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
     steps:
@@ -27,6 +42,7 @@ jobs:
 
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: ubuntu-latest
+    needs: version
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
@@ -39,15 +55,16 @@ jobs:
           path: "./target/artifacts/vector-x86_64-unknown-linux-gnu.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-amd64.deb"
-          path: "./target/artifacts/vector-amd64.deb"
+          name: "vector-${{ needs.version.outputs.version }}-amd64.deb"
+          path: "./target/artifacts/vector-${{ needs.version.outputs.version }}-amd64.deb"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-x86_64.rpm"
-          path: "./target/artifacts/vector-x86_64.rpm"
+          name: "vector-${{ needs.version.outputs.version }}-1.x86_64.rpm"
+          path: "./target/artifacts/vector-${{ needs.version.outputs.version }}-1.x86_64.rpm"
 
   build-aarch64-unknown-linux-musl-packages:
     runs-on: ubuntu-latest
+    needs: version
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
@@ -61,15 +78,16 @@ jobs:
           path: "./target/artifacts/vector-aarch64-unknown-linux-musl.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-arm64.deb"
-          path: "./target/artifacts/vector-arm64.deb"
+          name: "vector-${{ needs.version.outputs.version }}-arm64.deb"
+          path: "./target/artifacts/vector-${{ needs.version.outputs.version }}-arm64.deb"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-aarch64.rpm"
-          path: "./target/artifacts/vector-aarch64.rpm"
+          name: "vector-${{ needs.version.outputs.version }}-1.aarch64.rpm"
+          path: "./target/artifacts/vector-${{ needs.version.outputs.version }}-1.aarch64.rpm"
 
   build-armv7-unknown-linux-gnueabihf-packages:
     runs-on: ubuntu-latest
+    needs: version
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
@@ -82,12 +100,12 @@ jobs:
           path: "./target/artifacts/vector-armv7-unknown-linux-gnueabihf.tar.gz"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-armhf.deb"
-          path: "./target/artifacts/vector-armhf.deb"
+          name: "vector-${{ needs.version.outputs.version }}-armhf.deb"
+          path: "./target/artifacts/vector-${{ needs.version.outputs.version }}-armhf.deb"
       - uses: actions/upload-artifact@v1
         with:
-          name: "vector-armv7.rpm"
-          path: "./target/artifacts/vector-armv7.rpm"
+          name: "vector-${{ needs.version.outputs.version }}-1.armv7.rpm"
+          path: "./target/artifacts/vector-${{ needs.version.outputs.version }}-1.armv7.rpm"
 
   build-armv7-unknown-linux-musleabihf-packages:
     runs-on: ubuntu-latest
@@ -190,6 +208,7 @@ jobs:
       - build-aarch64-unknown-linux-musl-packages
       - build-x86_64-unknown-linux-gnu-packages
       - build-x86_64-unknown-linux-musl-packages
+      - version
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
@@ -202,11 +221,11 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-amd64.deb
+          name: vector-${{ needs.version.outputs.version }}-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-arm64.deb
+          name: vector-${{ needs.version.outputs.version }}-arm64.deb
           path: target/artifacts
       - env:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
@@ -227,6 +246,7 @@ jobs:
       - build-x86_64-pc-windows-msvc-packages
       - build-armv7-unknown-linux-musleabihf-packages
       - build-armv7-unknown-linux-gnueabihf-packages
+      - version
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
@@ -251,15 +271,15 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-amd64.deb
+          name: vector-${{ needs.version.outputs.version }}-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-arm64.deb
+          name: vector-${{ needs.version.outputs.version }}-arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-armhf.deb
+          name: vector-${{ needs.version.outputs.version }}-armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
@@ -275,15 +295,15 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-x86_64.rpm
+          name: vector-${{ needs.version.outputs.version }}-1.x86_64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-aarch64.rpm
+          name: vector-${{ needs.version.outputs.version }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-armv7.rpm
+          name: vector-${{ needs.version.outputs.version }}-1.armv7.rpm
           path: target/artifacts
       - env:
           AWS_ACCESS_KEY_ID: "${{ secrets.CI_AWS_ACCESS_KEY_ID }}"
@@ -296,31 +316,32 @@ jobs:
       - build-x86_64-unknown-linux-gnu-packages
       - build-aarch64-unknown-linux-musl-packages
       - build-armv7-unknown-linux-gnueabihf-packages
+      - version
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
         with:
-          name: vector-amd64.deb
+          name: vector-${{ needs.version.outputs.version }}-amd64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-arm64.deb
+          name: vector-${{ needs.version.outputs.version }}-arm64.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-armhf.deb
+          name: vector-${{ needs.version.outputs.version }}-armhf.deb
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-x86_64.rpm
+          name: vector-${{ needs.version.outputs.version }}-1.x86_64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-aarch64.rpm
+          name: vector-${{ needs.version.outputs.version }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
-          name: vector-armv7.rpm
+          name: vector-${{ needs.version.outputs.version }}-1.armv7.rpm
           path: target/artifacts
       - name: Push amd64 deb
         id: push-deb-amd64
@@ -334,7 +355,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-amd64.deb"
+          file: "target/artifacts/vector-${{ needs.version.outputs.version }}-amd64.deb"
       - name: Push arm64 deb
         id: push-deb-arm64
         uses: cloudsmith-io/action@master
@@ -347,7 +368,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-arm64.deb"
+          file: "target/artifacts/vector-${{ needs.version.outputs.version }}-arm64.deb"
       - name: Push armhf deb
         id: push-deb-armhf
         uses: cloudsmith-io/action@master
@@ -360,7 +381,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-armhf.deb"
+          file: "target/artifacts/vector-${{ needs.version.outputs.version }}-armhf.deb"
       - name: Push x86_64 RPM
         id: push-rpm-x86_64
         uses: cloudsmith-io/action@master
@@ -373,7 +394,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-x86_64.rpm"
+          file: "target/artifacts/vector-${{ needs.version.outputs.version }}-1.x86_64.rpm"
       - name: Push aarch64 RPM
         id: push-rpm-aarch64
         uses: cloudsmith-io/action@master
@@ -386,7 +407,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-aarch64.rpm"
+          file: "target/artifacts/vector-${{ needs.version.outputs.version }}-1.aarch64.rpm"
       - name: Push armv7-gnu RPM
         id: push-rpm-armv7-gnu
         uses: cloudsmith-io/action@master
@@ -399,7 +420,7 @@ jobs:
           distro: "any-distro"
           release: "any-version"
           republish: "true"
-          file: "target/artifacts/vector-armv7.rpm"
+          file: "target/artifacts/vector-${{ needs.version.outputs.version }}-1.armv7.rpm"
 
   release-helm:
     runs-on: ubuntu-latest
