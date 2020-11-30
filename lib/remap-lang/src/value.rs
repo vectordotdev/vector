@@ -38,7 +38,7 @@ impl PartialEq for Value {
             Map(v1) => other.as_map().map(|v2| v1 == v2).unwrap_or_default(),
             Array(v1) => other.as_array().map(|v2| v1 == v2).unwrap_or_default(),
             Timestamp(v1) => other.as_timestamp().map(|v2| v1 == v2).unwrap_or_default(),
-            Null => other.as_null().map(|_| true).unwrap_or_default(),
+            Null => other.is_null(),
             Regex(v1) => match other {
                 Regex(v2) => v1.as_str() == v2.as_str(),
                 _ => false,
@@ -258,6 +258,10 @@ macro_rules! value_impl {
     ($(($func:expr, $variant:expr, $ret:ty)),+ $(,)*) => {
         impl Value {
             $(paste::paste! {
+            pub fn [<is $func>](&self) -> bool {
+                matches!(self, Value::$variant(_))
+            }
+
             pub fn [<as_ $func>](&self) -> Option<&$ret> {
                 match self {
                     Value::$variant(v) => Some(v),
@@ -283,6 +287,10 @@ macro_rules! value_impl {
                 self.[<try_ $func>]().expect(stringify!($func))
             }
             })+
+
+            pub fn is_null(&self) -> bool {
+                matches!(self, Value::Null)
+            }
 
             pub fn as_null(&self) -> Option<()> {
                 match self {
