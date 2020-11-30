@@ -13,7 +13,7 @@ use std::str::FromStr;
 
 pub use kind::Kind;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -22,7 +22,29 @@ pub enum Value {
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Timestamp(DateTime<Utc>),
+    Regex(regex::Regex),
     Null,
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        use Value::*;
+
+        match self {
+            Bytes(v1) => other.as_bytes().map(|v2| v1 == v2).unwrap_or_default(),
+            Integer(v1) => other.as_integer().map(|v2| v1 == v2).unwrap_or_default(),
+            Float(v1) => other.as_float().map(|v2| v1 == v2).unwrap_or_default(),
+            Boolean(v1) => other.as_boolean().map(|v2| v1 == v2).unwrap_or_default(),
+            Map(v1) => other.as_map().map(|v2| v1 == v2).unwrap_or_default(),
+            Array(v1) => other.as_array().map(|v2| v1 == v2).unwrap_or_default(),
+            Timestamp(v1) => other.as_timestamp().map(|v2| v1 == v2).unwrap_or_default(),
+            Null => other.as_null().map(|_| true).unwrap_or_default(),
+            Regex(v1) => match other {
+                Regex(v2) => v1.as_str() == v2.as_str(),
+                _ => false,
+            },
+        }
+    }
 }
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -124,6 +146,12 @@ impl From<String> for Value {
 impl From<bool> for Value {
     fn from(v: bool) -> Self {
         Value::Boolean(v)
+    }
+}
+
+impl From<regex::Regex> for Value {
+    fn from(v: regex::Regex) -> Self {
+        Value::Regex(v)
     }
 }
 
@@ -285,6 +313,7 @@ value_impl! {
     (map, Map, BTreeMap<String, Value>),
     (array, Array, Vec<Value>),
     (timestamp, Timestamp, DateTime<Utc>),
+    (regex, Regex, regex::Regex),
     // manually implemented due to no variant value
     // (null, Null, ()),
 }

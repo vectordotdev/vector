@@ -252,12 +252,6 @@ impl<T: Into<Expr>> From<T> for Argument {
     }
 }
 
-impl From<regex::Regex> for Argument {
-    fn from(regex: regex::Regex) -> Self {
-        Argument::Regex(regex)
-    }
-}
-
 impl From<Vec<Argument>> for Argument {
     fn from(args: Vec<Argument>) -> Self {
         Argument::Array(args)
