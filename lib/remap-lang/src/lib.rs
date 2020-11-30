@@ -198,11 +198,11 @@ mod tests {
                 Ok(()),
                 Ok(vec![
                     r#"Expression(Bytes(b"foo"))"#,
-                    r#"Regex(bar)"#,
+                    r#"Expression(Regex(bar))"#,
                     r#"Expression(Integer(5))"#,
                     r#"Expression([Bytes(b"baz"), Float(4.2)])"#,
                     r#"Expression(Boolean(true))"#,
-                    r#"Regex(qu+x)"#,
+                    r#"Expression(Regex(qu+x))"#,
                 ].into()),
             ),
             (
@@ -326,7 +326,12 @@ mod tests {
             }
 
             fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-                Ok(Box::new(RegexPrinterFn(arguments.required_regex("value")?)))
+                Ok(Box::new(RegexPrinterFn(
+                    arguments
+                        .required_literal("value")?
+                        .into_value()
+                        .try_regex()?,
+                )))
             }
 
             fn parameters(&self) -> &'static [Parameter] {

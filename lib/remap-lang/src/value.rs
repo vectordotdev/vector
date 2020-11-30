@@ -954,6 +954,7 @@ impl fmt::Display for Value {
                 write!(f, "[{}]", joined)
             }
             Value::Timestamp(val) => write!(f, "{}", val.to_string()),
+            Value::Regex(regex) => write!(f, "{}", regex.to_string()),
             Value::Null => write!(f, "Null"),
         }
     }

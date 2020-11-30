@@ -17,7 +17,7 @@ if_statement = { "if" ~ boolean_expr ~ block ~ ("else if" ~ boolean_expr ~ block
 // Primary ---------------------------------------------------------------------
 
 primary  =  { value | variable | path | group }
-value    =  { string | float | integer | boolean | null | array }
+value    =  { string | float | integer | boolean | null | array | regex }
 variable = ${ "$" ~ ident ~ path_index* ~ ("." ~ path_segments)?  }
 group    =  { "(" ~ expression ~ ")" }
 
