@@ -127,9 +127,42 @@ jobs:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v1
+      - name: "Download Perl"
+        shell: bash
+        env:
+          VERSION: "5.30.0.1"
+          SHA256SUM: "459de13a284a4c83213208c9caa1c372c81136b6e863a3f13d42f631048e0b12" # we need to verify checksum because strawberryperl.com doesn't support HTTPS
+        run: |
+          curl -sSf http://strawberryperl.com/download/$VERSION/strawberry-perl-$VERSION-64bit.msi > perl-installer.msi
+          echo "$SHA256SUM perl-installer.msi" | sha256sum --check --status
+      - name: "Install Perl"
+        shell: cmd # msiexec fails when called from bash
+        run: |
+          msiexec /quiet /i perl-installer.msi
+          del perl-installer.msi
+      - name: "Download CMake"
+        shell: bash
+        env:
+          VERSION: "3.15.5"
+        run: |
+          curl -sSfL https://github.com/Kitware/CMake/releases/download/v$VERSION/cmake-$VERSION-win64-x64.msi > cmake-installer.msi
+      - name: "Install CMake"
+        shell: cmd # msiexec fails when called from bash
+        run: |
+          msiexec /quiet /i cmake-installer.msi
+          del cmake-installer.msi
+      - name: "Install Wix"
+        shell: bash
+        run: |
+          mkdir -p /c/wix
+          cd /c/wix
+          curl -sSfL https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip > wix-binaries.zip
+          unzip wix-binaries.zip
+          rm wix-binaries.zip
       - name: "Build archive"
         shell: bash
         run: |
+          export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export RUSTFLAGS=-Ctarget-feature=+crt-static
           export FEATURES="default-msvc"
           export ARCHIVE_TYPE="zip"
@@ -382,7 +415,7 @@ jobs:
           command: "push"
           format: "deb"
           owner: "timber"
-          repo: "vector-nightly"
+          repo: "vector"
           distro: "any-distro"
           release: "any-version"
           republish: "true"
@@ -395,7 +428,7 @@ jobs:
           command: "push"
           format: "deb"
           owner: "timber"
-          repo: "vector-nightly"
+          repo: "vector"
           distro: "any-distro"
           release: "any-version"
           republish: "true"
@@ -408,7 +441,7 @@ jobs:
           command: "push"
           format: "rpm"
           owner: "timber"
-          repo: "vector-nightly"
+          repo: "vector"
           distro: "any-distro"
           release: "any-version"
           republish: "true"
@@ -421,7 +454,7 @@ jobs:
           command: "push"
           format: "rpm"
           owner: "timber"
-          repo: "vector-nightly"
+          repo: "vector"
           distro: "any-distro"
           release: "any-version"
           republish: "true"
@@ -434,7 +467,7 @@ jobs:
           command: "push"
           format: "deb"
           owner: "timber"
-          repo: "vector-nightly"
+          repo: "vector"
           distro: "any-distro"
           release: "any-version"
           republish: "true"
@@ -447,7 +480,7 @@ jobs:
           command: "push"
           format: "rpm"
           owner: "timber"
-          repo: "vector-nightly"
+          repo: "vector"
           distro: "any-distro"
           release: "any-version"
           republish: "true"
