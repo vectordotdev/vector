@@ -18,7 +18,7 @@ require_relative "util/release"
 # Constants
 #
 
-ROOT_DIR = ".."
+ROOT_DIR = "."
 RELEASE_REFERENCE_DIR = File.join(ROOT_DIR, "docs", "reference", "releases")
 
 #
@@ -52,8 +52,6 @@ end
 #
 # Execute
 #
-
-Dir.chdir "scripts"
 
 release = Vector::Release.all!(RELEASE_REFERENCE_DIR).last
 
