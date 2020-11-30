@@ -103,14 +103,8 @@ impl Function {
                 // Wrap expression argument to validate its value type at
                 // runtime.
                 Argument::Expression(expr) => Argument::Expression(
-                    expression::Argument::new(
-                        Box::new(expr),
-                        definition.identifier(),
-                        param.keyword,
-                        param.accepts,
-                        ident,
-                    )
-                    .into(),
+                    expression::Argument::new(Box::new(expr), param.keyword, param.accepts, ident)
+                        .into(),
                 ),
                 Argument::Regex(_) | Argument::Array(_) => argument,
             };

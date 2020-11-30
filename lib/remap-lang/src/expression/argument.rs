@@ -12,7 +12,6 @@ pub enum Error {
 #[derive(Clone)]
 pub struct Argument {
     expression: Box<Expr>,
-    ident: &'static str,
     keyword: &'static str,
     validator: fn(&Value) -> bool,
 
@@ -24,7 +23,6 @@ impl std::fmt::Debug for Argument {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Argument")
             .field("expression", &self.expression)
-            .field("ident", &self.ident)
             .field("keyword", &self.keyword)
             .field("validator", &"fn(&Value) -> bool".to_owned())
             .finish()
@@ -43,14 +41,12 @@ impl PartialEq for Argument {
 impl Argument {
     pub fn new(
         expression: Box<Expr>,
-        ident: &'static str,
         keyword: &'static str,
         validator: fn(&Value) -> bool,
         function_ident: &'static str,
     ) -> Self {
         Self {
             expression,
-            ident,
             keyword,
             validator,
             function_ident,
