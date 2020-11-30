@@ -24,27 +24,6 @@ macro_rules! generate_param_list {
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error(r#"expected expression argument, got regex"#)]
-    ArgumentExprRegex,
-
-    #[error(r#"expected expression argument, got array"#)]
-    ArgumentExprArray,
-
-    #[error(r#"expected regex argument, got expression"#)]
-    ArgumentRegexExpr,
-
-    #[error(r#"expected regex argument, got array"#)]
-    ArgumentRegexArray,
-
-    #[error(r#"expected array literal argument, got expression"#)]
-    ArgumentArrayExpr,
-
-    #[error(r#"expected array literal argument, got regex"#)]
-    ArgumentArrayRegex,
-
-    #[error(r#"expected expression or regex argument, got array literal"#)]
-    ArgumentExprOrRegexArray,
-
     #[error(r#"missing required argument "{0}""#)]
     Required(String),
 
@@ -82,32 +61,23 @@ impl std::fmt::Debug for Parameter {
 }
 
 #[derive(Debug, Default)]
-pub struct ArgumentList(HashMap<&'static str, Argument>);
+pub struct ArgumentList(HashMap<&'static str, Expr>);
 
 impl ArgumentList {
-    pub fn optional(&mut self, keyword: &str) -> Option<Argument> {
+    pub fn optional(&mut self, keyword: &str) -> Option<Expr> {
         self.0.remove(keyword)
     }
 
-    pub fn required(&mut self, keyword: &str) -> Result<Argument> {
+    pub fn required(&mut self, keyword: &str) -> Result<Expr> {
         self.optional(keyword)
-            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
-    }
-
-    pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Expr>> {
-        self.optional(keyword)
-            .map(|v| v.try_into().map_err(Into::into))
-            .transpose()
-    }
-
-    pub fn required_expr(&mut self, keyword: &str) -> Result<Expr> {
-        self.optional_expr(keyword)?
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
     pub fn optional_regex(&mut self, keyword: &str) -> Result<Option<regex::Regex>> {
         self.optional(keyword)
-            .map(|v| v.try_into().map_err(Into::into))
+            .map(Literal::try_from)
+            .transpose()?
+            .map(|v| v.into_value().try_regex().map_err(Into::into))
             .transpose()
     }
 
@@ -117,9 +87,7 @@ impl ArgumentList {
     }
 
     pub fn optional_literal(&mut self, keyword: &str) -> Result<Option<Literal>> {
-        let expr = self.optional(keyword).map(Expr::try_from).transpose()?;
-
-        let argument = match expr {
+        let argument = match self.optional(keyword) {
             Some(expr) => expression::Argument::try_from(expr)?,
             None => return Ok(None),
         };
@@ -149,7 +117,7 @@ impl ArgumentList {
     }
 
     pub fn optional_path(&mut self, keyword: &str) -> Result<Option<Path>> {
-        self.optional_expr(keyword)?
+        self.optional(keyword)
             .map(Path::try_from)
             .transpose()
             .map_err(Into::into)
@@ -161,7 +129,7 @@ impl ArgumentList {
     }
 
     pub fn optional_array(&mut self, keyword: &str) -> Result<Option<Array>> {
-        self.optional_expr(keyword)?
+        self.optional(keyword)
             .map(|v| v.try_into().map_err(Into::into))
             .transpose()
     }
@@ -196,26 +164,11 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
-    pub fn optional_expr_or_regex(&mut self, keyword: &str) -> Result<Option<Argument>> {
-        self.optional(keyword)
-            .map(|arg| match arg {
-                Argument::Array(_) => Err(Error::ArgumentExprOrRegexArray),
-                _ => Ok(arg),
-            })
-            .transpose()
-            .map_err(Into::into)
-    }
-
-    pub fn required_expr_or_regex(&mut self, keyword: &str) -> Result<Argument> {
-        self.optional_expr_or_regex(keyword)?
-            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
-    }
-
     pub fn keywords(&self) -> Vec<&'static str> {
         self.0.keys().copied().collect::<Vec<_>>()
     }
 
-    pub fn insert(&mut self, k: &'static str, v: Argument) {
+    pub fn insert(&mut self, k: &'static str, v: Expr) {
         self.0.insert(k, v);
     }
 }
@@ -230,73 +183,6 @@ fn literal_to_enum_variant(literal: Literal, variants: &[&'static str]) -> Resul
         Ok(variant)
     } else {
         Err(Error::UnknownEnumVariant(variant, variants.to_owned()).into())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Argument {
-    Expression(Expr),
-    Regex(regex::Regex),
-    Array(Vec<Argument>),
-}
-
-impl<T: Into<Expr>> From<T> for Argument {
-    fn from(expr: T) -> Self {
-        Argument::Expression(expr.into())
-    }
-}
-
-impl From<Vec<Argument>> for Argument {
-    fn from(args: Vec<Argument>) -> Self {
-        Argument::Array(args)
-    }
-}
-
-impl TryFrom<Argument> for Expr {
-    type Error = Error;
-
-    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
-        match arg {
-            Argument::Expression(expr) => Ok(expr),
-            Argument::Regex(_) => Err(Error::ArgumentExprRegex),
-            Argument::Array(_) => Err(Error::ArgumentExprArray),
-        }
-    }
-}
-
-impl TryFrom<Argument> for Box<dyn Expression> {
-    type Error = Error;
-
-    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
-        match arg {
-            Argument::Expression(expr) => Ok(Box::new(expr) as _),
-            Argument::Regex(_) => Err(Error::ArgumentExprRegex),
-            Argument::Array(_) => Err(Error::ArgumentExprArray),
-        }
-    }
-}
-
-impl TryFrom<Argument> for regex::Regex {
-    type Error = Error;
-
-    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
-        match arg {
-            Argument::Regex(regex) => Ok(regex),
-            Argument::Expression(_) => Err(Error::ArgumentRegexExpr),
-            Argument::Array(_) => Err(Error::ArgumentRegexArray),
-        }
-    }
-}
-
-impl TryFrom<Argument> for Vec<Argument> {
-    type Error = Error;
-
-    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
-        match arg {
-            Argument::Array(args) => Ok(args),
-            Argument::Regex(_) => Err(Error::ArgumentArrayRegex),
-            Argument::Expression(_) => Err(Error::ArgumentArrayExpr),
-        }
     }
 }
 

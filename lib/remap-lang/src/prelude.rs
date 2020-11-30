@@ -8,7 +8,7 @@ pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Valu
 pub use crate::expression::{Literal, Noop, Path, Variable};
 
 // commonly used function types
-pub use crate::function::{Argument, ArgumentList, Parameter};
+pub use crate::function::{ArgumentList, Parameter};
 
 // commonly used macros
 pub use crate::generate_param_list;

@@ -1,8 +1,7 @@
 use super::Error as E;
 use crate::{
-    expression,
-    function::{Argument, ArgumentList},
-    state, Expression, Function as Fn, Object, Result, TypeDef, Value,
+    expression, function::ArgumentList, state, Expr, Expression, Function as Fn, Object, Result,
+    TypeDef, Value,
 };
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
@@ -43,7 +42,7 @@ impl PartialEq for Function {
 impl Function {
     pub fn new(
         ident: String,
-        arguments: Vec<(Option<String>, Argument)>,
+        arguments: Vec<(Option<String>, Expr)>,
         definitions: &[Box<dyn Fn>],
     ) -> Result<Self> {
         let definition = definitions
@@ -99,15 +98,9 @@ impl Function {
                 )
             })?;
 
-            let argument = match argument {
-                // Wrap expression argument to validate its value type at
-                // runtime.
-                Argument::Expression(expr) => Argument::Expression(
-                    expression::Argument::new(Box::new(expr), param.keyword, param.accepts, ident)
-                        .into(),
-                ),
-                Argument::Regex(_) | Argument::Array(_) => argument,
-            };
+            let argument =
+                expression::Argument::new(Box::new(argument), param.keyword, param.accepts, ident)
+                    .into();
 
             list.insert(param.keyword, argument);
         }

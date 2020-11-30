@@ -5,7 +5,6 @@ use crate::{
         self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Noop, Not,
         Path, Target, Variable,
     },
-    function::Argument,
     path, state, Error, Expr, Function as Fn, Operator, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
@@ -307,24 +306,21 @@ impl Parser<'_> {
     }
 
     /// Parse into a vector of argument properties.
-    fn arguments_from_pair(&mut self, pair: Pair<R>) -> Result<Vec<(Option<String>, Argument)>> {
+    fn arguments_from_pair(&mut self, pair: Pair<R>) -> Result<Vec<(Option<String>, Expr)>> {
         pair.into_inner()
             .map(|pair| self.argument_from_pair(pair))
             .collect::<Result<_>>()
     }
 
     /// Parse optional argument keyword and [`Argument`] value.
-    fn argument_from_pair(&mut self, pair: Pair<R>) -> Result<(Option<String>, Argument)> {
+    fn argument_from_pair(&mut self, pair: Pair<R>) -> Result<(Option<String>, Expr)> {
         let mut ident = None;
 
         for pair in pair.into_inner() {
             match pair.as_rule() {
                 // This matches first, if a keyword is provided.
                 R::ident => ident = Some(pair.as_str().to_owned()),
-                _ => {
-                    let expr = self.expression_from_pair(pair)?;
-                    return Ok((ident, Argument::Expression(expr)));
-                }
+                _ => return Ok((ident, self.expression_from_pair(pair)?)),
             }
         }
 
