@@ -6,7 +6,20 @@
 #
 #   Commits and tags the pending release
 
-require_relative "setup"
+#
+# Setup
+#
+
+require "json"
+require_relative "util/printer"
+require_relative "util/release"
+
+#
+# Constants
+#
+
+ROOT_DIR = ".."
+RELEASE_REFERENCE_DIR = File.join(ROOT_DIR, "docs", "reference", "releases")
 
 #
 # Functions
@@ -37,14 +50,15 @@ def release_exists?(release)
 end
 
 #
-# Commit
+# Execute
 #
 
-metadata = Metadata.load!(META_ROOT, DOCS_ROOT, GUIDES_ROOT, PAGES_ROOT)
-release = metadata.latest_release
+Dir.chdir "scripts"
+
+release = Vector::Release.all!(RELEASE_REFERENCE_DIR).last
 
 if release_exists?(release)
-  Printer.error!(
+  Util::Printer.error!(
     <<~EOF
     It looks like release v#{release.version} has already been released. A tag for this release already exists.
 
@@ -52,11 +66,11 @@ if release_exists?(release)
     EOF
   )
 else
-  Printer.title("Committing and tagging release")
+  Util::Printer.title("Committing and tagging release")
 
   bump_cargo_version(release.version)
 
-  Printer.success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
+  Util::Printer.success("Bumped the version in Cargo.toml & Cargo.lock to #{release.version}")
 
   branch_name = "#{release.version.major}.#{release.version.minor}"
 
@@ -76,24 +90,24 @@ else
     <<~EOF
     We'll be releasing v#{release.version} with the following commands:
 
-    #{commands.indent(2)}
+    #{commands}
 
     Your current `git status` is:
 
-    #{status.indent(2)}
+    #{status}
 
     Proceed to execute the above commands?
     EOF
 
-  if Printer.get(words, ["y", "n"]) == "n"
-    Printer.error!("Ok, I've aborted. Please re-run this command when you're ready.")
+  if Util::Printer.get(words, ["y", "n"]) == "n"
+    Util::Printer.error!("Ok, I've aborted. Please re-run this command when you're ready.")
   end
 
   commands.chomp.split("\n").each do |command|
     system(command)
 
     if !$?.success?
-      Printer.error!(
+      Util::Printer.error!(
         <<~EOF
         Command failed!
 
