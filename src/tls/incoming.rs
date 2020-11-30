@@ -1,10 +1,10 @@
 #[cfg(feature = "listenfd")]
 use super::Handshake;
-use super::MaybeTls;
 use super::{
     CreateAcceptor, IncomingListener, MaybeTlsSettings, MaybeTlsStream, TcpBind, TlsError,
     TlsSettings,
 };
+#[cfg(feature = "sources-utils-tcp-keepalive")]
 use crate::tcp::TcpKeepaliveConfig;
 use bytes::{Buf, BufMut};
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
@@ -16,7 +16,6 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 use tokio::{
     io::{self, AsyncRead, AsyncWrite},
@@ -122,7 +121,10 @@ impl<S> MaybeTlsIncomingStream<S> {
     }
 
     /// None if connection still hasn't been established.
+    #[cfg(any(feature = "listenfd", feature = "sources-utils-tcp-keepalive"))]
     pub fn get_ref(&self) -> Option<&S> {
+        use super::MaybeTls;
+
         match &self.state {
             StreamState::Accepted(stream) => Some(match stream {
                 MaybeTls::Raw(s) => s,
@@ -160,8 +162,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
         Ok(())
     }
 
-    // Required for `make check-component-features`
-    #[allow(dead_code)]
+    #[cfg(feature = "sources-utils-tcp-keepalive")]
     pub(crate) fn set_keepalive(
         &mut self,
         keepalive: Option<TcpKeepaliveConfig>,
@@ -174,7 +175,7 @@ impl MaybeTlsIncomingStream<TcpStream> {
         })?;
 
         if let Some(keepalive) = keepalive {
-            stream.set_keepalive(keepalive.time_secs.map(Duration::from_secs))?;
+            stream.set_keepalive(keepalive.time_secs.map(std::time::Duration::from_secs))?;
         }
 
         Ok(())
