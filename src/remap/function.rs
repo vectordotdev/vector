@@ -16,7 +16,12 @@ mod ip_subnet;
 mod ip_to_ipv6;
 mod ipv6_to_ipv4;
 mod r#match;
+mod flatten;
+mod floor;
+mod format_number;
+mod format_timestamp;
 mod log;
+mod r#match;
 mod md5;
 mod now;
 mod only_fields;
@@ -57,7 +62,11 @@ pub use contains::Contains;
 pub use del::Del;
 pub use downcase::Downcase;
 pub use ends_with::EndsWith;
+<<<<<<< HEAD
 pub use exists::Exists;
+=======
+pub use flatten::Flatten;
+>>>>>>> c9afb2ed... Readd flatten function
 pub use floor::Floor;
 pub use format_number::FormatNumber;
 pub use format_timestamp::FormatTimestamp;
