@@ -13,6 +13,7 @@ set -x
 #   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
 
 TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+PACKAGE_VERSION="${VECTOR_VERSION:-"$($PROJECT_ROOT/scripts/version.sh)"}"
 
 #
 # Local vars
@@ -22,7 +23,6 @@ PROJECT_ROOT="$(pwd)"
 ARCHIVE_NAME="vector-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 ABSOLUTE_ARCHIVE_PATH="$PROJECT_ROOT/$ARCHIVE_PATH"
-PACKAGE_VERSION="$("$PROJECT_ROOT/scripts/version.sh")"
 
 #
 # Header
