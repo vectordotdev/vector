@@ -28,8 +28,8 @@ team: [#Member, ...#Member] & [
 		_twitter: "a_hoverbear"
 		bio:      """
 			Ana is the proprietor of [Hoverbear Consulting](https://hoverbear.org)
-			and [Timber.io](\(urls.timber)) supports her work as a [core Vector
-			team](\(urls.team)) member. She is focused on building capacity within
+			and [Timber.io](\(urls.timber)) supports her work as a Vector
+			team member. She is focused on building capacity within
 			the Rust ecosystem and her local community. A frequent speaker, teacher,
 			and mentor, she was a founding organizer of [RustFest](https://rustfest.eu),
 			[RustCon Asia](https://rustcon.asia), and [Rust Belt
@@ -41,65 +41,86 @@ team: [#Member, ...#Member] & [
 		_github:  "binarylogic"
 		_keybase: "binarylogic"
 		_twitter: "binarylogic"
-		bio:      """
-			Ben is the CTO/Co-Founder at [Timber](\(urls.timber)) and a member of the
-			[core Vector team](\(urls.team)). He is an open-source veteran, creating
-			[Authlogic](https://github.com/binarylogic/authlogi) over 15 years ago
-			before helping to launch Vector.
+		bio: """
+			Ben is the CTO/Co-Founder at Timber.io and a member of the
+			Vector team.
 			"""
 	},
 	{
 		name:    "Bruce"
 		_github: "bruceg"
+		bio: """
+			Bruce is a senior engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "James"
 		_github:  "jamtur01"
 		_keybase: "jamtur01"
 		_twitter: "kartar"
+		bio: """
+			James is the VP of Engineering at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "Jean"
 		_github:  "JeanMertz"
 		_keybase: "JeanMertz"
 		_twitter: "JeanMertz"
+		bio: """
+			Jean is a senior engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "Jesse"
 		_github:  "jszwedko"
 		_keybase: "jszwedko"
 		_twitter: "jszwedko"
+		bio: """
+			Jesse is a senior engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "Kirill"
 		_github:  "fanatid"
 		_keybase: "fanatid"
+		bio: """
+			Jean is an engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:    "Kruno"
 		_github: "ktff"
+		bio: """
+			Kruno is an engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "Lee"
 		_github:  "leebenson"
 		_keybase: "leebenson"
 		_twitter: "leebenson"
+		bio: """
+			Lee is a senior engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "Luc"
 		_github:  "lucperkins"
 		_keybase: "lucperkins"
 		_twitter: "lucperkins"
+		bio: """
+			Luc is an engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "Luke"
 		_github:  "lukesteensen"
 		_keybase: "lukesteensen"
 		_twitter: "lukesteensen"
-		bio:      """
-			Luke is a Senior Engineer at [Timber.io](\(urls.timber)) and a
-			member of the [core Vector team](\(urls.team)). Before Timber,
-			Luke was an engineer at Braintree working on parts of their
+		bio: """
+			Luke is a Senior Engineer at Timber.io and a member of the Vector team.
+			Before Timber, Luke was an engineer at Braintree working on parts of their
 			observability infrastructure.
 			"""
 	},
@@ -108,21 +129,33 @@ team: [#Member, ...#Member] & [
 		_github:  "MOZGIII"
 		_keybase: "MOZGIII"
 		_twitter: "MOZGIII"
+		bio: """
+			Mike is a senior engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:     "Steve"
 		_github:  "sghall"
 		_keybase: "sghall"
 		_twitter: "sghall"
+		bio: """
+			Steve is a senior engineer at Timber.io and a member of the	Vector team.
+			"""
 	},
 	{
 		name:    "Vic"
 		_github: "vector-vic"
+		bio: """
+			Vic is the Vector mascot.
+			"""
 	},
 	{
 		name:     "Zach"
 		_github:  "zsherman"
 		_keybase: "zsherman"
 		_twitter: "zsherman"
+		bio: """
+			Zach is the CEO/co-founder of Timber.io.
+			"""
 	},
 ]

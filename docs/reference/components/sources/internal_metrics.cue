@@ -26,7 +26,7 @@ components: sources: internal_metrics: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -38,6 +38,10 @@ components: sources: internal_metrics: {
 		notices: []
 		requirements: []
 		warnings: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	output: metrics: {

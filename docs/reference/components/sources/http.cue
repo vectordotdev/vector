@@ -44,7 +44,7 @@ components: sources: http: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -56,6 +56,10 @@ components: sources: http: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -131,6 +135,7 @@ components: sources: http: {
 			_line:       "Hello world"
 			_user_agent: "my-service/v2.1"
 			title:       "text/plain"
+
 			configuration: {
 				address:  "0.0.0.0:\(_port)"
 				encoding: "text"
@@ -158,6 +163,7 @@ components: sources: http: {
 			_line:       "{\"key\": \"val\"}"
 			_user_agent: "my-service/v2.1"
 			title:       "application/json"
+
 			configuration: {
 				address:  "0.0.0.0:\(_port)"
 				encoding: "json"

@@ -290,7 +290,7 @@ config/vector.toml
 ```
 
 Example configurations are located in `config/vector/examples/*`. You can learn more about configuring
-Vector in the [Configuration][docs.configuration] section.
+Vector in the [Configuration][docs.setup.configuration] section.
 
 ### Data Directory
 
@@ -466,7 +466,7 @@ features one has to pass a comma-separated list of component features.
 </p>
 </details>
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.from_archives]: /docs/setup/installation/manual/from-archives/
 [docs.global-options#data_dir]: /docs/reference/global-options/#data_dir
 [docs.glossary#buffer]: /docs/meta/glossary/#buffer

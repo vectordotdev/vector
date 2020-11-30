@@ -39,13 +39,15 @@ components: sinks: [Name=string]: {
 									}
 								}
 							}
-							timeout_secs: {
-								common:      true
-								description: "The maximum age of a batch before it is flushed."
-								required:    false
-								type: uint: {
-									default: sinks[Name].features.send.batch.timeout_secs
-									unit:    "seconds"
+							if sinks[Name].features.send.batch.timeout_secs != null {
+								timeout_secs: {
+									common:      true
+									description: "The maximum age of a batch before it is flushed."
+									required:    false
+									type: uint: {
+										default: sinks[Name].features.send.batch.timeout_secs
+										unit:    "seconds"
+									}
 								}
 							}
 						}

@@ -18,8 +18,8 @@ remap: functions: ip_cidr_contains: {
 	return: ["boolean"]
 	category: "networking"
 	description: #"""
-			Returns `true` if the given ip address is contained within the block referenced
-			by the given CIDR mask.
+		Returns `true` if the given ip address is contained within the block referenced
+		by the given CIDR mask.
 		"""#
 	examples: [
 		{

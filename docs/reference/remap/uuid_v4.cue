@@ -5,7 +5,7 @@ remap: functions: uuid_v4: {
 	return: ["string"]
 	category: "text"
 	description: #"""
-			Returns a random UUID (Universally Unique Identifier).
+		Returns a random UUID (Universally Unique Identifier).
 		"""#
 	examples: [
 		{
