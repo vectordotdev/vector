@@ -55,7 +55,7 @@ installation: _interfaces: kubectl: {
 				  # Override the Vector image to avoid use of the sliding tag.
 				  - name: timberio/vector
 				    newName: timberio/vector
-				    newTag: #\(_vector_image_tag)
+				    newTag: \#(_vector_image_tag)
 
 				resources:
 				  # A namespace to keep the resources at.
