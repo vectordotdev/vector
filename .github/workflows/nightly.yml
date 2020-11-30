@@ -52,6 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
           DOCKER_PRIVILEGED: "true"
           PASS_FEATURES: "default-cmake"
@@ -74,6 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - run: make ci-sweep
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - env:
           DOCKER_PRIVILEGED: "true"
         run: make package-armv7-unknown-linux-gnueabihf-all
@@ -193,6 +195,7 @@ jobs:
       - build-x86_64-unknown-linux-musl-packages
     steps:
       - uses: actions/checkout@v1
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64-unknown-linux-musl.tar.gz
@@ -230,6 +233,7 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
     steps:
       - uses: actions/checkout@v1
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
           name: vector-x86_64-unknown-linux-gnu.tar.gz
@@ -299,6 +303,7 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
     steps:
       - uses: actions/checkout@v1
+      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - uses: actions/download-artifact@v2
         with:
           name: vector-${{ env.VECTOR_VERSION }}-amd64.deb
