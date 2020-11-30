@@ -12,10 +12,10 @@ pub enum Error {
 #[derive(Clone)]
 pub struct Argument {
     expression: Box<Expr>,
-    keyword: &'static str,
     validator: fn(&Value) -> bool,
 
     // used for error messages
+    keyword: &'static str,
     function_ident: &'static str,
 }
 
@@ -23,8 +23,9 @@ impl std::fmt::Debug for Argument {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Argument")
             .field("expression", &self.expression)
-            .field("keyword", &self.keyword)
             .field("validator", &"fn(&Value) -> bool".to_owned())
+            .field("keyword", &self.keyword)
+            .field("function_ident", &self.function_ident)
             .finish()
     }
 }
@@ -40,14 +41,14 @@ impl PartialEq for Argument {
 impl Argument {
     pub fn new(
         expression: Box<Expr>,
-        keyword: &'static str,
         validator: fn(&Value) -> bool,
+        keyword: &'static str,
         function_ident: &'static str,
     ) -> Self {
         Self {
             expression,
-            keyword,
             validator,
+            keyword,
             function_ident,
         }
     }
