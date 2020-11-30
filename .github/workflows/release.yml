@@ -188,8 +188,9 @@ jobs:
   release-docker:
     runs-on: ubuntu-latest
     needs:
-      - build-x86_64-unknown-linux-musl-packages
       - build-aarch64-unknown-linux-musl-packages
+      - build-x86_64-unknown-linux-gnu-packages
+      - build-x86_64-unknown-linux-musl-packages
     steps:
       - uses: actions/checkout@v1
       - uses: actions/download-artifact@v2
@@ -211,7 +212,7 @@ jobs:
       - env:
           DOCKER_USERNAME: "${{ secrets.CI_DOCKER_USERNAME }}"
           DOCKER_PASSWORD: "${{ secrets.CI_DOCKER_PASSWORD }}"
-          PLATFORM: "linux/amd64,linux/arm64,linux/arm"
+          PLATFORM: "linux/amd64,linux/arm64"
         run: |
           ./scripts/upgrade-docker.sh
           export VERSION=$(make version)
