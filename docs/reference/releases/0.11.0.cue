@@ -25,23 +25,27 @@ releases: "0.11.0": {
 		{
 			title:       "Kubernetes aggregator role"
 			description: """
-										In addition to Vector's observability, 0.12 will include
-										support for	deploying Vector into the [aggregator role](\(urls.vector_aggregator_role))
-										within Kubernetes. This will allow you to build sophisticated
-										observability piplines with Vector. Distributing processing
-										on the edge, centralizing it with an aggregator, or both.
-										If you are interested in beta testing, please
-										[join our chat](\(urls.vector_chat)) and let us know.
-										"""
+				In addition to Vector's observability, 0.12 will include
+				support for	deploying Vector into the [aggregator role](\(urls.vector_aggregator_role))
+				within Kubernetes. This will allow you to build end-to-end
+				observability piplines with Vector. Distributing processing
+				on the edge, centralizing it with an aggregator, or both.
+				If you are interested in beta testing, please
+				[join our chat](\(urls.vector_chat)) and let us know.
+				"""
 		},
 		{
-			title: "Timber Remap Language (TRL)"
+			title:       "Timber Remap Language (TRL)"
 			description: """
 				Finally, 0.13 will introduce the new Timber Remap Language.
 				This is a Rust-native syntax designed for safe and efficient
-				data mapping. It's an ultra-performance middle ground between
-				fundamental transforms like `add_fields` and a full blow
+				data mapping. It's an ultra-performant middle ground between
+				fundamental transforms like `add_fields` and a full blown
 				runtime like `lua`.
+
+				If interested, you can beta test via the [`remap` transform](\(urls.vector_remap_transform))
+				and use the [Timber Remap Language reference](\(urls.timber_remap_language_reference))
+				to write scripts.
 				"""
 		},
 	]
