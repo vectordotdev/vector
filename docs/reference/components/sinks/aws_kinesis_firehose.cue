@@ -95,4 +95,22 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	iam: {
+		platform: "aws"
+		service:  "firehose"
+
+		_stream: "deliveryStream/<stream-name>"
+
+		policies: [
+			{
+				_action:   "DescribeDeliveryStream"
+				_resource: _stream
+			},
+			{
+				_action:   "PutRecordBatch"
+				_resource: _stream
+			},
+		]
+	}
 }

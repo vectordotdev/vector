@@ -110,4 +110,15 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 			summary:      false
 		}
 	}
+
+	iam: {
+		platform: "aws"
+		_service: "cloudwatch"
+
+		policies: [
+			{
+				_action: "PutMetricData"
+			},
+		]
+	}
 }

@@ -98,4 +98,22 @@ components: sinks: aws_sqs: components._aws & {
 		logs:    true
 		metrics: null
 	}
+
+	iam: {
+		platform: "aws"
+		service: "sqs"
+
+		_queue: "<queue>" // Helper
+
+		policies: [
+			{
+				_action: "GetQueueAttributes"
+				_resource: _queue
+			},
+			{
+				_action: "SendMessage"
+				_resource: _queue
+			}
+		]
+	}
 }

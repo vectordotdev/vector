@@ -399,14 +399,21 @@ components: {
 		#Policy: {
 			_action:   string
 			_resource: string
+			action:    "\(_service):\(_action)"
 
 			if platform == "aws" {
-				arn:    "arn:aws:\(_service):<region-id>:<account-id>:\(_resource)"
-				action: "\(_service):\(_action)"
+				if _resource != _|_ {
+					if _service == "s3" {
+						resource: "arn:aws:s3:::\(_resource)"
+					} else {
+						resource: "arn:aws:\(_service):<region-id>:<account-id>:\(_resource)"
+					}
+				}
 			}
 			if platform == "gcp" {
-				resource_name: "//\(_service).googleapis.com/projects/<project-id>/\(_service)/\(_resource)"
-				action:        "\(_service):\(action)"
+				if _resource != _|_ {
+					resource: "//\(_service).googleapis.com/projects/<project-id>/\(_service)/\(_resource)"
+				}
 			}
 		}
 

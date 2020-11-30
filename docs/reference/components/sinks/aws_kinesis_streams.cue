@@ -146,4 +146,22 @@ components: sinks: aws_kinesis_streams: components._aws & {
 			]
 		}
 	}
+
+	iam: {
+		platform: "aws"
+		service:  "kinesis"
+
+		_stream: "<stream-name>" // Helper
+
+		policies: [
+			{
+				_action:   "DescribeStream"
+				_resource: _stream
+			},
+			{
+				_action:   "PutRecords"
+				_resource: _stream
+			},
+		]
+	}
 }
