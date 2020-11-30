@@ -208,8 +208,14 @@ installation: close({
 	}
 
 	#Roles: [Name=string]: {
-		name:  Name
-		title: string
+		name:         Name
+		title:        string
+		description?: string
+		sub_roles: [SubName=string]: {
+			name:        SubName
+			title:       string
+			description: string
+		}
 	}
 
 	#Tutorials: {
