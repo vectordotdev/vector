@@ -29,7 +29,7 @@ impl Function for Log {
         let value = arguments.required_expr("value")?;
         let level = arguments
             .optional_enum("level", &LEVELS)?
-            .unwrap_or("info".to_string());
+            .unwrap_or_else(|| "info".to_string());
 
         Ok(Box::new(LogFn { value, level }))
     }
