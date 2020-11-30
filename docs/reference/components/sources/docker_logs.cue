@@ -118,13 +118,33 @@ components: sources: docker_logs: {
 			required: false
 			type: bool: default: true
 		}
+		exclude_containers: {
+			common: false
+			description: """
+				A list of container IDs _or_ names to match against for
+				containers from which you don't want to collect logs. Prefix
+				matches are supported, meaning you can supply just the first
+				few characters of the container ID or name. If not provided,
+				all containers will be included. Alternatively, you can specify
+				only the containers you want to include using
+				[`include_containers`](#include_containers).
+				"""
+			required: false
+			type: array: {
+				default: null
+				items: type: string: examples: ["serene_", "serene_leakey", "ad08cc418cf9"]
+			}
+		}
 		include_containers: {
 			common: true
 			description: """
-				A list of container IDs _or_ names to match against. Prefix
+				A list of container IDs _or_ names to match against for
+				containers from which you want to collect logs. Prefix
 				matches are supported, meaning you can supply just the first
 				few characters of the container ID or name. If not provided,
-				all containers will be included.
+				all containers will be included. Alternatively, you can specify
+				only the containers you want to exclude using
+				[`exclude_containers`](#exclude_containers).
 				"""
 			required: false
 			type: array: {
