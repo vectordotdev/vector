@@ -117,6 +117,32 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		metrics: null
 	}
 
+	policies: {
+		required_prefix: "arn:aws:logs:<region-id>:<account-id>:"
+		policies: [
+			{
+				action:   "logs:DescribeLogGroups"
+				resource: "log-group::log-stream:"
+			},
+			{
+				action:   "logs:DescribeLogStreams"
+				resource: "log-group:<group-name>:log-stream:"
+			},
+			{
+				action:   "logs:PutLogEvents"
+				resource: "log-group:<group-name>:log-stream:<stream-name>"
+			},
+			{
+				action:   "logs:CreateLogGroup"
+				resource: "log-group:<group-name>:log-stream:"
+			},
+			{
+				action:   "logs:CreateLogStream"
+				resource: "log-group:<group-name>:log-stream:<stream-name>"
+			},
+		]
+	}
+
 	telemetry: metrics: {
 		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}

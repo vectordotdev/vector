@@ -395,8 +395,14 @@ components: {
 		metrics?: #MetricOutput
 	}
 
-	#Policies: {
-		description: string
+	#IAMPolicies: #Policies & {
+		#Policy: {
+			action:   string
+			resource: string
+		}
+
+		required_prefix: string
+		policies: [#Policy, ...#Policy]
 	}
 
 	#Runtime: {
