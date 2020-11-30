@@ -89,30 +89,21 @@ impl DockerLogsConfig {
         id: &str,
         names: impl IntoIterator<Item = &'a str>,
     ) -> bool {
+        let id_matches =
+            |items: &Vec<String>| -> bool { items.iter().any(|flag| id.starts_with(flag)) };
+
+        let name_matches = |items: &Vec<String>| -> bool {
+            names
+                .into_iter()
+                .any(|name| items.iter().any(|item| name.starts_with(item)))
+        };
+
+        // This combination of let Some expressions is okay here, as the Source's constructor
+        // ensures that both are not set.
         if let Some(exclude_containers) = &self.exclude_containers {
-            let id_flag = exclude_containers
-                .iter()
-                .any(|exclude| id.starts_with(exclude));
-
-            let name_flag = names.into_iter().any(|name| {
-                exclude_containers
-                    .iter()
-                    .any(|exclude| name.starts_with(exclude))
-            });
-
-            !(id_flag || name_flag)
+            !(id_matches(exclude_containers) || name_matches(exclude_containers))
         } else if let Some(include_containers) = &self.include_containers {
-            let id_flag = include_containers
-                .iter()
-                .any(|include| id.starts_with(include));
-
-            let name_flag = names.into_iter().any(|name| {
-                include_containers
-                    .iter()
-                    .any(|include| name.starts_with(include))
-            });
-
-            id_flag || name_flag
+            id_matches(include_containers) || name_matches(include_containers)
         } else {
             true
         }
