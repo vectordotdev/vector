@@ -19,6 +19,24 @@ impl fmt::Debug for Array {
     }
 }
 
+impl From<Array> for Vec<Expr> {
+    fn from(array: Array) -> Self {
+        array.expressions
+    }
+}
+
+impl<T: Into<Value>> From<Vec<T>> for Array {
+    fn from(values: Vec<T>) -> Self {
+        Self::new(
+            values
+                .into_iter()
+                .map(Into::into)
+                .map(Expr::from)
+                .collect::<Vec<_>>(),
+        )
+    }
+}
+
 impl IntoIterator for Array {
     type Item = Expr;
     type IntoIter = std::vec::IntoIter<Self::Item>;
@@ -107,7 +125,7 @@ mod tests {
                           Box::new(Literal::from(true).into()),
                           Operator::Multiply,
                         ).into(),
-                        Literal::from(vec![1]).into(),
+                        Array::from(vec![1]).into(),
             ]),
             def: TypeDef {
                 fallible: true,

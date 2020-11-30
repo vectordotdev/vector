@@ -11,6 +11,16 @@ impl fmt::Debug for Literal {
 }
 
 impl Literal {
+    pub fn new(value: Value) -> Self {
+        debug_assert!(
+            !matches!(value, Value::Array(_)),
+            "{} must use expression::Array instead of expression::Literal",
+            value.kind()
+        );
+
+        Self(value)
+    }
+
     pub fn boxed(self) -> Box<dyn Expression> {
         Box::new(self)
     }
@@ -26,7 +36,7 @@ impl Literal {
 
 impl<T: Into<Value>> From<T> for Literal {
     fn from(value: T) -> Self {
-        Self(value.into())
+        Self::new(value.into())
     }
 }
 
@@ -68,11 +78,6 @@ mod tests {
         float {
             expr: |_| Literal::from(123.456),
             def: TypeDef { kind: Kind::Float, ..Default::default() },
-        }
-
-        array {
-            expr: |_| Literal::from(vec!["foo"]),
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         map {

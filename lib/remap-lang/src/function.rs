@@ -1,5 +1,5 @@
 use crate::{
-    expression::{self, Literal, Path},
+    expression::{self, Array, Literal, Path},
     Expr, Expression, Result, Value,
 };
 use core::convert::{TryFrom, TryInto};
@@ -94,13 +94,13 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
-    pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Box<dyn Expression>>> {
+    pub fn optional_expr(&mut self, keyword: &str) -> Result<Option<Expr>> {
         self.optional(keyword)
             .map(|v| v.try_into().map_err(Into::into))
             .transpose()
     }
 
-    pub fn required_expr(&mut self, keyword: &str) -> Result<Box<dyn Expression>> {
+    pub fn required_expr(&mut self, keyword: &str) -> Result<Expr> {
         self.optional_expr(keyword)?
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
@@ -149,9 +149,7 @@ impl ArgumentList {
     }
 
     pub fn optional_path(&mut self, keyword: &str) -> Result<Option<Path>> {
-        self.optional(keyword)
-            .map(Expr::try_from)
-            .transpose()?
+        self.optional_expr(keyword)?
             .map(Path::try_from)
             .transpose()
             .map_err(Into::into)
@@ -162,13 +160,13 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
-    pub fn optional_array(&mut self, keyword: &str) -> Result<Option<Vec<Argument>>> {
-        self.optional(keyword)
+    pub fn optional_array(&mut self, keyword: &str) -> Result<Option<Array>> {
+        self.optional_expr(keyword)?
             .map(|v| v.try_into().map_err(Into::into))
             .transpose()
     }
 
-    pub fn required_array(&mut self, keyword: &str) -> Result<Vec<Argument>> {
+    pub fn required_array(&mut self, keyword: &str) -> Result<Array> {
         self.optional_array(keyword)?
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
@@ -182,11 +180,7 @@ impl ArgumentList {
             .map(|array| {
                 array
                     .into_iter()
-                    .map(|arg| {
-                        let expr = Expr::try_from(arg)?;
-
-                        Literal::try_from(expr).map_err(Into::into)
-                    })
+                    .map(|expr| Literal::try_from(expr).map_err(Into::into))
                     .map(|lit: Result<Literal>| literal_to_enum_variant(lit?, variants))
                     .collect::<Result<Vec<_>>>()
             })
