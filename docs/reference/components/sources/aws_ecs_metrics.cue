@@ -61,11 +61,11 @@ components: sources: aws_ecs_metrics: {
 	configuration: {
 		endpoint: {
 			description: """
-					Base URI of the task metadata endpoint.
-					If empty, the URI will be automatically discovered based on the latest version detected.
-					The version 2 endpoint base URI is `169.254.170.2/v2/`.
-					The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
-					The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
+				Base URI of the task metadata endpoint.
+				If empty, the URI will be automatically discovered based on the latest version detected.
+				The version 2 endpoint base URI is `169.254.170.2/v2/`.
+				The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
+				The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
 				"""
 			common:   false
 			required: false

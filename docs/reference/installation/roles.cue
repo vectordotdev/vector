@@ -16,11 +16,11 @@ installation: roles: {
 			sidecar: {
 				title: "Sidecar"
 				description: """
-					The sidecar roles couples Vector with each service, focused on data collection
+					The sidecar role couples Vector with each service, focused on data collection
 					for that individual service only. While the deamon role is recommended, the
 					sidecar role is beneficial when you want to shift reponsibility of data
 					collection to the service owner. And, in some cases, it can be simpler to
-					reason and manage.
+					manage.
 					"""
 			}
 		}
