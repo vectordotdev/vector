@@ -25,6 +25,7 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{compat::Sink01CompatExt, sink::SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::{
     future::ready,
     pin::Pin,
@@ -48,9 +49,16 @@ lazy_static! {
     static ref STDOUT: Bytes = "stdout".into();
 }
 
+#[derive(Debug, Snafu)]
+pub enum DockerLogsConfigErrors {
+    #[snafu(display("you cannot specify both include_containers and exclude_containers"))]
+    IncludeAndExcludeSpecified,
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
+    exclude_containers: Option<Vec<String>>,
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
@@ -63,6 +71,7 @@ pub struct DockerLogsConfig {
 impl Default for DockerLogsConfig {
     fn default() -> Self {
         Self {
+            exclude_containers: None,
             include_containers: None,
             include_labels: None,
             include_images: None,
@@ -80,7 +89,19 @@ impl DockerLogsConfig {
         id: &str,
         names: impl IntoIterator<Item = &'a str>,
     ) -> bool {
-        if let Some(include_containers) = &self.include_containers {
+        if let Some(exclude_containers) = &self.exclude_containers {
+            let id_flag = exclude_containers
+                .iter()
+                .any(|exclude| id.starts_with(exclude));
+
+            let name_flag = names.into_iter().any(|name| {
+                exclude_containers
+                    .iter()
+                    .any(|exclude| name.starts_with(exclude))
+            });
+
+            !(id_flag || name_flag)
+        } else if let Some(include_containers) = &self.include_containers {
             let id_flag = include_containers
                 .iter()
                 .any(|include| id.starts_with(include));
@@ -297,17 +318,32 @@ impl DockerLogsSource {
         out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerLogsSource> {
+        // Ensure that include_containers and exclude_containers aren't both
+        // specified
+        if config.include_containers.is_some() && config.exclude_containers.is_some() {
+            return Err(Box::new(DockerLogsConfigErrors::IncludeAndExcludeSpecified));
+        }
+
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
         // various approaches need to be made. As such the solution is not
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
-        let exclude_self = config
+        let include_containers_specified = config
             .include_containers
             .clone()
             .unwrap_or_default()
-            .is_empty()
+            .is_empty();
+
+        let exclude_containers_specified = config
+            .exclude_containers
+            .clone()
+            .unwrap_or_default()
+            .is_empty();
+
+        let exclude_self = include_containers_specified
+            && !exclude_containers_specified
             && config.include_labels.clone().unwrap_or_default().is_empty();
 
         let backoff_secs = config.retry_backoff_secs;
