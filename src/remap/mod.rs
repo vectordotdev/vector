@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 lazy_static! {
     // List of immutable functions that can be loaded into a remap-lang program.
     pub(crate) static ref FUNCTIONS: Vec<Box<dyn remap::Function>> = vec![
+        Box::new(Assert),
         Box::new(Split),
         Box::new(ToString),
         Box::new(ToInt),

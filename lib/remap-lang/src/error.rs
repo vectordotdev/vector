@@ -28,6 +28,9 @@ pub enum Error {
     #[error("function call error: {0}")]
     Call(String),
 
+    #[error("assertion failed: {0}")]
+    Assert(String),
+
     #[error("unknown error")]
     Unknown,
 }
