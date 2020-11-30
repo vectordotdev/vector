@@ -401,14 +401,18 @@ components: {
 			_resource: string
 
 			if platform == "aws" {
-				arn:    "arn:aws:\(_namespace):<region-id>:<account-id>:\(_resource)"
-				action: "\(namespace):\(_action)"
+				arn:    "arn:aws:\(_service):<region-id>:<account-id>:\(_resource)"
+				action: "\(_service):\(_action)"
+			}
+			if platform == "gcp" {
+				resource_name: "//\(_service).googleapis.com/projects/<project-id>/\(_service)/\(_resource)"
+				action:        "\(_service):\(action)"
 			}
 		}
 
-		_namespace: string
-		platform:  "aws" | "gcp"
+		platform: "aws" | "gcp"
 		policies: [#Policy, ...#Policy]
+		_service: string
 	}
 
 	#Runtime: {

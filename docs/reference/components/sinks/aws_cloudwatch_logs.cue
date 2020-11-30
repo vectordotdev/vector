@@ -119,7 +119,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 
 	iam: {
 		platform: "aws"
-		_namespace: "logs"
+		_service: "logs"
 
 		_stream: "log-group:<group-name>:log-stream:<stream-name>" // Helper
 
