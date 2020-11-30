@@ -194,8 +194,6 @@ anyhow = { version = "1.0.28" }
 snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
-
-# For AVRO
 avro-rs = "0.11.0"
 
 # For WASM
