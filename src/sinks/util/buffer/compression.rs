@@ -99,10 +99,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                             if level.is_some() {
                                 return Err(de::Error::duplicate_field("level"));
                             }
-                            level = Some(match map.next_value::<usize>() {
-                                Ok(value) => value.to_string(),
-                                Err(_) => map.next_value::<&str>()?.to_string(),
-                            });
+                            level = Some(map.next_value::<&str>()?);
                         }
                         _ => return Err(de::Error::unknown_field(key, &["algorithm", "level"])),
                     };
@@ -114,7 +111,7 @@ impl<'de> de::Deserialize<'de> for Compression {
                         None => Ok(Compression::None),
                     },
                     "gzip" => Ok(Compression::Gzip(match level {
-                        Some(level) => Some(match level.as_str() {
+                        Some(level) => Some(match level {
                             "none" => GZIP_NONE,
                             "fast" => GZIP_FAST,
                             "default" => GZIP_DEFAULT,

@@ -136,7 +136,7 @@ impl GenerateConfig for S3SinkConfig {
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
             encoding: Encoding::Text.into(),
-            compression: Compression::Gzip(None),
+            compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             assume_role: None,
