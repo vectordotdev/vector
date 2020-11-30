@@ -2,84 +2,19 @@ use crate::{
     async_read::VecAsyncReadExt,
     emit,
     event::Event,
-    internal_events::{ConnectionOpen, OpenGauge, SocketMode, SocketReceiveError, UnixSocketError},
+    internal_events::{ConnectionOpen, OpenGauge, UnixSocketError},
     shutdown::ShutdownSignal,
     sources::Source,
     Pipeline,
 };
-use bytes::{Bytes, BytesMut};
-use futures::{
-    compat::{Future01CompatExt, Sink01CompatExt},
-    FutureExt, SinkExt, StreamExt,
-};
+use bytes::Bytes;
+use futures::{compat::Sink01CompatExt, FutureExt, SinkExt, StreamExt};
 use futures01::Sink;
 use std::{future::ready, path::PathBuf};
-use tokio::net::{UnixDatagram, UnixListener, UnixStream};
+use tokio::net::{UnixListener, UnixStream};
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::field;
 use tracing_futures::Instrument;
-
-/// Returns a Source object corresponding to a Unix domain datagram
-/// socket.  Passing in different functions for build_event can allow
-/// for different source-specific logic (such as decoding syslog
-/// messages in the syslog source).
-pub fn build_unix_datagram_source<D, E>(
-    listen_path: PathBuf,
-    max_length: usize,
-    host_key: String,
-    mut decoder: D,
-    mut shutdown: ShutdownSignal,
-    out: Pipeline,
-    build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
-) -> Source
-where
-    D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
-    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
-{
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
-
-    Box::pin(async move {
-        let mut socket =
-            UnixDatagram::bind(&listen_path).expect("Failed to bind to datagram socket");
-        info!(message = "Listening.", path = ?listen_path, r#type = "unix_datagram");
-
-        let mut buf = BytesMut::with_capacity(max_length);
-        loop {
-            buf.resize(max_length, 0);
-            tokio::select! {
-                recv = socket.recv_from(&mut buf) => {
-                    let (byte_size, address) = recv.map_err(|error| {
-                        emit!(SocketReceiveError { error, mode: SocketMode::Unix })
-                    })?;
-
-                    let mut payload = buf.split_to(byte_size);
-
-                    let span = info_span!("datagram");
-                    let path = address.as_pathname().map(|e| e.to_owned()).map(|path| {
-                        span.record("peer_path", &field::debug(&path));
-                        path
-                    });
-
-                    let build_event = build_event.clone();
-                    let received_from: Option<Bytes> =
-                        path.map(|p| p.to_string_lossy().into_owned().into());
-
-                    while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
-                        if let Some(event) = build_event(&host_key, received_from.clone(), &line) {
-                            tokio::select! {
-                                result = out.send(event).compat() => {
-                                    out = result?;
-                                }
-                                _ = &mut shutdown => return Ok(()),
-                            }
-                        }
-                    }
-                }
-                _ = &mut shutdown => return Ok(()),
-            }
-        }
-    })
-}
 
 /// Returns a Source object corresponding to a Unix domain stream
 /// socket.  Passing in different functions for build_event can allow
