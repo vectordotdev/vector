@@ -4,21 +4,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  version:
-    runs-on: ubuntu-latest
-    # Set job outputs to values from filter step
-    outputs:
-      version:
-        description: "Vector version"
-        value: ${{ steps.make-version.outputs.version }}
-    runs:
-      using: "composite"
-      steps:
-        - uses: actions/checkout@v1
-        - id: make-version
-          run: echo "::set-output name=version::$(make version)"
-          shell: bash
-
   test-harness:
 
     runs-on: ubuntu-latest
@@ -74,6 +59,10 @@ jobs:
       with:
         lfs: true
         ref: '${{ steps.pr-info.outputs.head_sha }}'
+
+    - name: Set the Vector version
+      run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+
     - name: Complete repo clone and gather info on the cloned code
       id: cloned-repo-info
       run: |
@@ -86,7 +75,7 @@ jobs:
       id: deb-cache
       uses: actions/cache@v1
       with:
-        path: target/artifacts/vector-${{ needs.version.outputs.version }}-amd64.deb
+        path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb
         key: vector-test-harness-packaged-deb-${{ steps.pr-info.outputs.head_sha }}
     - name: Make deb
       if: steps.deb-cache.outputs.cache-hit != 'true'
@@ -100,7 +89,7 @@ jobs:
           && bin/test $(echo '${{ github.event.comment.body }}' | head -n 1 | sed 's|^/test ||')"
       env:
         GENERATE_SSH_KEY: true
-        VECTOR_TEST_VECTOR_DEB_PATH: '${{ github.workspace }}/target/artifacts/vector-${{ needs.version.outputs.version }}-amd64.deb'
+        VECTOR_TEST_VECTOR_DEB_PATH: '${{ github.workspace }}/target/artifacts/vector-${{ env.VECTOR_VERSION }}-amd64.deb'
         VECTOR_TEST_USER_ID: 'gha_${{ github.event.issue.number }}'
         VECTOR_TEST_RESULTS_S3_BUCKET_NAME: test-results.vector.dev
         VECTOR_TEST_SUBJECT: vector
