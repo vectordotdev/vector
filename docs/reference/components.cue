@@ -126,6 +126,10 @@ components: {
 		// For example, the `http` sink has a `HTTP` title.
 		title: string
 
+		// Platform-specific policies, e.g. AWS IAM policies, that are
+		// required or recommended when using the component.
+		policies?: #Policies
+
 		// Telemetry produced by the component
 		telemetry: metrics: #MetricOutput
 	}
@@ -389,6 +393,10 @@ components: {
 	#Output: {
 		logs?:    #LogOutput
 		metrics?: #MetricOutput
+	}
+
+	#Policies: {
+		description: string
 	}
 
 	#Runtime: {
