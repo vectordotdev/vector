@@ -293,7 +293,7 @@ Dir.chdir "scripts"
 
 Util::Printer.title("Creating release meta file...")
 
-last_tag = `git describe --tags --abbrev=0`.chomp
+last_tag = `git describe --tags $(git rev-list --tags --max-count=1)`.chomp
 last_version = Util::Version.new(last_tag.gsub(/^v/, ''))
 current_commits = get_commits_since(last_version)
 new_version = get_new_version(last_version, current_commits)
