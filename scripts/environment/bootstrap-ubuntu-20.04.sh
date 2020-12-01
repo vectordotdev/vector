@@ -39,6 +39,7 @@ apt install --yes \
     ca-certificates \
     curl \
     gnupg-agent \
+    gnuplot \
     nodejs \
     npm \
     ruby-bundler \
