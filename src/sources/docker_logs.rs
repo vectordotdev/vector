@@ -1350,10 +1350,27 @@ mod integration_tests {
     }
 
     #[tokio::test]
-    async fn include_containers() {
+    async fn exclude_containers() {
         trace_init();
 
         let message = "11";
+        let name0 = "vector_test_exclude_container_0";
+
+        let config = DockerLogsConfig {
+            exclude_containers: Some(&[name0].iter().map(|&s| s.to_owned()).collect())
+        };
+        let out = source_with_config(config);
+
+        let docker = docker().unwrap();
+        let events = collect_n(out, 1).await.unwrap();
+        assert!(events.is_empty());
+    }
+
+    #[tokio::test]
+    async fn include_containers() {
+        trace_init();
+
+        let message = "12";
         let name0 = "vector_test_include_container_0";
         let name1 = "vector_test_include_container_1";
 
@@ -1377,7 +1394,7 @@ mod integration_tests {
     async fn include_labels() {
         trace_init();
 
-        let message = "12";
+        let message = "13";
         let name0 = "vector_test_include_labels_0";
         let name1 = "vector_test_include_labels_1";
         let label = "vector_test_include_label";
