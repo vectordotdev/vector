@@ -6442,8 +6442,10 @@ checksum = "6d9e878ad426ca286e4dcae09cbd4e1973a7f8987d97570e2469703dd7f5720c"
 dependencies = [
  "futures-util",
  "log",
+ "native-tls",
  "pin-project 0.4.27",
  "tokio",
+ "tokio-native-tls",
  "tungstenite",
 ]
 
@@ -6760,6 +6762,7 @@ dependencies = [
  "httparse",
  "input_buffer",
  "log",
+ "native-tls",
  "rand 0.7.3",
  "sha-1 0.9.1",
  "url",
