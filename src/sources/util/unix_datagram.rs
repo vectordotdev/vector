@@ -18,7 +18,7 @@ use tracing::field;
 /// socket.  Passing in different functions for build_event can allow
 /// for different source-specific logic (such as decoding syslog
 /// messages in the syslog source).
-pub fn build_unix_datagram_source<D, E>(
+pub fn build_unix_datagram_source<D>(
     listen_path: PathBuf,
     max_length: usize,
     host_key: String,
@@ -28,8 +28,8 @@ pub fn build_unix_datagram_source<D, E>(
     build_event: impl Fn(&str, Option<Bytes>, &str) -> Option<Event> + Clone + Send + Sync + 'static,
 ) -> Source
 where
-    D: Decoder<Item = String, Error = E> + Clone + Send + 'static,
-    E: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
+    D: Decoder<Item = String> + Clone + Send + 'static,
+    D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
     let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
 
