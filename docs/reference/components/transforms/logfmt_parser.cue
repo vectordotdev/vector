@@ -20,7 +20,7 @@ components: transforms: logfmt_parser: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -177,5 +177,9 @@ components: transforms: logfmt_parser: {
 				```
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

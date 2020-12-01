@@ -1,0 +1,3 @@
+subscription ProcessedBytesThroughputSubscription($interval: Int!) {
+    processedBytesThroughput(interval: $interval)
+}

@@ -4,7 +4,7 @@ remap: functions: to_float: {
 			name:        "value"
 			description: "The string that is to be converted to a float. Must be the string representation of a `float`, otherwise an `ArgumentError` will be raised."
 			required:    true
-			type: ["string"]
+			type: ["float", "integer", "boolean", "string"]
 		},
 	]
 	return: ["float"]

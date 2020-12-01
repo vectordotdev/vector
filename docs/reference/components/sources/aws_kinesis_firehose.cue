@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_kinesis_firehose: {
+components: sources: aws_kinesis_firehose: components._aws & {
 	_port: 443
 
 	title:       "AWS Kinesis Firehose"
@@ -18,10 +18,20 @@ components: sources: aws_kinesis_firehose: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "AWS Kinesis Firehose"
-				thing:    "a \(name) stream"
-				url:      urls.aws_kinesis_firehose
-				versions: null
+				service: {
+					name:     "AWS Kinesis Firehose"
+					thing:    "a \(name) stream"
+					url:      urls.aws_kinesis_firehose
+					versions: null
+
+					setup: [
+						"""
+						[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
+						in your preferred AWS region. Point the endpoint to your
+						Vector instance's address.
+						""",
+					]
+				}
 
 				interface: socket: {
 					api: {
@@ -33,14 +43,6 @@ components: sources: aws_kinesis_firehose: {
 					protocols: ["http"]
 					ssl: "required"
 				}
-
-				setup: [
-					"""
-						[Setup a Kinesis Firehose delivery stream](\(urls.aws_kinesis_firehose_setup))
-						in your preferred AWS region. Point the endpoint to your
-						Vector instance's address.
-						""",
-				]
 			}
 
 			tls: {
@@ -52,7 +54,7 @@ components: sources: aws_kinesis_firehose: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -66,6 +68,10 @@ components: sources: aws_kinesis_firehose: {
 		notices: []
 	}
 
+	installation: {
+		platform_name: null
+	}
+
 	configuration: {
 		address: {
 			description: "The address to listen for connections on"
@@ -75,10 +81,10 @@ components: sources: aws_kinesis_firehose: {
 		access_key: {
 			common: true
 			description: """
-					AWS Kinesis Firehose can be configured to pass along an access
-					key to authenticate requests. If configured, `access_key` should
-					be set to the same value. If not specified, vector will treat
-					all requests as authenticated.
+				AWS Kinesis Firehose can be configured to pass along an access
+				key to authenticate requests. If configured, `access_key` should
+				be set to the same value. If not specified, vector will treat
+				all requests as authenticated.
 				"""
 			required: false
 			type: "string": {
@@ -115,6 +121,7 @@ components: sources: aws_kinesis_firehose: {
 	examples: [
 		{
 			title: "AWS CloudWatch Subscription message"
+
 			configuration: {
 				address: "0.0.0.0:443"
 			}
@@ -186,5 +193,10 @@ components: sources: aws_kinesis_firehose: {
 				   forward the events to your delivery stream
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		request_read_errors_total: components.sources.internal_metrics.output.metrics.request_read_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

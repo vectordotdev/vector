@@ -4,7 +4,7 @@ remap: functions: md5: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text to calculate the hash for."
+			description: "The string to calculate the hash for."
 			required:    true
 			type: ["string"]
 		},
@@ -12,7 +12,7 @@ remap: functions: md5: {
 	return: ["string"]
 	category: "hash"
 	description: #"""
-			Calculates an md5 hash of a given string.
+		Calculates an md5 hash of a given string.
 		"""#
 	examples: [
 		{

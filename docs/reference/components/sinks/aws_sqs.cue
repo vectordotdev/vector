@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_sqs: {
+components: sinks: aws_sqs: components._aws & {
 	title:       "Amazon Simple Queue Service (SQS)"
 	description: "[Amazon Simple Queue Service (SQS)](\(urls.aws_sqs)) is a fully managed message queuing service that enables you to decouple and scale microservices, distributed systems, and serverless applications."
 
@@ -27,7 +27,7 @@ components: sinks: aws_sqs: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -36,10 +36,12 @@ components: sinks: aws_sqs: {
 			}
 			tls: enabled: false
 			to: {
-				name:     "Amazon Simple Queue Service"
-				thing:    "an \(url) queue"
-				url:      urls.aws_sqs
-				versions: null
+				service: {
+					name:     "Amazon Simple Queue Service"
+					thing:    "an \(url) queue"
+					url:      urls.aws_sqs
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -57,7 +59,7 @@ components: sinks: aws_sqs: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

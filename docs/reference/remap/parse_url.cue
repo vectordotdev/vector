@@ -12,7 +12,7 @@ remap: functions: parse_url: {
 	return: ["map"]
 	category: "parse"
 	description: #"""
-			Parses a url into it's constituent components.
+		Parses a url into it's constituent components.
 		"""#
 	examples: [
 		{
@@ -24,6 +24,7 @@ remap: functions: parse_url: {
 				.parsed = parse_url(.url)
 				"""#
 			output: {
+				url: #"ftp://foo:bar@vector.dev:4343/foobar?hello=world#123"#
 				parsed: {
 					"scheme":   "ftp"
 					"username": "foo"

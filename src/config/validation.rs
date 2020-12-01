@@ -73,7 +73,7 @@ pub fn check_resources(config: &Config) -> Result<(), Vec<String>> {
     }
 }
 
-pub fn warnings(config: &Config) -> Option<Vec<String>> {
+pub fn warnings(config: &Config) -> Vec<String> {
     let mut warnings = vec![];
 
     let source_names = config.sources.keys().map(|name| ("source", name.clone()));
@@ -99,11 +99,7 @@ pub fn warnings(config: &Config) -> Option<Vec<String>> {
         }
     }
 
-    if warnings.is_empty() {
-        None
-    } else {
-        Some(warnings)
-    }
+    warnings
 }
 
 pub fn typecheck(config: &Config) -> Result<(), Vec<String>> {
@@ -300,8 +296,7 @@ fn capitalize(s: &str) -> String {
 
 #[cfg(test)]
 mod test {
-    use super::Graph;
-    use crate::config::DataType;
+    use super::*;
     use pretty_assertions::assert_eq;
 
     #[test]

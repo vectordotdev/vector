@@ -33,10 +33,12 @@ components: sinks: socket: {
 				enabled_default:        false
 			}
 			to: {
-				name:     "socket receiver"
-				thing:    "a \(name)"
-				url:      urls.socket
-				versions: null
+				service: {
+					name:     "socket receiver"
+					thing:    "a \(name)"
+					url:      urls.socket
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -50,7 +52,7 @@ components: sinks: socket: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

@@ -4,13 +4,13 @@ remap: functions: ends_with: {
 	arguments: [
 		{
 			name:        "value"
-			description: "The text to search."
+			description: "The string to search."
 			required:    true
 			type: ["string"]
 		},
 		{
 			name:        "substring"
-			description: "The substring to search for in `value`."
+			description: "The substring `value` must end with."
 			required:    true
 			type: ["string"]
 		},
@@ -25,8 +25,8 @@ remap: functions: ends_with: {
 	return: ["boolean"]
 	category: "text"
 	description: #"""
-			Determines if a given string ends with a given `substring`.
-			The search can be optionally case insensitive.
+		Determines if a given string ends with a given `substring`.
+		The search can be optionally case insensitive.
 		"""#
 	examples: [
 		{
@@ -38,6 +38,7 @@ remap: functions: ends_with: {
 				.contains = ends_with(.message, "the haystack", case_sensitive = false)
 				"""#
 			output: {
+				message:  #"The Needle In The Haystack"#
 				contains: true
 			}
 		},

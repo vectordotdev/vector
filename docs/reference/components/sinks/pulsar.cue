@@ -28,10 +28,12 @@ components: sinks: pulsar: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				name:     "Apache Pulsar"
-				thing:    "an \(name) cluster"
-				url:      urls.pulsar
-				versions: null
+				service: {
+					name:     "Apache Pulsar"
+					thing:    "an \(name) cluster"
+					url:      urls.pulsar
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -49,7 +51,7 @@ components: sinks: pulsar: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

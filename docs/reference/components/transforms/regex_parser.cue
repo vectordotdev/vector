@@ -20,7 +20,7 @@ components: transforms: regex_parser: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -177,5 +177,9 @@ components: transforms: regex_parser: {
 				Vector uses the Rust standard regular expression engine for pattern matching. Its syntax shares most of the features of Perl-style regular expressions, with a few exceptions. You can find examples of patterns in the [Rust regex module documentation][rust_regex_syntax].
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

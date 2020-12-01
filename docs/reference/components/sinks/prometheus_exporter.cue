@@ -5,11 +5,12 @@ components: sinks: prometheus_exporter: {
 
 	title:       "Prometheus Exporter"
 	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	alias:       "prometheus"
 
 	classes: {
 		commonly_used: true
 		delivery:      "best_effort"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "expose"
 		service_providers: []
 	}
@@ -19,10 +20,12 @@ components: sinks: prometheus_exporter: {
 		healthcheck: enabled: false
 		exposes: {
 			for: {
-				name:     "Prometheus"
-				thing:    "a \(name) database"
-				url:      urls.prometheus
-				versions: ">= 1.0"
+				service: {
+					name:     "Prometheus"
+					thing:    "a \(name) database"
+					url:      urls.prometheus
+					versions: ">= 1.0"
+				}
 
 				interface: {
 					socket: {
@@ -41,7 +44,7 @@ components: sinks: prometheus_exporter: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -95,9 +98,10 @@ components: sinks: prometheus_exporter: {
 		default_namespace: {
 			common:      true
 			description: """
-				Used as a namespace for metrics that don't have it.
-				A namespace will be prefixed to a metric's name.
-				It should follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
+				Used as a namespace for metrics that don't have it. Typically
+				namespaces are set during ingestion (sources), but it is
+				optional and when missing, we'll use this value. It should
+				follow Prometheus [naming conventions](\(urls.prometheus_metric_naming)).
 				"""
 			required:    false
 			warnings: []

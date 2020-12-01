@@ -6,7 +6,6 @@ use crate::{
     shutdown::ShutdownSignal,
     Pipeline,
 };
-use futures::future::{FutureExt, TryFutureExt};
 use rusoto_core::Region;
 use rusoto_s3::S3Client;
 use rusoto_sqs::SqsClient;
@@ -75,12 +74,10 @@ impl SourceConfig for AwsS3Config {
             .transpose()?;
 
         match self.strategy {
-            Strategy::Sqs => Ok(Box::new(
+            Strategy::Sqs => Ok(Box::pin(
                 self.create_sqs_ingestor(multiline_config)
                     .await?
-                    .run(out, shutdown)
-                    .boxed()
-                    .compat(),
+                    .run(out, shutdown),
             )),
         }
     }
@@ -268,7 +265,6 @@ mod integration_tests {
         test_util::{collect_n, random_lines},
         Pipeline,
     };
-    use futures::compat::Future01CompatExt;
     use pretty_assertions::assert_eq;
     use rusoto_core::Region;
     use rusoto_s3::{PutObjectRequest, S3Client, S3};
@@ -377,7 +373,6 @@ mod integration_tests {
                 )
                 .await
                 .unwrap()
-                .compat()
                 .await
                 .unwrap()
         });

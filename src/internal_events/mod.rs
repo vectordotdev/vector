@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+mod adaptive_concurrency;
 mod add_fields;
 mod add_tags;
 mod ansi_stripper;
@@ -7,7 +8,6 @@ mod ansi_stripper;
 mod apache_metrics;
 #[cfg(feature = "api")]
 mod api;
-mod auto_concurrency;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 mod aws_cloudwatch_logs_subscription_parser;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
@@ -44,6 +44,7 @@ mod heartbeat;
 #[cfg(feature = "sources-host_metrics")]
 mod host_metrics;
 mod http;
+pub mod http_client;
 #[cfg(all(unix, feature = "sources-journald"))]
 mod journald;
 #[cfg(feature = "transforms-json_parser")]
@@ -67,10 +68,13 @@ mod metric_to_log;
 mod mongodb_metrics;
 #[cfg(feature = "sinks-nats")]
 mod nats;
+#[cfg(feature = "sources-nginx_metrics")]
+mod nginx_metrics;
 mod open;
 mod process;
-#[cfg(feature = "sources-prometheus")]
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
 mod prometheus;
+mod pulsar;
 #[cfg(feature = "transforms-reduce")]
 mod reduce;
 #[cfg(feature = "transforms-regex_parser")]
@@ -110,6 +114,7 @@ mod wasm;
 
 pub mod kubernetes;
 
+pub use self::adaptive_concurrency::*;
 pub use self::add_fields::*;
 pub use self::add_tags::*;
 pub use self::ansi_stripper::*;
@@ -117,7 +122,6 @@ pub use self::ansi_stripper::*;
 pub use self::apache_metrics::*;
 #[cfg(feature = "api")]
 pub use self::api::*;
-pub use self::auto_concurrency::*;
 #[cfg(feature = "transforms-aws_cloudwatch_logs_subscription_parser")]
 pub(crate) use self::aws_cloudwatch_logs_subscription_parser::*;
 #[cfg(feature = "transforms-aws_ec2_metadata")]
@@ -142,7 +146,11 @@ pub(crate) use self::dedupe::*;
 #[cfg(feature = "sources-docker_logs")]
 pub use self::docker_logs::*;
 pub use self::elasticsearch::*;
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes-logs",
+    feature = "sinks-file",
+))]
 pub use self::file::*;
 #[cfg(feature = "sources-generator")]
 pub use self::generator::*;
@@ -176,10 +184,13 @@ pub use self::lua::*;
 pub(crate) use self::metric_to_log::*;
 #[cfg(feature = "sinks-nats")]
 pub use self::nats::*;
+#[cfg(feature = "sources-nginx_metrics")]
+pub(crate) use self::nginx_metrics::*;
 pub use self::open::*;
 pub use self::process::*;
-#[cfg(feature = "sources-prometheus")]
-pub use self::prometheus::*;
+#[cfg(any(feature = "sources-prometheus", feature = "sinks-prometheus"))]
+pub(crate) use self::prometheus::*;
+pub use self::pulsar::*;
 #[cfg(feature = "transforms-reduce")]
 pub(crate) use self::reduce::*;
 #[cfg(feature = "transforms-regex_parser")]
@@ -239,7 +250,11 @@ macro_rules! emit {
 }
 
 // Modules that require emit! macro so they need to be defined after the macro.
-#[cfg(any(feature = "sources-file", feature = "sources-kubernetes-logs"))]
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes-logs",
+    feature = "sinks-file",
+))]
 mod file;
 mod windows;
 

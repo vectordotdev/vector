@@ -1,18 +1,17 @@
 use vector::{
-    config::{self, ConfigDiff},
+    config::{self, ConfigDiff, Format},
     topology,
 };
 
-async fn load(config: &str) -> Result<Vec<String>, Vec<String>> {
-    match config::load_from_str(config) {
+async fn load(config: &str, format: config::FormatHint) -> Result<Vec<String>, Vec<String>> {
+    match config::load_from_str(config, format) {
         Ok(c) => {
             let diff = ConfigDiff::initial(&c);
             match (
                 config::warnings(&c),
                 topology::builder::build_pieces(&c, &diff).await,
             ) {
-                (Some(warnings), Ok(_pieces)) => Ok(warnings),
-                (None, Ok(_pieces)) => Ok(vec![]),
+                (warnings, Ok(_pieces)) => Ok(warnings),
                 (_, Err(errors)) => Err(errors),
             }
         }
@@ -38,7 +37,8 @@ async fn happy_path() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -46,7 +46,8 @@ async fn happy_path() {
         inputs = ["sampler"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -57,11 +58,12 @@ async fn happy_path() {
         in = {type = "socket", mode = "tcp", address = "127.0.0.1:1235"}
 
         [transforms]
-        sampler = {type = "sampler", inputs = ["in"], rate = 10, pass_list = ["error"]}
+        sampler = {type = "sampler", inputs = ["in"], rate = 10, key_field = "message", exclude."message.contains" = "error"}
 
         [sinks]
         out = {type = "socket", mode = "tcp", inputs = ["sampler"], encoding = "text", address = "127.0.0.1:9999"}
       "#,
+      Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -69,18 +71,21 @@ async fn happy_path() {
 
 #[tokio::test]
 async fn early_eof() {
-    let err = load("[sinks]\n[sin").await.unwrap_err();
+    let err = load("[sinks]\n[sin", Some(Format::TOML)).await.unwrap_err();
 
-    assert_eq!(err, vec!["expected a right bracket, found eof at line 2"]);
+    assert_eq!(
+        err,
+        vec!["expected a right bracket, found eof at line 2 column 5"]
+    );
 }
 
 #[tokio::test]
 async fn bad_syntax() {
-    let err = load(r#"{{{"#).await.unwrap_err();
+    let err = load(r#"{{{"#, Some(Format::TOML)).await.unwrap_err();
 
     assert_eq!(
         err,
-        vec!["expected a table key, found a left brace at line 1"]
+        vec!["expected a table key, found a left brace at line 1 column 1"]
     );
 }
 
@@ -97,12 +102,16 @@ async fn missing_key() {
         inputs = ["in"]
         mode = "tcp"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["missing field `mode` for key `sources.in`"]);
+    assert_eq!(
+        err,
+        vec!["missing field `mode` for key `sources.in` at line 5 column 9"]
+    );
 }
 
 #[cfg(all(feature = "sources-socket", feature = "sinks-socket"))]
@@ -119,12 +128,16 @@ async fn missing_key2() {
         mode = "out"
         inputs = ["in"]
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
 
-    assert_eq!(err, vec!["missing field `address` for key `sources.in`"]);
+    assert_eq!(
+        err,
+        vec!["missing field `address` for key `sources.in` at line 6 column 9"]
+    );
 }
 
 #[cfg(feature = "sources-socket")]
@@ -141,7 +154,8 @@ async fn bad_type() {
         type = "jabberwocky"
         inputs = ["in"]
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
@@ -172,7 +186,8 @@ async fn nonexistant_input() {
         type = "sampler"
         inputs = ["qwerty"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -180,7 +195,8 @@ async fn nonexistant_input() {
         inputs = ["asdf"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
@@ -212,7 +228,8 @@ async fn bad_regex() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = ["(["]
+        key_field = "message"
+        exclude."message.regex" = "(["
 
         [sinks.out]
         type = "socket"
@@ -220,7 +237,8 @@ async fn bad_regex() {
         inputs = ["sampler"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
@@ -246,7 +264,8 @@ async fn bad_regex() {
         inputs = ["parser"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
@@ -283,7 +302,8 @@ async fn good_regex_parser() {
         inputs = ["parser"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await;
 
@@ -319,7 +339,8 @@ async fn good_tokenizer() {
         inputs = ["parser"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await;
 
@@ -373,7 +394,8 @@ async fn bad_s3_region() {
 
         [sinks.out4.batch]
         max_size = 100000
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
@@ -412,13 +434,15 @@ async fn warnings() {
         type = "sampler"
         inputs = ["in1"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [transforms.sampler2]
         type = "sampler"
         inputs = ["in1"]
         rate = 10
-        pass_list = ["error"]
+        key_field = "message"
+        exclude."message.contains" = "error"
 
         [sinks.out]
         type = "socket"
@@ -426,7 +450,8 @@ async fn warnings() {
         inputs = ["sampler1"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -458,25 +483,25 @@ async fn cycle() {
         type = "sampler"
         inputs = ["in"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.two]
         type = "sampler"
         inputs = ["one", "four"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.three]
         type = "sampler"
         inputs = ["two"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [transforms.four]
         type = "sampler"
         inputs = ["three"]
         rate = 10
-        pass_list = []
+        key_field = "message"
 
         [sinks.out]
         type = "socket"
@@ -484,7 +509,8 @@ async fn cycle() {
         inputs = ["four"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap_err();
@@ -500,19 +526,20 @@ async fn cycle() {
 async fn disabled_healthcheck() {
     load(
         r#"
-      [sources.in]
-      type = "socket"
-      mode = "tcp"
-      address = "127.0.0.1:1234"
+        [sources.in]
+        type = "socket"
+        mode = "tcp"
+        address = "127.0.0.1:1234"
 
-      [sinks.out]
-      type = "socket"
-      mode = "tcp"
-      inputs = ["in"]
-      address = "0.0.0.0:0"
-      encoding = "text"
-      healthcheck = false
-      "#,
+        [sinks.out]
+        type = "socket"
+        mode = "tcp"
+        inputs = ["in"]
+        address = "0.0.0.0:0"
+        encoding = "text"
+        healthcheck = false
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -532,6 +559,7 @@ async fn parses_sink_no_request() {
         uri = "https://localhost"
         encoding = "json"
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -552,8 +580,9 @@ async fn parses_sink_partial_request() {
         encoding = "json"
 
         [sinks.out.request]
-        in_flight_limit = 42
+        concurrency = 42
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -574,7 +603,7 @@ async fn parses_sink_full_request() {
         encoding = "json"
 
         [sinks.out.request]
-        in_flight_limit = 42
+        concurrency = 42
         timeout_secs = 2
         rate_limit_duration_secs = 3
         rate_limit_num = 4
@@ -582,6 +611,7 @@ async fn parses_sink_full_request() {
         retry_max_duration_secs = 10
         retry_initial_backoff_secs = 6
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -605,6 +635,7 @@ async fn parses_sink_full_batch_bytes() {
         max_size = 100
         timeout_secs = 10
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -630,6 +661,7 @@ async fn parses_sink_full_batch_event() {
         max_events = 100
         timeout_secs = 10
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -654,6 +686,7 @@ async fn parses_sink_full_auth() {
         user = "user"
         password = "password"
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -677,6 +710,7 @@ async fn parses_sink_full_es_basic_auth() {
         user = "user"
         password = "password"
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -702,6 +736,7 @@ async fn parses_sink_full_es_aws() {
         [sinks.out.auth]
         strategy = "aws"
         "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();
@@ -739,7 +774,8 @@ async fn swimlanes() {
         inputs = ["splitting_gerrys.only_gerrys", "splitting_gerrys.no_gerrys"]
         encoding = "text"
         address = "127.0.0.1:9999"
-      "#,
+        "#,
+        Some(Format::TOML),
     )
     .await
     .unwrap();

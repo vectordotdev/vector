@@ -20,6 +20,7 @@ use futures::{compat::Future01CompatExt, future, FutureExt, StreamExt, TryFuture
 use futures01::{sync::mpsc, Future};
 use std::{
     collections::{HashMap, HashSet},
+    future::ready,
     panic::AssertUnwindSafe,
 };
 use tokio::time::{delay_until, interval, Duration, Instant};
@@ -173,7 +174,7 @@ impl RunningTopology {
                     message = "Shutting down... Waiting on running components.", remaining_components = ?remaining_components.join(", "), time_remaining = ?time_remaining
                 );
             })
-            .filter(|_| future::ready(false)) // Run indefinitely without emitting items
+            .filter(|_| ready(false)) // Run indefinitely without emitting items
             .into_future()
             .map(|_| Ok(()));
 
@@ -1026,7 +1027,7 @@ mod transient_state_tests {
         transforms::json_parser::JsonParserConfig,
         Error, Pipeline,
     };
-    use futures::{future, FutureExt, TryFutureExt};
+    use futures::{future, FutureExt};
     use serde::{Deserialize, Serialize};
     use stream_cancel::{Trigger, Tripwire};
 
@@ -1058,19 +1059,18 @@ mod transient_state_tests {
             shutdown: ShutdownSignal,
             out: Pipeline,
         ) -> Result<Source, Error> {
-            let source = future::select(
-                shutdown.map(|_| ()).boxed(),
-                self.tripwire
-                    .clone()
-                    .unwrap()
-                    .then(crate::stream::tripwire_handler)
-                    .boxed(),
-            )
-            .map(|_| std::mem::drop(out))
-            .unit_error()
-            .boxed()
-            .compat();
-            Ok(Box::new(source))
+            Ok(Box::pin(
+                future::select(
+                    shutdown.map(|_| ()).boxed(),
+                    self.tripwire
+                        .clone()
+                        .unwrap()
+                        .then(crate::stream::tripwire_handler)
+                        .boxed(),
+                )
+                .map(|_| std::mem::drop(out))
+                .unit_error(),
+            ))
         }
 
         fn output_type(&self) -> DataType {

@@ -899,20 +899,283 @@
     [[tests.outputs.conditions]]
     "foo.equals" = "foobar"
 
-# [transforms.remap_function_log]
-#   inputs=[]
-#   type = "remap"
-#   source = """
-#     log(.foo, level=info)
-#   """
-# [[tests]]
-#   name = "remap_function_log"
-#   [tests.input]
-#     insert_at = "remap_function_log"
-#     type = "log"
-#     [tests.input.log_fields]
-#       foo = "this should be unchanged"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_log"
-#     [[tests.outputs.conditions]]
-#     "foo.equals" = "this should be unchanged"
+[transforms.remap_function_parse_grok]
+  inputs = []
+  type = "remap"
+  source = """
+    .grokked = parse_grok(.message, "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}")
+    """
+[[tests]]
+  name = "remap_function_parse_grok"
+  [tests.input]
+    insert_at = "remap_function_parse_grok"
+    type = "log"
+    [tests.input.log_fields]
+      message = "2020-10-02T23:22:12.223222Z info Hello world"
+  [[tests.outputs]]
+    extract_from = "remap_function_parse_grok"
+    [[tests.outputs.conditions]]
+    "grokked.timestamp.equals" = "2020-10-02T23:22:12.223222Z"
+    "grokked.level.equals" = "info"
+    "grokked.message.equals" = "Hello world"
+
+[transforms.remap_function_ip_subnet]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_subnet("192.168.10.23", "255.255.0.0")
+    .b = ip_subnet("192.168.10.23", "/8")
+    .c = ip_subnet("2404:6800:4003:c02::64", "ffff:ffff::")
+    .d = ip_subnet("2404:6800:4003:c02::64", "/16")
+  """
+[[tests]]
+  name = "remap_function_ip_subnet"
+  [tests.input]
+    insert_at = "remap_function_ip_subnet"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_subnet"
+    [[tests.outputs.conditions]]
+    "a.equals" = "192.168.0.0"
+    "b.equals" = "192.0.0.0"
+    "c.equals" = "2404:6800::"
+    "d.equals" = "2404::"
+
+[transforms.remap_function_ip_cidr_contains]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.168.10.2")
+    .b = ip_cidr_contains(cidr = "192.168.0.0/16", value = "192.169.10.2")
+    .c = ip_cidr_contains(cidr = "2404:6800:4003:c02::/64", value = "2404:6800:4003:c02::aaaa")
+    .d = ip_cidr_contains("2404:6800:4003:c02::/64", "2404:6800:4004:c02::aaaa")
+  """
+[[tests]]
+  name = "remap_function_ip_cidr_contains"
+  [tests.input]
+    insert_at = "remap_function_ip_cidr_contains"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_cidr_contains"
+    [[tests.outputs.conditions]]
+    "a.equals" = true
+    "b.equals" = false
+    "c.equals" = true
+    "d.equals" = false
+
+[transforms.remap_function_ip_to_ipv6]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ip_to_ipv6("192.168.10.2")
+  """
+[[tests]]
+  name = "remap_function_ip_to_ipv6"
+  [tests.input]
+    insert_at = "remap_function_ip_to_ipv6"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ip_to_ipv6"
+    [[tests.outputs.conditions]]
+    "a.equals" = "::ffff:192.168.10.2"
+
+[transforms.remap_function_ipv6_to_ipv4]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = ipv6_to_ipv4("::ffff:192.168.10.2")
+  """
+[[tests]]
+  name = "remap_function_ipv6_to_ipv4"
+  [tests.input]
+    insert_at = "remap_function_ipv6_to_ipv4"
+    type = "raw"
+    value = ""
+  [[tests.outputs]]
+    extract_from = "remap_function_ipv6_to_ipv4"
+    [[tests.outputs.conditions]]
+    "a.equals" = "192.168.10.2"
+
+[transforms.remap_function_exists]
+  inputs = []
+  type = "remap"
+  source = """
+    .data = parse_json(.data)
+    .a = exists(.foo)
+    .b = exists(.bar)
+    .c = exists(.data.child)
+    .d = exists(.data.nochild)
+    .e = exists(.data.arr[2])
+    .f = exists(.data.arr[3])
+  """
+[[tests]]
+  name = "remap_function_exists"
+  [tests.input]
+    insert_at = "remap_function_exists"
+    type = "log"
+    [tests.input.log_fields]
+      data = """
+        { "child": 42, "arr": [1,3,3] }
+      """
+      foo = 42
+  [[tests.outputs]]
+    extract_from = "remap_function_exists"
+    [[tests.outputs.conditions]]
+    "a.equals" = true
+    "b.equals" = false
+    "c.equals" = true
+    "d.equals" = false
+    "e.equals" = true
+    "f.equals" = false
+
+[transforms.remap_function_compact]
+  inputs = []
+  type = "remap"
+  source = """
+    .compactarr = compact(parse_json(.arr))
+    .compactmap = compact(parse_json(.map))
+    .a = exists(.compactmap.field1)
+    .b = exists(.compactmap.field2)
+    .c = exists(.compactmap.field3)
+    .d = exists(.compactmap.field4.nested1)
+    .e = exists(.compactmap.field4.nested2)
+  """
+[[tests]]
+  name = "remap_function_compact"
+  [tests.input]
+    insert_at = "remap_function_compact"
+    type = "log"
+    [tests.input.log_fields]
+      arr = """
+          [null, "", [], 1]
+          """
+      map = """
+          {"field1": null,
+           "field2": 32,
+           "field3": "",
+           "field4": { "nested1": 3,
+                       "nested2": null } }
+            """
+  [[tests.outputs]]
+    extract_from = "remap_function_compact"
+    [[tests.outputs.conditions]]
+    "a.equals" = false
+    "b.equals" = true
+    "c.equals" = false
+    "d.equals" = true
+    "e.equals" = false
+    "compactarr[0].equals" = 1
+
+[transforms.remap_function_assert_pass]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    assert(.foo, message = "assert failed")
+    .check = "checked"
+  """
+[[tests]]
+  name = "remap_function_assert_pass"
+  [tests.input]
+    insert_at = "remap_function_assert_pass"
+    type = "log"
+    [tests.input.log_fields]
+      foo = true
+  [[tests.outputs]]
+  extract_from = "remap_function_assert_pass"
+  [[tests.outputs.conditions]]
+  "check.equals" = "checked"
+
+[transforms.remap_function_assert_fail]
+  inputs = []
+  type = "remap"
+  drop_on_err = true
+  source = """
+    assert(.foo, message = "assert failed")
+  """
+[[tests]]
+  name = "remap_function_assert_fail"
+  no_outputs_from = ["remap_function_assert_fail"]
+  [tests.input]
+    insert_at = "remap_function_assert_fail"
+    type = "log"
+    [tests.input.log_fields]
+      foo = false
+
+[transforms.remap_function_log]
+  inputs=[]
+  type = "remap"
+  source = """
+    log(.foo, level="info")
+  """
+[[tests]]
+  name = "remap_function_log"
+  [tests.input]
+    insert_at = "remap_function_log"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "this should be unchanged"
+  [[tests.outputs]]
+    extract_from = "remap_function_log"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "this should be unchanged"
+
+[transforms.remap_function_merge]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = parse_json(.foo)
+    .bar = parse_json(.bar)
+    merge(.bar, .foo, deep = true)
+  """
+[[tests]]
+  name = "remap_function_merge"
+  [tests.input]
+    insert_at = "remap_function_merge"
+    type = "log"
+    [tests.input.log_fields]
+      bar = """
+        {"field1": "ook"}
+      """
+      foo = """
+        {"field2": "ook ook"}
+      """
+  [[tests.outputs]]
+    extract_from = "remap_function_merge"
+    [[tests.outputs.conditions]]
+    "bar.field1.equals" = "ook"
+    "bar.field2.equals" = "ook ook"
+
+[transforms.remap_function_flatten]
+  inputs = []
+  type = "remap"
+  source = """
+      .arr = flatten(parse_json(.arr))
+      .map = flatten(parse_json(.map))
+      .a = .map."field1.field2"
+      .b = .map."field1.field3"
+      """
+[[tests]]
+  name = "remap_function_flatten"
+  [tests.input]
+    insert_at = "remap_function_flatten"
+    type = "log"
+    [tests.input.log_fields]
+      arr = "[1, 2, [3, 4, [5, 6]]]"
+      map = """
+        {"field1": {"field2": 1, "field3": 2} }
+        """
+  [[tests.outputs]]
+    extract_from = "remap_function_flatten"
+    [[tests.outputs.conditions]]
+    "arr[0].equals" = 1
+    "arr[1].equals" = 2
+    "arr[2].equals" = 3
+    "arr[3].equals" = 4
+    "arr[4].equals" = 5
+    "arr[5].equals" = 6
+    "a.equals" = 1
+    "b.equals" = 2

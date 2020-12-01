@@ -1,4 +1,4 @@
-use criterion::{criterion_group, Benchmark, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
 use futures::{compat::Future01CompatExt, TryFutureExt};
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -7,13 +7,15 @@ use hyper::{
 use std::net::SocketAddr;
 use tokio::runtime::Runtime;
 use vector::{
-    config, sinks, sources,
+    config, sinks,
+    sinks::util::Compression,
+    sources,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
     Error,
 };
 
-fn benchmark_http_no_compression(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
+fn benchmark_http(c: &mut Criterion) {
+    let num_lines: usize = 1_000;
     let line_size: usize = 100;
 
     let in_addr = next_addr();
@@ -21,111 +23,65 @@ fn benchmark_http_no_compression(c: &mut Criterion) {
 
     let _srv = serve(out_addr);
 
-    let bench = Benchmark::new("http_no_compression", move |b| {
-        b.iter_with_setup(
-            || {
-                let mut config = config::Config::builder();
-                config.add_source(
-                    "in",
-                    sources::socket::SocketConfig::make_tcp_config(in_addr),
-                );
-                config.add_sink(
-                    "out",
-                    &["in"],
-                    sinks::http::HttpSinkConfig {
-                        uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
-                        compression: sinks::util::Compression::None,
-                        method: Default::default(),
-                        healthcheck_uri: Default::default(),
-                        auth: Default::default(),
-                        headers: Default::default(),
-                        batch: Default::default(),
-                        encoding: sinks::http::Encoding::Text.into(),
-                        request: Default::default(),
-                        tls: Default::default(),
+    let mut group = c.benchmark_group("http");
+    group.throughput(Throughput::Bytes((num_lines * line_size) as u64));
+    group.sampling_mode(SamplingMode::Flat);
+
+    for compression in [Compression::None, Compression::gzip_default()].iter() {
+        group.bench_with_input(
+            BenchmarkId::new("compression", compression),
+            compression,
+            |b, compression| {
+                b.iter_batched(
+                    || {
+                        let mut config = config::Config::builder();
+                        config.add_source(
+                            "in",
+                            sources::socket::SocketConfig::make_tcp_config(in_addr),
+                        );
+                        config.add_sink(
+                            "out",
+                            &["in"],
+                            sinks::http::HttpSinkConfig {
+                                uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
+                                compression: *compression,
+                                method: Default::default(),
+                                healthcheck_uri: Default::default(),
+                                auth: Default::default(),
+                                headers: Default::default(),
+                                batch: sinks::util::BatchConfig {
+                                    max_bytes: Some(num_lines * line_size),
+                                    ..Default::default()
+                                },
+                                encoding: sinks::http::Encoding::Text.into(),
+                                request: Default::default(),
+                                tls: Default::default(),
+                            },
+                        );
+
+                        let mut rt = runtime();
+                        let topology = rt.block_on(async move {
+                            let (topology, _crash) =
+                                start_topology(config.build().unwrap(), false).await;
+                            wait_for_tcp(in_addr).await;
+                            topology
+                        });
+                        (rt, topology)
                     },
-                );
-
-                let mut rt = runtime();
-                let topology = rt.block_on(async move {
-                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-                    wait_for_tcp(in_addr).await;
-                    topology
-                });
-                (rt, topology)
-            },
-            |(mut rt, topology)| {
-                rt.block_on(async move {
-                    let lines = random_lines(line_size).take(num_lines);
-                    send_lines(in_addr, lines).await.unwrap();
-                    topology.stop().compat().await.unwrap();
-                });
-            },
-        )
-    })
-    .sample_size(10)
-    .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
-
-    c.bench("http", bench);
-}
-
-fn benchmark_http_gzip(c: &mut Criterion) {
-    let num_lines: usize = 100_000;
-    let line_size: usize = 100;
-
-    let in_addr = next_addr();
-    let out_addr = next_addr();
-
-    let _srv = serve(out_addr);
-
-    let bench = Benchmark::new("http_gzip", move |b| {
-        b.iter_with_setup(
-            || {
-                let mut config = config::Config::builder();
-                config.add_source(
-                    "in",
-                    sources::socket::SocketConfig::make_tcp_config(in_addr),
-                );
-                config.add_sink(
-                    "out",
-                    &["in"],
-                    sinks::http::HttpSinkConfig {
-                        uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
-                        compression: Default::default(),
-                        method: Default::default(),
-                        healthcheck_uri: Default::default(),
-                        auth: Default::default(),
-                        headers: Default::default(),
-                        batch: Default::default(),
-                        encoding: sinks::http::Encoding::Text.into(),
-                        request: Default::default(),
-                        tls: Default::default(),
+                    |(mut rt, topology)| {
+                        rt.block_on(async move {
+                            let lines = random_lines(line_size).take(num_lines);
+                            send_lines(in_addr, lines).await.unwrap();
+                            topology.stop().compat().await.unwrap();
+                        })
                     },
-                );
-
-                let mut rt = runtime();
-                let topology = rt.block_on(async move {
-                    let (topology, _crash) = start_topology(config.build().unwrap(), false).await;
-                    wait_for_tcp(in_addr).await;
-                    topology
-                });
-                (rt, topology)
+                    BatchSize::PerIteration,
+                )
             },
-            |(mut rt, topology)| {
-                rt.block_on(async move {
-                    let lines = random_lines(line_size).take(num_lines);
-                    send_lines(in_addr, lines).await.unwrap();
-                    topology.stop().compat().await.unwrap();
-                });
-            },
-        )
-    })
-    .sample_size(10)
-    .noise_threshold(0.05)
-    .throughput(Throughput::Bytes((num_lines * line_size) as u64));
+        );
+    }
 
-    c.bench("http", bench);
+    group.finish();
 }
 
 fn serve(addr: SocketAddr) -> Runtime {
@@ -145,4 +101,4 @@ fn serve(addr: SocketAddr) -> Runtime {
     rt
 }
 
-criterion_group!(http, benchmark_http_no_compression, benchmark_http_gzip);
+criterion_group!(benches, benchmark_http);

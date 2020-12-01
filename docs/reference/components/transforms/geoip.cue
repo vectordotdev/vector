@@ -5,13 +5,13 @@ components: transforms: geoip: {
 
 	classes: {
 		commonly_used: false
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
 	features: {
 		enrich: {
-			from: {
+			from: service: {
 				name:     "MaxMind GeoIP2 and GeoLite2 city databases"
 				url:      urls.maxmind_geoip2_isp
 				versions: ">= 2"
@@ -20,7 +20,7 @@ components: transforms: geoip: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

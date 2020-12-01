@@ -37,10 +37,7 @@ components: sinks: azure_monitor_logs: {
 				enabled_default:        true
 			}
 			to: {
-				name:     "Azure Monitor logs"
-				thing:    "a \(name) account"
-				url:      urls.azure_monitor
-				versions: null
+				service: services.azure_monitor_logs
 
 				interface: {
 					socket: {
@@ -58,7 +55,7 @@ components: sinks: azure_monitor_logs: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

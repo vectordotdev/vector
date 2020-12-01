@@ -8,7 +8,7 @@ components: sources: journald: {
 		commonly_used: true
 		delivery:      "at_least_once"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 	}
 
@@ -16,10 +16,12 @@ components: sources: journald: {
 		collect: {
 			checkpoint: enabled: true
 			from: {
-				name:     "JournalD"
-				thing:    name
-				url:      urls.journald
-				versions: null
+				service: {
+					name:     "JournalD"
+					thing:    name
+					url:      urls.journald
+					versions: null
+				}
 
 				interface: binary: {
 					name: "journalctl"
@@ -31,7 +33,7 @@ components: sources: journald: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        false
@@ -43,6 +45,10 @@ components: sources: journald: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -129,6 +135,7 @@ components: sources: journald: {
 	examples: [
 		{
 			title: "Sample Output"
+
 			configuration: {}
 			input: """
 				```text
@@ -188,5 +195,10 @@ components: sources: journald: {
 				are replaced with the Unicode replacement character, `�`.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 	}
 }

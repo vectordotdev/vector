@@ -28,10 +28,12 @@ components: sinks: nats: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				name:     "NATS"
-				thing:    "a \(name) server"
-				url:      urls.nats
-				versions: null
+				service: {
+					name:     "NATS"
+					thing:    "a \(name) server"
+					url:      urls.nats
+					versions: null
+				}
 
 				interface: {
 					socket: {
@@ -45,7 +47,7 @@ components: sinks: nats: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

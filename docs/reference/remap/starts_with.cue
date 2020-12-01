@@ -25,8 +25,8 @@ remap: functions: starts_with: {
 	return: ["boolean"]
 	category: "text"
 	description: #"""
-			Determines if a given string begins with a given `substring`.
-			The search can be optionally case insensitive.
+		Determines if a given string begins with a given `substring`.
+		The search can be optionally case insensitive.
 		"""#
 	examples: [
 		{
@@ -35,10 +35,11 @@ remap: functions: starts_with: {
 				message: #"The Needle In The Haystack"#
 			}
 			source: #"""
-				.contains = starts_with(.message, \"the needle\", case_sensitive = false)
+				.starts = starts_with(.message, \"the needle\", case_sensitive = false)
 				"""#
 			output: {
-				contains: true
+				message: #"The Needle In The Haystack"#
+				starts:  true
 			}
 		},
 		{
@@ -46,7 +47,7 @@ remap: functions: starts_with: {
 			input: {
 				message: "A string with 42"
 			}
-			source: ".contains = starts_with(.message, 42)"
+			source: ".starts = starts_with(.message, 42)"
 			output: {
 				error: remap.errors.ArgumentError
 			}

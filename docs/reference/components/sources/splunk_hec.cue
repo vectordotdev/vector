@@ -10,7 +10,7 @@ components: sources: splunk_hec: {
 		commonly_used: false
 		delivery:      "at_least_once"
 		deployment_roles: ["aggregator"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 	}
 
@@ -18,17 +18,20 @@ components: sources: splunk_hec: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "Splunk HEC"
-				thing:    "a \(name) client"
-				url:      urls.splunk_hec
-				versions: null
+				service: {
+					name:     "Splunk HEC"
+					thing:    "a \(name) client"
+					url:      urls.splunk_hec
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
 						title: "Splunk HEC"
 						url:   urls.splunk_hec_protocol
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["http"]
 					ssl: "optional"
 				}
@@ -44,7 +47,7 @@ components: sources: splunk_hec: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -56,6 +59,10 @@ components: sources: splunk_hec: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -91,5 +98,10 @@ components: sources: splunk_hec: {
 			}
 			timestamp: fields._current_timestamp
 		}
+	}
+
+	telemetry: metrics: {
+		http_request_errors_total: components.sources.internal_metrics.output.metrics.http_request_errors_total
+		requests_received_total:   components.sources.internal_metrics.output.metrics.requests_received_total
 	}
 }

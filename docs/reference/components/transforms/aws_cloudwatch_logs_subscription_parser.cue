@@ -21,7 +21,7 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -141,5 +141,9 @@ components: transforms: aws_cloudwatch_logs_subscription_parser: {
 			title: "Structured Log Events"
 			body:  "Note that the events themselves are not parsed. If they are structured data, you will typically want to pass them through a [parsing transform](\(urls.vector_parsing_transforms))."
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

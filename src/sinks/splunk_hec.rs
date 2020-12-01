@@ -9,7 +9,7 @@ use crate::{
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
-        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
     template::Template,
     tls::{TlsOptions, TlsSettings},
@@ -59,7 +59,7 @@ pub struct HecSinkConfig {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: InFlightLimit::Fixed(10),
+        concurrency: Concurrency::Fixed(10),
         rate_limit_num: Some(10),
         ..Default::default()
     };
@@ -424,9 +424,9 @@ mod integration_tests {
         test_util::{random_lines_with_stream, random_string},
         Event,
     };
-    use futures::{future, stream};
+    use futures::stream;
     use serde_json::Value as JsonValue;
-    use std::net::SocketAddr;
+    use std::{future::ready, net::SocketAddr};
     use tokio::time::{delay_for, Duration};
     use warp::Filter;
 
@@ -458,7 +458,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -477,7 +477,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -494,7 +494,7 @@ mod integration_tests {
 
         let message = random_string(100);
         let event = Event::from(message.clone());
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -542,7 +542,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -563,7 +563,7 @@ mod integration_tests {
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -587,7 +587,7 @@ mod integration_tests {
         let message = random_string(100);
         let mut event = Event::from(message.clone());
         event.as_mut_log().insert("asdf", "hello");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 
@@ -614,7 +614,7 @@ mod integration_tests {
         event.as_mut_log().insert("asdf", "hello");
         event.as_mut_log().insert("host", "example.com:1234");
         event.as_mut_log().insert("roast", "beef.example.com:1234");
-        sink.run(stream::once(future::ready(event))).await.unwrap();
+        sink.run(stream::once(ready(event))).await.unwrap();
 
         let entry = find_entry(message.as_str()).await;
 

@@ -6,7 +6,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
-        BatchConfig, BatchSettings, Buffer, Compression, InFlightLimit, PartitionBatchSink,
+        BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, ServiceBuilderExt, TowerRequestConfig,
     },
     template::Template,
@@ -101,7 +101,7 @@ enum S3ServerSideEncryption {
     AwsKms,
 }
 
-#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, PartialEq, Serialize)]
 #[derivative(Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum S3StorageClass {
@@ -109,7 +109,9 @@ enum S3StorageClass {
     Standard,
     ReducedRedundancy,
     IntelligentTiering,
+    #[serde(rename = "STANDARD_IA")]
     StandardIA,
+    #[serde(rename = "ONEZONE_IA")]
     OnezoneIA,
     Glacier,
     DeepArchive,
@@ -117,7 +119,7 @@ enum S3StorageClass {
 
 lazy_static! {
     static ref REQUEST_DEFAULTS: TowerRequestConfig = TowerRequestConfig {
-        in_flight_limit: InFlightLimit::Fixed(50),
+        concurrency: Concurrency::Fixed(50),
         rate_limit_num: Some(250),
         ..Default::default()
     };
@@ -368,11 +370,7 @@ impl RetryLogic for S3RetryLogic {
     type Response = PutObjectOutput;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        match error {
-            RusotoError::HttpDispatch(_) => true,
-            RusotoError::Unknown(res) if res.status.is_server_error() => true,
-            _ => false,
-        }
+        rusoto::is_retriable_error(error)
     }
 }
 
@@ -526,6 +524,26 @@ mod tests {
             S3Options::default(),
         );
         assert_ne!(req.key, "key/date.log.gz".to_string());
+    }
+
+    #[test]
+    fn storage_class_names() {
+        for &(name, storage_class) in &[
+            ("DEEP_ARCHIVE", S3StorageClass::DeepArchive),
+            ("GLACIER", S3StorageClass::Glacier),
+            ("INTELLIGENT_TIERING", S3StorageClass::IntelligentTiering),
+            ("ONEZONE_IA", S3StorageClass::OnezoneIA),
+            ("REDUCED_REDUNDANCY", S3StorageClass::ReducedRedundancy),
+            ("STANDARD", S3StorageClass::Standard),
+            ("STANDARD_IA", S3StorageClass::StandardIA),
+        ] {
+            assert_eq!(name, to_string(storage_class));
+            let result: S3StorageClass = serde_json::from_str(&format!("{:?}", name))
+                .unwrap_or_else(|error| {
+                    panic!("Unparsable storage class name {:?}: {}", name, error)
+                });
+            assert_eq!(result, storage_class);
+        }
     }
 }
 

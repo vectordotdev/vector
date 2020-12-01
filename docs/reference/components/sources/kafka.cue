@@ -16,7 +16,7 @@ components: sources: kafka: {
 				can_verify_hostname:    false
 				enabled_default:        false
 			}
-			from: components._kafka.features.service
+			from: components._kafka.features.collect.from
 		}
 		multiline: enabled: false
 	}
@@ -25,11 +25,15 @@ components: sources: kafka: {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
 	support: components._kafka.support
+
+	installation: {
+		platform_name: null
+	}
 
 	configuration: {
 		auto_offset_reset: {
@@ -81,6 +85,36 @@ components: sources: kafka: {
 			type: string: {
 				default: null
 				examples: ["message_key"]
+			}
+		}
+		topic_key: {
+			common:      false
+			description: "The log field name to use for the Kafka topic. If unspecified, the key would not be added to the log event."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["topic"]
+			}
+		}
+		partition_key: {
+			common:      false
+			description: "The log field name to use for the Kafka partition name. If unspecified, the key would not be added to the log event."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["partition"]
+			}
+		}
+		offset_key: {
+			common:      false
+			description: "The log field name to use for the Kafka offset. If unspecified, the key would not be added to the log event."
+			required:    false
+			warnings: []
+			type: string: {
+				default: null
+				examples: ["offset"]
 			}
 		}
 		librdkafka_options: components._kafka.configuration.librdkafka_options
@@ -160,8 +194,26 @@ components: sources: kafka: {
 				required:    true
 				type: string: examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
 			}
+			offset: {
+				description: "The Kafka offset at the time the record was retrieved."
+				required:    true
+				type: uint: {
+					examples: [100]
+					unit: null
+				}
+			}
+			partition: {
+				description: "The Kafka partition that the record came from."
+				required:    true
+				type: string: examples: ["partition"]
+			}
 			timestamp: fields._current_timestamp & {
 				description: "If the [Splunk HEC event endpoint](\(urls.splunk_hec_event_endpoint)) is used then the value of the `time` field will be used. If the [Splunk HEC raw endpoint](\(urls.splunk_hec_raw_endpoint)) is used, then the current time the event was received will be used."
+			}
+			topic: {
+				description: "The Kafka topic that the record came from."
+				required:    true
+				type: string: examples: ["topic"]
 			}
 		}
 	}

@@ -272,7 +272,14 @@ cross-image-%:
 
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --workspace --features ${DEFAULT_FEATURES} ${SCOPE} -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --workspace --features ${DEFAULT_FEATURES} ${SCOPE} --all-targets -- --nocapture
+
+.PHONY: test-components
+test-components: ## Test with all components enabled
+test-components: $(WASM_MODULE_OUTPUTS)
+# TODO(jesse) add `wasm-benches` when https://github.com/timberio/vector/issues/5106 is fixed
+test-components: export DEFAULT_FEATURES:="${DEFAULT_FEATURES} benches"
+test-components: test
 
 .PHONY: test-all
 test-all: test test-behavior test-integration ## Runs all tests, unit, behaviorial, and integration.
@@ -287,27 +294,28 @@ test-aarch64-unknown-linux-gnu: cross-test-aarch64-unknown-linux-gnu ## Runs uni
 
 .PHONY: test-behavior
 test-behavior: ## Runs behaviorial test
-	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*.toml
+	${MAYBE_ENVIRONMENT_EXEC} cargo run -- test tests/behavior/**/*
 
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
-test-integration: test-integration-mongodb_metrics test-integration-nats test-integration-pulsar test-integration-splunk
+test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
+test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
+test-integration: test-integration-nginx test-integration-prometheus test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
-start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
-start-test-integration: start-integration-mongodb_metrics start-integration-nats start-integration-pulsar
-start-test-integratino: start-integration-splunk
+start-test-integration: start-integration-gcp start-integration-humio start-integration-influxdb start-integration-kafka
+start-test-integration: start-integration-loki start-integration-mongodb_metrics start-integration-nats
+start-test-integration: start-integration-nginx start-integration-prometheus start-integration-pulsar start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
-stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
-stop-test-integration: stop-integration-mongodb_metrics stop-integration-nats stop-integration-pulsar
-stop-test-integration: stop-integration-splunk
+stop-test-integration: stop-integration-gcp stop-integration-humio stop-integration-influxdb stop-integration-kafka
+stop-test-integration: stop-integration-loki stop-integration-mongodb_metrics stop-integration-nats
+stop-test-integration: stop-integration-nginx stop-integration-prometheus stop-integration-pulsar stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:
@@ -719,6 +727,39 @@ ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-nats
 endif
 
+.PHONY: start-integration-nginx
+start-integration-nginx:
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-nginx -p 8010:8000
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-nginx --name vector_nginx \
+	-v $(PWD)tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-nginx
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-nginx -p 8010:8000 --name vector_nginx \
+	-v $(PWD)/tests/data/nginx/:/etc/nginx:ro nginx:1.19.4
+endif
+
+.PHONY: stop-integration-nginx
+stop-integration-nginx:
+	$(CONTAINER_TOOL) rm --force vector_nginx 2>/dev/null; true
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-nginx 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-nginx 2>/dev/null; true
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-nginx 2>/dev/null; true
+endif
+
+.PHONY: test-integration-nginx
+test-integration-nginx: ## Runs nginx integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-nginx
+	$(MAKE) start-integration-nginx
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-nginx
+endif
+
 .PHONY: start-integration-prometheus stop-integration-prometheus test-integration-prometheus
 start-integration-prometheus:
 	$(CONTAINER_TOOL) run -d --name vector_prometheus --net=host \
@@ -849,18 +890,23 @@ $(WASM_MODULE_OUTPUTS): ### Build a specific WASM module
 test-wasm: export TEST_THREADS=1
 test-wasm: export TEST_LOG=vector=trace
 test-wasm: $(WASM_MODULE_OUTPUTS)  ### Run engine tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "wasm" --lib -- --nocapture
+	${MAYBE_ENVIRONMENT_EXEC} cargo test wasm --no-fail-fast --no-default-features --features "transforms-field_filter transforms-wasm transforms-lua transforms-add_fields" --lib --all-targets -- --nocapture
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 
 .PHONY: bench
 bench: ## Run benchmarks in /benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES}" | tee bench_output.txt
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches"
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
+.PHONY: bench-all
+bench-all: ### Run default and WASM benches
+bench-all: $(WASM_MODULE_OUTPUTS)
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "benches wasm-benches"
 
 .PHONY: bench-wasm
 bench-wasm: $(WASM_MODULE_OUTPUTS)  ### Run WASM benches
-	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "${DEFAULT_FEATURES} transforms-wasm transforms-lua" --bench wasm wasm
+	${MAYBE_ENVIRONMENT_EXEC} cargo bench --no-default-features --features "wasm-benches" --bench wasm wasm
 
 ##@ Checking
 

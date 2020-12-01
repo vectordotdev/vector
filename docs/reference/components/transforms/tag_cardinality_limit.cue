@@ -14,7 +14,7 @@ components: transforms: tag_cardinality_limit: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -217,5 +217,10 @@ components: transforms: tag_cardinality_limit: {
 				for more info.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		tag_value_limit_exceeded_total: components.sources.internal_metrics.output.metrics.tag_value_limit_exceeded_total
+		value_limit_reached_total:      components.sources.internal_metrics.output.metrics.value_limit_reached_total
 	}
 }

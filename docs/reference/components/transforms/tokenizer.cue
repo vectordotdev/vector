@@ -21,7 +21,7 @@ components: transforms: tokenizer: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -113,5 +113,9 @@ components: transforms: tokenizer: {
 				* `\` - Can be used to escape the above characters, Vector will treat them as literal.
 				"""#
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

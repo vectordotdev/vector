@@ -14,7 +14,7 @@ components: transforms: dedupe: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -145,5 +145,9 @@ components: transforms: dedupe: {
 				b:5}" will be considered different to the event "{b:5}".
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		events_discarded_total: components.sources.internal_metrics.output.metrics.events_discarded_total
 	}
 }

@@ -77,4 +77,4 @@ rpmbuild \
 #
 
 ls "$RPMBUILD_DIR/RPMS/$ARCH"
-mv -v "$RPMBUILD_DIR/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$ARCH.rpm"
+mv -v "$RPMBUILD_DIR/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm"

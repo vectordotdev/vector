@@ -207,8 +207,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -233,8 +232,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -266,8 +264,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -297,14 +294,7 @@ mod test {
 
         let mut config = TcpConfig::new(addr.into());
         config.max_length = 10;
-        config.tls = Some(TlsConfig {
-            enabled: Some(true),
-            options: TlsOptions {
-                crt_file: Some("tests/data/localhost.crt".into()),
-                key_file: Some("tests/data/localhost.key".into()),
-                ..Default::default()
-            },
-        });
+        config.tls = Some(TlsConfig::test_config());
 
         let server = SocketConfig::from(config)
             .build(
@@ -314,8 +304,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -364,8 +353,7 @@ mod test {
                 tx,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         let lines = vec![
@@ -410,8 +398,7 @@ mod test {
         let server = SocketConfig::from(TcpConfig::new(addr.into()))
             .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         let source_handle = tokio::spawn(server);
 
         // Send data to Source.
@@ -452,8 +439,7 @@ mod test {
         })
         .build(source_name, &GlobalOptions::default(), shutdown_signal, tx)
         .await
-        .unwrap()
-        .compat();
+        .unwrap();
         let source_handle = tokio::spawn(server);
 
         wait_for_tcp(addr).await;
@@ -550,8 +536,7 @@ mod test {
                 sender,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         let source_handle = tokio::spawn(server);
 
         // Wait for UDP to start listening
@@ -716,8 +701,7 @@ mod test {
                 sender,
             )
             .await
-            .unwrap()
-            .compat();
+            .unwrap();
         tokio::spawn(server);
 
         // Wait for server to accept traffic

@@ -71,7 +71,7 @@ impl InternalEvent for EventProcessingProgress {
             "state" => self.state.as_const_str(),
         );
         match self.state {
-            State::Completed => counter!("events_processed_total", 1,
+            State::Completed => counter!("processed_events_total", 1,
                 "component_role" => self.role.as_const_str(),
             ),
             State::Errored => counter!("processing_errors_total", 1,

@@ -14,7 +14,7 @@ components: transforms: reduce: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -144,4 +144,8 @@ components: transforms: reduce: {
 			}
 		},
 	]
+
+	telemetry: metrics: {
+		stale_events_flushed_total: components.sources.internal_metrics.output.metrics.stale_events_flushed_total
+	}
 }

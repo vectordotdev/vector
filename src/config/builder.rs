@@ -39,7 +39,11 @@ impl Clone for ConfigBuilder {
 
 impl ConfigBuilder {
     pub fn build(self) -> Result<Config, Vec<String>> {
-        compiler::compile(self)
+        self.build_with(false)
+    }
+
+    pub fn build_with(self, deny_warnings: bool) -> Result<Config, Vec<String>> {
+        compiler::compile(self, deny_warnings)
     }
 
     pub fn add_source<S: SourceConfig + 'static, T: Into<String>>(&mut self, name: T, source: S) {

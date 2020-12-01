@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_s3: {
+components: sources: aws_s3: components._aws & {
 	title:       "AWS S3"
 	description: "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
 
@@ -9,7 +9,7 @@ components: sources: aws_s3: {
 		collect: {
 			tls: enabled:        false
 			checkpoint: enabled: false
-			from: {
+			from: service: {
 				name:     "AWS S3"
 				thing:    "an \(name) bucket"
 				url:      urls.aws_s3
@@ -43,7 +43,7 @@ components: sources: aws_s3: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -57,6 +57,10 @@ components: sources: aws_s3: {
 		notices: []
 	}
 
+	installation: {
+		platform_name: null
+	}
+
 	configuration: {
 		strategy: {
 			common:      false
@@ -65,7 +69,7 @@ components: sources: aws_s3: {
 			type: string: {
 				default: "sqs"
 				enum: {
-					sqs: "Consume S3 objects by polling for bucket notifications sent to an [SQS queue][urls.sqs]."
+					sqs: "Consume S3 objects by polling for bucket notifications sent to an [AWS SQS queue](\(urls.aws_sqs))."
 				}
 			}
 		}
@@ -238,5 +242,16 @@ components: sources: aws_s3: {
 				```
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		sqs_message_delete_failed_total:        components.sources.internal_metrics.output.metrics.sqs_message_delete_failed_total
+		sqs_message_delete_succeeded_total:     components.sources.internal_metrics.output.metrics.sqs_message_delete_succeeded_total
+		sqs_message_processing_failed_total:    components.sources.internal_metrics.output.metrics.sqs_message_processing_failed_total
+		sqs_message_processing_succeeded_total: components.sources.internal_metrics.output.metrics.sqs_message_processing_succeeded_total
+		sqs_message_receive_failed_total:       components.sources.internal_metrics.output.metrics.sqs_message_receive_failed_total
+		sqs_message_receive_succeeded_total:    components.sources.internal_metrics.output.metrics.sqs_message_receive_succeeded_total
+		sqs_message_received_messages_total:    components.sources.internal_metrics.output.metrics.sqs_message_received_messages_total
+		sqs_s3_event_record_ignored_total:      components.sources.internal_metrics.output.metrics.sqs_s3_event_record_ignored_total
 	}
 }

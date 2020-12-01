@@ -44,7 +44,8 @@ remap: functions: format_number: {
 				.formatted = format_number(.number, 3, decimal_separator=".", grouping_separator=",")
 				"""#
 			output: {
-				formatter: "1,234,567.890"
+				number:    1234567.89
+				formatted: "1,234,567.890"
 			}
 		},
 		{

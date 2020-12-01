@@ -126,6 +126,7 @@ mod tests {
             0,
             &EncodingConfig {
                 codec: Encoding::Json,
+                schema: None,
                 only_fields: None,
                 except_fields: Some(vec!["magic".into()]),
                 timestamp_format: None,

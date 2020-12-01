@@ -35,7 +35,7 @@ components: sinks: sematext_metrics: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -77,5 +77,9 @@ components: sinks: sematext_metrics: {
 			set:          false
 			summary:      false
 		}
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

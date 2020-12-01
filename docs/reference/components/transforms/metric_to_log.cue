@@ -14,7 +14,7 @@ components: transforms: metric_to_log: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -93,4 +93,8 @@ components: transforms: metric_to_log: {
 	]
 
 	how_it_works: {}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
+	}
 }

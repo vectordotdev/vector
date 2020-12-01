@@ -2,61 +2,6 @@ package metadata
 
 // These sources produce JSON providing a structured representation of the
 // Vector CLI (commands, flags, etc.)
-
-#Args: [Arg=string]: {
-	description: !=""
-	type:        #ArgType
-	default?:    string | [...string]
-}
-
-#ArgType: "string" | "list"
-
-#CommandLineTool: {
-	name:     !=""
-	flags:    #Flags
-	options:  #Options
-	commands: #Commands
-}
-
-#Commands: [Command=string]: {
-	description: !=""
-	flags?:      #Flags
-	options?:    #Options
-	args?:       #Args
-}
-
-#Flags: [Flag=string]: {
-	flag:        "--\(Flag)"
-	description: !=""
-	default:     bool | *false
-
-	if _short != _|_ {
-		short: "-\(_short)"
-	}
-
-	_short: !=""
-}
-
-#Options: [Option=string]: {
-	option:      "--\(Option)"
-	description: !=""
-	default?:    string | int
-	enum?: [...string]
-	type: #OptionType
-
-	if _short != _|_ {
-		short: "-\(_short)"
-	}
-
-	_short: !=""
-
-	if enum != _|_ {
-		type: "enum"
-	}
-}
-
-#OptionType: "string" | "integer" | "enum"
-
 _default_flags: {
 	"help": {
 		_short:      "h"
@@ -68,7 +13,72 @@ _default_flags: {
 	}
 }
 
-cli: #CommandLineTool & {
+cli: {
+	#Args: [Arg=string]: {
+		description: !=""
+		name:        Arg
+		type:        #ArgType
+		default?:    string | [...string]
+	}
+
+	#ArgType: "string" | "list"
+
+	#Commands: [Command=string]: {
+		description: !=""
+		name:        Command
+		flags?:      #Flags
+		options?:    #Options
+		args?:       #Args
+	}
+
+	#Flags: [Flag=string]: {
+		flag:        "--\(Flag)"
+		description: string
+		env_var?:    string
+		name:        Flag
+
+		if _short != _|_ {
+			short: "-\(_short)"
+		}
+
+		_short: string
+	}
+
+	#Options: [Option=string]: {
+		option:      "--\(Option)"
+		default?:    string | int
+		description: string
+		enum?:       #Enum
+		name:        Option
+		type:        #OptionType
+		env_var?:    string
+		example?:    string
+		required:    bool | *false
+
+		if default == _|_ {
+			required: true
+		}
+
+		if _short != _|_ {
+			short: "-\(_short)"
+		}
+
+		_short: !=""
+
+		if enum != _|_ {
+			type: "enum"
+		}
+	}
+
+	#OptionType: "string" | "integer" | "enum"
+
+	name:     !=""
+	flags:    #Flags
+	options:  #Options
+	commands: #Commands
+}
+
+cli: {
 	name: "vector"
 
 	flags: _default_flags & {
@@ -82,6 +92,7 @@ cli: #CommandLineTool & {
 		"require-healthy": {
 			_short:      "r"
 			description: "Exit on startup if any sinks fail healthchecks"
+			env_var:     "VECTOR_REQUIRE_HEALTHY"
 		}
 		"verbose": {
 			_short:      "v"
@@ -90,33 +101,59 @@ cli: #CommandLineTool & {
 		"watch-config": {
 			_short:      "w"
 			description: "Watch for changes in the configuration file, and reload accordingly"
+			env_var:     "VECTOR_WATCH_CONFIG"
 		}
 	}
 
 	options: {
 		"color": {
-			description: """
-				Control when ANSI terminal formatting is used.
-
-				By default `vector` will try and detect if `stdout` is a terminal,
-				if it is ANSI will be enabled. Otherwise it will be disabled. By
-				providing this flag with the `--color always` option will always
-				enable ANSI terminal formatting. `--color never` will disable all
-				ANSI terminal formatting. `--color auto` will attempt to detect it
-				automatically.
-				"""
-			default: "auto"
-			enum: ["always", "auto", "never"]
+			description: "Control when ANSI terminal formatting is used."
+			default:     "auto"
+			enum: {
+				always: "Enable ANSI terminal formatting always."
+				auto:   "Detect ANSI terminal formatting and enable if supported."
+				never:  "Disable ANSI terminal formatting."
+			}
 		}
 		"config": {
 			_short: "c"
 			description: """
 				Read configuration from one or more files. Wildcard paths are
 				supported. If zero files are specified the default config path
-				`/etc/vector/vector.toml` will be targeted
+				`/etc/vector/vector.toml` will be targeted.
+				TOML, YAML and JSON file formats are supported.
+				The format to interpret the file with is determined from
+				the file extension (.toml, .yaml, .json).
+				We will fallback to TOML if we are unable to detect
+				a supported format.
 				"""
 			type:    "string"
 			default: "/etc/vector/vector.toml"
+			env_var: "VECTOR_CONFIG"
+		}
+		"config-toml": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. TOML file format is assumed.
+				"""
+			type:    "string"
+			env_var: "VECTOR_CONFIG_TOML"
+		}
+		"config-json": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. JSON file format is assumed.
+				"""
+			type:    "string"
+			env_var: "VECTOR_CONFIG_JSON"
+		}
+		"config-yaml": {
+			description: """
+				Read configuration from one or more files. Wildcard paths are
+				supported. YAML file format is assumed.
+				"""
+			type:    "string"
+			env_var: "VECTOR_CONFIG_YAML"
 		}
 		"threads": {
 			_short: "t"
@@ -124,12 +161,16 @@ cli: #CommandLineTool & {
 				Number of threads to use for processing (default is number of
 				available cores)
 				"""
-			type: "integer"
+			type:    "integer"
+			env_var: "VECTOR_THREADS"
 		}
 		"log-format": {
 			description: "Set the logging format [default: text]"
 			default:     "text"
-			enum: ["json", "text"]
+			enum: {
+				json: "Output Vector's logs as JSON."
+				text: "Output Vector's logs as text."
+			}
 		}
 	}
 
@@ -144,40 +185,18 @@ cli: #CommandLineTool & {
 				}
 			}
 
+			options: {
+				"file": {
+					description: "Generate config as a file"
+					type:        "string"
+					example:     "/etc/vector/my-config.toml"
+				}
+			}
+
 			args: {
-				expression: {
-					description: """
-						Generate expression, e.g. `stdin/json_parser,add_fields/console`
-
-						Three comma-separated lists of sources, transforms and sinks, divided
-						by forward slashes. If subsequent component types are not needed then
-						their dividers can be omitted from the expression.
-
-						For example:
-
-						`/json_parser` prints a `json_parser` transform.
-
-						`//file,http` prints a `file` and `http` sink.
-
-						`stdin//http` prints a `stdin` source an an `http` sink.
-
-						Generated components are given incremental names (`source1`,
-						`source2`, etc) which should be replaced in order to provide better
-						context. You can optionally specify the names of components by
-						prefixing them with `<name>:`, e.g.:
-
-						`foo:stdin/bar:regex_parser/baz:http` prints a `stdin` source called
-						`foo`, a `regex_parser` transform called `bar`, and an `http` sink
-						called `baz`.
-
-						Vector makes a best attempt at constructing a sensible topology. The
-						first transform generated will consume from all sources and subsequent
-						transforms will consume from their predecessor. All sinks will consume
-						from the last transform or, if none are specified, from all sources.
-						It is then up to you to restructure the `inputs` of each component to
-						build the topology you need.
-						"""
-					type: "string"
+				pipeline: {
+					description: "Pipeline expression, e.g. `stdin/json_parser,add_fields/console`"
+					type:        "string"
 				}
 			}
 		}
@@ -195,7 +214,10 @@ cli: #CommandLineTool & {
 				"format": {
 					description: "Format the list in an encoding schema"
 					default:     "text"
-					enum: ["json", "text"]
+					enum: {
+						json: "Output components as JSON"
+						text: "Output components as text"
+					}
 				}
 			}
 		}
@@ -206,6 +228,15 @@ cli: #CommandLineTool & {
 				therefore subject to change. For guidance on how to write unit tests check
 				out: https://vector.dev/docs/setup/guides/unit-testing/
 				"""
+
+			args: {
+				paths: _paths_arg & {
+					description: """
+						Any number of Vector config files to test. If none are specified
+						the default config path `/etc/vector/vector.toml` will be targeted
+						"""
+				}
+			}
 		}
 
 		"top": {
@@ -221,7 +252,6 @@ cli: #CommandLineTool & {
 						Humanize metrics, using numeric suffixes - e.g. 1,100 = 1.10 k,
 						1,000,000 = 1.00 M
 						"""
-					default: false
 				}
 			}
 
@@ -236,7 +266,6 @@ cli: #CommandLineTool & {
 					_short:      "u"
 					description: "The URL for the GraphQL endpoint of the running Vector instance"
 					type:        "string"
-					default:     "http://127.0.0.1:8686/graphql"
 				}
 			}
 		}
@@ -245,43 +274,57 @@ cli: #CommandLineTool & {
 			description: "Validate the target config, then exit"
 
 			flags: _default_flags & {
-				"no-topology": {
-					description: "Disables topology check"
-				}
 				"no-environment": {
+					_short: "ne"
 					description: """
 						Disables environment checks. That includes component
 						checks and health checks
 						"""
 				}
 				"deny-warnings": {
+					_short:      "d"
 					description: "Fail validation on warnings"
 				}
 			}
 
 			options: {
-				n: {
+				"config-toml": {
 					description: """
-						Shorthand for the `--no-topology` and `--no-environment` flags. Just
-						`-n` won't disable anything, it needs to be used with `t` for
-						`--no-topology`, and or `e` for `--no-environment` in any order.
-						Example: `-nte` and `net` both mean `--no-topology` and
-						`--no-environment`
+						Any number of Vector config files to validate.
+						TOML file format is assumed.
 						"""
-					enum: ["e", "t", "et", "te"]
+					type: "string"
+				}
+				"config-json": {
+					description: """
+						Any number of Vector config files to validate.
+						JSON file format is assumed.
+						"""
+					type: "string"
+				}
+				"config-yaml": {
+					description: """
+						Any number of Vector config files to validate.
+						YAML file format is assumed.
+						"""
+					type: "string"
 				}
 			}
 
 			args: {
-				paths: {
+				paths: _paths_arg & {
 					description: """
 						Any number of Vector config files to validate. If none are specified
 						the default config path `/etc/vector/vector.toml` will be targeted
 						"""
-					type:    "list"
-					default: "/etc/vector/vector.toml"
 				}
 			}
 		}
+	}
+
+	// Helpers
+	_paths_arg: {
+		type:    "list"
+		default: "/etc/vector/vector.toml"
 	}
 }

@@ -427,6 +427,22 @@ impl From<Metric> for Event {
 impl remap::Object for Event {
     // TODO(jean): replace this with `Lookup`, once that lands.
     fn insert(&mut self, path: &[Vec<String>], value: remap::Value) -> Result<(), String> {
+        // assignment to object root
+        if path.is_empty() {
+            match value {
+                remap::Value::Map(map) => {
+                    *self = map
+                        .into_iter()
+                        .map(|(k, v)| (k, v.into()))
+                        .collect::<BTreeMap<_, _>>()
+                        .into();
+
+                    return Ok(());
+                }
+                _ => return Err("tried to assign non-map value to event root path".to_owned()),
+            }
+        }
+
         let path_str = path
             .iter()
             .map(|c| {
@@ -444,6 +460,19 @@ impl remap::Object for Event {
 
     // TODO(jean): replace this with `Lookup`, once that lands.
     fn find(&self, path: &[Vec<String>]) -> Result<Option<remap::Value>, String> {
+        // return object root
+        if path.is_empty() {
+            let map = self
+                .as_log()
+                .as_map()
+                .clone()
+                .into_iter()
+                .map(|(k, v)| (k, v.into()))
+                .collect::<BTreeMap<_, _>>();
+
+            return Ok(Some(map.into()));
+        }
+
         let path = path
             .iter()
             .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect::<Vec<_>>())
@@ -499,8 +528,21 @@ impl remap::Object for Event {
     }
 
     fn remove(&mut self, path: &str, compact: bool) {
-        self.as_mut_log()
-            .remove_prune(path.trim_start_matches('.'), compact);
+        match path {
+            // root path
+            "" => {
+                let keys: Vec<_> = self.as_log().keys().collect();
+
+                for key in keys {
+                    self.as_mut_log().remove_prune(key, true);
+                }
+            }
+
+            _ => {
+                self.as_mut_log()
+                    .remove_prune(path.trim_start_matches('.'), compact);
+            }
+        }
     }
 }
 

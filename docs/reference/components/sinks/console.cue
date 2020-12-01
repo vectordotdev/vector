@@ -27,10 +27,7 @@ components: sinks: console: {
 			request: enabled: false
 			tls: enabled:     false
 			to: {
-				name:     "STDOUT"
-				thing:    "a \(name) stream"
-				url:      urls.stdout
-				versions: null
+				service: services.stdout
 
 				interface: stdout: {}
 			}
@@ -38,7 +35,7 @@ components: sinks: console: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -81,7 +78,6 @@ components: sinks: console: {
 	}
 
 	telemetry: metrics: {
-		vector_processed_bytes_total:   _vector_processed_bytes_total
-		vector_processing_errors_total: _vector_processing_errors_total
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

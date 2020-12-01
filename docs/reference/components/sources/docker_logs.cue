@@ -2,21 +2,15 @@ package metadata
 
 components: sources: docker_logs: {
 	title:       "Docker"
-	description: """
-		[Docker](\(urls.docker)) is an open platform for developing, shipping, and running
-		applications and services. Docker enables you to separate your services from
-		your infrastructure so you can ship quickly. With Docker, you can manage your
-		infrastructure in the same ways you manage your services. By taking advantage
-		of Docker's methodologies for shipping, testing, and deploying code quickly,
-		you can significantly reduce the delay between writing code and running it in
-		production.
-		"""
+	description: "Test."
+
+	alias: "docker"
 
 	classes: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
@@ -45,11 +39,31 @@ components: sources: docker_logs: {
 		collect: {
 			checkpoint: enabled: false
 			from: {
-				name:     "Docker Engine"
-				thing:    "the \(name)"
-				url:      urls.docker_engine
-				versions: ">= 1.24"
+				service: {
+					name:     "Docker"
+					thing:    "the \(name) platform"
+					url:      urls.docker
+					versions: ">= 1.24"
 
+					setup: [
+						"""
+							Ensure that [Docker is setup](\(urls.docker_setup)) and running.
+							""",
+						"""
+							Ensure that the Docker Engine is properly exposing logs:
+
+							```bash
+							docker logs $(docker ps | awk '{ print $1 }')
+							```
+
+							If you receive an error it's likely that you do not have
+							the proper Docker logging drivers installed. The Docker
+							Engine requires the [`json-file`](\(urls.docker_logging_driver_json_file)) (default),
+							[`journald`](docker_logging_driver_journald), or [`local`](\(urls.docker_logging_driver_local)) Docker
+							logging drivers to be installed.
+							""",
+					]
+				}
 				interface: socket: {
 					api: {
 						title: "Docker Engine API"
@@ -61,32 +75,13 @@ components: sources: docker_logs: {
 					socket: "/var/run/docker.sock"
 					ssl:    "disabled"
 				}
-
-				setup: [
-					"""
-						Ensure that [Docker is setup](\(urls.docker_setup)) and running.
-						""",
-					"""
-						Ensure that the Docker Engine is properly exposing logs:
-
-						```bash
-						docker logs $(docker ps | awk '{ print $1 }')
-						```
-
-						If you receive an error it's likely that you do not have
-						the proper Docker logging drivers installed. The Docker
-						Engine requires either the [`json-file`](\(urls.docker_logging_driver_json_file)) (default)
-						or [`journald`](docker_logging_driver_journald) Docker
-						logging driver to be installed.
-						""",
-				]
 			}
 		}
 		multiline: enabled: true
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-pc-windows-msv":      true
@@ -107,6 +102,10 @@ components: sources: docker_logs: {
 				""",
 		]
 		notices: []
+	}
+
+	installation: {
+		platform_name: "docker"
 	}
 
 	configuration: {
@@ -257,12 +256,21 @@ components: sources: docker_logs: {
 			body: """
 				Docker, by default, will split log messages that exceed 16kb. This can be a
 				rather frustrating problem because it produces malformed log messages that are
-				difficult to work with. Vector's `docker_logs` source solves this by default,
-				automatically merging these messages into a single message. You can turn this
-				off via the `auto_partial_merge` option. Furthermore, you can adjust the marker
+				difficult to work with. Vector's solves this by default, automatically merging
+				these messages into a single message. You can turn this off via the
+				`auto_partial_merge` option. Furthermore, you can adjust the marker
 				that we use to determine if an event is partial via the
 				`partial_event_marker_field` option.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		communication_errors_total:            components.sources.internal_metrics.output.metrics.communication_errors_total
+		container_processed_events_total:      components.sources.internal_metrics.output.metrics.container_processed_events_total
+		container_metadata_fetch_errors_total: components.sources.internal_metrics.output.metrics.container_metadata_fetch_errors_total
+		containers_unwatched_total:            components.sources.internal_metrics.output.metrics.containers_unwatched_total
+		containers_watched_total:              components.sources.internal_metrics.output.metrics.containers_watched_total
+		logging_driver_errors_total:           components.sources.internal_metrics.output.metrics.logging_driver_errors_total
 	}
 }

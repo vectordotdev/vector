@@ -11,7 +11,7 @@ components: transforms: aws_ec2_metadata: {
 
 	features: {
 		enrich: {
-			from: {
+			from: service: {
 				name:     "AWS EC2 instance metadata"
 				url:      urls.aws_ec2_instance_metadata
 				versions: ">= 2"
@@ -20,7 +20,7 @@ components: transforms: aws_ec2_metadata: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -169,5 +169,10 @@ components: transforms: aws_ec2_metadata: {
 				}
 			}
 		}
+	}
+
+	telemetry: metrics: {
+		metadata_refresh_failed_total:     components.sources.internal_metrics.output.metrics.metadata_refresh_failed_total
+		metadata_refresh_successful_total: components.sources.internal_metrics.output.metrics.metadata_refresh_successful_total
 	}
 }

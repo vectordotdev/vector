@@ -14,7 +14,7 @@ components: transforms: ansi_stripper: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -44,5 +44,9 @@ components: transforms: ansi_stripper: {
 	input: {
 		logs:    true
 		metrics: null
+	}
+
+	telemetry: metrics: {
+		processing_errors_total: components.sources.internal_metrics.output.metrics.processing_errors_total
 	}
 }

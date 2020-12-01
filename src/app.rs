@@ -29,7 +29,7 @@ use tokio::runtime;
 use tokio::runtime::Runtime;
 
 pub struct ApplicationConfig {
-    pub config_paths: Vec<PathBuf>,
+    pub config_paths: Vec<(PathBuf, config::FormatHint)>,
     pub topology: RunningTopology,
     pub graceful_crash: mpsc::UnboundedReceiver<()>,
     #[cfg(feature = "api")]
@@ -51,25 +51,21 @@ impl Application {
     pub fn prepare_from_opts(opts: Opts) -> Result<Self, exitcode::ExitCode> {
         openssl_probe::init_ssl_cert_env_vars();
 
-        let level = opts.log_level();
+        let level = std::env::var("LOG").unwrap_or_else(|_| match opts.log_level() {
+            "off" => "off".to_owned(),
+            level => [
+                format!("vector={}", level),
+                format!("codec={}", level),
+                format!("file_source={}", level),
+                "tower_limit=trace".to_owned(),
+                format!("rdkafka={}", level),
+            ]
+            .join(","),
+        });
+
         let root_opts = opts.root;
 
         let sub_command = opts.sub_command;
-
-        let levels = match std::env::var("LOG").ok() {
-            Some(level) => level,
-            None => match level {
-                "off" => "off".to_string(),
-                _ => [
-                    format!("vector={}", level),
-                    format!("codec={}", level),
-                    format!("file_source={}", level),
-                    "tower_limit=trace".to_owned(),
-                    format!("rdkafka={}", level),
-                ]
-                .join(","),
-            },
-        };
 
         let color = match root_opts.color {
             #[cfg(unix)]
@@ -85,7 +81,7 @@ impl Application {
             LogFormat::Json => true,
         };
 
-        trace::init(color, json, levels.as_str());
+        trace::init(color, json, &level);
 
         metrics::init().expect("metrics initialization failed");
 
@@ -107,7 +103,7 @@ impl Application {
         };
 
         let config = {
-            let config_paths = root_opts.config_paths.clone();
+            let config_paths = root_opts.config_paths_with_formats();
             let watch_config = root_opts.watch_config;
             let require_healthy = root_opts.require_healthy;
 
@@ -133,10 +129,11 @@ impl Application {
 
                 if watch_config {
                     // Start listening for config changes immediately.
-                    config::watcher::spawn_thread(&config_paths, None).map_err(|error| {
-                        error!(message = "Unable to start config watcher.", %error);
-                        exitcode::CONFIG
-                    })?;
+                    config::watcher::spawn_thread(config_paths.iter().map(|(path, _)| path), None)
+                        .map_err(|error| {
+                            error!(message = "Unable to start config watcher.", %error);
+                            exitcode::CONFIG
+                        })?;
                 }
 
                 info!(
@@ -145,7 +142,7 @@ impl Application {
                 );
 
                 let config =
-                    config::load_from_paths(&config_paths).map_err(handle_config_errors)?;
+                    config::load_from_paths(&config_paths, false).map_err(handle_config_errors)?;
 
                 config::LOG_SCHEMA
                     .set(config.global.log_schema.clone())
@@ -200,12 +197,13 @@ impl Application {
             // assigned to prevent the API terminating when falling out of scope
             let api_server = if api_config.enabled {
                 emit!(ApiStarted {
-                    addr: api_config.bind.unwrap(),
+                    addr: api_config.address.unwrap(),
                     playground: api_config.playground
                 });
 
                 Some(api::Server::start(topology.config()))
             } else {
+                info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
                 None
             };
 
@@ -219,9 +217,9 @@ impl Application {
                 Some(signal) = signals.next() => {
                     if signal == SignalTo::Reload {
                         // Reload paths
-                        config_paths = config::process_paths(&opts.config_paths).unwrap_or(config_paths);
+                        config_paths = config::process_paths(&opts.config_paths_with_formats()).unwrap_or(config_paths);
                         // Reload config
-                        let new_config = config::load_from_paths(&config_paths).map_err(handle_config_errors).ok();
+                        let new_config = config::load_from_paths(&config_paths, false).map_err(handle_config_errors).ok();
 
                         if let Some(new_config) = new_config {
                             match topology

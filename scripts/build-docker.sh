@@ -11,7 +11,7 @@ set -euo pipefail
 set -x
 
 CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
-VERSION="${VERSION:-"$(scripts/version.sh)"}"
+VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 PUSH="${PUSH:-}"
 PLATFORM="${PLATFORM:-}"

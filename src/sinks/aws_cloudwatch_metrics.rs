@@ -219,7 +219,7 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
         let (items, namespace) = items.into_parts();
         let metric_data = self.encode_events(items);
         if metric_data.is_empty() {
-            return future::ready(Ok(())).boxed();
+            return future::ok(()).boxed();
         }
 
         let input = PutMetricDataInput {
@@ -242,15 +242,8 @@ impl RetryLogic for CloudWatchMetricsRetryLogic {
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
         match error {
-            RusotoError::HttpDispatch(_) => true,
             RusotoError::Service(PutMetricDataError::InternalServiceFault(_)) => true,
-            RusotoError::Unknown(res)
-                if res.status.is_server_error()
-                    || res.status == http::StatusCode::TOO_MANY_REQUESTS =>
-            {
-                true
-            }
-            _ => false,
+            error => rusoto::is_retriable_error(error),
         }
     }
 }

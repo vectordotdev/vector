@@ -15,7 +15,7 @@ components: sources: host_metrics: {
 	features: {
 		collect: {
 			checkpoint: enabled: false
-			from: {
+			from: service: {
 				name:     "host"
 				thing:    "a \(name)"
 				url:      urls.host
@@ -26,7 +26,7 @@ components: sources: host_metrics: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -38,6 +38,10 @@ components: sources: host_metrics: {
 		notices: []
 		requirements: []
 		warnings: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -261,22 +265,23 @@ components: sources: host_metrics: {
 	}
 
 	output: metrics: {
-		_tags: {
+		_host_metrics_tags: {
+			collector: {
+				description: "Which collector this metric comes from."
+				required:    true
+			}
 			host: {
 				description: "The hostname of the originating system."
 				required:    true
 				examples: [_values.local_host]
 			}
-			collector: {
-				description: "Which collector this metric comes from."
-				required:    true
-			}
 		}
 
-		cpu_seconds_total: {
+		// Host CPU
+		host_cpu_seconds_total: _host & {
 			description: "The number of CPU seconds accumulated in different operating modes."
 			type:        "counter"
-			tags:        _tags & {
+			tags:        _host_metrics_tags & {
 				collector: examples: ["cpu"]
 				cpu: {
 					description: "The index of the CPU core or socket."
@@ -291,6 +296,57 @@ components: sources: host_metrics: {
 			}
 		}
 
+		// Host disk
+		disk_read_bytes_total:       _host & _disk_counter & {description: "The accumulated number of bytes read in."}
+		disk_reads_completed_total:  _host & _disk_counter & {description: "The accumulated number of read operations completed."}
+		disk_written_bytes_total:    _host & _disk_counter & {description: "The accumulated number of bytes written out."}
+		disk_writes_completed_total: _host & _disk_counter & {description: "The accumulated number of write operations completed."}
+
+		// Host filesystem
+		filesystem_free_bytes:  _host & _filesystem_bytes & {description: "The number of bytes free on the named filesystem."}
+		filesystem_total_bytes: _host & _filesystem_bytes & {description: "The total number of bytes in the named filesystem."}
+		filesystem_used_bytes:  _host & _filesystem_bytes & {description: "The number of bytes used on the named filesystem."}
+
+		// Host load
+		load1:  _host & _loadavg & {description: "System load averaged over the last 1 second."}
+		load5:  _host & _loadavg & {description: "System load averaged over the last 5 seconds."}
+		load15: _host & _loadavg & {description: "System load averaged over the last 15 seconds."}
+
+		// Host memory
+		memory_active_bytes:           _host & _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
+		memory_available_bytes:        _host & _memory_gauge & {description:                 "The number of bytes of main memory available."}
+		memory_buffers_bytes:          _host & _memory_linux & {description:                 "The number of bytes of main memory used by buffers."}
+		memory_cached_bytes:           _host & _memory_linux & {description:                 "The number of bytes of main memory used by cached blocks."}
+		memory_free_bytes:             _host & _memory_gauge & {description:                 "The number of bytes of main memory not used."}
+		memory_inactive_bytes:         _host & _memory_macos & {description:                 "The number of bytes of main memory that is not active."}
+		memory_shared_bytes:           _host & _memory_linux & {description:                 "The number of bytes of main memory shared between processes."}
+		memory_swap_free_bytes:        _host & _memory_gauge & {description:                 "The number of free bytes of swap space."}
+		memory_swapped_in_bytes_total: _host & _memory_counter & _memory_nowin & {
+			description: "The number of bytes that have been swapped in to main memory."
+		}
+		memory_swapped_out_bytes_total: _host & _memory_counter & _memory_nowin & {
+			description: "The number of bytes that have been swapped out from main memory."
+		}
+		memory_swap_total_bytes: _host & _memory_gauge & {description: "The total number of bytes of swap space."}
+		memory_swap_used_bytes:  _host & _memory_gauge & {description: "The number of used bytes of swap space."}
+		memory_total_bytes:      _host & _memory_gauge & {description: "The total number of bytes of main memory."}
+		memory_used_bytes:       _host & _memory_linux & {description: "The number of bytes of main memory used by programs or caches."}
+		memory_wired_bytes:      _host & _memory_macos & {description: "The number of wired bytes of main memory."}
+
+		// Host network
+		network_receive_bytes_total:         _host & _network_gauge & {description: "The number of bytes received on this interface."}
+		network_receive_errs_total:          _host & _network_gauge & {description: "The number of errors encountered during receives on this interface."}
+		network_receive_packets_total:       _host & _network_gauge & {description: "The number of packets received on this interface."}
+		network_transmit_bytes_total:        _host & _network_gauge & {description: "The number of bytes transmitted on this interface."}
+		network_transmit_errs_total:         _host & _network_gauge & {description: "The number of errors encountered during transmits on this interface."}
+		network_transmit_packets_drop_total: _host & _network_nomac & {description: "The number of packets dropped during transmits on this interface."}
+		network_transmit_packets_total:      _host & _network_nomac & {description: "The number of packets transmitted on this interface."}
+
+		// Helpers
+		_host: {
+			default_namespace: "host"
+		}
+
 		_disk_device: {
 			description: "The disk device name."
 			required:    true
@@ -298,19 +354,14 @@ components: sources: host_metrics: {
 		}
 		_disk_counter: {
 			type: "counter"
-			tags: _tags & {
+			tags: _host_metrics_tags & {
 				collector: examples: ["disk"]
 				device: _disk_device
 			}
 		}
-		disk_read_bytes_total:       _disk_counter & {description: "The accumulated number of bytes read in."}
-		disk_reads_completed_total:  _disk_counter & {description: "The accumulated number of read operations completed."}
-		disk_written_bytes_total:    _disk_counter & {description: "The accumulated number of bytes written out."}
-		disk_writes_completed_total: _disk_counter & {description: "The accumulated number of write operations completed."}
-
 		_filesystem_bytes: {
 			type: "gauge"
-			tags: _tags & {
+			tags: _host_metrics_tags & {
 				collector: examples: ["filesystem"]
 				device: _disk_device
 				filesystem: {
@@ -320,59 +371,31 @@ components: sources: host_metrics: {
 				}
 			}
 		}
-		filesystem_free_bytes:  _filesystem_bytes & {description: "The number of bytes free on the named filesystem."}
-		filesystem_total_bytes: _filesystem_bytes & {description: "The total number of bytes in the named filesystem."}
-		filesystem_used_bytes:  _filesystem_bytes & {description: "The number of bytes used on the named filesystem."}
-
-		_memory_gauge: {
-			type: "gauge"
-			tags: _tags & {
-				collector: examples: ["memory"]
-			}
-		}
-		_memory_counter: {
-			type: "counter"
-			tags: _tags & {
-				collector: examples: ["memory"]
-			}
-		}
-		_memory_linux: _memory_gauge & {relevant_when: "OS is Linux"}
-		_memory_macos: _memory_gauge & {relevant_when: "OS is MacOS X"}
-		_memory_nowin: {relevant_when: "OS is not Windows"}
-		memory_free_bytes:             _memory_gauge & {description:                 "The number of bytes of main memory not used."}
-		memory_available_bytes:        _memory_gauge & {description:                 "The number of bytes of main memory available."}
-		memory_swap_free_bytes:        _memory_gauge & {description:                 "The number of free bytes of swap space."}
-		memory_swap_total_bytes:       _memory_gauge & {description:                 "The total number of bytes of swap space."}
-		memory_swap_used_bytes:        _memory_gauge & {description:                 "The number of used bytes of swap space."}
-		memory_total_bytes:            _memory_gauge & {description:                 "The total number of bytes of main memory."}
-		memory_active_bytes:           _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
-		memory_buffers_bytes:          _memory_linux & {description:                 "The number of bytes of main memory used by buffers."}
-		memory_cached_bytes:           _memory_linux & {description:                 "The number of bytes of main memory used by cached blocks."}
-		memory_shared_bytes:           _memory_linux & {description:                 "The number of bytes of main memory shared between processes."}
-		memory_used_bytes:             _memory_linux & {description:                 "The number of bytes of main memory used by programs or caches."}
-		memory_inactive_bytes:         _memory_macos & {description:                 "The number of bytes of main memory that is not active."}
-		memory_swapped_in_bytes_total: _memory_counter & _memory_nowin & {
-			description: "The number of bytes that have been swapped in to main memory."
-		}
-		memory_swapped_out_bytes_total: _memory_counter & _memory_nowin & {
-			description: "The number of bytes that have been swapped out from main memory."
-		}
-		memory_wired_bytes: _memory_macos & {description: "The number of wired bytes of main memory."}
-
 		_loadavg: {
 			type: "gauge"
-			tags: _tags & {
+			tags: _host_metrics_tags & {
 				collector: examples: ["loadavg"]
 			}
 			relevant_when: "OS is not Windows"
 		}
-		load1:  _loadavg & {description: "System load averaged over the last 1 second."}
-		load5:  _loadavg & {description: "System load averaged over the last 5 seconds."}
-		load15: _loadavg & {description: "System load averaged over the last 15 seconds."}
-
+		_memory_counter: {
+			type: "counter"
+			tags: _host_metrics_tags & {
+				collector: examples: ["memory"]
+			}
+		}
+		_memory_gauge: {
+			type: "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["memory"]
+			}
+		}
+		_memory_linux: _memory_gauge & {relevant_when: "OS is Linux"}
+		_memory_macos: _memory_gauge & {relevant_when: "OS is macOS X"}
+		_memory_nowin: {relevant_when: "OS is not Windows"}
 		_network_gauge: {
 			type: "gauge"
-			tags: _tags & {
+			tags: _host_metrics_tags & {
 				collector: examples: ["network"]
 				device: {
 					description: "The network interface device name."
@@ -381,13 +404,6 @@ components: sources: host_metrics: {
 				}
 			}
 		}
-		_network_nomac:                      _network_gauge & {relevant_when: "OS is not MacOS"}
-		network_receive_bytes_total:         _network_gauge & {description:   "The number of bytes received on this interface."}
-		network_receive_errs_total:          _network_gauge & {description:   "The number of errors encountered during receives on this interface."}
-		network_receive_packets_total:       _network_gauge & {description:   "The number of packets received on this interface."}
-		network_transmit_bytes_total:        _network_gauge & {description:   "The number of bytes transmitted on this interface."}
-		network_transmit_errs_total:         _network_gauge & {description:   "The number of errors encountered during transmits on this interface."}
-		network_transmit_packets_drop_total: _network_nomac & {description:   "The number of packets dropped during transmits on this interface."}
-		network_transmit_packets_total:      _network_nomac & {description:   "The number of packets transmitted on this interface."}
+		_network_nomac: _network_gauge & {relevant_when: "OS is not macOS"}
 	}
 }

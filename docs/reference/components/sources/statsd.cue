@@ -18,17 +18,20 @@ components: sources: statsd: {
 		multiline: enabled: false
 		receive: {
 			from: {
-				name:     "StatsD"
-				thing:    "a \(name) client"
-				url:      urls.statsd
-				versions: null
+				service: {
+					name:     "StatsD"
+					thing:    "a \(name) client"
+					url:      urls.statsd
+					versions: null
+				}
 
 				interface: socket: {
 					api: {
 						title: "StatsD"
 						url:   urls.statsd_udp_protocol
 					}
-					port: _port
+					direction: "incoming"
+					port:      _port
 					protocols: ["udp"]
 					ssl: "optional"
 				}
@@ -39,7 +42,7 @@ components: sources: statsd: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -51,6 +54,10 @@ components: sources: statsd: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {
@@ -119,5 +126,11 @@ components: sources: statsd: {
 				[metric][docs.data-model.metric] data model page for more info.
 				"""
 		}
+	}
+
+	telemetry: metrics: {
+		connection_errors_total:    components.sources.internal_metrics.output.metrics.connection_errors_total
+		invalid_record_total:       components.sources.internal_metrics.output.metrics.invalid_record_total
+		invalid_record_bytes_total: components.sources.internal_metrics.output.metrics.invalid_record_bytes_total
 	}
 }
