@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use std::{convert::Infallible, future::Future};
 
+mod watch_request_builder;
+
 /// Configuration for the `kubernetes_metadata` transform.
 #[derive(Default, Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
