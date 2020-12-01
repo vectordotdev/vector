@@ -24,10 +24,6 @@ We cover each below to help you upgrade quickly:
 
 ## Upgrade Guide
 
-### Metrics sources and sinks include new namespace options<a name="first"></a>
-
-
-
 ### The metrics emitted by the `internal_metrics` source have changed names<a name="second"></a>
 
 We have not officially announced the `internal_metrics` source (coming in 0.12)
