@@ -45,7 +45,7 @@ remap: functions: format_number: {
 				"""#
 			output: {
 				number:    1234567.89
-				formatter: "1,234,567.890"
+				formatted: "1,234,567.890"
 			}
 		},
 		{
