@@ -133,7 +133,9 @@ jobs:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v1
-      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - name: "Add Vector version"
+        run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
       - name: "Download Perl"
         shell: bash
         env:
@@ -169,6 +171,7 @@ jobs:
       - name: "Build archive"
         shell: bash
         run: |
+          export VECTOR_VERSION=$(make version)
           export PATH="$HOME/.cargo/bin:/c/Strawberry/perl/bin:/c/Program Files/CMake/bin:$PATH"
           export RUSTFLAGS=-Ctarget-feature=+crt-static
           export FEATURES="default-msvc"
