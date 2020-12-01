@@ -178,8 +178,10 @@ async fn handle_stream(
         }
     };
 
-    if let Err(error) = socket.set_keepalive(keepalive) {
-        warn!(message = "Failed configuring TCP keepalive.", %error);
+    if let Some(keepalive) = keepalive {
+        if let Err(error) = socket.set_keepalive(keepalive) {
+            warn!(message = "Failed configuring TCP keepalive.", %error);
+        }
     }
 
     let mut _token = None;

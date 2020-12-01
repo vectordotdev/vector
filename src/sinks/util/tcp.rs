@@ -132,8 +132,10 @@ impl TcpConnector {
             .await
             .context(ConnectError)
             .map(|mut maybe_tls| {
-                if let Err(error) = maybe_tls.set_keepalive(self.keepalive) {
-                    warn!(message = "Failed configuring TCP keepalive.", %error);
+                if let Some(keepalive) = self.keepalive {
+                    if let Err(error) = maybe_tls.set_keepalive(keepalive) {
+                        warn!(message = "Failed configuring TCP keepalive.", %error);
+                    }
                 }
 
                 maybe_tls
