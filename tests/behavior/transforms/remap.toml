@@ -1148,3 +1148,34 @@
     [[tests.outputs.conditions]]
     "bar.field1.equals" = "ook"
     "bar.field2.equals" = "ook ook"
+
+[transforms.remap_function_flatten]
+  inputs = []
+  type = "remap"
+  source = """
+      .arr = flatten(parse_json(.arr))
+      .map = flatten(parse_json(.map))
+      .a = .map."field1.field2"
+      .b = .map."field1.field3"
+      """
+[[tests]]
+  name = "remap_function_flatten"
+  [tests.input]
+    insert_at = "remap_function_flatten"
+    type = "log"
+    [tests.input.log_fields]
+      arr = "[1, 2, [3, 4, [5, 6]]]"
+      map = """
+        {"field1": {"field2": 1, "field3": 2} }
+        """
+  [[tests.outputs]]
+    extract_from = "remap_function_flatten"
+    [[tests.outputs.conditions]]
+    "arr[0].equals" = 1
+    "arr[1].equals" = 2
+    "arr[2].equals" = 3
+    "arr[3].equals" = 4
+    "arr[4].equals" = 5
+    "arr[5].equals" = 6
+    "a.equals" = 1
+    "b.equals" = 2
