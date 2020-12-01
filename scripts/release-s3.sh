@@ -51,13 +51,13 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   sleep "$VERIFY_TIMEOUT"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/$DATE/vector-x86_64-unknown-linux-musl.tar.gz" \
+    "https://packages.timber.io/vector/nightly/$DATE/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
     "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz" \
+    "https://packages.timber.io/vector/nightly/latest/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
     "$td/vector-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz" \
+    "https://packages.timber.io/vector/nightly/latest/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz" \
     "$td/vector-x86_64-unknown-linux-gnu.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"

@@ -12,7 +12,4 @@ set -euo pipefail
 
 VERSION="${VERSION:-"$(sed -n 's/^version\s=\s"\(.*\)"/\1/p' Cargo.toml)"}"
 CHANNEL="${CHANNEL:-"$(scripts/release-channel.sh)"}"
-if [ "$CHANNEL" == "nightly" ]; then
-  VERSION="$VERSION-nightly"
-fi
 echo "$VERSION"
