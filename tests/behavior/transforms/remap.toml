@@ -1105,20 +1105,46 @@
     [tests.input.log_fields]
       foo = false
 
-# [transforms.remap_function_log]
-#   inputs=[]
-#   type = "remap"
-#   source = """
-#     log(.foo, level=info)
-#   """
-# [[tests]]
-#   name = "remap_function_log"
-#   [tests.input]
-#     insert_at = "remap_function_log"
-#     type = "log"
-#     [tests.input.log_fields]
-#       foo = "this should be unchanged"
-#   [[tests.outputs]]
-#     extract_from = "remap_function_log"
-#     [[tests.outputs.conditions]]
-#     "foo.equals" = "this should be unchanged"
+[transforms.remap_function_log]
+  inputs=[]
+  type = "remap"
+  source = """
+    log(.foo, level="info")
+  """
+[[tests]]
+  name = "remap_function_log"
+  [tests.input]
+    insert_at = "remap_function_log"
+    type = "log"
+    [tests.input.log_fields]
+      foo = "this should be unchanged"
+  [[tests.outputs]]
+    extract_from = "remap_function_log"
+    [[tests.outputs.conditions]]
+    "foo.equals" = "this should be unchanged"
+
+[transforms.remap_function_merge]
+  inputs=[]
+  type = "remap"
+  source = """
+    .foo = parse_json(.foo)
+    .bar = parse_json(.bar)
+    merge(.bar, .foo, deep = true)
+  """
+[[tests]]
+  name = "remap_function_merge"
+  [tests.input]
+    insert_at = "remap_function_merge"
+    type = "log"
+    [tests.input.log_fields]
+      bar = """
+        {"field1": "ook"}
+      """
+      foo = """
+        {"field2": "ook ook"}
+      """
+  [[tests.outputs]]
+    extract_from = "remap_function_merge"
+    [[tests.outputs.conditions]]
+    "bar.field1.equals" = "ook"
+    "bar.field2.equals" = "ook ook"
