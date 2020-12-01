@@ -36,7 +36,7 @@ jobs:
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Download baseline benchmarks
-        uses: dawidd6/action-download-artifact@v2
+        uses: dawidd6/action-download-artifact@f2f4c0c7333a76ab3aff16e7b2cf4ed7f5a74556
         with:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: benches.yml
@@ -48,7 +48,22 @@ jobs:
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make bench
-      - uses: actions/upload-artifact@f2f4c0c7333a76ab3aff16e7b2cf4ed7f5a74556
+      - uses: actions/upload-artifact@v2
         with:
           name: "vector-benches"
           path: "./target/criterion/*"
+
+  master-failure:
+    name: master-failure
+    if: failure() && github.ref == 'refs/heads/master'
+    needs:
+      - cancel-previous
+      - bench
+    runs-on: ubuntu-latest
+    steps:
+    - name: Discord notification
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      uses: Ilshidur/action-discord@0.3.0
+      with:
+        args: "Master benchmarks failed: <https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}>"
