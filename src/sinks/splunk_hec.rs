@@ -79,8 +79,8 @@ inventory::submit! {
 impl GenerateConfig for HecSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            token: "".to_owned(),
-            endpoint: "".to_owned(),
+            token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned(),
+            endpoint: "endpoint".to_owned(),
             host_key: default_host_key(),
             indexed_fields: vec![],
             index: None,

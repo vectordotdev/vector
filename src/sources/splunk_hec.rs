@@ -827,7 +827,7 @@ mod tests {
         HecSinkConfig {
             token: TOKEN.to_owned(),
             endpoint: format!("http://{}", address),
-            host_key: "".to_owned(),
+            host_key: "host".to_owned(),
             indexed_fields: vec![],
             index: None,
             sourcetype: None,
