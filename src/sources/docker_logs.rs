@@ -51,7 +51,7 @@ lazy_static! {
 
 #[derive(Debug, Snafu)]
 pub enum DockerLogsConfigErrors {
-    #[snafu(display("you cannot specify both include_containers and exclude_containers"))]
+    #[snafu(display("expected either include_containers or exclude_containers but got both"))]
     IncludeAndExcludeSpecified,
 }
 
@@ -1301,26 +1301,24 @@ mod integration_tests {
         let (sender, _) = Pipeline::new_test();
         let shutdown = ShutdownSignal::noop();
 
-        let containers = Some(vec!["container1".to_owned()]);
-
         let good_config_1 = DockerLogsConfig {
-            include_containers: containers,
+            include_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_1).is_ok(), sender, shutdown);
+        assert!(DockerLogsSource::new(good_config_1, sender, shutdown).is_ok());
 
-        let good_config_1 = DockerLogsConfig {
-            exclude_containers: containers,
+        let good_config_2 = DockerLogsConfig {
+            exclude_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_2).is_ok()), sender, shutdown;
+        assert!(DockerLogsSource::new(good_config_2, sender, shutdown).is_ok());
 
         let errant_config = DockerLogsConfig {
-            exclude_containers: containers,
-            include_containers: containers,
+            exclude_containers: Some(vec!["container1".to_owned()]),
+            include_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_2).is_err(), sender, shutdown);
+        assert!(DockerLogsSource::new(errant_config, sender, shutdown).is_err());
     }
 
     #[tokio::test]
