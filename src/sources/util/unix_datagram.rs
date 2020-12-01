@@ -61,12 +61,7 @@ where
 
                     while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
                         if let Some(event) = build_event(&host_key, received_from.clone(), &line) {
-                            tokio::select! {
-                                result = out.send(event).compat() => {
-                                    out = result?;
-                                }
-                                _ = &mut shutdown => return Ok(()),
-                            }
+                            out = out.send(event).compat().await?;
                         }
                     }
                 }
