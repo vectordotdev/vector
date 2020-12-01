@@ -259,12 +259,12 @@ def get_new_version(last_version, current_commits)
       Util::Version.new(version_string)
     rescue ArgumentError => e
       Util::Printer.invalid("It looks like the version you entered is invalid: #{e.message}")
-      get_new_version(last_version, commits)
+      get_new_version(last_version, current_commits)
     end
 
   if last_version.bump_type(version).nil?
     Util::Printer.invalid("The version you entered must be a single patch, minor, or major bump")
-    get_new_version(last_version, commits)
+    get_new_version(last_version, current_commits)
   else
     version
   end
