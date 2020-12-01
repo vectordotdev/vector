@@ -129,8 +129,8 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				_action: "CreateLogStream"
 			},
 			{
-				_action:      "DescribeLogGroups"
-				required_for: "healthcheck"
+				_action: "DescribeLogGroups"
+				required_for: ["healthcheck"]
 			},
 			{
 				_action: "DescribeLogStreams"

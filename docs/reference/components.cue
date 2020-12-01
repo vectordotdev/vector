@@ -397,8 +397,10 @@ components: {
 
 	#IAM: {
 		#Policy: {
+			#RequiredFor: "normal_operation" | "healthcheck"
+
 			_action:      !=""
-			required_for: *"normal_operation" | "healthcheck"
+			required_for: *["normal_operation"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:     !=""
 
 			if platform == "aws" {

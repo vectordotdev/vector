@@ -153,8 +153,8 @@ components: sinks: aws_kinesis_streams: components._aws & {
 
 		policies: [
 			{
-				_action:      "DescribeStream"
-				required_for: "healthcheck"
+				_action: "DescribeStream"
+				required_for: ["healthcheck"]
 			},
 			{
 				_action: "PutRecords"

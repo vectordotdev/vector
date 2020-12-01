@@ -106,8 +106,8 @@ components: sinks: aws_sqs: components._aws & {
 
 		policies: [
 			{
-				_action:      "GetQueueAttributes"
-				required_for: "healthcheck"
+				_action: "GetQueueAttributes"
+				required_for: ["healthcheck"]
 			},
 			{
 				_action: "SendMessage"
