@@ -1,13 +1,14 @@
 name: Benchmark Suite
 
 on:
+  pull_request: {}
   push:
     branches:
-      - bench-*
+      - master
+  workflow_dispatch:
 
 env:
   VERBOSE: true
-  ENVIRONMENT_UPSTREAM: timberio/ci_image:${{ github.sha }}
   AWS_ACCESS_KEY_ID: "dummy"
   AWS_SECRET_ACCESS_KEY: "dummy"
   CI: true
@@ -23,26 +24,31 @@ jobs:
           access_token: ${{ secrets.GITHUB_TOKEN }}
 
   bench:
-    name: All - Linux
-    # Full CI suites for this platform were only recently introduced.
-    # Some failures are permitted until we can properly correct them.
-    continue-on-error: true
+    name: Bench - Linux
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - run: make ci-sweep
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Download baseline benchmarks
+        uses: dawidd6/action-download-artifact@v2
+        with:
+          github_token: ${{secrets.GITHUB_TOKEN}}
+          workflow: benches.yml
+          branch: master
+          name: vector-benches
+          path: target/criterion
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make slim-builds
       - run: make bench
-      - name: Store benchmark result
-        uses: rhysd/github-action-benchmark@v1
+      - uses: actions/upload-artifact@f2f4c0c7333a76ab3aff16e7b2cf4ed7f5a74556
         with:
-           tool: 'cargo'
-           output-file-path: output.txt
-           fail-on-alert: true
-           # GitHub API token to make a commit comment
-           github-token: ${{ secrets.GITHUB_TOKEN }}
-           # Enable alert commit comment
-           comment-on-alert: true
-           # Mention folks in the commit comment
-           alert-comment-cc-users: '@jamtur01, @binarylogic'
+          name: "vector-benches"
+          path: "./target/criterion/*"
