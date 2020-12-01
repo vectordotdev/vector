@@ -1298,26 +1298,29 @@ mod integration_tests {
 
     #[test]
     fn config_allows_inclusion_or_exclusion() {
+        let (sender, _) = Pipeline::new_test();
+        let shutdown = ShutdownSignal::noop();
+
         let containers = Some(vec!["container1".to_owned()]);
 
         let good_config_1 = DockerLogsConfig {
             include_containers: containers,
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_1).is_ok());
+        assert!(DockerLogsSource::new(good_config_1).is_ok(), sender, shutdown);
 
         let good_config_1 = DockerLogsConfig {
             exclude_containers: containers,
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_2).is_ok());
+        assert!(DockerLogsSource::new(good_config_2).is_ok()), sender, shutdown;
 
         let errant_config = DockerLogsConfig {
             exclude_containers: containers,
             include_containers: containers,
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_2).is_err());
+        assert!(DockerLogsSource::new(good_config_2).is_err(), sender, shutdown);
     }
 
     #[tokio::test]
