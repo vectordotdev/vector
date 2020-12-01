@@ -63,6 +63,7 @@ async-trait = "0.1"
 
 # Tracing
 tracing = "0.1.15"
+tracing-core = "0.1.17"
 tracing-futures = { version = "0.2", features = ["futures-01", "futures-03"]}
 tracing-subscriber = "0.2.15"
 tracing-log = "0.1.0"
