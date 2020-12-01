@@ -124,9 +124,11 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		policies: [
 			{
 				_action: "CreateLogGroup"
+				required_when: "[`create_missing_group`](#create_missing_group) is set to `true`"
 			},
 			{
 				_action: "CreateLogStream"
+				required_when: "[`create_missing_stream`](#create_missing_stream) is set to `true`"
 			},
 			{
 				_action: "DescribeLogGroups"

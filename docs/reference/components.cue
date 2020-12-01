@@ -399,9 +399,10 @@ components: {
 		#Policy: {
 			#RequiredFor: "normal_operation" | "healthcheck"
 
-			_action:      !=""
-			required_for: *["normal_operation"] | [#RequiredFor, ...#RequiredFor]
-			docs_url:     !=""
+			_action:        !=""
+			required_for:   *["normal_operation"] | [#RequiredFor, ...#RequiredFor]
+			docs_url:       !=""
+			required_when?: !=""
 
 			if platform == "aws" {
 				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
