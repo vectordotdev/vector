@@ -631,7 +631,7 @@ components: sources: internal_metrics: {
 			required:    true
 		}
 		_component_kind: {
-			description: "The component's kind (options are `source`, `sink`, or `transform`)."
+			description: "The Vector component kind."
 			required:    true
 			enum: {
 				"sink":      "Vector sink components"
@@ -640,12 +640,12 @@ components: sources: internal_metrics: {
 			}
 		}
 		_component_name: {
-			description: "The name of the component as specified in the Vector configuration."
+			description: "The Vector component ID."
 			required:    true
 			examples: ["file_source", "splunk_sink"]
 		}
 		_component_type: {
-			description: "The type of component (source, transform, or sink)."
+			description: "The Vector component type."
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
 		}
