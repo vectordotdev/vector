@@ -397,9 +397,9 @@ components: {
 
 	#IAM: {
 		#Policy: {
-			_action:      string
+			_action:      !=""
 			required_for: *"normal_operation" | "healthcheck"
-			docs_url:     string
+			docs_url:     !=""
 
 			if platform == "aws" {
 				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
@@ -413,10 +413,10 @@ components: {
 
 		platform: "aws" | "gcp"
 		policies: [#Policy, ...#Policy]
-		_service: string // The slug of the service, e.g. "s3" or "firehose"
+		_service: !="" // The slug of the service, e.g. "s3" or "firehose"
 		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
 		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
-		_docs_tag: *_service | string
+		_docs_tag: *_service | !=""
 	}
 
 	#Runtime: {
