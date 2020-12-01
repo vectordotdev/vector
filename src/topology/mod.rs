@@ -743,21 +743,16 @@ mod tests {
     feature = "transforms-log_to_metric"
 ))]
 mod reload_tests {
-    use crate::{
-        config::Config,
-        sinks::{
-            console::{ConsoleSinkConfig, Encoding, Target},
-            prometheus::exporter::PrometheusExporterConfig,
-        },
-        sources::{generator::GeneratorConfig, splunk_hec::SplunkConfig},
-        test_util::{next_addr, start_topology, wait_for_tcp},
-        transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig},
-    };
+    use crate::config::Config;
+    use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
+    use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
+    use crate::sources::generator::GeneratorConfig;
+    use crate::sources::splunk_hec::SplunkConfig;
+    use crate::test_util::{next_addr, start_topology, wait_for_tcp};
+    use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use futures::{compat::Stream01CompatExt, StreamExt};
-    use std::{
-        net::{SocketAddr, TcpListener},
-        time::Duration,
-    };
+    use std::net::{SocketAddr, TcpListener};
+    use std::time::Duration;
     use tokio::time::delay_for;
 
     #[tokio::test]

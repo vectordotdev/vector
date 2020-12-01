@@ -26,6 +26,7 @@ use crate::{
     template::Template,
     tls::{TlsOptions, TlsSettings},
 };
+use derivative::Derivative;
 use futures::{FutureExt, SinkExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

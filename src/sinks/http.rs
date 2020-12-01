@@ -1,5 +1,6 @@
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
+    event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
@@ -8,7 +9,6 @@ use crate::{
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
     },
     tls::{TlsOptions, TlsSettings},
-    Event,
 };
 use flate2::write::GzEncoder;
 use futures::{future, FutureExt, SinkExt};

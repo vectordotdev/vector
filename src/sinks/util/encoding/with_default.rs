@@ -51,13 +51,13 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
 }
 
 #[cfg(any(feature = "sinks-new_relic_logs", feature = "sinks-humio"))]
-impl<E1> EncodingConfigWithDefault<E1>
+impl<E> EncodingConfigWithDefault<E>
 where
-    E1: Default + PartialEq,
+    E: Default + PartialEq,
 {
-    pub(crate) fn without_default<E2>(self) -> crate::sinks::util::encoding::EncodingConfig<E2>
+    pub(crate) fn without_default<X>(self) -> crate::sinks::util::encoding::EncodingConfig<X>
     where
-        E2: From<E1> + PartialEq,
+        X: From<E> + PartialEq,
     {
         crate::sinks::util::encoding::EncodingConfig {
             codec: self.codec.into(),
