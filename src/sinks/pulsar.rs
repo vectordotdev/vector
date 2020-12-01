@@ -361,7 +361,7 @@ mod tests {
         let result = encode_event(evt.clone(), &encoding, &Some(schema.clone())).unwrap();
 
         let value = avro_rs::to_value(evt.into_log()).unwrap();
-        let resolved_value = avro_rs::types::Value::resolve(value, &schema.clone()).unwrap();
+        let resolved_value = avro_rs::types::Value::resolve(value, &schema).unwrap();
         let must_be = avro_rs::to_avro_datum(&schema, resolved_value).unwrap();
 
         assert_eq!(result, must_be);
@@ -430,7 +430,7 @@ mod integration_tests {
 
         let (acker, ack_counter) = Acker::new_for_testing();
         let producer = cnf.create_pulsar_producer().await.unwrap();
-        let sink = PulsarSink::new(producer, cnf.encoding.clone().into(), acker);
+        let sink = PulsarSink::new(producer, cnf.encoding.clone().into(), acker).unwrap();
         events.map(Ok).forward(sink).await.unwrap();
 
         assert_eq!(
