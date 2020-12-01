@@ -196,9 +196,8 @@ where
                     self.linger = None;
 
                     let num_items = batch.num_items();
-                    let num_bytes = batch.num_bytes();
                     let request = batch.finish();
-                    tokio::spawn(self.service.call(request, num_items, num_bytes));
+                    tokio::spawn(self.service.call(request, num_items));
 
                     continue;
                 }
@@ -387,9 +386,8 @@ where
                     self.lingers.remove(&partition);
 
                     let num_items = batch.num_items();
-                    let num_bytes = batch.num_bytes();
                     let request = batch.finish();
-                    tokio::spawn(self.service.call(request, num_items, num_bytes));
+                    tokio::spawn(self.service.call(request, num_items));
 
                     batch_consumed = true;
                 } else {
@@ -446,11 +444,11 @@ where
 
 struct ServiceSink<S, Request> {
     service: S,
-    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize, usize)>>,
+    in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
     on_success: BatchOnSuccess,
     seq_head: usize,
     seq_tail: usize,
-    pending_acks: HashMap<usize, (usize, usize)>,
+    pending_acks: HashMap<usize, usize>,
     next_request_id: usize,
     _pd: PhantomData<Request>,
 }
@@ -479,7 +477,7 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: Request, num_items: usize, num_bytes: usize) -> BoxFuture<'static, ()> {
+    fn call(&mut self, req: Request, num_items: usize) -> BoxFuture<'static, ()> {
         let seqno = self.seq_head;
         self.seq_head += 1;
 
@@ -513,7 +511,7 @@ where
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
                 // ignore for now.
-                let _ = tx.send((seqno, num_items, num_bytes));
+                let _ = tx.send((seqno, num_items));
             })
             .instrument(info_span!("request", %request_id))
             .boxed()
@@ -522,20 +520,16 @@ where
     fn poll_complete(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         while !self.in_flight.is_empty() {
             match ready!(Pin::new(&mut self.in_flight).poll_next(cx)) {
-                Some(Ok((seqno, num_items, num_bytes))) => {
-                    self.pending_acks.insert(seqno, (num_items, num_bytes));
+                Some(Ok((seqno, num_items))) => {
+                    self.pending_acks.insert(seqno, num_items);
 
                     let mut total_items = 0;
-                    let mut total_bytes = 0;
-                    while let Some((num_items, num_bytes)) =
-                        self.pending_acks.remove(&self.seq_tail)
-                    {
+                    while let Some(num_items) = self.pending_acks.remove(&self.seq_tail) {
                         total_items += num_items;
-                        total_bytes += num_bytes;
                         self.seq_tail += 1
                     }
                     trace!(message = "Acking events.", acking_num = total_items);
-                    (self.on_success)(total_items, total_bytes);
+                    (self.on_success)(total_items);
                 }
                 Some(Err(_)) => panic!("ServiceSink service sender dropped."),
                 None => break,
@@ -562,11 +556,11 @@ where
 
 // === BatchOnSuccess ===
 
-pub type BatchOnSuccess = Box<dyn Fn(usize, usize) + Send>;
+pub type BatchOnSuccess = Box<dyn Fn(usize) + Send>;
 
 impl From<Acker> for BatchOnSuccess {
     fn from(acker: Acker) -> Self {
-        Box::new(move |num_to_ack, _total_bytes| acker.ack(num_to_ack))
+        Box::new(move |num_to_ack| acker.ack(num_to_ack))
     }
 }
 

@@ -188,7 +188,6 @@ pub trait Batch: Sized {
     fn fresh(&self) -> Self;
     fn finish(self) -> Self::Output;
     fn num_items(&self) -> usize;
-    fn num_bytes(&self) -> usize;
 
     /// Replace the current batch with a fresh one, returning the old one.
     fn fresh_replace(&mut self) -> Self
@@ -267,9 +266,5 @@ where
 
     fn num_items(&self) -> usize {
         self.inner.num_items()
-    }
-
-    fn num_bytes(&self) -> usize {
-        self.inner.num_bytes()
     }
 }

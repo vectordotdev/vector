@@ -134,12 +134,9 @@ impl SinkConfig for HttpSinkConfig {
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
         let acker = cx.acker();
-        let on_success = Box::new(move |events_count, byte_size| {
+        let on_success = Box::new(move |events_count| {
             acker.ack(events_count);
-            emit!(HTTPEventsSent {
-                events_count,
-                byte_size
-            })
+            emit!(HTTPEventsSent { events_count })
         });
 
         let sink = BatchedHttpSink::new(

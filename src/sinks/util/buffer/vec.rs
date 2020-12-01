@@ -71,10 +71,6 @@ impl<T: EncodedLength> Batch for VecBuffer<T> {
     fn num_items(&self) -> usize {
         self.batch.len()
     }
-
-    fn num_bytes(&self) -> usize {
-        self.bytes
-    }
 }
 
 impl EncodedLength for Bytes {

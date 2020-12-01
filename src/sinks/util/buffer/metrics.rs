@@ -254,10 +254,6 @@ impl Batch for MetricBuffer {
     fn num_items(&self) -> usize {
         self.metrics.len()
     }
-
-    fn num_bytes(&self) -> usize {
-        unreachable!()
-    }
 }
 
 fn compress_distribution(values: Vec<f64>, sample_rates: Vec<u32>) -> (Vec<f64>, Vec<u32>) {
