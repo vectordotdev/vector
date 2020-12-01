@@ -2,7 +2,7 @@ use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
     http::{Auth, HttpClient},
-    internal_events::{HTTPEventMissingMessage, HTTPEventsSent},
+    internal_events::HTTPEventMissingMessage,
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
         encoding::{EncodingConfig, EncodingConfiguration},
@@ -133,19 +133,13 @@ impl SinkConfig for HttpSinkConfig {
             .parse_config(config.batch)?;
         let request = config.request.unwrap_with(&REQUEST_DEFAULTS);
 
-        let acker = cx.acker();
-        let on_success = Box::new(move |events_count| {
-            acker.ack(events_count);
-            emit!(HTTPEventsSent { events_count })
-        });
-
         let sink = BatchedHttpSink::new(
             config,
             Buffer::new(batch.size, Compression::None),
             request,
             batch.timeout,
             client.clone(),
-            on_success,
+            cx.acker(),
         )
         .sink_map_err(|error| error!(message = "Fatal HTTP sink error.", %error));
 

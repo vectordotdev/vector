@@ -59,20 +59,20 @@ impl InternalEvent for HTTPEventMissingMessage {
     }
 }
 
-#[derive(Debug)]
-pub struct HTTPEventsSent {
-    pub events_count: usize,
-}
+// #[derive(Debug)]
+// pub struct HTTPEventsSent {
+//     pub events_count: usize,
+// }
 
-impl InternalEvent for HTTPEventsSent {
-    fn emit_logs(&self) {
-        trace!(
-            message = "Events sent.",
-            events_count = %self.events_count,
-        );
-    }
+// impl InternalEvent for HTTPEventsSent {
+//     fn emit_logs(&self) {
+//         trace!(
+//             message = "Events sent.",
+//             events_count = %self.events_count,
+//         );
+//     }
 
-    fn emit_metrics(&self) {
-        counter!("events_processed_total", self.events_count as u64);
-    }
-}
+//     fn emit_metrics(&self) {
+//         counter!("events_processed_total", self.events_count as u64);
+//     }
+// }

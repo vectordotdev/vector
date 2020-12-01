@@ -103,8 +103,8 @@ where
     S::Response: Response,
     B: Batch<Output = Request>,
 {
-    pub fn new(service: S, batch: B, timeout: Duration, on_success: BatchOnSuccess) -> Self {
-        let service = ServiceSink::new(service, on_success);
+    pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
+        let service = ServiceSink::new(service, acker);
 
         Self {
             service,
@@ -195,9 +195,9 @@ where
                     let batch = self.batch.fresh_replace();
                     self.linger = None;
 
-                    let num_items = batch.num_items();
+                    let batch_size = batch.num_items();
                     let request = batch.finish();
-                    tokio::spawn(self.service.call(request, num_items));
+                    tokio::spawn(self.service.call(request, batch_size));
 
                     continue;
                 }
@@ -283,7 +283,7 @@ where
     S::Response: Response,
 {
     pub fn new(service: S, batch: B, timeout: Duration, acker: Acker) -> Self {
-        let service = ServiceSink::new(service, acker.into());
+        let service = ServiceSink::new(service, acker);
 
         Self {
             service,
@@ -385,9 +385,9 @@ where
                     let batch = self.partitions.remove(&partition).unwrap();
                     self.lingers.remove(&partition);
 
-                    let num_items = batch.num_items();
+                    let batch_size = batch.num_items();
                     let request = batch.finish();
-                    tokio::spawn(self.service.call(request, num_items));
+                    tokio::spawn(self.service.call(request, batch_size));
 
                     batch_consumed = true;
                 } else {
@@ -445,7 +445,7 @@ where
 struct ServiceSink<S, Request> {
     service: S,
     in_flight: FuturesUnordered<oneshot::Receiver<(usize, usize)>>,
-    on_success: BatchOnSuccess,
+    acker: Acker,
     seq_head: usize,
     seq_tail: usize,
     pending_acks: HashMap<usize, usize>,
@@ -460,11 +460,11 @@ where
     S::Error: Into<crate::Error> + Send + 'static,
     S::Response: Response,
 {
-    fn new(service: S, on_success: BatchOnSuccess) -> Self {
+    fn new(service: S, acker: Acker) -> Self {
         Self {
             service,
             in_flight: FuturesUnordered::new(),
-            on_success,
+            acker,
             seq_head: 0,
             seq_tail: 0,
             pending_acks: HashMap::new(),
@@ -477,7 +477,7 @@ where
         self.service.poll_ready(cx).map_err(Into::into)
     }
 
-    fn call(&mut self, req: Request, num_items: usize) -> BoxFuture<'static, ()> {
+    fn call(&mut self, req: Request, batch_size: usize) -> BoxFuture<'static, ()> {
         let seqno = self.seq_head;
         self.seq_head += 1;
 
@@ -511,7 +511,7 @@ where
                 // If the rx end is dropped we still completed
                 // the request so this is a weird case that we can
                 // ignore for now.
-                let _ = tx.send((seqno, num_items));
+                let _ = tx.send((seqno, batch_size));
             })
             .instrument(info_span!("request", %request_id))
             .boxed()
@@ -520,16 +520,16 @@ where
     fn poll_complete(&mut self, cx: &mut Context<'_>) -> Poll<()> {
         while !self.in_flight.is_empty() {
             match ready!(Pin::new(&mut self.in_flight).poll_next(cx)) {
-                Some(Ok((seqno, num_items))) => {
-                    self.pending_acks.insert(seqno, num_items);
+                Some(Ok((seqno, batch_size))) => {
+                    self.pending_acks.insert(seqno, batch_size);
 
-                    let mut total_items = 0;
-                    while let Some(num_items) = self.pending_acks.remove(&self.seq_tail) {
-                        total_items += num_items;
+                    let mut num_to_ack = 0;
+                    while let Some(ack_size) = self.pending_acks.remove(&self.seq_tail) {
+                        num_to_ack += ack_size;
                         self.seq_tail += 1
                     }
-                    trace!(message = "Acking events.", acking_num = total_items);
-                    (self.on_success)(total_items);
+                    trace!(message = "Acking events.", acking_num = num_to_ack);
+                    self.acker.ack(num_to_ack);
                 }
                 Some(Err(_)) => panic!("ServiceSink service sender dropped."),
                 None => break,
@@ -547,20 +547,11 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ServiceSink")
             .field("service", &self.service)
+            .field("acker", &self.acker)
             .field("seq_head", &self.seq_head)
             .field("seq_tail", &self.seq_tail)
             .field("pending_acks", &self.pending_acks)
             .finish()
-    }
-}
-
-// === BatchOnSuccess ===
-
-pub type BatchOnSuccess = Box<dyn Fn(usize) + Send>;
-
-impl From<Acker> for BatchOnSuccess {
-    fn from(acker: Acker) -> Self {
-        Box::new(move |num_to_ack| acker.ack(num_to_ack))
     }
 }
 
@@ -979,7 +970,7 @@ mod tests {
                 future::ok("good")
             }
         });
-        let mut sink = ServiceSink::new(svc, acker.into());
+        let mut sink = ServiceSink::new(svc, acker);
 
         // send some initial requests
         let mut fut1 = sink.call(1, 1);
