@@ -1357,7 +1357,7 @@ mod integration_tests {
         let name0 = "vector_test_exclude_container_0";
 
         let config = DockerLogsConfig {
-            exclude_containers: Some(&[name0].iter().map(|&s| s.to_owned()).collect())
+            exclude_containers: Some(&[name0].iter().map(|&s| s.to_owned()).collect()),
         };
         let out = source_with_config(config);
 
