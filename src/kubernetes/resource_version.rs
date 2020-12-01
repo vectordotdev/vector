@@ -52,6 +52,18 @@ impl Candidate {
         };
         object.resource_version()
     }
+
+    /// Create a new [`resource_version::Candidate`] from a [`String`] without
+    /// controlling the meaningness of the call.
+    ///
+    /// The [`resource_version::Candidate`] is a newtype solely designed,
+    /// to lift the constraints on the resource version lifecycle to
+    /// the type-system level.
+    /// Use this function with caution, as this constructor permits unsoundess
+    /// in the system.
+    pub fn new_unchecked(val: String) -> Self {
+        Self(val)
+    }
 }
 
 /// An abstract entity holding and exposing a resource version.
