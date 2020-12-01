@@ -502,20 +502,20 @@ mod test {
                 chrono::Utc.ymd(2019, 2, 13).and_hms(19, 48, 34),
             );
             expected.insert(log_schema().source_type_key().clone(), "syslog");
-            expected.insert(LookupBuf::from("host"), "74794bfb6795");
-            expected.insert(LookupBuf::from("hostname"), "74794bfb6795");
+            expected.insert(LookupBuf::from_str("host").unwrap(), "74794bfb6795");
+            expected.insert(LookupBuf::from_str("hostname").unwrap(), "74794bfb6795");
 
-            expected.insert(LookupBuf::from("meta.sequenceId"), "1");
-            expected.insert(LookupBuf::from("meta.sysUpTime"), "37");
-            expected.insert(LookupBuf::from("meta.language"), "EN");
-            expected.insert(LookupBuf::from("origin.software"), "test");
-            expected.insert(LookupBuf::from("origin.ip"), "192.168.0.1");
+            expected.insert(LookupBuf::from_str("meta.sequenceId").unwrap(), "1");
+            expected.insert(LookupBuf::from_str("meta.sysUpTime").unwrap(), "37");
+            expected.insert(LookupBuf::from_str("meta.language").unwrap(), "EN");
+            expected.insert(LookupBuf::from_str("origin.software").unwrap(), "test");
+            expected.insert(LookupBuf::from_str("origin.ip").unwrap(), "192.168.0.1");
 
-            expected.insert(LookupBuf::from("severity"), "notice");
-            expected.insert(LookupBuf::from("facility"), "user");
-            expected.insert(LookupBuf::from("version"), 1);
-            expected.insert(LookupBuf::from("appname"), "root");
-            expected.insert(LookupBuf::from("procid"), 8449);
+            expected.insert(LookupBuf::from_str("severity").unwrap(), "notice");
+            expected.insert(LookupBuf::from_str("facility").unwrap(), "user");
+            expected.insert(LookupBuf::from_str("version").unwrap(), 1);
+            expected.insert(LookupBuf::from_str("appname").unwrap(), "root");
+            expected.insert(LookupBuf::from_str("procid").unwrap(), 8449);
         }
 
         assert_eq!(

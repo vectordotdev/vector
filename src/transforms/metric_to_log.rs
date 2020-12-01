@@ -57,7 +57,7 @@ pub struct MetricToLog {
 impl MetricToLog {
     pub fn new(host_tag: Option<LookupBuf>) -> Self {
         let host_tag = host_tag.unwrap_or_else(|| log_schema().host_key().clone());
-        let mut tag_lookup = LookupBuf::from("timestamp");
+        let mut tag_lookup = LookupBuf::from("tags");
         tag_lookup.extend(host_tag);
         Self {
             timestamp_key: "timestamp".into(),
