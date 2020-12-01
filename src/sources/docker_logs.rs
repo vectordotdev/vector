@@ -84,7 +84,7 @@ impl Default for DockerLogsConfig {
 }
 
 impl DockerLogsConfig {
-    fn container_name_included<'a>(
+    fn container_name_or_id_included<'a>(
         &self,
         id: &str,
         names: impl IntoIterator<Item = &'a str>,
@@ -98,8 +98,8 @@ impl DockerLogsConfig {
                 .any(|name| items.iter().any(|item| name.starts_with(item)))
         };
 
-        // This combination of let Some expressions is okay here, as the Source's constructor
-        // ensures that both are not set.
+        // This if/else logic with `let Some` expressions is okay here, as the Source's constructor
+        // ensures that both cannot be set at the same time.
         if let Some(exclude_containers) = &self.exclude_containers {
             !(id_matches(exclude_containers) || name_matches(exclude_containers))
         } else if let Some(include_containers) = &self.include_containers {
@@ -411,7 +411,7 @@ impl DockerLogsSource {
                     return;
                 }
 
-                if !self.esb.core.config.container_name_included(
+                if !self.esb.core.config.container_name_or_id_included(
                     id.as_str(),
                     names.iter().map(|s| {
                         // In this case bollard / shiplift gives names with starting '/' so it needs to be removed.
@@ -494,7 +494,7 @@ impl DockerLogsSource {
                                         self.esb.restart(state);
                                     } else {
                                         let include_name =
-                                            self.esb.core.config.container_name_included(
+                                            self.esb.core.config.container_name_or_id_included(
                                                 id.as_str(),
                                                 attributes.get("name").map(|s| s.as_str()),
                                             );
@@ -1385,6 +1385,14 @@ mod integration_tests {
             events[0].as_log()[log_schema().message_key()],
             message.into()
         );
+    }
+
+    #[test]
+    fn exclude_containers() {
+        let config = DockerLogsConfig {
+            exclude_containers:
+            ..DockerLogsConfig::default()
+        };
     }
 
     #[tokio::test]
