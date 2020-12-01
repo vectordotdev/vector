@@ -151,17 +151,13 @@ components: sinks: aws_kinesis_streams: components._aws & {
 		platform: "aws"
 		_service: "kinesis"
 
-		_stream: "<stream-name>" // Helper
-
 		policies: [
 			{
 				_action:      "DescribeStream"
-				_resource:    _stream
 				required_for: "healthcheck"
 			},
 			{
-				_action:   "PutRecords"
-				_resource: _stream
+				_action: "PutRecords"
 			},
 		]
 	}

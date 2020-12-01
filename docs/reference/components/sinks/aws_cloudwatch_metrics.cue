@@ -112,8 +112,9 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 	}
 
 	permissions: iam: {
-		platform: "aws"
-		_service: "cloudwatch"
+		platform:  "aws"
+		_service:  "cloudwatch"
+		_docs_tag: "AmazonCloudWatch"
 
 		policies: [
 			{

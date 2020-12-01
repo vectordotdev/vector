@@ -398,30 +398,24 @@ components: {
 	#IAM: {
 		#Policy: {
 			_action:      string
-			_resource:    string
 			action:       "\(_service):\(_action)"
 			required_for: *"normal_operation" | "healthcheck"
+			docs_url:     string
 
 			if platform == "aws" {
-				if _resource != _|_ {
-					if _service == "s3" {
-						resource: "arn:aws:s3:::\(_resource)"
-					}
-					if _service != "s3" {
-						resource: "arn:aws:\(_service):<region-id>:<account-id>:\(_resource)"
-					}
-				}
+				docs_url: "https://docs.aws.amazon.com/\(_docs_tag)/latest/APIReference/API_\(_action).html"
 			}
 			if platform == "gcp" {
-				if _resource != _|_ {
-					resource: "//\(_service).googleapis.com/projects/<project-id>/\(_service)/\(_resource)"
-				}
+				docs_url: "https://cloud.google.com/iam/docs/permissions-reference"
 			}
 		}
 
 		platform: "aws" | "gcp"
 		policies: [#Policy, ...#Policy]
-		_service: string
+		_service: string // The slug of the service, e.g. "s3" or "firehose"
+		// _docs_tag is used to ed to construct URLs, e.g. "AmazonCloudWatchLogs" in
+		// https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeLogStreams.html
+		_docs_tag: *_service | string
 	}
 
 	#Runtime: {

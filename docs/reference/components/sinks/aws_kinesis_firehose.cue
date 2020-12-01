@@ -100,17 +100,13 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 		platform: "aws"
 		_service: "firehose"
 
-		_stream: "deliveryStream/<stream-name>" // Helper
-
 		policies: [
 			{
 				_action:      "DescribeDeliveryStream"
-				_resource:    _stream
 				required_for: "healthcheck"
 			},
 			{
-				_action:   "PutRecordBatch"
-				_resource: _stream
+				_action: "PutRecordBatch"
 			},
 		]
 	}

@@ -121,29 +121,22 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		platform: "aws"
 		_service: "logs"
 
-		_stream: "log-group:<group-name>:log-stream:<stream-name>" // Helper
-
 		policies: [
 			{
-				_action:   "CreateLogGroup"
-				_resource: "log-group:<group-name>:log-stream:*"
+				_action: "CreateLogGroup"
 			},
 			{
-				_action:   "CreateLogStream"
-				_resource: _stream
+				_action: "CreateLogStream"
 			},
 			{
 				_action:      "DescribeLogGroups"
-				_resource:    "log-group:<group-id>:*"
 				required_for: "healthcheck"
 			},
 			{
-				_action:   "DescribeLogStreams"
-				_resource: _stream
+				_action: "DescribeLogStreams"
 			},
 			{
-				_action:   "PutLogEvents"
-				_resource: _stream
+				_action: "PutLogEvents"
 			},
 		]
 	}
