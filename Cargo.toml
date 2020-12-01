@@ -305,6 +305,7 @@ sources = [
   "sources-generator",
   "sources-host_metrics",
   "sources-http",
+  "sources-internal_logs",
   "sources-internal_metrics",
   "sources-journald",
   "sources-kafka",
@@ -329,6 +330,7 @@ sources-file = ["bytesize", "file-source"]
 sources-generator = []
 sources-host_metrics = ["heim"]
 sources-http = ["sources-utils-http"]
+sources-internal_logs = []
 sources-internal_metrics = []
 sources-journald = []
 sources-kafka = ["rdkafka"]

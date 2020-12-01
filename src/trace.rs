@@ -86,9 +86,8 @@ impl<F: Subscriber + 'static> Subscriber for BroadcastSubscriber<F> {
 
     #[inline]
     fn event(&self, event: &tracing::Event<'_>) {
-        let log_event: Event = event.into();
         if self.sender.receiver_count() > 0 {
-            let _ = self.sender.send(log_event); // Ignore errors
+            let _ = self.sender.send(event.into()); // Ignore errors
         }
         self.formatter.event(event)
     }

@@ -1,0 +1,110 @@
+use crate::{
+    config::{DataType, GlobalOptions, SourceConfig, SourceDescription},
+    shutdown::ShutdownSignal,
+    Pipeline,
+};
+use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
+use futures01::Sink;
+use serde::{Deserialize, Serialize};
+
+#[serde(deny_unknown_fields)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct InternalLogsConfig {}
+
+inventory::submit! {
+    SourceDescription::new::<InternalLogsConfig>("internal_logs")
+}
+
+impl_generate_config_from_default!(InternalLogsConfig);
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "internal_logs")]
+impl SourceConfig for InternalLogsConfig {
+    async fn build(
+        &self,
+        _name: &str,
+        _globals: &GlobalOptions,
+        shutdown: ShutdownSignal,
+        out: Pipeline,
+    ) -> crate::Result<super::Source> {
+        Ok(Box::pin(run(out, shutdown)))
+    }
+
+    fn output_type(&self) -> DataType {
+        DataType::Log
+    }
+
+    fn source_type(&self) -> &'static str {
+        "internal_logs"
+    }
+}
+
+async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
+    let mut subscriber = crate::trace::subscribe()
+        .ok_or_else(|| error!("Tracing is not initialized"))?
+        .take_until(shutdown);
+    let mut out = out
+        .sink_map_err(|error| error!(message = "Error sending log.", %error))
+        .sink_compat();
+
+    // Note: This loop, or anything called within it, MUST NOT generate
+    // any logs that don't break the loop, as that could cause an
+    // infinite loop since it receives all such logs.
+
+    while let Some(receive) = subscriber.next().await {
+        let event = receive.map_err(
+            |error| error!(message = "Failed to receive log from tracing subscriber.", %error),
+        )?;
+        out.send(event).await?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{config::GlobalOptions, test_util::collect_ready};
+    use tokio::time::{delay_for, Duration};
+
+    #[test]
+    fn generates_config() {
+        crate::test_util::test_generate_config::<InternalLogsConfig>();
+    }
+
+    #[tokio::test]
+    async fn receives_logs() {
+        let start = chrono::Utc::now();
+        crate::trace::init(false, false, "debug");
+        let (tx, rx) = Pipeline::new_test();
+
+        let source = InternalLogsConfig {}
+            .build(
+                "default",
+                &GlobalOptions::default(),
+                ShutdownSignal::noop(),
+                tx,
+            )
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        delay_for(Duration::from_millis(1)).await;
+
+        info!("Message goes here");
+
+        delay_for(Duration::from_millis(1)).await;
+        let logs = collect_ready(rx).await.expect("Collecting logs failed");
+
+        assert_eq!(logs.len(), 1);
+
+        let log = logs[0].as_log();
+        assert_eq!(log["message"], "Message goes here".into());
+        assert!(
+            log["timestamp"]
+                .as_timestamp()
+                .expect("timestamp isn't a timestamp")
+                > &start
+        );
+        assert_eq!(log["metadata.kind"], "event".into());
+        assert_eq!(log["metadata.level"], "INFO".into());
+    }
+}
