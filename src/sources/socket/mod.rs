@@ -159,7 +159,7 @@ impl SourceConfig for SocketConfig {
 
 #[cfg(test)]
 mod test {
-    use super::{tcp::TcpConfig, udp::UdpConfig, Mode, SocketConfig};
+    use super::{tcp::TcpConfig, udp::UdpConfig, SocketConfig};
     use crate::{
         config::{log_schema, GlobalOptions, SinkContext, SourceConfig},
         shutdown::{ShutdownSignal, SourceShutdownCoordinator},
@@ -190,7 +190,7 @@ mod test {
     };
     #[cfg(unix)]
     use {
-        super::unix::UnixConfig,
+        super::{unix::UnixConfig, Mode},
         futures::SinkExt,
         std::path::PathBuf,
         tokio::{
