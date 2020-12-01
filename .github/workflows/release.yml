@@ -112,11 +112,13 @@ jobs:
     runs-on: macos-10.15
     steps:
       - uses: actions/checkout@v1
-      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
       - name: "Upgrade bash"
         run: brew install bash
       - name: "Install realpath dependency"
         run: brew install coreutils
+      - name: Add version variable
+        run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
       - name: "Build archive"
         env:
           TARGET: "x86_64-apple-darwin"
@@ -133,7 +135,9 @@ jobs:
     runs-on: windows-2019
     steps:
       - uses: actions/checkout@v1
-      - run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+      - name: "Add Vector version"
+        run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
       - name: "Download Perl"
         shell: bash
         env:

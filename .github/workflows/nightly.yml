@@ -117,6 +117,7 @@ jobs:
         run: brew install coreutils
       - name: Add version variable
         run: echo VECTOR_VERSION=$(make version) >> $GITHUB_ENV
+        shell: bash
       - name: "Build archive"
         env:
           TARGET: "x86_64-apple-darwin"
