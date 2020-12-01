@@ -206,8 +206,10 @@ jobs:
       - run: |
           mv ./target/artifacts/vector-x86_64-pc-windows-msvc.zip \
           ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
+        shell: bash
       - run:
           mv ./target/artifacts/vector-x64.msi ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x64.msi
+        shell: bash
       - uses: actions/upload-artifact@v1
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-pc-windows-msvc.zip
