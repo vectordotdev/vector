@@ -1398,14 +1398,6 @@ mod integration_tests {
         );
     }
 
-    #[test]
-    fn exclude_containers() {
-        let config = DockerLogsConfig {
-            exclude_containers:
-            ..DockerLogsConfig::default()
-        };
-    }
-
     #[tokio::test]
     async fn include_labels() {
         trace_init();
