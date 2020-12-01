@@ -1302,17 +1302,20 @@ mod integration_tests {
 
         let good_config_1 = DockerLogsConfig {
             include_containers: containers,
+            ..DockerLogsConfig::default()
         };
         assert!(DockerLogsSource::new(good_config_1).is_ok());
 
         let good_config_1 = DockerLogsConfig {
             exclude_containers: containers,
+            ..DockerLogsConfig::default()
         };
         assert!(DockerLogsSource::new(good_config_2).is_ok());
 
         let errant_config = DockerLogsConfig {
             exclude_containers: containers,
             include_containers: containers,
+            ..DockerLogsConfig::default()
         };
         assert!(DockerLogsSource::new(good_config_2).is_err());
     }
