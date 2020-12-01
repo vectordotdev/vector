@@ -12,7 +12,7 @@ require_relative "setup"
 # Constants
 #
 
-VERSION = ENV.fetch("VERSION")
+VERSION = ENV.fetch("VECTOR_VERSION")
 SHA1 = ENV.fetch("SHA1")
 
 #
