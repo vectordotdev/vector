@@ -2,7 +2,6 @@
 
 use async_trait::async_trait;
 use futures::future::BoxFuture;
-use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
 
 pub mod delayed_delete;
 pub mod evmap;
@@ -17,7 +16,11 @@ pub mod mock;
 #[async_trait]
 pub trait Write {
     /// A type of the k8s resource the state operates on.
-    type Item: Metadata<Ty = ObjectMeta> + Send;
+    ///
+    /// Typically, the item is a [`k8s_openapi::Metadata`] with an
+    /// [`k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta`] `Ty`
+    /// paramter, or a similar type.
+    type Item: Send;
 
     /// Add an object to the state.
     async fn add(&mut self, item: Self::Item);
