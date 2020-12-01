@@ -7,8 +7,7 @@ use crate::{
     Pipeline,
 };
 use bytes::{Bytes, BytesMut};
-use futures::compat::Future01CompatExt;
-use futures01::Sink;
+use futures::{compat::Sink01CompatExt, SinkExt};
 use std::path::PathBuf;
 use tokio::net::UnixDatagram;
 use tokio_util::codec::Decoder;
@@ -31,7 +30,9 @@ where
     D: Decoder<Item = String> + Clone + Send + 'static,
     D::Error: From<std::io::Error> + std::fmt::Debug + std::fmt::Display + Send,
 {
-    let mut out = out.sink_map_err(|error| error!(message = "Error sending line.", %error));
+    let mut out = out
+        .sink_compat()
+        .sink_map_err(|error| error!(message = "Error sending line.", %error));
 
     Box::pin(async move {
         let mut socket =
@@ -60,7 +61,7 @@ where
 
                     while let Ok(Some(line)) = decoder.decode_eof(&mut payload) {
                         if let Some(event) = build_event(&host_key, received_from.clone(), &line) {
-                            out = out.send(event).compat().await?;
+                            out.send(event).await?;
                         }
                     }
                 }
