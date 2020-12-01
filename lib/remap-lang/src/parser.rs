@@ -5,7 +5,7 @@ use crate::{
         self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Noop, Not,
         Path, Target, Variable,
     },
-    path, state, Error as E, Expr, Function as Fn, Operator, Result, Value,
+    path, state, Error as E, Expr, Expression, Function as Fn, Operator, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
@@ -24,6 +24,9 @@ type R = Rule;
 pub enum Error {
     #[error("cannot assign regex to object")]
     RegexAssignment,
+
+    #[error("cannot return regex from program")]
+    RegexResult,
 
     #[error(r#"path in variable assignment unsupported, use "${0}" without "{1}""#)]
     VariableAssignmentPath(String, String),
@@ -139,6 +142,14 @@ impl<'a> Parser<'a> {
                 }
                 R::EOI => (),
                 _ => return Err(e(R::expression)),
+            }
+        }
+
+        if let Some(expression) = expressions.last() {
+            let type_def = expression.type_def(&self.compiler_state);
+
+            if !type_def.kind.is_all() && type_def.kind.contains_regex() {
+                return Err(Error::RegexResult.into());
             }
         }
 
