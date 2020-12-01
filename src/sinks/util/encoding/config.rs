@@ -22,6 +22,8 @@ use std::{
 #[serde(deny_unknown_fields)]
 pub struct EncodingConfig<E> {
     pub(crate) codec: E,
+    #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
+    pub(crate) schema: Option<String>,
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     #[serde(default, skip_serializing_if = "skip_serializing_if_default")]
     pub(crate) only_fields: Option<Vec<Vec<PathComponent>>>,
@@ -34,6 +36,9 @@ pub struct EncodingConfig<E> {
 impl<E> EncodingConfiguration<E> for EncodingConfig<E> {
     fn codec(&self) -> &E {
         &self.codec
+    }
+    fn schema(&self) -> &Option<String> {
+        &self.schema
     }
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>> {
@@ -54,6 +59,7 @@ where
     fn from(encoding: EncodingConfigWithDefault<E>) -> Self {
         Self {
             codec: encoding.codec,
+            schema: encoding.schema,
             only_fields: encoding.only_fields,
             except_fields: encoding.except_fields,
             timestamp_format: encoding.timestamp_format,
@@ -65,6 +71,7 @@ impl<E> From<E> for EncodingConfig<E> {
     fn from(codec: E) -> Self {
         Self {
             codec,
+            schema: Default::default(),
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -105,6 +112,7 @@ where
             {
                 Ok(Self::Value {
                     codec: T::deserialize(value.into_deserializer())?,
+                    schema: Default::default(),
                     only_fields: Default::default(),
                     except_fields: Default::default(),
                     timestamp_format: Default::default(),
@@ -127,6 +135,7 @@ where
 
         let concrete = Self {
             codec: inner.codec,
+            schema: inner.schema,
             // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
             only_fields: inner.only_fields.map(|fields| {
                 fields
@@ -146,6 +155,8 @@ where
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
 pub struct Inner<E> {
     codec: E,
+    #[serde(default)]
+    schema: Option<String>,
     #[serde(default)]
     only_fields: Option<Vec<String>>,
     #[serde(default)]

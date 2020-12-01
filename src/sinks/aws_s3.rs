@@ -476,6 +476,7 @@ mod tests {
 
         let encoding_config = EncodingConfig {
             codec: Encoding::Ndjson,
+            schema: None,
             only_fields: None,
             except_fields: Some(vec!["key".into()]),
             timestamp_format: None,

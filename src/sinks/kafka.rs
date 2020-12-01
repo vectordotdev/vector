@@ -441,6 +441,7 @@ mod tests {
             &Some("key".into()),
             &EncodingConfig {
                 codec: Encoding::Json,
+                schema: None,
                 only_fields: None,
                 except_fields: Some(vec!["key".into()]),
                 timestamp_format: None,

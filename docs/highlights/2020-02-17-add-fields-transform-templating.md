@@ -11,10 +11,10 @@ tags: ["type: enhancement", "domain: transforms", "transform: add_fields"]
 ---
 
 Vector offers a [template syntax][docs.reference.templates] that you can use to build
-dynamic values in your [Vector configuration][docs.configuration] files. This
+dynamic values in your [Vector configuration][docs.setup.configuration] files. This
 has now been added to the [`add_fields` transform][docs.transforms.add_fields],
 enabling the ability to create fields from other fields values.
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.reference.templates]: /docs/reference/templates/
 [docs.transforms.add_fields]: /docs/reference/transforms/add_fields/

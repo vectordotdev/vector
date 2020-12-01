@@ -299,23 +299,23 @@ test-behavior: ## Runs behaviorial test
 .PHONY: test-integration
 test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
-test-integration: test-integration-gcp test-integration-influxdb test-integration-kafka test-integration-loki
-test-integration: test-integration-mongodb_metrics test-integration-nats test-integration-nginx test-integration-pulsar
-test-integration: test-integration-splunk
+test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
+test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
+test-integration: test-integration-nginx test-integration-prometheus test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
-start-test-integration: start-integration-gcp start-integration-influxdb start-integration-kafka start-integration-loki
-start-test-integration: start-integration-mongodb_metrics start-integration-nats start-integration-nginx
-start-test-integration: start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-gcp start-integration-humio start-integration-influxdb start-integration-kafka
+start-test-integration: start-integration-loki start-integration-mongodb_metrics start-integration-nats
+start-test-integration: start-integration-nginx start-integration-prometheus start-integration-pulsar start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
-stop-test-integration: stop-integration-gcp stop-integration-influxdb stop-integration-kafka stop-integration-loki
-stop-test-integration: stop-integration-mongodb_metrics stop-integration-nats stop-integration-nginx
-stop-test-integration: stop-integration-pulsar stop-integration-splunk
+stop-test-integration: stop-integration-gcp stop-integration-humio stop-integration-influxdb stop-integration-kafka
+stop-test-integration: stop-integration-loki stop-integration-mongodb_metrics stop-integration-nats
+stop-test-integration: stop-integration-nginx stop-integration-prometheus stop-integration-pulsar stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:

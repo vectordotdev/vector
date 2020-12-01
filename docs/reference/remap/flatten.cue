@@ -12,7 +12,7 @@ remap: functions: flatten: {
 	return: ["array", "map"]
 	category: "object"
 	description: #"""
-			Returns a nested array or map that has been flattened to a single level.
+		Returns a nested array or map that has been flattened to a single level.
 		"""#
 	examples: [
 		{
