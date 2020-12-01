@@ -403,8 +403,14 @@ components: sinks: aws_s3: components._aws & {
 
 		policies: [
 			{
-				_action:   "HeadBucket"
-				_resource: _bucket
+				_action:      "HeadBucket"
+				_resource:    _bucket
+				required_for: "healthcheck"
+			},
+			{
+				_action:      "ListBucket"
+				_resource:    _bucket
+				required_for: "healthcheck"
 			},
 			{
 				_action:   "PutObject"

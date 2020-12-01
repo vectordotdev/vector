@@ -104,8 +104,9 @@ components: sinks: aws_kinesis_firehose: components._aws & {
 
 		policies: [
 			{
-				_action:   "DescribeDeliveryStream"
-				_resource: _stream
+				_action:      "DescribeDeliveryStream"
+				_resource:    _stream
+				required_for: "healthcheck"
 			},
 			{
 				_action:   "PutRecordBatch"

@@ -133,8 +133,9 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 				_resource: _stream
 			},
 			{
-				_action:   "DescribeLogGroups"
-				_resource: "log-group:<group-id>:*"
+				_action:      "DescribeLogGroups"
+				_resource:    "log-group:<group-id>:*"
+				required_for: "healthcheck"
 			},
 			{
 				_action:   "DescribeLogStreams"
