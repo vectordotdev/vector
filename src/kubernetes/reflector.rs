@@ -9,10 +9,7 @@ use futures::{
     pin_mut,
     stream::{Stream, StreamExt},
 };
-use k8s_openapi::{
-    apimachinery::pkg::apis::meta::v1::{ObjectMeta, WatchEvent},
-    Metadata, WatchOptional, WatchResponse,
-};
+use k8s_openapi::{apimachinery::pkg::apis::meta::v1::WatchEvent, WatchOptional, WatchResponse};
 use snafu::Snafu;
 use std::convert::Infallible;
 use std::time::Duration;
@@ -26,7 +23,7 @@ use tokio::{select, time::delay_for};
 pub struct Reflector<W, S>
 where
     W: Watcher,
-    <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send,
+    <W as Watcher>::Object: resource_version::Resource + Send,
     S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
 {
     watcher: W,
@@ -40,7 +37,7 @@ where
 impl<W, S> Reflector<W, S>
 where
     W: Watcher,
-    <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send,
+    <W as Watcher>::Object: resource_version::Resource + Send,
     S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
 {
     /// Create a new [`Cache`].
@@ -66,7 +63,7 @@ where
 impl<W, S> Reflector<W, S>
 where
     W: Watcher,
-    <W as Watcher>::Object: Metadata<Ty = ObjectMeta> + Send + Unpin + std::fmt::Debug,
+    <W as Watcher>::Object: resource_version::Resource + Send + Unpin + std::fmt::Debug,
     <W as Watcher>::InvocationError: Unpin,
     <W as Watcher>::StreamError: Unpin,
     S: state::MaintainedWrite<Item = <W as Watcher>::Object>,
