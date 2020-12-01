@@ -3,7 +3,7 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::util::{
         buffer::compression::GZIP_DEFAULT,
-        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJsonNdjson as Encoding},
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig, UriSerde,
     },
@@ -87,6 +87,14 @@ pub enum HttpMethod {
     #[derivative(Default)]
     Post,
     Put,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Ndjson,
+    Json,
 }
 
 inventory::submit! {

@@ -5,7 +5,7 @@ use crate::{
     event::{Event, LogEvent, Value},
     rusoto::{self, RegionOrEndpoint},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
+        encoding::{EncodingConfig, EncodingConfiguration},
         retries::{FixedRetryPolicy, RetryLogic},
         BatchConfig, BatchSettings, Compression, EncodedLength, PartitionBatchSink,
         PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig, TowerRequestSettings, VecBuffer,
@@ -133,6 +133,13 @@ pub struct CloudwatchLogsPartitionSvc {
     clients: HashMap<CloudwatchKey, Svc>,
     request_settings: TowerRequestSettings,
     client: CloudWatchLogsClient,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 #[derive(Debug)]

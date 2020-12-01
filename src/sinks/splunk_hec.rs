@@ -7,7 +7,7 @@ use crate::{
         SplunkSourceTypeMissingKeys,
     },
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
+        encoding::{EncodingConfig, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, TowerRequestConfig,
     },
@@ -59,6 +59,13 @@ lazy_static! {
         rate_limit_num: Some(10),
         ..Default::default()
     };
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Derivative)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 fn default_host_key() -> String {

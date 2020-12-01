@@ -4,7 +4,7 @@ use crate::{
     emit,
     internal_events::{NatsEventMissingKeys, NatsEventSendFail, NatsEventSendSuccess},
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
+        encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
     template::{Template, TemplateError},
@@ -37,6 +37,13 @@ pub struct NatsSinkConfig {
 
 fn default_name() -> String {
     String::from("vector")
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 inventory::submit! {

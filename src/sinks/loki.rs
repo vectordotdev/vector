@@ -18,10 +18,7 @@ use crate::{
     http::{Auth, HttpClient},
     sinks::util::{
         buffer::loki::{LokiBuffer, LokiEvent, LokiRecord},
-        encoding::{
-            EncodingConfigWithDefault, EncodingConfiguration,
-            EncodingTextJsonDefaultJson as Encoding,
-        },
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         BatchConfig, BatchSettings, PartitionBuffer, PartitionInnerBuffer, TowerRequestConfig,
         UriSerde,
@@ -57,6 +54,15 @@ pub struct LokiConfig {
     batch: BatchConfig,
 
     tls: Option<TlsOptions>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+enum Encoding {
+    #[derivative(Default)]
+    Json,
+    Text,
 }
 
 inventory::submit! {

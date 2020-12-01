@@ -697,10 +697,7 @@ fn retain<T>(vec: &mut Vec<T>, mut retain_filter: impl FnMut(&mut T) -> bool) {
 mod tests {
     use crate::{
         config::Config,
-        sinks::{
-            console::{ConsoleSinkConfig, Target},
-            util::encoding::EncodingTextJson as Encoding,
-        },
+        sinks::console::{ConsoleSinkConfig, Encoding, Target},
         sources::socket::SocketConfig,
         test_util::{next_addr, start_topology},
     };
@@ -749,9 +746,8 @@ mod reload_tests {
     use crate::{
         config::Config,
         sinks::{
-            console::{ConsoleSinkConfig, Target},
+            console::{ConsoleSinkConfig, Encoding, Target},
             prometheus::exporter::PrometheusExporterConfig,
-            util::encoding::EncodingTextJson as Encoding,
         },
         sources::{generator::GeneratorConfig, splunk_hec::SplunkConfig},
         test_util::{next_addr, start_topology, wait_for_tcp},
@@ -991,10 +987,7 @@ mod reload_tests {
 mod source_finished_tests {
     use crate::{
         config::Config,
-        sinks::{
-            console::{ConsoleSinkConfig, Target},
-            util::encoding::EncodingTextJson as Encoding,
-        },
+        sinks::console::{ConsoleSinkConfig, Encoding, Target},
         sources::generator::GeneratorConfig,
         test_util::start_topology,
     };

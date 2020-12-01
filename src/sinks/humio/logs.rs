@@ -1,10 +1,9 @@
-use super::default_host_key;
+use super::{default_host_key, Encoding};
 use crate::{
     config::{DataType, SinkConfig, SinkContext, SinkDescription},
     sinks::splunk_hec::HecSinkConfig,
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingTextJsonDefaultJson as Encoding},
-        BatchConfig, Compression, TowerRequestConfig,
+        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
     template::Template,

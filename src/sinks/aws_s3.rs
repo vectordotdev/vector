@@ -3,7 +3,7 @@ use crate::{
     rusoto::{self, RegionOrEndpoint},
     serde::to_string,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextNdjson as Encoding},
+        encoding::{EncodingConfig, EncodingConfiguration},
         retries::RetryLogic,
         sink::Response,
         BatchConfig, BatchSettings, Buffer, Compression, Concurrency, PartitionBatchSink,
@@ -119,6 +119,13 @@ lazy_static! {
         rate_limit_num: Some(250),
         ..Default::default()
     };
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Ndjson,
 }
 
 inventory::submit! {

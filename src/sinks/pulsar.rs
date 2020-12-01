@@ -2,7 +2,7 @@ use crate::{
     buffers::Acker,
     config::{log_schema, DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     event::Event,
-    sinks::util::encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
+    sinks::util::encoding::{EncodingConfig, EncodingConfiguration},
 };
 use futures::{future::BoxFuture, ready, stream::FuturesUnordered, FutureExt, Sink, Stream};
 use pulsar::{
@@ -37,6 +37,13 @@ pub struct PulsarSinkConfig {
 pub struct AuthConfig {
     name: String,  // "token"
     token: String, // <jwt token>
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 type PulsarProducer = Producer<TokioExecutor>;

@@ -3,8 +3,8 @@ use crate::{
     sinks::{
         http::{HttpMethod, HttpSinkConfig},
         util::{
-            encoding::{EncodingConfigWithDefault, EncodingJson as Encoding},
-            BatchConfig, Compression, Concurrency, TowerRequestConfig,
+            encoding::EncodingConfigWithDefault, BatchConfig, Compression, Concurrency,
+            TowerRequestConfig,
         },
     },
 };
@@ -63,6 +63,22 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(NewRelicLogsConfig);
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Json,
+}
+
+impl From<Encoding> for crate::sinks::http::Encoding {
+    fn from(v: Encoding) -> crate::sinks::http::Encoding {
+        match v {
+            Encoding::Json => crate::sinks::http::Encoding::Json,
+        }
+    }
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "new_relic_logs")]

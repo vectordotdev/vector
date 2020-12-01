@@ -5,7 +5,7 @@ use crate::{
     event::Event,
     internal_events::FileOpen,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextNdjson as Encoding},
+        encoding::{EncodingConfig, EncodingConfiguration},
         StreamSink,
     },
     template::Template,
@@ -56,6 +56,13 @@ impl GenerateConfig for FileSinkConfig {
         })
         .unwrap()
     }
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Ndjson,
 }
 
 #[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Copy)]

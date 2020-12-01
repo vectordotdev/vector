@@ -1,10 +1,9 @@
 use super::Region;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
-    sinks::elasticsearch::ElasticSearchConfig,
+    sinks::elasticsearch::{ElasticSearchConfig, Encoding},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingJson as Encoding},
-        BatchConfig, Compression, TowerRequestConfig,
+        encoding::EncodingConfigWithDefault, BatchConfig, Compression, TowerRequestConfig,
     },
     sinks::{Healthcheck, VectorSink},
     Event,

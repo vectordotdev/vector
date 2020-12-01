@@ -3,10 +3,7 @@ use crate::sinks::util::unix::UnixSinkConfig;
 use crate::{
     config::{DataType, GenerateConfig, SinkConfig, SinkContext, SinkDescription},
     sinks::util::{
-        encode_event,
-        encoding::{EncodingConfig, EncodingTextJson as Encoding},
-        tcp::TcpSinkConfig,
-        udp::UdpSinkConfig,
+        encode_event, encoding::EncodingConfig, tcp::TcpSinkConfig, udp::UdpSinkConfig, Encoding,
     },
     tls::TlsConfig,
 };

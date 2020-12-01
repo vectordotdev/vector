@@ -771,11 +771,8 @@ mod tests {
         event::Event,
         shutdown::ShutdownSignal,
         sinks::{
-            splunk_hec::HecSinkConfig,
-            util::{
-                encoding::{EncodingConfig, EncodingTextJson as Encoding},
-                BatchConfig, Compression, TowerRequestConfig,
-            },
+            splunk_hec::{Encoding, HecSinkConfig},
+            util::{encoding::EncodingConfig, BatchConfig, Compression, TowerRequestConfig},
             Healthcheck, VectorSink,
         },
         test_util::{collect_n, next_addr, trace_init, wait_for_tcp},

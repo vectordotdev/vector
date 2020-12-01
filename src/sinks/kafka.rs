@@ -5,7 +5,7 @@ use crate::{
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
     sinks::util::{
-        encoding::{EncodingConfig, EncodingConfiguration, EncodingTextJson as Encoding},
+        encoding::{EncodingConfig, EncodingConfiguration},
         BatchConfig,
     },
     template::{Template, TemplateError},
@@ -69,6 +69,13 @@ fn default_socket_timeout_ms() -> u64 {
 
 fn default_message_timeout_ms() -> u64 {
     300000 // default in librdkafka
+}
+
+#[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Encoding {
+    Text,
+    Json,
 }
 
 pub struct KafkaSink {

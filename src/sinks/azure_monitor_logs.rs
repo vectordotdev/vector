@@ -4,9 +4,7 @@ use crate::{
     http::HttpClient,
     sinks::{
         util::{
-            encoding::{
-                EncodingConfigWithDefault, EncodingConfiguration, EncodingJson as Encoding,
-            },
+            encoding::{EncodingConfigWithDefault, EncodingConfiguration},
             http::{BatchedHttpSink, HttpSink},
             BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, TowerRequestConfig,
         },
@@ -49,6 +47,14 @@ pub struct AzureMonitorLogsConfig {
     #[serde(default)]
     pub request: TowerRequestConfig,
     pub tls: Option<TlsOptions>,
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 lazy_static! {

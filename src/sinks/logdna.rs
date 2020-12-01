@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration, EncodingJson as Encoding},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{HttpSink, PartitionHttpSink},
         BatchConfig, BatchSettings, BoxedRawValue, JsonArrayBuffer, PartitionBuffer,
         PartitionInnerBuffer, TowerRequestConfig, UriSerde,
@@ -62,6 +62,14 @@ impl GenerateConfig for LogdnaConfig {
         )
         .unwrap()
     }
+}
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
 }
 
 #[async_trait::async_trait]

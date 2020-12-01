@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     http::{Auth, HttpClient},
     sinks::util::{
-        encoding::{EncodingConfigWithDefault, EncodingConfiguration, EncodingJson as Encoding},
+        encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpRetryLogic, HttpSink},
         retries::{RetryAction, RetryLogic},
         BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
@@ -52,6 +52,14 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(ClickhouseConfig);
+
+#[derive(Deserialize, Serialize, Debug, Eq, PartialEq, Clone, Derivative)]
+#[serde(rename_all = "snake_case")]
+#[derivative(Default)]
+pub enum Encoding {
+    #[derivative(Default)]
+    Default,
+}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
