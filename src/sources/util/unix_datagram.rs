@@ -55,7 +55,6 @@ where
                         path
                     });
 
-                    let build_event = build_event.clone();
                     let received_from: Option<Bytes> =
                         path.map(|p| p.to_string_lossy().into_owned().into());
 
