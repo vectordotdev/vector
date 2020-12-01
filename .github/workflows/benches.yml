@@ -37,6 +37,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Download baseline benchmarks
         uses: dawidd6/action-download-artifact@f2f4c0c7333a76ab3aff16e7b2cf4ed7f5a74556
+        continue-on-error: true
         with:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: benches.yml
