@@ -1,7 +1,7 @@
 FROM debian:buster-slim AS builder
 
 COPY vector-*.deb ./
-RUN dpkg -i vector-$(dpkg --print-architecture).deb
+RUN dpkg -i vector-*-$(dpkg --print-architecture).deb
 
 FROM debian:buster-slim
 
