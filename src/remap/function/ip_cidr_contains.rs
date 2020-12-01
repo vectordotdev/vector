@@ -25,8 +25,8 @@ impl Function for IpCidrContains {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let cidr = arguments.required_expr("cidr")?;
-        let value = arguments.required_expr("value")?;
+        let cidr = arguments.required("cidr")?.boxed();
+        let value = arguments.required("value")?.boxed();
 
         Ok(Box::new(IpCidrContainsFn { cidr, value }))
     }

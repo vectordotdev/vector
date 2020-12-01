@@ -56,8 +56,8 @@ impl Function for ParseDuration {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let output = arguments.required_expr("output")?;
+        let value = arguments.required("value")?.boxed();
+        let output = arguments.required("output")?.boxed();
 
         Ok(Box::new(ParseDurationFn { value, output }))
     }

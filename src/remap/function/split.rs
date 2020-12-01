@@ -18,7 +18,7 @@ impl Function for Split {
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Regex(_)),
                 required: true,
             },
             Parameter {
@@ -30,9 +30,9 @@ impl Function for Split {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let pattern = arguments.required_expr_or_regex("pattern")?;
-        let limit = arguments.optional_expr("limit")?;
+        let value = arguments.required("value")?.boxed();
+        let pattern = arguments.required("pattern")?.boxed();
+        let limit = arguments.optional("limit").map(Expr::boxed);
 
         Ok(Box::new(SplitFn {
             value,
@@ -45,7 +45,7 @@ impl Function for Split {
 #[derive(Debug, Clone)]
 pub(crate) struct SplitFn {
     value: Box<dyn Expression>,
-    pattern: Argument,
+    pattern: Box<dyn Expression>,
     limit: Option<Box<dyn Expression>>,
 }
 
@@ -63,24 +63,26 @@ impl Expression for SplitFn {
             .and_then(|i| usize::try_from(i).ok())
             .unwrap_or(usize::MAX);
 
-        let value = match &self.pattern {
-            Argument::Regex(pattern) => pattern
-                .splitn(value.as_ref(), limit as usize)
-                .collect::<Vec<_>>()
-                .into(),
-            Argument::Expression(expr) => {
-                let bytes = expr.execute(state, object)?.try_bytes()?;
-                let pattern = String::from_utf8_lossy(&bytes);
-
-                value
-                    .splitn(limit, pattern.as_ref())
+        self.pattern
+            .execute(state, object)
+            .and_then(|pattern| match pattern {
+                Value::Regex(pattern) => Ok(pattern
+                    .splitn(value.as_ref(), limit as usize)
                     .collect::<Vec<_>>()
-                    .into()
-            }
-            Argument::Array(_) => unreachable!(),
-        };
+                    .into()),
+                Value::Bytes(bytes) => {
+                    let pattern = String::from_utf8_lossy(&bytes);
 
-        Ok(value)
+                    Ok(value
+                        .splitn(limit, pattern.as_ref())
+                        .collect::<Vec<_>>()
+                        .into())
+                }
+                v => Err(Error::Value(value::Error::Expected(
+                    value::Kind::Bytes | value::Kind::Regex,
+                    v.kind(),
+                ))),
+            })
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -92,17 +94,16 @@ impl Expression for SplitFn {
                 .fallible_unless(Kind::Integer | Kind::Float)
         });
 
-        let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
-            Argument::Regex(_) => None, // regex is a concrete infallible type
-            Argument::Array(_) => unreachable!(),
-        };
+        let pattern_def = self
+            .pattern
+            .type_def(state)
+            .fallible_unless(Kind::Bytes | Kind::Regex);
 
         self.value
             .type_def(state)
             .fallible_unless(Kind::Bytes)
+            .merge(pattern_def)
             .merge_optional(limit_def)
-            .merge_optional(pattern_def)
             .with_constraint(Kind::Array)
     }
 }
@@ -115,7 +116,7 @@ mod test {
         infallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 limit: None,
             },
             def: TypeDef {
@@ -127,7 +128,7 @@ mod test {
         value_fallible {
             expr: |_| SplitFn {
                 value: Literal::from(10).boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 limit: None,
             },
             def: TypeDef {
@@ -139,7 +140,7 @@ mod test {
         pattern_expression_infallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from("foo").into(),
+                pattern: Literal::from("foo").boxed(),
                 limit: None,
             },
             def: TypeDef {
@@ -151,7 +152,7 @@ mod test {
         pattern_expression_fallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from(10).into(),
+                pattern: Literal::from(10).boxed(),
                 limit: None,
             },
             def: TypeDef {
@@ -163,7 +164,7 @@ mod test {
         limit_infallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 limit: Some(Literal::from(10).boxed()),
             },
             def: TypeDef {
@@ -175,7 +176,7 @@ mod test {
         limit_fallible {
             expr: |_| SplitFn {
                 value: Literal::from("foo").boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 limit: Some(Literal::from("foo").boxed()),
             },
             def: TypeDef {

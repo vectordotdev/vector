@@ -17,7 +17,7 @@ impl Function for StripWhitespace {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
+        let value = arguments.required("value")?.boxed();
 
         Ok(Box::new(StripWhitespaceFn { value }))
     }

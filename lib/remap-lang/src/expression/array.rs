@@ -15,6 +15,10 @@ impl Array {
     pub(crate) fn expressions(&self) -> &[Expr] {
         &self.expressions
     }
+
+    pub fn boxed(self) -> Box<dyn Expression> {
+        Box::new(self)
+    }
 }
 
 impl fmt::Debug for Array {

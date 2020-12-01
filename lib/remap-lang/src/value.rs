@@ -49,7 +49,14 @@ impl PartialEq for Value {
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error(r#"expected "{0}", got "{1}""#)]
+    #[error(
+        r#"expected {}, got "{1}""#,
+        if .0.is_some() {
+            format!(r#"{}"#, .0)
+        } else {
+            format!(r#""{}""#, .0)
+        }
+    )]
     Expected(Kind, Kind),
 
     #[error(r#"unable to coerce "{0}" into "{1}""#)]

@@ -25,8 +25,8 @@ impl Function for ToBool {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let default = arguments.optional_expr("default")?;
+        let value = arguments.required("value")?.boxed();
+        let default = arguments.optional("default").map(Expr::boxed);
 
         Ok(Box::new(ToBoolFn { value, default }))
     }
@@ -59,7 +59,9 @@ impl Expression for ToBoolFn {
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            Array(_) | Map(_) | Timestamp(_) => Err("unable to convert value to boolean".into()),
+            Array(_) | Map(_) | Timestamp(_) | Regex(_) => {
+                Err("unable to convert value to boolean".into())
+            }
         };
 
         super::convert_value_or_default(
@@ -123,7 +125,7 @@ mod tests {
         }
 
         array_fallible {
-            expr: |_| ToBoolFn { value: Literal::from(vec![0]).boxed(), default: None },
+            expr: |_| ToBoolFn { value: Array::from(vec![0]).boxed(), default: None },
             def: TypeDef { fallible: true, kind: Kind::Boolean },
         }
 
@@ -142,8 +144,8 @@ mod tests {
 
        fallible_value_with_fallible_default {
             expr: |_| ToBoolFn {
-                value: Literal::from(vec![0]).boxed(),
-                default: Some(Literal::from(vec![0]).boxed()),
+                value: Array::from(vec![0]).boxed(),
+                default: Some(Array::from(vec![0]).boxed()),
             },
             def: TypeDef {
                 fallible: true,
@@ -153,7 +155,7 @@ mod tests {
 
        fallible_value_with_infallible_default {
             expr: |_| ToBoolFn {
-                value: Literal::from(vec![0]).boxed(),
+                value: Array::from(vec![0]).boxed(),
                 default: Some(Literal::from(true).boxed()),
             },
             def: TypeDef {
@@ -165,7 +167,7 @@ mod tests {
         infallible_value_with_fallible_default {
             expr: |_| ToBoolFn {
                 value: Literal::from(true).boxed(),
-                default: Some(Literal::from(vec![0]).boxed()),
+                default: Some(Array::from(vec![0]).boxed()),
             },
             def: TypeDef {
                 fallible: false,
@@ -191,7 +193,7 @@ mod tests {
             (
                 map![],
                 Ok(Value::Boolean(true)),
-                ToBoolFn::new(Literal::from(vec![0]).boxed(), Some(true.into())),
+                ToBoolFn::new(Array::from(vec![0]).boxed(), Some(true.into())),
             ),
             (
                 map!["foo": "true"],
