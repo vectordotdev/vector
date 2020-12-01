@@ -1296,19 +1296,6 @@ mod integration_tests {
             .await
     }
 
-    #[test]
-    fn proper_config() {
-        let good_config = DockerLogsConfig {
-            include_containers: Some(vec!["c1".to_owned()]),
-            ..DockerLogsConfig::default()
-        };
-
-        let bad_config = DockerLogsConfig {
-            include_containers: Some(vec!["c1".to_owned()]),
-            exclude_containers: Some(vec!["c2".to_owned()]),
-        };
-    }
-
     #[tokio::test]
     async fn newly_started() {
         trace_init();
