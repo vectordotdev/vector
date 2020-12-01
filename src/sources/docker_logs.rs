@@ -321,6 +321,7 @@ impl DockerLogsSource {
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
+
         let include_containers_specified = config
             .include_containers
             .clone()
@@ -1295,6 +1296,19 @@ mod integration_tests {
             .await
     }
 
+    #[test]
+    fn proper_config() {
+        let good_config = DockerLogsConfig {
+            include_containers: Some(vec!["c1".to_owned()]),
+            ..DockerLogsConfig::default()
+        };
+
+        let bad_config = DockerLogsConfig {
+            include_containers: Some(vec!["c1".to_owned()]),
+            exclude_containers: Some(vec!["c2".to_owned()]),
+        };
+    }
+
     #[tokio::test]
     async fn newly_started() {
         trace_init();
@@ -1347,23 +1361,6 @@ mod integration_tests {
             events[1].as_log()[log_schema().message_key()],
             message.into()
         );
-    }
-
-    #[tokio::test]
-    async fn exclude_containers() {
-        trace_init();
-
-        let message = "11";
-        let name0 = "vector_test_exclude_container_0";
-
-        let config = DockerLogsConfig {
-            exclude_containers: Some(&[name0].iter().map(|&s| s.to_owned()).collect()),
-        };
-        let out = source_with_config(config);
-
-        let docker = docker().unwrap();
-        let events = collect_n(out, 1).await.unwrap();
-        assert!(events.is_empty());
     }
 
     #[tokio::test]
