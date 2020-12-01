@@ -1,12 +1,15 @@
-use crate::{expression, function, parser::Rule, path, program, value};
-use pest::error::Error as PestError;
+use crate::{
+    expression, function,
+    parser::{self, Rule},
+    path, program, value,
+};
 use std::error::Error as StdError;
 use std::fmt;
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error("parser error: {0}")]
-    Parser(String),
+    #[error("parser error")]
+    Parser(#[from] parser::Error),
 
     #[error("program error")]
     Program(#[from] program::Error),
@@ -19,9 +22,6 @@ pub enum Error {
 
     #[error("function error")]
     Function(#[from] function::Error),
-
-    #[error("regex error")]
-    Regex(#[from] regex::Error),
 
     #[error("value error")]
     Value(#[from] value::Error),
@@ -48,12 +48,6 @@ impl From<String> for Error {
 impl From<&str> for Error {
     fn from(s: &str) -> Self {
         Error::Call(s.to_owned())
-    }
-}
-
-impl From<PestError<Rule>> for Error {
-    fn from(err: PestError<Rule>) -> Self {
-        Error::Parser(err.to_string())
     }
 }
 
@@ -129,7 +123,7 @@ impl fmt::Display for Rule {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct RemapError(pub(crate) Error);
+pub struct RemapError(Error);
 
 impl StdError for RemapError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {

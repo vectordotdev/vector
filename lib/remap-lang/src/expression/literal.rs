@@ -1,14 +1,9 @@
 use crate::{state, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
+use std::ops::Deref;
 
 #[derive(Clone, PartialEq)]
 pub struct Literal(Value);
-
-impl fmt::Debug for Literal {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
 
 impl Literal {
     pub fn new(value: Value) -> Self {
@@ -31,6 +26,20 @@ impl Literal {
 
     pub fn into_value(self) -> Value {
         self.0
+    }
+}
+
+impl fmt::Debug for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Deref for Literal {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 

@@ -177,7 +177,7 @@ mod tests {
             ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
             (
                 "$foo[0] = true",
-                Err(r#"remap error: parser error: paths in variable assignment not supported. Use "$foo" without ".[0]""#),
+                Err(r#"remap error: parser error: path in variable assignment unsupported, use "$foo" without ".[0]""#),
                 Ok(().into()),
             ),
             (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(vec!["foo", "bar", "baz"].into())),

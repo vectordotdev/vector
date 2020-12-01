@@ -258,7 +258,7 @@ macro_rules! value_impl {
     ($(($func:expr, $variant:expr, $ret:ty)),+ $(,)*) => {
         impl Value {
             $(paste::paste! {
-            pub fn [<is $func>](&self) -> bool {
+            pub fn [<is_ $func>](&self) -> bool {
                 matches!(self, Value::$variant(_))
             }
 

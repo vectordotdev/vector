@@ -11,6 +11,10 @@ impl Array {
     pub fn new(expressions: Vec<Expr>) -> Self {
         Self { expressions }
     }
+
+    pub(crate) fn expressions(&self) -> &[Expr] {
+        &self.expressions
+    }
 }
 
 impl fmt::Debug for Array {
