@@ -397,10 +397,10 @@ components: {
 
 	#IAM: {
 		#Policy: {
-			#RequiredFor: "normal_operation" | "healthcheck"
+			#RequiredFor: "write" | "healthcheck"
 
 			_action:        !=""
-			required_for:   *["normal_operation"] | [#RequiredFor, ...#RequiredFor]
+			required_for:   *["write"] | [#RequiredFor, ...#RequiredFor]
 			docs_url:       !=""
 			required_when?: !=""
 
@@ -410,7 +410,7 @@ components: {
 			}
 			if platform == "gcp" {
 				docs_url: "https://cloud.google.com/iam/docs/permissions-reference"
-				action:   "\(_service).\(action)"
+				action:   "\(_service).\(_action)"
 			}
 		}
 

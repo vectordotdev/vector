@@ -220,4 +220,16 @@ components: sinks: gcp_stackdriver_logs: {
 				"""#
 		}
 	}
+
+	permissions: iam: {
+		platform: "gcp"
+		_service: "logging"
+
+		policies: [
+			{
+				_action: "logEntries.create"
+				required_for: ["healthcheck", "write"]
+			},
+		]
+	}
 }
