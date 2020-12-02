@@ -1,6 +1,6 @@
 use super::{
     fanout::{self, Fanout},
-    task::{Task, TaskBuffer},
+    task::{Task, TaskOutput},
     BuildedBuffer, ConfigDiff,
 };
 use crate::{
@@ -75,7 +75,7 @@ pub async fn build_pieces(
         };
 
         let (output, control) = Fanout::new();
-        let pump = rx.forward(output).map(|_| TaskBuffer::Other).compat();
+        let pump = rx.forward(output).map(|_| TaskOutput::Source).compat();
         let pump = Task::new(name, typetag, pump);
 
         // The force_shutdown_tripwire is a Future that when it resolves means that this source
@@ -86,7 +86,7 @@ pub async fn build_pieces(
         let server = future::try_select(server, force_shutdown_tripwire.unit_error().boxed())
             .map_ok(|_| {
                 debug!("Finished.");
-                TaskBuffer::Other
+                TaskOutput::Source
             })
             .map_err(|_| ());
         let server = Task::new(name, typetag, server);
@@ -144,7 +144,7 @@ pub async fn build_pieces(
         }
         .map(|_| {
             debug!("Finished.");
-            TaskBuffer::Other
+            TaskOutput::Transform
         })
         .compat();
         let task = Task::new(name, typetag, transform);
@@ -221,7 +221,7 @@ pub async fn build_pieces(
             .await
             .map(|_| {
                 debug!("Finished.");
-                TaskBuffer::Sink(rx, acker)
+                TaskOutput::Sink(rx, acker)
             })
         };
         let task = Task::new(name, typetag, sink);
@@ -233,7 +233,7 @@ pub async fn build_pieces(
                     .map(|result| match result {
                         Ok(Ok(_)) => {
                             info!("Healthcheck: Passed.");
-                            Ok(TaskBuffer::Other)
+                            Ok(TaskOutput::Healthcheck)
                         }
                         Ok(Err(error)) => {
                             error!(message = "Healthcheck: Failed Reason.", %error);
@@ -247,7 +247,7 @@ pub async fn build_pieces(
                     .await
             } else {
                 info!("Healthcheck: Disabled.");
-                Ok(TaskBuffer::Other)
+                Ok(TaskOutput::Healthcheck)
             }
         };
         let healthcheck_task = Task::new(name, typetag, healthcheck_task);

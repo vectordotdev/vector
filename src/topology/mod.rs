@@ -17,7 +17,7 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     topology::{
         builder::Pieces,
-        task::{Task, TaskBuffer},
+        task::{Task, TaskOutput},
     },
     trigger::DisabledTrigger,
 };
@@ -33,7 +33,7 @@ use tokio::time::{delay_until, interval, Duration, Instant};
 use tracing_futures::Instrument;
 
 // TODO: Result is only for compat, remove when not needed
-type TaskHandle = tokio::task::JoinHandle<Result<TaskBuffer, ()>>;
+type TaskHandle = tokio::task::JoinHandle<Result<TaskOutput, ()>>;
 
 type BuildedBuffer = (
     buffers::BufferInputCloner,
@@ -473,7 +473,7 @@ impl RunningTopology {
                 if reuse_buffers.contains(name) {
                     let tx = self.inputs.remove(name).unwrap();
                     let (rx, acker) = match buffer {
-                        TaskBuffer::Sink(rx, acker) => (rx, acker),
+                        TaskOutput::Sink(rx, acker) => (rx, acker),
                         _ => unreachable!(),
                     };
 
