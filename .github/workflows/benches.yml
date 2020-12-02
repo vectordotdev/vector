@@ -47,6 +47,9 @@ jobs:
           branch: master
           name: vector-benches
           path: target/criterion
+      - name: Check if there were master artifacts
+        run: |
+          test -f target/criterion || echo "::warning::No master benchmark artifacts could be fetched for comparison."
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
