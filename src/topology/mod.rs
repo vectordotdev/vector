@@ -721,7 +721,6 @@ impl RunningTopology {
         });
     }
 
-    // TODO: remove replace None
     fn detach_inputs(&mut self, name: &str) {
         self.inputs.remove(name);
         self.detach_triggers.remove(name);
