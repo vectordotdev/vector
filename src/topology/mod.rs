@@ -824,13 +824,9 @@ mod reload_tests {
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
-    use crate::sinks::socket::{Mode, SocketSinkConfig};
-    use crate::sinks::util::{tcp::TcpSinkConfig, Encoding as SinkEncoding};
     use crate::sources::generator::GeneratorConfig;
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{
-        next_addr, start_topology, temp_dir, trace_init, wait_for_tcp, CountReceiver,
-    };
+    use crate::test_util::{next_addr, start_topology, temp_dir, wait_for_tcp};
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use futures::{compat::Stream01CompatExt, StreamExt};
     use std::net::{SocketAddr, TcpListener};
