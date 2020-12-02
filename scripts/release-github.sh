@@ -8,6 +8,6 @@ set -euo pipefail
 #   Uploads target/artifacts to Github releases
 
 grease --debug create-release timberio/vector v${VERSION} ${SHA1} \
-  --assets '${ROOT_DIR}/target/artifacts/*' \
+  --assets './target/artifacts/*' \
   --notes '[View release notes](${HOST}/releases/${VERSION})' \
   --name v${VERSION}
