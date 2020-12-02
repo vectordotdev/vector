@@ -1296,7 +1296,6 @@ mod integration_tests {
             .await
     }
 
-
     fn test_config(config: DockerLogsConfig, expect_ok: bool) {
         let (sender, _) = Pipeline::new_test();
         let shutdown = ShutdownSignal::noop();
