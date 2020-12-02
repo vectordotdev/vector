@@ -72,7 +72,7 @@ mod tests {
         c.api.address = Some(next_addr());
 
         let diff = config::ConfigDiff::initial(&c);
-        let pieces = vector::topology::build_or_log_errors(&c, &diff, &mut HashMap::new())
+        let pieces = vector::topology::build_or_log_errors(&c, &diff, HashMap::new())
             .await
             .unwrap();
 

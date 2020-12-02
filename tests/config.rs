@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use vector::{
     config::{self, ConfigDiff},
     topology,
