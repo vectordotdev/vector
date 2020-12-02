@@ -456,7 +456,7 @@ mod test {
                 .map_err(|error| error!(message = "Error reading line.", %error))
                 .map_ok(|(bytes, _addr)| bytes.freeze());
 
-            for item in stream.next().await.unwrap() {
+            while let Some(Ok(item)) = stream.next().await {
                 tx.send(item).await.unwrap();
             }
         });
