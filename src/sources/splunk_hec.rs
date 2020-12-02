@@ -19,6 +19,7 @@ use serde::{de, Deserialize, Serialize};
 use serde_json::{de::IoRead, json, Deserializer, Value as JsonValue};
 use snafu::Snafu;
 use std::{
+    future,
     io::Read,
     net::{Ipv4Addr, SocketAddr},
 };
@@ -200,7 +201,7 @@ impl SplunkSource {
                     let out = out.clone();
                     async move {
                         // Construct event parser
-                        let event = futures::future::ready(raw_event(body, gzip, channel, host));
+                        let event = future::ready(raw_event(body, gzip, channel, host));
                         futures::stream::once(event)
                             .forward(
                                 out.sink_map_err(|_| Rejection::from(ApiError::ServerShutdown)),
