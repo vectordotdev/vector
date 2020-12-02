@@ -7,6 +7,8 @@ set -euo pipefail
 #
 #   Uploads target/artifacts to Github releases
 
+VERSION="${VECTOR_VERSION:-"$(scripts/version.sh)"}"
+
 grease --debug create-release timberio/vector v${VERSION} ${SHA1} \
   --assets './target/artifacts/*' \
   --notes '[View release notes](https://vector.dev/releases/${VERSION}/)' \
