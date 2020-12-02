@@ -13,7 +13,7 @@ if_statement = {
     NEWLINE* ~ "}" )?
 }
 
-// Used by `src/event/lookup.rs`
+
 lookup = { (path_segment | quoted_path_segment) ~ ("." ~ (path_segment | quoted_path_segment))* }
 
 // Paths

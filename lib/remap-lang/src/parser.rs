@@ -11,10 +11,11 @@ use crate::{
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
 use std::str::FromStr;
+pub use Rule as ParserRule;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "../grammar.pest"]
-pub(super) struct Parser<'a> {
+pub struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
     pub compiler_state: state::Compiler,
 }

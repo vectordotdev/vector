@@ -1,6 +1,7 @@
 #![allow(clippy::len_without_is_empty)] // It's invalid to have a lookupbuf that is empty.
 
-use crate::{event::Value, mapping::parser::Rule};
+use crate::{event::Value};
+use remap::parser::ParserRule;
 use pest::iterators::Pair;
 use std::{
     convert::TryFrom,
@@ -56,10 +57,10 @@ pub struct LookupBuf {
     pub(super) segments: Vec<SegmentBuf>,
 }
 
-impl<'a> TryFrom<Pair<'a, Rule>> for LookupBuf {
+impl<'a> TryFrom<Pair<'a, ParserRule>> for LookupBuf {
     type Error = crate::Error;
 
-    fn try_from(pair: Pair<'a, Rule>) -> Result<Self, Self::Error> {
+    fn try_from(pair: Pair<'a, ParserRule>) -> Result<Self, Self::Error> {
         let retval = LookupBuf {
             segments: Segment::from_lookup(pair)?
                 .into_iter()

@@ -1,6 +1,5 @@
 mod error;
 mod operator;
-mod parser;
 mod program;
 mod runtime;
 mod test_util;
@@ -11,6 +10,7 @@ pub mod function;
 pub mod prelude;
 pub mod state;
 pub mod value;
+pub mod parser;
 
 pub use error::{Error, RemapError};
 pub use expression::{Expr, Expression};

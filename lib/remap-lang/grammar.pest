@@ -49,6 +49,9 @@ path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
 path_index       =  { "[" ~ path_index_inner ~ "]" }
 path_index_inner =  { ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
 
+// Used by `src/event/lookup.rs`. Changing this will have far reaching impacts on Vector.
+lookup = { (path_segment)+ }
+
 // Literals --------------------------------------------------------------------
 
 null    =  { "null" }

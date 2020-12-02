@@ -110,6 +110,7 @@ impl fmt::Display for Rule {
             value,
             variable,
             WHITESPACE,
+            lookup,
         ]
     }
 }

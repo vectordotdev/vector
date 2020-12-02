@@ -5,7 +5,6 @@ mod test;
 
 use super::{segmentbuf::SegmentBuf, LookupBuf};
 use crate::event::lookup::Segment;
-use crate::mapping::parser::{MappingParser, Rule};
 use core::fmt;
 use nom::lib::std::vec::IntoIter;
 use pest::iterators::Pair;
@@ -20,6 +19,7 @@ use std::{
     slice::Iter,
     str,
 };
+use remap::parser::{ParserRule, Parser as RemapParser};
 
 /// `Lookup`s are pre-validated event, unowned lookup paths.
 ///
@@ -51,10 +51,10 @@ pub struct Lookup<'a> {
     pub(super) segments: Vec<Segment<'a>>,
 }
 
-impl<'a> TryFrom<Pair<'a, Rule>> for Lookup<'a> {
+impl<'a> TryFrom<Pair<'a, ParserRule>> for Lookup<'a> {
     type Error = crate::Error;
 
-    fn try_from(pair: Pair<'a, Rule>) -> Result<Self, Self::Error> {
+    fn try_from(pair: Pair<'a, ParserRule>) -> Result<Self, Self::Error> {
         let retval = Self {
             segments: Segment::from_lookup(pair)?,
         };
@@ -128,7 +128,7 @@ impl<'a> Lookup<'a> {
     /// Parse the lookup from a str.
     #[instrument(level = "trace")]
     pub fn from_str(input: &'a str) -> Result<Self, crate::Error> {
-        let mut pairs = MappingParser::parse(Rule::lookup, input)?;
+        let mut pairs = RemapParser::parse(ParserRule::lookup, input)?;
         let pair = pairs.next().ok_or("No tokens found.")?;
         Self::try_from(pair)
     }
