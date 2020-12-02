@@ -31,19 +31,19 @@ installation: _interfaces: "helm3": {
 			helm_values_show:          #"helm show values \#(_repo_name)/\#(_chart_name)"#
 			configure: #"""
 				cat <<-'VALUES' > values.yaml
-				// The Vector Kubernetes integration automatically defines a
-				// kubernetes_logs source that is made available to you.
-				// You do not need to define a log source.
+				# The Vector Kubernetes integration automatically defines a
+				# kubernetes_logs source that is made available to you.
+				# You do not need to define a log source.
 				sinks:
-				  // Adjust as necessary. By default we use the console sink
-				  // to print all data. This allows you to see Vector working.
-				  // https://vector.dev/docs/reference/sinks/
+				  # Adjust as necessary. By default we use the console sink
+				  # to print all data. This allows you to see Vector working.
+				  # https://vector.dev/docs/reference/sinks/
 				  stdout:
 				    type: console
 				    inputs: ["kubernetes_logs"]
 				    rawConfig: |
-				    target = "stdout"
-				    encoding = "json"
+				      target = "stdout"
+				      encoding = "json"
 				VALUES
 				"""#
 			install:   #"helm install --namespace \#(_namespace) --create-namespace \#(_release_name) \#(_repo_name)/\#(_chart_name) --values values.yaml"#
