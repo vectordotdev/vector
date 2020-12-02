@@ -225,8 +225,8 @@ pub fn random_maps(
     iter::repeat(()).map(move |_| random_map(max_size, field_len))
 }
 
-pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Result<Vec<T>, ()> {
-    Ok(rx.take(n).collect().await)
+pub async fn collect_n<T>(rx: mpsc::Receiver<T>, n: usize) -> Vec<T> {
+    rx.take(n).collect().await
 }
 
 pub async fn collect_ready01<S>(rx: S) -> Result<Vec<S::Item>, ()>

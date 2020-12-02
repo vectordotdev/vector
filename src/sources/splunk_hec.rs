@@ -841,7 +841,7 @@ mod tests {
                 .unwrap();
         });
 
-        let events = collect_n(source, n).await.unwrap();
+        let events = collect_n(source, n).await;
         assert_eq!(n, events.len());
 
         events
@@ -970,7 +970,7 @@ mod tests {
         event.as_mut_log().insert("name", "bob");
         sink.run(stream::once(ready(event))).await.unwrap();
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()["greeting"], "hello".into());
         assert_eq!(event.as_log()["name"], "bob".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
@@ -990,7 +990,7 @@ mod tests {
         event.as_mut_log().insert("line", "hello");
         sink.run(stream::once(ready(event))).await.unwrap();
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "hello".into());
     }
 
@@ -1003,7 +1003,7 @@ mod tests {
 
         assert_eq!(200, post(address, "services/collector/raw", message).await);
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], message.into());
         assert_eq!(event.as_log()[&super::CHANNEL], "guid".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
@@ -1060,7 +1060,7 @@ mod tests {
             post(address, "services/collector/event", message).await
         );
 
-        let event = collect_n(source, 1).await.unwrap().remove(0);
+        let event = collect_n(source, 1).await.remove(0);
         assert_eq!(event.as_log()[log_schema().message_key()], "first".into());
         assert!(event.as_log().get(log_schema().timestamp_key()).is_some());
         assert_eq!(
@@ -1081,7 +1081,7 @@ mod tests {
             post(address, "services/collector/event", message).await
         );
 
-        let events = collect_n(source, 3).await.unwrap();
+        let events = collect_n(source, 3).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],

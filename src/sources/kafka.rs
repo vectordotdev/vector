@@ -357,7 +357,7 @@ mod integration_test {
         println!("Receiving event...");
         let (tx, rx) = Pipeline::new_test();
         tokio::spawn(kafka_source(&config, ShutdownSignal::noop(), tx).unwrap());
-        let events = collect_n(rx, 1).await.unwrap();
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],

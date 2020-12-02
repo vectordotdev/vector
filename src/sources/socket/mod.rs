@@ -455,7 +455,7 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let events = collect_n(rx, 100).await.unwrap();
+        let events = collect_n(rx, 100).await;
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(
@@ -545,7 +545,7 @@ mod test {
         let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).await.unwrap();
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
@@ -559,7 +559,7 @@ mod test {
         let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test\ntest2".to_string()]);
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
@@ -577,7 +577,7 @@ mod test {
         let address = init_udp(tx).await;
 
         send_lines_udp(address, vec!["test".to_string(), "test2".to_string()]);
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
@@ -595,7 +595,7 @@ mod test {
         let address = init_udp(tx).await;
 
         let from = send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).await.unwrap();
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().host_key()],
@@ -609,7 +609,7 @@ mod test {
         let address = init_udp(tx).await;
 
         let _ = send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).await.unwrap();
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().source_type_key()],
@@ -626,7 +626,7 @@ mod test {
         let (address, source_handle) = init_udp_with_shutdown(tx, source_name, &mut shutdown).await;
 
         send_lines_udp(address, vec!["test".to_string()]);
-        let events = collect_n(rx, 1).await.unwrap();
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
@@ -663,7 +663,7 @@ mod test {
         });
 
         // Important that 'rx' doesn't get dropped until the pump has finished sending items to it.
-        let events = collect_n(rx, 100).await.unwrap();
+        let events = collect_n(rx, 100).await;
         assert_eq!(100, events.len());
         for event in events {
             assert_eq!(event.as_log()[log_schema().message_key()], "test".into());
@@ -727,7 +727,7 @@ mod test {
 
         send_lines_unix(path, vec!["test"]).await;
 
-        let events = collect_n(rx, 1).await.unwrap();
+        let events = collect_n(rx, 1).await;
 
         assert_eq!(1, events.len());
         assert_eq!(
@@ -747,7 +747,7 @@ mod test {
         let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test\ntest2"]).await;
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         assert_eq!(2, events.len());
         assert_eq!(
@@ -767,7 +767,7 @@ mod test {
         let path = init_unix(tx).await;
 
         send_lines_unix(path, vec!["test", "test2"]).await;
-        let events = collect_n(rx, 2).await.unwrap();
+        let events = collect_n(rx, 2).await;
 
         assert_eq!(2, events.len());
         assert_eq!(
