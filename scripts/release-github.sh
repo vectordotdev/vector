@@ -9,5 +9,5 @@ set -euo pipefail
 
 grease --debug create-release timberio/vector v${VERSION} ${SHA1} \
   --assets './target/artifacts/*' \
-  --notes '[View release notes](${HOST}/releases/${VERSION})' \
+  --notes '[View release notes](https://vector.dev/releases/${VERSION}/)' \
   --name v${VERSION}
