@@ -41,7 +41,8 @@ operator_not            = { "!" }
 
 // Paths -----------------------------------------------------------------------
 
-path             = ${ ("." ~ path_segment)+ }
+path             = ${ path_root | ("." ~ path_segment)+ }
+path_root        = ${ ". " }
 path_segment     = ${ (path_field | path_coalesce) ~ path_index* }
 path_field       = ${ ident | string }
 path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }

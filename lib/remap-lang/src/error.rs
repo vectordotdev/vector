@@ -28,6 +28,9 @@ pub enum Error {
     #[error("function call error: {0}")]
     Call(String),
 
+    #[error("assertion failed: {0}")]
+    Assert(String),
+
     #[error("unknown error")]
     Unknown,
 }
@@ -93,6 +96,7 @@ impl fmt::Display for Rule {
             path_field,
             path_index,
             path_index_inner,
+            path_root,
             path_segment,
             primary,
             program,

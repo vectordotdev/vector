@@ -1,6 +1,6 @@
 #[cfg(feature = "api-client")]
 use crate::top;
-use crate::{generate, get_version, list, unit_test, validate};
+use crate::{config, generate, get_version, list, unit_test, validate};
 use std::path::PathBuf;
 use structopt::{clap::AppSettings, StructOpt};
 
@@ -58,10 +58,26 @@ impl Opts {
 #[structopt(rename_all = "kebab-case")]
 pub struct RootOpts {
     /// Read configuration from one or more files. Wildcard paths are supported.
+    /// File format is detected from the file name.
     /// If zero files are specified the default config path
     /// `/etc/vector/vector.toml` will be targeted.
     #[structopt(name = "config", short, long, env = "VECTOR_CONFIG")]
     pub config_paths: Vec<PathBuf>,
+
+    /// Read configuration from one or more files. Wildcard paths are supported.
+    /// TOML file format is expected.
+    #[structopt(name = "config-toml", long, env = "VECTOR_CONFIG_TOML")]
+    pub config_paths_toml: Vec<PathBuf>,
+
+    /// Read configuration from one or more files. Wildcard paths are supported.
+    /// JSON file format is expected.
+    #[structopt(name = "config-json", long, env = "VECTOR_CONFIG_JSON")]
+    pub config_paths_json: Vec<PathBuf>,
+
+    /// Read configuration from one or more files. Wildcard paths are supported.
+    /// YAML file format is expected.
+    #[structopt(name = "config-yaml", long, env = "VECTOR_CONFIG_YAML")]
+    pub config_paths_yaml: Vec<PathBuf>,
 
     /// Exit on startup if any sinks fail healthchecks
     #[structopt(short, long, env = "VECTOR_REQUIRE_HEALTHY")]
@@ -96,6 +112,18 @@ pub struct RootOpts {
     /// Watch for changes in configuration file, and reload accordingly.
     #[structopt(short, long, env = "VECTOR_WATCH_CONFIG")]
     pub watch_config: bool,
+}
+
+impl RootOpts {
+    /// Return a list of config paths with the associated formats.
+    pub fn config_paths_with_formats(&self) -> Vec<(PathBuf, config::FormatHint)> {
+        config::merge_path_lists(vec![
+            (&self.config_paths, None),
+            (&self.config_paths_toml, Some(config::Format::TOML)),
+            (&self.config_paths_json, Some(config::Format::JSON)),
+            (&self.config_paths_yaml, Some(config::Format::YAML)),
+        ])
+    }
 }
 
 #[derive(StructOpt, Debug)]

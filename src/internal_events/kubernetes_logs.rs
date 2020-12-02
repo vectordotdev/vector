@@ -1,6 +1,5 @@
 use super::InternalEvent;
 use crate::Event;
-use bytes::Bytes;
 use metrics::counter;
 
 #[derive(Debug)]
@@ -42,15 +41,33 @@ impl InternalEvent for KubernetesLogsEventAnnotationFailed<'_> {
 }
 
 #[derive(Debug)]
+pub struct KubernetesLogsFormatPickerEdgeCase {
+    pub what: &'static str,
+}
+
+impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
+    fn emit_logs(&self) {
+        warn!(
+            message = "Encountered format picker edge case.",
+            what = %self.what,
+        );
+    }
+
+    fn emit_metrics(&self) {
+        counter!("k8s_format_picker_edge_cases_total", 1);
+    }
+}
+
+#[derive(Debug)]
 pub struct KubernetesLogsDockerFormatParseFailed<'a> {
-    pub message: &'a Bytes,
+    pub error: &'a dyn std::error::Error,
 }
 
 impl InternalEvent for KubernetesLogsDockerFormatParseFailed<'_> {
     fn emit_logs(&self) {
         warn!(
-            message = "Failed to parse message as JSON object.",
-            value = %String::from_utf8_lossy(self.message),
+            message = "Failed to parse log line in docker format.",
+            error = %self.error,
         );
     }
 

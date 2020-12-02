@@ -30,7 +30,7 @@ components: sinks: gcp_pubsub: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             100
 				retry_initial_backoff_secs: 1
@@ -63,7 +63,7 @@ components: sinks: gcp_pubsub: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

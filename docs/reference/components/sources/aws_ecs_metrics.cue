@@ -40,7 +40,7 @@ components: sources: aws_ecs_metrics: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -54,19 +54,40 @@ components: sources: aws_ecs_metrics: {
 		notices: []
 	}
 
+	installation: {
+		platform_name: null
+	}
+
 	configuration: {
 		endpoint: {
 			description: """
-					Base URI of the task metadata endpoint.
-					If empty, the URI will be automatically discovered based on the latest version detected.
-					The version 2 endpoint base URI is `169.254.170.2/v2/`.
-					The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
-					The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
+				Base URI of the task metadata endpoint.
+				If empty, the URI will be automatically discovered based on the latest version detected.
+				The version 2 endpoint base URI is `169.254.170.2/v2/`.
+				The version 3 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI`.
+				The version 4 endpoint base URI is stored in the environment variable `ECS_CONTAINER_METADATA_URI_V4`.
 				"""
 			common:   false
 			required: false
 			type: string: {
 				default: "${ECS_CONTAINER_METADATA_URI_V4}"
+			}
+		}
+		namespace: {
+			description: "The namespace of the metric. Disabled if empty."
+			common:      true
+			required:    false
+			type: string: {
+				default: "awsecs"
+			}
+		}
+		scrape_interval_secs: {
+			description: "The interval between scrapes, in seconds."
+			common:      true
+			required:    false
+			type: uint: {
+				default: 15
+				unit:    "seconds"
 			}
 		}
 		version: {
@@ -83,23 +104,6 @@ components: sources: aws_ecs_metrics: {
 					v3: "When fails the v4 check, but the environment variable `ECS_CONTAINER_METADATA_URI` is defined."
 					v2: "When fails the v4 and v3 checks."
 				}
-			}
-		}
-		scrape_interval_secs: {
-			description: "The interval between scrapes, in seconds."
-			common:      true
-			required:    false
-			type: uint: {
-				default: 15
-				unit:    "seconds"
-			}
-		}
-		namespace: {
-			description: "The namespace of the metric. Disabled if empty."
-			common:      true
-			required:    false
-			type: string: {
-				default: "awsecs"
 			}
 		}
 	}

@@ -16,7 +16,7 @@ installation: _interfaces: "docker-cli": {
 		config:      "~/vector.{config_format}"
 	}
 
-	platform_name: installation.platforms.docker.name
+	platform_name: "docker"
 
 	roles: [Name=string]: {
 		_api_port:         8383

@@ -38,11 +38,12 @@ impl Expression for IfStatement {
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        self.conditional
+        let boolean_condition = self.conditional.type_def(state).kind.is_boolean();
+
+        self.true_expression
             .type_def(state)
-            .fallible_unless(value::Kind::Boolean)
-            .merge(self.true_expression.type_def(state))
             .merge(self.false_expression.type_def(state))
+            .into_fallible(!boolean_condition)
     }
 }
 
@@ -66,12 +67,11 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Boolean,
             },
         }
 
-        optional_any {
+        optional_null {
             expr: |_| {
                 let conditional = Box::new(Literal::from(true).into());
                 let true_expression = Box::new(Literal::from(true).into());
@@ -81,8 +81,7 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: true,
-                kind: Kind::all(),
+                kind: Kind::Boolean | Kind::Null,
             },
         }
     ];

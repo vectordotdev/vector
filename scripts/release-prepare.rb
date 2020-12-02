@@ -117,6 +117,7 @@ def create_release_file!(new_version)
   release_reference_path = "#{RELEASE_REFERENCE_DIR}/#{new_version}.cue"
 
   if commits.any?
+    commits.each(&:validate!)
     cue_commits = commits.collect(&:to_cue_struct).join(",\n    ")
 
     if File.exists?(release_reference_path)
@@ -180,7 +181,7 @@ def create_release_file!(new_version)
 end
 
 def get_commits_since(last_version)
-  Vector::Commit.fetch_since!(last_version).select do |commit|
+  Vector::Commit.fetch_since(last_version).select do |commit|
       commit.type != "chore" &&
         commit.type != "docs" &&
         !commit.scopes.include?("external docs") &&

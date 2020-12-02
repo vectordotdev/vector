@@ -18,7 +18,7 @@ mod tests {
     use vector::{
         self,
         api::{self, Server},
-        config::{self, Config},
+        config::{self, Config, Format},
         internal_events::{emit, GeneratorEventProcessed, Heartbeat},
         test_util::{next_addr, retry_until},
     };
@@ -70,7 +70,7 @@ mod tests {
     }
 
     async fn from_str_config(conf: &str) -> vector::topology::RunningTopology {
-        let mut c = config::load_from_str(conf).unwrap();
+        let mut c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
         c.api.address = Some(next_addr());
 
         let diff = config::ConfigDiff::initial(&c);
@@ -578,7 +578,7 @@ mod tests {
                   print_amount = 100000
             "#;
 
-            let c = config::load_from_str(conf).unwrap();
+            let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
 
             topology.reload_config_and_respawn(c, false).await.unwrap();
             server.update_config(topology.config());
@@ -660,7 +660,7 @@ mod tests {
                   print_amount = 100000
             "#;
 
-            let c = config::load_from_str(conf).unwrap();
+            let c = config::load_from_str(conf, Some(Format::TOML)).unwrap();
 
             topology.reload_config_and_respawn(c, false).await.unwrap();
             server.update_config(topology.config());

@@ -114,29 +114,28 @@ mod tests {
 
         string_fallible {
             expr: |_| ToBoolFn { value: Literal::from("foo").boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean },
         }
 
         map_fallible {
             expr: |_| ToBoolFn { value: Literal::from(BTreeMap::new()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean },
         }
 
         array_fallible {
             expr: |_| ToBoolFn { value: Literal::from(vec![0]).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean },
         }
 
         timestamp_fallible {
             expr: |_| ToBoolFn { value: Literal::from(chrono::Utc::now()).boxed(), default: None },
-            def: TypeDef { fallible: true, kind: Kind::Boolean, ..Default::default() },
+            def: TypeDef { fallible: true, kind: Kind::Boolean },
         }
 
         fallible_value_without_default {
             expr: |_| ToBoolFn { value: Literal::from("foo".to_owned()).boxed(), default: None },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Boolean,
             },
         }
@@ -148,7 +147,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: true,
-                optional: false,
                 kind: Kind::Boolean,
             },
         }
@@ -160,7 +158,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Boolean,
             },
         }
@@ -172,7 +169,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Boolean,
             },
         }
@@ -184,7 +180,6 @@ mod tests {
             },
             def: TypeDef {
                 fallible: false,
-                optional: false,
                 kind: Kind::Boolean,
             },
         }

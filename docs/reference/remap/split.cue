@@ -37,6 +37,7 @@ remap: functions: split: {
 				.split = split(.text, " and ")
 				"""#
 			output: {
+				text: "apples and pears and bananas"
 				split: ["apples", "pears", "bananas"]
 			}
 		},
@@ -49,6 +50,7 @@ remap: functions: split: {
 				.split = split(.text, " and ", 1)
 				"""#
 			output: {
+				text: "apples and pears and bananas"
 				split: ["apples", "pears and bananas"]
 			}
 		},

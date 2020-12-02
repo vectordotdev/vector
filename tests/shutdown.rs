@@ -49,7 +49,7 @@ const PROMETHEUS_SINK_CONFIG: &'static str = r#"
           field = "time"
 
     [sinks.out]
-        type = "prometheus"
+        type = "prometheus_exporter"
         default_namespace = "service"
         inputs = ["log_to_metric"]
         address = "${VECTOR_TEST_ADDRESS}"
@@ -273,7 +273,7 @@ fn timely_shutdown_prometheus() {
                 create_file(
                     source_config(
                         r#"
-        type = "prometheus"
+        type = "prometheus_scrape"
         hosts = ["http://${VECTOR_TEST_ADDRESS}"]"#,
                     )
                     .as_str(),

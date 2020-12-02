@@ -73,11 +73,12 @@ impl HumanFormatter for i64 {
     }
 }
 
+static COMPONENT_HEADERS: [&str; 6] = ["Name", "Kind", "Type", "Events", "Bytes", "Errors"];
+
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
     opts: &'a super::Opts,
-    component_headers: [String; 8],
 }
 
 impl<'a> Widgets<'a> {
@@ -89,23 +90,10 @@ impl<'a> Widgets<'a> {
             Constraint::Length(3),
         ];
 
-        // Create component headers
-        let component_headers = [
-            "Name".to_string(),
-            "Kind".to_string(),
-            "Type".to_string(),
-            "Events".to_string(),
-            format!("I/O @ {}ms", opts.interval),
-            "Bytes".to_string(),
-            format!("I/O @ {}ms", opts.interval),
-            "Errors".to_string(),
-        ];
-
         Self {
             constraints,
             url_string,
             opts,
-            component_headers,
         }
     }
 
@@ -136,30 +124,43 @@ impl<'a> Widgets<'a> {
         let items = state.iter().map(|(_, r)| {
             let mut data = vec![r.name.clone(), r.kind.clone(), r.component_type.clone()];
 
-            // Build metric stats
-            let formatted_metrics = if self.opts.human_metrics {
-                [
-                    r.processed_events_total.human_format(),
-                    r.processed_events_throughput.human_format(),
-                    r.processed_bytes_total.human_format_bytes(),
-                    r.processed_bytes_throughput.human_format_bytes(),
-                    r.errors.human_format(),
-                ]
-            } else {
-                [
-                    r.processed_events_total.thousands_format(),
-                    r.processed_events_throughput.thousands_format(),
-                    r.processed_bytes_total.thousands_format(),
-                    r.processed_bytes_throughput.thousands_format(),
-                    r.errors.thousands_format(),
-                ]
-            };
+            let formatted_metrics = [
+                match r.processed_events_total {
+                    0 => "N/A".to_string(),
+                    v => format!(
+                        "{} ({}/s)",
+                        if self.opts.human_metrics {
+                            v.human_format()
+                        } else {
+                            v.thousands_format()
+                        },
+                        r.processed_events_throughput_sec.human_format()
+                    ),
+                },
+                match r.processed_bytes_total {
+                    0 => "N/A".to_string(),
+                    v => format!(
+                        "{} ({}/s)",
+                        if self.opts.human_metrics {
+                            v.human_format()
+                        } else {
+                            v.thousands_format()
+                        },
+                        r.processed_bytes_throughput_sec.human_format_bytes()
+                    ),
+                },
+                if self.opts.human_metrics {
+                    r.errors.human_format()
+                } else {
+                    r.errors.thousands_format()
+                },
+            ];
 
             data.extend_from_slice(&formatted_metrics);
-            Row::StyledData(data.into_iter(), Style::default().fg(Color::White))
+            Row::StyledData(data.into_iter(), Style::default())
         });
 
-        let w = Table::new(self.component_headers.iter(), items)
+        let w = Table::new(COMPONENT_HEADERS.iter(), items)
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .header_gap(1)
             .column_spacing(2)
@@ -167,10 +168,8 @@ impl<'a> Widgets<'a> {
                 Constraint::Percentage(20),
                 Constraint::Percentage(10),
                 Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
-                Constraint::Percentage(10),
+                Constraint::Percentage(20),
+                Constraint::Percentage(20),
                 Constraint::Percentage(10),
             ]);
 

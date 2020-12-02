@@ -11,8 +11,8 @@ mod tests;
 
 pub(super) const MAX_CONCURRENCY: usize = 200;
 
-pub(crate) use layer::AutoConcurrencyLimitLayer;
-pub(crate) use service::AutoConcurrencyLimit;
+pub(crate) use layer::AdaptiveConcurrencyLimitLayer;
+pub(crate) use service::AdaptiveConcurrencyLimit;
 
 pub(self) fn instant_now() -> std::time::Instant {
     tokio::time::Instant::now().into()
@@ -23,7 +23,7 @@ pub(self) fn instant_now() -> std::time::Instant {
 // values are the best balances found between competing outcomes.
 #[derive(Clone, Copy, Debug, Derivative, Deserialize, Serialize)]
 #[derivative(Default)]
-pub struct AutoConcurrencySettings {
+pub struct AdaptiveConcurrencySettings {
     // This value maintained high concurrency without holding it too
     // high under adverse conditions.
     #[serde(default)]

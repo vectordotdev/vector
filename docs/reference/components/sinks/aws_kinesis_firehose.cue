@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_kinesis_firehose: {
+components: sinks: aws_kinesis_firehose: components._aws & {
 	title:       "AWS Kinesis Firehose"
 	description: "[Amazon Kinesis Data Firehose](\(urls.aws_kinesis_firehose)) is a fully managed service for delivering real-time streaming data to destinations such as Amazon Simple Storage Service (Amazon S3), Amazon Redshift, Amazon Elasticsearch Service (Amazon ES), and Splunk."
 
@@ -39,7 +39,7 @@ components: sinks: aws_kinesis_firehose: {
 			}
 			request: {
 				enabled:                    true
-				in_flight_limit:            5
+				concurrency:                5
 				rate_limit_duration_secs:   1
 				rate_limit_num:             5
 				retry_initial_backoff_secs: 1
@@ -66,7 +66,7 @@ components: sinks: aws_kinesis_firehose: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

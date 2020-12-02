@@ -7,7 +7,7 @@ use crate::{
     metrics::{self, capture_metrics, get_controller},
     sinks::{
         util::{
-            retries::RetryLogic, BatchSettings, EncodedLength, InFlightLimit, TowerRequestConfig,
+            retries::RetryLogic, BatchSettings, Concurrency, EncodedLength, TowerRequestConfig,
             VecBuffer,
         },
         Healthcheck, VectorSink,
@@ -115,17 +115,17 @@ struct TestParams {
     jitter: f64,
 
     #[serde(default)]
-    concurrency: LimitParams,
+    concurrency_limit_params: LimitParams,
 
     #[serde(default)]
     rate: LimitParams,
 
-    #[serde(default = "default_in_flight_limit")]
-    in_flight_limit: InFlightLimit,
+    #[serde(default = "default_concurrency")]
+    concurrency: Concurrency,
 }
 
-fn default_in_flight_limit() -> InFlightLimit {
-    InFlightLimit::Auto
+fn default_concurrency() -> Concurrency {
+    Concurrency::Adaptive
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -205,7 +205,7 @@ impl TestSink {
     fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
         self.params.delay
             * (1.0
-                + self.params.concurrency.scale(in_flight)
+                + self.params.concurrency_limit_params.scale(in_flight)
                 + self.params.rate.scale(rate)
                 + thread_rng().sample::<f64, _>(Exp1) * self.params.jitter)
     }
@@ -239,7 +239,7 @@ impl Service<Vec<Event>> for TestSink {
 
         let action = self
             .params
-            .concurrency
+            .concurrency_limit_params
             .action_at_level(in_flight)
             .or_else(|| self.params.rate.action_at_level(rate));
         match action {
@@ -359,7 +359,7 @@ async fn run_test(params: TestParams) -> TestResults {
 
     let test_config = TestConfig {
         request: TowerRequestConfig {
-            in_flight_limit: params.in_flight_limit,
+            concurrency: params.concurrency,
             rate_limit_num: Some(9999),
             timeout_secs: Some(1),
             ..Default::default()
@@ -408,21 +408,21 @@ async fn run_test(params: TestParams) -> TestResults {
         .collect::<HashMap<_, _>>();
     // Ensure basic statistics are captured, don't actually examine them
     assert!(
-        matches!(metrics.get("auto_concurrency_observed_rtt").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_observed_rtt").unwrap().value,
                  MetricValue::Distribution { .. })
     );
     assert!(
-        matches!(metrics.get("auto_concurrency_averaged_rtt").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_averaged_rtt").unwrap().value,
                  MetricValue::Distribution { .. })
     );
-    if params.in_flight_limit == InFlightLimit::Auto {
+    if params.concurrency == Concurrency::Adaptive {
         assert!(
-            matches!(metrics.get("auto_concurrency_limit").unwrap().value,
+            matches!(metrics.get("adaptive_concurrency_limit").unwrap().value,
                      MetricValue::Distribution { .. })
         );
     }
     assert!(
-        matches!(metrics.get("auto_concurrency_in_flight").unwrap().value,
+        matches!(metrics.get("adaptive_concurrency_in_flight").unwrap().value,
                  MetricValue::Distribution { .. })
     );
 
@@ -601,7 +601,7 @@ async fn run_compare(file_path: PathBuf, input: TestInput) {
 
 #[tokio::test]
 async fn all_tests() {
-    const PATH: &str = "tests/data/auto-concurrency";
+    const PATH: &str = "tests/data/adaptive-concurrency";
 
     // Read and parse everything first
     let mut entries = read_dir(PATH)

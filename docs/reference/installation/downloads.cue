@@ -7,6 +7,7 @@ installation: downloads: {
 		arch:                 "x86_64"
 		file_name:            "vector-x86_64-unknown-linux-musl.tar.gz"
 		file_type:            "tar.gz"
+		library:              "musl"
 		os:                   "Linux"
 		type:                 "archive"
 	}
@@ -17,6 +18,7 @@ installation: downloads: {
 		arch:                 "ARM64"
 		file_name:            "vector-aarch64-unknown-linux-musl.tar.gz"
 		file_type:            "tar.gz"
+		library:              "musl"
 		os:                   "Linux"
 		type:                 "archive"
 	}
@@ -27,6 +29,7 @@ installation: downloads: {
 		arch:                 "ARMv7"
 		file_name:            "vector-armv7-unknown-linux-gnueabihf.tar.gz"
 		file_type:            "tar.gz"
+		library:              "gnu"
 		os:                   "Linux"
 		type:                 "archive"
 	}
@@ -37,6 +40,7 @@ installation: downloads: {
 		arch:                 "ARMv7"
 		file_name:            "vector-armv7-unknown-linux-musleabihf.tar.gz"
 		file_type:            "tar.gz"
+		library:              "musl"
 		os:                   "Linux"
 		type:                 "archive"
 	}
@@ -47,6 +51,7 @@ installation: downloads: {
 		arch:                 "x86_64"
 		file_name:            "vector-x86_64-apple-darwin.tar.gz"
 		file_type:            "tar.gz"
+		library:              null
 		os:                   "macOS"
 		type:                 "archive"
 	}
@@ -57,6 +62,7 @@ installation: downloads: {
 		arch:                 "x86_64"
 		file_name:            "vector-x86_64-pc-windows-msvc.zip"
 		file_type:            "zip"
+		library:              null
 		os:                   "Windows"
 		type:                 "archive"
 	}
@@ -67,6 +73,7 @@ installation: downloads: {
 		arch:                 "x86_64"
 		file_name:            "vector-x64.msi"
 		file_type:            "msi"
+		library:              null
 		os:                   "Windows"
 		package_manager:      installation.package_managers.msi.name
 		type:                 "package"
@@ -78,6 +85,7 @@ installation: downloads: {
 		arch:                 "x86_64"
 		file_name:            "vector-amd64.deb"
 		file_type:            "deb"
+		library:              "gnu"
 		os:                   "Linux"
 		package_manager:      installation.package_managers.dpkg.name
 		type:                 "package"
@@ -89,6 +97,7 @@ installation: downloads: {
 		arch:                 "ARM64"
 		file_name:            "vector-arm64.deb"
 		file_type:            "deb"
+		library:              "gnu"
 		os:                   "Linux"
 		package_manager:      installation.package_managers.dpkg.name
 		type:                 "package"
@@ -100,6 +109,7 @@ installation: downloads: {
 		arch:                 "ARMv7"
 		file_name:            "vector-armhf.deb"
 		file_type:            "deb"
+		library:              "gnu"
 		os:                   "Linux"
 		package_manager:      installation.package_managers.dpkg.name
 		type:                 "package"
@@ -111,6 +121,7 @@ installation: downloads: {
 		arch:                 "x86_64"
 		file_name:            "vector-x86_64.rpm"
 		file_type:            "rpm"
+		library:              "gnu"
 		os:                   "Linux"
 		package_manager:      installation.package_managers.rpm.name
 		type:                 "package"
@@ -122,6 +133,7 @@ installation: downloads: {
 		arch:                 "ARM64"
 		file_name:            "vector-aarch64.rpm"
 		file_type:            "rpm"
+		library:              "gnu"
 		os:                   "Linux"
 		package_manager:      installation.package_managers.rpm.name
 		type:                 "package"
@@ -133,6 +145,7 @@ installation: downloads: {
 		arch:                 "ARMv7"
 		file_name:            "vector-armv7.rpm"
 		file_type:            "rpm"
+		library:              "gnu"
 		os:                   "Linux"
 		package_manager:      installation.package_managers.rpm.name
 		type:                 "package"

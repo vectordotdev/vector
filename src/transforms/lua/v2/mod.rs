@@ -59,7 +59,7 @@ fn default_config_paths() -> Vec<PathBuf> {
         Some(config_paths) => config_paths
             .clone()
             .into_iter()
-            .map(|mut path_buf| {
+            .map(|(mut path_buf, _format)| {
                 path_buf.pop();
                 path_buf
             })

@@ -1,13 +1,16 @@
 use super::semaphore::ShrinkableSemaphore;
-use super::{instant_now, AutoConcurrencySettings};
-use crate::emit;
-use crate::internal_events::{
-    AutoConcurrencyAveragedRtt, AutoConcurrencyInFlight, AutoConcurrencyLimit,
-    AutoConcurrencyObservedRtt,
-};
-use crate::sinks::util::retries::{RetryAction, RetryLogic};
+use super::{instant_now, AdaptiveConcurrencySettings};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
+use crate::{
+    emit,
+    http::HttpError,
+    internal_events::{
+        AdaptiveConcurrencyAveragedRtt, AdaptiveConcurrencyInFlight, AdaptiveConcurrencyLimit,
+        AdaptiveConcurrencyObservedRtt,
+    },
+    sinks::util::retries::{RetryAction, RetryLogic},
+};
 use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
@@ -19,8 +22,8 @@ use tower::timeout::error::Elapsed;
 #[derive(Clone, Debug)]
 pub(super) struct Controller<L> {
     semaphore: Arc<ShrinkableSemaphore>,
-    in_flight_limit: Option<usize>,
-    settings: AutoConcurrencySettings,
+    concurrency: Option<usize>,
+    settings: AdaptiveConcurrencySettings,
     logic: L,
     pub(super) inner: Arc<Mutex<Inner>>,
     #[cfg(test)]
@@ -49,18 +52,18 @@ pub(super) struct ControllerStatistics {
 
 impl<L> Controller<L> {
     pub(super) fn new(
-        in_flight_limit: Option<usize>,
-        settings: AutoConcurrencySettings,
+        concurrency: Option<usize>,
+        settings: AdaptiveConcurrencySettings,
         logic: L,
     ) -> Self {
-        // If an in_flight_limit is specified, it becomse both the
+        // If a `concurrency` is specified, it becomes both the
         // current limit and the maximum, effectively bypassing all the
         // mechanisms. Otherwise, the current limit is set to 1 and the
         // maximum to MAX_CONCURRENCY.
-        let current_limit = in_flight_limit.unwrap_or(1);
+        let current_limit = concurrency.unwrap_or(1);
         Self {
             semaphore: Arc::new(ShrinkableSemaphore::new(current_limit)),
-            in_flight_limit,
+            concurrency,
             settings,
             logic,
             inner: Arc::new(Mutex::new(Inner {
@@ -95,7 +98,7 @@ impl<L> Controller<L> {
         }
 
         inner.in_flight += 1;
-        emit!(AutoConcurrencyInFlight {
+        emit!(AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
     }
@@ -109,7 +112,7 @@ impl<L> Controller<L> {
 
         let rtt = now.saturating_duration_since(start);
         if use_rtt {
-            emit!(AutoConcurrencyObservedRtt { rtt });
+            emit!(AdaptiveConcurrencyObservedRtt { rtt });
         }
         let rtt = rtt.as_secs_f64();
 
@@ -129,7 +132,7 @@ impl<L> Controller<L> {
         }
 
         inner.in_flight -= 1;
-        emit!(AutoConcurrencyInFlight {
+        emit!(AdaptiveConcurrencyInFlight {
             in_flight: inner.in_flight as u64
         });
 
@@ -158,13 +161,13 @@ impl<L> Controller<L> {
                     }
 
                     if let Some(current_rtt) = current_rtt {
-                        emit!(AutoConcurrencyAveragedRtt {
+                        emit!(AdaptiveConcurrencyAveragedRtt {
                             rtt: Duration::from_secs_f64(current_rtt)
                         });
                     }
 
-                    // Only manage the concurrency if in_flight_limit was set to "auto"
-                    if self.in_flight_limit.is_none() {
+                    // Only manage the concurrency if `concurrency` was set to "adaptive"
+                    if self.concurrency.is_none() {
                         self.manage_limit(&mut inner, past_rtt, current_rtt);
                     }
 
@@ -210,7 +213,7 @@ impl<L> Controller<L> {
             self.semaphore.forget_permits(to_forget);
             inner.current_limit -= to_forget;
         }
-        emit!(AutoConcurrencyLimit {
+        emit!(AdaptiveConcurrencyLimit {
             concurrency: inner.current_limit as u64,
             reached_limit: inner.reached_limit,
             had_back_pressure: inner.had_back_pressure,
@@ -242,8 +245,16 @@ where
                     self.logic.is_retriable_error(error)
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     true
+                } else if error.downcast_ref::<HttpError>().is_some() {
+                    // HTTP protocol-level errors are not backpressure
+                    false
                 } else {
-                    unreachable!("Unhandled error response! {:?}", error)
+                    warn!(
+                        message = "Unhandled error response.",
+                        ?error,
+                        rate_limit_secs = 5
+                    );
+                    false
                 }
             }
         };

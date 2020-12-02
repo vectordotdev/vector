@@ -4,7 +4,10 @@ use crate::{
     event::{Event, Value},
     kafka::{KafkaAuthConfig, KafkaCompression},
     serde::to_string,
-    sinks::util::encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+    sinks::util::{
+        encoding::{EncodingConfig, EncodingConfigWithDefault, EncodingConfiguration},
+        BatchConfig,
+    },
     template::{Template, TemplateError},
 };
 use futures::{
@@ -45,6 +48,9 @@ pub struct KafkaSinkConfig {
     topic: String,
     key_field: Option<String>,
     encoding: EncodingConfigWithDefault<Encoding>,
+    /// These batching options will **not** override librdkafka_options values.
+    #[serde(default)]
+    batch: BatchConfig,
     #[serde(default)]
     compression: KafkaCompression,
     #[serde(flatten)]
@@ -53,7 +59,8 @@ pub struct KafkaSinkConfig {
     socket_timeout_ms: u64,
     #[serde(default = "default_message_timeout_ms")]
     message_timeout_ms: u64,
-    librdkafka_options: Option<HashMap<String, String>>,
+    #[serde(default)]
+    librdkafka_options: HashMap<String, String>,
 }
 
 fn default_socket_timeout_ms() -> u64 {
@@ -138,10 +145,50 @@ impl KafkaSinkConfig {
 
         self.auth.apply(&mut client_config)?;
 
-        if let Some(ref librdkafka_options) = self.librdkafka_options {
-            for (key, value) in librdkafka_options.iter() {
-                client_config.set(key.as_str(), value.as_str());
+        if let Some(queue_buffering_max_ms) = self.batch.timeout_secs {
+            // Delay in milliseconds to wait for messages in the producer queue to accumulate before
+            // constructing message batches (MessageSets) to transmit to brokers. A higher value
+            // allows larger and more effective (less overhead, improved compression) batches of
+            // messages to accumulate at the expense of increased message delivery latency.
+            // Type: float
+            let key = "queue.buffering.max.ms";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.timeout_secs` sets `librdkafka_options.{}={}`.\
+                                    The config already sets this as `librdkafka_options.queue.buffering.max.ms={}`.\
+                                    Please delete one.", key, queue_buffering_max_ms, val).into());
             }
+            client_config.set(key, &(queue_buffering_max_ms * 1000).to_string());
+        }
+        if let Some(batch_num_messages) = self.batch.max_events {
+            // Maximum number of messages batched in one MessageSet. The total MessageSet size is
+            // also limited by batch.size and message.max.bytes.
+            // Type: integer
+            let key = "batch.num.messages";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.max_events` sets `librdkafka_options.{}={}`.\
+                                    The config already sets this as `librdkafka_options.batch.num.messages={}`.\
+                                    Please delete one.", key, batch_num_messages, val).into());
+            }
+            client_config.set(key, &batch_num_messages.to_string());
+        }
+        if let Some(batch_size) = self.batch.max_bytes {
+            // Maximum size (in bytes) of all messages batched in one MessageSet, including protocol
+            // framing overhead. This limit is applied after the first message has been added to the
+            // batch, regardless of the first message's size, this is to ensure that messages that
+            // exceed batch.size are produced. The total MessageSet size is also limited by
+            // batch.num.messages and message.max.bytes.
+            // Type: integer
+            let key = "batch.size";
+            if let Some(val) = self.librdkafka_options.get(key) {
+                return Err(format!("Batching setting `batch.max_bytes` sets `librdkafka_options.{}={}`.\
+                                    The config already sets this as `librdkafka_options.batch.size={}`.\
+                                    Please delete one.", key, batch_size, val).into());
+            }
+            client_config.set(key, &batch_size.to_string());
+        }
+
+        for (key, value) in self.librdkafka_options.iter() {
+            client_config.set(key.as_str(), value.as_str());
         }
 
         Ok(client_config)
@@ -426,10 +473,6 @@ mod integration_test {
     };
     use std::{future::ready, thread, time::Duration};
 
-    const TEST_CA: &str = "tests/data/Vector_CA.crt";
-    const TEST_CRT: &str = "tests/data/localhost.crt";
-    const TEST_KEY: &str = "tests/data/localhost.key";
-
     #[tokio::test]
     async fn healthcheck() {
         let topic = format!("test-{}", random_string(10));
@@ -473,6 +516,84 @@ mod integration_test {
         kafka_happy_path("localhost:9091", None, None, KafkaCompression::Zstd).await;
     }
 
+    fn kafka_batch_options_overrides(
+        batch: BatchConfig,
+        librdkafka_options: HashMap<String, String>,
+    ) -> crate::Result<KafkaSink> {
+        let topic = format!("test-{}", random_string(10));
+        let config = KafkaSinkConfig {
+            bootstrap_servers: "localhost:9091".to_string(),
+            topic: format!("{}-%Y%m%d", topic),
+            compression: KafkaCompression::None,
+            encoding: EncodingConfigWithDefault::from(Encoding::Text),
+            key_field: None,
+            auth: KafkaAuthConfig {
+                sasl: None,
+                tls: None,
+            },
+            socket_timeout_ms: 60000,
+            message_timeout_ms: 300000,
+            batch,
+            librdkafka_options,
+        };
+        let (acker, _ack_counter) = Acker::new_for_testing();
+        KafkaSink::new(config, acker)
+    }
+
+    #[tokio::test]
+    async fn kafka_batch_options_max_bytes_errors_on_double_set() {
+        assert!(kafka_batch_options_overrides(
+            BatchConfig {
+                max_bytes: Some(1000),
+                max_events: None,
+                max_size: None,
+                timeout_secs: None
+            },
+            indexmap::indexmap! {
+                "batch.size".to_string() => 1.to_string(),
+            }
+            .into_iter()
+            .collect()
+        )
+        .is_err())
+    }
+
+    #[tokio::test]
+    async fn kafka_batch_options_max_events_errors_on_double_set() {
+        assert!(kafka_batch_options_overrides(
+            BatchConfig {
+                max_bytes: None,
+                max_events: Some(10),
+                max_size: None,
+                timeout_secs: None
+            },
+            indexmap::indexmap! {
+                "batch.num.messages".to_string() => 1.to_string(),
+            }
+            .into_iter()
+            .collect()
+        )
+        .is_err())
+    }
+
+    #[tokio::test]
+    async fn kafka_batch_options_timeout_secs_errors_on_double_set() {
+        assert!(kafka_batch_options_overrides(
+            BatchConfig {
+                max_bytes: None,
+                max_events: None,
+                max_size: None,
+                timeout_secs: Some(10),
+            },
+            indexmap::indexmap! {
+                "queue.buffering.max.ms".to_string() => 1.to_string(),
+            }
+            .into_iter()
+            .collect()
+        )
+        .is_err())
+    }
+
     #[tokio::test]
     async fn kafka_happy_path_tls() {
         kafka_happy_path(
@@ -480,10 +601,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions {
-                    ca_file: Some(TEST_CA.into()),
-                    ..Default::default()
-                },
+                options: TlsOptions::test_options(),
             }),
             KafkaCompression::None,
         )
@@ -497,13 +615,7 @@ mod integration_test {
             None,
             Some(KafkaTlsConfig {
                 enabled: Some(true),
-                options: TlsOptions {
-                    ca_file: Some(TEST_CA.into()),
-                    // Dummy key, not actually checked by server
-                    crt_file: Some(TEST_CRT.into()),
-                    key_file: Some(TEST_KEY.into()),
-                    ..Default::default()
-                },
+                options: TlsOptions::test_options(),
             }),
             KafkaCompression::None,
         )

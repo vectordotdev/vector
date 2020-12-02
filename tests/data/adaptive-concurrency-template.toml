@@ -5,11 +5,11 @@ delay = 0.050
 interval =
 jitter = 0
 
-concurrency.scale = 0
-concurrency.knee_start = 0
-concurrency.knee_exp = 0.0
-concurrency.limit = 0
-concurrency.action = "defer" | "drop"
+concurrency_limit_params.scale = 0
+concurrency_limit_params.knee_start = 0
+concurrency_limit_params.knee_exp = 0.0
+concurrency_limit_params.limit = 0
+concurrency_limit_params.action = "defer" | "drop"
 
 rate.scale = 0
 rate.knee_start = 0
@@ -17,7 +17,7 @@ rate.knee_exp = 0.0
 rate.limit = 0
 rate.action = "defer" | "drop"
 
-in_flight_limit = "auto"
+concurrency = "auto"
 
 [stats.in_flight]
 max = [,]

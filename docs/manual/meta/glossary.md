@@ -25,7 +25,7 @@ The glossary contains common terms and their definitions.
 
 ## Configuration
 
-"Configuration" refers to the settings and options used to control Vector's behavior. You can learn more about Vector's configuration in the [Configuration][docs.configuration] section.
+"Configuration" refers to the settings and options used to control Vector's behavior. You can learn more about Vector's configuration in the [Configuration][docs.setup.configuration] section.
 
 ## Durability
 
@@ -142,7 +142,7 @@ reducing cost, etc.
 
 "Vector" is the name of this project.
 
-[docs.configuration]: /docs/setup/configuration/
+[docs.setup.configuration]: /docs/setup/configuration/
 [docs.data-model.log]: /docs/about/data-model/log/
 [docs.data-model.metric]: /docs/about/data-model/metric/
 [docs.data_model]: /docs/about/data-model/
