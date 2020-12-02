@@ -30,7 +30,10 @@ pub enum Mode {
     Tcp(tcp::TcpConfig),
     Udp(udp::UdpConfig),
     #[cfg(unix)]
-    Unix(unix::UnixConfig),
+    UnixDatagram(unix::UnixConfig),
+    #[cfg(unix)]
+    #[serde(alias = "unix")]
+    UnixStream(unix::UnixConfig),
 }
 
 impl SocketConfig {
@@ -51,15 +54,6 @@ impl From<udp::UdpConfig> for SocketConfig {
     fn from(config: udp::UdpConfig) -> Self {
         SocketConfig {
             mode: Mode::Udp(config),
-        }
-    }
-}
-
-#[cfg(unix)]
-impl From<unix::UnixConfig> for SocketConfig {
-    fn from(config: unix::UnixConfig) -> Self {
-        SocketConfig {
-            mode: Mode::Unix(config),
         }
     }
 }
@@ -115,11 +109,24 @@ impl SourceConfig for SocketConfig {
                 ))
             }
             #[cfg(unix)]
-            Mode::Unix(config) => {
+            Mode::UnixDatagram(config) => {
                 let host_key = config
                     .host_key
                     .unwrap_or_else(|| log_schema().host_key().to_string());
-                Ok(unix::unix(
+                Ok(unix::unix_datagram(
+                    config.path,
+                    config.max_length,
+                    host_key,
+                    shutdown,
+                    out,
+                ))
+            }
+            #[cfg(unix)]
+            Mode::UnixStream(config) => {
+                let host_key = config
+                    .host_key
+                    .unwrap_or_else(|| log_schema().host_key().to_string());
+                Ok(unix::unix_stream(
                     config.path,
                     config.max_length,
                     host_key,
@@ -143,7 +150,9 @@ impl SourceConfig for SocketConfig {
             Mode::Tcp(tcp) => vec![tcp.address.into()],
             Mode::Udp(udp) => vec![udp.address.into()],
             #[cfg(unix)]
-            Mode::Unix(_) => vec![],
+            Mode::UnixDatagram(_) => vec![],
+            #[cfg(unix)]
+            Mode::UnixStream(_) => vec![],
         }
     }
 }
@@ -181,10 +190,13 @@ mod test {
     };
     #[cfg(unix)]
     use {
-        super::unix::UnixConfig,
+        super::{unix::UnixConfig, Mode},
         futures::SinkExt,
         std::path::PathBuf,
-        tokio::{net::UnixStream, task::yield_now},
+        tokio::{
+            net::{UnixDatagram, UnixStream},
+            task::yield_now,
+        },
         tokio_util::codec::{FramedWrite, LinesCodec},
     };
 
@@ -688,12 +700,18 @@ mod test {
         assert!(pump_handle.join().is_ok());
     }
 
-    ////////////// UNIX TESTS //////////////
+    ////////////// UNIX TEST LIBS //////////////
     #[cfg(unix)]
-    async fn init_unix(sender: Pipeline) -> PathBuf {
+    async fn init_unix(sender: Pipeline, stream: bool) -> PathBuf {
         let in_path = tempfile::tempdir().unwrap().into_path().join("unix_test");
 
-        let server = SocketConfig::from(UnixConfig::new(in_path.clone()))
+        let config = UnixConfig::new(in_path.clone());
+        let mode = if stream {
+            Mode::UnixStream(config)
+        } else {
+            Mode::UnixDatagram(config)
+        };
+        let server = SocketConfig { mode }
             .build(
                 "default",
                 &GlobalOptions::default(),
@@ -705,7 +723,12 @@ mod test {
         tokio::spawn(server);
 
         // Wait for server to accept traffic
-        while std::os::unix::net::UnixStream::connect(&in_path).is_err() {
+        while if stream {
+            std::os::unix::net::UnixStream::connect(&in_path).is_err()
+        } else {
+            let socket = std::os::unix::net::UnixDatagram::unbound().unwrap();
+            socket.connect(&in_path).is_err()
+        } {
             yield_now().await;
         }
 
@@ -713,25 +736,19 @@ mod test {
     }
 
     #[cfg(unix)]
-    async fn send_lines_unix(path: PathBuf, lines: Vec<&str>) {
-        let socket = UnixStream::connect(path).await.unwrap();
-        let mut sink = FramedWrite::new(socket, LinesCodec::new());
-
-        let lines = lines.into_iter().map(|s| Ok(s.to_string()));
-        let lines = lines.collect::<Vec<_>>();
-        sink.send_all(&mut stream::iter(lines)).await.unwrap();
-
-        let socket = sink.into_inner();
-        socket.shutdown(std::net::Shutdown::Both).unwrap();
+    async fn unix_send_lines(stream: bool, path: PathBuf, lines: &[&str]) {
+        match stream {
+            false => send_lines_unix_datagram(path, lines).await,
+            true => send_lines_unix_stream(path, lines).await,
+        }
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn unix_message() {
+    async fn unix_message(stream: bool) {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx).await;
+        let path = init_unix(tx, stream).await;
 
-        send_lines_unix(path, vec!["test"]).await;
+        unix_send_lines(stream, path, &["test"]).await;
 
         let events = collect_n(rx, 1).await.unwrap();
 
@@ -747,12 +764,11 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn unix_multiple_messages() {
+    async fn unix_multiple_messages(stream: bool) {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx).await;
+        let path = init_unix(tx, stream).await;
 
-        send_lines_unix(path, vec!["test\ntest2"]).await;
+        unix_send_lines(stream, path, &["test\ntest2"]).await;
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(2, events.len());
@@ -767,12 +783,11 @@ mod test {
     }
 
     #[cfg(unix)]
-    #[tokio::test]
-    async fn unix_multiple_packets() {
+    async fn unix_multiple_packets(stream: bool) {
         let (tx, rx) = Pipeline::new_test();
-        let path = init_unix(tx).await;
+        let path = init_unix(tx, stream).await;
 
-        send_lines_unix(path, vec!["test", "test2"]).await;
+        unix_send_lines(stream, path, &["test", "test2"]).await;
         let events = collect_n(rx, 2).await.unwrap();
 
         assert_eq!(2, events.len());
@@ -784,5 +799,100 @@ mod test {
             events[1].as_log()[log_schema().message_key()],
             "test2".into()
         );
+    }
+
+    #[cfg(unix)]
+    fn parses_unix_config(name: &str) -> SocketConfig {
+        toml::from_str::<SocketConfig>(&format!(
+            r#"
+               mode = "{}"
+               path = "/does/not/exist"
+            "#,
+            name
+        ))
+        .unwrap()
+    }
+
+    ////////////// UNIX DATAGRAM TESTS //////////////
+    #[cfg(unix)]
+    async fn send_lines_unix_datagram(path: PathBuf, lines: &[&str]) {
+        let mut socket = UnixDatagram::unbound().unwrap();
+        socket.connect(path).unwrap();
+
+        for line in lines {
+            socket.send(format!("{}\n", line).as_bytes()).await.unwrap();
+        }
+        socket.shutdown(std::net::Shutdown::Both).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_message() {
+        unix_message(false).await
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_multiple_messages() {
+        unix_multiple_messages(false).await
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_datagram_multiple_packets() {
+        unix_multiple_packets(false).await
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_unix_datagram_config() {
+        let config = parses_unix_config("unix_datagram");
+        assert!(matches!(config.mode,Mode::UnixDatagram { .. }));
+    }
+
+    ////////////// UNIX STREAM TESTS //////////////
+    #[cfg(unix)]
+    async fn send_lines_unix_stream(path: PathBuf, lines: &[&str]) {
+        let socket = UnixStream::connect(path).await.unwrap();
+        let mut sink = FramedWrite::new(socket, LinesCodec::new());
+
+        let lines = lines.iter().map(|s| Ok(s.to_string()));
+        let lines = lines.collect::<Vec<_>>();
+        sink.send_all(&mut stream::iter(lines)).await.unwrap();
+
+        let socket = sink.into_inner();
+        socket.shutdown(std::net::Shutdown::Both).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_stream_message() {
+        unix_message(true).await
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_stream_multiple_messages() {
+        unix_multiple_messages(true).await
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn unix_stream_multiple_packets() {
+        unix_multiple_packets(true).await
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_new_unix_stream_config() {
+        let config = parses_unix_config("unix_stream");
+        assert!(matches!(config.mode,Mode::UnixStream { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parses_old_unix_stream_config() {
+        let config = parses_unix_config("unix");
+        assert!(matches!(config.mode,Mode::UnixStream { .. }));
     }
 }

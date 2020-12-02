@@ -99,9 +99,10 @@ components: sources: socket: {
 			warnings: []
 			type: string: {
 				enum: {
-					tcp:  "TCP Socket."
-					udp:  "UDP Socket."
-					unix: "Unix Domain Socket."
+					tcp:           "TCP socket."
+					udp:           "UDP socket."
+					unix_datagram: "Unix domain datagram socket."
+					unix_stream:   "Unix domain stream socket."
 				}
 			}
 		}
