@@ -39,13 +39,15 @@ components: sinks: [Name=string]: {
 									}
 								}
 							}
-							timeout_secs: {
-								common:      true
-								description: "The maximum age of a batch before it is flushed."
-								required:    false
-								type: uint: {
-									default: sinks[Name].features.send.batch.timeout_secs
-									unit:    "seconds"
+							if sinks[Name].features.send.batch.timeout_secs != null {
+								timeout_secs: {
+									common:      true
+									description: "The maximum age of a batch before it is flushed."
+									required:    false
+									type: uint: {
+										default: sinks[Name].features.send.batch.timeout_secs
+										unit:    "seconds"
+									}
 								}
 							}
 						}
@@ -323,7 +325,7 @@ components: sinks: [Name=string]: {
 				if sinks[Name].features.send.batch != _|_ {
 					if sinks[Name].features.send.batch.enabled {
 						buffers_batches: {
-							title: "Buffers & Batches"
+							title: "Buffers & batches"
 							body: #"""
 									<SVG src="/optimized_svg/buffers-and-batches-serial_538_160.svg" />
 
@@ -358,9 +360,10 @@ components: sinks: [Name=string]: {
 				}
 			}
 		}
+
 		if sinks[Name].features.healthcheck.enabled {
 			healthchecks: {
-				title: "Health Checks"
+				title: "Health checks"
 				body: """
 					Health checks ensure that the downstream service is
 					accessible and ready to accept data. This check is performed
@@ -389,6 +392,98 @@ components: sinks: [Name=string]: {
 								"""
 					},
 				]
+			}
+		}
+
+		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.request.enabled {
+				partitioning: _ | *{
+					title: "Partitioning"
+					body: """
+						Vector supports dynamic configuration values through a simple
+						template syntax. If an option supports templating, it will be
+						noted with a badge and you can use event fields to create dynamic
+						values. For example:
+
+						```toml title="vector.toml"
+						[sinks.my-sink]
+							dynamic_option = "application={{ application_id }}"
+						```
+
+						In the above example, the `application_id` for each event will be
+						used to partition outgoing data.
+						"""
+				}
+			}
+		}
+
+		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.request.enabled {
+				rate_limits: {
+					title: "Rate limits & adapative concurrency"
+					body:  null
+					sub_sections: [
+						{
+							title: "Adaptive Request Concurrency (ARC)"
+							body:  """
+								Adaptive Requst Concurrency is a feature of Vector that does away
+								with static rate limits and automatically optimizes HTTP
+								concurrency limits based on downstream service responses. The
+								underlying mechanism is a feedback loop inspired by TCP congestion
+								control algorithms. Checkout the [announcement blog post](\(urls.adaptive_request_concurrency_post)),
+
+								We highly recommend enabling this feature as it improves
+								performance and reliability of Vector and the systems it
+								communicates with.
+
+								To enable, set the `request.concurrency` option to `adaptive`:
+
+								```toml title="vector.toml"
+								[sinks.my-sink]
+								  request.concurrency = "adaptive"
+								```
+								"""
+						},
+						{
+							title: "Static rate limits"
+							body: """
+								If Adaptive Request Concurrency is not for you, you can manually
+								set static rate limits with the `request.rate_limit_duration_secs`,
+								`request.rate_limit_num`, and `request.concurrency` options:
+
+								```toml title="vector.toml"
+								[sinks.my-sink]
+								  request.rate_limit_duration_secs = 1
+								  request.rate_limit_num = 10
+								  request.concurrency = 10
+								```
+								"""
+						},
+					]
+				}
+
+				retry_policy: {
+					title: "Retry policy"
+					body: """
+						Vector will retry failed requests (status == 429, >= 500, and != 501).
+						Other responses will not be retried. You can control the number of
+						retry attempts and backoff rate with the `request.retry_attempts` and
+						`request.retry_backoff_secs` options.
+						"""
+				}
+			}
+		}
+
+		if sinks[Name].features.send != _|_ {
+			if sinks[Name].features.send.tls.enabled {
+				transport_layer_security: {
+					title: "Transport Layer Security (TLS)"
+					body:  """
+						Vector uses [Openssl](\(urls.openssl)) for TLS protocols for it's
+						maturity. You can enable and adjust TLS behavior via the `tls.*`
+						options.
+						"""
+				}
 			}
 		}
 	}

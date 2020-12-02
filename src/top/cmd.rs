@@ -71,8 +71,8 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 
     let subscription_client = match connect_subscription_client(ws_url).await {
         Ok(c) => c,
-        _ => {
-            eprintln!("Couldn't connect to Vector API via WebSockets.");
+        Err(e) => {
+            eprintln!("Couldn't connect to Vector API via WebSockets: {:?}", e);
             return exitcode::UNAVAILABLE;
         }
     };

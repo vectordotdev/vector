@@ -12,7 +12,7 @@ remap: functions: sha1: {
 	return: ["string"]
 	category: "hash"
 	description: #"""
-			Calculates a sha1 hash of a given string.
+		Calculates a sha1 hash of a given string.
 		"""#
 	examples: [
 		{

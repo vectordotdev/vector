@@ -41,6 +41,10 @@ components: {
 		kind: #ComponentKind
 		let Kind = kind
 
+		installation?: {
+			platform_name: string | null
+		}
+
 		configuration: #Schema
 
 		// `description` describes the components with a single paragraph.
@@ -136,8 +140,10 @@ components: {
 	// `#EgressMethod` specified how a component outputs events.
 	//
 	// * `batch` - one or more events at a time
+	// * `dynamic` - can switch between batch and stream based on configuration.
+	// * `expose` - exposes data, ex: prometheus_exporter sink
 	// * `stream` - one event at a time
-	#EgressMethod: "batch" | "expose" | "stream"
+	#EgressMethod: "batch" | "dynamic" | "expose" | "stream"
 
 	#EnvVars: #Schema & {[Type=string]: {
 		common:   true
@@ -269,7 +275,7 @@ components: {
 		}
 		let Args = _args
 
-		if Args.egress_method == "batch" {
+		if Args.egress_method == "batch" || Args.egress_method == "dynamic" {
 			// `batch` describes how the component batches data. This is only
 			// relevant if a component has an `egress_method` of "batch".
 			batch: close({
@@ -277,7 +283,7 @@ components: {
 				common:       bool
 				max_bytes:    uint | null
 				max_events:   uint | null
-				timeout_secs: uint16
+				timeout_secs: uint16 | null
 			})
 		}
 
@@ -394,18 +400,15 @@ components: {
 	#Support: {
 		_args: kind: string
 
-		// `platforms` describes which platforms this component is available on.
-		//
-		// For example, the `journald` source is only available on Linux
-		// environments.
-		platforms: #TargetTriples
-
 		// `requirements` describes any external requirements that the component
 		// needs to function properly.
 		//
 		// For example, the `journald` source requires the presence of the
 		// `journalctl` binary.
 		requirements: [...string] | null // Allow for empty list
+
+		// `targets` describes which targets this component is available on.
+		targets: #TargetTriples
 
 		// `warnings` describes any warnings the user should know about the
 		// component.
@@ -738,6 +741,34 @@ components: {
 						warnings: []
 						type: string: {
 							examples: [Args.username_example, "username"]
+						}
+					}
+				}
+			}
+
+			_http_basic_auth: {
+				common:      false
+				description: "Options for HTTP Basic Authentication."
+				required:    false
+				warnings: []
+				type: object: {
+					examples: []
+					options: {
+						username: {
+							description: "The basic authentication user name."
+							required:    true
+							warnings: []
+							type: string: {
+								examples: ["${HTTP_USERNAME}", "username"]
+							}
+						}
+						password: {
+							description: "The basic authentication password."
+							required:    true
+							warnings: []
+							type: string: {
+								examples: ["${HTTP_PASSWORD}", "password"]
+							}
 						}
 					}
 				}

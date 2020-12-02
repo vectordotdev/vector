@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_s3: {
+components: sinks: aws_s3: components._aws & {
 	title:       "AWS S3"
 	description: "[Amazon Simple Storage Service (Amazon S3)](\(urls.aws_s3)) is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
 
@@ -66,7 +66,7 @@ components: sinks: aws_s3: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -275,7 +275,7 @@ components: sinks: aws_s3: {
 
 	how_it_works: {
 		cross_account: {
-			title: "Cross Account Object Writing"
+			title: "Cross account object writing"
 			body:  """
 				If you're using Vector to write objects across AWS accounts then you should
 				consider setting the `grant_full_control` option to the bucket owner's
@@ -308,7 +308,7 @@ components: sinks: aws_s3: {
 		}
 
 		object_naming: {
-			title: "Object Naming"
+			title: "Object naming"
 			body:  """
 				By default, Vector will name your S3 objects in the following format:
 
@@ -358,8 +358,21 @@ components: sinks: aws_s3: {
 				"""
 		}
 
+		object_tags_and_metadata: {
+			title: "Object Tags & metadata"
+			body:  """
+				Vector currently only supports [AWS S3 object tags](\(urls.aws_s3_tags)) and does
+				_not_ support [object metadata](\(urls.aws_s3_metadata)). If you require metadata
+				support see [issue #1694](\(urls.issue_1694)).
+
+				We believe tags are more flexible since they are separate from the actual S3
+				object. You can freely modify tags without modifying the object. Conversely,
+				object metadata requires a full rewrite of the object to make changes.
+				"""
+		}
+
 		server_side_encryption: {
-			title: "Server-side Encryption"
+			title: "Server-Side Encryption (SSE)"
 			body:  """
 				AWS S3 offers [server-side encryption](\(urls.aws_s3_sse)). You can apply defaults
 				at the bucket level or set the encryption at the object level. In the context,
@@ -371,26 +384,13 @@ components: sinks: aws_s3: {
 		}
 
 		storage_class: {
-			title: "Storage Class"
+			title: "Storage class"
 			body:  """
 				AWS S3 offers [storage classes](\(urls.aws_s3_storage_classes)). You can apply
 				defaults, and rules, at the bucket level or set the storage class at the object
 				level. In the context of Vector only the object level is relevant (Vector does
 				not create or modify buckets). You can set the storage class via the
 				`storage_class` option.
-				"""
-		}
-
-		tags_and_metadata: {
-			title: "Tags & Metadata"
-			body:  """
-				Vector currently only supports [AWS S3 object tags](\(urls.aws_s3_tags)) and does
-				_not_ support [object metadata](\(urls.aws_s3_metadata)). If you require metadata
-				support see [issue #1694](\(urls.issue_1694)).
-
-				We believe tags are more flexible since they are separate from the actual S3
-				object. You can freely modify tags without modifying the object. Conversely,
-				object metadata requires a full rewrite of the object to make changes.
 				"""
 		}
 	}

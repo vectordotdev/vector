@@ -12,6 +12,7 @@ set -u
 
 # If PACKAGE_ROOT is unset or empty, default it.
 PACKAGE_ROOT="${PACKAGE_ROOT:-"https://packages.timber.io/vector"}"
+VECTOR_VERSION="0.11.0"
 _divider="--------------------------------------------------------------------------------"
 _prompt=">>>"
 _indent="   "
@@ -147,12 +148,12 @@ install_from_archive() {
             ;;
     esac
 
-    local _url="${PACKAGE_ROOT}/latest/vector-${_archive_arch}.tar.gz"
+    local _url="${PACKAGE_ROOT}/latest/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     local _dir
     _dir="$(mktemp -d 2>/dev/null || ensure mktemp -d -t vector-install)"
 
-    local _file="${_dir}/vector-${_archive_arch}.tar.gz"
+    local _file="${_dir}/vector-${VECTOR_VERSION}-${_archive_arch}.tar.gz"
 
     ensure mkdir -p "$_dir"
 

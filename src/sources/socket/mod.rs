@@ -294,14 +294,7 @@ mod test {
 
         let mut config = TcpConfig::new(addr.into());
         config.max_length = 10;
-        config.tls = Some(TlsConfig {
-            enabled: Some(true),
-            options: TlsOptions {
-                crt_file: Some("tests/data/localhost.crt".into()),
-                key_file: Some("tests/data/localhost.key".into()),
-                ..Default::default()
-            },
-        });
+        config.tls = Some(TlsConfig::test_config());
 
         let server = SocketConfig::from(config)
             .build(

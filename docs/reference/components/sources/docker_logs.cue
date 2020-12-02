@@ -2,7 +2,7 @@ package metadata
 
 components: sources: docker_logs: {
 	title:       "Docker"
-	description: installation.platforms.docker.description
+	description: "Test."
 
 	alias: "docker"
 
@@ -10,7 +10,7 @@ components: sources: docker_logs: {
 		commonly_used: false
 		delivery:      "best_effort"
 		deployment_roles: ["daemon"]
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
@@ -81,7 +81,7 @@ components: sources: docker_logs: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-pc-windows-msv":      true
@@ -102,6 +102,10 @@ components: sources: docker_logs: {
 				""",
 		]
 		notices: []
+	}
+
+	installation: {
+		platform_name: "docker"
 	}
 
 	configuration: {

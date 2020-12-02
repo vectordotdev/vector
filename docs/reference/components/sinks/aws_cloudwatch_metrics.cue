@@ -1,13 +1,13 @@
 package metadata
 
-components: sinks: aws_cloudwatch_metrics: {
+components: sinks: aws_cloudwatch_metrics: components._aws & {
 	title:       "AWS Cloudwatch Metrics"
 	description: sinks._aws_cloudwatch.description
 
 	classes: {
 		commonly_used: false
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "batch"
 		service_providers: ["AWS"]
 	}
@@ -51,7 +51,7 @@ components: sinks: aws_cloudwatch_metrics: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

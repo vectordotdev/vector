@@ -1,8 +1,9 @@
 package metadata
 
-components: sources: prometheus: {
+components: sources: prometheus_scrape: {
 	title:       "Prometheus"
 	description: "[Prometheus](\(urls.prometheus)) is a pull-based monitoring system that scrapes metrics from configured endpoints, stores them efficiently, and supports a powerful query language to compose dynamic information from a variety of otherwise unrelated data points."
+	alias:       "prometheus"
 
 	classes: {
 		commonly_used: false
@@ -45,7 +46,7 @@ components: sources: prometheus: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -57,6 +58,10 @@ components: sources: prometheus: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {

@@ -24,6 +24,11 @@ pub struct EncodingConfigWithDefault<E: Default + PartialEq> {
         skip_serializing_if = "crate::serde::skip_serializing_if_default"
     )]
     pub(crate) codec: E,
+    #[serde(
+        default,
+        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+    )]
+    pub(crate) schema: Option<String>,
     /// Keep only the following fields of the message. (Items mutually exclusive with `except_fields`)
     #[serde(
         default,
@@ -48,6 +53,9 @@ impl<E: Default + PartialEq> EncodingConfiguration<E> for EncodingConfigWithDefa
     fn codec(&self) -> &E {
         &self.codec
     }
+    fn schema(&self) -> &Option<String> {
+        &self.schema
+    }
     fn only_fields(&self) -> &Option<Vec<LookupBuf>> {
         &self.only_fields
     }
@@ -70,6 +78,7 @@ where
     {
         EncodingConfigWithDefault {
             codec: self.codec.into(),
+            schema: self.schema,
             only_fields: self.only_fields,
             except_fields: self.except_fields,
             timestamp_format: self.timestamp_format,
@@ -82,6 +91,7 @@ where
     {
         EncodingConfig {
             codec: self.codec.into(),
+            schema: self.schema,
             only_fields: self.only_fields,
             except_fields: self.except_fields,
             timestamp_format: self.timestamp_format,
@@ -96,12 +106,14 @@ where
     fn into(self) -> EncodingConfig<E> {
         let Self {
             codec,
+            schema,
             only_fields,
             except_fields,
             timestamp_format,
         } = self;
         EncodingConfig {
             codec,
+            schema,
             only_fields,
             except_fields,
             timestamp_format,
@@ -113,6 +125,7 @@ impl<E: Default + PartialEq> From<E> for EncodingConfigWithDefault<E> {
     fn from(codec: E) -> Self {
         Self {
             codec,
+            schema: Default::default(),
             only_fields: Default::default(),
             except_fields: Default::default(),
             timestamp_format: Default::default(),
@@ -155,6 +168,7 @@ where
             {
                 Ok(Self::Value {
                     codec: T::deserialize(value.into_deserializer())?,
+                    schema: Default::default(),
                     only_fields: Default::default(),
                     except_fields: Default::default(),
                     timestamp_format: Default::default(),
@@ -177,6 +191,7 @@ where
 
         let concrete = Self {
             codec: inner.codec,
+            schema: inner.schema,
             only_fields: inner.only_fields,
             except_fields: inner.except_fields,
             timestamp_format: inner.timestamp_format,
@@ -191,6 +206,8 @@ where
 pub struct InnerWithDefault<E: Default> {
     #[serde(default)]
     codec: E,
+    #[serde(default)]
+    schema: Option<String>,
     #[serde(default)]
     only_fields: Option<Vec<LookupBuf>>,
     #[serde(default)]

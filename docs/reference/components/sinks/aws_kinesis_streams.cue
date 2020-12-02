@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_kinesis_streams: {
+components: sinks: aws_kinesis_streams: components._aws & {
 	title:       "AWS Kinesis Data Streams"
 	description: "[Amazon Kinesis Data Streams](\(urls.aws_kinesis_streams)) is a scalable and durable real-time data streaming service that can continuously capture gigabytes of data per second from hundreds of thousands of sources. Making it an excellent candidate for streaming logs and metrics data."
 
@@ -66,7 +66,7 @@ components: sinks: aws_kinesis_streams: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

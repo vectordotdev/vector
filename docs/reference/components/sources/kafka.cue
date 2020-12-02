@@ -25,11 +25,15 @@ components: sources: kafka: {
 		commonly_used: true
 		deployment_roles: ["aggregator"]
 		delivery:      "at_least_once"
-		development:   "beta"
+		development:   "stable"
 		egress_method: "stream"
 	}
 
 	support: components._kafka.support
+
+	installation: {
+		platform_name: null
+	}
 
 	configuration: {
 		auto_offset_reset: {

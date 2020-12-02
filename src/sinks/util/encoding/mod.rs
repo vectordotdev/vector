@@ -46,6 +46,7 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
+    fn schema(&self) -> &Option<String>;
     fn only_fields(&self) -> &Option<Vec<LookupBuf>>;
     fn except_fields(&self) -> &Option<Vec<LookupBuf>>;
     fn timestamp_format(&self) -> &Option<TimestampFormat>;

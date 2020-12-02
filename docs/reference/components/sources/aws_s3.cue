@@ -1,6 +1,6 @@
 package metadata
 
-components: sources: aws_s3: {
+components: sources: aws_s3: components._aws & {
 	title:       "AWS S3"
 	description: "[Amazon Simple Storage Service (Amazon S3)][urls.aws_s3] is a scalable, high-speed, web-based cloud storage service designed for online backup and archiving of data and applications on Amazon Web Services. It is very commonly used to store log data."
 
@@ -43,7 +43,7 @@ components: sources: aws_s3: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true
@@ -55,6 +55,10 @@ components: sources: aws_s3: {
 		requirements: []
 		warnings: []
 		notices: []
+	}
+
+	installation: {
+		platform_name: null
 	}
 
 	configuration: {

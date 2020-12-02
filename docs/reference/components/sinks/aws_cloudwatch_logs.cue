@@ -1,6 +1,6 @@
 package metadata
 
-components: sinks: aws_cloudwatch_logs: {
+components: sinks: aws_cloudwatch_logs: components._aws & {
 	title:       "AWS Cloudwatch Logs"
 	description: sinks._aws_cloudwatch.description
 
@@ -67,7 +67,7 @@ components: sinks: aws_cloudwatch_logs: {
 	}
 
 	support: {
-		platforms: {
+		targets: {
 			"aarch64-unknown-linux-gnu":  true
 			"aarch64-unknown-linux-musl": true
 			"x86_64-apple-darwin":        true

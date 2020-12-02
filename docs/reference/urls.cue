@@ -1,6 +1,7 @@
 package metadata
 
 urls: {
+	adaptive_request_concurrency_post:                        "/blog/adaptive-request-concurrency/"
 	amazon_linux:                                             "https://aws.amazon.com/amazon-linux-ami/"
 	apache:                                                   "https://httpd.apache.org/"
 	apache_extended_status:                                   "https://httpd.apache.org/docs/current/mod/core.html#extendedstatus"
@@ -340,6 +341,7 @@ urls: {
 	tcp:                                                      "https://en.wikipedia.org/wiki/Transmission_Control_Protocol"
 	team:                                                     "/community#team"
 	timber:                                                   "https://timber.io"
+	timber_remap_language_reference:                          "https://vector.dev/docs/reference/remap/"
 	toml:                                                     "https://github.com/toml-lang/toml"
 	toml_array:                                               "https://github.com/toml-lang/toml#array"
 	toml_table:                                               "https://github.com/toml-lang/toml#table"
@@ -396,6 +398,7 @@ urls: {
 	vector_receiving_sources:                                 "https://vector.dev/components/?functions%5B%5D=receive"
 	vector_regex_parser:                                      "https://vector.dev/docs/reference/transforms/regex_parser/"
 	vector_releases:                                          "https://vector.dev/releases/latest/"
+	vector_remap_transform:                                   "https://vector.dev/docs/reference/transforms/remap/"
 	vector_repo:                                              "https://github.com/timberio/vector"
 	vector_roadmap:                                           "https://roadmap.vector.dev"
 	vector_rpm_source_files:                                  "https://github.com/timberio/vector/tree/master/distribution/rpm"

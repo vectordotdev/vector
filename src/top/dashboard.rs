@@ -157,7 +157,7 @@ impl<'a> Widgets<'a> {
             ];
 
             data.extend_from_slice(&formatted_metrics);
-            Row::StyledData(data.into_iter(), Style::default().fg(Color::White))
+            Row::StyledData(data.into_iter(), Style::default())
         });
 
         let w = Table::new(COMPONENT_HEADERS.iter(), items)
