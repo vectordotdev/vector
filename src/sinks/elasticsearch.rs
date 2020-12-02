@@ -3,7 +3,7 @@ use crate::{
     emit,
     event::Event,
     http::{Auth, HttpClient},
-    internal_events::{ElasticSearchEventReceived, ElasticSearchMissingKeys},
+    internal_events::{ElasticSearchEventEncoded, ElasticSearchMissingKeys},
     rusoto::{self, region_from_endpoint, RegionOrEndpoint},
     sinks::util::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
