@@ -42,9 +42,9 @@ jobs:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: benches.yml
           branch: master
-          name: vector-benches
+          name: criterion
           path: target/criterion
-      - run: zip --recurse-paths target/criterion.zip target/criterion
+      - run: unzip target/criterion.zip
         continue-on-error: true
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
@@ -54,7 +54,7 @@ jobs:
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
-          name: "vector-benches"
+          name: "criterion"
           path: "./target/criterion.zip"
 
   master-failure:
