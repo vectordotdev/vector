@@ -1097,7 +1097,7 @@ mod reload_tests {
         let (mut topology, crash) = start_topology(old_config, false).await;
         let mut crash = crash.compat();
 
-        // Wait for sink to come onlineEncoding
+        // Wait for sink to come online
         wait_for_tcp(old_address).await;
 
         // Give topology some time to run
