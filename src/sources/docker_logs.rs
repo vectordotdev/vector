@@ -1296,29 +1296,38 @@ mod integration_tests {
             .await
     }
 
-    #[test]
-    fn config_allows_inclusion_or_exclusion() {
+
+    fn test_config(config: DockerLogsConfig, expect_ok: bool) {
         let (sender, _) = Pipeline::new_test();
         let shutdown = ShutdownSignal::noop();
+        let source = DockerLogsSource::new(config, sender, shutdown);
+        if expect_ok {
+            assert!(source.is_ok());
+        } else {
+            assert!(source.is_err());
+        }
+    }
 
+    #[test]
+    fn config_allows_inclusion_or_exclusion() {
         let good_config_1 = DockerLogsConfig {
             include_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_1, sender.clone(), shutdown).is_ok());
+        test_config(good_config_1, true);
 
         let good_config_2 = DockerLogsConfig {
             exclude_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_2, sender.clone(), shutdown).is_ok());
+        test_config(good_config_2, true);
 
         let errant_config = DockerLogsConfig {
             exclude_containers: Some(vec!["container1".to_owned()]),
             include_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(errant_config, sender.clone(), shutdown).is_err());
+        test_config(errant_config, false);
     }
 
     #[tokio::test]
