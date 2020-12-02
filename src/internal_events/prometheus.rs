@@ -139,7 +139,7 @@ impl InternalEvent for PrometheusRemoteWriteReceived {
     }
 
     fn emit_metrics(&self) {
-        counter!("events_processed_total", self.count as u64);
+        counter!("processed_events_total", self.count as u64);
         counter!("processed_bytes_total", self.byte_size as u64);
     }
 }
