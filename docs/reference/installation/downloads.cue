@@ -5,7 +5,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "x86_64"
-		file_name:            "vector-x86_64-unknown-linux-musl.tar.gz"
+		file_name:            "vector-{version}-x86_64-unknown-linux-musl.tar.gz"
 		file_type:            "tar.gz"
 		library:              "musl"
 		os:                   "Linux"
@@ -16,7 +16,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "ARM64"
-		file_name:            "vector-aarch64-unknown-linux-musl.tar.gz"
+		file_name:            "vector-{version}-aarch64-unknown-linux-musl.tar.gz"
 		file_type:            "tar.gz"
 		library:              "musl"
 		os:                   "Linux"
@@ -27,7 +27,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "ARMv7"
-		file_name:            "vector-armv7-unknown-linux-gnueabihf.tar.gz"
+		file_name:            "vector-{version}-armv7-unknown-linux-gnueabihf.tar.gz"
 		file_type:            "tar.gz"
 		library:              "gnu"
 		os:                   "Linux"
@@ -38,7 +38,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "ARMv7"
-		file_name:            "vector-armv7-unknown-linux-musleabihf.tar.gz"
+		file_name:            "vector-{version}-armv7-unknown-linux-musleabihf.tar.gz"
 		file_type:            "tar.gz"
 		library:              "musl"
 		os:                   "Linux"
@@ -49,7 +49,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "x86_64"
-		file_name:            "vector-x86_64-apple-darwin.tar.gz"
+		file_name:            "vector-{version}-x86_64-apple-darwin.tar.gz"
 		file_type:            "tar.gz"
 		library:              null
 		os:                   "macOS"
@@ -60,7 +60,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "x86_64"
-		file_name:            "vector-x86_64-pc-windows-msvc.zip"
+		file_name:            "vector-{version}-x86_64-pc-windows-msvc.zip"
 		file_type:            "zip"
 		library:              null
 		os:                   "Windows"
@@ -71,7 +71,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "x86_64"
-		file_name:            "vector-x64.msi"
+		file_name:            "vector-{version}-x64.msi"
 		file_type:            "msi"
 		library:              null
 		os:                   "Windows"
@@ -83,7 +83,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "x86_64"
-		file_name:            "vector-amd64.deb"
+		file_name:            "vector-{version}-amd64.deb"
 		file_type:            "deb"
 		library:              "gnu"
 		os:                   "Linux"
@@ -95,7 +95,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "ARM64"
-		file_name:            "vector-arm64.deb"
+		file_name:            "vector-{version}-arm64.deb"
 		file_type:            "deb"
 		library:              "gnu"
 		os:                   "Linux"
@@ -107,7 +107,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "ARMv7"
-		file_name:            "vector-armhf.deb"
+		file_name:            "vector-{version}-armhf.deb"
 		file_type:            "deb"
 		library:              "gnu"
 		os:                   "Linux"
@@ -119,7 +119,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "x86_64"
-		file_name:            "vector-x86_64.rpm"
+		file_name:            "vector-{version}-1.x86_64.rpm"
 		file_type:            "rpm"
 		library:              "gnu"
 		os:                   "Linux"
@@ -131,7 +131,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "ARM64"
-		file_name:            "vector-aarch64.rpm"
+		file_name:            "vector-{version}-1.aarch64.rpm"
 		file_type:            "rpm"
 		library:              "gnu"
 		os:                   "Linux"
@@ -143,7 +143,7 @@ installation: downloads: {
 		available_on_latest:  true
 		available_on_nightly: true
 		arch:                 "ARMv7"
-		file_name:            "vector-armv7.rpm"
+		file_name:            "vector-{version}-1.armv7.rpm"
 		file_type:            "rpm"
 		library:              "gnu"
 		os:                   "Linux"

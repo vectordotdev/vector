@@ -12,7 +12,7 @@ tags: ["type: new feature", "domain: metrics", "domain: sources"]
 
 We're big fans of Prometheus at Timber, and as an extension of our Kubernetes
 integration we wanted to better understand how Vector could assist Prometheus
-oeprators. As noted in the [Kubernetes highlight][kubernetes_highlight], it is
+operators. As noted in the [Kubernetes highlight][kubernetes_highlight], it is
 our intent to be the only tool needed to collect and process _all_ Kubernetes
 observability data, and working with Prometheus is core to our
 metrics strategy. As a result, 0.11.0 includes two new components that assist
