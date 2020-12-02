@@ -1042,15 +1042,14 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{test_util::trace_init, Pipeline};
-    use futures::compat::Stream01CompatExt;
+    use futures::StreamExt;
     use tokio::time::{timeout, Duration};
 
     async fn test_instance(endpoint: &'static str) {
         let host = ClientOptions::parse(endpoint).await.unwrap().hosts[0].to_string();
         let namespace = "vector_mongodb";
 
-        let (sender, recv) = Pipeline::new_test();
-        let mut recv = recv.compat();
+        let (sender, mut recv) = Pipeline::new_test();
 
         tokio::spawn(async move {
             MongoDBMetricsConfig {
@@ -1085,7 +1084,7 @@ mod integration_tests {
 
         assert!(events.len() > 100);
         for event in events {
-            let metric = event.expect("Valid Event").into_metric();
+            let metric = event.into_metric();
             // validate namespace
             assert!(metric.namespace == Some(namespace.to_string()));
             // validate timestamp
