@@ -210,6 +210,7 @@ pub fn file_source(
         glob_minimum_cooldown,
         fingerprinter: Fingerprinter {
             strategy: config.fingerprint.clone().into(),
+            max_line_length: config.max_line_bytes,
             ignore_not_found: false,
         },
         oldest_first: config.oldest_first,
@@ -1450,6 +1451,13 @@ mod tests {
         let dir = tempdir().unwrap();
         let config = file::FileConfig {
             include: vec![PathBuf::from("tests/data/gzipped.log")],
+            // TODO: remove this once files are fingerprinted after decompression
+            //
+            // Currently, this needs to be smaller than the total size of the compressed file
+            // because the fingerprinter tries to read until a newline, which it's not going to see
+            // in the compressed data, or this number of bytes. If it hits EOF before that, it
+            // can't return a fingerprint because the value would change once more data is written.
+            max_line_bytes: 100,
             ..test_default_file_config(&dir)
         };
 

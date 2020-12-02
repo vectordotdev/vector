@@ -22,7 +22,7 @@ PROJECT_ROOT="$(pwd)"
 ARCHIVE_NAME="vector-$TARGET.tar.gz"
 ARCHIVE_PATH="target/artifacts/$ARCHIVE_NAME"
 ABSOLUTE_ARCHIVE_PATH="$PROJECT_ROOT/$ARCHIVE_PATH"
-PACKAGE_VERSION="$("$PROJECT_ROOT/scripts/version.sh")"
+PACKAGE_VERSION="${VECTOR_VERSION:-"$("$PROJECT_ROOT"/scripts/version.sh)"}"
 
 #
 # Header
@@ -77,8 +77,8 @@ cargo deb --target "$TARGET" --deb-version "$PACKAGE_VERSION" --no-build --no-st
 # is consistent with our package naming scheme.
 for file in target/"${TARGET}"/debian/*.deb; do
   base=$(basename "${file}")
-  tail=${base#vector_${PACKAGE_VERSION}_}
-  mv "${file}" target/"${TARGET}"/debian/vector-"${tail}";
+  nbase=${base//_/-}
+  mv "${file}" target/"${TARGET}"/debian/"${nbase}";
 done
 
 #

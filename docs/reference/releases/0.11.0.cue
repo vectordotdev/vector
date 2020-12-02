@@ -17,31 +17,29 @@ releases: "0.11.0": {
 		{
 			title: "Vector's own observability"
 			description: """
-				The next Vector release (0.12.0) will focus on Vector's own
-				internal observability. We've got some _very_ exciting
-				features planned for this.
+				The next Vector release (0.12.0) will focus on Vector's own	internal
+				observability. We've got some _very_ exciting	features planned for this.
 				"""
 		},
 		{
 			title:       "Kubernetes aggregator role"
 			description: """
-				In addition to Vector's observability, 0.12 will include
-				support for	deploying Vector into the [aggregator role](\(urls.vector_aggregator_role))
-				within Kubernetes. This will allow you to build end-to-end
-				observability piplines with Vector. Distributing processing
-				on the edge, centralizing it with an aggregator, or both.
-				If you are interested in beta testing, please
-				[join our chat](\(urls.vector_chat)) and let us know.
+				In addition to Vector's observability, 0.12 will include support for
+				deploying Vector into the [aggregator role](\(urls.vector_aggregator_role))
+				within Kubernetes. This will allow you to build end-to-end observability
+				piplines in Kubernetes with Vector. Distributing processing on the edge,
+				centralizing it with an aggregator, or both. If you are interested in
+				beta testing, please [join our chat](\(urls.vector_chat)) and let us
+				know.
 				"""
 		},
 		{
 			title:       "Timber Remap Language (TRL)"
 			description: """
-				Finally, 0.13 will introduce the new Timber Remap Language.
-				This is a Rust-native syntax designed for safe and efficient
-				data mapping. It's an ultra-performant middle ground between
-				fundamental transforms like `add_fields` and a full blown
-				runtime like `lua`.
+				Finally, 0.13 will introduce the new Timber Remap Language.	This is a
+				Rust-native syntax designed for safe and efficient data mapping. It's an
+				ultra-performant middle ground between fundamental transforms like
+				`add_fields` and a full blown runtime like `lua`.
 
 				If interested, you can beta test via the [`remap` transform](\(urls.vector_remap_transform))
 				and use the [Timber Remap Language reference](\(urls.timber_remap_language_reference))
@@ -383,5 +381,12 @@ releases: "0.11.0": {
 		{sha: "9e51f2e3795d08598118c7bb6bf475b352b172b1", date: "2020-11-29 07:21:46 UTC", description:   "Allow JSON and YAML config formats in addition to TOML", pr_number:                              5005, scopes: ["config"], type:                                           "enhancement", breaking_change: false, author: "MOZGIII", files_count:               22, insertions_count:  792, deletions_count:  189},
 		{sha: "9bddcb233a6ec7814e685d6060f7e0ffd37d71ad", date: "2020-11-30 01:35:51 UTC", description:   "Add compact remap function", pr_number:                                                          5231, scopes: ["remap transform"], type:                                  "feat", breaking_change:        false, author: "FungusHumungus", files_count:        5, insertions_count:   525, deletions_count:  0},
 		{sha: "84aebc078678549e1933d0c6c6505f3f464a6f40", date: "2020-12-01 04:44:31 UTC", description:   "fix integration tests list", pr_number:                                                          5293, scopes: ["ci", "tests"], type:                                      "chore", breaking_change:       false, author: "Kirill Fomichev", files_count:       2, insertions_count:   27, deletions_count:   9},
+		{sha: "fdb77ff020c7f0487c7bd3d39d78c5f8a56ef2ac", date: "2020-11-30 22:36:19 UTC", description:   "Update release Windows task", pr_number:                                                         5295, scopes: ["ci"], type:                                               "fix", breaking_change:         false, author: "James Turnbull", files_count:        1, insertions_count:   39, deletions_count:   6},
+		{sha: "dfc18c17c149a5e7b1a7cd0697ef2b7085d99272", date: "2020-12-01 00:01:49 UTC", description:   "Update release-docker task", pr_number:                                                          5299, scopes: ["ci"], type:                                               "fix", breaking_change:         false, author: "James Turnbull", files_count:        1, insertions_count:   3, deletions_count:    2},
+		{sha: "018091fc4b7c569d8d9b32c3d3d06d279eca2f87", date: "2020-12-01 05:49:44 UTC", description:   "add assert remap function", pr_number:                                                           5073, scopes: ["remap transform"], type:                                  "feat", breaking_change:        false, author: "FungusHumungus", files_count:        6, insertions_count:   199, deletions_count:  0},
+		{sha: "529581de69d431c9d0cbc59d152b5858d479e68f", date: "2020-12-01 15:43:25 UTC", description:   "Enable TLS subscription connections in vector top", pr_number:                                   5296, scopes: ["observability"], type:                                    "enhancement", breaking_change: false, author: "Steve Hall", files_count:            3, insertions_count:   6, deletions_count:    3},
+		{sha: "12a9cc325f1f6c86ab802f3f6deda29079c857bc", date: "2020-12-02 01:26:57 UTC", description:   "Add missing remap functions", pr_number:                                                         5312, scopes: ["remap transform"], type:                                  "feat", breaking_change:        false, author: "FungusHumungus", files_count:        9, insertions_count:   758, deletions_count:  22},
+		{sha: "c8352140d597c6623b5c3486d39a27b9191c204e", date: "2020-12-01 20:57:20 UTC", description:   "Change packages to have full versions and architectures", pr_number:                             5303, scopes: ["ci"], type:                                               "fix", breaking_change:         false, author: "James Turnbull", files_count:        20, insertions_count:  274, deletions_count:  189},
+		{sha: "10e42732a6f1b14d09208d5110634e9718d4cee9", date: "2020-12-02 03:28:19 UTC", description:   "introduce encoding schema and pulsar avro schema", pr_number:                                    5021, scopes: ["pulsar sink"], type:                                      "enhancement", breaking_change: false, author: "Alexandre DUVAL", files_count:       10, insertions_count:  284, deletions_count:  16},
 	]
 }

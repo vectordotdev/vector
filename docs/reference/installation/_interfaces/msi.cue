@@ -26,8 +26,8 @@ installation: _interfaces: msi: {
 						VECTORCFG
 						"""#
 			install: #"""
-				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{arch}.msi && \
-					msiexec /i vector-{arch}.msi /quiet
+				powershell Invoke-WebRequest https://packages.timber.io/vector/{version}/vector-{arch}.msi -OutFile vector-{version}-{arch}.msi && \
+					msiexec /i vector-{version}-{arch}.msi /quiet
 				"""#
 			logs:      null
 			reload:    null

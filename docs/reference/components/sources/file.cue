@@ -18,8 +18,8 @@ components: sources: file: {
 			checkpoint: enabled: true
 			from: {
 				service: {
-					name:     "file system"
-					thing:    "one or more files"
+					name:     "files"
+					thing:    name
 					url:      urls.file_system
 					versions: null
 
