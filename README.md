@@ -53,14 +53,14 @@ or [**install Vector**][docs.installation].
 ### About
 
 * [**Concepts**][docs.concepts]
-* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 * [**Guarantees**][docs.guarantees]
+* [**Data model**][docs.data_model] - [log event][docs.data-model.log], [metric event][docs.data-model.metric]
 
 ### Setup
 
-* [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms], [from archives][docs.from-archives], [from source][docs.from-source]
+* [**Installation**][docs.installation] - [operating systems][docs.operating_systems], [package managers][docs.package_managers], [platforms][docs.platforms] ([Kubernetes][docs.kubernetes]), [manual][docs.manual]
 * [**Configuration**][docs.setup.configuration]
-* [**Deployment**][docs.deployment] - [strategies][docs.strategies], [topologies][docs.topologies]
+* [**Deployment**][docs.deployment] - [roles][docs.roles], [topologies][docs.topologies]
 
 ### Reference
 
@@ -111,7 +111,7 @@ fundamental differences in quality and attention to detail:
 | [File Rotate (copytruncate)](https://github.com/timberio/vector-test-harness/tree/master/cases/file_rotate_truncate_correctness) | **✓**  |          |           |         |          |     ✓     |     ✓     |
 |                   [File Truncation](https://github.com/timberio/vector-test-harness/tree/master/cases/file_truncate_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
 |                         [Process (SIGHUP)](https://github.com/timberio/vector-test-harness/tree/master/cases/sighup_correctness) | **✓**  |          |           |         |    ⚠     |     ✓     |     ✓     |
-|                     [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | **✓**  |    ✓     |           |    ✓    |    ✓     |     ✓     |     ✓     |
+|                     [JSON (wrapped)](https://github.com/timberio/vector-test-harness/tree/master/cases/wrapped_json_correctness) | **✓**  |    ✓     |     ✓     |    ✓    |    ✓     |     ✓     |     ✓     |
 
 To learn more about our correctness tests, please see the [Vector test harness][urls.vector_test_harness].
 
@@ -157,11 +157,11 @@ Vector is an end-to-end, unified, open data platform.
 [docs.data-model.metric]: https://vector.dev/docs/about/data-model/metric/
 [docs.data_model]: https://vector.dev/docs/about/data-model/
 [docs.deployment]: https://vector.dev/docs/setup/deployment/
-[docs.from-archives]: https://vector.dev/docs/setup/installation/manual/from-archives/
-[docs.from-source]: https://vector.dev/docs/setup/installation/manual/from-source/
 [docs.global-options#log_schema]: https://vector.dev/docs/reference/global-options/#log_schema
 [docs.guarantees]: https://vector.dev/docs/about/guarantees/
 [docs.installation]: https://vector.dev/docs/setup/installation/
+[docs.kubernetes]: https://vector.dev/docs/setup/installation/platforms/kubernetes/
+[docs.manual]: https://vector.dev/docs/setup/installation/manual/
 [docs.monitoring]: https://vector.dev/docs/administration/monitoring/
 [docs.operating_systems]: https://vector.dev/docs/setup/installation/operating-systems/
 [docs.package_managers]: https://vector.dev/docs/setup/installation/package-managers/
@@ -170,6 +170,10 @@ Vector is an end-to-end, unified, open data platform.
 [docs.process-management#starting]: https://vector.dev/docs/administration/process-management/#starting
 [docs.process-management]: https://vector.dev/docs/administration/process-management/
 [docs.reference.templating]: https://vector.dev/docs/reference/templating/
+[docs.roles#aggregator]: https://vector.dev/docs/setup/deployment/roles/#aggregator
+[docs.roles#daemon]: https://vector.dev/docs/setup/deployment/roles/#daemon
+[docs.roles#sidecar]: https://vector.dev/docs/setup/deployment/roles/#sidecar
+[docs.roles]: https://vector.dev/docs/setup/deployment/roles/
 [docs.sinks.aws_cloudwatch_logs]: https://vector.dev/docs/reference/sinks/aws_cloudwatch_logs/
 [docs.sinks.aws_s3#partitioning]: https://vector.dev/docs/reference/sinks/aws_s3/#partitioning
 [docs.sinks.aws_s3]: https://vector.dev/docs/reference/sinks/aws_s3/
@@ -186,10 +190,6 @@ Vector is an end-to-end, unified, open data platform.
 [docs.sources.kafka]: https://vector.dev/docs/reference/sources/kafka/
 [docs.sources.socket]: https://vector.dev/docs/reference/sources/socket/
 [docs.sources]: https://vector.dev/docs/reference/sources/
-[docs.strategies#daemon]: https://vector.dev/docs/setup/deployment/strategies/#daemon
-[docs.strategies#service]: https://vector.dev/docs/setup/deployment/strategies/#service
-[docs.strategies#sidecar]: https://vector.dev/docs/setup/deployment/strategies/#sidecar
-[docs.strategies]: https://vector.dev/docs/setup/deployment/strategies/
 [docs.topologies]: https://vector.dev/docs/setup/deployment/topologies/
 [docs.transforms.filter]: https://vector.dev/docs/reference/transforms/filter/
 [docs.transforms.grok_parser]: https://vector.dev/docs/reference/transforms/grok_parser/
