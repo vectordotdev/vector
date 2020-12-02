@@ -44,15 +44,18 @@ jobs:
           branch: master
           name: vector-benches
           path: target/criterion
+      - run: zip --recurse-paths target/criterion.zip target/criterion
+        continue-on-error: true
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make bench
+      - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
           name: "vector-benches"
-          path: "./target/criterion/*"
+          path: "./target/criterion.zip"
 
   master-failure:
     name: master-failure
