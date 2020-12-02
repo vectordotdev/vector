@@ -31,7 +31,7 @@ impl<'a> InternalEvent for MongoDBMetricsRequestError<'a> {
     }
 
     fn emit_metrics(&self) {
-        counter!("request_error_total", 1);
+        counter!("request_errors_total", 1);
     }
 }
 
