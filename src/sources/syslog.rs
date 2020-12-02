@@ -1,6 +1,6 @@
 use super::util::{SocketListenAddr, TcpSource};
 #[cfg(unix)]
-use crate::sources::util::build_unix_source;
+use crate::sources::util::build_unix_stream_source;
 use crate::{
     config::{
         log_schema, DataType, GenerateConfig, GlobalOptions, Resource, SourceConfig,
@@ -116,7 +116,7 @@ impl SourceConfig for SyslogConfig {
             }
             Mode::Udp { address } => Ok(udp(address, self.max_length, host_key, shutdown, out)),
             #[cfg(unix)]
-            Mode::Unix { path } => Ok(build_unix_source(
+            Mode::Unix { path } => Ok(build_unix_stream_source(
                 path,
                 SyslogDecoder::new(self.max_length),
                 host_key,
@@ -329,7 +329,7 @@ fn resolve_year((month, _date, _hour, _min, _sec): IncompleteDate) -> i32 {
 }
 
 /**
-* Function to pass to build_unix_source, specific to the Unix mode of the syslog source.
+* Function to pass to build_unix_stream_source, specific to the Unix mode of the syslog source.
 * Handles the logic of parsing and decoding the syslog message format.
 **/
 // TODO: many more cases to handle:
