@@ -455,6 +455,7 @@ impl RunningTopology {
         for name in &diff.sinks.to_remove {
             let previous = self.tasks.remove(name).unwrap();
             if wait_for_sinks.contains(name) {
+                debug!(message = "Waiting for sink to shutdown.", %name);
                 previous.await.unwrap().unwrap();
             } else {
                 drop(previous); // detach and forget
@@ -466,6 +467,7 @@ impl RunningTopology {
         for name in &diff.sinks.to_change {
             if wait_for_sinks.contains(name) {
                 let previous = self.tasks.remove(name).unwrap();
+                debug!(message = "Waiting for sink to shutdown.", %name);
                 let buffer = previous.await.unwrap().unwrap();
 
                 if reuse_buffers.contains(name) {
