@@ -1064,7 +1064,7 @@ release-docker: ## Release to Docker Hub
 
 .PHONY: release-github
 release-github: ## Release to Github
-	@scripts/release-github.rb
+	@scripts/release-github.sh
 
 .PHONY: release-homebrew
 release-homebrew: ## Release to timberio Homebrew tap
