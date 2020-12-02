@@ -101,7 +101,7 @@ impl GeneratorConfig {
             out.send_all(&mut futures::stream::iter(events))
                 .await
                 .map_err(|_: crate::pipeline::ClosedError| {
-                    error!(message = "Failed to forward events; downstream is closed");
+                    error!(message = "Failed to forward events; downstream is closed.");
                 })?;
         }
         Ok(())
