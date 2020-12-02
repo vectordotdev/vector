@@ -12,7 +12,7 @@ use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use snafu::Snafu;
 use std::task::Poll;
-use tokio::time::{interval, Duration, Interval};
+use tokio::time::{interval, Duration};
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct GeneratorConfig {
@@ -43,6 +43,7 @@ pub enum OutputFormat {
     },
     ApacheCommon,
     ApacheError,
+    #[serde(alias = "rfc5424")]
     Syslog,
 }
 
@@ -54,7 +55,9 @@ impl Generator {
         mut shutdown: ShutdownSignal,
         mut out: Pipeline,
     ) -> Result<(), ()> {
-        let mut batch_interval = get_batch_interval(config.batch_interval);
+        let mut batch_interval = config
+            .batch_interval
+            .map(|i| interval(Duration::from_secs_f64(i)));
 
         for n in 0..config.count {
             if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
@@ -83,6 +86,8 @@ impl Generator {
 impl OutputFormat {
     fn generate_events(&self, n: usize) -> Vec<Event> {
         emit!(GeneratorEventProcessed);
+
+        let events_from_log_line = |log: String| -> Vec<Event> { vec![Event::from(log)] };
 
         match self {
             Self::RoundRobin {
@@ -143,14 +148,6 @@ inventory::submit! {
 }
 
 impl_generate_config_from_default!(GeneratorConfig);
-
-fn events_from_log_line(log: String) -> Vec<Event> {
-    vec![Event::from(log)]
-}
-
-fn get_batch_interval(i: Option<f64>) -> Option<Interval> {
-    i.map(|i| interval(Duration::from_secs_f64(i)))
-}
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "generator")]
