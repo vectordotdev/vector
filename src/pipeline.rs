@@ -118,10 +118,6 @@ impl Pipeline {
             enqueued: VecDeque::with_capacity(10),
         }
     }
-
-    pub fn is_blocked(&self) -> Result<bool, ClosedError> {
-        todo!()
-    }
 }
 
 #[cfg(all(test, feature = "transforms-add_fields", feature = "transforms-filter"))]

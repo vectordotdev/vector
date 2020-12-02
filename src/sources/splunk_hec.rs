@@ -87,7 +87,7 @@ impl SourceConfig for SplunkConfig {
 
         let event_service = source.event_service(out.clone());
         let raw_service = source.raw_service(out.clone());
-        let health_service = source.health_service(out);
+        let health_service = source.health_service();
         let options = SplunkSource::options();
 
         let services = path!("services" / "collector" / ..)
@@ -214,7 +214,7 @@ impl SplunkSource {
             .boxed()
     }
 
-    fn health_service(&self, out: Pipeline) -> BoxedFilter<(Response,)> {
+    fn health_service(&self) -> BoxedFilter<(Response,)> {
         let credentials = self.credentials.clone();
         let authorize =
             warp::header::optional("Authorization").and_then(move |token: Option<String>| {
@@ -233,23 +233,7 @@ impl SplunkSource {
         warp::get()
             .and(path!("health" / "1.0").or(path!("health")))
             .and(authorize)
-            .and_then(move |_, _| {
-                let out = out.clone();
-                async move {
-                    match out.clone().is_blocked() {
-                        Ok(false) => Ok(warp::reply().into_response()),
-                        // Since channel of mpsc::Sender increase by one with each sender, technically
-                        // channel will never be full, and this will never be returned.
-                        // This behavior doesn't fulfill one of the purposes of healthcheck.
-                        Ok(true) => Ok(warp::reply::with_status(
-                            warp::reply(),
-                            StatusCode::SERVICE_UNAVAILABLE,
-                        )
-                        .into_response()),
-                        Err(_) => Err(Rejection::from(ApiError::ServerShutdown)),
-                    }
-                }
-            })
+            .map(move |_, _| warp::reply().into_response())
             .boxed()
     }
 
