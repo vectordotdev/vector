@@ -14,7 +14,7 @@ tags: ["type: breaking change"]
 
 1. [The metrics emitted by the `internal_metrics` source have changed names.](#second)
 1. [The `statsd` sink now supports all socket types.](#third)
-1. [The `reduce` tranform `identifier_fields` was renamed to `group_by`.](#fourth)
+1. [The `reduce` transform `identifier_fields` was renamed to `group_by`.](#fourth)
 1. [The `source_type` field is now explicit in the `splunk_hec` sink.](#fifth)
 1. [Remove forwarding to syslog from distributed systemd unit.](#sixth)
 1. [The `http` source no longer dedots JSON fields.](#seventh)
@@ -26,10 +26,10 @@ We cover each below to help you upgrade quickly:
 ### The metrics emitted by the `internal_metrics` source have changed names<a name="second"></a>
 
 We have not officially announced the `internal_metrics` source (coming in 0.12)
-due to the high probability of breaking changes. Specifically, the metric names
-and labels. Since then we've settled on a [metric naming convention][metric_naming_convention]
-that is largely inspired by the [Prometheus naming convention][prometheus_naming_convention].
-0.11 includes these naming changes.
+due to the high probability of metric name changes.Since then we've settled on a
+[metric naming convention][metric_naming_convention] that is largely inspired by
+the [Prometheus naming convention][prometheus_naming_convention]. 0.11 includes
+these naming changes.
 
 To upgrade, please see the following:
 
@@ -52,7 +52,7 @@ only protocol available was UDP.
 +  mode = "udp"
 ```
 
-### The `reduce` tranform `identifier_fields` was renamed to `group_by`<a name="fourth"></a>
+### The `reduce` transform `identifier_fields` was renamed to `group_by`<a name="fourth"></a>
 
 We renamed the `reduce` transform's `identifier_fields` option to `group_by`
 for clarity. We are repositioning this transform to handle broad reduce
@@ -124,3 +124,4 @@ structure may change if it contained `.` characters in the keys.
 [metric_naming_convention]: https://github.com/timberio/vector/blob/master/CONTRIBUTING.md#metric-naming-convention
 [prometheus_naming_convention]: https://prometheus.io/docs/practices/naming/
 [removed_systemd_syslog_options]: https://github.com/timberio/vector/pull/3427/files
+[statsd_sink]: /docs/reference/sinks/statsd/
