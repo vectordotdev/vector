@@ -114,7 +114,18 @@ where
 
         let checkpoints = checkpointer.view();
 
+        let needs_checksum_upgrade = checkpoints.contains_bytes_checksums();
+
         for (path, file_id) in existing_files {
+            if needs_checksum_upgrade {
+                if let Ok(Some(old_checksum)) = self
+                    .fingerprinter
+                    .get_bytes_checksum(&path, &mut fingerprint_buffer)
+                {
+                    checkpoints.update_key(old_checksum, file_id)
+                }
+            }
+
             self.watch_new_file(
                 path,
                 file_id,

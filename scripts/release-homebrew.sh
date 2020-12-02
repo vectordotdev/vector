@@ -29,7 +29,7 @@ NEW_CONTENT="$(update-content < Formula/vector.rb)"
 
 echo "$NEW_CONTENT" > Formula/vector.rb
 
-git commit -am "Release Vector $VECTOR_VERSION"
+git diff-index --quiet HEAD || git commit -am "Release Vector $VECTOR_VERSION"
 git push
 
 popd
