@@ -194,6 +194,12 @@ pub async fn build_pieces(
         let (trigger, tripwire) = Tripwire::new();
 
         let sink = async move {
+            // Why is this Arc<Mutex<Option<_>>> needed you ask.
+            // In case when this function build_pieces errors
+            // this future won't be run so this rx won't be taken
+            // which will enable us to reuse rx to rebuild
+            // old configuration by passing this Arc<Mutex<Option<_>>>
+            // yet again.
             let mut rx = rx
                 .lock()
                 .unwrap()

@@ -815,15 +815,22 @@ mod tests {
     feature = "sources-splunk_hec",
     feature = "sources-generator",
     feature = "sinks-prometheus",
-    feature = "transforms-log_to_metric"
+    feature = "transforms-log_to_metric",
+    feature = "sinks-socket",
+    feature = "leveldb"
 ))]
 mod reload_tests {
+    use crate::buffers::{BufferConfig, WhenFull};
     use crate::config::Config;
     use crate::sinks::console::{ConsoleSinkConfig, Encoding, Target};
     use crate::sinks::prometheus::exporter::PrometheusExporterConfig;
+    use crate::sinks::socket::{Mode, SocketSinkConfig};
+    use crate::sinks::util::{tcp::TcpSinkConfig, Encoding as SinkEncoding};
     use crate::sources::generator::GeneratorConfig;
     use crate::sources::splunk_hec::SplunkConfig;
-    use crate::test_util::{next_addr, start_topology, wait_for_tcp};
+    use crate::test_util::{
+        next_addr, start_topology, temp_dir, trace_init, wait_for_tcp, CountReceiver,
+    };
     use crate::transforms::log_to_metric::{GaugeConfig, LogToMetricConfig, MetricConfig};
     use futures::{compat::Stream01CompatExt, StreamExt};
     use std::net::{SocketAddr, TcpListener};
@@ -1026,6 +1033,64 @@ mod reload_tests {
         .await;
     }
 
+    #[tokio::test(core_threads = 2)]
+    async fn topology_disk_buffer_conflict() {
+        let address_0 = next_addr();
+        let address_1 = next_addr();
+        let data_dir = temp_dir();
+        std::fs::create_dir(&data_dir).unwrap();
+
+        let mut old_config = Config::builder();
+        old_config.global.data_dir = Some(data_dir);
+        old_config.add_source(
+            "in",
+            GeneratorConfig::repeat(vec!["msg".to_string()], usize::max_value(), Some(0.001)),
+        );
+        old_config.add_transform(
+            "trans",
+            &[&"in"],
+            LogToMetricConfig {
+                metrics: vec![MetricConfig::Gauge(GaugeConfig {
+                    field: "message".to_string(),
+                    name: None,
+                    namespace: None,
+                    tags: None,
+                })],
+            },
+        );
+        old_config.add_sink(
+            "out",
+            &[&"trans"],
+            PrometheusExporterConfig {
+                address: address_0,
+                flush_period_secs: 1,
+                ..PrometheusExporterConfig::default()
+            },
+        );
+        old_config.sinks["out"].buffer = BufferConfig::Disk {
+            max_size: 1024,
+            when_full: WhenFull::Block,
+        };
+
+        let mut new_config = old_config.clone();
+        new_config.sinks["out"].inner = Box::new(PrometheusExporterConfig {
+            address: address_1,
+            flush_period_secs: 1,
+            ..PrometheusExporterConfig::default()
+        });
+        new_config.sinks["out"].buffer = BufferConfig::Disk {
+            max_size: 2048,
+            when_full: WhenFull::Block,
+        };
+
+        reload_sink_test(
+            old_config.build().unwrap(),
+            new_config.build().unwrap(),
+            address_0,
+            address_1,
+        )
+        .await;
+    }
     async fn reload_sink_test(
         old_config: Config,
         new_config: Config,
@@ -1035,8 +1100,11 @@ mod reload_tests {
         let (mut topology, crash) = start_topology(old_config, false).await;
         let mut crash = crash.compat();
 
-        // Wait for sink to come online
+        // Wait for sink to come onlineEncoding
         wait_for_tcp(old_address).await;
+
+        // Give topology some time to run
+        delay_for(Duration::from_secs(1)).await;
 
         assert!(topology
             .reload_config_and_respawn(new_config, false)
