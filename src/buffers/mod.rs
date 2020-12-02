@@ -135,6 +135,7 @@ impl BufferConfig {
     }
 
     /// Resources that the sink is using.
+    #[cfg_attr(not(feature = "leveldb"), allow(unused))]
     pub fn resources(&self, sink_name: &str) -> Vec<Resource> {
         match self {
             BufferConfig::Memory { .. } => Vec::new(),
