@@ -1305,20 +1305,20 @@ mod integration_tests {
             include_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_1, sender, shutdown).is_ok());
+        assert!(DockerLogsSource::new(good_config_1, sender.clone(), shutdown).is_ok());
 
         let good_config_2 = DockerLogsConfig {
             exclude_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(good_config_2, sender, shutdown).is_ok());
+        assert!(DockerLogsSource::new(good_config_2, sender.clone(), shutdown).is_ok());
 
         let errant_config = DockerLogsConfig {
             exclude_containers: Some(vec!["container1".to_owned()]),
             include_containers: Some(vec!["container1".to_owned()]),
             ..DockerLogsConfig::default()
         };
-        assert!(DockerLogsSource::new(errant_config, sender, shutdown).is_err());
+        assert!(DockerLogsSource::new(errant_config, sender.clone(), shutdown).is_err());
     }
 
     #[tokio::test]
