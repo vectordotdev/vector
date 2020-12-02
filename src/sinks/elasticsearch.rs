@@ -196,7 +196,7 @@ impl HttpSink for ElasticSearchCommon {
         serde_json::to_writer(&mut body, &event.into_log()).unwrap();
         body.push(b'\n');
 
-        emit!(ElasticSearchEventReceived {
+        emit!(ElasticSearchEventEncoded {
             byte_size: body.len(),
             index
         });
