@@ -417,7 +417,7 @@ mod integration_tests {
         tokio::spawn(source);
         tokio::time::delay_for(Duration::from_secs(1)).await;
 
-        let events = test_util::collect_ready(rx).await.unwrap();
+        let events = test_util::collect_ready(rx).await;
         assert!(!events.is_empty());
 
         let metrics: Vec<_> = events
