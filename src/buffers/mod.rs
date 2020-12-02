@@ -138,6 +138,7 @@ impl BufferConfig {
     pub fn resources(&self, sink_name: &str) -> Vec<Resource> {
         match self {
             BufferConfig::Memory { .. } => Vec::new(),
+            #[cfg(feature = "leveldb")]
             BufferConfig::Disk { .. } => vec![Resource::DiskBuffer(sink_name.to_string())],
         }
     }
