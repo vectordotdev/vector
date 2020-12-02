@@ -203,11 +203,11 @@ _values: {
 
 #MetricTags: [Name=string]: close({
 	name:        Name
+	default?:    string
 	description: string
+	enum?:       #Enum
 	examples?: [string, ...string]
 	required: bool
-	options?: [string, ...string] | #Map
-	default?: string
 })
 
 #MetricType: "counter" | "distribution" | "gauge" | "histogram" | "summary"

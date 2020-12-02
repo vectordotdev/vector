@@ -51,14 +51,14 @@ if [[ "$CHANNEL" == "nightly" ]]; then
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   sleep "$VERIFY_TIMEOUT"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/$DATE/vector-x86_64-unknown-linux-musl.tar.gz" \
-    "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+    "https://packages.timber.io/vector/nightly/$DATE/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
+    "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-musl.tar.gz" \
-    "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+    "https://packages.timber.io/vector/nightly/latest/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
+    "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
   verify_artifact \
-    "https://packages.timber.io/vector/nightly/latest/vector-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td/vector-x86_64-unknown-linux-gnu.tar.gz"
+    "https://packages.timber.io/vector/nightly/latest/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz" \
+    "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
 elif [[ "$CHANNEL" == "latest" ]]; then
   VERSION_EXACT="$VERSION"
   # shellcheck disable=SC2001
@@ -78,12 +78,12 @@ elif [[ "$CHANNEL" == "latest" ]]; then
   echo "Waiting for $VERIFY_TIMEOUT seconds before running the verifications"
   for i in "$VERSION_EXACT" "$VERSION_MINOR_X" "$VERSION_MAJOR_X" latest; do
     verify_artifact \
-      "https://packages.timber.io/vector/$i/vector-x86_64-unknown-linux-musl.tar.gz" \
-      "$td/vector-x86_64-unknown-linux-musl.tar.gz"
+      "https://packages.timber.io/vector/$i/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz" \
+      "$td/vector-$VERSION-x86_64-unknown-linux-musl.tar.gz"
   done
   verify_artifact \
-    "https://packages.timber.io/vector/latest/vector-x86_64-unknown-linux-gnu.tar.gz" \
-    "$td/vector-x86_64-unknown-linux-gnu.tar.gz"
+    "https://packages.timber.io/vector/latest/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz" \
+    "$td/vector-$VERSION-x86_64-unknown-linux-gnu.tar.gz"
 fi
 
 #

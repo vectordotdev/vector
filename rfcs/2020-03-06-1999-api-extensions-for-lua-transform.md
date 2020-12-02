@@ -92,7 +92,7 @@ Currently, the [`lua` transform](https://vector.dev/docs/reference/transforms/lu
 The following example illustrates fields manipulations with the new approach.
 
 ```toml
-[tranforms.lua]
+[transforms.lua]
   type = "lua"
   inputs = []
   version = "2"

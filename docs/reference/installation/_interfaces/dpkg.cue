@@ -21,7 +21,7 @@ installation: _interfaces: dpkg: {
 		commands: roles._systemd_commands & {
 			_config_path: paths.config
 			install: #"""
-				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{arch}.deb && \
+				curl --proto '=https' --tlsv1.2 -O https://packages.timber.io/vector/{version}/vector-{version}-{arch}.deb && \
 					sudo dpkg -i vector-{arch}.deb
 				"""#
 			uninstall: "sudo dpkg -r vector"

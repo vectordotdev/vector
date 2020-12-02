@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
+use std::fmt;
 
 pub use kind::Kind;
 
@@ -445,5 +446,69 @@ impl Value {
             Float(lhv) => f64::try_from(rhs).map(|rhv| *lhv == rhv).unwrap_or(false),
             _ => self == rhs,
         }
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Value::Bytes(val) => write!(f, "{}", String::from_utf8_lossy(val)),
+            Value::Integer(val) => write!(f, "{}", val),
+            Value::Float(val) => write!(f, "{}", val),
+            Value::Boolean(val) => write!(f, "{}", val),
+            Value::Map(map) => {
+                let joined = map
+                    .iter()
+                    .map(|(key, val)| format!("{}: {}", key, val))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "{{ {} }}", joined)
+            }
+            Value::Array(array) => {
+                let joined = array
+                    .iter()
+                    .map(|val| format!("{}", val))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                write!(f, "[{}]", joined)
+            }
+            Value::Timestamp(val) => write!(f, "{}", val.to_string()),
+            Value::Null => write!(f, "Null"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::prelude::*;
+
+    #[test]
+    fn test_display() {
+        let string = format!("{}", Value::from("Sausage 🌭"));
+        assert_eq!("Sausage 🌭", string);
+
+        let int = format!("{}", Value::from(42));
+        assert_eq!("42", int);
+
+        let float = format!("{}", Value::from(42.5));
+        assert_eq!("42.5", float);
+
+        let boolean = format!("{}", Value::from(true));
+        assert_eq!("true", boolean);
+
+        let mut map = BTreeMap::new();
+        map.insert("field".to_string(), Value::from(1));
+        let map = format!("{}", Value::Map(map));
+        assert_eq!("{ field: 1 }", map);
+
+        let array = format!("{}", Value::from(vec![1, 2, 3]));
+        assert_eq!("[1, 2, 3]", array);
+
+        let timestamp = format!("{}", Value::from(Utc.ymd(2020, 10, 21).and_hms(16, 20, 13)));
+        assert_eq!("2020-10-21 16:20:13 UTC", timestamp);
+
+        let null = format!("{}", Value::Null);
+        assert_eq!("Null", null);
     }
 }
