@@ -10,6 +10,7 @@ use futures::{compat::Future01CompatExt, stream::StreamExt};
 use futures01::{stream::iter_ok, Sink};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
+use snafu::Snafu;
 use std::task::Poll;
 use tokio::time::{interval, Duration, Interval};
 
@@ -21,6 +22,12 @@ pub struct GeneratorConfig {
     count: usize,
     #[serde(flatten)]
     format: OutputFormat,
+}
+
+#[derive(Debug, Snafu)]
+pub enum GeneratorConfigErrors {
+    #[snafu(display("Expected a non-empty items list for round_robin but got an empty list"))]
+    RoundRobinItemsEmpty,
 }
 
 #[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
@@ -88,7 +95,7 @@ impl OutputFormat {
         }
     }
 
-    fn round_robin_generate(sequence: &bool, items: &Vec<String>, n: usize) -> Vec<Event> {
+    fn round_robin_generate(sequence: &bool, items: &[String], n: usize) -> Vec<Event> {
         let line: String = items.choose(&mut rand::thread_rng()).unwrap().into();
 
         let event = if *sequence {
@@ -98,6 +105,14 @@ impl OutputFormat {
         };
 
         vec![event]
+    }
+
+    // Ensures that the items list is non-empty if RoundRobin is chosen
+    fn items_empty(&self) -> bool {
+        match self {
+            Self::RoundRobin { items, .. } => items.is_empty(),
+            _ => false,
+        }
     }
 }
 
@@ -147,6 +162,10 @@ impl SourceConfig for GeneratorConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
+        if self.format.items_empty() {
+            return Err(Box::new(GeneratorConfigErrors::RoundRobinItemsEmpty));
+        }
+
         Ok(self.clone().generator(shutdown, out))
     }
 
