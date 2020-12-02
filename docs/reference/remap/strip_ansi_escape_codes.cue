@@ -12,7 +12,7 @@ remap: functions: strip_ansi_escape_codes: {
 	return: ["string"]
 	category: "text"
 	description: #"""
-			Removes the any ANSI escape codes from the provided string.
+		Removes the any ANSI escape codes from the provided string.
 		"""#
 	examples: [
 		{

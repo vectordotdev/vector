@@ -46,6 +46,7 @@ pub trait EncodingConfiguration<E> {
     // Required Accessors
 
     fn codec(&self) -> &E;
+    fn schema(&self) -> &Option<String>;
     // TODO(2410): Using PathComponents here is a hack for #2407, #2410 should fix this fully.
     fn only_fields(&self) -> &Option<Vec<Vec<PathComponent>>>;
     fn except_fields(&self) -> &Option<Vec<String>>;

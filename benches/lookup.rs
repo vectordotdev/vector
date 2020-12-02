@@ -1,4 +1,4 @@
-use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
+use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, Throughput};
 use indexmap::map::IndexMap;
 use std::convert::TryFrom;
 use std::{fs, io::Read, path::Path};
@@ -109,5 +109,4 @@ fn lookup_to_string(c: &mut Criterion) {
     group_deserialize.finish();
 }
 
-criterion_group!(lookup, lookup_to_string);
-criterion_main!(lookup);
+criterion_group!(benches, lookup_to_string);

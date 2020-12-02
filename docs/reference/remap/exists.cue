@@ -13,7 +13,7 @@ remap: functions: exists: {
 	return: ["boolean"]
 	category: "event"
 	description: #"""
-			Checks if the given path exists. Nested paths and arrays can also be checked.
+		Checks if the given path exists. Nested paths and arrays can also be checked.
 		"""#
 	examples: [
 		{

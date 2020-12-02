@@ -3,7 +3,7 @@ package metadata
 remap: functions: merge: {
 	arguments: [
 		{
-			name:        "to_path"
+			name:        "to"
 			description: "The path of the object to merge into."
 			required:    true
 			type: ["string"]
@@ -25,7 +25,7 @@ remap: functions: merge: {
 	return: ["string"]
 	category: "text"
 	description: #"""
-		Merges the `from` map provided into the `to_path` path specified, which must specify an existing map.
+		Merges the `from` map provided into the `to` path specified, which must specify an existing map.
 		If a key exists in both maps, the field from the `from` map is chosen.
 		If `deep` is specified, if a key exists in both maps, and both these fields are also maps merge will recursively
 		merge these fields.
@@ -45,13 +45,17 @@ remap: functions: merge: {
 				}
 			}
 			source: #"""
-				merge(".map1", .map2, deep = false)
+				merge(.map1, .map2, deep = false)
 				"""#
 			output: {
 				map1: {"parent1": {"child2": 4
 								"child5": 5
 				}
 					"parent2": {"child3": 3}
+				}
+				map2: {"parent1": {"child2": 4
+								"child5": 5
+				}
 				}
 			}
 		},
@@ -69,7 +73,7 @@ remap: functions: merge: {
 				}
 			}
 			source: #"""
-				merge(".map1", .map2, deep = true)
+				merge(.map1, .map2, deep = true)
 				"""#
 			output: {
 				map1: {"parent1": {"child1": 1
@@ -94,7 +98,7 @@ remap: functions: merge: {
 				}
 			}
 			source: #"""
-				merge(".map1", .map2, deep = true)
+				merge(.map1, .map2, deep = true)
 				"""#
 			output: {
 				error: remap.errors.ArgumentError
