@@ -1034,14 +1034,14 @@ mod integration_tests {
         },
         image::{CreateImageOptions, ListImagesOptions},
     };
-    use futures::{compat::Future01CompatExt, stream::TryStreamExt};
-    use futures01::{sync::mpsc as mpsc01, Async, Stream as Stream01};
+    use futures::stream::TryStreamExt;
+    use tokio::sync::mpsc;
 
     /// None if docker is not present on the system
     fn source_with<'a, L: Into<Option<&'a str>>>(
         names: &[&str],
         label: L,
-    ) -> mpsc01::Receiver<Event> {
+    ) -> mpsc::Receiver<Event> {
         source_with_config(DockerLogsConfig {
             include_containers: Some(names.iter().map(|&s| s.to_owned()).collect()),
             include_labels: Some(label.into().map(|l| vec![l.to_owned()]).unwrap_or_default()),
@@ -1050,7 +1050,7 @@ mod integration_tests {
     }
 
     /// None if docker is not present on the system
-    fn source_with_config(config: DockerLogsConfig) -> mpsc01::Receiver<Event> {
+    fn source_with_config(config: DockerLogsConfig) -> mpsc::Receiver<Event> {
         // trace_init();
         let (sender, recv) = Pipeline::new_test();
         tokio::spawn(async move {
@@ -1259,10 +1259,12 @@ mod integration_tests {
         id
     }
 
-    async fn is_empty<T>(mut rx: mpsc01::Receiver<T>) -> Result<bool, ()> {
-        futures01::future::poll_fn(move || Ok(Async::Ready(rx.poll()?.is_not_ready())))
-            .compat()
-            .await
+    async fn is_empty<T>(mut rx: mpsc::Receiver<T>) -> Result<bool, ()> {
+        match rx.try_recv() {
+            Ok(_) => Ok(false),
+            Err(mpsc::error::TryRecvError::Empty) => Ok(true),
+            Err(mpsc::error::TryRecvError::Closed) => Err(()),
+        }
     }
 
     #[tokio::test]
