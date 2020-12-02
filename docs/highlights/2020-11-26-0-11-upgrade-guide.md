@@ -12,7 +12,6 @@ tags: ["type: breaking change"]
 
 0.11 includes some minor breaking changes:
 
-1. [Metrics sources and sinks include new namespace options](#first)
 1. [The metrics emitted by the `internal_metrics` source have changed names.](#second)
 1. [The `statsd` sink now supports all socket types.](#third)
 1. [The `reduce` tranform `identifier_fields` was renamed to `group_by`.](#fourth)
