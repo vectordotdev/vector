@@ -159,7 +159,6 @@ mod test {
         }))?;
 
         pipeline.send(event).await?;
-        pipeline.flush().await?;
         let out = collect_ready(receiver).await;
 
         assert_eq!(out[0].as_log().get(KEYS[0]), Some(&Value::from(VALS[0])));
@@ -186,7 +185,6 @@ mod test {
         }))?;
 
         pipeline.send(event).await?;
-        pipeline.flush().await?;
         let out = collect_ready(receiver).await;
 
         assert_eq!(out, vec![]);
