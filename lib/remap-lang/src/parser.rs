@@ -146,9 +146,9 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(expression) = expressions.last() {
-            let type_def = expression.type_def(&self.compiler_state);
+            let kind = expression.type_def(&self.compiler_state).scalar_kind();
 
-            if !type_def.kind.is_all() && type_def.kind.contains_regex() {
+            if !kind.is_all() && kind.contains_regex() {
                 return Err(Error::RegexResult.into());
             }
         }
@@ -796,6 +796,32 @@ mod tests {
                 // We cannot assign to a regular expression.
                 r#"/ab/ = .foo"#,
                 vec![" 1:6\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+            ),
+            (
+                r#"/ab/"#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"$foo = /ab/"#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"[/ab/]"#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"
+                    $foo = /ab/
+                    [$foo]
+                "#,
+                vec!["remap error: parser error: cannot return regex from program"],
+            ),
+            (
+                r#"
+                    $foo = [/ab/]
+                    $foo
+                "#,
+                vec!["remap error: parser error: cannot return regex from program"],
             ),
         ];
 
