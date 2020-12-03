@@ -195,7 +195,7 @@ snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
 avro-rs = "0.11.0"
-tokio-postgres = { version = "0.5.5", optional = true }
+tokio-postgres = { version = "0.5.5", optional = true, features = ["runtime", "with-chrono-0_4"] }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
