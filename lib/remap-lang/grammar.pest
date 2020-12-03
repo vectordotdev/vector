@@ -23,9 +23,13 @@ group    =  { "(" ~ expression ~ ")" }
 
 // Function Calls --------------------------------------------------------------
 
-call      = ${ ident ~ "(" ~ arguments? ~ ")"  }
-arguments = !{ argument ~ ("," ~ argument)* }
-argument  =  { (ident ~ "=")? ~ (expression | regex) }
+call           = ${ ident ~ "(" ~ arguments? ~ ")"  }
+arguments      = !{ argument ~ ("," ~ argument)* }
+argument       =  { (ident ~ "=")? ~ (argument_array | argument_value) }
+argument_value = _{ (expression | regex) }
+
+// Similar to `array`, but also accepts regex patterns.
+argument_array =  { "[" ~ NEWLINE* ~ (argument_value ~ "," ~ NEWLINE*)* ~ argument_value? ~ NEWLINE* ~ "]" }
 
 // Operations ------------------------------------------------------------------
 

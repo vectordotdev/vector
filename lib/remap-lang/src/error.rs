@@ -76,6 +76,8 @@ impl fmt::Display for Rule {
         rules_str![
             addition,
             argument,
+            argument_array,
+            argument_value,
             arguments,
             array,
             assignment,
