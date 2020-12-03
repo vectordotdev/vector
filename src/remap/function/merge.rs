@@ -61,10 +61,10 @@ impl Expression for MergeFn {
             Some(deep) => deep.execute(state, object)?.try_boolean()?,
         };
 
-        match object.find(&self.to.segments())? {
+        match object.get(&self.to.as_ref())? {
             Some(Value::Map(mut map1)) => {
                 merge_maps(&mut map1, &from_value, deep);
-                object.insert(&self.to.segments(), Value::Map(map1))?;
+                object.insert(&self.to.as_ref(), Value::Map(map1))?;
                 Ok(Value::Null)
             }
             _ => Err("parameters passed to merge are non-map values".into()),
@@ -193,7 +193,10 @@ mod tests {
         ];
 
         let mut state = state::Program::default();
-        for (mut input_event, exp_event, func, exp_result) in cases {
+        for (input_event, exp_event, func, exp_result) in cases {
+            let mut input_event = Value::Map(input_event);
+            let exp_event = Value::Map(exp_event);
+
             let got = func
                 .execute(&mut state, &mut input_event)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

@@ -106,7 +106,7 @@ mod tests {
 
         value_float_or_integer {
             expr: |_| CeilFn {
-                value: Variable::new("foo".to_owned()).boxed(),
+                value: Variable::new("foo".to_owned(), None).boxed(),
                 precision: None,
             },
             def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float },
@@ -115,7 +115,7 @@ mod tests {
         fallible_precision {
             expr: |_| CeilFn {
                 value: Literal::from(1).boxed(),
-                precision: Some(Variable::new("foo".to_owned()).boxed()),
+                precision: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Integer },
         }
@@ -169,7 +169,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

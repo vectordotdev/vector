@@ -36,6 +36,9 @@ pub enum Error {
     #[error("assignment error")]
     Assignment(#[from] assignment::Error),
 
+    #[error(r#"error for variable "{0}""#)]
+    Variable(String, #[source] variable::Error),
+
     #[error("path error")]
     Path(#[from] path::Error),
 
@@ -65,7 +68,7 @@ macro_rules! expression_dispatch {
         ///
         /// Any expression that stores other expressions internally will still
         /// have to box this enum, to avoid infinite recursion.
-        #[derive(Debug, Clone)]
+        #[derive(Debug, Clone, PartialEq)]
         pub enum Expr {
             $($expr($expr)),+
         }
