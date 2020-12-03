@@ -69,7 +69,7 @@ impl Path {
     /// .foo.bar.(baz | qux)    => [[".foo"], [".bar"], [".baz", ".qux"]]
     pub fn to_alternative_components(&self) -> Vec<Vec<String>> {
         let mut segments = vec![];
-        let handle_field = |field: &Field| field.as_str().replace(".", "\\.");
+        let handle_field = |field: &Field| field.as_str().replace('.', "\\.");
 
         for segment in self.segments() {
             match segment {
@@ -78,7 +78,7 @@ impl Path {
                     segments.push(fields.iter().map(|f| handle_field(f)).collect::<Vec<_>>())
                 }
                 Segment::Index(_) => segments.last_mut().into_iter().for_each(|vec| {
-                    vec.into_iter()
+                    vec.iter_mut()
                         .for_each(|s| s.push_str(&segment.to_string()))
                 }),
             }
@@ -111,7 +111,7 @@ impl Path {
         for fields in components.iter() {
             debug_assert!(!fields.is_empty());
 
-            loop_count = loop_count / fields.len();
+            loop_count /= fields.len();
 
             let mut paths_index = 0;
             let mut component_index = 0;
@@ -165,7 +165,7 @@ impl Path {
                         handle_field(part, &mut segments)?;
                     }
 
-                    while let Some(c) = chars.next() {
+                    for c in chars {
                         if c == ']' {
                             let index = part
                                 .parse::<usize>()

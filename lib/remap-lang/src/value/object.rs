@@ -2,7 +2,8 @@ use crate::{Object, Path, Value};
 
 impl Object for Value {
     fn insert(&mut self, path: &Path, value: Value) -> Result<(), String> {
-        Ok(self.insert_by_path(path, value))
+        self.insert_by_path(path, value);
+        Ok(())
     }
 
     fn get(&self, path: &Path) -> Result<Option<Value>, String> {
