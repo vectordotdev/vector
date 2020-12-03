@@ -9,7 +9,7 @@ use crate::{
         encoding::{EncodingConfigWithDefault, EncodingConfiguration},
         http::{BatchedHttpSink, HttpSink},
         retries::{RetryAction, RetryLogic},
-        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig,
+        BatchConfig, BatchSettings, Buffer, Compression, TowerRequestConfig, UriSerde,
     },
     template::{Template, TemplateError},
     tls::{TlsOptions, TlsSettings},
@@ -342,14 +342,16 @@ impl ElasticSearchCommon {
             .into());
         }
 
-        let (base_url, mut authorization) = Auth::get_and_strip_basic_auth(&config.endpoint);
-
-        if let Some(ElasticSearchAuth::Basic { user, password }) = config.auth.clone() {
-            if authorization.is_some() {
-                warn!("Overwriting authorization config in `endpoint`.");
-            }
-            authorization = Some(Auth::Basic { user, password });
-        }
+        let mut authorization = match &config.auth {
+            Some(ElasticSearchAuth::Basic { user, password }) => Some(Auth::Basic {
+                user: user.clone(),
+                password: password.clone(),
+            }),
+            _ => None,
+        };
+        let uri = config.endpoint.parse::<UriSerde>()?;
+        uri.merge_auth_config(&mut authorization)?;
+        let base_url = uri.uri.to_string();
 
         let region = match &config.aws {
             Some(region) => Region::try_from(region)?,
