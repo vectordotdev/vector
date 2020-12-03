@@ -118,6 +118,36 @@ components: {
 			output: #Output
 		}
 
+		// Whether the component's docs should include a blurb about timestamp support in Vector
+		timestamp_docs: *false | bool
+
+		if timestamp_docs == true {
+			// A map of provided formats and their meaning
+			formats: [_group=string]: [_format=string]: string
+
+			formats: {
+				"Standard": {
+					"%F %T":           "`YYYY-MM-DD HH:MM:SS`"
+					"%v %T":           "`DD-Mmm-YYYY HH:MM:SS`"
+					"%FT%T":           "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone"
+					"%a, %d %b %Y %T": "[RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone"
+					"%a %d %b %T %Y":  "[Chrono](\(urls.chrono)) `date` method output without time zone"
+				}
+
+				"UTC": {
+					"%s":     "[UNIX](\(urls.unix_timestamp)) timestamp"
+					"%FT%TZ": "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC"
+				}
+
+				"Time zone": {
+					"%+":                 "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone"
+					"%a %d %b %T %Z %Y":  "[Chrono](\(urls.chrono)) `date` method output with time zone"
+					"%a %d %b %T %z %Y":  "[Chrono](\(urls.chrono)) `date` method output with numeric time zone"
+					"%a %d %b %T %#z %Y": "[Chrono](\(urls.chrono)) `date` method output with numeric time zone"
+				}
+			}
+		}
+
 		// `support` communicates the varying levels of support of the component.
 		support: #Support & {_args: kind: Kind}
 
