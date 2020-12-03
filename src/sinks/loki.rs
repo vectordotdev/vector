@@ -100,8 +100,11 @@ impl SinkConfig for LokiConfig {
         let tls = TlsSettings::from_options(&self.tls)?;
         let client = HttpClient::new(tls)?;
 
+        let mut config = self.clone();
+        config.endpoint.merge_auth_config(&mut config.auth)?;
+
         let sink = PartitionHttpSink::new(
-            self.clone(),
+            config.clone(),
             PartitionBuffer::new(LokiBuffer::new(batch_settings.size)),
             request_settings,
             batch_settings.timeout,
@@ -110,7 +113,7 @@ impl SinkConfig for LokiConfig {
         )
         .sink_map_err(|error| error!(message = "Fatal loki sink error.", %error));
 
-        let healthcheck = healthcheck(self.clone(), client).boxed();
+        let healthcheck = healthcheck(config, client).boxed();
 
         Ok((super::VectorSink::Sink(Box::new(sink)), healthcheck))
     }
@@ -202,7 +205,7 @@ impl HttpSink for LokiConfig {
 
         let body = serde_json::to_vec(&json).unwrap();
 
-        let uri = format!("{}loki/api/v1/push", self.endpoint);
+        let uri = format!("{}loki/api/v1/push", self.endpoint.uri);
 
         let mut req = http::Request::post(uri).header("Content-Type", "application/json");
 
@@ -221,7 +224,7 @@ impl HttpSink for LokiConfig {
 }
 
 async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Result<()> {
-    let uri = format!("{}ready", config.endpoint);
+    let uri = format!("{}ready", config.endpoint.uri);
 
     let mut req = http::Request::get(uri).body(hyper::Body::empty()).unwrap();
 
