@@ -11,7 +11,6 @@ use crate::{
     event::Event,
     transforms::{self, FunctionTransform},
 };
-use k8s_openapi::api::core::v1::Pod;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use std::{convert::Infallible, future::Future};
@@ -21,6 +20,7 @@ mod watch_request_builder;
 /// Configuration for the `kubernetes_metadata` transform.
 #[derive(Default, Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
+    watch_request_builder: watch_request_builder::Config,
     label_selector: Option<String>,
     field_selector: Option<String>,
 }
@@ -58,6 +58,7 @@ impl_generate_config_from_default!(Config);
 
 struct Runtime {
     client: k8s::client::Client,
+    watch_request_builder: watch_request_builder::Builder,
     label_selector: Option<String>,
     field_selector: Option<String>,
 }
@@ -66,8 +67,10 @@ impl Runtime {
     fn new(config: &Config) -> crate::Result<Self> {
         let k8s_config = k8s::client::config::Config::in_cluster()?;
         let client = k8s::client::Client::new(k8s_config)?;
+        let watch_request_builder = (&config.watch_request_builder).into();
         Ok(Self {
             client,
+            watch_request_builder,
             field_selector: config.label_selector.clone(),
             label_selector: config.field_selector.clone(),
         })
@@ -81,12 +84,12 @@ impl Runtime {
     )> {
         let Self {
             client,
+            watch_request_builder,
             field_selector,
             label_selector,
         } = self;
 
-        // TODO: use dynamic provider here.
-        let watcher = k8s::api_watcher::ApiWatcher::new(client, Pod::watch_pod_for_all_namespaces);
+        let watcher = k8s::api_watcher::ApiWatcher::new(client, watch_request_builder);
         let watcher = k8s::instrumenting_watcher::InstrumentingWatcher::new(watcher);
         let (_state_reader, state_writer) = evmap::new();
         let state_writer =
