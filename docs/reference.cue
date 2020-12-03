@@ -429,10 +429,49 @@ _values: {
 		default: #Timestamp | null
 	}
 
+	description: """
+		Vector supports a wide variety of timestamp formats. You can use:
+
+		1. One of the [built-in formats](#timestamp_formats) listed in the table below.
+		2. Custom timestamps using the [time format specifiers](\(urls.chrono_time_formats))
+			from Rust's `chrono` library. Custom timestamps need to be prefixed with
+			`timestamp|`, for example `timestamp|%Y-%m-%d %H:%M:%S`.
+
+
+		"""
+
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.
 	examples: [_values.current_timestamp]
+
+	formats: [_group=string]: [_format=string]: string
+
+	// This map is used to generate an HTML table
+	formats: {
+		"Standard": {
+			"%F %T":           "`YYYY-MM-DD HH:MM:SS`"
+			"%v %T":           "`DD-Mmm-YYYY HH:MM:SS`"
+			"%FT%T":           "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone"
+			"%a, %d %b %Y %T": "[RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone"
+			"%a %d %b %T %Y":  "[`date`](\(urls.date)) command output without time zone"
+			"%a %b %e %T %Y":  "[ctime](\(urls.ctime)) format"
+		}
+
+		"UTC": {
+			"%s":     "[UNIX](\(urls.unix_timestamp)) timestamp"
+			"%FT%TZ": "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC"
+		}
+
+		"Time zone": {
+			"%+":                 "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone"
+			"%a %d %b %T %Z %Y":  "[`date`](\(urls.date)) command output with time zone"
+			"%a %d %b %T %z %Y":  "[`date`](\(urls.date)) command output with numeric time zone"
+			"%a %d %b %T %#z %Y": """
+				[`date`](\(urls.date)) command output with numeric time zone (minutes can be missing or present)
+				"""
+		}
+	}
 }
 
 #TypeUint: {
