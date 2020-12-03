@@ -573,6 +573,7 @@ mod tests {
         validate_rule(cases);
     }
 
+    #[allow(clippy::type_complexity)]
     fn validate_rule(cases: Vec<(&str, Vec<&str>, Result<Vec<Expr>>)>) {
         for (mut i, (source, compile_check, run_check)) in cases.into_iter().enumerate() {
             let compile_check: Vec<&str> = compile_check;

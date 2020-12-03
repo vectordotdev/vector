@@ -317,7 +317,7 @@ mod tests {
         ];
 
         for (object, expect) in cases {
-            let mut object: Value = object.into();
+            let object: Value = object.into();
 
             assert_eq!(
                 Object::paths(&object),
