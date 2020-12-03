@@ -212,6 +212,10 @@ impl HttpSink for ElasticSearchCommon {
 
             request.add_header("Content-Type", "application/x-ndjson");
 
+            if let Some(ce) = self.compression.content_encoding() {
+                request.add_header("Content-Encoding", ce);
+            }
+
             if let Some(headers) = &self.config.headers {
                 for (header, value) in headers {
                     request.add_header(header, value);
@@ -709,7 +713,23 @@ mod integration_tests {
             },
             false,
         )
-        .await;
+            .await;
+    }
+
+    #[tokio::test]
+    async fn insert_events_on_aws_with_compression() {
+        trace_init();
+
+        run_insert_tests(
+            ElasticSearchConfig {
+                auth: Some(ElasticSearchAuth::Aws { assume_role: None }),
+                endpoint: "http://localhost:4571".into(),
+                compression: Compression::gzip_default(),
+                ..config()
+            },
+            false,
+        )
+            .await;
     }
 
     #[tokio::test]
