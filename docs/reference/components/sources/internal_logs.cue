@@ -79,11 +79,6 @@ components: sources: internal_logs: {
 								}
 							}
 						}
-						name: {
-							description: "The name of the span."
-							required:    true
-							type:        "string"
-						}
 						level: {
 							description: "The level of verbosity of the described span or event."
 							required:    true

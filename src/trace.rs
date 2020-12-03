@@ -1,7 +1,7 @@
 use crate::event::{Event, LogEvent, Value};
 use metrics_tracing_context::MetricsLayer;
 use once_cell::sync::OnceCell;
-use std::{collections::BTreeMap, convert::TryInto, fmt::Debug};
+use std::{convert::TryInto, fmt::Debug};
 use tokio::sync::broadcast::{self, Receiver, Sender};
 use tracing::{
     dispatcher::{set_global_default, Dispatch},
@@ -129,61 +129,59 @@ impl From<&tracing::Event<'_>> for Event {
         let mut maker = MakeLogEvent::default();
         event.record(&mut maker);
 
+        let mut log = maker.0;
+        log.insert("timestamp", now);
+
         let meta = event.metadata();
-        let mut data = BTreeMap::<String, Value>::new();
-        data.insert("name".into(), meta.target().to_string().into());
-        data.insert("target".into(), meta.target().to_string().into());
-        data.insert("level".into(), meta.level().to_string().into());
-        data.insert(
-            "module_path".into(),
-            meta.module_path().map(|mp| mp.to_string()).into(),
-        );
-        data.insert(
-            "kind".into(),
+        log.insert(
+            "metadata.kind",
             if meta.is_event() {
-                "event".to_string().into()
+                Value::Bytes("event".to_string().into())
             } else if meta.is_span() {
-                "span".to_string().into()
+                Value::Bytes("span".to_string().into())
             } else {
                 Value::Null
             },
         );
+        log.insert("metadata.level", meta.level().to_string());
+        log.insert(
+            "metadata.module_path",
+            meta.module_path()
+                .map(|mp| Value::Bytes(mp.to_string().into()))
+                .unwrap_or(Value::Null),
+        );
+        log.insert("metadata.target", meta.target().to_string());
 
-        maker.0.insert("metadata".into(), data.into());
-        maker.0.insert("timestamp".into(), now.into());
-
-        let log: LogEvent = maker.0.into_iter().collect();
         log.into()
     }
 }
 
 #[derive(Debug, Default)]
-struct MakeLogEvent(BTreeMap<String, Value>);
+struct MakeLogEvent(LogEvent);
 
 impl Visit for MakeLogEvent {
     fn record_str(&mut self, field: &Field, value: &str) {
-        self.0.insert(field.name().into(), value.to_string().into());
+        self.0.insert(field.name(), value.to_string());
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.0
-            .insert(field.name().into(), format!("{:?}", value).into());
+        self.0.insert(field.name(), format!("{:?}", value));
     }
 
     fn record_i64(&mut self, field: &Field, value: i64) {
-        self.0.insert(field.name().into(), value.into());
+        self.0.insert(field.name(), value);
     }
 
     fn record_u64(&mut self, field: &Field, value: u64) {
-        let field = field.name().into();
+        let field = field.name();
         let converted: Result<i64, _> = value.try_into();
         match converted {
-            Ok(value) => self.0.insert(field, value.into()),
-            Err(_) => self.0.insert(field, value.to_string().into()),
+            Ok(value) => self.0.insert(field, value),
+            Err(_) => self.0.insert(field, value.to_string()),
         };
     }
 
     fn record_bool(&mut self, field: &Field, value: bool) {
-        self.0.insert(field.name().into(), value.into());
+        self.0.insert(field.name(), value);
     }
 }
