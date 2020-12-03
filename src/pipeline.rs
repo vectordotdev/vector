@@ -49,10 +49,11 @@ impl Pipeline {
                 Ok(()) => {
                     // we good, keep looping
                 }
-                Err(Full(item)) => {
-                    // TODO: can we get here after the poll_ready?
-                    self.enqueued.push_front(item);
-                    return Poll::Pending;
+                Err(Full(_item)) => {
+                    // We only try to send after a successful call to poll_ready, which reserves
+                    // space for us in the channel. That makes this branch unreachable as long as
+                    // the channel implementation fulfills its own contract.
+                    panic!("Channel was both ready and full; this is a bug.")
                 }
                 Err(Closed(_item)) => {
                     return Poll::Ready(Err(ClosedError));
