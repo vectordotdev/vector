@@ -141,6 +141,7 @@ components: {
 					"%FT%T":           "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) format without time zone"
 					"%a, %d %b %Y %T": "[RFC 822](\(urls.rfc_822))/[2822](\(urls.rfc_2822)) without time zone"
 					"%a %d %b %T %Y":  "[`date`](\(urls.date)) command output without time zone"
+					"%a %b %e %T %Y":  "[ctime](\(urls.ctime)) format"
 				}
 
 				"UTC": {
@@ -149,7 +150,7 @@ components: {
 				}
 
 				"Time zone": {
-					"%+":                 """[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone"
+					"%+":                 "[ISO 8601](\(urls.iso_8601))/[RFC 3339](\(urls.rfc_3339)) UTC with time zone"
 					"%a %d %b %T %Z %Y":  "[`date`](\(urls.date)) command output with time zone"
 					"%a %d %b %T %z %Y":  "[`date`](\(urls.date)) command output with numeric time zone"
 					"%a %d %b %T %#z %Y": """
