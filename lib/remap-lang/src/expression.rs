@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 
 mod argument;
 mod arithmetic;
+mod array;
 mod assignment;
 mod block;
 pub(crate) mod function;
@@ -15,6 +16,7 @@ mod variable;
 
 pub use argument::Argument;
 pub use arithmetic::Arithmetic;
+pub use array::Array;
 pub use assignment::{Assignment, Target};
 pub use block::Block;
 pub use function::Function;
@@ -127,7 +129,9 @@ macro_rules! expression_dispatch {
 }
 
 expression_dispatch![
+    Argument,
     Arithmetic,
+    Array,
     Assignment,
     Block,
     Function,
@@ -137,7 +141,6 @@ expression_dispatch![
     Not,
     Path,
     Variable,
-    Argument,
 ];
 
 impl<T: Into<Value>> From<T> for Expr {
