@@ -24,7 +24,7 @@ impl FromStr for Path {
     /// parser grammar.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parser = Parser::default();
-        if s.starts_with(".") {
+        if s.starts_with('.') {
             parser.path_from_str(s)
         } else {
             let s = format!(".{}", s);
