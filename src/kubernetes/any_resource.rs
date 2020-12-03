@@ -1,6 +1,6 @@
 //! Arbitrary Kubernetes resource container.
 
-use super::resource_version;
+use super::{hash_value::Identity, resource_version};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use snafu::Snafu;
@@ -79,6 +79,35 @@ impl resource_version::Resource for AnyResource {
         Some(resource_version::Candidate::new_unchecked(
             new_resource_version.clone(),
         ))
+    }
+}
+
+impl Identity for AnyResource {
+    type IdentityType = str;
+
+    fn identity(&self) -> Option<&'_ Self::IdentityType> {
+        let maybe_value = self
+            .data
+            .get("metadata")
+            .and_then(|metadata| metadata.get("uid"));
+
+        let value = match maybe_value {
+            Some(val) => val,
+            None => {
+                warn!(message = "Got a resource without a `metadata.uid`.");
+                return None;
+            }
+        };
+
+        let uid = match value {
+            Value::String(ref val) => val,
+            _ => {
+                warn!(message = "Got a resource where a `metadata.uid` is not a string.");
+                return None;
+            }
+        };
+
+        Some(uid.as_ref())
     }
 }
 
