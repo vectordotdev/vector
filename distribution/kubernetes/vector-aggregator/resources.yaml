@@ -1,0 +1,172 @@
+# This file is generated from the Helm Chart by "scripts/kubernetes-yaml.sh".
+# You might want to use the Helm Chart, see "distribution/helm/vector-aggregator" or the
+# documentation on our website at https://vector.dev/docs.
+# If you copied this file into you local setup - feel free to change it however
+# you please.
+# If you want to create a PR to the Vector's Kubernetes config - please do not
+# edit this file directly. Instead, apply your changes to the Helm Chart.
+---
+# Source: vector-aggregator/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vector-aggregator
+  labels:
+    helm.sh/chart: vector-aggregator-0.0.0
+    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: vector-aggregator/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-aggregator
+  labels:
+    helm.sh/chart: vector-aggregator-0.0.0
+    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/managed-by: Helm
+data:
+  # We leave `vector.toml` file name available to let externally managed config
+  # maps to provide it.
+  managed.toml: |
+    # Configuration for vector.
+    # Docs: https://vector.dev/docs/
+
+    # Data dir is location controlled at the `StatefulSet`.
+    data_dir = "/vector-data-dir"
+    [log_schema]
+      host_key = "host"
+      message_key = "message"
+      source_type_key = "source_type"
+      timestamp_key = "timestamp"
+    # Accept logs from Vector agents.
+    [sources.vector]
+      type = "vector"
+      address = "0.0.0.0:9000"
+---
+# Source: vector-aggregator/templates/service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector-aggregator-headless
+  labels:
+    helm.sh/chart: vector-aggregator-0.0.0
+    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  clusterIP: None
+  ports:
+    
+    - name: vector
+      port: 9000
+      protocol: TCP
+      targetPort: 9000
+  selector:
+    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/instance: vector
+---
+# Source: vector-aggregator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: vector-aggregator
+  labels:
+    helm.sh/chart: vector-aggregator-0.0.0
+    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  ports:
+    
+    - name: vector
+      port: 9000
+      protocol: TCP
+      targetPort: 9000
+  selector:
+    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/instance: vector
+---
+# Source: vector-aggregator/templates/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: vector-aggregator
+  labels:
+    helm.sh/chart: vector-aggregator-0.0.0
+    app.kubernetes.io/name: vector-aggregator
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/version: "0.0.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  serviceName: vector-aggregator-headless
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vector-aggregator
+      app.kubernetes.io/instance: vector
+  podManagementPolicy: "Parallel"
+  replicas: 1
+  template:
+    metadata:
+      annotations:
+        checksum/config: 5ef9ad798d288ca3aec45303d221f8ce0c413ec73d25d498f509fed43a389b8c
+      labels:
+        app.kubernetes.io/name: vector-aggregator
+        app.kubernetes.io/instance: vector
+    spec:
+      serviceAccountName: vector-aggregator
+      securityContext:
+        {}
+      containers:
+        - name: vector
+          securityContext:
+            {}
+          image: "timberio/vector:latest-debian"
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --config
+            - /etc/vector/*.toml
+          env:
+            
+            - name: LOG
+              value: info
+          ports:
+          resources:
+            {}
+          volumeMounts:
+            # Vector data dir mount.
+            - name: data-dir
+              mountPath: "/vector-data-dir"
+            # Vector config dir mount.
+            - name: config-dir
+              mountPath: /etc/vector
+              readOnly: true
+            # Extra volumes.
+      terminationGracePeriodSeconds: 60
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+      volumes:
+        # Vector will store it's data here.
+        - name: data-dir
+          emptyDir: {}
+        # Vector config dir.
+        - name: config-dir
+          projected:
+            sources:
+              - configMap:
+                  name: vector-aggregator
+                  optional: true
+              - configMap:
+                  name: vector-aggregator-config
+                  optional: true
+              - secret:
+                  name: vector-aggregator-config
+                  optional: true
+  volumeClaimTemplates:
