@@ -321,6 +321,7 @@ impl Parser<'_> {
                 // This matches first, if a keyword is provided.
                 R::ident => ident = Some(pair.as_str().to_owned()),
                 R::regex => return Ok((ident, Argument::Regex(self.regex_from_pair(pair)?))),
+                R::argument_array => return Ok((ident, self.argument_array_from_pair(pair)?)),
                 _ => {
                     let expr = self.expression_from_pair(pair)?;
                     return Ok((ident, Argument::Expression(expr)));
@@ -329,6 +330,16 @@ impl Parser<'_> {
         }
 
         Err(e(R::argument))
+    }
+
+    fn argument_array_from_pair(&mut self, pair: Pair<R>) -> Result<Argument> {
+        pair.into_inner()
+            .map(|pair| match pair.as_rule() {
+                R::regex => self.regex_from_pair(pair).map(Argument::Regex),
+                _ => self.expression_from_pair(pair).map(Argument::Expression),
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(Argument::Array)
     }
 
     /// Parse a [`Regex`] value
