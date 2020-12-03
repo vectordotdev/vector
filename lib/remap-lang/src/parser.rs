@@ -573,9 +573,9 @@ mod tests {
         validate_rule(cases);
     }
 
-    fn validate_rule(cases: Vec<(&'static str, Vec<&'static str>, Result<Vec<Expr>>)>) {
+    fn validate_rule(cases: Vec<(&str, Vec<&str>, Result<Vec<Expr>>)>) {
         for (mut i, (source, compile_check, run_check)) in cases.into_iter().enumerate() {
-            let compile_check: Vec<&'static str> = compile_check;
+            let compile_check: Vec<&str> = compile_check;
             i += 1;
 
             let pairs = Parser::parse(Rule::program, source);

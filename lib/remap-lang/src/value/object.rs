@@ -320,7 +320,7 @@ mod tests {
             let mut object: Value = object.into();
 
             assert_eq!(
-                Object::paths(&mut object),
+                Object::paths(&object),
                 expect.map(|vec| vec.iter().map(|s| Path::from_str(s).unwrap()).collect())
             );
         }
