@@ -21,7 +21,7 @@ jobs:
       - run: make ci-sweep
       - env:
           PASS_FEATURES: "default-cmake"
-        run: make package-x86_64-unknown-linux-musl
+        run: make package-x86_64-unknown-linux-musl-all
       - run: |
           mv ./target/artifacts/vector-x86_64-unknown-linux-musl.tar.gz \
           ./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
@@ -29,6 +29,10 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz
           path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-x86_64-unknown-linux-musl.tar.gz"
+      - uses: actions/upload-artifact@v1
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
+          path: "./target/artifacts/vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm"
 
   build-x86_64-unknown-linux-gnu-packages:
     runs-on: ubuntu-latest
@@ -316,6 +320,10 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -386,6 +394,10 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -447,6 +459,10 @@ jobs:
           path: target/artifacts
       - uses: actions/download-artifact@v2
         with:
+          name: vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm
+          path: target/artifacts
+      - uses: actions/download-artifact@v2
+        with:
           name: vector-${{ env.VECTOR_VERSION }}-1.aarch64.rpm
           path: target/artifacts
       - uses: actions/download-artifact@v2
@@ -505,6 +521,19 @@ jobs:
           release: "any-version"
           republish: "true"
           file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1.x86_64.rpm"
+      - name: Push x86_64 musl RPM
+        id: push-rpm-x86_64-musl
+        uses: cloudsmith-io/action@master
+        with:
+          api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          command: "push"
+          format: "rpm"
+          owner: "timber"
+          repo: "vector-nightly"
+          distro: "any-distro"
+          release: "any-version"
+          republish: "true"
+          file: "target/artifacts/vector-${{ env.VECTOR_VERSION }}-1-musl.x86_64.rpm"
       - name: Push aarch64 RPM
         id: push-rpm-aarch64
         uses: cloudsmith-io/action@master
