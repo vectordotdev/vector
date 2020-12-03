@@ -144,6 +144,8 @@ fi
 cd lib/k8s-e2e-tests
 cargo test \
   --no-fail-fast \
+  --no-default-features \
+  --features e2e-tests \
   "${CARGO_TEST_ARGS_CARGO[@]}" \
   -- \
   --nocapture \
