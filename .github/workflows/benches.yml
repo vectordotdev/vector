@@ -45,20 +45,23 @@ jobs:
           github_token: ${{secrets.GITHUB_TOKEN}}
           workflow: benches.yml
           branch: master
-          name: vector-benches
-          path: target/criterion
+          name: criterion
+          path: target
       - name: Check if there were master artifacts
         run: |
-          test -f target/criterion || echo "::warning::No master benchmark artifacts could be fetched for comparison."
+          test -f target/criterion.zip || echo "::warning::No master benchmark artifacts could be fetched for comparison."
+      - run: unzip target/criterion.zip
+        continue-on-error: true
       - run: sudo bash scripts/environment/bootstrap-ubuntu-20.04.sh
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
       - run: make bench | tee target/criterion/out
+      - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
-          name: "vector-benches"
-          path: "./target/criterion/*"
+          name: "criterion"
+          path: "./target/criterion.zip"
       - run: cat target/criterion/out | scripts/check-criterion-output.sh
 
   master-failure:

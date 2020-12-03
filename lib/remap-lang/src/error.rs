@@ -1,4 +1,5 @@
-use crate::{expression, function, parser::Rule, program, value};
+use crate::{expression, function, parser::Rule, path, program, value};
+use pest::error::Error as PestError;
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -31,6 +32,9 @@ pub enum Error {
     #[error("assertion failed: {0}")]
     Assert(String),
 
+    #[error("path error")]
+    Path(#[from] path::Error),
+
     #[error("unknown error")]
     Unknown,
 }
@@ -44,6 +48,12 @@ impl From<String> for Error {
 impl From<&str> for Error {
     fn from(s: &str) -> Self {
         Error::Call(s.to_owned())
+    }
+}
+
+impl From<PestError<Rule>> for Error {
+    fn from(err: PestError<Rule>) -> Self {
+        Error::Parser(err.to_string())
     }
 }
 
@@ -66,7 +76,10 @@ impl fmt::Display for Rule {
         rules_str![
             addition,
             argument,
+            argument_array,
+            argument_value,
             arguments,
+            array,
             assignment,
             block,
             boolean,
@@ -96,14 +109,17 @@ impl fmt::Display for Rule {
             path_field,
             path_index,
             path_index_inner,
-            path_root,
             path_segment,
+            path_segments,
             primary,
             program,
             regex,
             regex_char,
             regex_flags,
             regex_inner,
+            rule_ident,
+            rule_path,
+            rule_string_inner,
             string,
             string_inner,
             target,

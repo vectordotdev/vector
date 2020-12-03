@@ -6,7 +6,7 @@ pub enum Error {
     Value(#[from] value::Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IfStatement {
     conditional: Box<Expr>,
     true_expression: Box<Expr>,

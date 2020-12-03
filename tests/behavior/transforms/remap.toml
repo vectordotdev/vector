@@ -215,14 +215,14 @@
       "b.equals" = "10"
       "c.equals" = "10"
       "d.equals" = "10"
-      "e.equals" = "20"
-      "f.equals" = "20"
+      "e.equals" = ""
+      "f.equals" = ""
       "g.equals" = "10"
       "h.equals" = "10"
       "i.equals" = "10"
       "j.equals" = "10"
-      "k.equals" = "20"
-      "l.equals" = "30"
+      "k.equals" = ""
+      "l.equals" = ""
 
 [transforms.remap_function_upcase]
   inputs = []

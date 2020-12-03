@@ -83,7 +83,7 @@ mod tests {
             Box::new(Literal::from(Value::Array(vec![Value::from(42)]))),
             "warn".to_string(),
         );
-        let mut object = map![];
+        let mut object = Value::Map(map![]);
         let got = func.execute(&mut state, &mut object);
 
         assert_eq!(Ok(Value::Null), got);

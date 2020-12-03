@@ -27,10 +27,10 @@ fn remove_array(
 ) -> Option<(Value, bool)> {
     match path.next()? {
         PathComponent::Index(index) => match path.peek() {
-            None => array_remove(array, index).map(|v| (v, false)),
+            None => array_remove(array, index).map(|v| (v, array.is_empty())),
             Some(_) => array
                 .get_mut(index)
-                .and_then(|value| Some((remove_rec(value, path, prune)?.0, false))),
+                .and_then(|value| remove_rec(value, path, prune)),
         },
         _ => None,
     }
@@ -158,7 +158,7 @@ mod test {
         let mut fields = fields_from_json(json!({
             "a": {
                 "b": {
-                    "c": 5
+                    "c": vec![5]
                 },
                 "d": 4,
             }
@@ -170,13 +170,16 @@ mod test {
             fields_from_json(json!({
                 "a": {
                     "b": {
-                        "c": 5
+                        "c": vec![5]
                     }
                 }
             }))
         );
 
-        assert_eq!(remove(&mut fields, "a.b.c", true), Some(Value::Integer(5)));
+        assert_eq!(
+            remove(&mut fields, "a.b.c[0]", true),
+            Some(Value::Integer(5))
+        );
         assert_eq!(fields, fields_from_json(json!({})));
     }
 }

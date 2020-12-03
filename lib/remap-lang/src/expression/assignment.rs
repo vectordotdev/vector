@@ -10,13 +10,13 @@ pub enum Error {
     PathInsertion(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Target {
     Path(Path),
     Variable(Variable),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Assignment {
     target: Target,
     value: Box<Expr>,
@@ -32,7 +32,7 @@ impl Assignment {
                 .insert(variable.ident().to_owned(), type_def),
             Target::Path(path) => state
                 .path_query_types_mut()
-                .insert(path.as_string(), type_def),
+                .insert(path.as_ref().clone(), type_def),
         };
 
         Self { target, value }
@@ -50,7 +50,7 @@ impl Expression for Assignment {
                     .insert(variable.ident().to_owned(), value.clone());
             }
             Target::Path(path) => object
-                .insert(path.segments(), value.clone())
+                .insert(path.as_ref(), value.clone())
                 .map_err(|e| E::Assignment(Error::PathInsertion(e)))?,
         }
 
@@ -64,7 +64,7 @@ impl Expression for Assignment {
                 .cloned()
                 .expect("variable must be assigned via Assignment::new"),
             Target::Path(path) => state
-                .path_query_type(&path.as_string())
+                .path_query_type(path)
                 .cloned()
                 .expect("path must be assigned via Assignment::new"),
         }
@@ -79,7 +79,7 @@ mod tests {
     test_type_def![
         variable {
             expr: |state: &mut state::Compiler| {
-                let target = Target::Variable(Variable::new("foo".to_owned()));
+                let target = Target::Variable(Variable::new("foo".to_owned(), None));
                 let value = Box::new(Literal::from(true).into());
 
                 Assignment::new(target, value, state)

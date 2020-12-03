@@ -73,8 +73,20 @@ rpmbuild \
   -ba distribution/rpm/vector.spec
 
 #
+# Set the type of RPM - gnu or musl
+#
+
+TYPE="${TYPE:-"$(echo "$TARGET" | cut -d'-' -f4)"}"
+
+if [ "${TYPE}" = "gnu" ]; then
+  TYPE=""
+elif [ "${TYPE}" = "musl" ]; then
+  TYPE=${TYPE/#/-}
+fi
+
+#
 # Move the RPM into the artifacts dir
 #
 
 ls "$RPMBUILD_DIR/RPMS/$ARCH"
-mv -v "$RPMBUILD_DIR/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm"
+mv -v "$RPMBUILD_DIR/RPMS/$ARCH/vector-$CLEANED_VERSION-$RELEASE.$ARCH.rpm" "target/artifacts/vector-${CLEANED_VERSION}-${RELEASE}${TYPE}.${ARCH}.rpm"

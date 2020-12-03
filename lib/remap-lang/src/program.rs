@@ -91,9 +91,7 @@ impl Program {
         function_definitions: &[Box<dyn Function>],
         constraint: Option<TypeConstraint>,
     ) -> Result<Self, RemapError> {
-        let pairs = parser::Parser::parse(parser::Rule::program, source)
-            .map_err(|s| E::Parser(s.to_string()))
-            .map_err(RemapError)?;
+        let pairs = parser::Parser::parse(parser::Rule::program, source).map_err(E::from)?;
 
         let compiler_state = state::Compiler::default();
 

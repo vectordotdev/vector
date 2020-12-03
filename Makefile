@@ -989,7 +989,10 @@ package: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} ./scripts/package-archive.sh
 
 .PHONY: package-x86_64-unknown-linux-gnu-all
-package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64 package-rpm-x86_64 # Build all x86_64 GNU packages
+package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
+
+.PHONY: package-x86_64-unknown-linux-musl-all
+package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-musl package-rpm-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
 
 .PHONY: package-aarch64-unknown-linux-musl-all
 package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl package-deb-aarch64 package-rpm-aarch64  # Build all aarch64 MUSL packages
@@ -1023,9 +1026,13 @@ package-armv7-unknown-linux-musleabihf: target/artifacts/vector-armv7-unknown-li
 
 # debs
 
-.PHONY: package-deb-x86_64
-package-deb-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 deb package
+.PHONY: package-deb-x86_64-unknown-linux-gnu
+package-deb-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 GNU deb package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-deb.sh
+
+.PHONY: package-deb-x86_64-unknown-linux-musl
+package-deb-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 GNU deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-deb.sh
 
 .PHONY: package-deb-aarch64
 package-deb-aarch64: package-aarch64-unknown-linux-musl  ## Build the aarch64 deb package
@@ -1037,9 +1044,13 @@ package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-
 
 # rpms
 
-.PHONY: package-rpm-x86_64
-package-rpm-x86_64: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
+.PHONY: package-rpm-x86_64-unknown-linux-gnu
+package-rpm-x86_64-unknown-linux-gnu: package-x86_64-unknown-linux-gnu ## Build the x86_64 rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-gnu timberio/ci_image ./scripts/package-rpm.sh
+
+.PHONY: package-rpm-x86_64-unknown-linux-musl
+package-rpm-x86_64-unknown-linux-musl: package-x86_64-unknown-linux-musl ## Build the x86_64 musl rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/timberio/vector/ -e TARGET=x86_64-unknown-linux-musl timberio/ci_image ./scripts/package-rpm.sh
 
 .PHONY: package-rpm-aarch64
 package-rpm-aarch64: package-aarch64-unknown-linux-musl ## Build the aarch64 rpm package
