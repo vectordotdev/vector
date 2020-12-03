@@ -70,7 +70,6 @@ urls: {
 	big_query_streaming:                                      "https://cloud.google.com/bigquery/streaming-data-into-bigquery"
 	cargo_audit:                                              "https://github.com/RustSec/cargo-audit"
 	centos:                                                   "https://www.centos.org/"
-	chrono:                                                   "https://docs.rs/chrono/latest"
 	chrono_time_formats:                                      "https://docs.rs/chrono/latest/chrono/format/strftime/index.html"
 	cgroups_limit_resources:                                  "https://the.binbashtheory.com/control-resources-cgroups/"
 	clickhouse:                                               "https://clickhouse.yandex/"
