@@ -88,6 +88,7 @@ urls: {
 	datadog_logs_endpoints:                                   "https://docs.datadoghq.com/logs/log_collection/?tab=http#datadog-logs-endpoints"
 	datadog_metrics:                                          "https://docs.datadoghq.com/metrics/"
 	datadog_metrics_endpoints:                                "https://docs.datadoghq.com/api/v1/metrics/"
+	date:                                                     "https://man7.org/linux/man-pages/man1/date.1.html"
 	debian:                                                   "https://www.debian.org/"
 	default_configuration:                                    "https://github.com/timberio/vector/blob/master/config/vector.toml"
 	docker:                                                   "https://www.docker.com/"
