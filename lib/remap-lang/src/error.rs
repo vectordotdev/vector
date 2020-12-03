@@ -77,6 +77,7 @@ impl fmt::Display for Rule {
             addition,
             argument,
             arguments,
+            array,
             assignment,
             block,
             boolean,
