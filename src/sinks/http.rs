@@ -123,7 +123,8 @@ impl SinkConfig for HttpSinkConfig {
         let client = HttpClient::new(tls)?;
 
         let mut config = self.clone();
-        config.uri = build_uri(config.uri.clone()).into();
+        config.uri.merge_auth_config(&mut config.auth)?;
+        config.uri.uri = build_uri(&config.uri.uri);
 
         let batch = BatchSettings::default()
             .bytes(bytesize::mib(10u64))
@@ -210,7 +211,7 @@ impl HttpSink for HttpSinkConfig {
             HttpMethod::Post => Method::POST,
             HttpMethod::Put => Method::PUT,
         };
-        let uri: Uri = self.uri.clone().into();
+        let uri: Uri = self.uri.uri.clone();
 
         let ct = match self.encoding.codec() {
             Encoding::Text => "text/plain",
@@ -256,8 +257,13 @@ impl HttpSink for HttpSinkConfig {
     }
 }
 
-async fn healthcheck(uri: UriSerde, auth: Option<Auth>, client: HttpClient) -> crate::Result<()> {
-    let uri = build_uri(uri);
+async fn healthcheck(
+    uri: UriSerde,
+    mut auth: Option<Auth>,
+    client: HttpClient,
+) -> crate::Result<()> {
+    uri.merge_auth_config(&mut auth)?;
+    let uri = build_uri(&uri.uri);
     let mut request = Request::head(&uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
@@ -292,14 +298,15 @@ fn validate_headers(
     Ok(())
 }
 
-fn build_uri(base: UriSerde) -> Uri {
-    let base: Uri = base.into();
-    Uri::builder()
-        .scheme(base.scheme_str().unwrap_or("http"))
-        .authority(base.authority().map(|a| a.as_str()).unwrap_or("127.0.0.1"))
-        .path_and_query(base.path_and_query().map(|pq| pq.as_str()).unwrap_or(""))
-        .build()
-        .expect("bug building uri")
+fn build_uri(base: &Uri) -> Uri {
+    let mut parts = base.clone().into_parts();
+    if parts.scheme.is_none() {
+        parts.scheme = Some("http".parse().unwrap());
+    }
+    if parts.authority.is_none() {
+        parts.authority = Some("127.0.0.1".parse().unwrap());
+    }
+    Uri::from_parts(parts).unwrap()
 }
 
 #[cfg(test)]

@@ -1,18 +1,34 @@
-use http::Uri;
+use crate::http::Auth;
+use http::uri::{Authority, Uri};
+use percent_encoding::percent_decode_str;
 use serde::{
     de::{Error, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::fmt;
+use std::str::FromStr;
 
 /// A wrapper for `http::Uri` that implements the serde traits.
 #[derive(Default, Debug, Clone)]
-pub struct UriSerde(Uri);
+pub struct UriSerde {
+    pub uri: Uri,
+    pub auth: Option<Auth>,
+}
+
+impl UriSerde {
+    pub fn merge_auth_config(&self, auth: &mut Option<Auth>) -> crate::Result<()> {
+        if auth.is_some() && self.auth.is_some() {
+            Err("Two authorization credentials was provided.".into())
+        } else {
+            *auth = auth.take().or_else(|| self.auth.clone());
+            Ok(())
+        }
+    }
+}
 
 impl Serialize for UriSerde {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let uri = format!("{}", self.0);
-        serializer.serialize_str(&uri)
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -27,7 +43,16 @@ impl<'a> Deserialize<'a> for UriSerde {
 
 impl fmt::Display for UriSerde {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        match (self.uri.authority(), &self.auth) {
+            (Some(authority), Some(Auth::Basic { user, password })) => {
+                let authority = format!("{}:{}@{}", user, password, authority);
+                let authority = Authority::from_maybe_shared(authority).unwrap();
+                let mut parts = self.uri.clone().into_parts();
+                parts.authority = Some(authority);
+                Uri::from_parts(parts).unwrap().fmt(f)
+            }
+            _ => self.uri.fmt(f),
+        }
     }
 }
 
@@ -44,27 +69,58 @@ impl<'a> Visitor<'a> for UriVisitor {
     where
         E: Error,
     {
-        let uri = s.parse::<Uri>().map_err(Error::custom)?;
-        Ok(UriSerde(uri))
+        s.parse().map_err(Error::custom)
     }
 }
 
-impl From<UriSerde> for Uri {
-    fn from(t: UriSerde) -> Self {
-        t.0
+impl FromStr for UriSerde {
+    type Err = <Uri as FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse::<Uri>().map(Into::into)
     }
 }
 
 impl From<Uri> for UriSerde {
-    fn from(t: Uri) -> Self {
-        Self(t)
+    fn from(uri: Uri) -> Self {
+        match uri.authority() {
+            None => Self { uri, auth: None },
+            Some(authority) => {
+                let (authority, auth) = get_basic_auth(authority);
+
+                let mut parts = uri.into_parts();
+                parts.authority = Some(authority);
+                let uri = Uri::from_parts(parts).unwrap();
+
+                Self { uri, auth }
+            }
+        }
     }
 }
 
-impl std::ops::Deref for UriSerde {
-    type Target = Uri;
+fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
+    let mut url = url::Url::parse(&format!("http://{}", authority)).unwrap();
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
+    let user = url.username();
+    if !user.is_empty() {
+        let user = percent_decode_str(user).decode_utf8_lossy().into_owned();
+
+        let password = url.password().unwrap_or("");
+        let password = percent_decode_str(password)
+            .decode_utf8_lossy()
+            .into_owned();
+
+        url.set_username("").unwrap();
+        url.set_password(None).unwrap();
+
+        let authority = Uri::from_maybe_shared(url.into_string())
+            .unwrap()
+            .authority()
+            .unwrap()
+            .clone();
+
+        (authority, Some(Auth::Basic { user, password }))
+    } else {
+        (authority.clone(), None)
     }
 }
