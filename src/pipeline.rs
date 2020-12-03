@@ -34,10 +34,16 @@ impl Pipeline {
         use mpsc::error::TrySendError::*;
 
         while let Some(event) = self.enqueued.pop_front() {
-            futures::ready!(self
-                .inner
-                .poll_ready(cx)
-                .map_err(|_: mpsc::error::ClosedError| ClosedError))?;
+            match self.inner.poll_ready(cx) {
+                Poll::Pending => {
+                    self.enqueued.push_front(event);
+                    return Poll::Pending;
+                }
+                Poll::Ready(Ok(())) => {
+                    // continue to send below
+                }
+                Poll::Ready(Err(_error)) => return Poll::Ready(Err(ClosedError)),
+            }
 
             match self.inner.try_send(event) {
                 Ok(()) => {
