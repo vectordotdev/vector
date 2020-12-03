@@ -301,21 +301,24 @@ test-integration: ## Runs all integration tests
 test-integration: test-integration-aws test-integration-clickhouse test-integration-docker-logs test-integration-elasticsearch
 test-integration: test-integration-gcp test-integration-humio test-integration-influxdb test-integration-kafka
 test-integration: test-integration-loki test-integration-mongodb_metrics test-integration-nats
-test-integration: test-integration-nginx test-integration-prometheus test-integration-pulsar test-integration-splunk
+test-integration: test-integration-nginx test-integration-postgresql_metrics test-integration-prometheus
+test-integration: test-integration-pulsar test-integration-splunk
 
 .PHONY: start-test-integration
 start-test-integration: ## Starts all integration test infrastructure
 start-test-integration: start-integration-aws start-integration-clickhouse start-integration-elasticsearch
 start-test-integration: start-integration-gcp start-integration-humio start-integration-influxdb start-integration-kafka
 start-test-integration: start-integration-loki start-integration-mongodb_metrics start-integration-nats
-start-test-integration: start-integration-nginx start-integration-prometheus start-integration-pulsar start-integration-splunk
+start-test-integration: start-integration-nginx start-integration-postgresql_metrics start-integration-prometheus
+start-test-integration: start-integration-pulsar start-integration-splunk
 
 .PHONY: stop-test-integration
 stop-test-integration: ## Stops all integration test infrastructure
 stop-test-integration: stop-integration-aws stop-integration-clickhouse stop-integration-elasticsearch
 stop-test-integration: stop-integration-gcp stop-integration-humio stop-integration-influxdb stop-integration-kafka
 stop-test-integration: stop-integration-loki stop-integration-mongodb_metrics stop-integration-nats
-stop-test-integration: stop-integration-nginx stop-integration-prometheus stop-integration-pulsar stop-integration-splunk
+stop-test-integration: stop-integration-nginx stop-integration-postgresql_metrics stop-integration-prometheus
+stop-test-integration: stop-integration-pulsar stop-integration-splunk
 
 .PHONY: start-integration-aws
 start-integration-aws:
@@ -758,6 +761,39 @@ endif
 	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features nginx-integration-tests --lib ::nginx:: -- --nocapture
 ifeq ($(AUTODESPAWN), true)
 	$(MAKE) -k stop-integration-nginx
+endif
+
+.PHONY: start-integration-postgresql_metrics
+start-integration-postgresql_metrics:
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create --replace --name vector-test-integration-postgresql_metrics -p 5432:5432
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-postgresql_metrics --name vector_postgresql_metrics \
+	-e POSTGRES_PASSWORD=vector postgres:13.1
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) create vector-test-integration-postgresql_metrics
+	$(CONTAINER_TOOL) run -d --$(CONTAINER_ENCLOSURE)=vector-test-integration-postgresql_metrics -p 5432:5432 --name vector_postgresql_metrics \
+	-e POSTGRES_PASSWORD=vector postgres:13.1
+endif
+
+.PHONY: stop-integration-postgresql_metrics
+stop-integration-postgresql_metrics:
+	$(CONTAINER_TOOL) rm --force vector_postgresql_metrics 2>/dev/null; true
+ifeq ($(CONTAINER_TOOL),podman)
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) stop --name=vector-test-integration-postgresql_metrics 2>/dev/null; true
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm --force --name vector-test-integration-postgresql_metrics 2>/dev/null; true
+else
+	$(CONTAINER_TOOL) $(CONTAINER_ENCLOSURE) rm vector-test-integration-postgresql_metrics 2>/dev/null; true
+endif
+
+.PHONY: test-integration-postgresql_metrics
+test-integration-postgresql_metrics: ## Runs postgresql_metrics integration tests
+ifeq ($(AUTOSPAWN), true)
+	-$(MAKE) -k stop-integration-postgresql_metrics
+	$(MAKE) start-integration-postgresql_metrics
+endif
+	${MAYBE_ENVIRONMENT_EXEC} cargo test --no-fail-fast --no-default-features --features postgresql_metrics-integration-tests --lib ::postgresql_metrics:: -- --nocapture
+ifeq ($(AUTODESPAWN), true)
+	$(MAKE) -k stop-integration-postgresql_metrics
 endif
 
 .PHONY: start-integration-prometheus stop-integration-prometheus test-integration-prometheus

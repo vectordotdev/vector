@@ -195,6 +195,7 @@ snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
 avro-rs = "0.11.0"
+tokio-postgres = { version = "0.5.5", optional = true }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }
@@ -313,6 +314,7 @@ sources = [
   "sources-logplex",
   "sources-mongodb_metrics",
   "sources-nginx_metrics",
+  "sources-postgresql_metrics",
   "sources-prometheus",
   "sources-socket",
   "sources-splunk_hec",
@@ -337,6 +339,7 @@ sources-kubernetes-logs = ["kubernetes", "transforms-merge", "transforms-regex_p
 sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
+sources-postgresql_metrics = ["tokio-postgres"]
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]
 sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
@@ -498,6 +501,7 @@ all-integration-tests = [
   "mongodb_metrics-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "postgresql_metrics-integration-tests",
   "prometheus-integration-tests",
   "pulsar-integration-tests",
   "splunk-integration-tests",
@@ -534,6 +538,7 @@ loki-integration-tests = ["sinks-loki"]
 mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 nats-integration-tests = ["sinks-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
+postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 prometheus-integration-tests = ["sinks-prometheus", "sources-prometheus", "bytesize"]
 pulsar-integration-tests = ["sinks-pulsar"]
 splunk-integration-tests = ["sinks-splunk_hec", "warp"]
