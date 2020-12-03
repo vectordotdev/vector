@@ -64,7 +64,7 @@ impl Expression for Arithmetic {
                 .fallible_unless(Kind::Integer | Kind::Float)
                 .with_constraint(Kind::Integer | Kind::Float),
             IntegerDivide => type_def
-                .fallible_unless(Kind::Integer)
+                .fallible_unless(Kind::Integer | Kind::Float)
                 .with_constraint(Kind::Integer),
             Multiply | Add => type_def
                 .fallible_unless(Kind::Bytes | Kind::Integer | Kind::Float)
