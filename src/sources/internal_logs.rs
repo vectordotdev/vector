@@ -6,6 +6,7 @@ use crate::{
 use futures::{compat::Sink01CompatExt, SinkExt, StreamExt};
 use futures01::Sink;
 use serde::{Deserialize, Serialize};
+use tokio::sync::broadcast::RecvError;
 
 #[serde(deny_unknown_fields)]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -52,10 +53,11 @@ async fn run(out: Pipeline, shutdown: ShutdownSignal) -> Result<(), ()> {
     // infinite loop since it receives all such logs.
 
     while let Some(receive) = subscriber.next().await {
-        let event = receive.map_err(
-            |error| error!(message = "Failed to receive log from tracing subscriber.", %error),
-        )?;
-        out.send(event).await?;
+        match receive {
+            Ok(event) => out.send(event).await?,
+            Err(RecvError::Lagged(_)) => (),
+            Err(RecvError::Closed) => break,
+        }
     }
     Ok(())
 }
