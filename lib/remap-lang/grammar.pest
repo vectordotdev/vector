@@ -42,7 +42,7 @@ operator_boolean_expr   = { "||" | "&&" }
 operator_equality       = { "!=" | "==" }
 operator_comparison     = { ">=" | ">" | "<=" | "<" }
 operator_addition       = { "-" | "+" }
-operator_multiplication = { "/" | "*" | "%" }
+operator_multiplication = { "//" | "/" | "*" | "%" }
 operator_not            = { "!" }
 
 // Paths -----------------------------------------------------------------------
