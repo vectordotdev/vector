@@ -127,7 +127,7 @@ impl TypeDef {
         let mut type_def = self.inner_type_def.clone();
 
         while let Some(td) = type_def {
-            kind = kind | td.kind;
+            kind |= td.kind;
             type_def = td.inner_type_def;
         }
 
