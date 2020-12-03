@@ -2,11 +2,11 @@
 
 use crate::{
     expression::{
-        Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path, Target,
-        Variable,
+        self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Noop, Not,
+        Path, Target, Variable,
     },
     function::Argument,
-    state, Error, Expr, Function as Fn, Operator, Result, Value,
+    path, state, Error, Expr, Function as Fn, Operator, Result, Value,
 };
 use pest::iterators::{Pair, Pairs};
 use regex::{Regex, RegexBuilder};
@@ -14,6 +14,7 @@ use std::str::FromStr;
 
 #[derive(pest_derive::Parser)]
 #[grammar = "../grammar.pest"]
+#[derive(Default)]
 pub(super) struct Parser<'a> {
     pub function_definitions: &'a [Box<dyn Fn>],
     pub compiler_state: state::Compiler,
@@ -58,6 +59,50 @@ macro_rules! operation_fns {
 }
 
 impl Parser<'_> {
+    /// Parse a string path into a [`path::Path`] wrapper with easy access to
+    /// individual path [`path::Segment`]s.
+    ///
+    /// This function fails if the provided path is invalid, as defined by the
+    /// parser grammar.
+    pub(crate) fn path_from_str(&mut self, path: &str) -> Result<path::Path> {
+        use pest::Parser;
+
+        let mut pairs = Self::parse(R::rule_path, path)?;
+        let pair = pairs.next().ok_or(e(R::rule_path))?;
+
+        match pair.as_rule() {
+            R::path => self.path_from_pair(pair),
+            _ => unreachable!(),
+        }
+    }
+
+    /// Parse a string into a [`path::Field`] wrapper.
+    ///
+    /// Depending on the provided string, this can result in three outcomes:
+    ///
+    /// - A `Field::Regular` if the string is a valid "identifier".
+    /// - A `Field::Quoted` if the string is a valid "quoted string".
+    /// - An error if neither is true.
+    ///
+    /// These rules are defined by the Remap parser.
+    pub(crate) fn path_field_from_str(&mut self, field: &str) -> Result<path::Field> {
+        use pest::Parser;
+
+        if let Ok(mut pairs) = Self::parse(R::rule_ident, field) {
+            let field = pairs.next().ok_or(e(R::rule_ident))?.as_str().to_owned();
+
+            return Ok(path::Field::Regular(field));
+        }
+
+        let field = Self::parse(R::rule_string_inner, field)?
+            .next()
+            .ok_or(e(R::rule_string_inner))?
+            .as_str()
+            .to_owned();
+
+        Ok(path::Field::Quoted(field))
+    }
+
     /// Converts the set of known "root" rules into boxed [`Expression`] trait
     /// objects.
     pub(crate) fn pairs_to_expressions(&mut self, pairs: Pairs<R>) -> Result<Vec<Expr>> {
@@ -79,23 +124,24 @@ impl Parser<'_> {
     /// Given a `Pair`, build a boxed [`Expression`] trait object from it.
     fn expression_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         match pair.as_rule() {
-            R::assignment => {
-                let mut inner = pair.into_inner();
-                let target = self.target_from_pair(inner.next().ok_or(e(R::target))?)?;
-                let expression =
-                    self.expression_from_pair(inner.next().ok_or(e(R::expression))?)?;
-
-                Ok(Expr::from(Assignment::new(
-                    target,
-                    Box::new(expression),
-                    &mut self.compiler_state,
-                )))
-            }
+            R::assignment => self.assignment_from_pair(pair),
             R::boolean_expr => self.boolean_expr_from_pairs(pair.into_inner()),
             R::block => self.block_from_pairs(pair.into_inner()),
             R::if_statement => self.if_statement_from_pairs(pair.into_inner()),
             _ => Err(e(R::expression)),
         }
+    }
+
+    fn assignment_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+        let mut inner = pair.into_inner();
+        let target = self.target_from_pair(inner.next().ok_or(e(R::target))?)?;
+        let expression = self.expression_from_pair(inner.next().ok_or(e(R::expression))?)?;
+
+        Ok(Expr::from(Assignment::new(
+            target,
+            Box::new(expression),
+            &mut self.compiler_state,
+        )))
     }
 
     /// Return the target type to which a value is being assigned.
@@ -104,16 +150,20 @@ impl Parser<'_> {
     /// on the parser rule being processed.
     fn target_from_pair(&mut self, pair: Pair<R>) -> Result<Target> {
         match pair.as_rule() {
-            R::variable => Ok(Target::Variable(Variable::new(
-                pair.into_inner()
-                    .next()
-                    .ok_or(e(R::variable))?
-                    .as_str()
-                    .to_owned(),
-            ))),
-            R::path => Ok(Target::Path(Path::new(
-                self.path_segments_from_pairs(pair.into_inner())?,
-            ))),
+            R::variable => self.variable_from_pair(pair).and_then(|variable| {
+                if let Some(path) = variable.path() {
+                    let err = format!(
+                        r#"paths in variable assignment not supported. Use "${}" without "{}""#,
+                        variable.ident(),
+                        path
+                    );
+
+                    return Err(Error::Parser(err));
+                }
+
+                Ok(Target::Variable(variable))
+            }),
+            R::path => Ok(Target::Path(Path::new(self.path_from_pair(pair)?))),
             _ => Err(e(R::target)),
         }
     }
@@ -204,27 +254,41 @@ impl Parser<'_> {
         let pair = pair.into_inner().next().ok_or(e(R::primary))?;
 
         match pair.as_rule() {
-            R::value => self.value_from_pair(pair.into_inner().next().ok_or(e(R::value))?),
-            R::variable => self.variable_from_pair(pair),
-            R::path => self.path_from_pair(pair),
+            R::value => self.literal_from_pair(pair.into_inner().next().ok_or(e(R::value))?),
+            R::variable => self.variable_from_pair(pair).map(Into::into),
+            R::path => Ok(Path::new(self.path_from_pair(pair)?).into()),
             R::group => self.expression_from_pair(pair.into_inner().next().ok_or(e(R::group))?),
             _ => Err(e(R::primary)),
         }
     }
 
     /// Parse a [`Value`] into a [`Literal`] expression.
-    fn value_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
+    fn literal_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
         Ok(match pair.as_rule() {
             R::string => {
                 let string = pair.into_inner().next().ok_or(e(R::string))?;
-                Expr::from(Literal::from(self.escaped_string_from_pair(string)?))
+                Literal::from(self.escaped_string_from_pair(string)?).into()
             }
-            R::null => Expr::from(Literal::from(Value::Null)),
-            R::boolean => Expr::from(Literal::from(pair.as_str() == "true")),
-            R::integer => Expr::from(Literal::from(pair.as_str().parse::<i64>().unwrap())),
-            R::float => Expr::from(Literal::from(pair.as_str().parse::<f64>().unwrap())),
+            R::null => Literal::from(Value::Null).into(),
+            R::boolean => Literal::from(pair.as_str() == "true").into(),
+            R::integer => {
+                Literal::from(pair.as_str().parse::<i64>().map_err(|_| e(R::integer))?).into()
+            }
+            R::float => {
+                Literal::from(pair.as_str().parse::<f64>().map_err(|_| e(R::float))?).into()
+            }
+            R::array => self.array_from_pair(pair)?.into(),
             _ => return Err(e(R::value)),
         })
+    }
+
+    fn array_from_pair(&mut self, pair: Pair<R>) -> Result<Array> {
+        let expressions = pair
+            .into_inner()
+            .map(|pair| self.expression_from_pair(pair))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(Array::new(expressions))
     }
 
     /// Parse function call expressions.
@@ -257,6 +321,7 @@ impl Parser<'_> {
                 // This matches first, if a keyword is provided.
                 R::ident => ident = Some(pair.as_str().to_owned()),
                 R::regex => return Ok((ident, Argument::Regex(self.regex_from_pair(pair)?))),
+                R::argument_array => return Ok((ident, self.argument_array_from_pair(pair)?)),
                 _ => {
                     let expr = self.expression_from_pair(pair)?;
                     return Ok((ident, Argument::Expression(expr)));
@@ -265,6 +330,16 @@ impl Parser<'_> {
         }
 
         Err(e(R::argument))
+    }
+
+    fn argument_array_from_pair(&mut self, pair: Pair<R>) -> Result<Argument> {
+        pair.into_inner()
+            .map(|pair| match pair.as_rule() {
+                R::regex => self.regex_from_pair(pair).map(Argument::Regex),
+                _ => self.expression_from_pair(pair).map(Argument::Expression),
+            })
+            .collect::<Result<Vec<_>>>()
+            .map(Argument::Array)
     }
 
     /// Parse a [`Regex`] value
@@ -301,65 +376,103 @@ impl Parser<'_> {
     }
 
     /// Parse a [`Path`] value, e.g. ".foo.bar"
-    fn path_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
-        let inner = pair.into_inner();
+    fn path_from_pair(&self, pair: Pair<R>) -> Result<path::Path> {
+        // If no segments are provided, it's the root path (e.g. `.`).
+        let path_segments = match pair.into_inner().next() {
+            Some(path_segments) => path_segments,
+            None => return Ok(path::Path::root()),
+        };
 
-        let segments = match inner.peek().map(|p| p.as_rule()) {
-            Some(R::path_root) => vec![vec![]],
-            Some(R::path_segment) => self.path_segments_from_pairs(inner)?,
+        let segments = match path_segments.as_rule() {
+            R::path_segments => self.path_segments_from_pair(path_segments)?,
             _ => return Err(e(R::path)),
         };
 
-        Ok(Expr::from(Path::new(segments)))
+        Ok(path::Path::new_unchecked(segments))
     }
 
-    fn path_segments_from_pairs(&self, pairs: Pairs<R>) -> Result<Vec<Vec<String>>> {
-        pairs
-            .map(|pair| self.path_segment_from_pair(pair))
+    fn path_segments_from_pair(&self, pair: Pair<R>) -> Result<Vec<path::Segment>> {
+        pair.into_inner()
+            .map(|pair| match pair.as_rule() {
+                R::path_index => self.path_index_from_pair(pair),
+                R::path_segment => self.path_segment_from_pair(pair),
+                _ => Err(e(R::path_segments)),
+            })
             .collect::<Result<_>>()
     }
 
-    fn path_segment_from_pair(&self, pair: Pair<R>) -> Result<Vec<String>> {
-        let mut segments = vec![];
-        for segment in pair.into_inner() {
-            match segment.as_rule() {
-                R::path_field => segments.push(self.path_field_from_pair(segment)?),
-                R::path_coalesce => segments.append(&mut self.path_coalesce_from_pair(segment)?),
-                R::path_index => segments
-                    .last_mut()
-                    .get_or_insert(&mut "".to_owned())
-                    .push_str(segment.as_str()),
-                _ => todo!(),
-            }
-        }
+    fn path_segment_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+        let segment = pair.into_inner().next().ok_or(e(R::path_segment))?;
 
-        Ok(segments)
+        match segment.as_rule() {
+            R::path_field => self.path_field_segment_from_pair(segment),
+            R::path_coalesce => self.path_coalesce_segment_from_pair(segment),
+            _ => Err(e(R::path_segment)),
+        }
     }
 
-    fn path_field_from_pair(&self, pair: Pair<R>) -> Result<String> {
+    fn path_field_segment_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+        self.path_field_from_pair(pair).map(path::Segment::Field)
+    }
+
+    fn path_coalesce_segment_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+        let fields = pair
+            .into_inner()
+            .map(|pair| self.path_field_from_pair(pair))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(path::Segment::Coalesce(fields))
+    }
+
+    fn path_field_from_pair(&self, pair: Pair<R>) -> Result<path::Field> {
         let field = pair.into_inner().next().ok_or(e(Rule::path_field))?;
 
         match field.as_rule() {
             R::string => {
                 let string = field.into_inner().next().ok_or(e(R::string))?;
-                self.escaped_string_from_pair(string)
+                Ok(path::Field::Quoted(self.escaped_string_from_pair(string)?))
             }
-            R::ident => Ok(field.as_str().to_owned()),
-            _ => Err(e(Rule::path_field)),
+            R::ident => Ok(path::Field::Regular(field.as_str().to_owned())),
+            _ => Err(e(R::path_field)),
         }
     }
 
-    fn path_coalesce_from_pair(&self, pair: Pair<R>) -> Result<Vec<String>> {
-        pair.into_inner()
-            .map(|pair| self.path_field_from_pair(pair))
-            .collect::<Result<_>>()
+    fn path_index_from_pair(&self, pair: Pair<R>) -> Result<path::Segment> {
+        let index = pair
+            .into_inner()
+            .next()
+            .ok_or(e(R::path_index))?
+            .as_str()
+            .parse::<usize>()
+            .map_err(|_| e(R::path_index_inner))?;
+
+        Ok(path::Segment::Index(index))
     }
 
     /// Parse a [`Variable`] value, e.g. "$foo"
-    fn variable_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
-        let ident = pair.into_inner().next().ok_or(e(R::variable))?;
+    fn variable_from_pair(&self, pair: Pair<R>) -> Result<Variable> {
+        let mut inner = pair.into_inner();
 
-        Ok(Expr::from(Variable::new(ident.as_str().to_owned())))
+        let ident = inner.next().ok_or(e(R::variable))?.as_str().to_owned();
+        let segments = inner.try_fold(vec![], |mut segments, pair| {
+            match pair.as_rule() {
+                R::path_index => segments.push(self.path_index_from_pair(pair)?),
+                R::path_segments => segments.append(&mut self.path_segments_from_pair(pair)?),
+                _ => return Err(e(R::variable)),
+            };
+
+            Ok(segments)
+        })?;
+
+        let expr = match segments {
+            _ if segments.is_empty() => None,
+            _ => {
+                let path = path::Path::new_unchecked(segments);
+                Some(expression::Path::new(path))
+            }
+        };
+
+        Ok(Variable::new(ident, expr))
     }
 
     fn escaped_string_from_pair(&self, pair: Pair<R>) -> Result<String> {
@@ -436,8 +549,108 @@ mod tests {
     use pest::Parser as _;
 
     #[test]
+    fn rule_root_path() {
+        let cases = vec![
+            (
+                ".",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                " . ",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                ".\n",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                "\n.",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                "\n.\n",
+                vec![],
+                Ok(vec![Path::new(path::Path::new_unchecked(vec![])).into()]),
+            ),
+            (
+                "..",
+                vec![" 1:2\n", "= expected path_segment"],
+                Ok(vec![]),
+            ),
+            (
+                ". bar",
+                vec![" 1:3\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+                Ok(vec![])
+            ),
+            (
+                r#". "bar""#,
+                vec![" 1:2\n", "= expected path_segment"], // TODO: improve error message
+                Ok(vec![]),
+            ),
+        ];
+
+        validate_rule(cases);
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn validate_rule(cases: Vec<(&str, Vec<&str>, Result<Vec<Expr>>)>) {
+        for (mut i, (source, compile_check, run_check)) in cases.into_iter().enumerate() {
+            let compile_check: Vec<&str> = compile_check;
+            i += 1;
+
+            let pairs = Parser::parse(Rule::program, source);
+
+            match pairs {
+                Ok(pairs) => {
+                    let got = Parser::default().pairs_to_expressions(pairs);
+
+                    if compile_check.is_empty() {
+                        assert_eq!(got, run_check, "test case: {}", i)
+                    } else {
+                        for exp in compile_check {
+                            assert!(
+                                "".contains(exp),
+                                "expected error: {}\nwith source: {}\nresult: {:?}\n test case {}",
+                                exp,
+                                source,
+                                got,
+                                i
+                            );
+                        }
+                    }
+                }
+                Err(err) if !compile_check.is_empty() => {
+                    for exp in compile_check {
+                        assert!(
+                            err.to_string().contains(exp),
+                            "expected: {}\nwith source: {}\nfull error message: {}\n test case {}",
+                            exp,
+                            source,
+                            err,
+                            i
+                        );
+                    }
+                }
+                Err(err) => panic!("expected no error, got \"{}\" for test case {}", err, i),
+            }
+        }
+    }
+
+    #[test]
     fn check_parser_errors() {
         let cases = vec![
+            (
+                ".foo bar",
+                vec![" 1:6\n", "= expected EOI, assignment, if_statement, not, operator_boolean_expr, operator_equality, operator_comparison, operator_addition, operator_multiplication, or block"],
+            ),
+            (
+                ".=",
+                vec![" 1:3\n", "= expected assignment, if_statement, not, or block"],
+            ),
             (
                 ".foo = !",
                 vec![" 1:9\n", "= expected primary, operator_not, or ident"],
@@ -504,7 +717,7 @@ mod tests {
             (
                 // Regexes can't be parsed as part of a path
                 r#".foo = split(.foo, ./[aa]/)"#,
-                vec![" 1:21\n", "= expected path_segment"],
+                vec![" 1:23\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 // We cannot assign a regular expression to a field.

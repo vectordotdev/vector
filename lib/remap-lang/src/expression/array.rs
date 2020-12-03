@@ -1,43 +1,53 @@
 use crate::{state, value, Expr, Expression, Object, Result, TypeDef, Value};
+use std::fmt;
+use std::iter::IntoIterator;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Block {
+#[derive(Clone, PartialEq)]
+pub struct Array {
     expressions: Vec<Expr>,
 }
 
-impl Block {
+impl Array {
     pub fn new(expressions: Vec<Expr>) -> Self {
         Self { expressions }
     }
 }
 
-impl Expression for Block {
+impl fmt::Debug for Array {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.expressions.fmt(f)
+    }
+}
+
+impl IntoIterator for Array {
+    type Item = Expr;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.expressions.into_iter()
+    }
+}
+
+impl Expression for Array {
     fn execute(&self, state: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
         self.expressions
             .iter()
             .map(|expr| expr.execute(state, object))
             .collect::<Result<Vec<_>>>()
-            .map(|mut v| v.pop().unwrap_or(Value::Null))
+            .map(Value::Array)
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
-        let mut type_defs = self
+        let fallible = self
             .expressions
             .iter()
             .map(|e| e.type_def(state))
-            .collect::<Vec<_>>();
+            .any(|d| d.is_fallible());
 
-        // If any of the stored expressions is fallible, the entire block is
-        // fallible.
-        let fallible = type_defs.iter().any(TypeDef::is_fallible);
-
-        // The last expression determines the resulting value of the block.
-        let mut type_def = type_defs
-            .pop()
-            .unwrap_or_else(|| TypeDef::default().with_constraint(value::Kind::Null));
-
-        type_def.fallible = fallible;
-        type_def
+        TypeDef {
+            fallible,
+            kind: value::Kind::Array,
+        }
     }
 }
 
@@ -53,29 +63,29 @@ mod tests {
 
     test_type_def![
         no_expression {
-            expr: |_| Block::new(vec![]),
+            expr: |_| Array::new(vec![]),
             def: TypeDef {
                 fallible: false,
-                kind: Kind::Null,
+                kind: Kind::Array,
             },
         }
 
         one_expression {
-            expr: |_| Block::new(vec![Literal::from(true).into()]),
-            def: TypeDef { kind: Kind::Boolean, ..Default::default() },
+            expr: |_| Array::new(vec![Literal::from(true).into()]),
+            def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         multiple_expressions {
-            expr: |_| Block::new(vec![
+            expr: |_| Array::new(vec![
                         Literal::from("foo").into(),
                         Literal::from(true).into(),
                         Literal::from(1234).into(),
             ]),
-            def: TypeDef { kind: Kind::Integer, ..Default::default() },
+            def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         last_one_fallible {
-            expr: |_| Block::new(vec![
+            expr: |_| Array::new(vec![
                         Literal::from(true).into(),
                         Arithmetic::new(
                           Box::new(Literal::from(12).into()),
@@ -85,12 +95,12 @@ mod tests {
             ]),
             def: TypeDef {
                 fallible: true,
-                kind: Kind::Bytes | Kind::Integer | Kind::Float,
+                kind: Kind::Array,
             },
         }
 
         any_fallible {
-            expr: |_| Block::new(vec![
+            expr: |_| Array::new(vec![
                         Literal::from(true).into(),
                         Arithmetic::new(
                           Box::new(Literal::from(12).into()),

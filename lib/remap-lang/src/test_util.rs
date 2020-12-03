@@ -37,7 +37,7 @@ macro_rules! bench_function {
                 c.bench_function(&format!("{}: {}", stringify!($name), stringify!($case)), |b| {
                     let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
                     let mut state = $crate::state::Program::default();
-                    let mut object = ::std::collections::HashMap::default();
+                    let mut object: $crate::Value = ::std::collections::BTreeMap::default().into();
 
                     b.iter(|| {
                         let got = expression.execute(&mut state, &mut object).map_err(|e| e.to_string());
@@ -58,7 +58,7 @@ macro_rules! test_function {
         fn [<$name _ $case:snake:lower>]() {
             let (expression, want) = $crate::__prep_bench_or_test!($func, $args, $(Ok($crate::Value::from($ok)))? $(Err($err.to_owned()))?);
             let mut state = $crate::state::Program::default();
-            let mut object = ::std::collections::HashMap::default();
+            let mut object: $crate::Value = ::std::collections::BTreeMap::default().into();
 
             let got = expression.execute(&mut state, &mut object).map_err(|e| e.to_string());
             assert_eq!(got, want);

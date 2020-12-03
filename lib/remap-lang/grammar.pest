@@ -3,6 +3,12 @@
 program    = _{ SOI ~ NEWLINE* ~ (expression ~ (NEWLINE+ ~ expression)*)* ~ NEWLINE* ~ EOI }
 expression = _{ assignment | if_statement | boolean_expr | block }
 
+// Program Rules ---------------------------------------------------------------
+
+rule_path         = _{ SOI ~ path ~ EOI }
+rule_ident        = _{ SOI ~ ident ~ EOI }
+rule_string_inner = _{ SOI ~ string_inner ~ EOI }
+
 // Statements ------------------------------------------------------------------
 
 assignment   = { target ~ "=" ~ expression }
@@ -11,15 +17,19 @@ if_statement = { "if" ~ boolean_expr ~ block ~ ("else if" ~ boolean_expr ~ block
 // Primary ---------------------------------------------------------------------
 
 primary  =  { value | variable | path | group }
-value    =  { string | float | integer | boolean | null }
-variable = ${ "$" ~ ident }
+value    =  { string | float | integer | boolean | null | array }
+variable = ${ "$" ~ ident ~ path_index* ~ ("." ~ path_segments)?  }
 group    =  { "(" ~ expression ~ ")" }
 
 // Function Calls --------------------------------------------------------------
 
-call      = ${ ident ~ "(" ~ arguments? ~ ")"  }
-arguments = !{ argument ~ ("," ~ argument)* }
-argument  =  { (ident ~ "=")? ~ (expression | regex) }
+call           = ${ ident ~ "(" ~ arguments? ~ ")"  }
+arguments      = !{ argument ~ ("," ~ argument)* }
+argument       =  { (ident ~ "=")? ~ (argument_array | argument_value) }
+argument_value = _{ (expression | regex) }
+
+// Similar to `array`, but also accepts regex patterns.
+argument_array =  { "[" ~ NEWLINE* ~ (argument_value ~ "," ~ NEWLINE*)* ~ argument_value? ~ NEWLINE* ~ "]" }
 
 // Operations ------------------------------------------------------------------
 
@@ -41,9 +51,15 @@ operator_not            = { "!" }
 
 // Paths -----------------------------------------------------------------------
 
-path             = ${ path_root | ("." ~ path_segment)+ }
-path_root        = ${ ". " }
-path_segment     = ${ (path_field | path_coalesce) ~ path_index* }
+path             = ${ "." ~ path_segments? ~ !(WHITESPACE* ~ ("." | "\"")) }
+path_segments    = ${
+    (
+        ((path_segment | path_index+) ~ path_index*)
+        ~ ("." ~ path_segment ~ path_index*)*
+    )
+    | path_index+
+}
+path_segment     = ${ path_field | path_coalesce }
 path_field       = ${ ident | string }
 path_coalesce    = !{ "(" ~ path_field ~ ("|" ~ path_field)+ ~ ")" }
 path_index       =  { "[" ~ path_index_inner ~ "]" }
@@ -54,6 +70,7 @@ path_index_inner =  { ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
 null    =  { "null" }
 boolean =  { "true" | "false" }
 string  = ${ "\"" ~ string_inner ~ "\"" }
+array   =  { "[" ~ NEWLINE* ~ (expression ~ "," ~ NEWLINE*)* ~ expression? ~ NEWLINE* ~ "]" }
 integer = ${ "-"? ~ ("0" | ASCII_NONZERO_DIGIT) ~ ASCII_DIGIT* }
 float   = ${
     "-"?

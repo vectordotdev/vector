@@ -31,6 +31,15 @@ impl std::fmt::Debug for Argument {
     }
 }
 
+impl PartialEq for Argument {
+    fn eq(&self, other: &Self) -> bool {
+        self.expression == other.expression
+            && self.ident == other.ident
+            && self.keyword == other.keyword
+            && self.function_ident == other.function_ident
+    }
+}
+
 impl Argument {
     pub fn new(
         expression: Box<Expr>,
