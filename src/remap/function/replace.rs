@@ -35,7 +35,7 @@ impl Function for Replace {
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
         let value = arguments.required_expr("value")?;
-        let pattern = arguments.required("pattern")?;
+        let pattern = arguments.required_expr_or_regex("pattern")?;
         let with = arguments.required_expr("with")?;
         let count = arguments.optional_expr("count")?;
 
@@ -108,6 +108,7 @@ impl Expression for ReplaceFn {
 
                 Ok(replaced)
             }
+            Argument::Array(_) => unreachable!(),
         }
     }
 
@@ -124,6 +125,7 @@ impl Expression for ReplaceFn {
         let pattern_def = match &self.pattern {
             Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
             Argument::Regex(_) => None, // regex is a concrete infallible type
+            Argument::Array(_) => unreachable!(),
         };
 
         self.value
@@ -291,7 +293,8 @@ mod test {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
@@ -357,7 +360,8 @@ mod test {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
@@ -403,7 +407,8 @@ mod test {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

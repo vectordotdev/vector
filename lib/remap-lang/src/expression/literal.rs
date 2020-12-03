@@ -1,7 +1,14 @@
 use crate::{state, Expression, Object, Result, TypeDef, Value};
+use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Literal(Value);
+
+impl fmt::Debug for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 impl Literal {
     pub fn boxed(self) -> Box<dyn Expression> {
@@ -10,6 +17,10 @@ impl Literal {
 
     pub fn as_value(&self) -> &Value {
         &self.0
+    }
+
+    pub fn into_value(self) -> Value {
+        self.0
     }
 }
 

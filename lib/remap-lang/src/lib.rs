@@ -1,6 +1,8 @@
 mod error;
+mod object;
 mod operator;
 mod parser;
+mod path;
 mod program;
 mod runtime;
 mod test_util;
@@ -15,7 +17,9 @@ pub mod value;
 pub use error::{Error, RemapError};
 pub use expression::{Expr, Expression};
 pub use function::{Function, Parameter};
+pub use object::Object;
 pub use operator::Operator;
+pub use path::{Field, Path, Segment};
 pub use program::{Program, TypeConstraint};
 pub use runtime::Runtime;
 pub use type_def::TypeDef;
@@ -25,127 +29,19 @@ pub use paste::paste;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Any object you want to map through the remap language has to implement this
-/// trait.
-pub trait Object: std::fmt::Debug {
-    /// Insert a given [`Value`] in the provided [`Object`].
-    ///
-    /// The `path` parameter determines _where_ in the given object the value
-    /// should be inserted.
-    ///
-    /// A path contains dot-delimited segments, and can contain a combination
-    /// of:
-    ///
-    /// * regular path segments:
-    ///
-    ///   ```txt
-    ///   .foo.bar.baz
-    ///   ```
-    ///
-    /// * quoted path segments:
-    ///
-    ///   ```txt
-    ///   .foo."bar.baz"
-    ///   ```
-    ///
-    /// * coalesced path segments:
-    ///
-    ///   ```txt
-    ///   .foo.(bar.baz | foobar | "bar.baz").qux
-    ///   ```
-    ///
-    /// * path indices:
-    ///
-    ///   ```txt
-    ///   .foo[2]
-    ///   ```
-    ///
-    /// When inserting into a coalesced path, the implementor is encouraged to
-    /// insert into the right-most segment if none exists, but can return an
-    /// error if needed.
-    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String>;
-
-    /// Find a value for a given path.
-    ///
-    /// See [`Object::insert`] for more details.
-    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String>;
-
-    /// Get the list of paths in the object.
-    ///
-    /// Paths are represented similar to what's documented in [`Object::insert`].
-    fn paths(&self) -> Vec<String>;
-
-    /// Remove the given path from the object.
-    ///
-    /// If `compact` is true, after deletion, if an empty object or array is
-    /// left behind, it should be removed as well.
-    fn remove(&mut self, path: &str, compact: bool);
-}
-
-impl Object for std::collections::HashMap<String, Value> {
-    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
-        self.insert(vec_path_to_string(path), value);
-
-        Ok(())
-    }
-
-    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
-        Ok(self.get(&vec_path_to_string(path)).cloned())
-    }
-
-    fn paths(&self) -> Vec<String> {
-        self.keys().cloned().collect::<Vec<_>>()
-    }
-
-    fn remove(&mut self, path: &str, _: bool) {
-        self.remove(path);
-    }
-}
-
-impl Object for std::collections::BTreeMap<String, Value> {
-    fn insert(&mut self, path: &[Vec<String>], value: Value) -> std::result::Result<(), String> {
-        self.insert(vec_path_to_string(path), value);
-
-        Ok(())
-    }
-
-    fn find(&self, path: &[Vec<String>]) -> std::result::Result<Option<Value>, String> {
-        Ok(self.get(&vec_path_to_string(path)).cloned())
-    }
-
-    fn paths(&self) -> Vec<String> {
-        self.keys().cloned().collect::<Vec<_>>()
-    }
-
-    fn remove(&mut self, path: &str, _: bool) {
-        self.remove(path);
-    }
-}
-
-fn vec_path_to_string(path: &[Vec<String>]) -> String {
-    path.iter()
-        .map(|v| v.join("."))
-        .collect::<Vec<_>>()
-        .join(".")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::function::ArgumentList;
-    use std::collections::HashMap;
+    use crate::function::{Argument, ArgumentList};
+    use crate::map;
 
     #[test]
     fn it_works() {
+        #[rustfmt::skip]
         let cases = vec![
             (r#".foo = null || "bar""#, Ok(()), Ok("bar".into())),
             (r#"$foo = null || "bar""#, Ok(()), Ok("bar".into())),
-            // (r#".foo == .bar"#, Ok(Value::Boolean(false))),
-            (
-                r#".foo == .bar"#,
-                Ok(()),
-                Ok(true.into()),
-            ),
+            (r#".qux == .quux"#, Ok(()), Ok(true.into())),
             (
                 r#"if "foo" { "bar" }"#,
                 Ok(()),
@@ -168,7 +64,6 @@ mod tests {
                     .foo
                 }"#,
                 Ok(()),
-
                 Ok("foobar".into()),
             ),
             (
@@ -177,9 +72,7 @@ mod tests {
                     false || (.foo = true) && true
                     .foo
                 "#,
-
                 Ok(()),
-
                 Ok(true.into()),
             ),
             (r#"if false { 1 }"#, Ok(()), Ok(Value::Null)),
@@ -228,7 +121,7 @@ mod tests {
             (
                 r#"enum_validator("baz")"#,
                 Err("remap error: function error: unknown enum variant: baz, must be one of: foo, bar"),
-                Ok("valid: baz".into()),
+                Ok(().into()),
             ),
             (r#"false || true"#, Ok(()), Ok(true.into())),
             (r#"false || false"#, Ok(()), Ok(false.into())),
@@ -239,7 +132,107 @@ mod tests {
             (r#"null || false"#, Ok(()), Ok(false.into())),
             (r#"false || null"#, Ok(()), Ok(().into())),
             (r#"null || "foo""#, Ok(()), Ok("foo".into())),
-            (r#". = "bar""#, Ok(()), Ok("bar".into())),
+            (r#". = .foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#"."#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
+            (r#" . "#, Ok(()), Ok(map!["foo": map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])]].into())),
+            (r#".foo"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".foo.qux[0]"#, Ok(()), Ok(1.into())),
+            (r#".foo.bar"#, Ok(()), Ok("baz".into())),
+            (r#".(nope | foo)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".(foo | nope)"#, Ok(()), Ok(map!["bar": "baz", "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()])].into())),
+            (r#".(nope | foo).bar"#, Ok(()), Ok("baz".into())),
+            (r#".foo.(nope | bar)"#, Ok(()), Ok("baz".into())),
+            (r#".foo.(nope | no)"#, Ok(()), Ok(().into())),
+            (r#".foo.(nope | qux)[1]"#, Ok(()), Ok(2.into())),
+            (
+                r#"
+                    .foo.bar.(bar1 | bar2).baz[2] = "qux"
+                    .foo
+                "#,
+                Ok(()),
+                Ok(map![
+                    "bar": map![
+                        "bar2": map![
+                            "baz": vec![
+                                Value::Null,
+                                Value::Null,
+                                "qux".into(),
+                            ],
+                        ],
+                    ],
+                    "qux": Value::Array(vec![1.into(), 2.into(), map!["quux": true].into()]),
+                ].into()),
+            ),
+            (
+                r#"
+                    .foo.bar = "baz"
+                    $foo = .foo
+                    .foo.bar
+                "#,
+                Ok(()),
+                Ok("baz".into()),
+            ),
+            ("$foo = .foo\n$foo.bar", Ok(()), Ok("baz".into())),
+            ("$foo = .foo.qux\n$foo[1]", Ok(()), Ok(2.into())),
+            ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
+            (
+                "$foo[0] = true",
+                Err(r#"remap error: parser error: paths in variable assignment not supported. Use "$foo" without ".[0]""#),
+                Ok(().into()),
+            ),
+            (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(vec!["foo", "bar", "baz"].into())),
+            (
+                r#"
+                    .foo = [
+                        "foo",
+                        5,
+                        ["bar"],
+                    ]
+                    .foo
+                "#,
+                Ok(()),
+                Ok(vec!["foo".into(), 5.into(), Value::Array(vec!["bar".into()])].into()),
+            ),
+            (
+                r#"array_printer(["foo", /bar/, 5, ["baz", 4.2], true, /qu+x/])"#,
+                Ok(()),
+                Ok(vec![
+                    r#"Expression(Bytes(b"foo"))"#,
+                    r#"Regex(bar)"#,
+                    r#"Expression(Integer(5))"#,
+                    r#"Expression([Bytes(b"baz"), Float(4.2)])"#,
+                    r#"Expression(Boolean(true))"#,
+                    r#"Regex(qu+x)"#,
+                ].into()),
+            ),
+            (
+                r#"
+                    .foo = ["foo", "bar"]
+                    array_printer(.foo)
+                "#,
+                Err("remap error: function error: expected array literal argument, got expression"),
+                Ok(().into()),
+            ),
+            (
+                r#"enum_list_validator(["foo"])"#,
+                Ok(()),
+                Ok(r#"valid: ["foo"]"#.into()),
+            ),
+            (
+                r#"enum_list_validator(["bar", "foo"])"#,
+                Ok(()),
+                Ok(r#"valid: ["bar", "foo"]"#.into()),
+            ),
+            (
+                r#"enum_list_validator(["qux"])"#,
+                Err("remap error: function error: unknown enum variant: qux, must be one of: foo, bar, baz"),
+                Ok(().into()),
+            ),
+            (
+                r#"enum_list_validator("qux")"#,
+                Err("remap error: function error: expected array literal argument, got expression"),
+                Ok(().into()),
+            ),
         ];
 
         for (script, compile_expected, runtime_expected) in cases {
@@ -248,6 +241,8 @@ mod tests {
                 &[
                     Box::new(test_functions::RegexPrinter),
                     Box::new(test_functions::EnumValidator),
+                    Box::new(test_functions::EnumListValidator),
+                    Box::new(test_functions::ArrayPrinter),
                 ],
                 None,
             );
@@ -263,7 +258,20 @@ mod tests {
 
             let program = program.unwrap();
             let mut runtime = Runtime::new(state::Program::default());
-            let mut event = HashMap::default();
+            let mut event: Value = map![
+                "foo":
+                    map![
+                        "bar": "baz",
+                        "qux": Value::Array(vec![
+                            1.into(),
+                            2.into(),
+                            map![
+                                "quux": true,
+                            ].into(),
+                        ]),
+                    ],
+            ]
+            .into();
 
             let result = runtime
                 .execute(&mut event, &program)
@@ -335,6 +343,77 @@ mod tests {
         impl Expression for RegexPrinterFn {
             fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
                 Ok(format!("regex: {:?}", self.0).into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct ArrayPrinter;
+        impl Function for ArrayPrinter {
+            fn identifier(&self) -> &'static str {
+                "array_printer"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(ArrayPrinterFn(arguments.required_array("value")?)))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: true,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct ArrayPrinterFn(Vec<Argument>);
+        impl Expression for ArrayPrinterFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(self
+                    .0
+                    .iter()
+                    .map(|v| format!("{:?}", v))
+                    .collect::<Vec<_>>()
+                    .into())
+            }
+
+            fn type_def(&self, _: &state::Compiler) -> TypeDef {
+                TypeDef::default()
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        pub(super) struct EnumListValidator;
+        impl Function for EnumListValidator {
+            fn identifier(&self) -> &'static str {
+                "enum_list_validator"
+            }
+
+            fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
+                Ok(Box::new(EnumListValidatorFn(
+                    arguments.required_enum_list("value", &["foo", "bar", "baz"])?,
+                )))
+            }
+
+            fn parameters(&self) -> &'static [Parameter] {
+                &[Parameter {
+                    keyword: "value",
+                    accepts: |_| true,
+                    required: true,
+                }]
+            }
+        }
+
+        #[derive(Debug, Clone)]
+        struct EnumListValidatorFn(Vec<String>);
+        impl Expression for EnumListValidatorFn {
+            fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
+                Ok(format!("valid: {:?}", self.0).into())
             }
 
             fn type_def(&self, _: &state::Compiler) -> TypeDef {
