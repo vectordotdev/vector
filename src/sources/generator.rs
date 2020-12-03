@@ -143,7 +143,7 @@ mod tests {
             assert_eq!(message, *line);
         }
 
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -157,7 +157,7 @@ mod tests {
         for _ in 0..10 {
             assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -177,7 +177,7 @@ mod tests {
             assert_eq!(message, *line);
         }
 
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
     }
 
     #[tokio::test]
@@ -193,7 +193,7 @@ mod tests {
         for _ in 0..6 {
             assert!(matches!(rx.try_recv(), Ok(_)));
         }
-        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        assert_eq!(rx.try_recv(), Err(mpsc::error::TryRecvError::Closed));
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
     }

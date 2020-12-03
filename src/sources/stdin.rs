@@ -186,6 +186,6 @@ mod tests {
 
         let event = rx.try_recv();
         assert!(event.is_err());
-        assert_eq!(Err(mpsc::error::TryRecvError::Empty), event);
+        assert_eq!(Err(mpsc::error::TryRecvError::Closed), event);
     }
 }
