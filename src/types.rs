@@ -208,8 +208,8 @@ const TIMESTAMP_FORMATS: &[&str] = &[
     "%FT%T",           // ISO 8601 / RFC 3339 without TZ
     "%m/%d/%Y:%T",     // ???
     "%a, %d %b %Y %T", // RFC 822/2822 without TZ
-    "%a %d %b %T %Y",  // Chrono `date` method output without TZ
-    "%A %d %B %T %Y",  // Chrono `date` method output without TZ, long names
+    "%a %d %b %T %Y",  // `date` command output without TZ
+    "%A %d %B %T %Y",  // `date` command output without TZ, long names
     "%a %b %e %T %Y",  // ctime format
 ];
 
@@ -222,9 +222,9 @@ const TIMESTAMP_UTC_FORMATS: &[&str] = &[
 /// The list of allowed "automatic" timestamp formats with time zones
 const TIMESTAMP_TZ_FORMATS: &[&str] = &[
     "%+",                 // ISO 8601 / RFC 3339
-    "%a %d %b %T %Z %Y",  // Chrono `date` method output
-    "%a %d %b %T %z %Y",  // Chrono `date` method output, numeric TZ
-    "%a %d %b %T %#z %Y", // `Chrono `date` method numeric TZ
+    "%a %d %b %T %Z %Y",  // `date` command output
+    "%a %d %b %T %z %Y",  // `date` command output, numeric TZ
+    "%a %d %b %T %#z %Y", // `date` command output, numeric TZ
 ];
 
 /// Parse a string into a timestamp using one of a set of formats
