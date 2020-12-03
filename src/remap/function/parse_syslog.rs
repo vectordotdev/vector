@@ -187,7 +187,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
@@ -208,7 +209,7 @@ mod tests {
         }
 
         let mut state = state::Program::default();
-        let mut object = map![];
+        let mut object: Value = map![].into();
 
         let msg = format!(
             r#"<13>1 2019-02-13T19:48:34+00:00 74794bfb6795 root 8449 - {} qwerty"#,

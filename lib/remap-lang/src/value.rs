@@ -1,11 +1,15 @@
 mod kind;
+mod object;
 
+use crate::{Field, Path, Segment, Segment::*};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::{TryFrom, TryInto};
 use std::fmt;
+use std::iter::FromIterator;
+use std::str::FromStr;
 
 pub use kind::Kind;
 
@@ -61,6 +65,12 @@ pub enum Error {
 
     #[error("unable to compare {0} <= {1}")]
     Le(Kind, Kind),
+
+    #[error("unable to query into {0}")]
+    Query(Kind),
+
+    #[error("invalid field format: {0}")]
+    Field(String),
 }
 
 impl From<i32> for Value {
@@ -138,6 +148,18 @@ impl From<()> for Value {
 impl From<BTreeMap<String, Value>> for Value {
     fn from(value: BTreeMap<String, Value>) -> Self {
         Value::Map(value)
+    }
+}
+
+impl FromIterator<(String, Value)> for Value {
+    fn from_iter<I: IntoIterator<Item = (String, Value)>>(iter: I) -> Self {
+        Value::Map(iter.into_iter().collect::<BTreeMap<String, Value>>())
+    }
+}
+
+impl FromIterator<Value> for Value {
+    fn from_iter<I: IntoIterator<Item = Value>>(iter: I) -> Self {
+        Value::Array(iter.into_iter().collect::<Vec<Value>>())
     }
 }
 
@@ -445,6 +467,428 @@ impl Value {
             Integer(lhv) => i64::try_from(rhs).map(|rhv| *lhv == rhv).unwrap_or(false),
             Float(lhv) => f64::try_from(rhs).map(|rhv| *lhv == rhv).unwrap_or(false),
             _ => self == rhs,
+        }
+    }
+
+    /// Return a list of [`Path`]s present in this [`Value`].
+    ///
+    /// This method will always return at least _one_ path (the root path,
+    /// pointing to the value itself).
+    ///
+    /// If the value represents a [`Value::Map`] or [`Value::Array`], and the
+    /// relevant collection is not empty, it will recursively traverse into
+    /// those values to return the final list of paths.
+    ///
+    /// # Errors
+    ///
+    /// This function can return the [`Error::Field`] error, if one of the
+    /// [`Value::Map`] keys does not conform to the `ident` or `string` rule as
+    /// defined by the Remap language grammar.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use remap_lang::{Path, Value};
+    /// # use std::str::FromStr;
+    /// # use std::collections::BTreeMap;
+    /// # use std::iter::FromIterator;
+    ///
+    /// let fields = vec![("foo".to_owned(), Value::Array(vec![0.into(), 1.into()]))];
+    /// let map = BTreeMap::from_iter(fields.into_iter());
+    ///
+    /// let paths = Value::Map(map).paths().unwrap();
+    ///
+    /// assert_eq!(
+    ///     paths.iter().map(|p| p.to_string()).collect::<Vec<_>>(),
+    ///     vec![
+    ///         ".".to_owned(),
+    ///         ".foo".to_owned(),
+    ///         ".foo[0]".to_owned(),
+    ///         ".foo[1]".to_owned(),
+    ///     ],
+    /// )
+    /// ```
+    pub fn paths(&self) -> Result<Vec<Path>, Error> {
+        let mut paths = vec![Path::root()];
+        paths.append(&mut self.paths_from_segments(&mut vec![])?);
+
+        Ok(paths)
+    }
+
+    /// Get a reference to a value from a given path.
+    ///
+    /// # Examples
+    ///
+    /// Given an existing value, there are three routes this function can take:
+    ///
+    /// 1. If the path points to the root (`.`), it will return the current
+    ///    value:
+    ///
+    ///    ```rust
+    ///    # use remap_lang::{Path, Value};
+    ///    # use std::str::FromStr;
+    ///
+    ///    let value = Value::Boolean(true);
+    ///    let path = Path::from_str(".").unwrap();
+    ///
+    ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
+    ///    ```
+    ///
+    /// 2. If the path points to an index, if the value is an `Array`, it will
+    ///    return the value at the given index, if one exists, or it will return
+    ///    `None`:
+    ///
+    ///    ```rust
+    ///    # use remap_lang::{Path, Value};
+    ///    # use std::str::FromStr;
+    ///
+    ///    let value = Value::Array(vec![false.into(), true.into()]);
+    ///    let path = Path::from_str(".[1]").unwrap();
+    ///
+    ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
+    ///    ```
+    ///
+    /// 3. If the path points to a nested path, if the value is a `Map`, it will
+    ///    traverse into the map, and return the appropriate value, if one
+    ///    exists:
+    ///
+    ///    ```rust
+    ///    # use remap_lang::{Path, Value};
+    ///    # use std::str::FromStr;
+    ///    # use std::collections::BTreeMap;
+    ///    # use std::iter::FromIterator;
+    ///
+    ///    let map = BTreeMap::from_iter(vec![("foo".to_owned(), true.into())].into_iter());
+    ///    let value = Value::Map(map);
+    ///    let path = Path::from_str(".foo").unwrap();
+    ///
+    ///    assert_eq!(value.get_by_path(&path), Some(&Value::Boolean(true)))
+    ///    ```
+    ///
+    pub fn get_by_path(&self, path: &Path) -> Option<&Value> {
+        self.get_by_segments(path.segments())
+    }
+
+    /// Similar to [`Value::get_by_path`], but returns a mutable reference to
+    /// the value.
+    pub fn get_by_path_mut(&mut self, path: &Path) -> Option<&mut Value> {
+        self.get_by_segments_mut(path.segments())
+    }
+
+    /// Insert a value, given the provided path.
+    ///
+    /// # Examples
+    ///
+    /// ## Insert At Field
+    ///
+    /// ```
+    /// # use remap_lang::{Path, Value};
+    /// # use std::str::FromStr;
+    /// # use std::collections::BTreeMap;
+    /// # use std::iter::FromIterator;
+    ///
+    /// let fields = vec![("foo".to_owned(), Value::from("bar"))];
+    /// let map = BTreeMap::from_iter(fields.into_iter());
+    ///
+    /// let mut value = Value::Map(map);
+    /// let path = Path::from_str(".foo").unwrap();
+    ///
+    /// value.insert_by_path(&path, true.into());
+    ///
+    /// assert_eq!(
+    ///     value.get_by_path(&path),
+    ///     Some(&true.into()),
+    /// )
+    /// ```
+    ///
+    /// ## Insert Into Array
+    ///
+    /// ```
+    /// # use remap_lang::{Path, Value, map};
+    /// # use std::str::FromStr;
+    /// # use std::collections::BTreeMap;
+    /// # use std::iter::FromIterator;
+    ///
+    /// let mut value = Value::Array(vec![false.into(), true.into()]);
+    /// let path = Path::from_str(".[1].foo").unwrap();
+    ///
+    /// value.insert_by_path(&path, "bar".into());
+    ///
+    /// assert_eq!(
+    ///     value.get_by_path(&Path::from_str(".").unwrap()),
+    ///     Some(&Value::Array(vec![false.into(), map!["foo": "bar"].into()])),
+    /// )
+    /// ```
+    ///
+    pub fn insert_by_path(&mut self, path: &Path, new: Value) {
+        self.insert_by_segments(path.segments(), new)
+    }
+
+    /// Remove a value, given the provided path.
+    ///
+    /// This works similar to [`Value::get_by_path`], except that it removes the
+    /// value at the provided path, instead of returning it.
+    ///
+    /// The one difference is if a root path (`.`) is provided. In this case,
+    /// the [`Value`] object (i.e. "self") is set to `Value::Null`.
+    ///
+    /// If the `compact` argument is set to `true`, then any `Array` or `Map`
+    /// that had one of its elements removed and is now empty, is removed as
+    /// well.
+    pub fn remove_by_path(&mut self, path: &Path, compact: bool) {
+        self.remove_by_segments(path.segments(), compact)
+    }
+
+    fn get_by_segments(&self, segments: &[Segment]) -> Option<&Value> {
+        let (segment, next) = match segments.split_first() {
+            Some(segments) => segments,
+            None => return Some(self),
+        };
+
+        self.get_by_segment(segment)
+            .and_then(|value| value.get_by_segments(next))
+    }
+
+    fn get_by_segment(&self, segment: &Segment) -> Option<&Value> {
+        match segment {
+            Field(field) => self.as_map().and_then(|map| map.get(field.as_str())),
+            Coalesce(fields) => self
+                .as_map()
+                .and_then(|map| fields.iter().find_map(|field| map.get(field.as_str()))),
+            Index(index) => self.as_array().and_then(|array| array.get(*index)),
+        }
+    }
+
+    fn get_by_segments_mut(&mut self, segments: &[Segment]) -> Option<&mut Value> {
+        let (segment, next) = match segments.split_first() {
+            Some(segments) => segments,
+            None => return Some(self),
+        };
+
+        self.get_by_segment_mut(segment)
+            .and_then(|value| value.get_by_segments_mut(next))
+    }
+
+    fn get_by_segment_mut(&mut self, segment: &Segment) -> Option<&mut Value> {
+        match segment {
+            Field(field) => self
+                .as_map_mut()
+                .and_then(|map| map.get_mut(field.as_str())),
+            Coalesce(fields) => self.as_map_mut().and_then(|map| {
+                fields
+                    .iter()
+                    .find(|field| map.contains_key(field.as_str()))
+                    .and_then(move |field| map.get_mut(field.as_str()))
+            }),
+            Index(index) => self.as_array_mut().and_then(|array| array.get_mut(*index)),
+        }
+    }
+
+    fn remove_by_segments(&mut self, segments: &[Segment], compact: bool) {
+        let (segment, next) = match segments.split_first() {
+            Some(segments) => segments,
+            None => {
+                return match self {
+                    Value::Map(v) => v.clear(),
+                    Value::Array(v) => v.clear(),
+                    _ => *self = Value::Null,
+                }
+            }
+        };
+
+        if next.is_empty() {
+            return self.remove_by_segment(segment);
+        }
+
+        if let Some(value) = self.get_by_segment_mut(segment) {
+            value.remove_by_segments(next, compact);
+
+            match value {
+                Value::Map(v) if compact & v.is_empty() => self.remove_by_segment(segment),
+                Value::Array(v) if compact & v.is_empty() => self.remove_by_segment(segment),
+                _ => {}
+            }
+        }
+    }
+
+    fn remove_by_segment(&mut self, segment: &Segment) {
+        match segment {
+            Field(field) => self.as_map_mut().and_then(|map| map.remove(field.as_str())),
+
+            Coalesce(fields) => fields
+                .iter()
+                .find(|field| {
+                    self.as_map()
+                        .map(|map| map.contains_key(field.as_str()))
+                        .unwrap_or_default()
+                })
+                .and_then(|field| self.as_map_mut().and_then(|map| map.remove(field.as_str()))),
+
+            Index(index) => self.as_array_mut().map(|array| array.remove(*index)),
+        };
+    }
+
+    /// Create a list of [`Path`]s from a list of [`Segment`]s.
+    ///
+    /// # Errors
+    ///
+    /// This function can return the [`Error::Field`] error, if one of the
+    /// [`Value::Map`] keys does not conform to the `ident` or `string` rule as
+    /// defined by the Remap language grammar.
+    fn paths_from_segments(&self, segments: &mut Vec<Segment>) -> Result<Vec<Path>, Error> {
+        let mut paths = vec![];
+
+        let mut handle_value = |value: &Value, segments: &mut Vec<Segment>| {
+            paths.push(Path::new_unchecked(segments.clone()));
+
+            if let Value::Map(_) | Value::Array(_) = value {
+                paths.append(&mut value.paths_from_segments(segments)?)
+            }
+
+            Ok(())
+        };
+
+        match self {
+            Value::Map(map) => map.iter().try_for_each(|(key, value)| {
+                let field = Field::from_str(key).map_err(|err| Error::Field(err.to_string()))?;
+                segments.push(Field(field));
+
+                handle_value(value, segments)?;
+                segments.clear();
+
+                Ok(())
+            })?,
+
+            Value::Array(array) => array.iter().enumerate().try_for_each(|(index, value)| {
+                let mut segs = segments.clone();
+                segs.push(Index(index));
+
+                handle_value(value, &mut segs)
+            })?,
+            _ => {}
+        }
+
+        segments.clear();
+
+        Ok(paths)
+    }
+
+    fn insert_by_segments(&mut self, segments: &[Segment], new: Value) {
+        let (segment, rest) = match segments.split_first() {
+            Some(segments) => segments,
+            None => return *self = new,
+        };
+
+        // As long as the provided segments match the shape of the value, we'll
+        // traverse down the tree. Once we encounter a value kind that does not
+        // match the requested segment, we'll update the value to match and
+        // continue on, until we're able to assign the final `new` value.
+        match self.get_by_segment_mut(segment) {
+            Some(value) => value.insert_by_segments(rest, new),
+            None => self.update_by_segments(segments, new),
+        };
+    }
+
+    fn update_by_segments(&mut self, segments: &[Segment], new: Value) {
+        let (segment, rest) = match segments.split_first() {
+            Some(segments) => segments,
+            None => return,
+        };
+
+        let mut handle_field = |field: &Field, new| {
+            let key = field.as_str().to_owned();
+            let mut map = BTreeMap::default();
+
+            match rest.first() {
+                // If there are no other segments to traverse, we'll add the new
+                // value to the current map.
+                None => {
+                    map.insert(key, new);
+                    return *self = map.into();
+                }
+                // If there are more segments to traverse, insert an empty map
+                // or array depending on what the next segment is, and continue
+                // to add the next segment.
+                Some(next) => match next {
+                    Index(_) => map.insert(key, Value::Array(vec![])),
+                    _ => map.insert(key, BTreeMap::default().into()),
+                },
+            };
+
+            map.get_mut(field.as_str())
+                .unwrap()
+                .insert_by_segments(rest, new);
+
+            *self = map.into();
+        };
+
+        match segment {
+            Field(field) => handle_field(field, new),
+
+            Coalesce(fields) => {
+                // At this point, we know that the coalesced field query did not
+                // result in an actual value, so none of the fields match an
+                // existing field. We'll pick the last field in the list to
+                // insert the new value into.
+                let field = match fields.last() {
+                    Some(field) => field,
+                    None => return,
+                };
+
+                handle_field(field, new)
+            }
+
+            Index(index) => match self {
+                // If the current value is an array, we need to either swap out
+                // an existing value, or append the new value to the array.
+                Value::Array(array) => {
+                    // If the array has less items than needed, we'll fill it in
+                    // with `Null` values.
+                    if array.len() < *index {
+                        array.resize(*index, Value::Null);
+                    }
+
+                    match rest.first() {
+                        None => {
+                            array.push(new);
+                            return;
+                        }
+                        Some(next) => match next {
+                            Index(_) => array.push(Value::Array(vec![])),
+                            _ => array.push(BTreeMap::default().into()),
+                        },
+                    };
+
+                    array
+                        .last_mut()
+                        .expect("exists")
+                        .insert_by_segments(rest, new);
+                }
+
+                // Any non-array value is swapped out with an array.
+                _ => {
+                    let mut array = Vec::with_capacity(index + 1);
+                    array.resize(*index, Value::Null);
+
+                    match rest.first() {
+                        None => {
+                            array.push(new);
+                            return *self = array.into();
+                        }
+                        Some(next) => match next {
+                            Index(_) => array.push(Value::Array(vec![])),
+                            _ => array.push(BTreeMap::default().into()),
+                        },
+                    };
+
+                    array
+                        .last_mut()
+                        .expect("exists")
+                        .insert_by_segments(rest, new);
+
+                    *self = array.into();
+                }
+            },
         }
     }
 }

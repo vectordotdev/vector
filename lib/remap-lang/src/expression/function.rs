@@ -29,6 +29,15 @@ pub enum Error {
 #[derive(Debug, Clone)]
 pub struct Function {
     function: Box<dyn Expression>,
+
+    // only used for `PartialEq` impl
+    ident: &'static str,
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident == other.ident
+    }
 }
 
 impl Function {
@@ -121,7 +130,7 @@ impl Function {
             .collect::<Result<_>>()?;
 
         let function = definition.compile(list)?;
-        Ok(Self { function })
+        Ok(Self { function, ident })
     }
 }
 
@@ -143,7 +152,10 @@ mod tests {
     test_type_def![pass_through {
         expr: |_| {
             let function = Box::new(Noop);
-            Function { function }
+            Function {
+                function,
+                ident: "foo",
+            }
         },
         def: TypeDef {
             fallible: false,

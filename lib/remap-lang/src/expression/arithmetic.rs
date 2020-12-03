@@ -1,7 +1,7 @@
 use super::{Expr, Expression, Object, Result, TypeDef, Value};
 use crate::{state, value, Operator};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Arithmetic {
     lhs: Box<Expr>,
     rhs: Box<Expr>,
