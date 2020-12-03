@@ -2,7 +2,7 @@
 pub use crate::{expression, function, state, value};
 
 // commonly used top-level crate types
-pub use crate::{Error, Expression, Function, Object, Result, TypeDef, Value};
+pub use crate::{Error, Expr, Expression, Function, Object, Result, TypeDef, Value};
 
 // commonly used expressions
 pub use crate::expression::{Literal, Noop, Path, Variable};

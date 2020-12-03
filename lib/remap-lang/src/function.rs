@@ -1,5 +1,5 @@
 use crate::{
-    expression::{self, Path},
+    expression::{self, Literal, Path},
     Expr, Expression, Result, Value,
 };
 use core::convert::{TryFrom, TryInto};
@@ -27,14 +27,29 @@ pub enum Error {
     #[error(r#"expected expression argument, got regex"#)]
     ArgumentExprRegex,
 
+    #[error(r#"expected expression argument, got array"#)]
+    ArgumentExprArray,
+
     #[error(r#"expected regex argument, got expression"#)]
     ArgumentRegexExpr,
+
+    #[error(r#"expected regex argument, got array"#)]
+    ArgumentRegexArray,
+
+    #[error(r#"expected array literal argument, got expression"#)]
+    ArgumentArrayExpr,
+
+    #[error(r#"expected array literal argument, got regex"#)]
+    ArgumentArrayRegex,
+
+    #[error(r#"expected expression or regex argument, got array literal"#)]
+    ArgumentExprOrRegexArray,
 
     #[error(r#"missing required argument "{0}""#)]
     Required(String),
 
     #[error("unknown enum variant: {0}, must be one of: {}", .1.join(", "))]
-    UnknownEnumVariant(String, &'static [&'static str]),
+    UnknownEnumVariant(String, Vec<&'static str>),
 }
 
 #[derive(Copy, Clone)]
@@ -101,7 +116,7 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
-    pub fn optional_literal(&mut self, keyword: &str) -> Result<Option<expression::Literal>> {
+    pub fn optional_literal(&mut self, keyword: &str) -> Result<Option<Literal>> {
         let expr = self.optional(keyword).map(Expr::try_from).transpose()?;
 
         let argument = match expr {
@@ -109,11 +124,11 @@ impl ArgumentList {
             None => return Ok(None),
         };
 
-        let variant = expression::Literal::try_from(argument.into_expr())?;
+        let variant = Literal::try_from(argument.into_expr())?;
         Ok(Some(variant))
     }
 
-    pub fn required_literal(&mut self, keyword: &str) -> Result<expression::Literal> {
+    pub fn required_literal(&mut self, keyword: &str) -> Result<Literal> {
         self.optional_literal(keyword)?
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
@@ -121,31 +136,14 @@ impl ArgumentList {
     pub fn optional_enum(
         &mut self,
         keyword: &str,
-        variants: &'static [&'static str],
+        variants: &[&'static str],
     ) -> Result<Option<String>> {
-        match self.optional_literal(keyword)? {
-            None => Ok(None),
-            Some(variant) => {
-                let variant = variant
-                    .as_value()
-                    .clone()
-                    .try_bytes()
-                    .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())?;
-
-                if variants.contains(&variant.as_str()) {
-                    Ok(Some(variant))
-                } else {
-                    Err(Error::UnknownEnumVariant(variant, &variants).into())
-                }
-            }
-        }
+        self.optional_literal(keyword)?
+            .map(|lit| literal_to_enum_variant(lit, variants))
+            .transpose()
     }
 
-    pub fn required_enum(
-        &mut self,
-        keyword: &str,
-        variants: &'static [&'static str],
-    ) -> Result<String> {
+    pub fn required_enum(&mut self, keyword: &str, variants: &[&'static str]) -> Result<String> {
         self.optional_enum(keyword, variants)?
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
@@ -164,6 +162,61 @@ impl ArgumentList {
             .ok_or_else(|| Error::Required(keyword.to_owned()).into())
     }
 
+    pub fn optional_array(&mut self, keyword: &str) -> Result<Option<Vec<Argument>>> {
+        self.optional(keyword)
+            .map(|v| v.try_into().map_err(Into::into))
+            .transpose()
+    }
+
+    pub fn required_array(&mut self, keyword: &str) -> Result<Vec<Argument>> {
+        self.optional_array(keyword)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
+    pub fn optional_enum_list(
+        &mut self,
+        keyword: &str,
+        variants: &[&'static str],
+    ) -> Result<Option<Vec<String>>> {
+        self.optional_array(keyword)?
+            .map(|array| {
+                array
+                    .into_iter()
+                    .map(|arg| {
+                        let expr = Expr::try_from(arg)?;
+
+                        Literal::try_from(expr).map_err(Into::into)
+                    })
+                    .map(|lit: Result<Literal>| literal_to_enum_variant(lit?, variants))
+                    .collect::<Result<Vec<_>>>()
+            })
+            .transpose()
+    }
+
+    pub fn required_enum_list(
+        &mut self,
+        keyword: &str,
+        variants: &[&'static str],
+    ) -> Result<Vec<String>> {
+        self.optional_enum_list(keyword, variants)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
+    pub fn optional_expr_or_regex(&mut self, keyword: &str) -> Result<Option<Argument>> {
+        self.optional(keyword)
+            .map(|arg| match arg {
+                Argument::Array(_) => Err(Error::ArgumentExprOrRegexArray),
+                _ => Ok(arg),
+            })
+            .transpose()
+            .map_err(Into::into)
+    }
+
+    pub fn required_expr_or_regex(&mut self, keyword: &str) -> Result<Argument> {
+        self.optional_expr_or_regex(keyword)?
+            .ok_or_else(|| Error::Required(keyword.to_owned()).into())
+    }
+
     pub fn keywords(&self) -> Vec<&'static str> {
         self.0.keys().copied().collect::<Vec<_>>()
     }
@@ -173,10 +226,24 @@ impl ArgumentList {
     }
 }
 
+fn literal_to_enum_variant(literal: Literal, variants: &[&'static str]) -> Result<String> {
+    let variant = literal
+        .into_value()
+        .try_bytes()
+        .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())?;
+
+    if variants.contains(&variant.as_str()) {
+        Ok(variant)
+    } else {
+        Err(Error::UnknownEnumVariant(variant, variants.to_owned()).into())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Argument {
     Expression(Expr),
     Regex(regex::Regex),
+    Array(Vec<Argument>),
 }
 
 impl<T: Into<Expr>> From<T> for Argument {
@@ -191,6 +258,12 @@ impl From<regex::Regex> for Argument {
     }
 }
 
+impl From<Vec<Argument>> for Argument {
+    fn from(args: Vec<Argument>) -> Self {
+        Argument::Array(args)
+    }
+}
+
 impl TryFrom<Argument> for Expr {
     type Error = Error;
 
@@ -198,6 +271,7 @@ impl TryFrom<Argument> for Expr {
         match arg {
             Argument::Expression(expr) => Ok(expr),
             Argument::Regex(_) => Err(Error::ArgumentExprRegex),
+            Argument::Array(_) => Err(Error::ArgumentExprArray),
         }
     }
 }
@@ -209,6 +283,7 @@ impl TryFrom<Argument> for Box<dyn Expression> {
         match arg {
             Argument::Expression(expr) => Ok(Box::new(expr) as _),
             Argument::Regex(_) => Err(Error::ArgumentExprRegex),
+            Argument::Array(_) => Err(Error::ArgumentExprArray),
         }
     }
 }
@@ -220,6 +295,19 @@ impl TryFrom<Argument> for regex::Regex {
         match arg {
             Argument::Regex(regex) => Ok(regex),
             Argument::Expression(_) => Err(Error::ArgumentRegexExpr),
+            Argument::Array(_) => Err(Error::ArgumentRegexArray),
+        }
+    }
+}
+
+impl TryFrom<Argument> for Vec<Argument> {
+    type Error = Error;
+
+    fn try_from(arg: Argument) -> std::result::Result<Self, Self::Error> {
+        match arg {
+            Argument::Array(args) => Ok(args),
+            Argument::Regex(_) => Err(Error::ArgumentArrayRegex),
+            Argument::Expression(_) => Err(Error::ArgumentArrayExpr),
         }
     }
 }
