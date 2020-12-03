@@ -58,22 +58,22 @@ components: sources: generator: {
 		}
 		format: {
 			description: "The message format for output lines."
-			required: true
-			default: null
+			required:    true
+			default:     null
 			type: enum: ["round_robin", "apache_common", "apache_error", "syslog"]
 		}
 		items: {
-			description: "The list of lines to output."
-			required:    false
+			description:   "The list of lines to output."
+			required:      false
 			relevant_when: "[`format`](#format) is set to `round_robin`"
 			warnings: []
 			type: array: items: type: string: examples: ["Line 1", "Line 2"]
 		}
 		sequence: {
-			common:      false
-			description: "If `true`, each output line will start with an increasing sequence number."
+			common:        false
+			description:   "If `true`, each output line will start with an increasing sequence number."
 			relevant_when: "[`format`](#format) is set to `round_robin`"
-			required:    false
+			required:      false
 			warnings: []
 			type: bool: default: false
 		}
