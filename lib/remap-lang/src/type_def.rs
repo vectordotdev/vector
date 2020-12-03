@@ -118,6 +118,22 @@ impl TypeDef {
         Box::new(self)
     }
 
+    /// Returns the set of scalar kinds associated with this type definition.
+    ///
+    /// If a type definition includes an `inner_type_def`, this method will
+    /// recursively resolve those until the final scalar kinds are known.
+    pub fn scalar_kind(&self) -> value::Kind {
+        let mut kind = self.kind;
+        let mut type_def = self.inner_type_def.clone();
+
+        while let Some(td) = type_def {
+            kind = kind | td.kind;
+            type_def = td.inner_type_def;
+        }
+
+        kind
+    }
+
     pub fn is_fallible(&self) -> bool {
         self.fallible
     }
@@ -187,5 +203,39 @@ impl TypeDef {
             // Otherwise merge the optional as usual.
             Some(other) => self.merge(other),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scalar_kind() {
+        use value::Kind;
+
+        let type_def = TypeDef {
+            kind: Kind::Boolean,
+            inner_type_def: Some(
+                TypeDef {
+                    kind: Kind::Boolean | Kind::Float,
+                    inner_type_def: Some(
+                        TypeDef {
+                            kind: Kind::Bytes,
+                            ..Default::default()
+                        }
+                        .boxed(),
+                    ),
+                    ..Default::default()
+                }
+                .boxed(),
+            ),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            type_def.scalar_kind(),
+            Kind::Boolean | Kind::Float | Kind::Bytes
+        );
     }
 }
