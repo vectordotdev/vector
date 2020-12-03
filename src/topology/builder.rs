@@ -21,7 +21,7 @@ use std::{
     future::ready,
     sync::{Arc, Mutex},
 };
-use stream_cancel::{Trigger, Tripwire};
+use stream_cancel::{StreamExt as StreamCancelExt, Trigger, Tripwire};
 use tokio::time::{timeout, Duration};
 
 pub struct Pieces {
@@ -215,7 +215,7 @@ pub async fn build_pieces(
                     })
                     .compat()
                     .take_while(|e| ready(e.is_ok()))
-                    .take_until(tripwire)
+                    .take_until_if(tripwire)
                     .map(|x| x.unwrap()),
             )
             .await
