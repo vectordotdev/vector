@@ -98,9 +98,8 @@ impl DockerLogsConfig {
                 .any(|name| items.iter().any(|item| name.starts_with(item)))
         };
 
-        let container_included = |items: &Vec<String>| -> bool {
-            id_matches(items) || name_matches(items)
-        };
+        let container_included =
+            |items: &Vec<String>| -> bool { id_matches(items) || name_matches(items) };
 
         // This if/else logic with `let Some` expressions is okay here, as the Source's constructor
         // ensures that both cannot be set at the same time.
