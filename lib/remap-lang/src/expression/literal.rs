@@ -1,6 +1,6 @@
 use crate::{state, Expression, Object, Result, TypeDef, Value};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Literal(Value);
 
 impl Literal {

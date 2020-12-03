@@ -133,9 +133,7 @@ mod test {
             (
                 log_event![],
                 ".",
-                Err(
-                    "remap error: parser error:  --> 1:2\n  |\n1 | .\n  |  ^---\n  |\n  = expected path_segment",
-                ),
+                Err("remap error: program error: expected to resolve to boolean value, but instead resolves to any value"),
                 Ok(()),
             ),
         ];

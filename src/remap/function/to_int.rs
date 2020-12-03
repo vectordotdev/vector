@@ -133,7 +133,7 @@ mod tests {
         }
 
         fallible_value_without_default {
-            expr: |_| ToIntFn { value: Variable::new("foo".to_owned()).boxed(), default: None },
+            expr: |_| ToIntFn { value: Variable::new("foo".to_owned(), None).boxed(), default: None },
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Integer,
@@ -207,7 +207,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
