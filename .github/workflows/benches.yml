@@ -25,7 +25,7 @@ jobs:
 
   bench:
     name: Bench - Linux
-    runs-on: ubuntu-20.04
+    runs-on: [self-hosted, linux, x64]
     # Allow benchmarks show regressions until we can refine the thresholds for
     # regression to reduce false positives.
     continue-on-error: true
