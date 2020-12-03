@@ -1,10 +1,14 @@
 //! A state implementation backed by [`evmap`].
 
-use crate::kubernetes::{debounce::Debounce, hash_value::HashValue};
+use crate::kubernetes::{
+    debounce::Debounce,
+    hash_value::{HashValue, Identity},
+};
 use async_trait::async_trait;
 use evmap::WriteHandle;
 use futures::future::BoxFuture;
-use k8s_openapi::{apimachinery::pkg::apis::meta::v1::ObjectMeta, Metadata};
+use std::borrow::ToOwned;
+use std::hash::Hash;
 use std::time::Duration;
 
 /// A [`WriteHandle`] wrapper that implements [`super::Write`].
@@ -12,20 +16,24 @@ use std::time::Duration;
 /// [`crate::kubernetes::Reflector`].
 pub struct Writer<T>
 where
-    T: Metadata<Ty = ObjectMeta> + Send,
+    T: Identity + Send,
+    <T as Identity>::IdentityType: ToOwned,
+    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
 {
-    inner: WriteHandle<String, Value<T>>,
+    inner: WriteHandle<<<T as Identity>::IdentityType as ToOwned>::Owned, Value<T>>,
     debounced_flush: Option<Debounce>,
 }
 
 impl<T> Writer<T>
 where
-    T: Metadata<Ty = ObjectMeta> + Send,
+    T: Identity + Send,
+    <T as Identity>::IdentityType: ToOwned,
+    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
 {
     /// Take a [`WriteHandle`], initialize it and return it wrapped with
     /// [`Self`].
     pub fn new(
-        mut inner: WriteHandle<String, Value<T>>,
+        mut inner: WriteHandle<<<T as Identity>::IdentityType as ToOwned>::Owned, Value<T>>,
         flush_debounce_timeout: Option<Duration>,
     ) -> Self {
         // Prepare inner.
@@ -60,7 +68,9 @@ where
 #[async_trait]
 impl<T> super::Write for Writer<T>
 where
-    T: Metadata<Ty = ObjectMeta> + Send,
+    T: Identity + Send,
+    <T as Identity>::IdentityType: ToOwned,
+    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
 {
     type Item = T;
 
@@ -97,7 +107,9 @@ where
 #[async_trait]
 impl<T> super::MaintainedWrite for Writer<T>
 where
-    T: Metadata<Ty = ObjectMeta> + Send,
+    T: Identity + Send,
+    <T as Identity>::IdentityType: ToOwned,
+    <<T as Identity>::IdentityType as ToOwned>::Owned: Hash + Eq + Clone + Send,
 {
     fn maintenance_request(&mut self) -> Option<BoxFuture<'_, ()>> {
         if let Some(ref mut debounced_flush) = self.debounced_flush {
@@ -119,9 +131,13 @@ where
 pub type Value<T> = Box<HashValue<T>>;
 
 /// Build a key value pair for using in [`evmap`].
-fn kv<T: Metadata<Ty = ObjectMeta>>(object: T) -> Option<(String, Value<T>)> {
+fn kv<T>(object: T) -> Option<(<<T as Identity>::IdentityType as ToOwned>::Owned, Value<T>)>
+where
+    T: Identity,
+    <T as Identity>::IdentityType: ToOwned,
+{
     let value = Box::new(HashValue::new(object));
-    let key = value.uid()?.to_owned();
+    let key = value.identity()?.to_owned();
     Some((key, value))
 }
 
@@ -129,7 +145,7 @@ fn kv<T: Metadata<Ty = ObjectMeta>>(object: T) -> Option<(String, Value<T>)> {
 mod tests {
     use super::*;
     use crate::kubernetes::state::{MaintainedWrite, Write};
-    use k8s_openapi::api::core::v1::Pod;
+    use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 
     fn make_pod(uid: &str) -> Pod {
         Pod {
