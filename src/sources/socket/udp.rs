@@ -83,7 +83,10 @@ pub fn udp(
                         emit!(SocketEventReceived { byte_size,mode:SocketMode::Udp });
 
                         tokio::select!{
-                            _ = out.send(event) => { }
+                            result = out.send(event) => {match result {
+                                Ok(()) => { },
+                                Err(()) => return Ok(()),
+                            }}
                             _ = &mut shutdown => return Ok(()),
                         }
                     }
