@@ -713,7 +713,7 @@ mod integration_tests {
             },
             false,
         )
-            .await;
+        .await;
     }
 
     #[tokio::test]
@@ -729,7 +729,7 @@ mod integration_tests {
             },
             false,
         )
-            .await;
+        .await;
     }
 
     #[tokio::test]
