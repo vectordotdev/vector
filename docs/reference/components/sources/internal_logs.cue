@@ -52,10 +52,17 @@ components: sources: internal_logs: {
 		fields: {
 			message: {
 				description: "The textual message for this log or trace."
-				required:    false
-				type:        string
+				required:    true
+				type: string: examples: ["Vector has started."]
 			}
-			timestamp: fields._current_timestamp
+			timestamp: fields._current_timestamp & {
+				description: "The exact time the log or trace was generated."
+			}
+			"*": {
+				description: "Each field from the original message is copied into the event."
+				required:    true
+				type: "*": {}
+			}
 			metadata: {
 				description: "Metadata from the source log or trace event."
 				required:    true
@@ -75,7 +82,7 @@ components: sources: internal_logs: {
 						name: {
 							description: "The name of the span."
 							required:    true
-							type:        string
+							type:        "string"
 						}
 						level: {
 							description: "The level of verbosity of the described span or event."
@@ -93,12 +100,12 @@ components: sources: internal_logs: {
 						module_path: {
 							description: "The path to the internal module where the span occurred"
 							required:    true
-							type:        string
+							type:        "string"
 						}
 						target: {
 							description: "Describes the part of the system where the span or event that this metadata describes occurred."
 							required:    true
-							type:        string
+							type:        "string"
 						}
 					}
 				}
