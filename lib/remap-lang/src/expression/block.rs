@@ -55,8 +55,8 @@ mod tests {
         no_expression {
             expr: |_| Block::new(vec![]),
             def: TypeDef {
-                fallible: false,
                 kind: Kind::Null,
+                ..Default::default()
             },
         }
 
@@ -86,6 +86,7 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Bytes | Kind::Integer | Kind::Float,
+                ..Default::default()
             },
         }
 
@@ -102,6 +103,12 @@ mod tests {
             def: TypeDef {
                 fallible: true,
                 kind: Kind::Array,
+                inner_type_def: Some(TypeDef {
+                    fallible: false,
+                    kind: Kind::Integer,
+                    ..Default::default()
+                }.boxed()),
+                ..Default::default()
             },
         }
     ];
