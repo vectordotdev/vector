@@ -2,8 +2,8 @@
 
 use crate::{
     expression::{
-        self, Arithmetic, Assignment, Block, Function, IfStatement, Literal, Noop, Not, Path,
-        Target, Variable,
+        self, Arithmetic, Array, Assignment, Block, Function, IfStatement, Literal, Noop, Not,
+        Path, Target, Variable,
     },
     function::Argument,
     path, state, Error, Expr, Function as Fn, Operator, Result, Value,
@@ -263,20 +263,32 @@ impl Parser<'_> {
     }
 
     /// Parse a [`Value`] into a [`Literal`] expression.
-    fn literal_from_pair(&self, pair: Pair<R>) -> Result<Expr> {
-        let literal = match pair.as_rule() {
+    fn literal_from_pair(&mut self, pair: Pair<R>) -> Result<Expr> {
+        Ok(match pair.as_rule() {
             R::string => {
                 let string = pair.into_inner().next().ok_or(e(R::string))?;
-                Literal::from(self.escaped_string_from_pair(string)?)
+                Literal::from(self.escaped_string_from_pair(string)?).into()
             }
-            R::null => Literal::from(Value::Null),
-            R::boolean => Literal::from(pair.as_str() == "true"),
-            R::integer => Literal::from(pair.as_str().parse::<i64>().map_err(|_| e(R::integer))?),
-            R::float => Literal::from(pair.as_str().parse::<f64>().map_err(|_| e(R::float))?),
+            R::null => Literal::from(Value::Null).into(),
+            R::boolean => Literal::from(pair.as_str() == "true").into(),
+            R::integer => {
+                Literal::from(pair.as_str().parse::<i64>().map_err(|_| e(R::integer))?).into()
+            }
+            R::float => {
+                Literal::from(pair.as_str().parse::<f64>().map_err(|_| e(R::float))?).into()
+            }
+            R::array => self.array_from_pair(pair)?.into(),
             _ => return Err(e(R::value)),
-        };
+        })
+    }
 
-        Ok(literal.into())
+    fn array_from_pair(&mut self, pair: Pair<R>) -> Result<Array> {
+        let expressions = pair
+            .into_inner()
+            .map(|pair| self.expression_from_pair(pair))
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(Array::new(expressions))
     }
 
     /// Parse function call expressions.
@@ -694,7 +706,7 @@ mod tests {
             (
                 // Regexes can't be parsed as part of a path
                 r#".foo = split(.foo, ./[aa]/)"#,
-                vec![" 1:22\n", "= expected not"],
+                vec![" 1:23\n", "= expected assignment, if_statement, not, or block"],
             ),
             (
                 // We cannot assign a regular expression to a field.
