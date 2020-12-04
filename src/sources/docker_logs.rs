@@ -1366,15 +1366,15 @@ mod integration_tests {
 
         let will_be_read = "12";
         let all_containers = "vector_test";
+        let excluded0 = "vector_test_exclude_0";
         let included0 = "vector_test_include_0";
         let included1 = "vector_test_include_1";
-        let excluded0 = "vector_test_exclude_0";
 
         let docker = docker().unwrap();
 
         let out = source_with_config(DockerLogsConfig {
-            include_containers: Some(&[all_containers].iter().map(|&s| s.to_owned()).collect()),
-            exclude_containers: Some(&[excluded0].iter().map(|&s| s.to_owned()).collect()),
+            include_containers: Some(vec![all_containers.to_owned()]),
+            exclude_containers: Some(vec![excluded0.to_owned()]),
             ..DockerLogsConfig::default()
         });
 
