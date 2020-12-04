@@ -9,6 +9,8 @@ use std::fmt;
 use std::str::FromStr;
 
 /// A wrapper for `http::Uri` that implements the serde traits.
+/// Authorization credentials, if exist, will be removed from the URI and stored in `auth`.
+/// For example: "http://user:password@example.com".
 #[derive(Default, Debug, Clone)]
 pub struct UriSerde {
     pub uri: Uri,
@@ -16,6 +18,8 @@ pub struct UriSerde {
 }
 
 impl UriSerde {
+    /// Used to combine existing authorization credentials with credentials in this URI.
+    /// If both is `Some`, return an error. Otherwise, choose one of them.
     pub fn merge_auth_config(&self, auth: &mut Option<Auth>) -> crate::Result<()> {
         if auth.is_some() && self.auth.is_some() {
             Err("Two authorization credentials was provided.".into())
