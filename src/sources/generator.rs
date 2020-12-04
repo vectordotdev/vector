@@ -24,8 +24,8 @@ pub struct GeneratorConfig {
     format: OutputFormat,
 }
 
-#[derive(Debug, Snafu)]
-pub enum GeneratorConfigErrors {
+#[derive(Debug, PartialEq, Snafu)]
+pub enum GeneratorConfigError {
     #[snafu(display("Expected a non-empty items list for round_robin but got an empty list"))]
     RoundRobinItemsEmpty,
 }
@@ -47,9 +47,71 @@ pub enum OutputFormat {
     Syslog,
 }
 
-struct Generator;
+impl OutputFormat {
+    fn generate_events(&self, n: usize) -> Vec<Event> {
+        emit!(GeneratorEventProcessed);
 
-impl Generator {
+        let events_from_log_line = |log: String| -> Vec<Event> { vec![Event::from(log)] };
+
+        match self {
+            Self::RoundRobin {
+                sequence,
+                ref items,
+            } => Self::round_robin_generate(sequence, items, n),
+            Self::ApacheCommon => events_from_log_line(apache_common_log_line()),
+            Self::ApacheError => events_from_log_line(apache_error_log_line()),
+            Self::Syslog => events_from_log_line(syslog_log_line()),
+        }
+    }
+
+    fn round_robin_generate(sequence: &bool, items: &[String], n: usize) -> Vec<Event> {
+        let line: String = items.choose(&mut rand::thread_rng()).unwrap().into();
+
+        let event = if *sequence {
+            Event::from(&format!("{} {}", n, line)[..])
+        } else {
+            Event::from(&line[..])
+        };
+
+        vec![event]
+    }
+
+    // Ensures that the items list is non-empty if RoundRobin is chosen
+    pub(self) fn validate(&self) -> Result<(), GeneratorConfigError> {
+        match self {
+            Self::RoundRobin { items, .. } => {
+                if items.is_empty() {
+                    return Err(GeneratorConfigError::RoundRobinItemsEmpty);
+                } else {
+                    Ok(())
+                }
+            }
+            _ => Ok(()),
+        }
+    }
+}
+
+impl GeneratorConfig {
+    pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
+        Box::pin(self.inner(shutdown, out))
+    }
+
+    #[allow(dead_code)] // to make check-component-features pass
+    pub fn repeat(items: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
+        Self {
+            count,
+            batch_interval,
+            format: OutputFormat::RoundRobin {
+                items,
+                sequence: false,
+            },
+        }
+    }
+
+    async fn inner(self, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
+        Self::generate(self, shutdown, out).await
+    }
+
     async fn generate(
         config: GeneratorConfig,
         mut shutdown: ShutdownSignal,
@@ -83,66 +145,6 @@ impl Generator {
     }
 }
 
-impl OutputFormat {
-    fn generate_events(&self, n: usize) -> Vec<Event> {
-        emit!(GeneratorEventProcessed);
-
-        let events_from_log_line = |log: String| -> Vec<Event> { vec![Event::from(log)] };
-
-        match self {
-            Self::RoundRobin {
-                sequence,
-                ref items,
-            } => Self::round_robin_generate(sequence, items, n),
-            Self::ApacheCommon => events_from_log_line(apache_common_log_line()),
-            Self::ApacheError => events_from_log_line(apache_error_log_line()),
-            Self::Syslog => events_from_log_line(syslog_log_line()),
-        }
-    }
-
-    fn round_robin_generate(sequence: &bool, items: &[String], n: usize) -> Vec<Event> {
-        let line: String = items.choose(&mut rand::thread_rng()).unwrap().into();
-
-        let event = if *sequence {
-            Event::from(&format!("{} {}", n, line)[..])
-        } else {
-            Event::from(&line[..])
-        };
-
-        vec![event]
-    }
-
-    // Ensures that the items list is non-empty if RoundRobin is chosen
-    fn items_empty(&self) -> bool {
-        match self {
-            Self::RoundRobin { items, .. } => items.is_empty(),
-            _ => false,
-        }
-    }
-}
-
-impl GeneratorConfig {
-    pub(self) fn generator(self, shutdown: ShutdownSignal, out: Pipeline) -> super::Source {
-        Box::pin(self.inner(shutdown, out))
-    }
-
-    #[allow(dead_code)] // to make check-component-features pass
-    pub fn repeat(items: Vec<String>, count: usize, batch_interval: Option<f64>) -> Self {
-        Self {
-            count,
-            batch_interval,
-            format: OutputFormat::RoundRobin {
-                items,
-                sequence: false,
-            },
-        }
-    }
-
-    async fn inner(self, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
-        Generator::generate(self, shutdown, out).await
-    }
-}
-
 inventory::submit! {
     SourceDescription::new::<GeneratorConfig>("generator")
 }
@@ -159,9 +161,9 @@ impl SourceConfig for GeneratorConfig {
         shutdown: ShutdownSignal,
         out: Pipeline,
     ) -> crate::Result<super::Source> {
-        if self.format.items_empty() {
-            return Err(Box::new(GeneratorConfigErrors::RoundRobinItemsEmpty));
-        }
+        if let Err(e) = self.format.validate() {
+            return Err(Box::new(e));
+        };
 
         Ok(self.clone().generator(shutdown, out))
     }
@@ -194,8 +196,22 @@ mod tests {
         rx
     }
 
-    async fn done_generating(mut rx: mpsc::Receiver<Event>) {
-        assert_eq!(rx.poll().unwrap(), Ready(None));
+    #[test]
+    fn config_round_robin_items_not_empty() {
+        let empty_items: Vec<String> = Vec::new();
+
+        let errant_config = GeneratorConfig {
+            format: OutputFormat::RoundRobin {
+                sequence: false,
+                items: empty_items,
+            },
+            ..GeneratorConfig::default()
+        };
+
+        assert_eq!(
+            errant_config.format.validate(),
+            Err(GeneratorConfigError::RoundRobinItemsEmpty)
+        );
     }
 
     #[tokio::test]
@@ -221,7 +237,7 @@ mod tests {
             }
         }
 
-        done_generating(rx).await;
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
     #[tokio::test]
@@ -236,7 +252,7 @@ mod tests {
         for _ in 0..10 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        done_generating(rx).await;
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
     #[tokio::test]
@@ -262,7 +278,7 @@ mod tests {
                 NotReady => panic!("Generator was not ready"),
             }
         }
-        done_generating(rx).await;
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 
     #[tokio::test]
@@ -279,9 +295,51 @@ mod tests {
         for _ in 0..6 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
-        done_generating(rx).await;
+        assert_eq!(rx.poll().unwrap(), Ready(None));
 
         let duration = start.elapsed();
         assert!(duration >= Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn apache_common_generates_output() {
+        let mut rx = runit(
+            r#"format = "apache_common"
+            count = 10"#,
+        )
+        .await;
+
+        for _ in 0..10 {
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+        }
+        assert_eq!(rx.poll().unwrap(), Ready(None));
+    }
+
+    #[tokio::test]
+    async fn apache_error_generates_output() {
+        let mut rx = runit(
+            r#"format = "apache_error"
+            count = 10"#,
+        )
+        .await;
+
+        for _ in 0..10 {
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+        }
+        assert_eq!(rx.poll().unwrap(), Ready(None));
+    }
+
+    #[tokio::test]
+    async fn syslog_generates_output() {
+        let mut rx = runit(
+            r#"format = "syslog"
+            count = 10"#,
+        )
+        .await;
+
+        for _ in 0..10 {
+            assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
+        }
+        assert_eq!(rx.poll().unwrap(), Ready(None));
     }
 }
