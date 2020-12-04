@@ -1351,7 +1351,7 @@ mod integration_tests {
     async fn include_containers() {
         trace_init();
 
-        let message = "12";
+        let message = "11";
         let name0 = "vector_test_include_container_0";
         let name1 = "vector_test_include_container_1";
 
@@ -1359,7 +1359,7 @@ mod integration_tests {
 
         let docker = docker().unwrap();
 
-        let id0 = container_log_n(1, name0, None, "13", &docker).await;
+        let id0 = container_log_n(1, name0, None, "11", &docker).await;
         let id1 = container_log_n(1, name1, None, message, &docker).await;
         let events = collect_n(out, 1).await.unwrap();
         container_remove(&id0, &docker).await;
@@ -1368,6 +1368,47 @@ mod integration_tests {
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
             message.into()
+        );
+    }
+
+    #[tokio::test]
+    async fn exclude_containers() {
+        trace_init();
+
+        let will_be_read = "12";
+        let included0 = "vector_test_include_0";
+        let included1 = "vector_test_include_1";
+        let excluded0 = "vector_test_exclude_0";
+
+        let docker = docker().unwrap();
+
+        let out = source_with_config(DockerLogsConfig {
+            include_containers: Some(
+                &[included0, included1]
+                    .iter()
+                    .map(|&s| s.to_owned())
+                    .collect(),
+            ),
+            exclude_Containers: Some(&[excluded0].iter().map(|&s| s.to_owned()).collect()),
+            ..DockerLogsConfig::default()
+        });
+
+        let id0 = container_log_n(1, excluded0, None, "will not be read", &docker).await;
+        let id1 = container_log_n(1, included0, None, will_be_read, &docker).await;
+        let id2 = container_log_n(1, included1, None, will_be_read, &docker).await;
+        let events = collect_n(out, 2).await.unwrap();
+        container_remove(&id0, &docker).await;
+        container_remove(&id1, &docker).await;
+        container_remove(&id2, &docker).await;
+
+        assert_eq!(
+            events[0].as_log()[log_schema().message_key()],
+            will_be_read.into()
+        );
+
+        assert_eq!(
+            events[1].as_log()[log_schema().message_key()],
+            will_be_read.into()
         );
     }
 
