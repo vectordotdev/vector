@@ -41,6 +41,7 @@ enum BuildError {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct PrometheusExporterConfig {
+    #[serde(alias = "namespace")]
     pub default_namespace: Option<String>,
     #[serde(default = "default_address")]
     pub address: SocketAddr,
