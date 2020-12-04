@@ -125,8 +125,7 @@ components: sources: docker_logs: {
 				containers from which you don't want to collect logs. Prefix
 				matches are supported, meaning you can supply just the first
 				few characters of the container ID or name. If not provided,
-				all containers will be included. Alternatively, you can specify
-				only the containers you want to include using
+				all containers will be included. This can be specified alongside
 				[`include_containers`](#include_containers).
 				"""
 			required: false
@@ -142,8 +141,7 @@ components: sources: docker_logs: {
 				containers from which you want to collect logs. Prefix
 				matches are supported, meaning you can supply just the first
 				few characters of the container ID or name. If not provided,
-				all containers will be included. Alternatively, you can specify
-				only the containers you want to exclude using
+				all containers will be included. This can be specified alongside
 				[`exclude_containers`](#exclude_containers).
 				"""
 			required: false
