@@ -87,7 +87,7 @@ impl DockerLogsConfig {
         self.include_containers
             .as_ref()
             .map(|include_list| Self::name_or_id_matches(id, &containers, include_list))
-            .unwrap_or(false)
+            .unwrap_or(true)
             && !(self
                 .exclude_containers
                 .as_ref()
@@ -1041,7 +1041,7 @@ mod tests {
 mod integration_tests {
     use super::*;
     use crate::{
-        test_util::{collect_n, trace_init},
+        test_util::{collect_n, collect_ready, trace_init},
         Pipeline,
     };
     use bollard::{
@@ -1381,11 +1381,12 @@ mod integration_tests {
         let id0 = container_log_n(1, excluded0, None, "will not be read", &docker).await;
         let id1 = container_log_n(1, included0, None, will_be_read, &docker).await;
         let id2 = container_log_n(1, included1, None, will_be_read, &docker).await;
-        let events = collect_n(out, 2).await.unwrap();
+        let events = collect_ready(out).await.unwrap();
         container_remove(&id0, &docker).await;
         container_remove(&id1, &docker).await;
         container_remove(&id2, &docker).await;
 
+        assert_eq!(events.len(), 2);
         assert_eq!(
             events[0].as_log()[log_schema().message_key()],
             will_be_read.into()
