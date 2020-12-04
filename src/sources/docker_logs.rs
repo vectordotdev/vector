@@ -84,15 +84,13 @@ impl DockerLogsConfig {
     ) -> bool {
         let containers: Vec<String> = names.into_iter().map(Into::into).collect();
 
-        match (&self.include_containers, &self.exclude_containers) {
-            (Some(include_list), Some(exclude_list)) => {
-                Self::name_or_id_matches(id, &containers, include_list)
-                    && !(Self::name_or_id_matches(id, &containers, exclude_list))
-            }
-            (Some(include_list), None) => Self::name_or_id_matches(id, &containers, include_list),
-            (None, Some(exclude_list)) => !Self::name_or_id_matches(id, &containers, exclude_list),
-            (None, None) => true,
-        }
+        self.include_containers
+            .as_ref()
+            .map(|include_list| Self::name_or_id_matches(id, &containers, include_list))
+            && !self
+                .exclude_containers
+                .as_ref()
+                .map(|exclude_list| Self::name_or_id_matches(id, &containers, exclude_list))
     }
 
     fn name_or_id_matches(id: &str, names: &Vec<String>, items: &Vec<String>) -> bool {
