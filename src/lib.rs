@@ -61,6 +61,7 @@ pub mod sink;
 pub mod sinks;
 pub mod sources;
 pub mod stream;
+pub mod tcp;
 pub mod template;
 pub mod test_util;
 pub mod tls;
