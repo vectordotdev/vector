@@ -123,11 +123,11 @@ impl TypeDef {
     /// If a type definition includes an `inner_type_def`, this method will
     /// recursively resolve those until the final scalar kinds are known.
     pub fn scalar_kind(&self) -> value::Kind {
-        let mut kind = self.kind;
+        let mut kind = self.kind.scalar();
         let mut type_def = self.inner_type_def.clone();
 
         while let Some(td) = type_def {
-            kind |= td.kind;
+            kind |= td.kind.scalar();
             type_def = td.inner_type_def;
         }
 
@@ -215,7 +215,7 @@ mod tests {
         use value::Kind;
 
         let type_def = TypeDef {
-            kind: Kind::Boolean,
+            kind: Kind::Array,
             inner_type_def: Some(
                 TypeDef {
                     kind: Kind::Boolean | Kind::Float,

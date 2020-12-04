@@ -146,9 +146,9 @@ impl<'a> Parser<'a> {
         }
 
         if let Some(expression) = expressions.last() {
-            let kind = expression.type_def(&self.compiler_state).scalar_kind();
+            let type_def = expression.type_def(&self.compiler_state);
 
-            if !kind.is_all() && kind.contains_regex() {
+            if !type_def.kind.is_all() && type_def.scalar_kind().contains_regex() {
                 return Err(Error::RegexResult.into());
             }
         }
@@ -666,8 +666,6 @@ mod tests {
 
             let mut parser = Parser::new(&[]);
             let pairs = parser.program_from_str(source).map_err(RemapError::from);
-
-            dbg!(&pairs);
 
             match pairs {
                 Ok(got) => {
