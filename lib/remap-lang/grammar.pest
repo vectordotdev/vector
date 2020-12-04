@@ -17,7 +17,7 @@ if_statement = { "if" ~ boolean_expr ~ block ~ ("else if" ~ boolean_expr ~ block
 // Primary ---------------------------------------------------------------------
 
 primary  =  { value | variable | path | group }
-value    =  { string | float | integer | boolean | null | array }
+value    =  { string | float | integer | boolean | null | array | regex }
 variable = ${ "$" ~ ident ~ path_index* ~ ("." ~ path_segments)?  }
 group    =  { "(" ~ expression ~ ")" }
 
@@ -25,11 +25,7 @@ group    =  { "(" ~ expression ~ ")" }
 
 call           = ${ ident ~ "(" ~ arguments? ~ ")"  }
 arguments      = !{ argument ~ ("," ~ argument)* }
-argument       =  { (ident ~ "=")? ~ (argument_array | argument_value) }
-argument_value = _{ (expression | regex) }
-
-// Similar to `array`, but also accepts regex patterns.
-argument_array =  { "[" ~ NEWLINE* ~ (argument_value ~ "," ~ NEWLINE*)* ~ argument_value? ~ NEWLINE* ~ "]" }
+argument       =  { (ident ~ "=")? ~ expression }
 
 // Operations ------------------------------------------------------------------
 

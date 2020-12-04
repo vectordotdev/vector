@@ -1205,3 +1205,23 @@
     "c.equals" = "hello ****, hello ****"
     "d.equals" = "hello world, hello universe"
     "e.equals" = "**** w****rld, **** ****n****v****rs****"
+
+[transforms.remap_function_replace]
+  inputs = []
+  type = "remap"
+  source = """
+    .a = replace("foo", pattern = "o", with = "bar", 1)
+    .b = replace("foo", pattern = /o/, with = "bar")
+  """
+[[tests]]
+  name = "remap_function_replace"
+  [tests.input]
+    insert_at = "remap_function_replace"
+    type = "log"
+    [tests.input.log_fields]
+      input = "hello world, hello universe"
+  [[tests.outputs]]
+    extract_from = "remap_function_replace"
+    [[tests.outputs.conditions]]
+    "a.equals" = "fbaro"
+    "b.equals" = "fbarbar"

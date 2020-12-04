@@ -35,7 +35,7 @@ impl Function for Redact {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
+        let value = arguments.required("value")?.boxed();
 
         let filters = arguments
             .optional_enum_list("filters", &Filter::all_str())?
@@ -49,7 +49,7 @@ impl Function for Redact {
             .map(|s| Redactor::from_str(&s).expect("validated enum"))
             .unwrap_or_default();
 
-        let patterns = arguments.optional_array("patterns")?;
+        let patterns = arguments.optional_array("patterns")?.map(Into::into);
 
         Ok(Box::new(RedactFn {
             value,
@@ -67,7 +67,7 @@ struct RedactFn {
     value: Box<dyn Expression>,
     filters: Vec<Filter>,
     redactor: Redactor,
-    patterns: Option<Vec<Argument>>,
+    patterns: Option<Vec<Expr>>,
 }
 
 impl Expression for RedactFn {
@@ -82,21 +82,24 @@ impl Expression for RedactFn {
                     .as_deref()
                     .unwrap_or_default()
                     .iter()
-                    .try_for_each::<_, Result<()>>(|pattern| match pattern {
-                        Argument::Regex(regex) => {
-                            input = regex
-                                .replace_all(&input, self.redactor.pattern())
-                                .into_owned();
-                            Ok(())
-                        }
-                        Argument::Expression(expr) => {
-                            let bytes = expr.execute(state, object)?.try_bytes()?;
+                    .try_for_each::<_, Result<()>>(|expr| match expr.execute(state, object)? {
+                        Value::Bytes(bytes) => {
                             let pattern = String::from_utf8_lossy(&bytes);
 
                             input = input.replace(pattern.as_ref(), self.redactor.pattern());
                             Ok(())
                         }
-                        _ => unimplemented!(),
+                        Value::Regex(regex) => {
+                            input = regex
+                                .replace_all(&input, self.redactor.pattern())
+                                .into_owned();
+                            Ok(())
+                        }
+                        v => Err(value::Error::Expected(
+                            value::Kind::Bytes | value::Kind::Regex,
+                            v.kind(),
+                        )
+                        .into()),
                     })?,
             }
         }
