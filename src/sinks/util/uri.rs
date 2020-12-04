@@ -46,7 +46,8 @@ impl fmt::Display for UriSerde {
         match (self.uri.authority(), &self.auth) {
             (Some(authority), Some(Auth::Basic { user, password })) => {
                 let authority = format!("{}:{}@{}", user, password, authority);
-                let authority = Authority::from_maybe_shared(authority).unwrap();
+                let authority =
+                    Authority::from_maybe_shared(authority).map_err(|_| std::fmt::Error)?;
                 let mut parts = self.uri.clone().into_parts();
                 parts.authority = Some(authority);
                 Uri::from_parts(parts).unwrap().fmt(f)
