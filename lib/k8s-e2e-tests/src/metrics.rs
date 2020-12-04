@@ -16,15 +16,15 @@ fn metrics_regex() -> regex::Regex {
     .expect("invalid regex")
 }
 
-/// This helper function extracts the sum of `events_processed`-ish metrics
+/// This helper function extracts the sum of `processed_events`-ish metrics
 /// across all labels.
-pub fn extract_events_poccessed_sum(metrics: &str) -> Result<u64, Box<dyn std::error::Error>> {
+pub fn extract_processed_events_sum(metrics: &str) -> Result<u64, Box<dyn std::error::Error>> {
     metrics_regex()
         .captures_iter(&metrics)
         .filter_map(|captures| {
             let metric_name = &captures["name"];
             let value = &captures["value"];
-            if !metric_name.contains("events_processed") {
+            if !metric_name.contains("processed_events") {
                 return None;
             }
             Some(value.to_owned())
@@ -46,10 +46,10 @@ pub fn extract_vector_started(metrics: &str) -> bool {
 }
 
 /// This helper function performs an HTTP request to the specified URL and
-/// extracts the sum of `events_processed`-ish metrics across all labels.
-pub async fn get_events_processed(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
+/// extracts the sum of `processed_events`-ish metrics across all labels.
+pub async fn get_processed_events(url: &str) -> Result<u64, Box<dyn std::error::Error>> {
     let metrics = load(url).await?;
-    extract_events_poccessed_sum(&metrics)
+    extract_processed_events_sum(&metrics)
 }
 
 /// This helper function performs an HTTP request to the specified URL and
@@ -93,25 +93,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extract_events_poccessed_sum() {
+    fn test_extract_processed_events_sum() {
         let cases = vec![
             (vec![r#""#], 0),
-            (vec![r#"events_processed 123"#], 123),
-            (vec![r#"events_processed{} 123"#], 123),
-            (vec![r#"events_processed{method="POST"} 456"#], 456),
-            (vec![r#"events_processed{a="b",c="d"} 456"#], 456),
+            (vec![r#"processed_events 123"#], 123),
+            (vec![r#"processed_events{} 123"#], 123),
+            (vec![r#"processed_events{method="POST"} 456"#], 456),
+            (vec![r#"processed_events{a="b",c="d"} 456"#], 456),
             (
                 vec![
-                    r#"events_processed 123"#,
-                    r#"events_processed{method="POST"} 456"#,
+                    r#"processed_events 123"#,
+                    r#"processed_events{method="POST"} 456"#,
                 ],
                 123 + 456,
             ),
             (vec![r#"other{} 789"#], 0),
             (
                 vec![
-                    r#"events_processed{} 123"#,
-                    r#"events_processed{method="POST"} 456"#,
+                    r#"processed_events{} 123"#,
+                    r#"processed_events{method="POST"} 456"#,
                     r#"other{} 789"#,
                 ],
                 123 + 456,
@@ -119,10 +119,10 @@ mod tests {
             // Prefixes and suffixes
             (
                 vec![
-                    r#"events_processed 1"#,
-                    r#"events_processed_total 2"#,
-                    r#"vector_events_processed 3"#,
-                    r#"vector_events_processed_total 4"#,
+                    r#"processed_events 1"#,
+                    r#"processed_events_total 2"#,
+                    r#"vector_processed_events 3"#,
+                    r#"vector_processed_events_total 4"#,
                 ],
                 1 + 2 + 3 + 4,
             ),
@@ -130,7 +130,7 @@ mod tests {
 
         for (input, expected_value) in cases {
             let input = input.join("\n");
-            let actual_value = extract_events_poccessed_sum(&input).unwrap();
+            let actual_value = extract_processed_events_sum(&input).unwrap();
             assert_eq!(expected_value, actual_value);
         }
     }
