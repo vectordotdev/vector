@@ -27,7 +27,7 @@ impl Function for Sha3 {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
+        let value = arguments.required("value")?.boxed();
         let variant = arguments.optional_enum("variant", &VARIANTS)?;
 
         Ok(Box::new(Sha3Fn { value, variant }))

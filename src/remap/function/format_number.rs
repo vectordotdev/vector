@@ -35,10 +35,10 @@ impl Function for FormatNumber {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let scale = arguments.optional_expr("scale")?;
-        let decimal_separator = arguments.optional_expr("decimal_separator")?;
-        let grouping_separator = arguments.optional_expr("grouping_separator")?;
+        let value = arguments.required("value")?.boxed();
+        let scale = arguments.optional("scale").map(Expr::boxed);
+        let decimal_separator = arguments.optional("decimal_separator").map(Expr::boxed);
+        let grouping_separator = arguments.optional("grouping_separator").map(Expr::boxed);
 
         Ok(Box::new(FormatNumberFn {
             value,

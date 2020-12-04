@@ -20,12 +20,12 @@ macro_rules! test_type_def {
 #[macro_export]
 macro_rules! func_args {
     () => (
-        ::std::collections::HashMap::<&'static str, $crate::function::Argument>::default()
+        ::std::collections::HashMap::<&'static str, $crate::Expr>::default()
     );
     ($($k:tt: $v:expr),+ $(,)?) => {
         vec![$((stringify!($k), $v.into())),+]
             .into_iter()
-            .collect::<::std::collections::HashMap<&'static str, $crate::function::Argument>>()
+            .collect::<::std::collections::HashMap<&'static str, $crate::Expr>>()
     };
 }
 
@@ -83,7 +83,7 @@ macro_rules! map {
 #[macro_export]
 macro_rules! __prep_bench_or_test {
     ($func:path, $args:expr, $want:expr) => {{
-        let args: ::std::collections::HashMap<&str, $crate::function::Argument> = $args;
+        let args: ::std::collections::HashMap<&str, $crate::Expr> = $args;
 
         let mut arguments = $crate::function::ArgumentList::default();
         for (k, v) in args {

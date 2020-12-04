@@ -19,7 +19,7 @@ impl Function for Ipv6ToIpV4 {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
+        let value = arguments.required("value")?.boxed();
 
         Ok(Box::new(Ipv6ToIpV4Fn { value }))
     }
