@@ -22,9 +22,12 @@ pub use tracing_tower::{InstrumentableService, InstrumentedService};
 
 pub fn init(color: bool, json: bool, levels: &str) {
     let (sender, _) = broadcast::channel(99);
-    SENDER
-        .set(sender.clone())
-        .expect("Tracing already initialized");
+    // Ignore errors when setting, since tests can initialize this
+    // multiple times.
+    let _ = SENDER.set(sender);
+    // However, we need to grab a handle on the actual channel that was
+    // previously set up.
+    let sender = SENDER.get().unwrap().clone();
 
     let dispatch = if json {
         let formatter = FmtSubscriber::builder()

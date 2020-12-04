@@ -75,6 +75,8 @@ mod tests {
 
     #[tokio::test]
     async fn receives_logs() {
+        const ERROR_TEXT: &str = "This is not an error.";
+
         let start = chrono::Utc::now();
         crate::trace::init(false, false, "debug");
         let (tx, rx) = Pipeline::new_test();
@@ -91,7 +93,7 @@ mod tests {
         tokio::spawn(source);
         delay_for(Duration::from_millis(1)).await;
 
-        info!("Message goes here");
+        error!(message = ERROR_TEXT);
 
         delay_for(Duration::from_millis(1)).await;
         let logs = collect_ready(rx).await.expect("Collecting logs failed");
@@ -99,7 +101,7 @@ mod tests {
         assert_eq!(logs.len(), 1);
 
         let log = logs[0].as_log();
-        assert_eq!(log["message"], "Message goes here".into());
+        assert_eq!(log["message"], ERROR_TEXT.into());
         assert!(
             log["timestamp"]
                 .as_timestamp()
@@ -107,6 +109,6 @@ mod tests {
                 > &start
         );
         assert_eq!(log["metadata.kind"], "event".into());
-        assert_eq!(log["metadata.level"], "INFO".into());
+        assert_eq!(log["metadata.level"], "ERROR".into());
     }
 }
