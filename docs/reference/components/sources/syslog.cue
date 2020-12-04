@@ -32,6 +32,8 @@ components: sources: syslog: {
 				}
 			}
 
+			keepalive: enabled: true
+
 			tls: sources.socket.features.receive.tls
 		}
 	}
