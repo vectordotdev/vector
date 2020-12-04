@@ -234,6 +234,7 @@ tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
+rusty-fork = "0.3.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
