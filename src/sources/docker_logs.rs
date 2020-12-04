@@ -51,7 +51,7 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
-    exclude_containers: Option<Vec<String>>,
+    exclude_containers: Option<Vec<String>>, // Starts with actually, not include
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
@@ -82,34 +82,24 @@ impl DockerLogsConfig {
         id: &str,
         names: impl IntoIterator<Item = &'a str>,
     ) -> bool {
-        let containers: Vec<String> = names.into_iter().map(|i| i.into()).collect();
+        let containers: Vec<String> = names.into_iter().map(Into::into).collect();
 
-        // Containers are included by default
-        let mut included: bool = true;
-
-        // Container remains included if include_containers is specified
-        // and container name or ID matches the inclusion list
-        if let Some(include_list) = &self.include_containers {
-            included = Self::name_or_id_matches(id, &containers, include_list);
+        match (&self.include_containers, &self.exclude_containers) {
+            (Some(include_list), Some(exclude_list)) => {
+                Self::name_or_id_matches(id, &containers, include_list)
+                    && !(Self::name_or_id_matches(id, &containers, exclude_list))
+            }
+            (Some(include_list), None) => Self::name_or_id_matches(id, &containers, include_list),
+            (None, Some(exclude_list)) => !Self::name_or_id_matches(id, &containers, exclude_list),
+            (None, None) => true,
         }
-
-        // Container gets excluded if exclude_containers is specified
-        // and container name or ID matches the exclusion list
-        if let Some(exclude_list) = &self.exclude_containers {
-            included = !(Self::name_or_id_matches(id, &containers, exclude_list));
-        }
-
-        included
     }
 
     fn name_or_id_matches(id: &str, names: &Vec<String>, items: &Vec<String>) -> bool {
-        let id_matches = items.iter().any(|flag| id.starts_with(flag));
-
-        let name_matches = names
-            .into_iter()
-            .any(|name| items.iter().any(|item| name.starts_with(item)));
-
-        id_matches || name_matches
+        items.iter().any(|flag| id.starts_with(flag))
+            || names
+                .into_iter()
+                .any(|name| items.iter().any(|item| name.starts_with(item)))
     }
 
     fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
@@ -318,18 +308,17 @@ impl DockerLogsSource {
         // exact, but probable.
         // This is to be used only if source is in state of catching everything.
         // Or in other words, if includes are used then this is not necessary.
-
         let include_containers_specified = config
             .include_containers
-            .clone()
-            .unwrap_or_default()
-            .is_empty();
+            .as_ref()
+            .map(Vec::is_empty)
+            .unwrap_or(false);
 
         let exclude_containers_specified = config
             .exclude_containers
-            .clone()
-            .unwrap_or_default()
-            .is_empty();
+            .as_ref()
+            .map(Vec::is_empty)
+            .unwrap_or(false);
 
         let exclude_self = include_containers_specified
             && !exclude_containers_specified
@@ -1376,6 +1365,7 @@ mod integration_tests {
         trace_init();
 
         let will_be_read = "12";
+        let all_containers = "vector_test";
         let included0 = "vector_test_include_0";
         let included1 = "vector_test_include_1";
         let excluded0 = "vector_test_exclude_0";
@@ -1383,12 +1373,7 @@ mod integration_tests {
         let docker = docker().unwrap();
 
         let out = source_with_config(DockerLogsConfig {
-            include_containers: Some(
-                &[included0, included1]
-                    .iter()
-                    .map(|&s| s.to_owned())
-                    .collect(),
-            ),
+            include_containers: Some(&[all_containers].iter().map(|&s| s.to_owned()).collect()),
             exclude_containers: Some(&[excluded0].iter().map(|&s| s.to_owned()).collect()),
             ..DockerLogsConfig::default()
         });
