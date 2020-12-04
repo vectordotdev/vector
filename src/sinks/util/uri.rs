@@ -124,3 +124,52 @@ fn get_basic_auth(authority: &Authority) -> (Authority, Option<Auth>) {
         (authority.clone(), None)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_parse(input: &str, expected_uri: &str, expected_auth: Option<(&str, &str)>) {
+        let UriSerde { uri, auth } = input.parse().unwrap();
+        assert_eq!(
+            uri,
+            Uri::from_maybe_shared(expected_uri.to_owned()).unwrap()
+        );
+        assert_eq!(
+            auth,
+            expected_auth.map(|(user, password)| {
+                Auth::Basic {
+                    user: user.to_owned(),
+                    password: password.to_owned(),
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn parse_endpoint() {
+        test_parse(
+            "http://user:pass@example.com/test",
+            "http://example.com/test",
+            Some(("user", "pass")),
+        );
+
+        test_parse("localhost:8080", "localhost:8080", None);
+
+        test_parse("/api/test", "/api/test", None);
+
+        test_parse(
+            "http://user:pass;@example.com",
+            "http://example.com",
+            Some(("user", "pass;")),
+        );
+
+        test_parse(
+            "user:pass@example.com",
+            "example.com",
+            Some(("user", "pass")),
+        );
+
+        test_parse("user@example.com", "example.com", Some(("user", "")));
+    }
+}
