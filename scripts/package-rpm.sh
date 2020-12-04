@@ -76,12 +76,10 @@ rpmbuild \
 # Set the type of RPM - gnu or musl
 #
 
-TYPE="${TYPE:-"$(echo "$TARGET" | cut -d'-' -f4)"}"
-
-if [ "${TYPE}" = "gnu" ]; then
+if [ "${TARGET}" = "x86_64-unknown-linux-musl" ]; then
+  TYPE="-musl"
+else
   TYPE=""
-elif [ "${TYPE}" = "musl" ]; then
-  TYPE=${TYPE/#/-}
 fi
 
 #
