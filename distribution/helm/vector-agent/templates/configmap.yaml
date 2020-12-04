@@ -45,6 +45,8 @@ data:
       {{- end }}
     {{- end }}
 
+    {{- include "libvector.metricsConfigPartial" . | nindent 4  }}
+
     {{- range $sourceId, $source := .Values.sources }}
     [sources.{{ $sourceId }}]
       type = "{{ $source.type }}"

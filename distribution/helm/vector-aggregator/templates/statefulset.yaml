@@ -17,6 +17,7 @@ spec:
         {{- if not .Values.externalConfigMap }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- end }}
+        {{- include "libvector.metricsPrometheusPodAnnotations" . | nindent 8 }}
         {{- with .Values.podAnnotations }}
           {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -48,6 +49,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           ports:
+            {{- include "libvector.metricsContainerPorts" . | nindent 12  }}
             {{- with .Values.extraContainersPorts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
