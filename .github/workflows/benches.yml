@@ -37,6 +37,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
       - name: Download baseline benchmarks
         uses: dawidd6/action-download-artifact@f2f4c0c7333a76ab3aff16e7b2cf4ed7f5a74556
         continue-on-error: true
@@ -55,7 +56,10 @@ jobs:
       - run: bash scripts/environment/prepare.sh
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make slim-builds
-      - run: make bench | tee target/criterion/out
+      - name: Run benchmarks
+        run: |
+          mkdir -p target/criterion
+          make bench | tee target/criterion/out
       - run: zip --recurse-paths target/criterion.zip target/criterion
       - uses: actions/upload-artifact@v2
         with:
