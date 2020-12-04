@@ -3,7 +3,7 @@ use crate::{
     event::Event,
     internal_events::GeneratorEventProcessed,
     shutdown::ShutdownSignal,
-    sources::util::fake::{apache_common_log_line, apache_error_log_line, syslog_log_line},
+    sources::util::fake::{apache_common_log_line, apache_error_log_line, syslog_5424_log_line},
     Pipeline,
 };
 use futures::{compat::Future01CompatExt, stream::StreamExt};
@@ -60,7 +60,7 @@ impl OutputFormat {
             } => Self::round_robin_generate(sequence, items, n),
             Self::ApacheCommon => events_from_log_line(apache_common_log_line()),
             Self::ApacheError => events_from_log_line(apache_error_log_line()),
-            Self::Syslog => events_from_log_line(syslog_log_line()),
+            Self::Syslog => events_from_log_line(syslog_5424_log_line()),
         }
     }
 

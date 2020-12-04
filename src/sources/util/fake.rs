@@ -47,7 +47,7 @@ pub fn apache_error_log_line() -> String {
     )
 }
 
-pub fn syslog_log_line() -> String {
+pub fn syslog_5424_log_line() -> String {
     // Example log line:
     // <65>2 2020-11-05T18:11:43.975Z chiefubiquitous.io totam 6899 ID44 - Something bad happened
     format!(
