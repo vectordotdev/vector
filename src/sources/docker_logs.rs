@@ -102,7 +102,7 @@ impl DockerLogsConfig {
         included
     }
 
-    fn name_or_id_matches<'a>(id: &str, names: &Vec<String>, items: &Vec<String>) -> bool {
+    fn name_or_id_matches(id: &str, names: &Vec<String>, items: &Vec<String>) -> bool {
         let id_matches = items.iter().any(|flag| id.starts_with(flag));
 
         let name_matches = names
