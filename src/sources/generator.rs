@@ -108,20 +108,12 @@ impl GeneratorConfig {
         }
     }
 
-    async fn inner(self, shutdown: ShutdownSignal, out: Pipeline) -> Result<(), ()> {
-        Self::generate(self, shutdown, out).await
-    }
-
-    async fn generate(
-        config: GeneratorConfig,
-        mut shutdown: ShutdownSignal,
-        mut out: Pipeline,
-    ) -> Result<(), ()> {
-        let mut batch_interval = config
+    async fn inner(self, mut shutdown: ShutdownSignal, mut out: Pipeline) -> Result<(), ()> {
+        let mut batch_interval = self
             .batch_interval
             .map(|i| interval(Duration::from_secs_f64(i)));
 
-        for n in 0..config.count {
+        for n in 0..self.count {
             if matches!(futures::poll!(&mut shutdown), Poll::Ready(_)) {
                 break;
             }
@@ -130,7 +122,7 @@ impl GeneratorConfig {
                 batch_interval.next().await;
             }
 
-            let events = config.format.generate_events(n);
+            let events = self.format.generate_events(n);
 
             let (sink, _) = out
                 .clone()
