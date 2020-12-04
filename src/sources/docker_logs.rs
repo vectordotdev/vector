@@ -87,16 +87,18 @@ impl DockerLogsConfig {
         self.include_containers
             .as_ref()
             .map(|include_list| Self::name_or_id_matches(id, &containers, include_list))
-            && !self
+            .unwrap_or(false)
+            && !(self
                 .exclude_containers
                 .as_ref()
                 .map(|exclude_list| Self::name_or_id_matches(id, &containers, exclude_list))
+                .unwrap_or(false))
     }
 
-    fn name_or_id_matches(id: &str, names: &Vec<String>, items: &Vec<String>) -> bool {
+    fn name_or_id_matches(id: &str, names: &[String], items: &[String]) -> bool {
         items.iter().any(|flag| id.starts_with(flag))
             || names
-                .into_iter()
+                .iter()
                 .any(|name| items.iter().any(|item| name.starts_with(item)))
     }
 
