@@ -14,9 +14,16 @@ serde_json = "1"
 tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
 
 [features]
-all = ["agent"]
-agent = []
+e2e-tests = []
 
 [[test]]
 name = "vector-agent"
-required-features = ["agent"]
+required-features = ["e2e-tests"]
+
+[[test]]
+name = "vector-aggregator"
+required-features = ["e2e-tests"]
+
+[[test]]
+name = "vector"
+required-features = ["e2e-tests"]

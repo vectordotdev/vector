@@ -1,4 +1,4 @@
-# Default values for vector-agent.
+# Default values for vector-aggregator.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -11,7 +11,7 @@ image:
   version: ""
   base: "debian"
 
-# Image pull secrets to use at the `Pod`s managed by `DaemonSet`.
+# Image pull secrets to use at the `Pod`s managed by `StatefulSet`.
 imagePullSecrets: []
 
 # Override the chart name used in templates.
@@ -20,7 +20,9 @@ nameOverride: ""
 # templates.
 fullnameOverride: ""
 
-updateStrategy: RollingUpdate
+podManagementPolicy: Parallel
+
+replicas: 1
 
 serviceAccount:
   # Specifies whether a service account should be created.
@@ -32,18 +34,18 @@ serviceAccount:
   # template.
   name: ""
 
-# Annotations to add to the `Pod`s managed by `DaemonSet`.
+# Annotations to add to the `Pod`s managed by `StatefulSet`.
 podAnnotations: {}
 
-# Labels to add to the `Pod`s managed by `DaemonSet`.
+# Labels to add to the `Pod`s managed by `StatefulSet`.
 podLabels: {}
 
-# PodSecurityContext to set at the `Pod`s managed by `DaemonSet`.
+# PodSecurityContext to set at the `Pod`s managed by `StatefulSet`.
 podSecurityContext: {}
   # fsGroup: 2000
 
 # Security context to set at the `vector` container at the `Pod`s managed by
-# `DaemonSet`.
+# `StatefulSet`.
 securityContext: {}
   # capabilities:
   #   drop:
@@ -54,6 +56,11 @@ securityContext: {}
 
 # Extra env vars to pass to the `vector` container.
 env: []
+  # - name: VAR
+  #    valueFrom:
+  #      secretKeyRef:
+  #        name: secret
+  #        key: password
 
 # Tolerations to set for the `Pod`s managed by `DaemonSet`.
 tolerations:
@@ -62,33 +69,83 @@ tolerations:
   - key: node-role.kubernetes.io/master
     effect: NoSchedule
 
-# Various tweakables for the `Pod`s managed by `DaemonSet`.
+# Various tweakables for the `Pod`s managed by `StatefulSet`.
 resources: {}
 nodeSelector: {}
 affinity: {}
 
 # Additional container ports to pass to the `vector` container of the `Pod`s
-# managed by `DaemonSet`.
+# managed by `StatefulSet`.
 extraContainersPorts: []
 
 # Additional sources to include at the `config-dir` projection of the `Pod`s
-# managed by `DaemonSet`.
+# managed by `StatefulSet`.
 extraConfigDirSources: []
 
-# Additional volumes to pass to the `Pod`s managed by `DaemonSet`.
+# Additional volumes to pass to the `Pod`s managed by `StatefulSet`.
 extraVolumes: []
 
 # Additional volume mounts to pass to the `vector` container of the `Pod`s
-# managed by `DaemonSet`.
+# managed by `StatefulSet`.
 extraVolumeMounts: []
+
+# Storage options.
+storage:
+  # The storage mode to use to store `vector` data.
+  # Possible values:
+  # - `hostPath`
+  # - `managedPersistentVolumeClaim`
+  # - `existingPersistentVolumeClaim`
+  # - `empty`
+  mode: empty
+
+  # Absolute path on the host to store `vector` data.
+  # If `mode` is set to anything other than `hostPath` has no effect.
+  hostPath: ""
+
+  # Create `PersistentVolumeClaim` via the `volumeClaimTemplates` of
+  # the `StatefulSet` to store `vector` data.
+  # If `mode` is set to anything other than `managedPersistentVolumeClaim` has
+  # no effect.
+  managedPersistentVolumeClaim:
+    # The size to allocate.
+    size: 10Gi
+    # If defined, then `storageClassName: <storageClass>`.
+    # If set to "-", then `storageClassName: ""`, which disables dynamic
+    # provisioning.
+    # If undefined or empty (default), then no `storageClassName` spec is set,
+    # so the default provisioner will be chosen (gp2 on AWS, standard on
+    # GKE, AWS & OpenStack).
+    storageClass: ""
+
+    # Additional labels to apply to the created `PersistentVolumeClaim`.
+    labels: {}
+    # Additional annotations to apply to the created `PersistentVolumeClaim`.
+    annotations: {}
+
+  # The name of the existing `PersistentVolumeClaim` to store `vector` data.
+  # Useful if you're running in a cluster that requires manually provisioning
+  # `PersistentVolume`s and binding them to the `PersistentVolumeClaim`s.
+  # If `mode` is set to anything other than `existingPersistentVolumeClaim` has
+  # no effect.
+  existingPersistentVolumeClaim: ""
 
 rbac:
   # Whether to create rbac resources or not. Disable for non-rbac clusters.
-  enabled: true
+  enabled: false
 
 psp:
   # Whether to create `PodSecurityPolicy` or not.
   enabled: false
+
+# Configuration for both regular and headless `Service`.
+service:
+  # Additional ports to expose.
+  ports: []
+    # - name: http
+    #   port: 1234
+    #   protocol: TCP
+    #   targetPort: 1234
 
 # Set this to non-empty value to use existing `ConfigMap` for `vector`, instead
 # of using a generated one.
@@ -106,36 +163,21 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
-# The "built-in" kubernetes logs source to collect logs from the `Pod`s running
-# on the `Node`.
+# The "built-in" vector source, for accepting logs from the vector agents.
 # Will be added by default, unless explicitly disabled.
-kubernetesLogsSource:
-  # Disable to omit the kubernetes logs source from being added.
+vectorSource:
+  # Disable to omit the vector source from being added.
   enabled: true
-  # The name to use for the "built-in" kubernetes logs source.
-  sourceId: kubernetes_logs
-  # Raw TOML config to embed at the kubernetes logs source.
+  # The name to use for the "built-in" vector source.
+  sourceId: vector
+  # The address to listen at.
+  listenAddress: "0.0.0.0"
+  # The port to listen at.
+  listenPort: "9000"
+  # Raw TOML config to embed at the vector source.
   rawConfig: null
 
-# The "built-in" vector sink, to send the logs to the vector aggregator.
-# Disabled by default when using `vector-agent` chart.
-# Enabled by default when using `vector` chart, and automatically configured.
-vectorSink:
-  # Disable to omit the vector sink from being added.
-  enabled: false
-  # The name to use for the "built-in" vector sink.
-  sinkId: vector_sink
-  # Inputs of the built-in vector sink.
-  inputs: null # ["my_input_1", "my_input_2"]
-  # The host of the Vector to send the data to.
-  host: null # "vector.internal"
-  # The port of the Vector to send the data to.
-  port: null # 9000
-  # Raw TOML config to embed at the vector sink.
-  rawConfig: null
-
-# Sources to add to the generated `vector` config (besides "built-in" kubernetes
-# logs source).
+# Sources to add to the generated `vector` config
 sources: {}
   # source_name:
   #   type: "source_type"
