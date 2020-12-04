@@ -41,6 +41,7 @@ where
     pub start_at_beginning: bool,
     pub ignore_before: Option<DateTime<Utc>>,
     pub max_line_bytes: usize,
+    pub line_delimiter: Bytes,
     pub data_dir: PathBuf,
     pub glob_minimum_cooldown: Duration,
     pub fingerprinter: Fingerprinter,
@@ -406,6 +407,7 @@ where
             file_position,
             self.ignore_before,
             self.max_line_bytes,
+            self.line_delimiter.clone(),
         ) {
             Ok(mut watcher) => {
                 if file_position == 0 {

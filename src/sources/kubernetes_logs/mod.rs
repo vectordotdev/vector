@@ -271,6 +271,8 @@ impl Source {
             // Max line length to expect during regular log reads, see the
             // explanation above.
             max_line_bytes,
+            // Line delimiter
+            line_delimiter: Bytes::from("\n"),
             // The directory where to keep the checkpoints.
             data_dir,
             // This value specifies not exactly the globbing, but interval

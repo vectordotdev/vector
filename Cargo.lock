@@ -1674,6 +1674,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a51b8cf747471cb9499b6d59e59b0444f4c90eba8968c4e44874e92b5b64ace2"
 dependencies = [
  "cfg-if 0.1.10",
+ "serde",
 ]
 
 [[package]]
@@ -1821,6 +1822,7 @@ dependencies = [
 name = "file-source"
 version = "0.1.0"
 dependencies = [
+ "bstr",
  "bytes 0.5.6",
  "chrono",
  "crc",
@@ -7151,6 +7153,7 @@ dependencies = [
  "derivative 2.1.1",
  "derive_is_enum_variant",
  "dyn-clone",
+ "encoding_rs",
  "evmap",
  "exitcode",
  "file-source",

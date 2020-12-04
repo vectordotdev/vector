@@ -195,6 +195,7 @@ snap = { version = "1.0.2", optional = true }
 dyn-clone = "1.0.3"
 indoc = "1.0.3"
 avro-rs = "0.12.0"
+encoding_rs = { version = "0.8", features = ["serde"] }
 
 # For WASM
 vector-wasm = { path = "lib/vector-wasm", optional = true }

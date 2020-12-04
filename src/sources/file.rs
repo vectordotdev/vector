@@ -1,6 +1,7 @@
-use super::util::MultilineConfig;
+use super::util::{EncodingConfig, MultilineConfig};
 use crate::{
     config::{log_schema, DataType, GlobalOptions, SourceConfig, SourceDescription},
+    encoding_transcode::{Decoder, Encoder},
     event::Event,
     internal_events::{FileEventReceived, FileOpen, FileSourceInternalEventsEmitter},
     line_agg::{self, LineAgg},
@@ -79,6 +80,8 @@ pub struct FileConfig {
     pub max_read_bytes: usize,
     pub oldest_first: bool,
     pub remove_after: Option<u64>,
+    pub line_delimiter: String,
+    pub encoding: Option<EncodingConfig>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
@@ -135,6 +138,8 @@ impl Default for FileConfig {
             max_read_bytes: 2048,
             oldest_first: false,
             remove_after: None,
+            line_delimiter: "\n".to_string(),
+            encoding: None,
         }
     }
 }
@@ -200,12 +205,23 @@ pub fn file_source(
     let paths_provider = Glob::new(&config.include, &config.exclude, MatchOptions::default())
         .expect("invalid glob patterns");
 
+    let encoding_charset = config.encoding.clone().and_then(|e| *(e.charset()));
+
+    // if file encoding is specified, need to convert the line delimiter (present as utf8)
+    // to the specified encoding, so that delimiter-based line splitting can work properly
+    let line_delimiter_as_bytes = if let Some(e) = encoding_charset {
+        Encoder::new(e).from_utf8(&config.line_delimiter)
+    } else {
+        Bytes::from(config.line_delimiter.clone())
+    };
+
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
         start_at_beginning: config.start_at_beginning,
         ignore_before,
         max_line_bytes: config.max_line_bytes,
+        line_delimiter: line_delimiter_as_bytes,
         data_dir,
         glob_minimum_cooldown,
         fingerprinter: Fingerprinter {
@@ -235,9 +251,21 @@ pub fn file_source(
     Box::pin(async move {
         info!(message = "Starting file server.", include = ?include, exclude = ?exclude);
 
+        let mut encoding_decoder = encoding_charset.map(|e| Decoder::new(e));
+
         // sizing here is just a guess
         let (tx, rx) = futures::channel::mpsc::channel::<Vec<(Bytes, String)>>(2);
-        let rx = rx.map(futures::stream::iter).flatten();
+        let rx = rx
+            .map(futures::stream::iter)
+            .flatten()
+            .map(move |(line, src)| {
+                // transcode each line from the file's encoding charset to utf8
+                if let Some(d) = encoding_decoder.as_mut() {
+                    (d.to_utf8(line), src)
+                } else {
+                    (line, src)
+                }
+            });
 
         let messages: Box<dyn Stream<Item = (Bytes, String)> + Send + std::marker::Unpin> =
             if let Some(ref multiline_config) = multiline_config {
