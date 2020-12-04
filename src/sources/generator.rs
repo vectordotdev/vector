@@ -216,13 +216,15 @@ mod tests {
         )
         .await;
 
-        for line in &["one", "two"] {
+        let lines = &["one", "two"];
+
+        for _ in 0..5 {
             let event = rx.poll().unwrap();
             match event {
                 Ready(Some(event)) => {
                     let log = event.as_log();
                     let message = log[&message_key].to_string_lossy();
-                    assert_eq!(message, *line);
+                    assert!(lines.contains(&&*message));
                 }
                 Ready(None) => panic!("Premature end of input"),
                 NotReady => panic!("Generator was not ready"),
@@ -241,7 +243,7 @@ mod tests {
         )
         .await;
 
-        for _ in 0..10 {
+        for _ in 0..5 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
         assert_eq!(rx.poll().unwrap(), Ready(None));
@@ -258,13 +260,13 @@ mod tests {
         )
         .await;
 
-        for line in &["1 one", "2 two", "3 one", "4 two"] {
+        for n in 0..2 {
             let event = rx.poll().unwrap();
             match event {
                 Ready(Some(event)) => {
                     let log = event.as_log();
                     let message = log[&message_key].to_string_lossy();
-                    assert_eq!(message, *line);
+                    assert!(message.starts_with((n as usize).to_string()));
                 }
                 Ready(None) => panic!("Premature end of input"),
                 NotReady => panic!("Generator was not ready"),
@@ -284,7 +286,7 @@ mod tests {
         )
         .await;
 
-        for _ in 0..6 {
+        for _ in 0..3 {
             assert!(matches!(rx.poll().unwrap(), Ready(Some(_))));
         }
         assert_eq!(rx.poll().unwrap(), Ready(None));
