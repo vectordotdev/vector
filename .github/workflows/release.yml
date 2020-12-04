@@ -529,7 +529,7 @@ jobs:
           command: "push"
           format: "rpm"
           owner: "timber"
-          repo: "vector-nightly"
+          repo: "vector"
           distro: "any-distro"
           release: "any-version"
           republish: "true"
