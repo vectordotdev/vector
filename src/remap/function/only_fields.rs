@@ -39,20 +39,21 @@ pub struct OnlyFieldsFn {
 
 impl Expression for OnlyFieldsFn {
     fn execute(&self, _: &mut state::Program, object: &mut dyn Object) -> Result<Value> {
-        let paths = self.paths.iter().map(Path::as_string).collect::<Vec<_>>();
+        let paths = self.paths.iter().map(Path::to_string).collect::<Vec<_>>();
 
         object
-            .paths()
-            .into_iter()
-            .filter(|k| paths.iter().find(|p| k.starts_with(p.as_str())).is_none())
-            .for_each(|path| object.remove(&path, true));
+            .paths()?
+            .iter()
+            .map(|path| (path, path.to_string()))
+            .filter(|(_, key)| paths.iter().find(|p| key.starts_with(p.as_str())).is_none())
+            .try_for_each(|(path, _)| object.remove(&path, true))?;
 
         Ok(Value::Null)
     }
 
     fn type_def(&self, _: &state::Compiler) -> TypeDef {
         TypeDef {
-            fallible: false,
+            fallible: true,
             kind: value::Kind::Null,
         }
     }
@@ -67,7 +68,7 @@ mod tests {
             paths: vec![Path::from("foo")]
         },
         def: TypeDef {
-            fallible: false,
+            fallible: true,
             kind: value::Kind::Null,
         },
     }];

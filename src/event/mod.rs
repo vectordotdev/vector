@@ -3,6 +3,7 @@ use crate::config::log_schema;
 use bytes::Bytes;
 use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use std::collections::{BTreeMap, HashMap};
+use std::iter::FromIterator;
 
 pub mod discriminant;
 pub mod merge;
@@ -423,12 +424,53 @@ impl From<Metric> for Event {
     }
 }
 
-// TODO(jean): add tests
 impl remap::Object for Event {
-    // TODO(jean): replace this with `Lookup`, once that lands.
-    fn insert(&mut self, path: &[Vec<String>], value: remap::Value) -> Result<(), String> {
-        // assignment to object root
-        if path.is_empty() {
+    fn get(&self, path: &remap::Path) -> Result<Option<remap::Value>, String> {
+        if path.is_root() {
+            let iter = self
+                .as_log()
+                .as_map()
+                .clone()
+                .into_iter()
+                .map(|(k, v)| (k, v.into()));
+
+            return Ok(Some(remap::Value::from_iter(iter)));
+        }
+
+        let value = path
+            .to_alternative_strings()
+            .iter()
+            .find_map(|key| self.as_log().get(key))
+            .cloned()
+            .map(Into::into);
+
+        Ok(value)
+    }
+
+    fn remove(&mut self, path: &remap::Path, compact: bool) -> Result<(), String> {
+        if path.is_root() {
+            for key in self.as_log().keys().collect::<Vec<_>>() {
+                self.as_mut_log().remove_prune(key, compact);
+            }
+
+            return Ok(());
+        };
+
+        // loop until we find a path that exists.
+        for key in path.to_alternative_strings() {
+            if !self.as_log().contains(&key) {
+                continue;
+            }
+
+            self.as_mut_log().remove_prune(&key, compact);
+            break;
+        }
+
+        Ok(())
+    }
+
+    fn insert(&mut self, path: &remap::Path, value: remap::Value) -> Result<(), String> {
+        if path.is_root() {
             match value {
                 remap::Value::Map(map) => {
                     *self = map
@@ -443,106 +485,22 @@ impl remap::Object for Event {
             }
         }
 
-        let path_str = path
-            .iter()
-            .map(|c| {
-                c.iter()
-                    .map(|p| p.replace(".", "\\."))
-                    .collect::<Vec<_>>()
-                    .join(".")
-            })
-            .collect::<Vec<_>>()
-            .join(".");
+        if let Some(path) = path.to_alternative_strings().first() {
+            self.as_mut_log().insert(path, value);
+        }
 
-        self.as_mut_log().insert(path_str, value);
         Ok(())
     }
 
-    // TODO(jean): replace this with `Lookup`, once that lands.
-    fn find(&self, path: &[Vec<String>]) -> Result<Option<remap::Value>, String> {
-        // return object root
-        if path.is_empty() {
-            let map = self
-                .as_log()
-                .as_map()
-                .clone()
-                .into_iter()
-                .map(|(k, v)| (k, v.into()))
-                .collect::<BTreeMap<_, _>>();
-
-            return Ok(Some(map.into()));
+    fn paths(&self) -> Result<Vec<remap::Path>, String> {
+        if self.as_log().is_empty() {
+            return Ok(vec![remap::Path::root()]);
         }
 
-        let path = path
-            .iter()
-            .map(|c| c.iter().map(|p| p.replace(".", "\\.")).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-
-        // Event.as_log returns a LogEvent struct rather than a naked
-        // IndexMap<_, Value>, which means specifically for the first item in
-        // the path we need to manually call .get.
-        //
-        // If we could simply pull either an IndexMap or Value out of a LogEvent
-        // then we wouldn't need this duplicate code as we'd jump straight into
-        // the path walker.
-        let mut value = path[0]
-            .iter()
-            .find_map(|p| self.as_log().get(p))
-            .ok_or_else(|| format!("path .{} not found in event", path[0].first().unwrap()))?;
-
-        // Walk remaining (if any) path segments. Our parse is already capable
-        // of extracting individual path tokens from user input. For example,
-        // the path `.foo."bar.baz"[0]` could potentially be pulled out into
-        // the tokens `foo`, `bar.baz`, `0`. However, the Value API doesn't
-        // allow for traversing that way and we'd therefore need to implement
-        // our own walker.
-        //
-        // For now we're broken as we're using an API that assumes unescaped
-        // dots are path delimiters. We either need to escape dots within the
-        // path and take the hit of bridging one escaping mechanism with another
-        // or when we refactor the value API we add options for providing
-        // unescaped tokens.
-        for (i, segments) in path.iter().enumerate().skip(1) {
-            value = segments
-                .iter()
-                .find_map(|p| util::log::get_value(value, PathIter::new(p)))
-                .ok_or_else(|| {
-                    format!(
-                        "path {} not found in event",
-                        path.iter()
-                            .take(i + 1)
-                            .fold("".to_string(), |acc, p| format!(
-                                "{}.{}",
-                                acc,
-                                p.first().unwrap()
-                            ),)
-                    )
-                })?;
-        }
-
-        Ok(Some(value.clone().into()))
-    }
-
-    fn paths(&self) -> Vec<String> {
-        self.as_log().keys().collect()
-    }
-
-    fn remove(&mut self, path: &str, compact: bool) {
-        match path {
-            // root path
-            "" => {
-                let keys: Vec<_> = self.as_log().keys().collect();
-
-                for key in keys {
-                    self.as_mut_log().remove_prune(key, true);
-                }
-            }
-
-            _ => {
-                self.as_mut_log()
-                    .remove_prune(path.trim_start_matches('.'), compact);
-            }
-        }
+        self.as_log()
+            .keys()
+            .map(|key| remap::Path::from_alternative_string(key).map_err(|err| err.to_string()))
+            .collect::<Result<Vec<_>, String>>()
     }
 }
 
@@ -639,5 +597,280 @@ mod test {
                 (String::from("o9amkaRY"), &Value::from("pGsfG7Nr")),
             ]
         );
+    }
+
+    #[test]
+    fn object_get() {
+        use remap::{map, Field::*, Object, Path, Segment::*};
+
+        let cases = vec![
+            (map![], vec![], Ok(Some(map![].into()))),
+            (
+                map!["foo": "bar"],
+                vec![],
+                Ok(Some(map!["foo": "bar"].into())),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![Field(Regular("foo".to_owned()))],
+                Ok(Some("bar".into())),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![Field(Regular("bar".to_owned()))],
+                Ok(None),
+            ),
+            (
+                map!["foo": vec![map!["bar": true]]],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Index(0),
+                    Field(Regular("bar".to_owned())),
+                ],
+                Ok(Some(true.into())),
+            ),
+            (
+                map!["foo": map!["bar baz": map!["baz": 2]]],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Coalesce(vec![
+                        Regular("qux".to_owned()),
+                        Quoted("bar baz".to_owned()),
+                    ]),
+                    Field(Regular("baz".to_owned())),
+                ],
+                Ok(Some(2.into())),
+            ),
+        ];
+
+        for (value, segments, expect) in cases {
+            let value: BTreeMap<String, Value> = value;
+            let event = Event::from(value);
+            let path = Path::new_unchecked(segments);
+
+            assert_eq!(event.get(&path), expect)
+        }
+    }
+
+    #[test]
+    fn object_insert() {
+        use remap::{map, Field::*, Object, Path, Segment::*};
+
+        let cases = vec![
+            (
+                map!["foo": "bar"],
+                vec![],
+                map!["baz": "qux"].into(),
+                map!["baz": "qux"],
+                Ok(()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![Field(Regular("foo".to_owned()))],
+                "baz".into(),
+                map!["foo": "baz"],
+                Ok(()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Index(2),
+                    Field(Quoted("bar baz".to_owned())),
+                    Field(Regular("a".to_owned())),
+                    Field(Regular("b".to_owned())),
+                ],
+                true.into(),
+                map![
+                    "foo":
+                        vec![
+                            Value::Null,
+                            Value::Null,
+                            map!["bar baz": map!["a": map!["b": true]],].into()
+                        ]
+                ],
+                Ok(()),
+            ),
+            (
+                map!["foo": vec![0, 1, 2]],
+                vec![Field(Regular("foo".to_owned())), Index(5)],
+                "baz".into(),
+                map![
+                    "foo":
+                        vec![
+                            0.into(),
+                            1.into(),
+                            2.into(),
+                            Value::Null,
+                            Value::Null,
+                            Value::from("baz"),
+                        ]
+                ],
+                Ok(()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                "baz".into(),
+                map!["foo": vec!["baz"]],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![])],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                "baz".into(),
+                map!["foo": vec!["baz"]],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![0.into()])],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                "baz".into(),
+                map!["foo": vec!["baz"]],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                "baz".into(),
+                map!["foo": Value::Array(vec!["baz".into(), 1.into()])],
+                Ok(()),
+            ),
+            (
+                map!["foo": Value::Array(vec![0.into(), 1.into()])],
+                vec![Field(Regular("foo".to_owned())), Index(1)],
+                "baz".into(),
+                map!["foo": Value::Array(vec![0.into(), "baz".into()])],
+                Ok(()),
+            ),
+        ];
+
+        for (object, segments, value, expect, result) in cases {
+            let object: BTreeMap<String, Value> = object;
+            let mut event = Event::from(object);
+            let expect = Event::from(expect);
+            let value: remap::Value = value;
+            let path = Path::new_unchecked(segments);
+
+            assert_eq!(event.insert(&path, value.clone()), result);
+            assert_eq!(event, expect);
+            assert_eq!(event.get(&path), Ok(Some(value)));
+        }
+    }
+
+    #[test]
+    fn object_remove() {
+        use remap::{map, Field::*, Object, Path, Segment::*};
+
+        let cases = vec![
+            (
+                map!["foo": "bar"],
+                vec![Field(Regular("foo".to_owned()))],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar"],
+                vec![Coalesce(vec![
+                    Quoted("foo bar".to_owned()),
+                    Regular("foo".to_owned()),
+                ])],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar", "baz": "qux"],
+                vec![],
+                false,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": "bar", "baz": "qux"],
+                vec![],
+                true,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": vec![0]],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                false,
+                Some(map!["foo": Value::Array(vec![])].into()),
+            ),
+            (
+                map!["foo": vec![0]],
+                vec![Field(Regular("foo".to_owned())), Index(0)],
+                true,
+                Some(map![].into()),
+            ),
+            (
+                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Field(Quoted("bar baz".to_owned())),
+                    Index(0),
+                ],
+                false,
+                Some(map!["foo": map!["bar baz": Value::Array(vec![])], "bar": "baz"].into()),
+            ),
+            (
+                map!["foo": map!["bar baz": vec![0]], "bar": "baz"],
+                vec![
+                    Field(Regular("foo".to_owned())),
+                    Field(Quoted("bar baz".to_owned())),
+                    Index(0),
+                ],
+                true,
+                Some(map!["bar": "baz"].into()),
+            ),
+        ];
+
+        for (object, segments, compact, expect) in cases {
+            let object: BTreeMap<String, Value> = object;
+            let mut event = Event::from(object);
+            let path = Path::new_unchecked(segments);
+
+            assert_eq!(event.remove(&path, compact), Ok(()));
+            assert_eq!(event.get(&Path::root()), Ok(expect))
+        }
+    }
+
+    #[test]
+    fn object_paths() {
+        use remap::{map, Object, Path};
+        use std::str::FromStr;
+
+        let cases = vec![
+            (map![], Ok(vec!["."])),
+            (map!["foo bar baz": "bar"], Ok(vec![r#"."foo bar baz""#])),
+            (map!["foo": "bar", "baz": "qux"], Ok(vec![".baz", ".foo"])),
+            (map!["foo": map!["bar": "baz"]], Ok(vec![".foo.bar"])),
+            (map!["a": vec![0, 1]], Ok(vec![".a[0]", ".a[1]"])),
+            (
+                map!["a": map!["b": "c"], "d": 12, "e": vec![
+                    map!["f": 1],
+                    map!["g": 2],
+                    map!["h": 3],
+                ]],
+                Ok(vec![".a.b", ".d", ".e[0].f", ".e[1].g", ".e[2].h"]),
+            ),
+            (
+                map![
+                    "a": vec![map![
+                        "b": vec![map!["c": map!["d": map!["e": vec![vec![0, 1]]]]]]
+                    ]]
+                ],
+                Ok(vec![".a[0].b[0].c.d.e[0][0]", ".a[0].b[0].c.d.e[0][1]"]),
+            ),
+        ];
+
+        for (object, expect) in cases {
+            let object: BTreeMap<String, Value> = object;
+            let event = Event::from(object);
+
+            assert_eq!(
+                event.paths(),
+                expect.map(|vec| vec.iter().map(|s| Path::from_str(s).unwrap()).collect())
+            );
+        }
     }
 }

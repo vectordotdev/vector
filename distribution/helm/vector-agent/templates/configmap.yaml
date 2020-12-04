@@ -33,6 +33,18 @@ data:
       {{- end }}
     {{- end }}
 
+    {{- if .Values.vectorSink.enabled }}
+    # Send logs to the aggregator.
+    [sinks.{{ .Values.vectorSink.sinkId }}]
+      type = "vector"
+      inputs = {{ required "You must specify the `inputs` for the built-in vector sink" .Values.vectorSink.inputs | toJson }}
+      address = "{{ include "vector-agent.vectorSinkAddress" . }}"
+
+      {{- with .Values.vectorSink.rawConfig }}
+      {{- . | nindent 6 }}
+      {{- end }}
+    {{- end }}
+
     {{- range $sourceId, $source := .Values.sources }}
     [sources.{{ $sourceId }}]
       type = "{{ $source.type }}"

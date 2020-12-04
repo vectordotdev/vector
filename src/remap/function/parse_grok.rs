@@ -26,7 +26,7 @@ impl Function for ParseGrok {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
+        let value = arguments.required("value")?.boxed();
 
         let patternbytes = arguments
             .required_literal("pattern")?
@@ -115,24 +115,20 @@ mod test {
         let mut arguments = ArgumentList::default();
         arguments.insert(
             "value",
-            Argument::Expression(
-                expression::Argument::new(
-                    Box::new(Literal::from("foo").into()),
-                    "value",
-                    "value",
-                    |_| true,
-                    "parse_grok",
-                )
-                .into(),
-            ),
+            expression::Argument::new(
+                Box::new(Literal::from("foo").into()),
+                |_| true,
+                "value",
+                "parse_grok",
+            )
+            .into(),
         );
         arguments.insert(
             "pattern",
             expression::Argument::new(
                 Box::new(Literal::from("%{NOG}").into()),
-                "pattern",
-                "pattern",
                 |_| true,
+                "pattern",
                 "parse_grok",
             )
             .into(),
@@ -184,7 +180,8 @@ mod test {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object = Value::Map(object);
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

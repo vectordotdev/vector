@@ -25,8 +25,8 @@ impl Function for Floor {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let precision = arguments.optional_expr("precision")?;
+        let value = arguments.required("value")?.boxed();
+        let precision = arguments.optional("precision").map(Expr::boxed);
 
         Ok(Box::new(FloorFn { value, precision }))
     }
@@ -106,7 +106,7 @@ mod tests {
 
         value_float_or_integer {
             expr: |_| FloorFn {
-                value: Variable::new("foo".to_owned()).boxed(),
+                value: Variable::new("foo".to_owned(), None).boxed(),
                 precision: None,
             },
             def: TypeDef { fallible: true, kind: Kind::Integer | Kind::Float },
@@ -115,7 +115,7 @@ mod tests {
         fallible_precision {
             expr: |_| FloorFn {
                 value: Literal::from(1).boxed(),
-                precision: Some(Variable::new("foo".to_owned()).boxed()),
+                precision: Some(Variable::new("foo".to_owned(), None).boxed()),
             },
             def: TypeDef { fallible: true, kind: Kind::Integer },
         }
@@ -169,7 +169,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));

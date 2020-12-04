@@ -2,23 +2,6 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-# Global values can be consumed by both Parent and Child Helm Charts
-# Each chart yml file can leverage each of these values where applicable
-#  global:
-#    vector:
-#      image:
-#        repository: <docker repo>
-#        #  Overrides the image tag, the default is `{image.version}-{image.base}`
-#        tag: <tag>
-#        # Overrides the image version, the default is the Chart appVersion.
-#        version: <version>
-#        # Sets the image base OS
-#        base: <base>
-#    # Sets common environment variables for use globally
-#    commonEnvKV:
-#      - name: "CHIQUITA"
-#        value: "banana"
-
 image:
   repository: timberio/vector
   pullPolicy: IfNotPresent
@@ -123,14 +106,32 @@ logSchema:
   sourceTypeKey: "source_type"
   timestampKey: "timestamp"
 
-# The "built-in" kubernetes logs source. Will be added by default, unless
-# explicitly disabled.
+# The "built-in" kubernetes logs source to collect logs from the `Pod`s running
+# on the `Node`.
+# Will be added by default, unless explicitly disabled.
 kubernetesLogsSource:
   # Disable to omit the kubernetes logs source from being added.
   enabled: true
   # The name to use for the "built-in" kubernetes logs source.
   sourceId: kubernetes_logs
   # Raw TOML config to embed at the kubernetes logs source.
+  rawConfig: null
+
+# The "built-in" vector sink, to send the logs to the vector aggregator.
+# Disabled by default when using `vector-agent` chart.
+# Enabled by default when using `vector` chart, and automatically configured.
+vectorSink:
+  # Disable to omit the vector sink from being added.
+  enabled: false
+  # The name to use for the "built-in" vector sink.
+  sinkId: vector_sink
+  # Inputs of the built-in vector sink.
+  inputs: null # ["my_input_1", "my_input_2"]
+  # The host of the Vector to send the data to.
+  host: null # "vector.internal"
+  # The port of the Vector to send the data to.
+  port: null # 9000
+  # Raw TOML config to embed at the vector sink.
   rawConfig: null
 
 # Sources to add to the generated `vector` config (besides "built-in" kubernetes

@@ -29,9 +29,9 @@ impl Function for EndsWith {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let substring = arguments.required_expr("substring")?;
-        let case_sensitive = arguments.optional_expr("case_sensitive")?;
+        let value = arguments.required("value")?.boxed();
+        let substring = arguments.required("substring")?.boxed();
+        let case_sensitive = arguments.optional("case_sensitive").map(Expr::boxed);
 
         Ok(Box::new(EndsWithFn {
             value,
@@ -208,7 +208,8 @@ mod tests {
 
         let mut state = state::Program::default();
 
-        for (mut object, exp, func) in cases {
+        for (object, exp, func) in cases {
+            let mut object: Value = object.into();
             let got = func
                 .execute(&mut state, &mut object)
                 .map_err(|e| format!("{:#}", anyhow::anyhow!(e)));
