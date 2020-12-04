@@ -108,7 +108,6 @@ mod tests {
                     kind: Kind::Integer,
                     ..Default::default()
                 }.boxed()),
-                ..Default::default()
             },
         }
     ];
