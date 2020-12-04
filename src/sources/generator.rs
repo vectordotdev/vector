@@ -81,7 +81,7 @@ impl OutputFormat {
         match self {
             Self::RoundRobin { items, .. } => {
                 if items.is_empty() {
-                    return Err(GeneratorConfigError::RoundRobinItemsEmpty);
+                    Err(GeneratorConfigError::RoundRobinItemsEmpty)
                 } else {
                     Ok(())
                 }
