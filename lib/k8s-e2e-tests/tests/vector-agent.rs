@@ -1291,3 +1291,133 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
     drop(vector);
     Ok(())
 }
+
+/// This test validates that vector-agent properly exposes metrics in
+/// a Prometheus scraping format.
+#[tokio::test]
+async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework
+        .vector(
+            "test-vector",
+            HELM_CHART_VECTOR_AGENT,
+            VectorConfig {
+                custom_helm_values: HELM_VALUES_STDOUT_SINK,
+                ..Default::default()
+            },
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "daemonset/vector-agent",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut vector_metrics_port_forward =
+        framework.port_forward("test-vector", "daemonset/vector-agent", 9090, 9090)?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Wait that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
+    // We want to capture the initial value for the `processed_events` metric,
+    // but until the `kubernetes_logs` source loads the `Pod`s list, it's
+    // internal file server discovers the log files, and some events get
+    // a chance to be processed - we don't have a reason to beleive that
+    // the `processed_events` is even defined.
+    // We give Vector some reasonable time to perform this initial bootstrap,
+    // and capture the `processed_events` value afterwards.
+    println!("Waiting for Vector bootstrap");
+    tokio::time::delay_for(std::time::Duration::from_secs(30)).await;
+    println!("Done waiting for Vector bootstrap");
+
+    // Capture events processed before deploying the test pod.
+    let processed_events_before = metrics::get_processed_events(&vector_metrics_url).await?;
+
+    let test_namespace = framework.namespace("test-vector-test-pod").await?;
+
+    let test_pod = framework
+        .test_pod(test_pod::Config::from_pod(&make_test_pod(
+            "test-vector-test-pod",
+            "test-pod",
+            "echo MARKER",
+            vec![],
+            vec![],
+        ))?)
+        .await?;
+    framework
+        .wait(
+            "test-vector-test-pod",
+            vec!["pods/test-pod"],
+            WaitFor::Condition("initialized"),
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut log_reader = framework.logs("test-vector", "daemonset/vector-agent")?;
+    smoke_check_first_line(&mut log_reader).await;
+
+    // Read the rest of the log lines.
+    let mut got_marker = false;
+    look_for_log_line(&mut log_reader, |val| {
+        if val["kubernetes"]["pod_namespace"] != "test-vector-test-pod" {
+            // A log from something other than our test pod, pretend we don't
+            // see it.
+            return FlowControlCommand::GoOn;
+        }
+
+        // Ensure we got the marker.
+        assert_eq!(val["message"], "MARKER");
+
+        if got_marker {
+            // We've already seen one marker! This is not good, we only emitted
+            // one.
+            panic!("Marker seen more than once");
+        }
+
+        // If we did, remember it.
+        got_marker = true;
+
+        // Request to stop the flow.
+        FlowControlCommand::Terminate
+    })
+    .await?;
+
+    assert!(got_marker);
+
+    // Due to how `internal_metrics` are implemented, we have to wait for it's
+    // scraping period to pass before we can observe the updates.
+    println!("Waiting for `internal_metrics` to update");
+    tokio::time::delay_for(std::time::Duration::from_secs(6)).await;
+    println!("Done waiting for `internal_metrics` to update");
+
+    // Capture events processed after the test pod has finished.
+    let processed_events_after = metrics::get_processed_events(&vector_metrics_url).await?;
+
+    // Ensure we did get at least one event since before deployed the test pod.
+    assert!(
+        processed_events_after > processed_events_before,
+        "before: {}, after: {}",
+        processed_events_before,
+        processed_events_after
+    );
+
+    drop(test_pod);
+    drop(test_namespace);
+    drop(vector_metrics_port_forward);
+    drop(vector);
+    Ok(())
+}

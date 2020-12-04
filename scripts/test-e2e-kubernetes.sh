@@ -116,6 +116,7 @@ if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
   # Make the container image accessible to the k8s cluster.
   if is_minikube_cache_enabled; then
     minikube cache add "$CONTAINER_IMAGE"
+    trap 'minikube cache delete "$CONTAINER_IMAGE"' EXIT
   else
     docker push "$CONTAINER_IMAGE"
   fi

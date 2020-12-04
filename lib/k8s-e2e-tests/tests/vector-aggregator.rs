@@ -48,3 +48,46 @@ async fn dummy_topology() -> Result<(), Box<dyn std::error::Error>> {
     drop(vector);
     Ok(())
 }
+
+/// This test validates that vector-aggregator chart properly exposes metrics in
+/// a Prometheus scraping format ot of the box.
+#[tokio::test]
+async fn metrics_pipeline() -> Result<(), Box<dyn std::error::Error>> {
+    let _guard = lock();
+    let framework = make_framework();
+
+    let vector = framework
+        .vector(
+            "test-vector",
+            HELM_CHART_VECTOR_AGGREGATOR,
+            VectorConfig::default(),
+        )
+        .await?;
+    framework
+        .wait_for_rollout(
+            "test-vector",
+            "statefulset/vector-aggregator",
+            vec!["--timeout=60s"],
+        )
+        .await?;
+
+    let mut vector_metrics_port_forward =
+        framework.port_forward("test-vector", "statefulset/vector-aggregator", 9090, 9090)?;
+    vector_metrics_port_forward.wait_until_ready().await?;
+    let vector_metrics_url = format!(
+        "http://{}/metrics",
+        vector_metrics_port_forward.local_addr_ipv4()
+    );
+
+    // Assert that `vector_started`-ish metric is present.
+    metrics::wait_for_vector_started(
+        &vector_metrics_url,
+        std::time::Duration::from_secs(5),
+        std::time::Instant::now() + std::time::Duration::from_secs(60),
+    )
+    .await?;
+
+    drop(vector_metrics_port_forward);
+    drop(vector);
+    Ok(())
+}

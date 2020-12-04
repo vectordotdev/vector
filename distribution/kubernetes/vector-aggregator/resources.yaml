@@ -47,6 +47,15 @@ data:
     [sources.vector]
       type = "vector"
       address = "0.0.0.0:9000"
+    
+    # Emit internal Vector metrics.
+    [sources.internal_metrics]
+      type = "internal_metrics"
+    # Expose metrics for scraping in the Prometheus format.
+    [sinks.prometheus_sink]
+      type = "prometheus"
+      inputs = ["internal_metrics"]
+      address = "0.0.0.0:9090"
 ---
 # Source: vector-aggregator/templates/service-headless.yaml
 apiVersion: v1
@@ -115,7 +124,8 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 5ef9ad798d288ca3aec45303d221f8ce0c413ec73d25d498f509fed43a389b8c
+        checksum/config: f21e03060de6e60eeda4b7d6cbc3121890b76a4b3618f30fded3a8a4eb226c24
+        
       labels:
         app.kubernetes.io/name: vector-aggregator
         app.kubernetes.io/instance: vector
@@ -137,6 +147,9 @@ spec:
             - name: LOG
               value: info
           ports:
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
           resources:
             {}
           volumeMounts:
