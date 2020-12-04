@@ -10,7 +10,10 @@ set -euo pipefail
 
 DIR="$(dirname "${BASH_SOURCE[0]}")"
 
-awk --file "$DIR/parse-criterion-output.awk" |
-  jq --slurp --raw-output '.[] | [.name, .time, .time_change, .throughput, .throughput_change, .change] | @tsv' |
-  column --separator $'\t' --table --table-columns "name,time,time change,throughput,throughput change,change" |
+(
+  echo -e "name\ttime\ttime change\tthroughput\tthroughput change\tchange";
+  awk --file "$DIR/parse-criterion-output.awk" |
+    jq --slurp --raw-output '.[] | [.name, .time, .time_change, .throughput, .throughput_change, .change] | @tsv'
+) |
+  column -s $'\t' -t  |
   awk -v rc=0 '/regressed/ { rc=1 } 1; END { if (rc == 1) { print "\nRegression detected. Note that any regressions should be verified."; exit rc }}'
