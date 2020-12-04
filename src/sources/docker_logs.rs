@@ -1389,7 +1389,7 @@ mod integration_tests {
                     .map(|&s| s.to_owned())
                     .collect(),
             ),
-            exclude_Containers: Some(&[excluded0].iter().map(|&s| s.to_owned()).collect()),
+            exclude_containers: Some(&[excluded0].iter().map(|&s| s.to_owned()).collect()),
             ..DockerLogsConfig::default()
         });
 
