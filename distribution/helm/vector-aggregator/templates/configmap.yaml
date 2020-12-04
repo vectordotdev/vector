@@ -12,7 +12,7 @@ data:
     # Configuration for vector.
     # Docs: https://vector.dev/docs/
 
-    # Data dir is location controlled at the `DaemonSet`.
+    # Data dir is location controlled at the `StatefulSet`.
     data_dir = "{{ .Values.globalOptions.dataDir }}"
 
     {{- with .Values.logSchema }}
@@ -23,24 +23,13 @@ data:
       timestamp_key = "{{ .timestampKey }}"
     {{- end }}
 
-    {{- if .Values.kubernetesLogsSource.enabled }}
-    # Ingest logs from Kubernetes.
-    [sources.{{ .Values.kubernetesLogsSource.sourceId }}]
-      type = "kubernetes_logs"
-
-      {{- with .Values.kubernetesLogsSource.rawConfig }}
-      {{- . | nindent 6 }}
-      {{- end }}
-    {{- end }}
-
-    {{- if .Values.vectorSink.enabled }}
-    # Send logs to the aggregator.
-    [sinks.{{ .Values.vectorSink.sinkId }}]
+    {{- if .Values.vectorSource.enabled }}
+    # Accept logs from Vector agents.
+    [sources.{{ .Values.vectorSource.sourceId }}]
       type = "vector"
-      inputs = {{ required "You must specify the `inputs` for the built-in vector sink" .Values.vectorSink.inputs | toJson }}
-      address = "{{ include "vector-agent.vectorSinkAddress" . }}"
+      address = "{{ .Values.vectorSource.listenAddress }}:{{ .Values.vectorSource.listenPort }}"
 
-      {{- with .Values.vectorSink.rawConfig }}
+      {{- with .Values.vectorSource.rawConfig }}
       {{- . | nindent 6 }}
       {{- end }}
     {{- end }}

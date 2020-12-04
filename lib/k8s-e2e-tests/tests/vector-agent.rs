@@ -571,13 +571,13 @@ async fn pod_filtering() -> Result<(), Box<dyn std::error::Error>> {
         println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
-        if lines_till_we_give_up <= 0 {
+        if lines_till_we_give_up == 0 {
             println!("Giving up");
             log_reader.kill()?;
             break;
         }
 
-        if !line.starts_with("{") {
+        if !line.starts_with('{') {
             // This isn't a json, must be an entry from Vector's own log stream.
             continue;
         }
@@ -751,13 +751,13 @@ kubernetesLogsSource:
         println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
-        if lines_till_we_give_up <= 0 {
+        if lines_till_we_give_up == 0 {
             println!("Giving up");
             log_reader.kill()?;
             break;
         }
 
-        if !line.starts_with("{") {
+        if !line.starts_with('{') {
             // This isn't a json, must be an entry from Vector's own log stream.
             continue;
         }
@@ -892,13 +892,13 @@ async fn container_filtering() -> Result<(), Box<dyn std::error::Error>> {
         println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
-        if lines_till_we_give_up <= 0 {
+        if lines_till_we_give_up == 0 {
             println!("Giving up");
             log_reader.kill()?;
             break;
         }
 
-        if !line.starts_with("{") {
+        if !line.starts_with('{') {
             // This isn't a json, must be an entry from Vector's own log stream.
             continue;
         }
@@ -1042,13 +1042,13 @@ kubernetesLogsSource:
         println!("Got line: {:?}", line);
 
         lines_till_we_give_up -= 1;
-        if lines_till_we_give_up <= 0 {
+        if lines_till_we_give_up == 0 {
             println!("Giving up");
             log_reader.kill()?;
             break;
         }
 
-        if !line.starts_with("{") {
+        if !line.starts_with('{') {
             // This isn't a json, must be an entry from Vector's own log stream.
             continue;
         }
@@ -1224,7 +1224,6 @@ async fn additional_config_file() -> Result<(), Box<dyn std::error::Error>> {
             VectorConfig {
                 custom_helm_values: HELM_VALUES_ADDITIONAL_CONFIGMAP,
                 custom_resource: CUSTOM_RESOURCE_VECTOR_CONFIG,
-                ..Default::default()
             },
         )
         .await?;

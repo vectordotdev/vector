@@ -13,15 +13,15 @@ spec:
     - 'hostPath'
     - 'configMap'
     - 'secret'
+    - 'persistentVolumeClaim'
+    - 'emptyDir'
   allowedHostPaths:
-    - pathPrefix: "/var/log"
-      readOnly: true
-    - pathPrefix: "/var/lib/docker/containers"
-      readOnly: true
-    - pathPrefix: "/var/lib/vector/"
+    {{- if eq .Values.storage.mode "hostPath" }}
+    - pathPrefix: {{ .Values.storage.hostPath | quote }}
+    {{- end }}
     {{- range .Values.extraVolumes }}
-    {{- if .hostPath }}
-    - pathPrefix: {{ .hostPath.path }}
+    {{- with .hostPath }}
+    - pathPrefix: {{ .path }}
     {{- end }}
     {{- end }}
   hostNetwork: false

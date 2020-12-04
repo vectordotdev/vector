@@ -1,16 +1,16 @@
 apiVersion: apps/v1
-kind: DaemonSet
+kind: StatefulSet
 metadata:
   name: {{ include "libvector.fullname" . }}
   labels:
     {{- include "libvector.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "libvector.fullname" . }}-headless
   selector:
     matchLabels:
       {{- include "libvector.selectorLabels" . | nindent 6 }}
-  minReadySeconds: 1
-  updateStrategy:
-    type: {{ .Values.updateStrategy }}
+  podManagementPolicy: "{{ .Values.podManagementPolicy }}"
+  replicas: {{ .Values.replicas }}
   template:
     metadata:
       annotations:
@@ -25,7 +25,6 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- include "libvector.selectorLabels" . | nindent 8 }}
-        vector.dev/exclude: "true"
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -44,18 +43,6 @@ spec:
             - --config
             - /etc/vector/*.toml
           env:
-            - name: VECTOR_SELF_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: VECTOR_SELF_POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: VECTOR_SELF_POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
             {{- include "libvector.globalEnv" . | nindent 12 }}
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
@@ -67,14 +54,6 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            # Host log directory mount.
-            - name: var-log
-              mountPath: /var/log/
-              readOnly: true
-            # Host mount for docker and containerd log file symlinks.
-            - name: var-lib
-              mountPath: /var/lib
-              readOnly: true
             # Vector data dir mount.
             - name: data-dir
               mountPath: "{{ .Values.globalOptions.dataDir }}"
@@ -82,8 +61,8 @@ spec:
             - name: config-dir
               mountPath: /etc/vector
               readOnly: true
-            {{- with .Values.extraVolumeMounts }}
             # Extra volumes.
+            {{- with .Values.extraVolumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
       terminationGracePeriodSeconds: 60
@@ -100,24 +79,28 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-        # Log directory.
-        - name: var-log
-          hostPath:
-            path: /var/log/
-        # Docker and containerd log files in Kubernetes are symlinks to this folder.
-        - name: var-lib
-          hostPath:
-            path: /var/lib/
+        {{- if ne .Values.storage.mode "managedPersistentVolumeClaim" }}
         # Vector will store it's data here.
         - name: data-dir
+        {{- if eq .Values.storage.mode "existingPersistentVolumeClaim" }}
+          persistentVolumeClaim:
+            claimName: {{ required "The value storage.existingPersistentVolumeClaim must be set" .Values.storage.existingPersistentVolumeClaim }}
+        {{- else if eq .Values.storage.mode "hostPath" }}
           hostPath:
-            path: /var/lib/vector/
+            path: {{ required "The value storage.hostPath must be set" .Values.storage.hostPath | quote }}
+        {{- else if eq .Values.storage.mode "empty" }}
+          emptyDir: {}
+        {{- else }}
+        {{ fail "Please provide a valid storage.mode value" }}
+        {{- end }}
+        {{- end }}
         # Vector config dir.
         - name: config-dir
           projected:
             sources:
               - configMap:
                   name: {{ include "libvector.configMapName" . }}
+                  optional: true
               {{- with .Values.extraConfigDirSources }}
               {{- toYaml . | nindent 14 }}
               {{- end }}
@@ -125,3 +108,32 @@ spec:
         # Extra volumes.
         {{- toYaml . | nindent 8 }}
         {{- end }}
+  volumeClaimTemplates:
+    {{- if eq .Values.storage.mode "managedPersistentVolumeClaim" }}
+    {{- with .Values.storage.managedPersistentVolumeClaim }}
+    # Vector will store it's data here.
+    - metadata:
+        name: data-dir
+        labels:
+          {{- include "libvector.labels" $ | nindent 10 }}
+          {{- with .labels }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+        annotations:
+          {{- with .annotations }}
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+      {{- with .storageClass }}
+      {{- if (eq "-" .) }}
+        storageClassName: ""
+      {{- else }}
+        storageClassName: {{ . | quote}}
+      {{- end }}
+      {{- end }}
+        resources:
+          requests:
+            storage: {{ .size | quote }}
+    {{- end }}
+    {{- end }}
