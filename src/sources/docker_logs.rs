@@ -25,7 +25,6 @@ use chrono::{DateTime, FixedOffset, Local, ParseError, Utc};
 use futures::{compat::Sink01CompatExt, sink::SinkExt, Stream, StreamExt};
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use snafu::Snafu;
 use std::{
     future::ready,
     pin::Pin,
@@ -47,12 +46,6 @@ const CONTAINER: &str = "container_id";
 lazy_static! {
     static ref STDERR: Bytes = "stderr".into();
     static ref STDOUT: Bytes = "stdout".into();
-}
-
-#[derive(Debug, Snafu)]
-pub enum DockerLogsConfigErrors {
-    #[snafu(display("expected either include_containers or exclude_containers but got both"))]
-    IncludeAndExcludeSpecified,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -89,27 +82,34 @@ impl DockerLogsConfig {
         id: &str,
         names: impl IntoIterator<Item = &'a str>,
     ) -> bool {
-        let id_matches =
-            |items: &Vec<String>| -> bool { items.iter().any(|flag| id.starts_with(flag)) };
+        let containers: Vec<String> = names.into_iter().map(|i| i.into()).collect();
 
-        let name_matches = |items: &Vec<String>| -> bool {
-            names
-                .into_iter()
-                .any(|name| items.iter().any(|item| name.starts_with(item)))
-        };
+        // Containers are included by default
+        let mut included: bool = true;
 
-        let container_included =
-            |items: &Vec<String>| -> bool { id_matches(items) || name_matches(items) };
-
-        // This if/else logic with `let Some` expressions is okay here, as the Source's constructor
-        // ensures that both cannot be set at the same time.
-        if let Some(exclude_containers) = &self.exclude_containers {
-            !(container_included(exclude_containers))
-        } else if let Some(include_containers) = &self.include_containers {
-            container_included(include_containers)
-        } else {
-            true
+        // Container remains included if include_containers is specified
+        // and container name or ID matches the inclusion list
+        if let Some(include_list) = &self.include_containers {
+            included = Self::name_or_id_matches(id, &containers, include_list);
         }
+
+        // Container gets excluded if exclude_containers is specified
+        // and container name or ID matches the exclusion list
+        if let Some(exclude_list) = &self.exclude_containers {
+            included = !(Self::name_or_id_matches(id, &containers, exclude_list));
+        }
+
+        included
+    }
+
+    fn name_or_id_matches<'a>(id: &str, names: &Vec<String>, items: &Vec<String>) -> bool {
+        let id_matches = items.iter().any(|flag| id.starts_with(flag));
+
+        let name_matches = names
+            .into_iter()
+            .any(|name| items.iter().any(|item| name.starts_with(item)));
+
+        id_matches || name_matches
     }
 
     fn with_empty_partial_event_marker_field_as_none(mut self) -> Self {
@@ -312,12 +312,6 @@ impl DockerLogsSource {
         out: Pipeline,
         shutdown: ShutdownSignal,
     ) -> crate::Result<DockerLogsSource> {
-        // Ensure that include_containers and exclude_containers aren't both
-        // specified
-        if config.include_containers.is_some() && config.exclude_containers.is_some() {
-            return Err(Box::new(DockerLogsConfigErrors::IncludeAndExcludeSpecified));
-        }
-
         // Find out it's own container id, if it's inside a docker container.
         // Since docker doesn't readily provide such information,
         // various approaches need to be made. As such the solution is not
@@ -1297,42 +1291,6 @@ mod integration_tests {
         futures01::future::poll_fn(move || Ok(Async::Ready(rx.poll()?.is_not_ready())))
             .compat()
             .await
-    }
-
-    #[test]
-    fn config_allows_inclusion_or_exclusion_not_both() {
-        let config_ok = |config: DockerLogsConfig| {
-            let (sender, _) = Pipeline::new_test();
-            let shutdown = ShutdownSignal::noop();
-            let source = DockerLogsSource::new(config, sender, shutdown);
-            assert!(source.is_ok());
-        };
-
-        let config_err = |config: DockerLogsConfig| {
-            let (sender, _) = Pipeline::new_test();
-            let shutdown = ShutdownSignal::noop();
-            let source = DockerLogsSource::new(config, sender, shutdown);
-            assert!(source.is_err());
-        };
-
-        let good_config_1 = DockerLogsConfig {
-            include_containers: Some(vec!["container1".to_owned()]),
-            ..DockerLogsConfig::default()
-        };
-        config_ok(good_config_1);
-
-        let good_config_2 = DockerLogsConfig {
-            exclude_containers: Some(vec!["container1".to_owned()]),
-            ..DockerLogsConfig::default()
-        };
-        config_ok(good_config_2);
-
-        let errant_config = DockerLogsConfig {
-            exclude_containers: Some(vec!["container1".to_owned()]),
-            include_containers: Some(vec!["container1".to_owned()]),
-            ..DockerLogsConfig::default()
-        };
-        config_err(errant_config);
     }
 
     #[tokio::test]
