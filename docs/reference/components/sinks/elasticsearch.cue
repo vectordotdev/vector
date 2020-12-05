@@ -151,6 +151,16 @@ components: sinks: elasticsearch: {
 				}
 			}
 		}
+		bulk_action: {
+			common:      false
+			description: "Action to use when making requests to the Bulk API. Supports `index` and `create`."
+			required:    false
+			warnings: []
+			type: object: {
+				examples: ["index", "create"]
+				options: {}
+			}
+		}
 		doc_type: {
 			common:      false
 			description: "The `doc_type` for your index data. This is only relevant for Elasticsearch <= 6.X. If you are using >= 7.0 you do not need to set this option since Elasticsearch has removed it."
