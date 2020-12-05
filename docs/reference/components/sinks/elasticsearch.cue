@@ -156,9 +156,8 @@ components: sinks: elasticsearch: {
 			description: "Action to use when making requests to the Bulk API. Supports `index` and `create`."
 			required:    false
 			warnings: []
-			type: object: {
+			type: string: {
 				examples: ["index", "create"]
-				options: {}
 			}
 		}
 		doc_type: {
