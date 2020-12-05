@@ -42,8 +42,8 @@ impl Function for ToTimestamp {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let default = arguments.optional_expr("default")?;
+        let value = arguments.required("value")?.boxed();
+        let default = arguments.optional("default").map(Expr::boxed);
 
         Ok(Box::new(ToTimestampFn { value, default }))
     }
@@ -75,7 +75,7 @@ impl Expression for ToTimestampFn {
                 .convert(value.into())
                 .map(Into::into)
                 .map_err(|e| e.to_string().into()),
-            Boolean(_) | Array(_) | Map(_) | Null => {
+            Boolean(_) | Array(_) | Map(_) | Regex(_) | Null => {
                 Err("unable to convert value to timestamp".into())
             }
         };
@@ -141,7 +141,7 @@ mod tests {
         }
 
         array_fallible {
-            expr: |_| ToTimestampFn { value: Literal::from(vec![0]).boxed(), default: None},
+            expr: |_| ToTimestampFn { value: Array::from(vec![0]).boxed(), default: None},
             def: TypeDef { fallible: true, kind: Kind::Timestamp },
         }
 
@@ -160,8 +160,8 @@ mod tests {
 
        fallible_value_with_fallible_default {
             expr: |_| ToTimestampFn {
-                value: Literal::from(vec![0]).boxed(),
-                default: Some(Literal::from(vec![0]).boxed()),
+                value: Array::from(vec![0]).boxed(),
+                default: Some(Array::from(vec![0]).boxed()),
             },
             def: TypeDef {
                 fallible: true,
@@ -171,7 +171,7 @@ mod tests {
 
        fallible_value_with_infallible_default {
             expr: |_| ToTimestampFn {
-                value: Literal::from(vec![0]).boxed(),
+                value: Array::from(vec![0]).boxed(),
                 default: Some(Literal::from(1).boxed()),
             },
             def: TypeDef {
@@ -183,7 +183,7 @@ mod tests {
         infallible_value_with_fallible_default {
             expr: |_| ToTimestampFn {
                 value: Literal::from(1).boxed(),
-                default: Some(Literal::from(vec![0]).boxed()),
+                default: Some(Array::from(vec![0]).boxed()),
             },
             def: TypeDef {
                 fallible: false,

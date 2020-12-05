@@ -29,9 +29,9 @@ impl Function for Contains {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let substring = arguments.required_expr("substring")?;
-        let case_sensitive = arguments.optional_expr("case_sensitive")?;
+        let value = arguments.required("value")?.boxed();
+        let substring = arguments.required("substring")?.boxed();
+        let case_sensitive = arguments.optional("case_sensitive").map(Expr::boxed);
 
         Ok(Box::new(ContainsFn {
             value,

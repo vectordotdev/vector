@@ -32,7 +32,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::function::{Argument, ArgumentList};
+    use crate::function::ArgumentList;
     use crate::map;
 
     #[test]
@@ -177,7 +177,7 @@ mod tests {
             ("$foo = .foo.qux\n$foo[2].quux", Ok(()), Ok(true.into())),
             (
                 "$foo[0] = true",
-                Err(r#"remap error: parser error: paths in variable assignment not supported. Use "$foo" without ".[0]""#),
+                Err(r#"remap error: parser error: path in variable assignment unsupported, use "$foo" without ".[0]""#),
                 Ok(().into()),
             ),
             (r#"["foo", "bar", "baz"]"#, Ok(()), Ok(vec!["foo", "bar", "baz"].into())),
@@ -197,11 +197,11 @@ mod tests {
                 r#"array_printer(["foo", /bar/, 5, ["baz", 4.2], true, /qu+x/])"#,
                 Ok(()),
                 Ok(vec![
-                    r#"Expression(Bytes(b"foo"))"#,
+                    r#"Bytes(b"foo")"#,
                     r#"Regex(bar)"#,
-                    r#"Expression(Integer(5))"#,
-                    r#"Expression([Bytes(b"baz"), Float(4.2)])"#,
-                    r#"Expression(Boolean(true))"#,
+                    r#"Integer(5)"#,
+                    r#"[Bytes(b"baz"), Float(4.2)]"#,
+                    r#"Boolean(true)"#,
                     r#"Regex(qu+x)"#,
                 ].into()),
             ),
@@ -210,7 +210,7 @@ mod tests {
                     .foo = ["foo", "bar"]
                     array_printer(.foo)
                 "#,
-                Err("remap error: function error: expected array literal argument, got expression"),
+                Err("remap error: unexpected expression: expected Array, got Path"),
                 Ok(().into()),
             ),
             (
@@ -230,7 +230,7 @@ mod tests {
             ),
             (
                 r#"enum_list_validator("qux")"#,
-                Err("remap error: function error: expected array literal argument, got expression"),
+                Err("remap error: unexpected expression: expected Array, got Literal"),
                 Ok(().into()),
             ),
         ];
@@ -283,6 +283,7 @@ mod tests {
 
     mod test_functions {
         use super::*;
+        use crate::expression::Array;
 
         #[derive(Debug, Clone)]
         pub(super) struct EnumValidator;
@@ -326,7 +327,12 @@ mod tests {
             }
 
             fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-                Ok(Box::new(RegexPrinterFn(arguments.required_regex("value")?)))
+                Ok(Box::new(RegexPrinterFn(
+                    arguments
+                        .required_literal("value")?
+                        .into_value()
+                        .try_regex()?,
+                )))
             }
 
             fn parameters(&self) -> &'static [Parameter] {
@@ -371,12 +377,13 @@ mod tests {
         }
 
         #[derive(Debug, Clone)]
-        struct ArrayPrinterFn(Vec<Argument>);
+        struct ArrayPrinterFn(Array);
         impl Expression for ArrayPrinterFn {
             fn execute(&self, _: &mut state::Program, _: &mut dyn Object) -> Result<Value> {
                 Ok(self
                     .0
-                    .iter()
+                    .clone()
+                    .into_iter()
                     .map(|v| format!("{:?}", v))
                     .collect::<Vec<_>>()
                     .into())

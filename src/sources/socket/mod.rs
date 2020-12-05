@@ -1,4 +1,4 @@
-mod tcp;
+pub mod tcp;
 mod udp;
 #[cfg(unix)]
 mod unix;
@@ -37,7 +37,11 @@ pub enum Mode {
 }
 
 impl SocketConfig {
-    pub fn make_tcp_config(addr: SocketAddr) -> Self {
+    pub fn new_tcp(tcp_config: tcp::TcpConfig) -> Self {
+        tcp_config.into()
+    }
+
+    pub fn make_basic_tcp_config(addr: SocketAddr) -> Self {
         tcp::TcpConfig::new(addr.into()).into()
     }
 }
@@ -90,6 +94,7 @@ impl SourceConfig for SocketConfig {
                 let tls = MaybeTlsSettings::from_config(&config.tls, true)?;
                 tcp.run(
                     config.address,
+                    config.keepalive,
                     config.shutdown_timeout_secs,
                     tls,
                     shutdown,
@@ -461,7 +466,7 @@ mod test {
 
         let cx = SinkContext::new_test();
         let encode_event = move |_event| Some(message_bytes.clone());
-        let sink_config = TcpSinkConfig::new(format!("localhost:{}", addr.port()), None);
+        let sink_config = TcpSinkConfig::new(format!("localhost:{}", addr.port()), None, None);
         let (sink, _healthcheck) = sink_config.build(cx, encode_event).unwrap();
 
         // Spawn future that keeps sending lines to the TCP source forever.

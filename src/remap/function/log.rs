@@ -26,7 +26,7 @@ impl Function for Log {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
+        let value = arguments.required("value")?.boxed();
         let level = arguments
             .optional_enum("level", &LEVELS)?
             .unwrap_or_else(|| "info".to_string());
@@ -80,7 +80,7 @@ mod tests {
         // This is largely just a smoke test to ensure it doesn't crash as there isn't really much to test.
         let mut state = state::Program::default();
         let func = LogFn::new(
-            Box::new(Literal::from(Value::Array(vec![Value::from(42)]))),
+            Box::new(Array::from(vec![Value::from(42)])),
             "warn".to_string(),
         );
         let mut object = Value::Map(map![]);

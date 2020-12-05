@@ -15,3 +15,6 @@ dependencies:
   - name: vector-agent
     version: "*"
     repository: file://../vector-agent
+  - name: vector-aggregator
+    version: "*"
+    repository: file://../vector-aggregator

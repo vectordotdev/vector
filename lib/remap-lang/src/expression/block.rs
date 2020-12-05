@@ -45,7 +45,7 @@ impl Expression for Block {
 mod tests {
     use super::*;
     use crate::{
-        expression::{Arithmetic, Literal},
+        expression::{Arithmetic, Array, Literal},
         test_type_def,
         value::Kind,
         Operator,
@@ -97,7 +97,7 @@ mod tests {
                           Box::new(Literal::from(true).into()),
                           Operator::Multiply,
                         ).into(),
-                        Literal::from(vec![1]).into(),
+                        Array::from(vec![1]).into(),
             ]),
             def: TypeDef {
                 fallible: true,

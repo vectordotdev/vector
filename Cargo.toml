@@ -234,6 +234,7 @@ tokio-test = "0.2"
 tokio = { version = "0.2", features = ["test-util"] }
 assert_cmd = "1.0"
 reqwest = { version = "0.10.6", features = ["json"] }
+rusty-fork = "0.3.0"
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -339,13 +340,14 @@ sources-logplex = ["sources-utils-http"]
 sources-mongodb_metrics = ["mongodb"]
 sources-nginx_metrics = []
 sources-prometheus = ["prometheus-parser", "sinks-prometheus", "snap", "sources-utils-http", "warp"]
-sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
+sources-socket = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-splunk_hec = ["bytesize", "sources-utils-tls", "warp"]
-sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tls", "sources-utils-unix"]
+sources-statsd = ["tokio-util/udp", "listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
 sources-stdin = ["bytesize"]
-sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tls", "sources-utils-unix"]
-sources-vector = ["listenfd" ,"sources-utils-tls"]
+sources-syslog = ["bytesize", "listenfd", "tokio-util/udp", "sources-utils-tcp-keepalive", "sources-utils-tls", "sources-utils-unix"]
+sources-vector = ["listenfd", "sources-utils-tcp-keepalive", "sources-utils-tls"]
 sources-utils-http = ["sources-utils-tls", "warp"]
+sources-utils-tcp-keepalive = []
 sources-utils-tls = []
 sources-utils-unix = []
 

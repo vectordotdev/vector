@@ -1,16 +1,21 @@
 use crate::{state, Expression, Object, Result, TypeDef, Value};
 use std::fmt;
+use std::ops::Deref;
 
 #[derive(Clone, PartialEq)]
 pub struct Literal(Value);
 
-impl fmt::Debug for Literal {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
 impl Literal {
+    pub fn new(value: Value) -> Self {
+        debug_assert!(
+            !matches!(value, Value::Array(_)),
+            "{} must use expression::Array instead of expression::Literal",
+            value.kind()
+        );
+
+        Self(value)
+    }
+
     pub fn boxed(self) -> Box<dyn Expression> {
         Box::new(self)
     }
@@ -24,9 +29,23 @@ impl Literal {
     }
 }
 
+impl fmt::Debug for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl Deref for Literal {
+    type Target = Value;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 impl<T: Into<Value>> From<T> for Literal {
     fn from(value: T) -> Self {
-        Self(value.into())
+        Self::new(value.into())
     }
 }
 
@@ -68,11 +87,6 @@ mod tests {
         float {
             expr: |_| Literal::from(123.456),
             def: TypeDef { kind: Kind::Float, ..Default::default() },
-        }
-
-        array {
-            expr: |_| Literal::from(vec!["foo"]),
-            def: TypeDef { kind: Kind::Array, ..Default::default() },
         }
 
         map {

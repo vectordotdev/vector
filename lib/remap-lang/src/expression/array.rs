@@ -11,11 +11,37 @@ impl Array {
     pub fn new(expressions: Vec<Expr>) -> Self {
         Self { expressions }
     }
+
+    pub(crate) fn expressions(&self) -> &[Expr] {
+        &self.expressions
+    }
+
+    pub fn boxed(self) -> Box<dyn Expression> {
+        Box::new(self)
+    }
 }
 
 impl fmt::Debug for Array {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.expressions.fmt(f)
+    }
+}
+
+impl From<Array> for Vec<Expr> {
+    fn from(array: Array) -> Self {
+        array.expressions
+    }
+}
+
+impl<T: Into<Value>> From<Vec<T>> for Array {
+    fn from(values: Vec<T>) -> Self {
+        Self::new(
+            values
+                .into_iter()
+                .map(Into::into)
+                .map(Expr::from)
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -107,7 +133,7 @@ mod tests {
                           Box::new(Literal::from(true).into()),
                           Operator::Multiply,
                         ).into(),
-                        Literal::from(vec![1]).into(),
+                        Array::from(vec![1]).into(),
             ]),
             def: TypeDef {
                 fallible: true,

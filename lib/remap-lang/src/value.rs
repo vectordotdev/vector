@@ -13,7 +13,7 @@ use std::str::FromStr;
 
 pub use kind::Kind;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Bytes(Bytes),
     Integer(i64),
@@ -22,12 +22,41 @@ pub enum Value {
     Map(BTreeMap<String, Value>),
     Array(Vec<Value>),
     Timestamp(DateTime<Utc>),
+    Regex(regex::Regex),
     Null,
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        use Value::*;
+
+        match self {
+            Bytes(v1) => other.as_bytes().map(|v2| v1 == v2).unwrap_or_default(),
+            Integer(v1) => other.as_integer().map(|v2| v1 == v2).unwrap_or_default(),
+            Float(v1) => other.as_float().map(|v2| v1 == v2).unwrap_or_default(),
+            Boolean(v1) => other.as_boolean().map(|v2| v1 == v2).unwrap_or_default(),
+            Map(v1) => other.as_map().map(|v2| v1 == v2).unwrap_or_default(),
+            Array(v1) => other.as_array().map(|v2| v1 == v2).unwrap_or_default(),
+            Timestamp(v1) => other.as_timestamp().map(|v2| v1 == v2).unwrap_or_default(),
+            Null => other.is_null(),
+            Regex(v1) => match other {
+                Regex(v2) => v1.as_str() == v2.as_str(),
+                _ => false,
+            },
+        }
+    }
 }
 
 #[derive(thiserror::Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    #[error(r#"expected "{0}", got "{1}""#)]
+    #[error(
+        r#"expected {}, got "{1}""#,
+        if .0.is_some() {
+            format!(r#"{}"#, .0)
+        } else {
+            format!(r#""{}""#, .0)
+        }
+    )]
     Expected(Kind, Kind),
 
     #[error(r#"unable to coerce "{0}" into "{1}""#)]
@@ -124,6 +153,12 @@ impl From<String> for Value {
 impl From<bool> for Value {
     fn from(v: bool) -> Self {
         Value::Boolean(v)
+    }
+}
+
+impl From<regex::Regex> for Value {
+    fn from(v: regex::Regex) -> Self {
+        Value::Regex(v)
     }
 }
 
@@ -230,6 +265,10 @@ macro_rules! value_impl {
     ($(($func:expr, $variant:expr, $ret:ty)),+ $(,)*) => {
         impl Value {
             $(paste::paste! {
+            pub fn [<is_ $func>](&self) -> bool {
+                matches!(self, Value::$variant(_))
+            }
+
             pub fn [<as_ $func>](&self) -> Option<&$ret> {
                 match self {
                     Value::$variant(v) => Some(v),
@@ -255,6 +294,10 @@ macro_rules! value_impl {
                 self.[<try_ $func>]().expect(stringify!($func))
             }
             })+
+
+            pub fn is_null(&self) -> bool {
+                matches!(self, Value::Null)
+            }
 
             pub fn as_null(&self) -> Option<()> {
                 match self {
@@ -285,6 +328,7 @@ value_impl! {
     (map, Map, BTreeMap<String, Value>),
     (array, Array, Vec<Value>),
     (timestamp, Timestamp, DateTime<Utc>),
+    (regex, Regex, regex::Regex),
     // manually implemented due to no variant value
     // (null, Null, ()),
 }
@@ -917,6 +961,7 @@ impl fmt::Display for Value {
                 write!(f, "[{}]", joined)
             }
             Value::Timestamp(val) => write!(f, "{}", val.to_string()),
+            Value::Regex(regex) => write!(f, "{}", regex.to_string()),
             Value::Null => write!(f, "Null"),
         }
     }

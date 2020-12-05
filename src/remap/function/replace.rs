@@ -17,7 +17,7 @@ impl Function for Replace {
             },
             Parameter {
                 keyword: "pattern",
-                accepts: |v| matches!(v, Value::Bytes(_)),
+                accepts: |v| matches!(v, Value::Bytes(_) | Value::Regex(_)),
                 required: true,
             },
             Parameter {
@@ -34,10 +34,10 @@ impl Function for Replace {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let pattern = arguments.required_expr_or_regex("pattern")?;
-        let with = arguments.required_expr("with")?;
-        let count = arguments.optional_expr("count")?;
+        let value = arguments.required("value")?.boxed();
+        let pattern = arguments.required("pattern")?.boxed();
+        let with = arguments.required("with")?.boxed();
+        let count = arguments.optional("count").map(Expr::boxed);
 
         Ok(Box::new(ReplaceFn {
             value,
@@ -51,14 +51,19 @@ impl Function for Replace {
 #[derive(Debug, Clone)]
 struct ReplaceFn {
     value: Box<dyn Expression>,
-    pattern: Argument,
+    pattern: Box<dyn Expression>,
     with: Box<dyn Expression>,
     count: Option<Box<dyn Expression>>,
 }
 
 impl ReplaceFn {
     #[cfg(test)]
-    fn new(value: Box<dyn Expression>, pattern: Argument, with: &str, count: Option<i32>) -> Self {
+    fn new(
+        value: Box<dyn Expression>,
+        pattern: Box<dyn Expression>,
+        with: &str,
+        count: Option<i32>,
+    ) -> Self {
         let with = Box::new(Literal::from(Value::from(with)));
         let count = count.map(Literal::from).map(|v| Box::new(v) as _);
 
@@ -84,32 +89,36 @@ impl Expression for ReplaceFn {
             None => -1,
         };
 
-        match &self.pattern {
-            Argument::Expression(expr) => {
-                let bytes = expr.execute(state, object)?.try_bytes()?;
-                let pattern = String::from_utf8_lossy(&bytes);
-                let replaced = match count {
-                    i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
-                    i if i < 0 => value.replace(pattern.as_ref(), &with),
-                    _ => value.into_owned(),
-                };
+        self.pattern
+            .execute(state, object)
+            .and_then(|pattern| match pattern {
+                Value::Bytes(bytes) => {
+                    let pattern = String::from_utf8_lossy(&bytes);
+                    let replaced = match count {
+                        i if i > 0 => value.replacen(pattern.as_ref(), &with, i as usize),
+                        i if i < 0 => value.replace(pattern.as_ref(), &with),
+                        _ => value.into_owned(),
+                    };
 
-                Ok(replaced.into())
-            }
-            Argument::Regex(regex) => {
-                let replaced = match count {
-                    i if i > 0 => regex
-                        .replacen(&value, i as usize, with.as_ref())
-                        .as_bytes()
-                        .into(),
-                    i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
-                    _ => value.into(),
-                };
+                    Ok(replaced.into())
+                }
+                Value::Regex(regex) => {
+                    let replaced = match count {
+                        i if i > 0 => regex
+                            .replacen(&value, i as usize, with.as_ref())
+                            .as_bytes()
+                            .into(),
+                        i if i < 0 => regex.replace_all(&value, with.as_ref()).as_bytes().into(),
+                        _ => value.into(),
+                    };
 
-                Ok(replaced)
-            }
-            Argument::Array(_) => unreachable!(),
-        }
+                    Ok(replaced)
+                }
+                v => Err(Error::Value(value::Error::Expected(
+                    value::Kind::Bytes | value::Kind::Regex,
+                    v.kind(),
+                ))),
+            })
     }
 
     fn type_def(&self, state: &state::Compiler) -> TypeDef {
@@ -122,17 +131,16 @@ impl Expression for ReplaceFn {
             .as_ref()
             .map(|count| count.type_def(state).fallible_unless(Kind::Integer));
 
-        let pattern_def = match &self.pattern {
-            Argument::Expression(expr) => Some(expr.type_def(state).fallible_unless(Kind::Bytes)),
-            Argument::Regex(_) => None, // regex is a concrete infallible type
-            Argument::Array(_) => unreachable!(),
-        };
+        let pattern_def = self
+            .pattern
+            .type_def(state)
+            .fallible_unless(Kind::Bytes | Kind::Regex);
 
         self.value
             .type_def(state)
             .fallible_unless(Kind::Bytes)
             .merge(with_def)
-            .merge_optional(pattern_def)
+            .merge(pattern_def)
             .merge_optional(count_def)
             .with_constraint(Kind::Bytes)
     }
@@ -147,7 +155,7 @@ mod test {
         infallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 with: Literal::from("foo").boxed(),
                 count: None,
             },
@@ -160,7 +168,7 @@ mod test {
         value_fallible {
             expr: |_| ReplaceFn {
                 value: Literal::from(10).boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 with: Literal::from("foo").boxed(),
                 count: None,
             },
@@ -173,7 +181,7 @@ mod test {
         pattern_expression_infallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from("foo").into(),
+                pattern: Literal::from("foo").boxed(),
                 with: Literal::from("foo").boxed(),
                 count: None,
             },
@@ -186,7 +194,7 @@ mod test {
         pattern_expression_fallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: Literal::from(10).into(),
+                pattern: Literal::from(10).boxed(),
                 with: Literal::from("foo").boxed(),
                 count: None,
             },
@@ -199,7 +207,7 @@ mod test {
         with_fallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 with: Literal::from(10).boxed(),
                 count: None,
             },
@@ -212,7 +220,7 @@ mod test {
         count_infallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 with: Literal::from("foo").boxed(),
                 count: Some(Literal::from(10).boxed()),
             },
@@ -225,7 +233,7 @@ mod test {
         count_fallible {
             expr: |_| ReplaceFn {
                 value: Literal::from("foo").boxed(),
-                pattern: regex::Regex::new("foo").unwrap().into(),
+                pattern: Literal::from(regex::Regex::new("foo").unwrap()).boxed(),
                 with: Literal::from("foo").boxed(),
                 count: Some(Literal::from("foo").boxed()),
             },
@@ -244,7 +252,7 @@ mod test {
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    Literal::from("a").into(),
+                    Literal::from("a").boxed(),
                     "o",
                     None,
                 ),
@@ -254,7 +262,7 @@ mod test {
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    Literal::from("a").into(),
+                    Literal::from("a").boxed(),
                     "o",
                     Some(-1),
                 ),
@@ -264,7 +272,7 @@ mod test {
                 Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    Literal::from("a").into(),
+                    Literal::from("a").boxed(),
                     "o",
                     Some(0),
                 ),
@@ -274,7 +282,7 @@ mod test {
                 Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    Literal::from("a").into(),
+                    Literal::from("a").boxed(),
                     "o",
                     Some(1),
                 ),
@@ -284,7 +292,7 @@ mod test {
                 Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    Literal::from("a").into(),
+                    Literal::from("a").boxed(),
                     "o",
                     Some(2),
                 ),
@@ -311,7 +319,7 @@ mod test {
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    regex::Regex::new("a").unwrap().into(),
+                    Literal::from(regex::Regex::new("a").unwrap()).boxed(),
                     "o",
                     None,
                 ),
@@ -321,7 +329,7 @@ mod test {
                 Ok("I like opples ond bononos".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    regex::Regex::new("a").unwrap().into(),
+                    Literal::from(regex::Regex::new("a").unwrap()).boxed(),
                     "o",
                     Some(-1),
                 ),
@@ -331,7 +339,7 @@ mod test {
                 Ok("I like apples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    regex::Regex::new("a").unwrap().into(),
+                    Literal::from(regex::Regex::new("a").unwrap()).boxed(),
                     "o",
                     Some(0),
                 ),
@@ -341,7 +349,7 @@ mod test {
                 Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    regex::Regex::new("a").unwrap().into(),
+                    Literal::from(regex::Regex::new("a").unwrap()).boxed(),
                     "o",
                     Some(1),
                 ),
@@ -351,7 +359,7 @@ mod test {
                 Ok("I like opples ond bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    regex::Regex::new("a").unwrap().into(),
+                    Literal::from(regex::Regex::new("a").unwrap()).boxed(),
                     "o",
                     Some(2),
                 ),
@@ -378,7 +386,7 @@ mod test {
                 Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Literal::from("I like apples and bananas").boxed(),
-                    Literal::from("apples").into(),
+                    Literal::from("apples").boxed(),
                     "biscuits",
                     None,
                 ),
@@ -388,7 +396,7 @@ mod test {
                 Ok("I like opples and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
-                    regex::Regex::new("a").unwrap().into(),
+                    Literal::from(regex::Regex::new("a").unwrap()).boxed(),
                     "o",
                     Some(1),
                 ),
@@ -398,7 +406,7 @@ mod test {
                 Ok("I like biscuits and bananas".into()),
                 ReplaceFn::new(
                     Box::new(Path::from("foo")),
-                    regex::Regex::new("\\[apples\\]").unwrap().into(),
+                    Literal::from(regex::Regex::new("\\[apples\\]").unwrap()).boxed(),
                     "biscuits",
                     None,
                 ),

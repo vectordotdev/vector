@@ -24,8 +24,8 @@ impl Function for ToString {
     }
 
     fn compile(&self, mut arguments: ArgumentList) -> Result<Box<dyn Expression>> {
-        let value = arguments.required_expr("value")?;
-        let default = arguments.optional_expr("default")?;
+        let value = arguments.required("value")?.boxed();
+        let default = arguments.optional("default").map(Expr::boxed);
 
         Ok(Box::new(ToStringFn { value, default }))
     }
@@ -55,6 +55,7 @@ impl Expression for ToStringFn {
             Float(v) => Ok(v.to_string().into()),
             Boolean(v) => Ok(v.to_string().into()),
             Timestamp(v) => Ok(v.to_string().into()),
+            Regex(v) => Ok(v.to_string().into()),
             Null => Ok("".into()),
             Map(_) | Array(_) => Err("unable to convert value to string".into()),
         };
@@ -115,7 +116,7 @@ mod tests {
         }
 
         array_infallible {
-            expr: |_| ToStringFn { value: Literal::from(vec![0]).boxed(), default: None},
+            expr: |_| ToStringFn { value: Array::from(vec![0]).boxed(), default: None},
             def: TypeDef { kind: Kind::Bytes, ..Default::default() },
         }
 
@@ -183,7 +184,7 @@ mod tests {
             (
                 map![],
                 Ok(Value::from("default")),
-                ToStringFn::new(Literal::from(vec![0]).boxed(), Some("default".into())),
+                ToStringFn::new(Array::from(vec![0]).boxed(), Some("default".into())),
             ),
             (
                 map!["foo": 20],
