@@ -51,7 +51,7 @@ lazy_static! {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct DockerLogsConfig {
-    exclude_containers: Option<Vec<String>>, // Starts with actually, not include
+    exclude_containers: Option<Vec<String>>, // Starts with actually, not exclude
     include_containers: Option<Vec<String>>, // Starts with actually, not include
     include_labels: Option<Vec<String>>,
     include_images: Option<Vec<String>>,
