@@ -208,7 +208,9 @@ add_to_path() {
 # ------------------------------------------------------------------------------
 
 get_gnu_musl_glibc() {
-  need_cmd head
+  need_cmd ldd
+  need_cmd bc
+  need_cmd awk
   # Detect both gnu and musl
   # Also detect glibc versions older than 2.18 and return musl for these
   local _ldd_version
