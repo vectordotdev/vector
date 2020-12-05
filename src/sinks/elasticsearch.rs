@@ -86,16 +86,6 @@ pub enum ElasticSearchAuth {
     Aws { assume_role: Option<String> },
 }
 
-impl ElasticSearchAuth {
-    pub fn apply<B>(&self, req: &mut Request<B>) {
-        if let Self::Basic { user, password } = &self {
-            use headers::{Authorization, HeaderMapExt};
-            let auth = Authorization::basic(&user, &password);
-            req.headers_mut().typed_insert(auth);
-        }
-    }
-}
-
 #[derive(Derivative, Deserialize, Serialize, Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 #[derivative(Default)]
