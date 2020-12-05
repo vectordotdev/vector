@@ -108,7 +108,7 @@ mod source {
         }
 
         fn emit_metrics(&self) {
-            counter!("request_received_total", 1);
+            counter!("requests_received_total", 1);
         }
     }
 
